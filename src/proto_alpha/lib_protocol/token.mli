@@ -25,13 +25,13 @@
 
 (** The aim of this module is to manage operations involving tokens such as
     minting, transferring, and burning. Every constructor of the types [giver],
-    [container], or [sink] represents a kind of account that holds a given (or
+    [container], or [receiver] represents a kind of account that holds a given (or
     possibly infinite) amount of tokens.
 
-    Tokens can be transferred from a [giver] to a [sink]. To uniformly handle
-    all cases, special constructors of givers and sinks may be used. For
+    Tokens can be transferred from a [giver] to a [receiver]. To uniformly handle
+    all cases, special constructors of givers and receivers may be used. For
     example, the giver [`Minted] is used to express a transfer of minted tokens
-    to a destination, and the sink [`Burned] is used to express the action of
+    to a receiver, and the receiver [`Burned] is used to express the action of
     burning a given amount of tokens taken from a giver. Thanks to uniformity,
     it is easier to track transfers of tokens throughout the protocol by running
     [grep -R "Token.transfer" src/proto_alpha].
@@ -112,9 +112,9 @@ type infinite_sink =
   | `Sc_rollup_refutation_punishments  (** Smart rollups refutation slashing *)
   | `Burned  (** Generic sink mainly for test purpose *) ]
 
-(** [sink] is the type of token receivers. Token receivers that are not
+(** [receiver] is the type of token receivers. Token receivers that are not
     containers are considered to have infinite capacity. *)
-type sink = [infinite_sink | container]
+type receiver = [infinite_sink | container]
 
 (** [allocated ctxt container] returns a new context because of possible access
     to carbonated data, and a boolean that is [true] when
@@ -134,23 +134,23 @@ val allocated :
 val balance :
   Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
-(** [transfer_n ?origin ctxt givers dest] transfers [amount] Tez from [giver] to
-    [dest] for each [(giver, amount)] pair in [givers], and returns a new
+(** [transfer_n ?origin ctxt givers receiver] transfers [amount] Tez from [giver] to
+    [receiver] for each [(giver, amount)] pair in [givers], and returns a new
     context, and the list of corresponding balance updates. The function behaves
-    as though [transfer giver dest amount] was invoked for each pair
+    as though [transfer giver receiver amount] was invoked for each pair
     [(giver, amount)] in [givers], however a single balance update is generated
-    for the total amount transferred to [dest].
+    for the total amount transferred to [receiver].
     When [givers] is an empty list, the function does nothing to the context,
     and returns an empty list of balance updates. *)
 val transfer_n :
   ?origin:Receipt_repr.update_origin ->
   Raw_context.t ->
   ([< giver] * Tez_repr.t) list ->
-  [< sink] ->
+  [< receiver] ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** [transfer ?origin ctxt giver dest amount] transfers [amount] Tez from giver
-    [giver] to destination [dest], and returns a new context, and the list of
+(** [transfer ?origin ctxt giver receiver amount] transfers [amount] Tez from giver
+    [giver] to receiver [receiver], and returns a new context, and the list of
     corresponding balance updates tagged with [origin]. By default, [~origin] is
     set to [Receipt_repr.Block_application].
     Returns {!Storage_Error Missing_key} if [giver] refers to a contract that is
@@ -163,17 +163,17 @@ val transfer_n :
     implicit contract that delegates to a different contract, and whose balance
     is equal to [amount].
     Returns a [Non_existing_contract] error if
-    [dest] refers to an originated contract that is not allocated.
+    [receiver] refers to an originated contract that is not allocated.
     Returns a [Non_existing_contract] error if [amount <> Tez_repr.zero], and
-    [dest] refers to an originated contract that is not allocated.
-    Returns a [Addition_overflow] error if [dest] refers to a sink whose balance
+    [receiver] refers to an originated contract that is not allocated.
+    Returns a [Addition_overflow] error if [receiver] refers to a receiver whose balance
     is greater than [Int64.max - amount].
-    Returns a [Wrong_level] error if [src] or [dest] refer to a level that is
+    Returns a [Wrong_level] error if [src] or [receiver] refer to a level that is
     not the current level. *)
 val transfer :
   ?origin:Receipt_repr.update_origin ->
   Raw_context.t ->
   [< giver] ->
-  [< sink] ->
+  [< receiver] ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

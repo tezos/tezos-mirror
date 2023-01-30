@@ -55,7 +55,7 @@ type infinite_sink =
   | `Sc_rollup_refutation_punishments
   | `Burned ]
 
-type sink = [infinite_sink | container]
+type receiver = [infinite_sink | container]
 
 let allocated ctxt stored =
   match stored with
@@ -104,9 +104,9 @@ let balance ctxt stored =
       >|=? fun (ctxt, balance_opt) ->
       (ctxt, Option.value ~default:Tez_repr.zero balance_opt)
 
-let credit ctxt dest amount origin =
+let credit ctxt receiver amount origin =
   let open Receipt_repr in
-  (match dest with
+  (match receiver with
   | #infinite_sink as infinite_sink ->
       let sink =
         match infinite_sink with
@@ -120,9 +120,9 @@ let credit ctxt dest amount origin =
       return (ctxt, sink)
   | #container as container -> (
       match container with
-      | `Contract dest ->
-          Contract_storage.credit_only_call_from_token ctxt dest amount
-          >|=? fun ctxt -> (ctxt, Contract dest)
+      | `Contract receiver ->
+          Contract_storage.credit_only_call_from_token ctxt receiver amount
+          >|=? fun ctxt -> (ctxt, Contract receiver)
       | `Collected_commitments bpkh ->
           Commitment_storage.increase_commitment_only_call_from_token
             ctxt
@@ -136,8 +136,8 @@ let credit ctxt dest amount origin =
             contract
             amount
           >|=? fun ctxt -> (ctxt, Contract contract)
-      | `Frozen_deposits delegate as dest ->
-          allocated ctxt dest >>=? fun (ctxt, allocated) ->
+      | `Frozen_deposits delegate as receiver ->
+          allocated ctxt receiver >>=? fun (ctxt, allocated) ->
           (if not allocated then Frozen_deposits_storage.init ctxt delegate
           else return ctxt)
           >>=? fun ctxt ->
@@ -214,7 +214,7 @@ let spend ctxt giver amount origin =
           >>=? fun ctxt -> return (ctxt, Frozen_bonds (contract, bond_id))))
   >|=? fun (ctxt, balance) -> (ctxt, (balance, Debited amount, origin))
 
-let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers dest =
+let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers receiver =
   let givers = List.filter (fun (_, am) -> Tez_repr.(am <> zero)) givers in
   match givers with
   | [] ->
@@ -230,7 +230,7 @@ let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers dest =
         (ctxt, Tez_repr.zero, [])
         givers
       >>=? fun (ctxt, amount, debit_logs) ->
-      credit ctxt dest amount origin >>=? fun (ctxt, credit_log) ->
+      credit ctxt receiver amount origin >>=? fun (ctxt, credit_log) ->
       (* Deallocate implicit contracts with no stake. This must be done after
          spending and crediting. If done in between then a transfer of all the
          balance from (`Contract c) to (`Frozen_bonds (c,_)) would leave the
@@ -249,5 +249,6 @@ let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers dest =
       let balance_updates = List.rev (credit_log :: debit_logs) in
       (ctxt, balance_updates)
 
-let transfer ?(origin = Receipt_repr.Block_application) ctxt giver dest amount =
-  transfer_n ~origin ctxt [(giver, amount)] dest
+let transfer ?(origin = Receipt_repr.Block_application) ctxt giver receiver
+    amount =
+  transfer_n ~origin ctxt [(giver, amount)] receiver

@@ -59,17 +59,17 @@ let test_simple_balances () =
   create_context () >>=? fun (ctxt, pkh) ->
   let giver = `Contract (Contract.Implicit pkh) in
   let pkh, _pk, _sk = Signature.generate_key () in
-  let dest = `Contract (Contract.Implicit pkh) in
+  let receiver = `Contract (Contract.Implicit pkh) in
   let amount = Tez.one in
-  wrap (Token.transfer ctxt giver dest amount) >>=? fun (ctxt', _) ->
+  wrap (Token.transfer ctxt giver receiver amount) >>=? fun (ctxt', _) ->
   wrap (Token.balance ctxt giver) >>=? fun (ctxt, bal_giver) ->
   wrap (Token.balance ctxt' giver) >>=? fun (ctxt', bal_giver') ->
-  wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
-  wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
+  wrap (Token.balance ctxt receiver) >>=? fun (_, bal_receiver) ->
+  wrap (Token.balance ctxt' receiver) >>=? fun (_, bal_receiver') ->
   bal_giver' +? amount >>?= fun add_bal_giver'_amount ->
-  bal_dest +? amount >>?= fun add_bal_dest_amount ->
+  bal_receiver +? amount >>?= fun add_bal_receiver_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_giver add_bal_giver'_amount >>=? fun () ->
-  Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
+  Assert.equal_tez ~loc:__LOC__ bal_receiver' add_bal_receiver_amount
 
 (** Check balance updates for a simple transfer from [bootstrap] to new
     [Implicit]. *)
@@ -79,9 +79,9 @@ let test_simple_balance_updates () =
   create_context () >>=? fun (ctxt, pkh) ->
   let giver = Contract.Implicit pkh in
   let pkh, _pk, _sk = Signature.generate_key () in
-  let dest = Contract.Implicit pkh in
+  let receiver = Contract.Implicit pkh in
   let amount = Tez.one in
-  wrap (Token.transfer ctxt (`Contract giver) (`Contract dest) amount)
+  wrap (Token.transfer ctxt (`Contract giver) (`Contract receiver) amount)
   >>=? fun (_, bal_updates) ->
   Alcotest.(
     check
@@ -95,60 +95,65 @@ let test_simple_balance_updates () =
   Alcotest.(
     check
       bool
-      "Missing balance update for destination contract."
+      "Missing balance update for receiver contract."
       (List.mem
          ~equal:( = )
-         Receipt.(Contract dest, Credited amount, Block_application)
+         Receipt.(Contract receiver, Credited amount, Block_application)
          bal_updates)
       true) ;
   return_unit
 
-let test_allocated_and_deallocated ctxt dest initial_status status_when_empty =
+let test_allocated_and_deallocated ctxt receiver initial_status
+    status_when_empty =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.allocated ctxt dest) >>=? fun (ctxt, allocated) ->
+  wrap (Token.allocated ctxt receiver) >>=? fun (ctxt, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated initial_status >>=? fun () ->
   let amount = Tez.one in
-  wrap (Token.transfer ctxt `Minted dest amount) >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' dest) >>=? fun (ctxt', allocated) ->
+  wrap (Token.transfer ctxt `Minted receiver amount) >>=? fun (ctxt', _) ->
+  wrap (Token.allocated ctxt' receiver) >>=? fun (ctxt', allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
-  wrap (Token.balance ctxt' dest) >>=? fun (ctxt', bal_dest') ->
-  wrap (Token.transfer ctxt' dest `Burned bal_dest') >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' dest) >>=? fun (_, allocated) ->
+  wrap (Token.balance ctxt' receiver) >>=? fun (ctxt', bal_receiver') ->
+  wrap (Token.transfer ctxt' receiver `Burned bal_receiver')
+  >>=? fun (ctxt', _) ->
+  wrap (Token.allocated ctxt' receiver) >>=? fun (_, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated status_when_empty >>=? fun () ->
   return_unit
 
-let test_allocated_and_deallocated_when_empty ctxt dest =
-  test_allocated_and_deallocated ctxt dest false false
+let test_allocated_and_deallocated_when_empty ctxt receiver =
+  test_allocated_and_deallocated ctxt receiver false false
 
-let test_allocated_and_still_allocated_when_empty ctxt dest initial_status =
-  test_allocated_and_deallocated ctxt dest initial_status true
+let test_allocated_and_still_allocated_when_empty ctxt receiver initial_status =
+  test_allocated_and_deallocated ctxt receiver initial_status true
 
 let test_allocated () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
-  let dest = `Delegate_balance pkh in
-  test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun () ->
+  let receiver = `Delegate_balance pkh in
+  test_allocated_and_still_allocated_when_empty ctxt receiver true
+  >>=? fun () ->
   let pkh, _pk, _sk = Signature.generate_key () in
-  let dest = `Contract (Contract.Implicit pkh) in
-  test_allocated_and_deallocated_when_empty ctxt dest >>=? fun () ->
-  let dest = `Collected_commitments Blinded_public_key_hash.zero in
-  test_allocated_and_deallocated_when_empty ctxt dest >>=? fun () ->
-  let dest = `Frozen_deposits pkh in
-  test_allocated_and_still_allocated_when_empty ctxt dest false >>=? fun () ->
-  let dest = `Block_fees in
-  test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun () ->
-  let dest =
+  let receiver = `Contract (Contract.Implicit pkh) in
+  test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
+  let receiver = `Collected_commitments Blinded_public_key_hash.zero in
+  test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
+  let receiver = `Frozen_deposits pkh in
+  test_allocated_and_still_allocated_when_empty ctxt receiver false
+  >>=? fun () ->
+  let receiver = `Block_fees in
+  test_allocated_and_still_allocated_when_empty ctxt receiver true
+  >>=? fun () ->
+  let receiver =
     let bond_id = Bond_id.Sc_rollup_bond_id (sc_rollup ()) in
     `Frozen_bonds (Contract.Implicit pkh, bond_id)
   in
-  test_allocated_and_deallocated_when_empty ctxt dest
+  test_allocated_and_deallocated_when_empty ctxt receiver
 
-let check_sink_balances ctxt ctxt' dest amount =
+let check_receiver_balances ctxt ctxt' receiver amount =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
-  wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
-  bal_dest +? amount >>?= fun add_bal_dest_amount ->
-  Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
+  wrap (Token.balance ctxt receiver) >>=? fun (_, bal_receiver) ->
+  wrap (Token.balance ctxt' receiver) >>=? fun (_, bal_receiver') ->
+  bal_receiver +? amount >>?= fun add_bal_receiver_amount ->
+  Assert.equal_tez ~loc:__LOC__ bal_receiver' add_bal_receiver_amount
 
 (* Accounts of the form (`DelegateBalance pkh) are not allocated when they
    receive funds for the first time. To force allocation, we transfer to
@@ -161,42 +166,43 @@ let force_allocation_if_need_be ctxt account =
       wrap (Token.transfer ctxt `Minted account Tez.one_mutez) >|=? fst
   | _ -> return ctxt
 
-let test_transferring_to_sink ctxt sink amount expected_bupds =
+let test_transferring_to_receiver ctxt receiver amount expected_bupds =
   let open Lwt_result_wrap_syntax in
   (* Transferring zero must be a noop, and must not return balance updates. *)
-  wrap (Token.transfer ctxt `Minted sink Tez.zero) >>=? fun (ctxt', bupds) ->
+  wrap (Token.transfer ctxt `Minted receiver Tez.zero)
+  >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun () ->
-  (* Force the allocation of [dest] if need be. *)
-  force_allocation_if_need_be ctxt sink >>=? fun ctxt ->
+  (* Force the allocation of [receiver] if need be. *)
+  force_allocation_if_need_be ctxt receiver >>=? fun ctxt ->
   (* Test transferring a non null amount. *)
-  wrap (Token.transfer ctxt `Minted sink amount) >>=? fun (ctxt', bupds) ->
-  check_sink_balances ctxt ctxt' sink amount >>=? fun () ->
+  wrap (Token.transfer ctxt `Minted receiver amount) >>=? fun (ctxt', bupds) ->
+  check_receiver_balances ctxt ctxt' receiver amount >>=? fun () ->
   let expected_bupds =
     Receipt.(Minted, Debited amount, Block_application) :: expected_bupds
   in
   Alcotest.(
     check bool "Balance updates do not match." (bupds = expected_bupds) true) ;
   (* Test transferring to go beyond capacity. *)
-  wrap (Token.balance ctxt' sink) >>=? fun (ctxt', bal) ->
+  wrap (Token.balance ctxt' receiver) >>=? fun (ctxt', bal) ->
   let amount = Tez.of_mutez_exn Int64.max_int -! bal +! Tez.one_mutez in
-  wrap (Token.transfer ctxt' `Minted sink amount) >>= fun res ->
+  wrap (Token.transfer ctxt' `Minted receiver amount) >>= fun res ->
   Assert.proto_error_with_info ~loc:__LOC__ res "Overflowing tez addition"
 
 let test_transferring_to_contract ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
-  let dest = Contract.Implicit pkh in
+  let receiver = Contract.Implicit pkh in
   let amount = random_amount () in
-  test_transferring_to_sink
+  test_transferring_to_receiver
     ctxt
-    (`Contract dest)
+    (`Contract receiver)
     amount
-    [(Contract dest, Credited amount, Block_application)]
+    [(Contract receiver, Credited amount, Block_application)]
 
 let test_transferring_to_collected_commitments ctxt =
   let amount = random_amount () in
   let bpkh = Blinded_public_key_hash.zero in
-  test_transferring_to_sink
+  test_transferring_to_receiver
     ctxt
     (`Collected_commitments bpkh)
     amount
@@ -204,18 +210,18 @@ let test_transferring_to_collected_commitments ctxt =
 
 let test_transferring_to_delegate_balance ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
-  let dest = Contract.Implicit pkh in
+  let receiver = Contract.Implicit pkh in
   let amount = random_amount () in
-  test_transferring_to_sink
+  test_transferring_to_receiver
     ctxt
     (`Delegate_balance pkh)
     amount
-    [(Contract dest, Credited amount, Block_application)]
+    [(Contract receiver, Credited amount, Block_application)]
 
 let test_transferring_to_frozen_deposits ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
-  test_transferring_to_sink
+  test_transferring_to_receiver
     ctxt
     (`Frozen_deposits pkh)
     amount
@@ -223,7 +229,7 @@ let test_transferring_to_frozen_deposits ctxt =
 
 let test_transferring_to_collected_fees ctxt =
   let amount = random_amount () in
-  test_transferring_to_sink
+  test_transferring_to_receiver
     ctxt
     `Block_fees
     amount
@@ -287,13 +293,13 @@ let test_transferring_to_frozen_bonds ctxt =
   let sc_rollup = sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
   let amount = random_amount () in
-  test_transferring_to_sink
+  test_transferring_to_receiver
     ctxt
     (`Frozen_bonds (contract, bond_id))
     amount
     [(Frozen_bonds (contract, bond_id), Credited amount, Block_application)]
 
-let test_transferring_to_sink () =
+let test_transferring_to_receiver () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, _) ->
   test_transferring_to_contract ctxt >>=? fun () ->
@@ -352,7 +358,7 @@ let test_transferring_from_container ctxt giver amount expected_bupds =
   wrap (Token.transfer ctxt giver `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun () ->
-  (* Force the allocation of [dest] if need be. *)
+  (* Force the allocation of [giver] if need be. *)
   force_allocation_if_need_be ctxt giver >>=? fun ctxt ->
   (* Test transferring everything. *)
   wrap (Token.transfer ctxt `Minted giver amount) >>=? fun (ctxt, _) ->
@@ -557,7 +563,7 @@ let build_test_cases () =
       (`Frozen_bonds (baker2ic, bond_id2), random_amount ());
     ]
   in
-  let dest_list =
+  let receiver_list =
     [
       `Collected_commitments Blinded_public_key_hash.zero;
       `Delegate_balance baker1;
@@ -572,54 +578,54 @@ let build_test_cases () =
       `Burned;
     ]
   in
-  return (ctxt, List.product giver_list dest_list)
+  return (ctxt, List.product giver_list receiver_list)
 
 let check_giver_balances ctxt ctxt' giver amount =
   match cast_to_container_type giver with
   | None -> return_unit
   | Some giver -> check_giver_balances ctxt ctxt' giver amount
 
-let check_sink_balances ctxt ctxt' dest amount =
-  match cast_to_container_type dest with
+let check_receiver_balances ctxt ctxt' receiver amount =
+  match cast_to_container_type receiver with
   | None -> return_unit
-  | Some dest -> check_sink_balances ctxt ctxt' dest amount
+  | Some receiver -> check_receiver_balances ctxt ctxt' receiver amount
 
-let rec check_balances ctxt ctxt' giver dest amount =
+let rec check_balances ctxt ctxt' giver receiver amount =
   let open Lwt_result_wrap_syntax in
-  match (cast_to_container_type giver, cast_to_container_type dest) with
+  match (cast_to_container_type giver, cast_to_container_type receiver) with
   | None, None -> return_unit
   | ( Some (`Delegate_balance d),
       Some (`Contract (Contract.Implicit c) as contract) )
   | ( Some (`Contract (Contract.Implicit c) as contract),
       Some (`Delegate_balance d) )
     when d = c ->
-      (* giver and dest are in fact referring to the same contract *)
+      (* giver and receiver are in fact referring to the same contract *)
       check_balances ctxt ctxt' contract contract amount
-  | Some giver, Some dest when giver = dest ->
-      (* giver and dest are the same contract *)
-      wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
-      wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
-      Assert.equal_tez ~loc:__LOC__ bal_dest bal_dest'
+  | Some giver, Some receiver when giver = receiver ->
+      (* giver and receiver are the same contract *)
+      wrap (Token.balance ctxt receiver) >>=? fun (_, bal_receiver) ->
+      wrap (Token.balance ctxt' receiver) >>=? fun (_, bal_receiver') ->
+      Assert.equal_tez ~loc:__LOC__ bal_receiver bal_receiver'
   | Some giver, None -> check_giver_balances ctxt ctxt' giver amount
-  | None, Some dest -> check_sink_balances ctxt ctxt' dest amount
-  | Some giver, Some dest ->
+  | None, Some receiver -> check_receiver_balances ctxt ctxt' receiver amount
+  | Some giver, Some receiver ->
       check_giver_balances ctxt ctxt' giver amount >>=? fun () ->
-      check_sink_balances ctxt ctxt' dest amount
+      check_receiver_balances ctxt ctxt' receiver amount
 
-let test_all_combinations_of_givers_and_sinks () =
+let test_all_combinations_of_givers_and_receivers () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   build_test_cases () >>=? fun (ctxt, cases) ->
   List.iter_es
-    (fun ((giver, amount), dest) ->
+    (fun ((giver, amount), receiver) ->
       (match cast_to_container_type giver with
       | None -> return ctxt
       | Some giver ->
           wrap (Token.transfer ctxt `Minted giver amount) >>=? fun (ctxt, _) ->
           return ctxt)
       >>=? fun ctxt ->
-      wrap (Token.transfer ctxt giver dest amount) >>=? fun (ctxt', _) ->
-      check_balances ctxt ctxt' giver dest amount)
+      wrap (Token.transfer ctxt giver receiver amount) >>=? fun (ctxt', _) ->
+      check_balances ctxt ctxt' giver receiver amount)
     cases
 
 (** [coalesce (account, Credited am1, origin) (account, Credited am2, origin)
@@ -662,9 +668,9 @@ let check_balances_are_consistent ctxt1 ctxt2 elt =
       return_unit
 
 (** Test that [transfer_n] is equivalent to n debits followed by n credits. *)
-let test_transfer_n ctxt giver dest =
+let test_transfer_n ctxt giver receiver =
   (* Run transfer_n. *)
-  Token.transfer_n ctxt giver dest >>=? fun (ctxt1, bal_updates1) ->
+  Token.transfer_n ctxt giver receiver >>=? fun (ctxt1, bal_updates1) ->
   (* Debit all givers. *)
   List.fold_left_es
     (fun (ctxt, bal_updates) (giver, am) ->
@@ -679,10 +685,10 @@ let test_transfer_n ctxt giver dest =
       (fun b -> match b with Receipt.Burned, _, _ -> false | _ -> true)
       debit_logs
   in
-  (* Credit the sink for each giver. *)
+  (* Credit the receiver for each giver. *)
   List.fold_left_es
     (fun (ctxt, bal_updates) (_, am) ->
-      Token.transfer ctxt `Minted dest am >>=? fun (ctxt, credit_logs) ->
+      Token.transfer ctxt `Minted receiver am >>=? fun (ctxt, credit_logs) ->
       return (ctxt, bal_updates @ credit_logs))
     (ctxt, [])
     giver
@@ -702,15 +708,15 @@ let test_transfer_n ctxt giver dest =
   assert (bal_updates1 = debit_logs @ credit_logs) ;
   (* Check balances are the same in ctxt1 and ctxt2. *)
   List.(iter_es (check_balances_are_consistent ctxt1 ctxt2) (map fst giver))
-  >>=? fun () -> check_balances_are_consistent ctxt1 ctxt2 dest
+  >>=? fun () -> check_balances_are_consistent ctxt1 ctxt2 receiver
 
 let test_transfer_n_with_no_giver () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   wrap (test_transfer_n ctxt [] `Block_fees) >>=? fun () ->
-  let dest = `Delegate_balance pkh in
-  wrap (test_transfer_n ctxt [] dest)
+  let receiver = `Delegate_balance pkh in
+  wrap (test_transfer_n ctxt [] receiver)
 
 let test_transfer_n_with_several_givers () =
   let open Lwt_result_wrap_syntax in
@@ -750,21 +756,24 @@ let tests =
       tztest "transfer - balances" `Quick test_simple_balances;
       tztest "transfer - balance updates" `Quick test_simple_balance_updates;
       tztest "transfer - test allocated" `Quick test_allocated;
-      tztest "transfer - test transfer to sink" `Quick test_transferring_to_sink;
+      tztest
+        "transfer - test transfer to receiver"
+        `Quick
+        test_transferring_to_receiver;
       tztest
         "transfer - test transfer from giver"
         `Quick
         test_transferring_from_giver;
       tztest
-        "transfer - test all (givers x sinks)"
+        "transfer - test all (givers x receivers)"
         `Quick
-        test_all_combinations_of_givers_and_sinks;
+        test_all_combinations_of_givers_and_receivers;
       tztest
-        "transfer - test from no giver to a destination"
+        "transfer - test from no giver to a receiver"
         `Quick
         test_transfer_n_with_no_giver;
       tztest
-        "transfer - test from n givers to a destination"
+        "transfer - test from n givers to a receiver"
         `Quick
         test_transfer_n_with_several_givers;
     ]

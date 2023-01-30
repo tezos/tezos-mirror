@@ -5265,7 +5265,7 @@ module Token : sig
     | `Sc_rollup_refutation_rewards
     | container ]
 
-  type sink =
+  type receiver =
     [ `Storage_fees
     | `Double_signing_punishments
     | `Lost_endorsing_rewards of public_key_hash * bool * bool
@@ -5282,14 +5282,14 @@ module Token : sig
     ?origin:Receipt.update_origin ->
     context ->
     ([< giver] * Tez.t) list ->
-    [< sink] ->
+    [< receiver] ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
   val transfer :
     ?origin:Receipt.update_origin ->
     context ->
     [< giver] ->
-    [< sink] ->
+    [< receiver] ->
     Tez.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 end
