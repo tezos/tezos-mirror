@@ -112,12 +112,15 @@ let protocol_plugin_resolved =
     ("proto_hash", Data_encoding.string)
 
 let protocol_plugin_not_resolved =
-  declare_0
+  declare_2
     ~section
     ~name:"dac_node_plugin_not_resolved"
-    ~msg:"Could not resolve plugin"
+    ~msg:
+      "Could not resolve plugin for protocols {current_protocol} or \
+       {next_protocol}"
     ~level:Notice
-    ()
+    ("current_protocol", Data_encoding.string)
+    ("next_protocol", Data_encoding.string)
 
 let daemon_error =
   declare_1
@@ -166,4 +169,8 @@ let proto_short_hash_string hash =
 let emit_protocol_plugin_resolved hash =
   emit protocol_plugin_resolved @@ proto_short_hash_string hash
 
-let emit_protocol_plugin_not_resolved = emit protocol_plugin_not_resolved
+let emit_protocol_plugin_not_resolved current_protocol next_protocol =
+  emit
+    protocol_plugin_not_resolved
+    ( proto_short_hash_string current_protocol,
+      proto_short_hash_string next_protocol )
