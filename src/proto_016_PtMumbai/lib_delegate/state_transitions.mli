@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module, and in particular the {!step} function, modifies the automaton
+    state, while {!Baking_actions} performs potentially failing side-effects. *)
+
 open Protocol
 open Alpha_context
 open Baking_state

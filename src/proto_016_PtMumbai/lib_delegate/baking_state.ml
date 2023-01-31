@@ -31,8 +31,8 @@ open Protocol_client_context
     public key, its public key hash, and its secret key. *)
 type consensus_key = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.Public_key.t;
-  public_key_hash : Tezos_crypto.Signature.Public_key_hash.t;
+  public_key : Signature.Public_key.t;
+  public_key_hash : Signature.Public_key_hash.t;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -56,48 +56,39 @@ let consensus_key_encoding =
       })
     (obj4
        (req "alias" (option string))
-       (req "public_key" Tezos_crypto.Signature.Public_key.encoding)
-       (req "public_key_hash" Tezos_crypto.Signature.Public_key_hash.encoding)
+       (req "public_key" Signature.Public_key.encoding)
+       (req "public_key_hash" Signature.Public_key_hash.encoding)
        (req "secret_key_uri" string))
 
 let pp_consensus_key fmt {alias; public_key_hash; _} =
   match alias with
-  | None ->
-      Format.fprintf
-        fmt
-        "%a"
-        Tezos_crypto.Signature.Public_key_hash.pp
-        public_key_hash
+  | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp public_key_hash
   | Some alias ->
       Format.fprintf
         fmt
         "%s (%a)"
         alias
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         public_key_hash
 
-type consensus_key_and_delegate =
-  consensus_key * Tezos_crypto.Signature.Public_key_hash.t
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
 
 let consensus_key_and_delegate_encoding =
   let open Data_encoding in
   merge_objs
     consensus_key_encoding
-    (obj1 (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding))
+    (obj1 (req "delegate" Signature.Public_key_hash.encoding))
 
 let pp_consensus_key_and_delegate fmt (consensus_key, delegate) =
-  if
-    Tezos_crypto.Signature.Public_key_hash.equal
-      consensus_key.public_key_hash
-      delegate
-  then pp_consensus_key fmt consensus_key
+  if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate then
+    pp_consensus_key fmt consensus_key
   else
     Format.fprintf
       fmt
       "%a@,on behalf of %a"
       pp_consensus_key
       consensus_key
-      Tezos_crypto.Signature.Public_key_hash.pp
+      Signature.Public_key_hash.pp
       delegate
 
 type validation_mode = Node | Local of Abstract_context_index.t
@@ -250,7 +241,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
     list of slots (i.e., a list of position indexes in the slot map, in
     other words the list of rounds when it will be the proposer), and
     its endorsing power. *)
-type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
+type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
 (* FIXME: determine if the slot map should contain all slots or just
    the first one *)
@@ -357,6 +348,9 @@ type state = {
 }
 
 type t = state
+
+let update_current_phase state new_phase =
+  {state with round_state = {state.round_state with current_phase = new_phase}}
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
@@ -626,7 +620,7 @@ module DelegateSet = struct
     type t = consensus_key
 
     let compare {public_key_hash = pkh; _} {public_key_hash = pkh'; _} =
-      Tezos_crypto.Signature.Public_key_hash.compare pkh pkh'
+      Signature.Public_key_hash.compare pkh pkh'
   end)
 
   let find_pkh pkh s =
@@ -634,8 +628,8 @@ module DelegateSet = struct
     try
       iter
         (fun ({public_key_hash; _} as delegate) ->
-          if Tezos_crypto.Signature.Public_key_hash.equal pkh public_key_hash
-          then raise (Found delegate)
+          if Signature.Public_key_hash.equal pkh public_key_hash then
+            raise (Found delegate)
           else ())
         s ;
       None
@@ -654,7 +648,12 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
     List.fold_left
       (fun (own_map, all_map) slot ->
         let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
-        let endorsing_slot = {endorsing_power = List.length slots; slots} in
+        let endorsing_slot =
+          {
+            endorsing_power = List.length slots;
+            first_slot = Stdlib.List.hd slots;
+          }
+        in
         let all_map =
           List.fold_left
             (fun all_map slot -> SlotMap.add slot endorsing_slot all_map)
@@ -788,13 +787,13 @@ let pp_elected_block fmt {proposal; endorsement_qc} =
     proposal.block
     (List.length endorsement_qc)
 
-let pp_endorsing_slot fmt (consensus_key_and_delegate, {slots; endorsing_power})
-    =
+let pp_endorsing_slot fmt
+    (consensus_key_and_delegate, {first_slot; endorsing_power}) =
   Format.fprintf
     fmt
-    "slots: @[<h>[%a]@],@ delegate: %a,@ endorsing_power: %d"
-    Format.(pp_print_list ~pp_sep:pp_print_space Slot.pp)
-    slots
+    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ endorsing_power: %d"
+    Slot.pp
+    first_slot
     pp_consensus_key_and_delegate
     consensus_key_and_delegate
     endorsing_power
