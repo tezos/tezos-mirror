@@ -498,7 +498,7 @@ module Actions = struct
       ~section
       ~name:"skipping_preendorsement"
       ~level:Error
-      ~msg:"skipping preendorsement for {delegate} -- {trace}"
+      ~msg:"unable to sign preendorsement for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -509,7 +509,7 @@ module Actions = struct
       ~section
       ~name:"skipping_endorsement"
       ~level:Error
-      ~msg:"skipping endorsement for {delegate} -- {trace}"
+      ~msg:"unable to sign endorsement for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -520,7 +520,7 @@ module Actions = struct
       ~section
       ~name:"skipping_attestation"
       ~level:Error
-      ~msg:"skipping attestation for {delegate} -- {trace}"
+      ~msg:"unable to sign attestation for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
