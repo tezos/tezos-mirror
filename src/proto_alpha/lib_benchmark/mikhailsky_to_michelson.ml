@@ -37,10 +37,10 @@ let project_top (aft : Type.Stack.t) =
   | Type.Stack.Stack_var_t _ -> raise (Unexpected_stack_type "var")
   | Type.Stack.Item_t (top, _) -> top
 
-let project_union (aft : Type.Stack.t) =
+let project_or (aft : Type.Stack.t) =
   let top = project_top aft in
   match top.node with
-  | Type.Base.Union_t (l, r) -> (l, r)
+  | Type.Base.Or_t (l, r) -> (l, r)
   | _ -> raise Unexpected_base_type
 
 let project_lambda (aft : Type.Stack.t) =
@@ -100,14 +100,14 @@ let rec convert :
   (* Fail on holes *)
   | Micheline.Prim (_, I_Hole, _, _) | Micheline.Prim (_, D_Hole, _, _) ->
       raise Mikhailsky.Term_contains_holes
-  (* Add type information to union injections *)
+  (* Add type information to or injections *)
   | Micheline.Prim (_, I_LEFT, [], annots) -> (
       get_instr_annot path >>= fun ty_opt ->
       match ty_opt with
       | None -> raise (Cannot_get_type (node, path))
       | Some {aft; _} ->
           Inference.instantiate aft >>= fun aft ->
-          let _, r = project_union aft in
+          let _, r = project_or aft in
           Inference.instantiate_base r >>= fun r ->
           Autocomp.replace_vars r >>= fun r ->
           let r = unparse_type r in
@@ -119,7 +119,7 @@ let rec convert :
       | None -> raise (Cannot_get_type (node, path))
       | Some {aft; _} ->
           Inference.instantiate aft >>= fun aft ->
-          let l, _ = project_union aft in
+          let l, _ = project_or aft in
           Inference.instantiate_base l >>= fun l ->
           Autocomp.replace_vars l >>= fun l ->
           let l = unparse_type l in

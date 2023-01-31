@@ -55,7 +55,7 @@ type instruction_name =
   | N_ICons_none
   | N_IIf_none
   | N_IOpt_map
-  (* unions *)
+  (* ors *)
   | N_ILeft
   | N_IRight
   | N_IIf_left

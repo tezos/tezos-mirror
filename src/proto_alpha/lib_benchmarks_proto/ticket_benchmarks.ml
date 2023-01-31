@@ -169,7 +169,7 @@ let ticket_ty =
    [pair int_or_ticket (pair int_or_ticket (pair int_or_ticket ...))]
 
    This is a worst case type for [type_has_tickets], though nested
-   unions, nested maps or nested lists would be just as bad. *)
+   ors, nested maps or nested lists would be just as bad. *)
 let rec dummy_type_generator ~rng_state size =
   let open Script_typed_ir in
   let ticket_or_int =

@@ -71,10 +71,10 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   | Pair_t (tl, tr, _, YesYes), (lx, rx), (ly, ry) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl
-  | Union_t (tl, _, _, YesYes), L x, L y -> reference_compare_comparable tl x y
-  | Union_t _, L _, R _ -> -1
-  | Union_t _, R _, L _ -> 1
-  | Union_t (_, tr, _, YesYes), R x, R y -> reference_compare_comparable tr x y
+  | Or_t (tl, _, _, YesYes), L x, L y -> reference_compare_comparable tl x y
+  | Or_t _, L _, R _ -> -1
+  | Or_t _, R _, L _ -> 1
+  | Or_t (_, tr, _, YesYes), R x, R y -> reference_compare_comparable tr x y
   | Option_t _, None, None -> 0
   | Option_t _, None, Some _ -> -1
   | Option_t _, Some _, None -> 1

@@ -345,10 +345,10 @@ and instantiate_base (encountered : S.t) (ty : Type.Base.t) : Type.Base.t M.t =
         instantiate_base encountered lty >>= fun lty ->
         instantiate_base encountered rty >>= fun rty ->
         return (Type.pair lty rty)
-    | Union_t (lty, rty) ->
+    | Or_t (lty, rty) ->
         instantiate_base encountered lty >>= fun lty ->
         instantiate_base encountered rty >>= fun rty ->
-        return (Type.union lty rty)
+        return (Type.or_ lty rty)
     | Lambda_t (dom, range) ->
         instantiate_base encountered dom >>= fun dom ->
         instantiate_base encountered range >>= fun range ->
@@ -430,7 +430,7 @@ and unify_base (x : Type.Base.t) (y : Type.Base.t) : unit M.t =
         unify_base kx ky >>= fun () -> unify_base vx vy
     | Pair_t (x, x'), Pair_t (y, y') ->
         unify_base x y >>= fun () -> unify_base x' y'
-    | Union_t (x, x'), Union_t (y, y') ->
+    | Or_t (x, x'), Or_t (y, y') ->
         unify_base x y >>= fun () -> unify_base x' y'
     | Lambda_t (x, x'), Lambda_t (y, y') ->
         unify_base x y >>= fun () -> unify_base x' y'
@@ -531,7 +531,7 @@ and assert_comparability_aux lower_bound (ty : Type.Base.t)
             assert_comparability_aux Comparable l encountered >>= fun () ->
             assert_comparability_aux Comparable r encountered
         | Unconstrained | Not_comparable -> return ())
-    | Union_t (l, r) -> (
+    | Or_t (l, r) -> (
         match lower_bound with
         | Comparable ->
             assert_comparability_aux Comparable l encountered >>= fun () ->
@@ -551,7 +551,7 @@ and get_comparability (ty : Type.Base.t) : comparability M.t =
       return Comparable
   | List_t _ | Set_t _ | Map_t _ | Lambda_t _ | Key_t -> return Not_comparable
   | Option_t ty -> get_comparability ty
-  | Union_t (lt, rt) | Pair_t (lt, rt) -> (
+  | Or_t (lt, rt) | Pair_t (lt, rt) -> (
       get_comparability lt >>= fun lc ->
       get_comparability rt >>= fun rc ->
       match (lc, rc) with
@@ -882,26 +882,26 @@ let rec generate_constraints (path : Mikhailsky.Path.t) (node : Mikhailsky.node)
       exists_stack () >>= fun rest ->
       unify bef Type.(item (pair a b) rest) >>= fun () ->
       unify aft Type.(item b rest)
-  (* Unions *)
+  (* Ors *)
   | Prim (_, I_LEFT, [], _) ->
       exists () >>= fun lt ->
       exists () >>= fun rt ->
       exists_stack () >>= fun rest ->
       unify bef (Type.item lt rest) >>= fun () ->
-      unify aft Type.(item (union lt rt) rest) >>= fun res -> return res
+      unify aft Type.(item (or_ lt rt) rest) >>= fun res -> return res
   | Prim (_, I_RIGHT, [], _) ->
       exists () >>= fun lt ->
       exists () >>= fun rt ->
       exists_stack () >>= fun rest ->
       unify bef Type.(item rt rest) >>= fun () ->
-      unify aft Type.(item (union lt rt) rest)
+      unify aft Type.(item (or_ lt rt) rest)
   | Prim (_, (I_LEFT | I_RIGHT), _ :: _, _) ->
       invalid_ast ~msg:__LOC__ path node
   | Prim (_, I_LOOP_LEFT, [body], _) ->
       exists () >>= fun l ->
       exists () >>= fun r ->
       exists_stack () >>= fun rest ->
-      unify bef Type.(item (union l r) rest) >>= fun () ->
+      unify bef Type.(item (or_ l r) rest) >>= fun () ->
       unify aft Type.(item r rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
@@ -912,7 +912,7 @@ let rec generate_constraints (path : Mikhailsky.Path.t) (node : Mikhailsky.node)
       exists () >>= fun a ->
       exists () >>= fun b ->
       exists_stack () >>= fun rest ->
-      unify bef Type.(item (union a b) rest) >>= fun () ->
+      unify bef Type.(item (or_ a b) rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         bt
@@ -1031,12 +1031,12 @@ and generate_constraints_data (path : Mikhailsky.Path.t)
       exists () >>= fun lty ->
       exists () >>= fun rty ->
       generate_constraints_data (Mikhailsky.Path.at_index 0 path) term lty
-      >>= fun () -> unify_base ty (Type.union lty rty)
+      >>= fun () -> unify_base ty (Type.or_ lty rty)
   | Prim (_, D_Right, [term], _) ->
       exists () >>= fun lty ->
       exists () >>= fun rty ->
       generate_constraints_data (Mikhailsky.Path.at_index 0 path) term rty
-      >>= fun () -> unify_base ty (Type.union lty rty)
+      >>= fun () -> unify_base ty (Type.or_ lty rty)
   | Prim (_, D_None, [], _) ->
       exists () >>= fun elt_ty -> unify_base ty (Type.option elt_ty)
   | Prim (_, D_Some, [v], _) ->

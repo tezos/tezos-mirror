@@ -45,7 +45,7 @@ module Base : sig
     | Key_t
     | Option_t of t
     | Pair_t of t * t
-    | Union_t of t * t
+    | Or_t of t * t
     | List_t of t
     | Set_t of t
     | Map_t of t * t
@@ -94,7 +94,7 @@ val option : Base.t -> Base.t
 
 val pair : Base.t -> Base.t -> Base.t
 
-val union : Base.t -> Base.t -> Base.t
+val or_ : Base.t -> Base.t -> Base.t
 
 val list : Base.t -> Base.t
 

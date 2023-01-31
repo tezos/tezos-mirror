@@ -699,7 +699,7 @@ module Raw = struct
         | ICdr (_, k) ->
             let _, b = accu in
             (step [@ocaml.tailcall]) g gas k ks b stack
-        (* unions *)
+        (* ors *)
         | ICons_left (_, _tyb, k) ->
             (step [@ocaml.tailcall]) g gas k ks (L accu) stack
         | ICons_right (_, _tya, k) ->

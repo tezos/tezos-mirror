@@ -454,7 +454,7 @@ module Cost_of = struct
 
     let compare_pair_tag = atomic_step_cost (S.safe_int 10)
 
-    let compare_union_tag = atomic_step_cost (S.safe_int 10)
+    let compare_or_tag = atomic_step_cost (S.safe_int 10)
 
     let compare_option_tag = atomic_step_cost (S.safe_int 10)
 
@@ -543,14 +543,14 @@ module Cost_of = struct
               yl
               Gas.(acc +@ compare_pair_tag)
               (Compare (tr, xr, yr, k))
-        | Union_t (tl, tr, _, YesYes) -> (
+        | Or_t (tl, tr, _, YesYes) -> (
             match (x, y) with
             | L x, L y ->
-                (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
-            | L _, R _ -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-            | R _, L _ -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+                (compare [@tailcall]) tl x y Gas.(acc +@ compare_or_tag) k
+            | L _, R _ -> (apply [@tailcall]) Gas.(acc +@ compare_or_tag) k
+            | R _, L _ -> (apply [@tailcall]) Gas.(acc +@ compare_or_tag) k
             | R x, R y ->
-                (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k)
+                (compare [@tailcall]) tr x y Gas.(acc +@ compare_or_tag) k)
         | Option_t (t, _, Yes) -> (
             match (x, y) with
             | None, None ->

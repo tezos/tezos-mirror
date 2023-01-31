@@ -127,6 +127,6 @@ module Internal_for_tests : sig
     | `TString
     | `TTicket
     | `TTimestamp
-    | `TUnion
+    | `TOr
     | `TUnit ]
 end

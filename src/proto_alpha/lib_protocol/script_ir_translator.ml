@@ -182,7 +182,7 @@ let hash_comparable_data ctxt ty data =
 let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
   | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
-  | Tx_rollup_l2_address_t | Pair_t _ | Union_t _ | Option_t _ ->
+  | Tx_rollup_l2_address_t | Pair_t _ | Or_t _ | Option_t _ ->
       ()
 
 let check_dupable_ty ctxt loc ty =
@@ -220,7 +220,7 @@ let check_dupable_ty ctxt loc ty =
     | Pair_t (ty_a, ty_b, _, _) ->
         let* () = aux loc ty_a in
         aux loc ty_b
-    | Union_t (ty_a, ty_b, _, _) ->
+    | Or_t (ty_a, ty_b, _, _) ->
         let* () = aux loc ty_a in
         aux loc ty_b
     | Lambda_t (_, _, _) ->
@@ -390,13 +390,13 @@ let rec ty_eq :
         let Eq = Dependent_bool.merge_dand cmp1 cmp2 in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | Pair_t _, _ -> not_equal ()
-    | Union_t (tal, tar, meta1, cmp1), Union_t (tbl, tbr, meta2, cmp2) ->
+    | Or_t (tal, tar, meta1, cmp1), Or_t (tbl, tbr, meta2, cmp2) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
         let Eq = Dependent_bool.merge_dand cmp1 cmp2 in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
-    | Union_t _, _ -> not_equal ()
+    | Or_t _, _ -> not_equal ()
     | Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
@@ -715,7 +715,7 @@ let rec parse_ty :
         | Don't_parse_entrypoints ->
             let (Ex_ty tl) = parsed_l in
             let (Ex_ty tr) = parsed_r in
-            union_t loc tl tr >|? fun (Ty_ex_c ty) -> ((Ex_ty ty : ret), ctxt)
+            or_t loc tl tr >|? fun (Ty_ex_c ty) -> ((Ex_ty ty : ret), ctxt)
         | Parse_entrypoints ->
             let (Ex_parameter_ty_and_entrypoints_node
                   {arg_type = tl; entrypoints = left}) =
@@ -725,12 +725,12 @@ let rec parse_ty :
                   {arg_type = tr; entrypoints = right}) =
               parsed_r
             in
-            union_t loc tl tr >|? fun (Ty_ex_c arg_type) ->
+            or_t loc tl tr >|? fun (Ty_ex_c arg_type) ->
             let entrypoints =
               let at_node =
                 Option.map (fun name -> {name; original_type_expr = node}) name
               in
-              {at_node; nested = Entrypoints_Union {left; right}}
+              {at_node; nested = Entrypoints_Or {left; right}}
             in
             (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt)
         )
@@ -1096,7 +1096,7 @@ let check_packable ~legacy loc root =
     | Bls12_381_g2_t -> Result.return_unit
     | Bls12_381_fr_t -> Result.return_unit
     | Pair_t (l_ty, r_ty, _, _) -> check l_ty >>? fun () -> check r_ty
-    | Union_t (l_ty, r_ty, _, _) -> check l_ty >>? fun () -> check r_ty
+    | Or_t (l_ty, r_ty, _, _) -> check l_ty >>? fun () -> check r_ty
     | Option_t (v_ty, _, _) -> check v_ty
     | List_t (elt_ty, _) -> check elt_ty
     | Map_t (_, elt_ty, _) -> check elt_ty
@@ -1274,7 +1274,7 @@ let find_entrypoint (type full fullc error_context error_trace)
     | _, {at_node = Some {name; original_type_expr}; _}
       when Entrypoint.(name = entrypoint) ->
         return (Ex_ty_cstr {ty; construct = (fun e -> e); original_type_expr})
-    | Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _} -> (
+    | Or_t (tl, tr, _, _), {nested = Entrypoints_Or {left; right}; _} -> (
         Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
         | Ok (Ex_ty_cstr {ty; construct; original_type_expr}) ->
             return
@@ -1339,7 +1339,7 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
           ( (if reachable then acc
             else
               match ty with
-              | Union_t _ -> acc
+              | Or_t _ -> acc
               | _ -> (
                   match first_unreachable with
                   | None -> (Some (List.rev path), all)
@@ -1359,7 +1359,7 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
       (prim list option * Entrypoint.Set.t) tzresult =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
-    | Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _} ->
+    | Or_t (tl, tr, _, _), {nested = Entrypoints_Or {left; right}; _} ->
         merge (D_Left :: path) tl left reachable acc
         >>? fun (acc, l_reachable) ->
         merge (D_Right :: path) tr right reachable acc
@@ -1715,7 +1715,7 @@ let parse_pair (type r) parse_l parse_r ctxt ~legacy
   | Seq (loc, l) -> tzfail @@ Invalid_seq_arity (loc, 2, List.length l)
   | expr -> tzfail @@ unexpected expr [] Constant_namespace [D_Pair]
 
-let parse_union parse_l parse_r ctxt ~legacy = function
+let parse_or parse_l parse_r ctxt ~legacy = function
   | Prim (loc, D_Left, [v], annot) ->
       (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
@@ -2062,11 +2062,11 @@ let rec parse_data :
       let parse_l ctxt v = non_terminal_recursion ctxt tl v in
       let parse_r ctxt v = non_terminal_recursion ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
-  (* Unions *)
-  | Union_t (tl, tr, _, _), expr ->
+  (* Ors *)
+  | Or_t (tl, tr, _, _), expr ->
       let parse_l ctxt v = non_terminal_recursion ctxt tl v in
       let parse_r ctxt v = non_terminal_recursion ctxt tr v in
-      traced @@ parse_union parse_l parse_r ctxt ~legacy expr
+      traced @@ parse_or parse_l parse_r ctxt ~legacy expr
   (* Lambdas *)
   | Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr) ->
       traced
@@ -2831,13 +2831,13 @@ and parse_instr :
       check_destr_annot loc annot >>?= fun () ->
       let cdr = {apply = (fun k -> ICdr (loc, k))} in
       typed ctxt loc cdr (Item_t (b, rest))
-  (* unions *)
+  (* ors *)
   | Prim (loc, I_LEFT, [tr], annot), Item_t (tl, rest) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tr
       >>?= fun (Ex_ty tr, ctxt) ->
       check_constr_annot loc annot >>?= fun () ->
       let cons_left = {apply = (fun k -> ICons_left (loc, tr, k))} in
-      union_t loc tl tr >>?= fun (Ty_ex_c ty) ->
+      or_t loc tl tr >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_left stack_ty
   | Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest) ->
@@ -2845,11 +2845,11 @@ and parse_instr :
       >>?= fun (Ex_ty tl, ctxt) ->
       check_constr_annot loc annot >>?= fun () ->
       let cons_right = {apply = (fun k -> ICons_right (loc, tl, k))} in
-      union_t loc tl tr >>?= fun (Ty_ex_c ty) ->
+      or_t loc tl tr >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_right stack_ty
   | ( Prim (loc, I_IF_LEFT, [bt; bf], annot),
-      (Item_t (Union_t (tl, tr, _, _), rest) as bef) ) ->
+      (Item_t (Or_t (tl, tr, _, _), rest) as bef) ) ->
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
@@ -3316,7 +3316,7 @@ and parse_instr :
           in
           typed_no_lwt ctxt loc instr rest)
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
-      (Item_t (Union_t (tl, tr, _, _), rest) as stack) ) -> (
+      (Item_t (Or_t (tl, tr, _, _), rest) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
       non_terminal_recursion tc_context ctxt body (Item_t (tl, rest))
@@ -4274,7 +4274,7 @@ and parse_instr :
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
       if legacy then
         let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
-        typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
+        typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
       else tzfail (Deprecated_instruction I_OPEN_CHEST)
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
@@ -4902,7 +4902,7 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
         ( (if reachable then acc
           else
             match ty with
-            | Union_t _ -> acc
+            | Or_t _ -> acc
             | _ -> (List.rev path :: unreachables, all)),
           reachable )
     | Some {name; original_type_expr} ->
@@ -4923,7 +4923,7 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
       prim list list * (ex_ty * Script.node) Entrypoint.Map.t =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
-    | Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _} ->
+    | Or_t (tl, tr, _, _), {nested = Entrypoints_Or {left; right}; _} ->
         let acc, l_reachable = merge (D_Left :: path) tl left reachable acc in
         let acc, r_reachable = merge (D_Right :: path) tr right reachable acc in
         let acc = fold_tree tl left (D_Left :: path) l_reachable acc in
@@ -5141,9 +5141,9 @@ type 'ty has_lazy_storage =
   | Pair_f :
       'a has_lazy_storage * 'b has_lazy_storage
       -> ('a, 'b) pair has_lazy_storage
-  | Union_f :
+  | Or_f :
       'a has_lazy_storage * 'b has_lazy_storage
-      -> ('a, 'b) union has_lazy_storage
+      -> ('a, 'b) or_ has_lazy_storage
   | Option_f : 'a has_lazy_storage -> 'a option has_lazy_storage
   | List_f : 'a has_lazy_storage -> 'a Script_list.t has_lazy_storage
   | Map_f : 'v has_lazy_storage -> (_, 'v) map has_lazy_storage
@@ -5195,7 +5195,7 @@ let rec has_lazy_storage : type t tc. (t, tc) ty -> t has_lazy_storage =
   | Chest_key_t -> False_f
   | Chest_t -> False_f
   | Pair_t (l, r, _, _) -> aux2 (fun l r -> Pair_f (l, r)) l r
-  | Union_t (l, r, _, _) -> aux2 (fun l r -> Union_f (l, r)) l r
+  | Or_t (l, r, _, _) -> aux2 (fun l r -> Or_f (l, r)) l r
   | Option_t (t, _, _) -> aux1 (fun h -> Option_f h) t
   | List_t (t, _) -> aux1 (fun h -> List_f h) t
   | Map_t (_, t, _) -> aux1 (fun h -> Map_f h) t
@@ -5254,10 +5254,10 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
         aux ctxt mode ~temporary ids_to_copy acc tyr xr ~has_lazy_storage:hr
         >|=? fun (ctxt, xr, ids_to_copy, acc) ->
         (ctxt, (xl, xr), ids_to_copy, acc)
-    | Union_f (has_lazy_storage, _), Union_t (ty, _, _, _), L x ->
+    | Or_f (has_lazy_storage, _), Or_t (ty, _, _, _), L x ->
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, L x, ids_to_copy, acc)
-    | Union_f (_, has_lazy_storage), Union_t (_, ty, _, _), R x ->
+    | Or_f (_, has_lazy_storage), Or_t (_, ty, _, _), R x ->
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, R x, ids_to_copy, acc)
     | Option_f has_lazy_storage, Option_t (ty, _, _), Some x ->
@@ -5349,9 +5349,9 @@ let rec fold_lazy_storage :
       | Fold_lazy_storage.Ok init ->
           fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
       | Fold_lazy_storage.Error -> ok (init, ctxt))
-  | Union_f (has_lazy_storage, _), Union_t (ty, _, _, _), L x ->
+  | Or_f (has_lazy_storage, _), Or_t (ty, _, _, _), L x ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
-  | Union_f (_, has_lazy_storage), Union_t (_, ty, _, _), R x ->
+  | Or_f (_, has_lazy_storage), Or_t (_, ty, _, _), R x ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | _, Option_t (_, _, _), None -> ok (Fold_lazy_storage.Ok init, ctxt)
   | Option_f has_lazy_storage, Option_t (ty, _, _), Some x ->

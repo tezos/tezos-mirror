@@ -905,7 +905,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) kloop_in_left_type =
   ('c, 'd, 'e, 'f) continuation ->
   ('a, 'g, 'c, 'd) kinstr ->
   ('b, 'g, 'e, 'f) continuation ->
-  ('a, 'b) union ->
+  ('a, 'b) or_ ->
   'g ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 

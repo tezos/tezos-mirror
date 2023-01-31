@@ -127,7 +127,7 @@ let rec size_of_comparable_value :
          size_of_comparable_value leaf lv + size_of_comparable_value node rv
        in
        size + 1
-   | Union_t (left, right, _, YesYes) ->
+   | Or_t (left, right, _, YesYes) ->
        let size =
          match v with
          | L v -> size_of_comparable_value left v

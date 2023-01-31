@@ -242,7 +242,7 @@ module Proto = struct
           let g1 = List.map (fun g (v, _) -> g v) @@ find_lambda_tys t1 in
           let g2 = List.map (fun g (_, v) -> g v) @@ find_lambda_tys t2 in
           g1 @ g2
-      | Union_t (t1, t2, _, _) ->
+      | Or_t (t1, t2, _, _) ->
           let g1 =
             List.map (fun g -> function L v -> g v | R _ -> [])
             @@ find_lambda_tys t1

@@ -94,13 +94,12 @@ let pair k1 k2 =
 let cpair k1 k2 =
   match comparable_pair_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
-(* union type constructor*)
-let union k1 k2 =
-  match union_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+(* or type constructor*)
+let or_ k1 k2 = match or_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
-(* comparable union type constructor *)
-let cunion k1 k2 =
-  match comparable_union_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+(* comparable or type constructor *)
+let cor k1 k2 =
+  match comparable_or_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
 let lambda x y =
   match lambda_t (-1) x y with Error _ -> assert false | Ok t -> t

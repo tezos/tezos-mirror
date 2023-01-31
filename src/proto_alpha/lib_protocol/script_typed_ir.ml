@@ -98,7 +98,9 @@ type tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.value
 
 type ('a, 'b) pair = 'a * 'b
 
-type ('a, 'b) union = L of 'a | R of 'b
+(* We cannot call this type "or" as in Michelson because "or" is an
+   OCaml keyword. *)
+type ('a, 'b) or_ = L of 'a | R of 'b
 
 module Script_chain_id = struct
   type t = Chain_id_tag of Chain_id.t [@@ocaml.unboxed]
@@ -435,11 +437,11 @@ type 'arg entrypoints_node = {
 }
 
 and 'arg nested_entrypoints =
-  | Entrypoints_Union : {
+  | Entrypoints_Or : {
       left : 'l entrypoints_node;
       right : 'r entrypoints_node;
     }
-      -> ('l, 'r) union nested_entrypoints
+      -> ('l, 'r) or_ nested_entrypoints
   | Entrypoints_None : _ nested_entrypoints
 
 let no_entrypoints = {at_node = None; nested = Entrypoints_None}
@@ -509,14 +511,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
     }
       -> ('a option, 's, 'c, 't) kinstr
   (*
-     Unions
+     Ors
      ------
    *)
   | ICons_left :
-      Script.location * ('b, _) ty * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      Script.location * ('b, _) ty * (('a, 'b) or_, 'c * 's, 'r, 'f) kinstr
       -> ('a, 'c * 's, 'r, 'f) kinstr
   | ICons_right :
-      Script.location * ('a, _) ty * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      Script.location * ('a, _) ty * (('a, 'b) or_, 'c * 's, 'r, 'f) kinstr
       -> ('b, 'c * 's, 'r, 'f) kinstr
   | IIf_left : {
       loc : Script.location;
@@ -524,7 +526,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       branch_if_right : ('b, 's, 'c, 't) kinstr;
       k : ('c, 't, 'r, 'f) kinstr;
     }
-      -> (('a, 'b) union, 's, 'r, 'f) kinstr
+      -> (('a, 'b) or_, 's, 'r, 'f) kinstr
   (*
      Lists
      -----
@@ -835,9 +837,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop_left :
       Script.location
-      * ('a, 's, ('a, 'b) union, 's) kinstr
+      * ('a, 's, ('a, 'b) or_, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
-      -> (('a, 'b) union, 's, 'r, 'f) kinstr
+      -> (('a, 'b) or_, 's, 'r, 'f) kinstr
   | IDip :
       Script.location
       * ('b, 's, 'c, 't) kinstr
@@ -1117,7 +1119,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       Script.location * 'a comparable_ty * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      Script.location * ((bytes, bool) union, 's, 'r, 'f) kinstr
+      Script.location * ((bytes, bool) or_, 's, 'r, 'f) kinstr
       -> ( Script_timelock.chest_key,
            Script_timelock.chest * (n num * 's),
            'r,
@@ -1201,8 +1203,8 @@ and (_, _, _, _) continuation =
       ('a, 's, bool, 'a * 's) kinstr * ('a, 's, 'r, 'f) continuation
       -> (bool, 'a * 's, 'r, 'f) continuation
   | KLoop_in_left :
-      ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
-      -> (('a, 'b) union, 's, 'r, 'f) continuation
+      ('a, 's, ('a, 'b) or_, 's) kinstr * ('b, 's, 'r, 'f) continuation
+      -> (('a, 'b) or_, 's, 'r, 'f) continuation
   | KIter :
       ('a, 'b * 's, 'b, 's) kinstr
       * ('a, _) ty option
@@ -1328,12 +1330,12 @@ and ('ty, 'comparable) ty =
       * ('a, 'b) pair ty_metadata
       * ('ac, 'bc, 'rc) dand
       -> (('a, 'b) pair, 'rc) ty
-  | Union_t :
+  | Or_t :
       ('a, 'ac) ty
       * ('b, 'bc) ty
-      * ('a, 'b) union ty_metadata
+      * ('a, 'b) or_ ty_metadata
       * ('ac, 'bc, 'rc) dand
-      -> (('a, 'b) union, 'rc) ty
+      -> (('a, 'b) or_, 'rc) ty
   | Lambda_t :
       ('arg, _) ty * ('ret, _) ty * ('arg, 'ret) lambda ty_metadata
       -> (('arg, 'ret) lambda, no) ty
@@ -1741,7 +1743,7 @@ let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Tx_rollup_l2_address_t ->
       meta_basic
   | Pair_t (_, _, meta, _) -> meta
-  | Union_t (_, _, meta, _) -> meta
+  | Or_t (_, _, meta, _) -> meta
   | Option_t (_, meta, _) -> meta
   | Lambda_t (_, _, meta) -> meta
   | List_t (_, meta) -> meta
@@ -1774,7 +1776,7 @@ let is_comparable : type v c. (v, c) ty -> c dbool = function
   | Address_t -> Yes
   | Tx_rollup_l2_address_t -> Yes
   | Pair_t (_, _, _, dand) -> dbool_of_dand dand
-  | Union_t (_, _, _, dand) -> dbool_of_dand dand
+  | Or_t (_, _, _, dand) -> dbool_of_dand dand
   | Option_t (_, _, cmp) -> cmp
   | Lambda_t _ -> No
   | List_t _ -> No
@@ -1839,21 +1841,19 @@ let comparable_pair_t loc l r =
 let comparable_pair_3_t loc l m r =
   comparable_pair_t loc m r >>? fun r -> comparable_pair_t loc l r
 
-let union_t :
+let or_t :
     type a ac b bc.
-    Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) union ty_ex_c tzresult
-    =
+    Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) or_ ty_ex_c tzresult =
  fun loc l r ->
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
-  Ty_ex_c (Union_t (l, r, {size}, cmp))
+  Ty_ex_c (Or_t (l, r, {size}, cmp))
 
-let union_bytes_bool_t =
-  Union_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
+let or_bytes_bool_t = Or_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
 
-let comparable_union_t loc l r =
+let comparable_or_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Union_t (l, r, {size}, YesYes)
+  Or_t (l, r, {size}, YesYes)
 
 let lambda_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -2163,8 +2163,7 @@ let ty_traverse =
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
     | Pair_t (ty1, ty2, _, _) ->
         (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
-    | Union_t (ty1, ty2, _, _) ->
-        (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Or_t (ty1, ty2, _, _) -> (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
         (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Option_t (ty1, _, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
@@ -2244,7 +2243,7 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
         (return [@ocaml.tailcall]) ()
     | Pair_t (ty1, ty2, _, _) ->
         (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
-    | Union_t (ty1, ty2, _, _) -> (
+    | Or_t (ty1, ty2, _, _) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l
         | R r -> (next [@ocaml.tailcall]) ty2 r)

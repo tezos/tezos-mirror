@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Samplers for basic Michelson values (not including pairs, unions, tickets, big maps, etc) *)
+(** Samplers for basic Michelson values (not including pairs, ors, tickets, big maps, etc) *)
 
 open Protocol
 open Base_samplers

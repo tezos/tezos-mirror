@@ -82,11 +82,11 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
         match tr with
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts)
         | _ -> (T_pair, [tl; tr]))
-    | Union_t (utl, utr, _meta, _) ->
+    | Or_t (utl, utr, _meta, _) ->
         let entrypoints_l, entrypoints_r =
           match nested_entrypoints with
           | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-          | Entrypoints_Union {left; right} -> (left, right)
+          | Entrypoints_Or {left; right} -> (left, right)
         in
         let tl =
           unparse_ty_and_entrypoints_uncarbonated ~loc utl entrypoints_l
@@ -377,7 +377,7 @@ let unparse_pair (type r) ~loc unparse_l unparse_r ctxt mode
   in
   (res, ctxt)
 
-let unparse_union ~loc unparse_l unparse_r ctxt = function
+let unparse_or ~loc unparse_l unparse_r ctxt = function
   | L l ->
       unparse_l ctxt l >|=? fun (l, ctxt) -> (Prim (loc, D_Left, [l], []), ctxt)
   | R r ->
@@ -436,10 +436,10 @@ let rec unparse_comparable_data_rec :
       let unparse_l ctxt v = unparse_comparable_data_rec ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data_rec ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | Union_t (tl, tr, _, YesYes), v ->
+  | Or_t (tl, tr, _, YesYes), v ->
       let unparse_l ctxt v = unparse_comparable_data_rec ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data_rec ~loc ctxt mode tr v in
-      unparse_union ~loc unparse_l unparse_r ctxt v
+      unparse_or ~loc unparse_l unparse_r ctxt v
   | Option_t (t, _, Yes), v ->
       let unparse_v ctxt v = unparse_comparable_data_rec ~loc ctxt mode t v in
       unparse_option ~loc unparse_v ctxt v
@@ -525,10 +525,10 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
         let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
         let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
         unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-    | Union_t (tl, tr, _, _), v ->
+    | Or_t (tl, tr, _, _), v ->
         let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
         let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
-        unparse_union ~loc unparse_l unparse_r ctxt v
+        unparse_or ~loc unparse_l unparse_r ctxt v
     | Option_t (t, _, _), v ->
         let unparse_v ctxt v = non_terminal_recursion ctxt mode t v in
         unparse_option ~loc unparse_v ctxt v

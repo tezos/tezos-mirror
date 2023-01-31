@@ -63,7 +63,7 @@ let test_comparable_options client () =
   in
   unit
 
-let test_comparable_unions client () =
+let test_comparable_or client () =
   let* () =
     Client.typecheck_data ~data:"{}" ~typ:"(set (or unit bool))" client
   in
@@ -318,7 +318,7 @@ let register ~protocols =
     [
       ("Run `comparable_unit`", test_comparable_unit);
       ("Run `comparable_options`", test_comparable_options);
-      ("Run `comparable_unions`", test_comparable_unions);
+      ("Run `comparable_or`", test_comparable_or);
       ("Run `comparable_pair`", test_comparable_pair);
       ("Run `order_of_pairs`", test_order_of_pairs);
       ("Run `comparable_chain_id`", test_comparable_chain_id);
