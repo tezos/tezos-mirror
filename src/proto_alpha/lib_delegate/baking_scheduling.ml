@@ -68,9 +68,9 @@ let find_in_known_round_intervals known_round_intervals ~predecessor_timestamp
       {predecessor_timestamp; predecessor_round; time_interval = (now, now)})
 
 (** Memoization wrapper for [Round.timestamp_of_round]. *)
-let timestamp_of_round known_timestamps round_durations ~predecessor_timestamp
-    ~predecessor_round ~round =
+let timestamp_of_round state ~predecessor_timestamp ~predecessor_round ~round =
   let open Baking_cache in
+  let known_timestamps = state.global_state.cache.known_timestamps in
   match
     Timestamp_of_round_cache.find_opt
       known_timestamps
@@ -79,7 +79,7 @@ let timestamp_of_round known_timestamps round_durations ~predecessor_timestamp
   (* Compute and register the timestamp if not already existing. *)
   | None ->
       Protocol.Alpha_context.Round.timestamp_of_round
-        round_durations
+        state.global_state.round_durations
         ~predecessor_timestamp
         ~predecessor_round
         ~round
@@ -220,32 +220,18 @@ let compute_next_round_time state =
            repropose a block at next level. *)
         None
     | None -> (
-        let first_round_duration =
-          state.global_state.constants.parametric.minimal_block_delay
-        in
-        let delay_increment_per_round =
-          state.global_state.constants.parametric.delay_increment_per_round
-        in
+        let predecessor_timestamp = proposal.predecessor.shell.timestamp in
+        let predecessor_round = proposal.predecessor.round in
+        let next_round = Round.succ state.round_state.current_round in
         match
-          Round.Durations.create_opt
-            ~first_round_duration
-            ~delay_increment_per_round
+          timestamp_of_round
+            state
+            ~predecessor_timestamp
+            ~predecessor_round
+            ~round:next_round
         with
-        | Some round_durations -> (
-            let predecessor_timestamp = proposal.predecessor.shell.timestamp in
-            let predecessor_round = proposal.predecessor.round in
-            let next_round = Round.succ state.round_state.current_round in
-            match
-              timestamp_of_round
-                state.global_state.cache.known_timestamps
-                round_durations
-                ~predecessor_timestamp
-                ~predecessor_round
-                ~round:next_round
-            with
-            | Ok timestamp -> Some (timestamp, next_round)
-            | _ -> assert false)
-        | None -> assert false)
+        | Ok timestamp -> Some (timestamp, next_round)
+        | _ -> assert false)
 
 (** [first_potential_round_at_next_level state ~earliest_round] yields
     an optional pair of the earliest possible round (at or after
@@ -387,8 +373,7 @@ let compute_next_potential_baking_time_at_next_level state =
                           >>= fun () -> Lwt.return_none
                       | None | Some _ -> (
                           timestamp_of_round
-                            state.global_state.cache.known_timestamps
-                            round_durations
+                            state
                             ~predecessor_timestamp
                             ~predecessor_round
                             ~round:first_potential_round
@@ -653,13 +638,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     }
   in
   (if synchronize then
-   let round_durations =
-     Stdlib.Option.get
-     @@ Round.Durations.create_opt
-          ~first_round_duration:constants.parametric.minimal_block_delay
-          ~delay_increment_per_round:
-            constants.parametric.delay_increment_per_round
-   in
+   create_round_durations constants >>? fun round_durations ->
    Baking_actions.compute_round current_proposal round_durations
    >>? fun current_round -> ok {current_round; current_phase = Idle}
   else ok {Baking_state.current_round = Round.zero; current_phase = Idle})
