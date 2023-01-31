@@ -56,6 +56,8 @@ type unsuccessful_status =
           the same batch. *)
   | Failed of error trace  (** The operation failed with the provided error. *)
 
+type operation_status = Successful | Unsuccessful of unsuccessful_status
+
 (** Action to be taken for unsuccessful operation. *)
 type retry_action =
   | Retry  (** The operation is retried by being re-queued for injection. *)

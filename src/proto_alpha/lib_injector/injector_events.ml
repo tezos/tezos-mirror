@@ -180,8 +180,8 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
-      ("error", Environment.Error_monad.trace_encoding)
-      ~pp2:Environment.Error_monad.pp_trace
+      ("error", Error_monad.trace_encoding)
+      ~pp2:Error_monad.pp_print_trace
 
   let injected =
     declare_2

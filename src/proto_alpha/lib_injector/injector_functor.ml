@@ -54,6 +54,58 @@ let injector_context (cctxt : #Protocol_client_context.full) =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
+let manager_operation_result_status (type kind)
+    (op_result : kind Apply_results.manager_operation_result) : operation_status
+    =
+  match op_result with
+  | Applied _ -> Successful
+  | Backtracked (_, None) -> Unsuccessful Backtracked
+  | Skipped _ -> Unsuccessful Skipped
+  | Backtracked (_, Some err)
+  (* Backtracked because internal operation failed *)
+  | Failed (_, err) ->
+      Unsuccessful (Failed (Environment.wrap_tztrace err))
+
+let operation_result_status (type kind)
+    (op_result : kind Apply_results.contents_result) : operation_status =
+  match op_result with
+  | Preendorsement_result _ -> Successful
+  | Endorsement_result _ -> Successful
+  | Dal_attestation_result _ -> Successful
+  | Seed_nonce_revelation_result _ -> Successful
+  | Vdf_revelation_result _ -> Successful
+  | Double_endorsement_evidence_result _ -> Successful
+  | Double_preendorsement_evidence_result _ -> Successful
+  | Double_baking_evidence_result _ -> Successful
+  | Activate_account_result _ -> Successful
+  | Proposals_result -> Successful
+  | Ballot_result -> Successful
+  | Drain_delegate_result _ -> Successful
+  | Manager_operation_result {operation_result; _} ->
+      manager_operation_result_status operation_result
+
+let operation_contents_status (type kind)
+    (contents : kind Apply_results.contents_result_list) ~index :
+    operation_status tzresult =
+  let rec rec_status :
+      type kind. int -> kind Apply_results.contents_result_list -> _ =
+   fun n -> function
+    | Apply_results.Single_result _ when n <> 0 ->
+        error_with "No operation with index %d" index
+    | Single_result result -> Ok (operation_result_status result)
+    | Cons_result (result, _rest) when n = 0 ->
+        Ok (operation_result_status result)
+    | Cons_result (_result, rest) -> rec_status (n - 1) rest
+  in
+  rec_status index contents
+
+let operation_status (operation : Protocol.operation_receipt) ~index :
+    operation_status tzresult =
+  match (operation : _) with
+  | No_operation_metadata ->
+      error_with "Cannot find operation status because metadata is missing"
+  | Operation_metadata {contents} -> operation_contents_status contents ~index
+
 module Make (Parameters : PARAMETERS) = struct
   module Tags = Injector_tags.Make (Parameters.Tag)
   module Tags_table = Hashtbl.Make (Parameters.Tag)
@@ -576,45 +628,28 @@ module Make (Parameters : PARAMETERS) = struct
       trace (Step_failed "simulation")
       @@ simulate_operations ~must_succeed state operations
     in
-    let results = Apply_results.to_list result in
+    let (Contents_result_list contents_result) = result in
     let failure = ref false in
     let* rev_non_failing_operations =
-      List.fold_left2_s
-        ~when_different_lengths:
-          [
-            Exn
-              (Failure
-                 "Unexpected error: length of operations and result differ in \
-                  simulation");
-          ]
-        (fun acc (_index, op) (Apply_results.Contents_result result) ->
-          match result with
-          | Apply_results.Manager_operation_result
-              {
-                operation_result =
-                  Failed (_, error) | Backtracked (_, Some error);
-                _;
-              } ->
+      List.fold_left_es
+        (fun acc (index, op) ->
+          let open Lwt_result_syntax in
+          let*? status = operation_contents_status contents_result ~index in
+          match status with
+          | Unsuccessful (Failed error) ->
               let*! () = Event.(emit2 dropping_operation) state op error in
               failure := true ;
-              Lwt.return acc
-          | Apply_results.Manager_operation_result
-              {
-                operation_result = Applied _ | Backtracked (_, None) | Skipped _;
-                _;
-              } ->
+              return acc
+          | Successful | Unsuccessful (Backtracked | Skipped | Other_branch) ->
               (* Not known to be failing *)
-              Lwt.return (op :: acc)
-          | _ ->
-              (* Only manager operations *)
-              assert false)
+              return (op :: acc))
         []
         operations
-        results
     in
     if !failure then
-      (* Invariant: must_succeed = `At_least_one, otherwise the simulation would have
-         returned an error. We try to inject without the failing operation. *)
+      (* Invariant: must_succeed = `At_least_one, otherwise the simulation would
+         have returned an error. We try to inject without the failing
+         operation. *)
       let operations = List.rev rev_non_failing_operations in
       inject_operations ~must_succeed state operations
     else
@@ -777,34 +812,28 @@ module Make (Parameters : PARAMETERS) = struct
         (* No operations injected by us *)
         return_unit
     | _ ->
-        let apply (type kind) acc ~source:_ (op : kind manager_operation)
-            (result : kind Apply_results.manager_operation_result) =
-          match op with
-          | Reveal _ ->
-              (* Ignore public key revelations because, when present, they are
-                 added by the injection function automatically. If we don't
-                 ignore them, we may have more operations than we think we
-                 injected (and end up in the assert false below). *)
-              acc
-          | _ -> (
-              let* (injected : injected_info list), included, to_retry = acc in
-              let info, injected =
-                match injected with
-                | [] -> assert false
-                (* We should have the same number of injected operations and
-                   included operations. *)
-                | i :: rest -> (i, rest)
+        let* included, to_retry =
+          List.fold_left_es
+            (fun (included, to_retry) (info : injected_info) ->
+              let*? receipt =
+                match operation.receipt with
+                | Empty ->
+                    error_with
+                      "Empty receipt for %a"
+                      Operation_hash.pp
+                      operation.hash
+                | Too_large ->
+                    error_with
+                      "Receipt too large for %a"
+                      Operation_hash.pp
+                      operation.hash
+                | Receipt r -> Ok r
               in
-              match result with
-              | Applied _ -> return (injected, info :: included, to_retry)
-              | _ -> (
-                  let status =
-                    match result with
-                    | Applied _ -> assert false
-                    | Backtracked (_, _) -> Backtracked
-                    | Skipped _ -> Skipped
-                    | Failed (_, err) -> Failed (Environment.wrap_tztrace err)
-                  in
+              let*? status = operation_status receipt ~index:info.op_index in
+              match status with
+              | Successful -> return (info :: included, to_retry)
+              | Unsuccessful status -> (
+                  let (Manager op) = info.op.L1_operation.manager_operation in
                   let*! retry =
                     Parameters.retry_unsuccessful_operation
                       state.state
@@ -812,24 +841,18 @@ module Make (Parameters : PARAMETERS) = struct
                       status
                   in
                   match retry with
-                  | Retry -> return (injected, included, info :: to_retry)
-                  | Forget -> return (injected, included, to_retry)
+                  | Retry -> return (included, info.op :: to_retry)
+                  | Forget -> return (included, to_retry)
                   | Abort err -> fail err))
+            ([], [])
+            injected_infos
         in
-        let apply_internal acc ~source:_ _op _result = acc in
-        let* unhandled_injected, included, to_retry =
-          Layer1_services.process_manager_operations
-            (return (injected_infos, [], []))
-            [[operation]]
-            {apply; apply_internal}
-        in
-        assert (unhandled_injected = []) ;
         let* () =
           add_included_operations state block level (List.rev included)
         in
         List.iter_es
           (add_pending_operation ~retry:true state)
-          (List.rev_map (fun ({op; _} : injected_info) -> op) to_retry)
+          (List.rev to_retry)
 
   (** [register_included_operations state block level oph] marks the known (by
     this injector) manager operations contained in [block] as being included. *)
