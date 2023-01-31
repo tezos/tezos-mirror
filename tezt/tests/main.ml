@@ -142,6 +142,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Monitor_operations.register ~protocols ;
   Multinode_snapshot.register ~protocols ;
   Multiple_transfers.register ~protocols ;
+  Multisig.register ~protocols ;
   Node_cors.register ~protocols ;
   Node_event_level.register ~protocols ;
   Nonce_seed_revelation.register ~protocols ;

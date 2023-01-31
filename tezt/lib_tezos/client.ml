@@ -1669,8 +1669,11 @@ let spawn_hash_script ?hooks ?for_script ~script client =
   @ optional_arg "for-script" show_hash_script_format for_script
 
 let hash_script ?hooks ?for_script ~script client =
-  spawn_hash_script ?hooks ?for_script ~script client
-  |> Process.check_and_read_stdout
+  let* client_output =
+    spawn_hash_script ?hooks ?for_script ~script client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
 
 let spawn_get_contract_hash ?hooks ~contract client =
   spawn_command
@@ -1679,8 +1682,11 @@ let spawn_get_contract_hash ?hooks ~contract client =
     ["get"; "contract"; "script"; "hash"; "for"; contract]
 
 let get_contract_hash ?hooks ~contract client =
-  spawn_get_contract_hash ?hooks ~contract client
-  |> Process.check_and_read_stdout
+  let* client_output =
+    spawn_get_contract_hash ?hooks ~contract client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
 
 let spawn_hash_scripts ?hooks ?(display_names = false) ?for_script scripts
     client =
@@ -3339,3 +3345,541 @@ let compute_chain_id_from_seed ?endpoint client seed =
     |> Process.check_and_read_stdout
   in
   return (String.trim output)
+
+let spawn_show_supported_multisig_hashes client =
+  spawn_command client @@ ["show"; "supported"; "multisig"; "hashes"]
+
+let show_supported_multisig_hashes client =
+  spawn_show_supported_multisig_hashes client |> Process.check
+
+let spawn_show_multisig_script client =
+  spawn_command client @@ ["show"; "multisig"; "script"]
+
+let show_multisig_script client =
+  spawn_show_multisig_script client |> Process.check
+
+let spawn_deploy_multisig ~new_multisig ~qty ~src ~threshold ~keys ?delegate
+    ?(force = false) ?burn_cap client =
+  spawn_command client
+  @@ [
+       "deploy";
+       "multisig";
+       new_multisig;
+       "transferring";
+       Tez.to_string qty;
+       "from";
+       src;
+       "with";
+       "threshold";
+       string_of_int threshold;
+       "on";
+       "public";
+       "keys";
+     ]
+  @ keys
+  @ optional_arg "delegate" Fun.id delegate
+  @ optional_switch "force" force
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let deploy_multisig ~new_multisig ~qty ~src ~threshold ~keys ?delegate ?force
+    ?burn_cap client =
+  spawn_deploy_multisig
+    ~new_multisig
+    ~qty
+    ~src
+    ~threshold
+    ~keys
+    ?delegate
+    ?force
+    ?burn_cap
+    client
+  |> Process.check
+
+let spawn_sign_multisig_transaction_transfer ~multisig ~qty ~dst ~key ?arg
+    ?entrypoint client =
+  spawn_command client
+  @@ [
+       "sign";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "transferring";
+       Tez.to_string qty;
+       "to";
+       dst;
+       "using";
+       "secret";
+       "key";
+       key;
+     ]
+  @ optional_arg "arg" Fun.id arg
+  @ optional_arg "entrypoint" Fun.id entrypoint
+
+let sign_multisig_transaction_transfer ~multisig ~qty ~dst ~key ?arg ?entrypoint
+    client =
+  let* client_output =
+    spawn_sign_multisig_transaction_transfer
+      ~multisig
+      ~qty
+      ~dst
+      ~key
+      ?arg
+      ?entrypoint
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_sign_multisig_transaction_run_lambda ~multisig ~lambda ~key client =
+  spawn_command client
+  @@ [
+       "sign";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "running";
+       "lambda";
+       lambda;
+       "using";
+       "secret";
+       "key";
+       key;
+     ]
+
+let sign_multisig_transaction_run_lambda ~multisig ~lambda ~key client =
+  let* client_output =
+    spawn_sign_multisig_transaction_run_lambda ~multisig ~lambda ~key client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_sign_multisig_transaction_set_delegate ~multisig ~dlgt ~key client =
+  spawn_command client
+  @@ [
+       "sign";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "setting";
+       "delegate";
+       "to";
+       dlgt;
+       "using";
+       "secret";
+       "key";
+       key;
+     ]
+
+let sign_multisig_transaction_set_delegate ~multisig ~dlgt ~key client =
+  let* client_output =
+    spawn_sign_multisig_transaction_set_delegate ~multisig ~dlgt ~key client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_sign_multisig_transaction_withdraw_delegate ~multisig ~key client =
+  spawn_command client
+  @@ [
+       "sign";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "withdrawing";
+       "delegate";
+       "using";
+       "secret";
+       "key";
+       key;
+     ]
+
+let sign_multisig_transaction_withdraw_delegate ~multisig ~key client =
+  let* client_output =
+    spawn_sign_multisig_transaction_withdraw_delegate ~multisig ~key client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_sign_multisig_transaction_set_threshold_and_public_keys ~multisig
+    ~signing_key ~threshold ~public_keys client =
+  spawn_command client
+  @@ [
+       "sign";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "using";
+       "secret";
+       "key";
+       signing_key;
+       "setting";
+       "threshold";
+       "to";
+       string_of_int threshold;
+       "and";
+       "public";
+       "keys";
+       "to";
+     ]
+  @ public_keys
+
+let sign_multisig_transaction_set_threshold_and_public_keys ~multisig
+    ~signing_key ~threshold ~public_keys client =
+  let* client_output =
+    spawn_sign_multisig_transaction_set_threshold_and_public_keys
+      ~multisig
+      ~signing_key
+      ~threshold
+      ~public_keys
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_from_multisig_transfer ~multisig ~qty ~dst ~src ~signatures ?arg
+    ?burn_cap ?entrypoint client =
+  spawn_command client
+  @@ [
+       "from";
+       "multisig";
+       "contract";
+       multisig;
+       "transfer";
+       Tez.to_string qty;
+       "to";
+       dst;
+       "on";
+       "behalf";
+       "of";
+       src;
+       "with";
+       "signatures";
+     ]
+  @ signatures
+  @ optional_arg "arg" Fun.id arg
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "entrypoint" Fun.id entrypoint
+
+let from_multisig_transfer ~multisig ~qty ~dst ~src ~signatures ?arg ?burn_cap
+    ?entrypoint client =
+  spawn_from_multisig_transfer
+    ~multisig
+    ~qty
+    ~dst
+    ~src
+    ~signatures
+    ?arg
+    ?burn_cap
+    ?entrypoint
+    client
+  |> Process.check
+
+let spawn_from_multisig_run_lambda ~multisig ~lambda ~src ~signatures ?burn_cap
+    client =
+  spawn_command client
+  @@ [
+       "from";
+       "multisig";
+       "contract";
+       multisig;
+       "run";
+       "lambda";
+       lambda;
+       "on";
+       "behalf";
+       "of";
+       src;
+       "with";
+       "signatures";
+     ]
+  @ signatures
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let from_multisig_run_lambda ~multisig ~lambda ~src ~signatures ?burn_cap client
+    =
+  spawn_from_multisig_run_lambda
+    ~multisig
+    ~lambda
+    ~src
+    ~signatures
+    ?burn_cap
+    client
+  |> Process.check
+
+let spawn_set_delegate_of_multisig ~multisig ~dlgt ~src ~signatures ?burn_cap
+    client =
+  spawn_command client
+  @@ [
+       "set";
+       "delegate";
+       "of";
+       "multisig";
+       "contract";
+       multisig;
+       "to";
+       dlgt;
+       "on";
+       "behalf";
+       "of";
+       src;
+       "with";
+       "signatures";
+     ]
+  @ signatures
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let set_delegate_of_multisig ~multisig ~dlgt ~src ~signatures ?burn_cap client =
+  spawn_set_delegate_of_multisig
+    ~multisig
+    ~dlgt
+    ~src
+    ~signatures
+    ?burn_cap
+    client
+  |> Process.check
+
+let spawn_withdraw_delegate_of_multisig ~multisig ~src ~signatures ?burn_cap
+    client =
+  spawn_command client
+  @@ [
+       "withdraw";
+       "delegate";
+       "of";
+       "multisig";
+       "contract";
+       multisig;
+       "on";
+       "behalf";
+       "of";
+       src;
+       "with";
+       "signatures";
+     ]
+  @ signatures
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let withdraw_delegate_of_multisig ~multisig ~src ~signatures ?burn_cap client =
+  spawn_withdraw_delegate_of_multisig
+    ~multisig
+    ~src
+    ~signatures
+    ?burn_cap
+    client
+  |> Process.check
+
+let spawn_set_threshold_of_multisig ~multisig ~threshold ~public_keys ~src
+    ~signatures ?burn_cap client =
+  spawn_command client
+  @@ [
+       "set";
+       "threshold";
+       "of";
+       "multisig";
+       "contract";
+       multisig;
+       "to";
+       string_of_int threshold;
+       "and";
+       "public";
+       "keys";
+       "to";
+     ]
+  @ public_keys
+  @ ["on"; "behalf"; "of"; src; "with"; "signatures"]
+  @ signatures
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let set_threshold_of_multisig ~multisig ~threshold ~public_keys ~src ~signatures
+    ?burn_cap client =
+  spawn_set_threshold_of_multisig
+    ~multisig
+    ~threshold
+    ~public_keys
+    ~src
+    ~signatures
+    ?burn_cap
+    client
+  |> Process.check
+
+let spawn_run_transaction_on_multisig ~bytes ~multisig ~src ~signatures
+    ?burn_cap client =
+  spawn_command client
+  @@ [
+       "run";
+       "transaction";
+       bytes;
+       "on";
+       "multisig";
+       "contract";
+       multisig;
+       "on";
+       "behalf";
+       "of";
+       src;
+       "with";
+       "signatures";
+     ]
+  @ signatures
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let run_transaction_on_multisig ~bytes ~multisig ~src ~signatures ?burn_cap
+    client =
+  spawn_run_transaction_on_multisig
+    ~bytes
+    ~multisig
+    ~src
+    ~signatures
+    ?burn_cap
+    client
+  |> Process.check
+
+let spawn_prepare_multisig_transaction ~multisig ~qty ~dst ?arg ?entrypoint
+    ?(bytes_only = false) client =
+  spawn_command client
+  @@ [
+       "prepare";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "transferring";
+       Tez.to_string qty;
+       "to";
+       dst;
+     ]
+  @ optional_arg "arg" Fun.id arg
+  @ optional_arg "entrypoint" Fun.id entrypoint
+  @ optional_switch "bytes-only" bytes_only
+
+let prepare_multisig_transaction ~multisig ~qty ~dst ?arg ?entrypoint
+    ?bytes_only client =
+  let* client_output =
+    spawn_prepare_multisig_transaction
+      ~multisig
+      ~qty
+      ~dst
+      ?arg
+      ?entrypoint
+      ?bytes_only
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_prepare_multisig_transaction_run_lambda ~multisig ~lambda
+    ?(bytes_only = false) client =
+  spawn_command client
+  @@ [
+       "prepare";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "running";
+       "lambda";
+       lambda;
+     ]
+  @ optional_switch "bytes-only" bytes_only
+
+let prepare_multisig_transaction_run_lambda ~multisig ~lambda ?bytes_only client
+    =
+  let* client_output =
+    spawn_prepare_multisig_transaction_run_lambda
+      ~multisig
+      ~lambda
+      ?bytes_only
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_prepare_multisig_transaction_set_delegate ~multisig ~dlgt
+    ?(bytes_only = false) client =
+  spawn_command client
+  @@ [
+       "prepare";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "setting";
+       "delegate";
+       "to";
+       dlgt;
+     ]
+  @ optional_switch "bytes-only" bytes_only
+
+let prepare_multisig_transaction_set_delegate ~multisig ~dlgt ?bytes_only client
+    =
+  let* client_output =
+    spawn_prepare_multisig_transaction_set_delegate
+      ~multisig
+      ~dlgt
+      ?bytes_only
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_prepare_multisig_transaction_withdraw_delegate ~multisig
+    ?(bytes_only = false) client =
+  spawn_command client
+  @@ [
+       "prepare";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "withdrawing";
+       "delegate";
+     ]
+  @ optional_switch "bytes-only" bytes_only
+
+let prepare_multisig_transaction_withdraw_delegate ~multisig ?bytes_only client
+    =
+  let* client_output =
+    spawn_prepare_multisig_transaction_withdraw_delegate
+      ~multisig
+      ?bytes_only
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
+
+let spawn_prepare_multisig_transaction_set_threshold_and_public_keys ~multisig
+    ~threshold ~public_keys ?(bytes_only = false) client =
+  spawn_command client
+  @@ [
+       "prepare";
+       "multisig";
+       "transaction";
+       "on";
+       multisig;
+       "setting";
+       "threshold";
+       "to";
+       string_of_int threshold;
+       "and";
+       "public";
+       "keys";
+       "to";
+     ]
+  @ public_keys
+  @ optional_switch "bytes-only" bytes_only
+
+let prepare_multisig_transaction_set_threshold_and_public_keys ~multisig
+    ~threshold ~public_keys ?bytes_only client =
+  let* client_output =
+    spawn_prepare_multisig_transaction_set_threshold_and_public_keys
+      ~multisig
+      ~threshold
+      ~public_keys
+      ?bytes_only
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)

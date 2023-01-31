@@ -54,11 +54,9 @@ let test_contract_hash_with_origination ~protocol () =
       client
   in
   let* received_script_hash = Client.hash_script client ~script in
-  let returned_script_hash = String.trim received_script_hash in
   let* received_contract_hash = Client.get_contract_hash client ~contract in
-  let returned_contract_hash = String.trim received_contract_hash in
   Check.(
-    (returned_script_hash = returned_contract_hash)
+    (received_script_hash = received_contract_hash)
       string
       ~__LOC__
       ~error_msg:"Expected contract hash %R, got %L") ;

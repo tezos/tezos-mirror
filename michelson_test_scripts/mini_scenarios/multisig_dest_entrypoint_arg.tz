@@ -1,0 +1,3 @@
+parameter (or (int %a) (string %b));
+storage unit;
+code {CDR; NIL operation; PAIR}

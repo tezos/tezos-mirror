@@ -59,8 +59,7 @@ let test_bad_indentation_hash =
   let script =
     Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
   in
-  let* received = Client.hash_script ~script client in
-  let returned_hash = String.trim received in
+  let* returned_hash = Client.hash_script ~script client in
   Check.(
     (returned_hash = script_hash)
       string
@@ -101,8 +100,7 @@ let test_formatted_hash =
       ~dst_format:`Michelson
       client
   in
-  let* received = Client.hash_script ~script:formatted_script client in
-  let returned_hash = String.trim received in
+  let* returned_hash = Client.hash_script ~script:formatted_script client in
   Check.(
     (returned_hash = script_hash)
       string
