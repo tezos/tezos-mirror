@@ -3711,7 +3711,7 @@ end = struct
     type t = {main : target; embedded : target}
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
-        ?benchmark_type_inference ?sc_rollup ~main ~name () =
+        ?benchmark_type_inference ?octez_sc_rollup ~main ~name () =
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
@@ -3904,7 +3904,7 @@ end = struct
               octez_benchmark;
               benchmark |> if_some |> open_;
               benchmark_type_inference |> if_some |> open_;
-              sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
+              octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
               parameters |> if_some |> if_ N.(number >= 016) |> open_;
@@ -4898,7 +4898,7 @@ module Protocol = Protocol
         ~inline_tests:ppx_expect
         ~linkall:true
     in
-    let sc_rollup =
+    let octez_sc_rollup =
       only_if N.(number >= 016) @@ fun () ->
       public_lib
         (sf "tezos-smart-rollup-%s" name_dash)
@@ -4917,46 +4917,16 @@ module Protocol = Protocol
         ~inline_tests:ppx_expect
         ~linkall:true
     in
-    let _sc_rollup_client =
+    let octez_sc_rollup_node =
       only_if (active && N.(number >= 016)) @@ fun () ->
-      public_exe
-        (sf "octez-smart-rollup-client-%s" short_hash)
-        ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
-        ~path:(path // "bin_sc_rollup_client")
-        ~synopsis:
-          "Tezos/Protocol: `octez-smart-rollup-client-alpha` client binary"
-        ~release_status:executable_release_status
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_clic;
-            octez_client_base;
-            client |> if_some |> open_;
-            octez_client_commands |> open_;
-            octez_stdlib_unix |> open_;
-            octez_client_base_unix |> open_;
-            octez_rpc_http;
-            octez_rpc_http_client_unix |> open_;
-            main |> open_;
-            sc_rollup |> if_some |> open_;
-            uri;
-          ]
-    in
-    let _sc_rollup_node =
-      only_if (active && N.(number >= 016)) @@ fun () ->
-      public_exe
-        (sf "octez-smart-rollup-node-%s" short_hash)
-        ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
-        ~path:(path // "bin_sc_rollup_node")
-        ~synopsis:"Tezos/Protocol: Smart Rollup node binary"
-        ~release_status:executable_release_status
+      private_lib
+        (sf "octez_smart_rollup_node_%s" short_hash)
+        ~path:(path // "lib_sc_rollup_node")
+        ~opam:(sf "octez-smart-rollup-node-%s" short_hash)
         ~deps:
           [
             octez_base |> open_ |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_clic;
-            octez_client_commands |> open_;
             octez_stdlib_unix |> open_;
             octez_client_base |> open_;
             octez_client_base_unix |> open_;
@@ -4973,7 +4943,7 @@ module Protocol = Protocol
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
             octez_shell_services |> open_;
-            sc_rollup |> if_some |> open_;
+            octez_sc_rollup |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
             tree_encoding;
@@ -4989,6 +4959,63 @@ module Protocol = Protocol
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             prometheus_app |> if_ N.(number >= 016);
             octez_node_config |> if_ N.(number >= 016);
+          ]
+    in
+    let octez_sc_rollup_client =
+      only_if (active && N.(number >= 016)) @@ fun () ->
+      private_lib
+        (sf "octez_smart_rollup_client_%s" short_hash)
+        ~path:(path // "lib_sc_rollup_client")
+        ~opam:(sf "octez-smart-rollup-client-%s" short_hash)
+        ~deps:
+          [
+            octez_base |> open_ |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            main |> open_;
+            octez_client_commands |> open_;
+            octez_client_base |> open_;
+            octez_client_base_unix |> open_;
+            client |> if_some |> open_;
+            octez_sc_rollup |> if_some |> open_;
+          ]
+    in
+    let _sc_rollup_client =
+      only_if (active && N.(number >= 016)) @@ fun () ->
+      public_exe
+        (sf "octez-smart-rollup-client-%s" short_hash)
+        ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
+        ~path:(path // "bin_sc_rollup_client")
+        ~synopsis:"Tezos/Protocol: Smart rollup client"
+        ~release_status:executable_release_status
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic;
+            main |> open_;
+            octez_sc_rollup_client |> if_some |> open_;
+          ]
+    in
+    let _sc_rollup_node =
+      only_if (active && N.(number >= 016)) @@ fun () ->
+      public_exe
+        (sf "octez-smart-rollup-node-%s" short_hash)
+        ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
+        ~path:(path // "bin_sc_rollup_node")
+        ~synopsis:"Tezos/Protocol: protocol specific Smart rollup node"
+        ~release_status:executable_release_status
+        ~deps:
+          [
+            octez_base |> open_ |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic;
+            main |> open_;
+            octez_shell_services |> open_;
+            octez_client_base |> open_;
+            octez_client_base_unix |> open_;
+            octez_client_commands |> open_;
+            client |> if_some |> open_;
+            octez_sc_rollup_node |> if_some |> open_;
           ]
     in
     let tx_rollup =
@@ -5301,7 +5328,7 @@ module Protocol = Protocol
           ?client
           ?benchmark:(Option.bind benchmark Fun.id)
           ?benchmark_type_inference
-          ?sc_rollup
+          ?octez_sc_rollup
           ~main
           ~name
           ()
