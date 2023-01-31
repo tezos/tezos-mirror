@@ -397,6 +397,12 @@ let _alcotezt =
   public_lib
     "octez-alcotezt"
     ~path:"tezt/lib_alcotezt"
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4727
+
+         we mark "octez-alcotezt" as released but the real solution is to
+         modify the manifest to add build instructions for dune to be
+         used `with-test` *)
+    ~release_status:Released
     ~synopsis:
       "Provide the interface of Alcotest for Octez, but with Tezt as backend"
     ~js_compatible:true
