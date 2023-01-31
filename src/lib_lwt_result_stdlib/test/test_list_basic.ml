@@ -329,6 +329,248 @@ module Shuffle = struct
     ]
 end
 
+module Doubles = struct
+  let ( ++ ) a b =
+    (* The operator [++] is a non-associative, non-commutative function. This is
+       important for testing because it allows to test that the order of
+       traversal are correct. *)
+    ((a + 1) * 2) + (b + 2)
+
+  let iter2 _ =
+    assert (
+      iter2 ~when_different_lengths:() (fun _ _ -> assert false) [] [] = Ok ()) ;
+    assert (
+      iter2 ~when_different_lengths:() (fun _ _ -> assert false) [0] []
+      = Error ()) ;
+    assert (
+      iter2 ~when_different_lengths:() (fun _ _ -> assert false) [] [0]
+      = Error ()) ;
+    assert (
+      let r = ref 0 in
+      match
+        iter2 ~when_different_lengths:() (fun x y -> r := !r ++ x ++ y) [0] [0]
+      with
+      | Ok () -> !r = 0 ++ 0 ++ 0
+      | Error _ -> false) ;
+    assert (
+      let r = ref 0 in
+      match
+        iter2
+          ~when_different_lengths:()
+          (fun x y -> r := !r ++ x ++ y)
+          [11]
+          [10; 1]
+      with
+      | Ok _ -> false
+      | Error () -> !r = 0 ++ 11 ++ 10) ;
+    assert (
+      let r = ref 0 in
+      match
+        iter2 ~when_different_lengths:() (fun x y -> r := !r ++ x ++ y) [1] [2]
+      with
+      | Ok () -> !r = 0 ++ 1 ++ 2
+      | Error _ -> false) ;
+    assert (
+      let r = ref 0 in
+      match
+        iter2
+          ~when_different_lengths:()
+          (fun x y -> r := !r ++ x ++ y)
+          [1; 0]
+          [2; 4]
+      with
+      | Ok () -> !r = 0 ++ 1 ++ 2 ++ 0 ++ 4
+      | Error _ -> false) ;
+    ()
+
+  let map2 _ =
+    assert (
+      map2 ~when_different_lengths:() (fun _ _ -> assert false) [] [] = Ok []) ;
+    assert (
+      map2 ~when_different_lengths:() (fun _ _ -> assert false) [0] []
+      = Error ()) ;
+    assert (
+      map2 ~when_different_lengths:() (fun _ _ -> assert false) [] [0]
+      = Error ()) ;
+    assert (
+      map2 ~when_different_lengths:() (fun x y -> x ++ y) [0] [0] = Ok [0 ++ 0]) ;
+    assert (
+      map2 ~when_different_lengths:() (fun x y -> x ++ y) [0; 1] [0] = Error ()) ;
+    assert (
+      map2 ~when_different_lengths:() (fun x y -> x ++ y) [1] [2] = Ok [1 ++ 2]) ;
+    assert (
+      map2 ~when_different_lengths:() (fun x y -> x ++ y) [0; 1] [3; 2]
+      = Ok [0 ++ 3; 1 ++ 2]) ;
+    ()
+
+  let rev_map2 _ =
+    assert (
+      rev_map2 ~when_different_lengths:() (fun _ _ -> assert false) [] []
+      = Ok []) ;
+    assert (
+      rev_map2 ~when_different_lengths:() (fun _ _ -> assert false) [0] []
+      = Error ()) ;
+    assert (
+      rev_map2 ~when_different_lengths:() (fun _ _ -> assert false) [] [0]
+      = Error ()) ;
+    assert (
+      rev_map2 ~when_different_lengths:() (fun x y -> x ++ y) [0; 1] [0]
+      = Error ()) ;
+    assert (
+      rev_map2 ~when_different_lengths:() (fun x y -> x ++ y) [0] [0]
+      = Ok [0 ++ 0]) ;
+    assert (
+      rev_map2 ~when_different_lengths:() (fun x y -> x ++ y) [1] [2]
+      = Ok [1 ++ 2]) ;
+    assert (
+      rev_map2 ~when_different_lengths:() (fun x y -> x ++ y) [0; 1] [3; 2]
+      = Ok [1 ++ 2; 0 ++ 3]) ;
+    ()
+
+  let fold_left2 _ =
+    assert (
+      fold_left2 ~when_different_lengths:() (fun acc _ _ -> acc) 0 [] [] = Ok 0) ;
+    assert (
+      fold_left2 ~when_different_lengths:() (fun _ _ _ -> assert false) 0 [0] []
+      = Error ()) ;
+    assert (
+      fold_left2 ~when_different_lengths:() (fun _ _ _ -> assert false) 0 [] [0]
+      = Error ()) ;
+    assert (
+      fold_left2
+        ~when_different_lengths:()
+        (fun acc x y -> acc ++ x ++ y)
+        0
+        [0]
+        [0]
+      = Ok (0 ++ 0 ++ 0)) ;
+    assert (
+      fold_left2
+        ~when_different_lengths:()
+        (fun acc x y -> acc ++ x ++ y)
+        0
+        [0; 1]
+        [0]
+      = Error ()) ;
+    assert (
+      fold_left2
+        ~when_different_lengths:()
+        (fun acc x y -> acc ++ x ++ y)
+        0
+        [1]
+        [2]
+      = Ok (0 ++ 1 ++ 2)) ;
+    assert (
+      fold_left2
+        ~when_different_lengths:()
+        (fun acc x y -> acc ++ x ++ y)
+        0
+        [0; 1]
+        [3; 2]
+      = Ok (0 ++ 0 ++ 3 ++ 1 ++ 2)) ;
+    ()
+
+  let fold_right2 _ =
+    assert (
+      fold_right2 ~when_different_lengths:() (fun _ _ acc -> acc) [] [] 0 = Ok 0) ;
+    assert (
+      fold_right2
+        ~when_different_lengths:()
+        (fun _ _ _ -> assert false)
+        [0]
+        []
+        0
+      = Error ()) ;
+    assert (
+      fold_right2
+        ~when_different_lengths:()
+        (fun _ _ _ -> assert false)
+        []
+        [0]
+        0
+      = Error ()) ;
+    assert (
+      fold_right2
+        ~when_different_lengths:()
+        (fun x y acc -> acc ++ x ++ y)
+        [0]
+        [0]
+        0
+      = Ok (0 ++ 0 ++ 0)) ;
+    assert (
+      fold_right2
+        ~when_different_lengths:()
+        (fun x y acc -> acc ++ x ++ y)
+        [0; 1]
+        [0]
+        0
+      = Error ()) ;
+    assert (
+      fold_right2
+        ~when_different_lengths:()
+        (fun x y acc -> acc ++ x ++ y)
+        [1]
+        [2]
+        0
+      = Ok (0 ++ 1 ++ 2)) ;
+    assert (
+      fold_right2
+        ~when_different_lengths:()
+        (fun x y acc -> acc ++ x ++ y)
+        [0; 1]
+        [3; 2]
+        0
+      = Ok (0 ++ 1 ++ 2 ++ 0 ++ 3)) ;
+    ()
+
+  let for_all2 _ =
+    assert (
+      for_all2 ~when_different_lengths:() (fun _ _ -> assert false) [] []
+      = Ok true) ;
+    assert (
+      for_all2 ~when_different_lengths:() (fun _ _ -> assert false) [0] []
+      = Error ()) ;
+    assert (
+      for_all2 ~when_different_lengths:() (fun _ _ -> assert false) [] [0]
+      = Error ()) ;
+    assert (for_all2 ~when_different_lengths:() ( = ) [0] [0] = Ok true) ;
+    assert (for_all2 ~when_different_lengths:() ( = ) [0; 1] [0] = Error ()) ;
+    assert (for_all2 ~when_different_lengths:() ( = ) [1; 1] [0] = Ok false) ;
+    assert (for_all2 ~when_different_lengths:() ( = ) [1] [2] = Ok false) ;
+    assert (for_all2 ~when_different_lengths:() ( = ) [0; 1] [3; 2] = Ok false) ;
+    assert (for_all2 ~when_different_lengths:() ( = ) [3; 2] [3; 2] = Ok true) ;
+    ()
+
+  let exists2 _ =
+    assert (
+      exists2 ~when_different_lengths:() (fun _ _ -> assert false) [] []
+      = Ok false) ;
+    assert (
+      exists2 ~when_different_lengths:() (fun _ _ -> assert false) [0] []
+      = Error ()) ;
+    assert (
+      exists2 ~when_different_lengths:() (fun _ _ -> assert false) [] [0]
+      = Error ()) ;
+    assert (exists2 ~when_different_lengths:() ( = ) [0] [0] = Ok true) ;
+    assert (exists2 ~when_different_lengths:() ( = ) [0; 1] [0] = Ok true) ;
+    assert (exists2 ~when_different_lengths:() ( = ) [1; 1] [0] = Error ()) ;
+    assert (exists2 ~when_different_lengths:() ( = ) [1] [2] = Ok false) ;
+    assert (exists2 ~when_different_lengths:() ( = ) [0; 1] [3; 2] = Ok false) ;
+    assert (exists2 ~when_different_lengths:() ( = ) [2; 2] [3; 2] = Ok true) ;
+    ()
+
+  let tests =
+    [
+      Alcotest.test_case "iter2" `Quick iter2;
+      Alcotest.test_case "map2" `Quick map2;
+      Alcotest.test_case "rev_map2" `Quick rev_map2;
+      Alcotest.test_case "fold_left2" `Quick fold_left2;
+      Alcotest.test_case "fold_right2" `Quick fold_right2;
+      Alcotest.test_case "for_all2" `Quick for_all2;
+      Alcotest.test_case "exists2" `Quick exists2;
+    ]
+end
+
 let () =
   Alcotest.run
     "list-basic"
@@ -341,4 +583,5 @@ let () =
       ("partition_*", Partition.tests);
       ("shuffle", Shuffle.tests);
       ("product", Product.tests);
+      ("*2", Doubles.tests);
     ]
