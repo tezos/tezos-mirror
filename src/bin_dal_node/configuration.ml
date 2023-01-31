@@ -54,7 +54,7 @@ let neighbor_encoding : neighbor Data_encoding.t =
   conv
     (fun {addr; port} -> (addr, port))
     (fun (addr, port) -> {addr; port})
-    (obj2 (req "rpc-addr" string) (req "rpc-port" int16))
+    (obj2 (req "rpc-addr" string) (req "rpc-port" uint16))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -75,7 +75,7 @@ let encoding : t Data_encoding.t =
           string
           default_data_dir)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+       (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
        (dft
           "neighbors"
           ~description:"DAL Neighbors"
