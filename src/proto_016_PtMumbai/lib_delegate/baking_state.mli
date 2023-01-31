@@ -28,8 +28,8 @@ open Alpha_context
 
 type consensus_key = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.public_key;
-  public_key_hash : Tezos_crypto.Signature.public_key_hash;
+  public_key : Signature.public_key;
+  public_key_hash : Signature.public_key_hash;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -37,8 +37,7 @@ val consensus_key_encoding : consensus_key Data_encoding.t
 
 val pp_consensus_key : Format.formatter -> consensus_key -> unit
 
-type consensus_key_and_delegate =
-  consensus_key * Tezos_crypto.Signature.Public_key_hash.t
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
 
 val consensus_key_and_delegate_encoding :
   consensus_key_and_delegate Data_encoding.t
@@ -97,7 +96,7 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 
 module SlotMap : Map.S with type key = Slot.t
 
-type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
+type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
 type delegate_slots = {
   own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
@@ -146,6 +145,8 @@ type state = {
 }
 
 type t = state
+
+val update_current_phase : t -> phase -> t
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
