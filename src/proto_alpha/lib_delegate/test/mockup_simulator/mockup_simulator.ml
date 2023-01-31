@@ -327,9 +327,36 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
               else Protocol.hash);
           }
 
+    let may_lie_on_proto_level block x =
+      (* As for ../protocols, the baker distinguishes activation
+         blocks from "normal" blocks by comparing the [proto_level] of
+         the shell header and its predecessor. If the predecessor's
+         one is different, it must mean that we are considering an
+         activation block and must not endorse. Here, we do a bit of
+         hacking in order to return a different proto_level for the
+         predecessor of the genesis block which is considered as the
+         current protocol activation block. To perfectly mimic what is
+         supposed to happen, the first mocked up block created should
+         be made in the genesis protocol, however, it is not what's
+         done in the mockup mode. *)
+      let is_predecessor_of_genesis =
+        match block with
+        | `Hash (requested_hash, rel) ->
+            Int.equal rel 0
+            && Block_hash.equal requested_hash genesis_predecessor_block_hash
+        | _ -> false
+      in
+      if is_predecessor_of_genesis then
+        {
+          x.rpc_context.block_header with
+          proto_level = pred x.rpc_context.block_header.proto_level;
+        }
+      else x.rpc_context.block_header
+
     let raw_header (block : Tezos_shell_services.Block_services.block) :
         bytes tzresult Lwt.t =
       locate_block state block >>=? fun x ->
+      let shell = may_lie_on_proto_level block x in
       let protocol_data =
         Data_encoding.Binary.to_bytes_exn
           Protocol.block_header_data_encoding
@@ -338,16 +365,17 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
       return
         (Data_encoding.Binary.to_bytes_exn
            Tezos_base.Block_header.encoding
-           {shell = x.rpc_context.block_header; protocol_data})
+           {shell; protocol_data})
 
     let header (block : Tezos_shell_services.Block_services.block) :
         Mockup.M.Block_services.block_header tzresult Lwt.t =
       locate_block state block >>=? fun x ->
+      let shell = may_lie_on_proto_level block x in
       return
         {
           Mockup.M.Block_services.hash = x.rpc_context.block_hash;
           chain_id;
-          shell = x.rpc_context.block_header;
+          shell;
           protocol_data = x.protocol_data;
         }
 
