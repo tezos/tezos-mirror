@@ -562,7 +562,7 @@ let encoding : t Data_encoding.t =
                "Operators that sign operations of the smart rollup, by purpose"
              operators_encoding)
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-          (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+          (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
           (opt "metrics-addr" ~description:"Metrics address" string)
           (dft
              "reconnection_delay"
@@ -590,7 +590,7 @@ let encoding : t Data_encoding.t =
              Loser_mode.no_failures))
        (obj5
           (dft "DAL node address" string default_dal_node_addr)
-          (dft "DAL node port" int16 default_dal_node_port)
+          (dft "DAL node port" uint16 default_dal_node_port)
           (dft "batcher" batcher_encoding default_batcher)
           (dft
              "injector_retention_period"
