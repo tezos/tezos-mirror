@@ -28,49 +28,55 @@
     required to instantiate [Dac_node_client.(#cctxt)]. *)
 type host_and_port = {host : string; port : int}
 
-(** Configuration type for coordinators. *)
-type coordinator = {
-  threshold : int;
-      (** The number of signatures required from DAC members to consider a
-      message valid. *)
-  dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
-      (** The list of tz4 addresses denoting the dac members. *)
-}
+(** Coordinator specific configuration. *)
+module Coordinator : sig
+  (** The type of a coordinator specific configuration mode. *)
+  type t
 
-(** Configuration type for dac members. *)
-type dac_member = {
-  coordinator_rpc_address : string;  (** RPC address of the coordinator. *)
-  coordinator_rpc_port : int;  (** RPC port of the coordinator. *)
-  address : Tezos_crypto.Aggregate_signature.public_key_hash;
-      (** Tz4 address of the DAC member. *)
-}
+  (* [committee_members_addresses t] retrieves the addresses of the committee
+     members from the coordinator configuration [t].*)
+  val committee_members_addresses :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
+end
 
-(** Configuation type for observers. *)
-type observer = {
-  coordinator_rpc_address : string;  (** RPC address of the coordinator. *)
-  coordinator_rpc_port : int;  (** RPC port of the coordinator. *)
-}
+(** Committee_member specific configuration. *)
+module Committee_member : sig
+  (** The type of a Committee_member specific configuration mode. *)
+  type t
+end
 
-(** Configuration type for legacy mode. *)
-type legacy = {
-  threshold : int;
-      (** The number of signatures required from DAC members to consider a
-      message valid. *)
-  dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
-      (** The list of tz4 addresses denoting the dac members. *)
-  dac_cctxt_config : host_and_port option;
-      (**  When running integration tests with multiple dac nodes in the
-           [legacy] mode [dac_cctxt_config] is used to create
-           [Dac_node_client.cctxt] for the node that mimics coordinator. *)
-}
+(** Observer specific configuration. *)
+module Observer : sig
+  (** The type of an Observer specific configuration mode. *)
+  type t
+end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4707.
-   Remove legacy mode once other DAC operating modes are fully functional. *)
-type mode =
-  | Coordinator of coordinator
-  | Dac_member of dac_member
-  | Observer of observer
-  | Legacy of legacy
+(** Legacy specific configuration. *)
+module Legacy : sig
+  (** The type of a legacy-specific configuration mode. *)
+  type t
+
+  (* [committee_members_addresses t] retrieves the addresses of the committee
+     members from the legacy configuration [t].*)
+  val committee_members_addresses :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
+
+  (* [threshold t] retrieves the Data Availability Committee threshold from
+     the legacy configuration [t]. *)
+  val threshold : t -> int
+
+  (* [host_and_port t] retrieves the host and port of the node that serves
+     as a coordinator for the DAC, if any is specified in the legacy node
+     condiguration. *)
+  val dac_cctxt_config : t -> host_and_port option
+end
+
+(** Mode specific fragment of a configuration. *)
+type mode = private
+  | Coordinator of Coordinator.t
+  | Committee_member of Committee_member.t
+  | Observer of Observer.t
+  | Legacy of Legacy.t
 
 type t = {
   data_dir : string;  (** The path to the DAC node data directory. *)
@@ -83,12 +89,45 @@ type t = {
           DAC. *)
 }
 
+(** [make_coordinator threshold dac_members_addresses] creates a new coordinator
+    configuration mode using the given [threshold] and [dac_members_addresses].
+*)
+val make_coordinator :
+  int -> Tezos_crypto.Aggregate_signature.public_key_hash list -> mode
+
+(** [make_committee_member coordinator_rpc_address coordinator_rpc_port
+    committee_member_address] creates a new committee-member configuration
+    mode using the given address and port for the coordinator, and the given
+    [committee_member_address]. *)
+val make_committee_member :
+  string -> int -> Tezos_crypto.Aggregate_signature.public_key_hash -> mode
+
+(** [make_observer coordinator_rpc_address coordinator_rpc_port]
+    creates a new observer configuration using the given address and
+    port for the coordinator, and the given [committee_member_address]. *)
+val make_observer : string -> int -> mode
+
+(** [make_legacy ?coordinator_host_and_port threshold
+    committee_members_addresses]
+    creates a new legacy configuration mode with the specified input
+    parameters. If [host_and_port] is specified, then it will use as the
+    address of the coordinator node for the Data Availability Committee. *)
+val make_legacy :
+  ?coordinator_host_and_port:host_and_port ->
+  int ->
+  Tezos_crypto.Aggregate_signature.public_key_hash trace ->
+  mode
+
 (** [filename config] gets the path to config file *)
 val filename : t -> string
 
 (** [data_dir_path config subpath] builds a subpath relatively to the
     [config] *)
 val data_dir_path : t -> string -> string
+
+(* [reveal_data_dir config] returns the reveal data directory of
+   [config]. *)
+val reveal_data_dir : t -> string
 
 (** [default_data_dir] is the data directory that the DAC node
     will use, when one is not specified in the configuration:
@@ -114,3 +153,6 @@ val save : t -> unit tzresult Lwt.t
 (** [load ~data_dir] config tries to load the configuration of the DAC node
     from [data_dir]. *)
 val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+
+(** [mode config] returns the mode specific configuration of [config]. *)
+val mode : t -> mode
