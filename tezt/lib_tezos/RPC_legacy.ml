@@ -217,17 +217,18 @@ module Curl = struct
     let* output = Process.check_and_read_stdout process in
     return (JSON.parse ~origin:url output)
 
-  let get ?(args = []) url =
-    let process = Process.spawn "curl" (args @ ["-s"; url]) in
+  let get ?runner ?(args = []) url =
+    let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
     Runnable.{value = process; run = parse url}
 
-  let get_raw ?(args = []) url =
-    let process = Process.spawn "curl" (args @ ["-s"; url]) in
+  let get_raw ?runner ?(args = []) url =
+    let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
     Runnable.{value = process; run = Process.check_and_read_stdout}
 
-  let post ?(args = []) url data =
+  let post ?runner ?(args = []) url data =
     let process =
       Process.spawn
+        ?runner
         "curl"
         (args
         @ [
