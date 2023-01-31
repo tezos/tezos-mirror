@@ -23,19 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Each worker gets an interval of [interval_size] ports to work with.
-   The default starting port is 16384.
-   With an interval size of 1000 we can use -j 16 and stay below port 32768.
-   This means that we can run 500 nodes in the same test. *)
-let interval_size = 1000
+(* The trick for generating a fresh port relies on a non-POSIX but
+   standard behavior implemented by many operating systems, including
+   Linux and macOS.
 
-let next = ref 0
-
+   [Unix.bind] binds the address (IP with port) given in parameters to
+   the socket. If the port of the address given is [0], a fresh port
+   is used, then the operating system actually replace the port with a
+   fresh port which is known not used by the operating
+   system. Consequently, to generate a fresh port, we open a socket,
+   bind it to a fake address with port [0]. Ask for the address of the
+   socket and return the port given by the operating system. Finally,
+   we close the socket.
+*)
 let fresh () =
-  let slot = !next mod interval_size in
-  incr next ;
-  Cli.options.starting_port
-  + (interval_size * (Test.current_worker_id () |> Option.value ~default:0))
-  + slot
-
-let () = Test.declare_reset_function @@ fun () -> next := 0
+  let dummy_socket = Unix.(socket PF_INET SOCK_STREAM 0) in
+  Fun.protect ~finally:(fun () -> Unix.close dummy_socket) @@ fun () ->
+  Unix.bind dummy_socket Unix.(ADDR_INET (inet_addr_loopback, 0)) ;
+  let addr = Unix.getsockname dummy_socket in
+  match addr with ADDR_INET (_, port) -> port | _ -> assert false
