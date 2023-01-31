@@ -58,6 +58,12 @@ val default_max_operations : int
 (** Default bounds. *)
 val default_config : config
 
+(** Encoding for {!config}.
+
+    It is internally an object without any variable field, so it is
+    possible to use it in a {!Data_encoding.merge_objs}. *)
+val config_encoding : config Data_encoding.t
+
 module type T = sig
   (** Internal overview of all the valid operations present in the mempool. *)
   type state

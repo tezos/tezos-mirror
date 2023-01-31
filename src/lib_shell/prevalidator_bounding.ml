@@ -35,6 +35,15 @@ let default_config =
     max_total_bytes = default_max_total_bytes;
   }
 
+let config_encoding : config Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {max_operations; max_total_bytes} -> (max_operations, max_total_bytes))
+    (fun (max_operations, max_total_bytes) -> {max_operations; max_total_bytes})
+    (obj2
+       (dft "max_operations" uint16 default_config.max_operations)
+       (dft "max_total_bytes" (uint_like_n ()) default_config.max_total_bytes))
+
 open Shell_operation
 
 module type T = sig

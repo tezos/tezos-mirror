@@ -38,8 +38,18 @@ module type T = sig
       see {!Tezos_protocol_environment.PROTOCOL} *)
   type validation_state
 
-  (** Type {!Shell_plugin.FILTER.Mempool.config}. *)
-  type filter_config
+  (** Mempool configuration that groups both the plugin config
+      (e.g. minimal fee to pass the {!pre_filter}) and the bounding
+      config (e.g. max number of valid operations in the mempool). *)
+  type config
+
+  (** Default mempool configuration. *)
+  val default_config : config
+
+  (** Encoding for {!config}.
+
+      Internally an object without any variable fields. *)
+  val config_encoding : config Data_encoding.t
 
   (** The type implemented by {!Tezos_store.Store.chain_store} in
       production, and mocked in tests *)
@@ -80,7 +90,7 @@ module type T = sig
       See [Shell_plugin.FILTER.Mempool.pre_filter]. *)
   val pre_filter :
     t ->
-    filter_config ->
+    config ->
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
@@ -112,7 +122,7 @@ module type T = sig
       See {!add_result} for a description of the output. *)
   val add_operation :
     t ->
-    filter_config ->
+    config ->
     protocol_operation Shell_operation.operation ->
     add_result Lwt.t
 
@@ -149,7 +159,6 @@ module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store
 
 (**/**)
@@ -183,7 +192,6 @@ module Internal_for_tests : sig
     T
       with type protocol_operation = Filter.Proto.operation
        and type validation_state = Filter.Proto.validation_state
-       and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
        and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
        and type Internal_for_tests.bounding_state = Bounding.state

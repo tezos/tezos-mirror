@@ -43,7 +43,11 @@ module type T = sig
 
   type validation_state
 
-  type filter_config
+  type config
+
+  val default_config : config
+
+  val config_encoding : config Data_encoding.t
 
   type chain_store
 
@@ -64,7 +68,7 @@ module type T = sig
 
   val pre_filter :
     t ->
-    filter_config ->
+    config ->
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
@@ -80,7 +84,7 @@ module type T = sig
     * replacements
 
   val add_operation :
-    t -> filter_config -> protocol_operation operation -> add_result Lwt.t
+    t -> config -> protocol_operation operation -> add_result Lwt.t
 
   val remove_operation : t -> Operation_hash.t -> t
 
@@ -107,7 +111,6 @@ module MakeAbstract
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_config = Filter.Mempool.config
      and type chain_store = Chain_store.chain_store
      and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
      and type Internal_for_tests.bounding_state = Bounding.state = struct
@@ -117,7 +120,15 @@ module MakeAbstract
 
   type validation_state = Proto.validation_state
 
-  type filter_config = Filter.Mempool.config
+  type config = Filter.Mempool.config * Prevalidator_bounding.config
+
+  let default_config =
+    (Filter.Mempool.default_config, Prevalidator_bounding.default_config)
+
+  let config_encoding =
+    Data_encoding.merge_objs
+      Filter.Mempool.config_encoding
+      Prevalidator_bounding.config_encoding
 
   type chain_store = Chain_store.chain_store
 
@@ -159,7 +170,7 @@ module MakeAbstract
   let flush chain_store ~head ~timestamp old_state =
     create_aux ~old_state chain_store head timestamp
 
-  let pre_filter state filter_config op =
+  let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
     Filter.Mempool.pre_filter state.filter_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
@@ -221,7 +232,8 @@ module MakeAbstract
      [Proto.Mempool.add_operation], already contains the new operation
      (if it has been accepted). So the only update it may need is the
      removal of any operations replaced during [Bounding.add]. *)
-  let check_conflict_and_bound (mempool, proto_add_result) bounding_state op :
+  let check_conflict_and_bound (mempool, proto_add_result) bounding_state
+      bounding_config op :
       (Proto.Mempool.t * Bounding.state * replacements) tzresult =
     let open Result_syntax in
     let* proto_replacement = translate_proto_add_result proto_add_result op in
@@ -229,10 +241,6 @@ module MakeAbstract
       match proto_replacement with
       | None -> bounding_state
       | Some (replaced, _) -> Bounding.remove_operation bounding_state replaced
-    in
-    let bounding_config =
-      (* This will be made configurable in an upcoming commit. *)
-      Prevalidator_bounding.default_config
     in
     let* bounding_state, removed_by_bounding =
       Option.to_result
@@ -252,7 +260,8 @@ module MakeAbstract
     in
     return (mempool, bounding_state, replacements)
 
-  let add_operation_result state filter_config op : add_result tzresult Lwt.t =
+  let add_operation_result state (filter_config, bounding_config) op :
+      add_result tzresult Lwt.t =
     let open Lwt_result_syntax in
     let conflict_handler = Filter.Mempool.conflict_handler filter_config in
     let* proto_output = proto_add_operation ~conflict_handler state op in
@@ -266,7 +275,11 @@ module MakeAbstract
     let valid_op = record_successful_signature_check op in
     let res =
       catch_e @@ fun () ->
-      check_conflict_and_bound proto_output state.bounding_state valid_op
+      check_conflict_and_bound
+        proto_output
+        state.bounding_state
+        bounding_config
+        valid_op
     in
     match res with
     | Ok (mempool, bounding_state, replacement) ->
@@ -278,11 +291,9 @@ module MakeAbstract
            the same, so that we can return the updated [valid_op]. *)
         return (state, valid_op, classification_of_trace trace, [])
 
-  let add_operation state filter_config op : add_result Lwt.t =
+  let add_operation state config op : add_result Lwt.t =
     let open Lwt_syntax in
-    let* res =
-      protect (fun () -> add_operation_result state filter_config op)
-    in
+    let* res = protect (fun () -> add_operation_result state config op) in
     match res with
     | Ok add_result -> return add_result
     | Error trace -> return (state, op, classification_of_trace trace, [])
@@ -320,7 +331,6 @@ module Make (Filter : Shell_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store =
   MakeAbstract (Production_chain_store) (Filter)
     (Prevalidator_bounding.Make (Filter.Proto))
