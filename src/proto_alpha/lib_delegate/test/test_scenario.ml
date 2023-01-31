@@ -54,6 +54,65 @@ let test_level_5 () =
   in
   run ~config [(3, (module Hooks)); (2, (module Hooks))]
 
+let test_preendorse_on_valid () =
+  let level_to_reach = 2l in
+  let round_to_reach = 1l in
+  let module Hooks : Hooks = struct
+    include Default_hooks
+
+    let on_new_head ~block_hash ~block_header =
+      (* Stop notifying heads on the level to reach, only notify that
+         it has been validated *)
+      if block_header.Block_header.shell.level < level_to_reach then
+        Lwt.return_some (block_hash, block_header)
+      else Lwt.return_none
+
+    let seen_candidate = ref None
+
+    let pqc_noticed = ref false
+
+    let stop_on_event = function
+      | Baking_state.Prequorum_reached (candidate, _) ->
+          (* Register the PQC notice. *)
+          (match !seen_candidate with
+          | Some seen_candidate
+            when Block_hash.(candidate.hash = seen_candidate) ->
+              pqc_noticed := true
+          | _ -> ()) ;
+          false
+      | Baking_state.Quorum_reached (candidate, _) ->
+          (* Ensure that we never see a QC on the seen candidate. *)
+          (match !seen_candidate with
+          | Some seen_candidate
+            when Block_hash.(candidate.hash = seen_candidate) ->
+              Stdlib.failwith "Quorum occured on the seen candidate"
+          | _ -> ()) ;
+          false
+      | New_head_proposal {block; _} ->
+          (* Ensure that we never notice a new head at the level where
+             we are not supposed to. *)
+          if block.shell.level = level_to_reach then
+            Stdlib.failwith "Unexpected new head event"
+          else false
+      | New_valid_proposal {block; _} ->
+          (* Register the seen valid proposal candidate. *)
+          if
+            block.shell.level = level_to_reach
+            && Protocol.Alpha_context.Round.to_int32 block.round = 0l
+          then seen_candidate := Some block.hash ;
+          (* Stop the node when we reach level 2 / round 2. *)
+          block.shell.level = level_to_reach
+          && Protocol.Alpha_context.Round.to_int32 block.round >= round_to_reach
+      | _ -> false
+
+    let check_chain_on_success ~chain:_ =
+      assert (!seen_candidate <> None) ;
+      assert !pqc_noticed ;
+      return_unit
+  end in
+  let config = {default_config with timeout = 10} in
+  run ~config [(1, (module Hooks))]
+
 (*
 
 Scenario T1
@@ -1470,6 +1529,7 @@ let tests =
   let open Tezos_base_test_helpers.Tztest in
   [
     tztest "reaches level 5" `Quick test_level_5;
+    tztest "cannot progress without new head" `Quick test_preendorse_on_valid;
     tztest "scenario t1" `Quick test_scenario_t1;
     tztest "scenario t2" `Quick test_scenario_t2;
     tztest "scenario t3" `Quick test_scenario_t3;
