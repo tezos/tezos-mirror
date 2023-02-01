@@ -160,16 +160,14 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
           @ deposits_balance_updates )
-  | Lima_015
+  | Mumbai_016
   (* Please update [next_protocol] and [previous_protocol] in
      [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
       (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
          if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
-      >>=? fun ctxt ->
-      Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>= fun ctxt ->
-      return (ctxt, []))
+      >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
   >>=? fun ctxt ->
