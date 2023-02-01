@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold  <contact@tmarigold.dev>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -55,6 +56,10 @@ let () =
 module Registration = struct
   let register0_noctxt ~chunked s f dir =
     RPC_directory.register ~chunked dir s (fun _rpc_ctxt q i -> f q i)
+
+  (* A variant of [register0_noctxt] accepting one argument in the path *)
+  let register1_noctxt ~chunked s f dir =
+    RPC_directory.register ~chunked dir s (fun (_rpc_ctxt, p) q i -> f p q i)
 end
 
 module DAC = struct
@@ -109,6 +114,15 @@ module DAC = struct
         ~query:external_message_query
         ~output:Data_encoding.bool
         RPC_path.(open_root / "verify_signature")
+
+    let retrieve_preimage =
+      RPC_service.get_service
+        ~description:
+          "Retrieves a page by its page hash and returns its contents"
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.bytes Hex)
+        RPC_path.(
+          open_root / "preimage" /: Protocol.Sc_rollup_reveal_hash.rpc_arg)
   end
 
   let handle_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir
@@ -158,6 +172,10 @@ module DAC = struct
     | Some (External_message.Dac_message {root_hash; signature; witnesses}) ->
         Signatures.verify ~public_keys_opt root_hash signature witnesses
 
+  let handle_retrieve_preimage reveal_data_dir hash =
+    let page_store = Page_store.Filesystem.init reveal_data_dir in
+    Page_store.Filesystem.load page_store ~hash
+
   let register_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir =
     Registration.register0_noctxt
       ~chunked:false
@@ -178,10 +196,17 @@ module DAC = struct
           public_keys_opt
           external_message)
 
+  let register_retrieve_preimage reveal_data_dir =
+    Registration.register1_noctxt
+      ~chunked:false
+      S.retrieve_preimage
+      (fun hash () () -> handle_retrieve_preimage reveal_data_dir hash)
+
   let register reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris =
     (RPC_directory.empty : unit RPC_directory.t)
     |> register_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir
     |> register_verify_external_message_signature dac_public_keys_opt
+    |> register_retrieve_preimage reveal_data_dir
 end
 
 let rpc_services ~reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris

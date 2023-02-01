@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -912,6 +913,9 @@ module Dac = struct
             match Hex.of_string external_msg with `Hex s -> s );
         ]
       in
-      make ~query_string GET ["verify_signature"] @@ JSON.as_bool
+      make ~query_string GET ["verify_signature"] JSON.as_bool
+
+    let dac_retrieve_preimage page_hash =
+      make GET ["preimage"; page_hash] JSON.as_string
   end
 end

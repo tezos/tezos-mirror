@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -78,3 +79,5 @@ val scheme_of_hash : t -> supported_hashes
 val of_hex : string -> t option
 
 val to_hex : t -> string
+
+val rpc_arg : t RPC_arg.t
