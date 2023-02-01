@@ -193,3 +193,8 @@ module Block_number :
   METHOD
     with type m_input = unit
      and type m_output = Ethereum_types.block_height
+
+module Get_block_by_number :
+  METHOD
+    with type m_input = Ethereum_types.block_height * bool
+     and type m_output = Ethereum_types.block

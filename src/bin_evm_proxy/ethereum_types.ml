@@ -91,3 +91,148 @@ let block_param_encoding =
          (function Pending -> Some () | _ -> None)
          (fun () -> Pending));
     ]
+
+(** Ethereum block hash (32 bytes) *)
+type block_hash = Block_hash of string [@@ocaml.unboxed]
+
+let block_hash_of_string s = Block_hash s
+
+let block_hash_encoding =
+  Data_encoding.(conv (fun (Block_hash h) -> h) (fun h -> Block_hash h) string)
+
+(** Ethereum any hash *)
+type hash = Hash of string [@@ocaml.unboxed]
+
+let hash_of_string h = Hash h
+
+let hash_encoding =
+  Data_encoding.(conv (fun (Hash h) -> h) (fun h -> Hash h) string)
+
+(** Ethereum block hash representation from RPCs. *)
+type block = {
+  number : block_height option;
+  hash : block_hash option;
+  parent : block_hash;
+  nonce : hash;
+  sha3Uncles : hash;
+  logsBloom : hash option;
+  transactionRoot : hash;
+  stateRoot : hash;
+  receiptRoot : hash;
+  miner : hash;
+  difficulty : quantity;
+  totalDifficulty : quantity;
+  extraData : string;
+  size : quantity;
+  gasLimit : quantity;
+  gasUsed : quantity;
+  timestamp : quantity;
+  transaction : hash list;
+  uncles : hash list;
+}
+
+let block_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           number;
+           hash;
+           parent;
+           nonce;
+           sha3Uncles;
+           logsBloom;
+           transactionRoot;
+           stateRoot;
+           receiptRoot;
+           miner;
+           difficulty;
+           totalDifficulty;
+           extraData;
+           size;
+           gasLimit;
+           gasUsed;
+           timestamp;
+           transaction;
+           uncles;
+         } ->
+      ( ( number,
+          hash,
+          parent,
+          nonce,
+          sha3Uncles,
+          logsBloom,
+          transactionRoot,
+          stateRoot,
+          receiptRoot,
+          miner ),
+        ( difficulty,
+          totalDifficulty,
+          extraData,
+          size,
+          gasLimit,
+          gasUsed,
+          timestamp,
+          transaction,
+          uncles ) ))
+    (fun ( ( number,
+             hash,
+             parent,
+             nonce,
+             sha3Uncles,
+             logsBloom,
+             transactionRoot,
+             stateRoot,
+             receiptRoot,
+             miner ),
+           ( difficulty,
+             totalDifficulty,
+             extraData,
+             size,
+             gasLimit,
+             gasUsed,
+             timestamp,
+             transaction,
+             uncles ) ) ->
+      {
+        number;
+        hash;
+        parent;
+        nonce;
+        sha3Uncles;
+        logsBloom;
+        transactionRoot;
+        stateRoot;
+        receiptRoot;
+        miner;
+        difficulty;
+        totalDifficulty;
+        extraData;
+        size;
+        gasLimit;
+        gasUsed;
+        timestamp;
+        transaction;
+        uncles;
+      })
+    (merge_objs
+       (obj10
+          (req "number" (option block_height_encoding))
+          (req "hash" (option block_hash_encoding))
+          (req "parent" block_hash_encoding)
+          (req "nonce" hash_encoding)
+          (req "sha3Uncles" hash_encoding)
+          (req "logsBloom" (option hash_encoding))
+          (req "transactionRoot" hash_encoding)
+          (req "stateRoot" hash_encoding)
+          (req "receiptRoot" hash_encoding)
+          (req "miner" hash_encoding))
+       (obj9
+          (req "difficulty" quantity_encoding)
+          (req "totalDifficulty" quantity_encoding)
+          (req "extraData" string)
+          (req "size" quantity_encoding)
+          (req "gasLimit" quantity_encoding)
+          (req "gasUsed" quantity_encoding)
+          (req "timestamp" quantity_encoding)
+          (req "transaction" (list hash_encoding))
+          (req "uncles" (list hash_encoding))))

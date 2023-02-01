@@ -49,6 +49,8 @@ let dispatch_service =
 module Mock = struct
   open Ethereum_types
 
+  let hash_f = hash_of_string
+
   let qty_f = quantity_of_z
 
   (* Default chain_id for ethereum custom networks with Ganache. *)
@@ -57,6 +59,29 @@ module Mock = struct
   let block_height = block_height_of_z Z.zero
 
   let balance = qty_f @@ Z.of_int64 Int64.max_int
+
+  let block =
+    {
+      number = Some (block_height_of_z Z.zero);
+      hash = Some (block_hash_of_string @@ String.make 32 'a');
+      parent = block_hash_of_string (String.make 32 'a');
+      nonce = hash_f @@ String.make 8 'a';
+      sha3Uncles = hash_f @@ String.make 32 'a';
+      logsBloom = Some (hash_f @@ String.make 256 'a');
+      transactionRoot = hash_f @@ String.make 32 'a';
+      stateRoot = hash_f @@ String.make 32 'a';
+      receiptRoot = hash_f @@ String.make 32 'a';
+      miner = hash_f @@ String.make 20 'b';
+      difficulty = qty_f Z.one;
+      totalDifficulty = qty_f Z.one;
+      extraData = "";
+      size = qty_f @@ Z.of_int 12345;
+      gasLimit = qty_f @@ Z.of_int 1111111;
+      gasUsed = qty_f Z.zero;
+      timestamp = qty_f Z.zero;
+      transaction = [];
+      uncles = [];
+    }
 end
 
 let dispatch dir =
@@ -69,8 +94,9 @@ let dispatch dir =
       | Get_balance.Input _ ->
           Lwt.return_ok (Get_balance.Output (Ok Mock.balance))
       | Block_number.Input _ ->
-          Format.printf "Accessing blockNumber\n%!" ;
           Lwt.return_ok (Block_number.Output (Ok Mock.block_height))
+      | Get_block_by_number.Input _ ->
+          Lwt.return_ok (Get_block_by_number.Output (Ok Mock.block))
       | _ -> Error_monad.failwith "Unsupported method\n%!")
 
 let directory = Directory.empty |> version |> dispatch

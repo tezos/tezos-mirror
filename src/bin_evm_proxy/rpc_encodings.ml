@@ -249,6 +249,21 @@ module Block_number = MethodMaker (struct
   let method_ = "eth_blockNumber"
 end)
 
+module Get_block_by_number = MethodMaker (struct
+  open Ethereum_types
+
+  type input = block_height * bool
+
+  type output = block
+
+  let input_encoding =
+    Data_encoding.tup2 block_height_encoding Data_encoding.bool
+
+  let output_encoding = block_encoding
+
+  let method_ = "eth_getBlockByNumber"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Network_id);
@@ -256,6 +271,7 @@ let methods : (module METHOD) list =
     (module Accounts);
     (module Get_balance);
     (module Block_number);
+    (module Get_block_by_number);
   ]
 
 module Input = struct
