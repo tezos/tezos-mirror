@@ -26,3 +26,15 @@
 include Tezos_base.TzPervasives.Lwt_result_syntax
 
 let wrap m = m >|= Environment.wrap_tzresult
+
+let ( let*@ ) m f =
+  let* x = wrap m in
+  f x
+
+let ( let*?@ ) m f =
+  let*? x = Environment.wrap_tzresult m in
+  f x
+
+let ( let+@ ) m f =
+  let+ x = wrap m in
+  f x

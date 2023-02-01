@@ -75,12 +75,11 @@ let big_map_updates_of_key_values ctxt key_values =
   let open Lwt_result_wrap_syntax in
   List.fold_right_es
     (fun (key, value) (kvs, ctxt) ->
-      let* key_hash, ctxt =
-        wrap
-          (Script_ir_translator.hash_comparable_data
-             ctxt
-             Script_typed_ir.int_t
-             (Script_int.of_int key))
+      let*@ key_hash, ctxt =
+        Script_ir_translator.hash_comparable_data
+          ctxt
+          Script_typed_ir.int_t
+          (Script_int.of_int key)
       in
       return
         ( {
@@ -95,7 +94,7 @@ let big_map_updates_of_key_values ctxt key_values =
 
 let new_int_key_big_map ctxt contract ~value_type entries =
   let open Lwt_result_wrap_syntax in
-  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let*@ ctxt, big_map_id = Big_map.fresh ~temporary:false ctxt in
   let key_type = Expr.from_string "int" in
   let value_type = Expr.from_string value_type in
   let* updates, ctxt =
@@ -110,8 +109,8 @@ let new_int_key_big_map ctxt contract ~value_type entries =
          {init = Lazy_storage.Alloc Big_map.{key_type; value_type}; updates})
   in
   let storage = Expr.from_string "{}" in
-  let* ctxt =
-    wrap @@ Contract.update_script_storage ctxt contract storage (Some [alloc])
+  let*@ ctxt =
+    Contract.update_script_storage ctxt contract storage (Some [alloc])
   in
   return (big_map_id, ctxt)
 
@@ -121,13 +120,12 @@ let assert_equal_string_list ~loc msg =
 let string_of_ticket_token ctxt
     (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
   let open Lwt_result_wrap_syntax in
-  let* x, _ =
-    wrap
-    @@ Script_ir_unparser.unparse_comparable_data
-         ctxt
-         Script_ir_unparser.Readable
-         contents_type
-         contents
+  let*@ x, _ =
+    Script_ir_unparser.unparse_comparable_data
+      ctxt
+      Script_ir_unparser.Readable
+      contents_type
+      contents
   in
   return
   @@ Format.asprintf
@@ -255,24 +253,23 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
   let unparsed_storage = storage in
-  let* ( Script_ir_translator.Ex_script
-           (Script
-             {
-               storage_type;
-               storage;
-               code = _;
-               arg_type = _;
-               views = _;
-               entrypoints = _;
-               code_size = _;
-             }),
-         ctxt ) =
-    wrap
-    @@ Script_ir_translator.parse_script
-         ctxt
-         ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-         ~allow_forged_in_storage:true
-         script
+  let*@ ( Script_ir_translator.Ex_script
+            (Script
+              {
+                storage_type;
+                storage;
+                code = _;
+                arg_type = _;
+                views = _;
+                entrypoints = _;
+                code_size = _;
+              }),
+          ctxt ) =
+    Script_ir_translator.parse_script
+      ctxt
+      ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
+      ~allow_forged_in_storage:true
+      script
   in
   let operation =
     Script_typed_ir.Internal_operation
@@ -312,13 +309,12 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
 let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
   let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* params_node, ctxt =
-    wrap
-      (Script_ir_translator.unparse_data
-         ctxt
-         Script_ir_unparser.Readable
-         parameters_ty
-         parameters)
+  let*@ params_node, ctxt =
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Readable
+      parameters_ty
+      parameters
   in
   let incr = Incremental.set_alpha_ctxt incr ctxt in
   return
@@ -344,13 +340,12 @@ let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
     ~tx_rollup =
   let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* params_node, ctxt =
-    wrap
-      (Script_ir_translator.unparse_data
-         ctxt
-         Script_ir_unparser.Optimized_legacy
-         parameters_ty
-         parameters)
+  let*@ params_node, ctxt =
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Optimized_legacy
+      parameters_ty
+      parameters
   in
   let incr = Incremental.set_alpha_ctxt incr ctxt in
   return
@@ -370,11 +365,9 @@ let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
       incr )
 
 let ticket_diffs_of_operations incr operations =
-  let open Lwt_result_wrap_syntax in
-  wrap
-  @@ Ticket_operations_diff.ticket_diffs_of_operations
-       (Incremental.alpha_ctxt incr)
-       operations
+  Ticket_operations_diff.ticket_diffs_of_operations
+    (Incremental.alpha_ctxt incr)
+    operations
 
 let unit_script =
   {|
@@ -419,7 +412,7 @@ let make_tickets ts =
 let transfer_tickets_operation ~incr ~src ~destination tickets =
   let open Lwt_result_wrap_syntax in
   let*? parameters_ty = Environment.wrap_tzresult list_ticket_string_ty in
-  let* parameters = wrap @@ make_tickets tickets in
+  let*@ parameters = make_tickets tickets in
   transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters
 
 (** Test that no tickets are returned for operations that do not contain
@@ -429,7 +422,7 @@ let test_non_ticket_operations () =
   let* _baker, src, block = init () in
   let* incr = Incremental.begin_construction block in
   let operations = [delegation_operation ~src:(Contract src)] in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr operations in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr operations in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 
 (** Test transfer to a contract that does not take tickets. *)
@@ -453,7 +446,7 @@ let test_transfer_to_non_ticket_contract () =
       ~parameters_ty:unit_t
       ~parameters:()
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 
 (** Test transfer an empty list of tickets. *)
@@ -476,7 +469,7 @@ let test_transfer_empty_ticket_list () =
       ~destination:orig_contract
       []
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 
 let one = Ticket_amount.one
@@ -508,7 +501,7 @@ let test_transfer_one_ticket () =
       ~destination:orig_contract
       [(ticketer, "white", 1)]
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -552,7 +545,7 @@ let test_transfer_multiple_tickets () =
       ]
   in
   let orig_contract = Contract.Originated orig_contract in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -608,7 +601,7 @@ let test_transfer_different_tickets () =
       ]
   in
   let destination = Destination.Contract (Originated destination) in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -688,7 +681,7 @@ let test_transfer_to_two_contracts_with_different_tickets () =
       ~destination:destination2
       parameters
   in
-  let* ticket_diffs, ctxt =
+  let*@ ticket_diffs, ctxt =
     ticket_diffs_of_operations incr [operation1; operation2]
   in
   let one = Ticket_amount.one in
@@ -740,7 +733,7 @@ let test_originate_non_ticket_contract () =
       ~storage:"Unit"
       ~forges_tickets:false
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 
 (** Test originate a contract with an empty list of tickets. *)
@@ -757,7 +750,7 @@ let test_originate_with_empty_tickets_list () =
       ~storage
       ~forges_tickets:false
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 
 (** Test originate a contract with a single ticket. *)
@@ -777,7 +770,7 @@ let test_originate_with_one_ticket () =
       ~storage
       ~forges_tickets:true
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations ctxt [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations ctxt [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -819,7 +812,7 @@ let test_originate_with_multiple_tickets () =
       ~storage
       ~forges_tickets:true
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations ctxt [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations ctxt [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -882,7 +875,7 @@ let test_originate_with_different_tickets () =
       ~storage
       ~forges_tickets:true
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations ctxt [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations ctxt [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -953,7 +946,7 @@ let test_originate_two_contracts_with_different_tickets () =
       ~storage
       ~forges_tickets:true
   in
-  let* ticket_diffs, ctxt =
+  let*@ ticket_diffs, ctxt =
     ticket_diffs_of_operations incr [operation1; operations2]
   in
   assert_equal_ticket_token_diffs
@@ -1030,7 +1023,7 @@ let test_originate_and_transfer () =
       ~destination:destination2
       [(ticketer, "red", 1); (ticketer, "green", 1); (ticketer, "blue", 1)]
   in
-  let* ticket_diffs, ctxt =
+  let*@ ticket_diffs, ctxt =
     ticket_diffs_of_operations incr [operation1; operation2]
   in
   assert_equal_ticket_token_diffs
@@ -1103,7 +1096,7 @@ let test_originate_big_map_with_tickets () =
       ~storage
       ~forges_tickets:true
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
     ctxt
     ~loc:__LOC__
@@ -1187,7 +1180,7 @@ let test_transfer_big_map_with_tickets () =
       ~parameters_ty
       ~parameters
   in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
+  let*@ ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   let destination = Destination.Contract (Originated orig_contract) in
   assert_equal_ticket_token_diffs
     ctxt

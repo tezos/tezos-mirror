@@ -43,18 +43,19 @@ let new_ctxt () =
 
 let make_contract ticketer =
   let open Lwt_result_wrap_syntax in
-  wrap @@ Lwt.return @@ Contract.of_b58check ticketer
+  let*?@ x = Contract.of_b58check ticketer in
+  return x
 
 let make_ex_token ctxt ~ticketer ~ty ~content =
   let open Lwt_result_wrap_syntax in
-  let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
     let node = Micheline.root @@ Expr.from_string ty in
-    wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
   let* ticketer = make_contract ticketer in
-  let* contents, ctxt =
+  let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content in
-    wrap @@ Script_ir_translator.parse_comparable_data ctxt cty node
+    Script_ir_translator.parse_comparable_data ctxt cty node
   in
   return (Ticket_token.Ex_token {contents_type = cty; ticketer; contents}, ctxt)
 
@@ -62,12 +63,11 @@ let make_key ctxt ~ticketer ~ty ~content ~owner =
   let open Lwt_result_wrap_syntax in
   let* ex_token, ctxt = make_ex_token ctxt ~ticketer ~ty ~content in
   let* owner = make_contract owner in
-  let* key, ctxt =
-    wrap
-    @@ Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Destination.Contract owner)
-         ex_token
+  let*@ key, ctxt =
+    Ticket_balance_key.of_ex_token
+      ctxt
+      ~owner:(Destination.Contract owner)
+      ex_token
   in
   return (key, ctxt)
 

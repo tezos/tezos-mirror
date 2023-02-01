@@ -71,13 +71,12 @@ let string_list_of_ex_tickets ctxt tickets =
   let accum (xs, ctxt)
       (Ticket_scanner.Ex_ticket
         (cty, {Script_typed_ir.ticketer; contents; amount})) =
-    let* x, ctxt =
-      wrap
-      @@ Script_ir_translator.unparse_data
-           ctxt
-           Script_ir_unparser.Readable
-           cty
-           contents
+    let*@ x, ctxt =
+      Script_ir_translator.unparse_data
+        ctxt
+        Script_ir_unparser.Readable
+        cty
+        contents
     in
     let content =
       Format.kasprintf Fun.id "%a" Michelson_v1_printer.print_expr x
@@ -99,14 +98,14 @@ let string_list_of_ex_tickets ctxt tickets =
 
 let make_ex_ticket ctxt ~ticketer ~type_exp ~content_exp ~amount =
   let open Lwt_result_wrap_syntax in
-  let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
-    wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
-  let* ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer in
-  let* contents, ctxt =
+  let*?@ ticketer = Contract.of_b58check ticketer in
+  let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in
-    wrap @@ Script_ir_translator.parse_comparable_data ctxt cty node
+    Script_ir_translator.parse_comparable_data ctxt cty node
   in
   let amount = Script_int.(abs @@ of_int amount) in
   let amount =
@@ -134,18 +133,15 @@ let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
       (Script_ir_translator.parse_any_ty ctxt ~legacy:false node)
   in
   let node = Micheline.root @@ Expr.from_string value_exp in
-  let* value, ctxt =
-    wrap
-    @@ Script_ir_translator.parse_data
-         ctxt
-         ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-         ~allow_forged:true
-         ty
-         node
+  let*@ value, ctxt =
+    Script_ir_translator.parse_data
+      ctxt
+      ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+      ~allow_forged:true
+      ty
+      node
   in
-  let* ht, ctxt =
-    wrap @@ Lwt.return @@ Ticket_scanner.type_has_tickets ctxt ty
-  in
+  let*?@ ht, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
   wrap @@ Ticket_scanner.tickets_of_value ctxt ~include_lazy ht value
 
 let assert_contains_tickets ctxt ~loc ~include_lazy ~type_exp ~value_exp
@@ -195,18 +191,17 @@ let tickets_from_big_map_ref ~pre_populated value_exp =
   let* block = Block.bake ~operation block in
   let* inc = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt inc in
-  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let*@ ctxt, big_map_id = Big_map.fresh ~temporary:false ctxt in
   let int_ty_expr = Expr.from_string "int" in
   let* diffs, ctxt =
     let* updates, ctxt =
       List.fold_left_es
         (fun (kvs, ctxt) (key, value) ->
-          let* key_hash, ctxt =
-            wrap
-            @@ Script_ir_translator.hash_comparable_data
-                 ctxt
-                 Script_typed_ir.int_t
-                 (Script_int.of_int key)
+          let*@ key_hash, ctxt =
+            Script_ir_translator.hash_comparable_data
+              ctxt
+              Script_typed_ir.int_t
+              (Script_int.of_int key)
           in
           return
             ( {
@@ -232,9 +227,8 @@ let tickets_from_big_map_ref ~pre_populated value_exp =
         ],
         ctxt )
   in
-  let* ctxt =
-    wrap
-    @@ Contract.update_script_storage ctxt originated int_ty_expr (Some diffs)
+  let*@ ctxt =
+    Contract.update_script_storage ctxt originated int_ty_expr (Some diffs)
   in
   let value_exp =
     value_exp @@ Z.to_string (Big_map.Id.unparse_to_z big_map_id)

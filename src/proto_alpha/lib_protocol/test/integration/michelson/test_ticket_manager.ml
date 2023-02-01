@@ -83,39 +83,37 @@ let ticket_balance_of_storage ctxt (contract : Alpha_context.Contract.t) =
   match contract with
   | Implicit _ -> return ([], ctxt)
   | Originated contract_hash -> (
-      let* ctxt, script =
-        wrap @@ Alpha_context.Contract.get_script ctxt contract_hash
+      let*@ ctxt, script =
+        Alpha_context.Contract.get_script ctxt contract_hash
       in
       match script with
       | None -> return ([], ctxt)
       | Some script ->
-          let* ( Script_ir_translator.Ex_script
-                   (Script {storage; storage_type; _}),
-                 ctxt ) =
-            wrap
-              (Script_ir_translator.parse_script
-                 ctxt
-                 ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-                 ~allow_forged_in_storage:true
-                 script)
+          let*@ ( Script_ir_translator.Ex_script
+                    (Script {storage; storage_type; _}),
+                  ctxt ) =
+            Script_ir_translator.parse_script
+              ctxt
+              ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
+              ~allow_forged_in_storage:true
+              script
           in
-          let* tokens, ctxt =
-            wrap (tokens_of_value ~include_lazy:true ctxt storage_type storage)
+          let*@ tokens, ctxt =
+            tokens_of_value ~include_lazy:true ctxt storage_type storage
           in
-          let* tokens, ctxt =
-            wrap
-            @@ List.fold_left_es
-                 (fun (acc, ctxt) (ex_token, amount) ->
-                   let* key, ctxt =
-                     Ticket_balance_key.of_ex_token
-                       ctxt
-                       ~owner:(Contract contract)
-                       ex_token
-                   in
-                   let acc = (key, amount) :: acc in
-                   return (acc, ctxt))
-                 ([], ctxt)
-                 tokens
+          let*@ tokens, ctxt =
+            List.fold_left_es
+              (fun (acc, ctxt) (ex_token, amount) ->
+                let* key, ctxt =
+                  Ticket_balance_key.of_ex_token
+                    ctxt
+                    ~owner:(Contract contract)
+                    ex_token
+                in
+                let acc = (key, amount) :: acc in
+                return (acc, ctxt))
+              ([], ctxt)
+              tokens
           in
           return (tokens, ctxt))
 
@@ -228,17 +226,16 @@ let validate_ticket_balances block =
       ([], ctxt)
       contracts
   in
-  let* kvs_balance, _ctxt =
-    wrap
-    @@ List.fold_left_es
-         (fun (acc, ctxt) (key, _) ->
-           let* balance, ctxt = Ticket_balance.get_balance ctxt key in
-           let acc =
-             match balance with None -> acc | Some b -> (key, b) :: acc
-           in
-           return (acc, ctxt))
-         ([], ctxt)
-         kvs_storage
+  let*@ kvs_balance, _ctxt =
+    List.fold_left_es
+      (fun (acc, ctxt) (key, _) ->
+        let* balance, ctxt = Ticket_balance.get_balance ctxt key in
+        let acc =
+          match balance with None -> acc | Some b -> (key, b) :: acc
+        in
+        return (acc, ctxt))
+      ([], ctxt)
+      kvs_storage
   in
   let kvs_storage = normalize_balances kvs_storage in
   let kvs_balance = normalize_balances kvs_balance in
