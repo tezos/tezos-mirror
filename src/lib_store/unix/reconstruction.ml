@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2023 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +27,7 @@ type failure_kind =
   | Nothing_to_reconstruct
   | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
+  | Cannot_read_resulting_context_hash of Block_hash.t
 
 let failure_kind_encoding =
   let open Data_encoding in
@@ -58,6 +59,12 @@ let failure_kind_pp ppf = function
       Format.fprintf ppf "Unexpected missing block in store: %a" Block_hash.pp h
   | Cannot_read_block_level l ->
       Format.fprintf ppf "Unexpected missing block in store at level %ld" l
+  | Cannot_read_resulting_context_hash h ->
+      Format.fprintf
+        ppf
+        "Unexpected missing resulting context hash in store for block %a"
+        Block_hash.pp
+        h
 
 type error += Reconstruction_failure of failure_kind
 
@@ -100,7 +107,7 @@ open Reconstruction_events
 (* The status of a metadata. It is:
    - Complete: all the metadata of the corresponding cycle are stored
    - Partial level: the metadata before level are missing
-   - Not_stored: no metada are stored *)
+   - Not_stored: no metadata are stored *)
 type metadata_status = Complete | Partial of Int32.t | Not_stored
 
 (* We assume that :
@@ -210,7 +217,8 @@ let apply_context context_index chain_id ~user_activated_upgrades
     *)
   in
   return
-    ( validation_store.message,
+    ( validation_store.resulting_context_hash,
+      validation_store.message,
       validation_store.max_operations_ttl,
       validation_store.last_allowed_fork_level,
       fst block_metadata,
@@ -286,8 +294,12 @@ let reconstruct_genesis_operations_metadata chain_store =
         Block_validation.Metadata_hash operations_metadata
     | None -> No_metadata_hash operations_metadata
   in
+  let* resulting_context_hash =
+    Store.Block.resulting_context_hash chain_store genesis_block
+  in
   return
-    ( message,
+    ( resulting_context_hash,
+      message,
       max_operations_ttl,
       last_allowed_fork_level,
       block_metadata,
@@ -315,7 +327,8 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
           (Store.Block.proto_level block)
           (Store.Block.hash block)
       in
-      let* ( message,
+      let* ( _resulting_context_hash,
+             message,
              max_operations_ttl,
              last_allowed_fork_level,
              block_metadata,
@@ -564,6 +577,87 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
       in
       aux cemented_cycles)
 
+(* Tries to read the resulting context hash of a block in the cemented
+   block store first, then fallback in the floating.
+   This is necessary, while reconstructing the storage, as the blocks
+   are reconstructed from the genesis and as the max_op_ttl blocks
+   from the floating store are overlapping the cemented store. Thus,
+   these blocks will have their metadata freshly reconstructed but
+   their resulting context hashes might be wrong (as the context_hash
+   was set to Context.zero after a snapshot imported). *)
+let local_resulting_context_hash chain_store block =
+  let open Lwt_result_syntax in
+  let block_store = Store.Unsafe.get_block_store chain_store in
+  let cemented_store = Block_store.cemented_block_store block_store in
+  let* expect_predecessor =
+    Store.Chain.expect_predecessor_context_hash
+      chain_store
+      ~protocol_level:(Block_repr.proto_level block)
+  in
+  let get_succ_from_floating block_store block =
+    let floating_block_stores = Block_store.floating_block_stores block_store in
+    let block_hash = Block_repr.hash block in
+    let exception Found of Block_hash.t in
+    let* succ_hash =
+      List.find_map_es
+        (fun fs ->
+          protect
+            (fun () ->
+              let* () =
+                Floating_block_store.raw_iterate
+                  (fun (bytes, _offset) ->
+                    let pred_hash =
+                      Block_repr_unix.raw_get_block_predecessor bytes
+                    in
+                    if Block_hash.equal pred_hash block_hash then
+                      raise (Found (Block_repr_unix.raw_get_block_hash bytes))
+                    else return_unit)
+                  fs
+              in
+              return_none)
+            ~on_error:(function
+              | Exn (Found h) :: _ -> return_some h | exn -> fail exn))
+        floating_block_stores
+    in
+    match succ_hash with Some h -> return_some h | None -> return_none
+  in
+  let ( let*? ) t k =
+    let* v_opt = t in
+    match v_opt with None -> return_none | Some v -> k v
+  in
+  let*? adjusted_hash =
+    Block_store.get_hash block_store (Block (Block_repr.hash block, 0))
+  in
+  if expect_predecessor then
+    let*? block_level =
+      return
+        (Cemented_block_store.get_cemented_block_level
+           cemented_store
+           adjusted_hash)
+    in
+    let* succ_block =
+      Cemented_block_store.get_cemented_block_by_level
+        cemented_store
+        ~read_metadata:false
+        (Int32.succ block_level)
+    in
+    match succ_block with
+    | Some succ_block -> return_some (Block_repr.context succ_block)
+    | None ->
+        (* We have reached the last cemented block. Falling back to
+           the floating store. *)
+        let*? succ_block_hash = get_succ_from_floating block_store block in
+        let* succ_block = Store.Block.read_block chain_store succ_block_hash in
+        return_some (Store.Block.context_hash succ_block)
+  else
+    let*? block =
+      Cemented_block_store.get_cemented_block_by_hash
+        cemented_store
+        ~read_metadata:false
+        adjusted_hash
+    in
+    return_some (Block_repr.context block)
+
 let reconstruct_floating chain_store context_index ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
     ~progress_display_mode =
@@ -594,13 +688,15 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                       (Block_repr.proto_level block)
                       (Block_repr.hash block)
                   in
-                  (* If the block is genesis then just retrieve its metadata. *)
-                  let* ( message,
+                  let* ( resulting_context_hash,
+                         message,
                          max_operations_ttl,
                          last_allowed_fork_level,
                          block_metadata,
                          operations_metadata ) =
                     if
+                      (* If the block is genesis then just retrieve
+                         its metadata. *)
                       Store.Block.is_genesis chain_store (Block_repr.hash block)
                     then reconstruct_genesis_operations_metadata chain_store
                     else
@@ -704,8 +800,20 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                                   operations_metadata
                             | None -> No_metadata_hash operations_metadata
                           in
+                          let* resulting_context_hash =
+                            let* opt =
+                              local_resulting_context_hash chain_store block
+                            in
+                            match opt with
+                            | None ->
+                                tzfail
+                                  (Reconstruction_failure
+                                     (Cannot_read_block_level level))
+                            | Some v -> return v
+                          in
                           return
-                            ( message,
+                            ( resulting_context_hash,
+                              message,
                               max_operations_ttl,
                               last_allowed_fork_level,
                               block_metadata,
@@ -725,7 +833,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                   let* () =
                     Floating_block_store.append_block
                       new_ro_store
-                      info
+                      {info with resulting_context_hash}
                       reconstructed_block
                   in
                   let*! () = notify () in
