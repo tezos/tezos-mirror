@@ -35,6 +35,9 @@ Node
 - Added an option ``daily-logs`` to file-descriptor sinks, enabling
   log rotation based on a daily frequency.
 
+- Fixed a bug while reconstructing the storage after a snapshot import
+  that would result in wrong context hash mapping for some blocks.
+
 Client
 ------
 
