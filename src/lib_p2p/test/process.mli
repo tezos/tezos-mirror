@@ -25,7 +25,7 @@
 
 (** {1} Function evaluation in a detached process
 
-    This library uses a process detached in a separated unix thread to
+    This library uses a process detached in a separated unix process to
    execute a given function, with bidirectional communication channels
    and transmission of the function result at the end of the
    execution.
@@ -64,9 +64,9 @@ type ('sent, 'received, 'result) t
     SIGKILL.
 
     [input_encoding] and [output_encoding], if provided,  will be used
-    to exchange values between the main thread and the detached thread
-    [input_encoding] is for values received by the detached thread.
-    [output_encoding] is for values sent by the detached thread.
+    to exchange values between the main process and the detached process
+    [input_encoding] is for values received by the detached process.
+    [output_encoding] is for values sent by the detached process.
 
     In absence of data encoding the Marshal mecanism will be  used.
     Be aware that extensible types, like error or exception cannot be
@@ -79,8 +79,8 @@ type ('sent, 'received, 'result) t
     for the ['result] type. Ie if the detached function end with an
     error, the error will safely be serialized-deserialised.
 
-   If no encoding is given, the values will be serialized using hte
-     Marshal module, with the given [flags] (if any is provided).
+   If no encoding is given, the values will be serialized using the
+   Marshal module, with the given [flags] (if any is provided).
 
   *)
 val detach :
