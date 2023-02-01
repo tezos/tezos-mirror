@@ -87,7 +87,7 @@ let encoding : t Data_encoding.t =
           string
           default_data_dir)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+       (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
        (dft
           "dac"
           ~description:"Data Availability Committee"
