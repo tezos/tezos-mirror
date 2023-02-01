@@ -135,6 +135,9 @@ Node
 
 - Allowed symbolic links in the datadir (to split data over several places).
 
+- Fixed a bug while reconstructing the storage after a snapshot import
+  that would result in wrong context hash mapping for some blocks.
+
 Client
 ------
 
