@@ -32,7 +32,7 @@ type 'a store = 'a Store.t
 
 type 'a t = {
   cctxt : Protocol_client_context.full;
-  dal_cctxt : Dal_node_client.cctxt;
+  dal_cctxt : Dal_node_client.cctxt option;
   data_dir : string;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
@@ -114,7 +114,7 @@ let get_last_published_commitment (cctxt : Protocol_client_context.full)
   | Ok None -> return_none
   | Ok (Some (_staked_hash, staked_commitment)) -> return_some staked_commitment
 
-let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
+let init (cctxt : Protocol_client_context.full) ~data_dir mode
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -123,9 +123,13 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
         fee_parameters;
         loser_mode;
         l2_blocks_cache_size;
+        dal_node_endpoint;
         _;
       } as configuration) =
   let open Lwt_result_syntax in
+  let dal_cctxt =
+    Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
+  in
   let* store =
     Store.load
       mode
@@ -143,6 +147,11 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
     Option.filter_map_es
       (get_last_published_commitment cctxt rollup_address)
       publisher
+  in
+  let*! () =
+    if dal_cctxt = None && protocol_constants.parametric.dal.feature_enable then
+      Event.warn_dal_enabled_no_node ()
+    else Lwt.return_unit
   in
   return
     {
@@ -202,7 +211,8 @@ let metadata node_ctxt =
   Sc_rollup.Metadata.{address; origination_level}
 
 let dal_enabled node_ctxt =
-  node_ctxt.protocol_constants.parametric.dal.feature_enable
+  node_ctxt.dal_cctxt <> None
+  && node_ctxt.protocol_constants.parametric.dal.feature_enable
 
 let readonly (node_ctxt : _ t) =
   {

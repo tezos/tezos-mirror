@@ -71,3 +71,7 @@ val kernel_debug : string -> unit Lwt.t
 (** [kernel_debug str] emits the event that the kernel has logged [str].
     (Doesn't wait for event to be emitted) *)
 val kernel_debug_dont_wait : string -> unit
+
+(** [warn_dal_enabled_no_node ()] emits a warning for when DAL is enabled in the
+    protocol but the rollup node has no DAL node. *)
+val warn_dal_enabled_no_node : unit -> unit Lwt.t

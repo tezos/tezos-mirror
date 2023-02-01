@@ -118,15 +118,15 @@ let metrics_addr_arg =
     Client_proto_args.string_parameter
 
 let dal_node_endpoint_arg =
-  let default = Configuration.default_dal_node_endpoint in
   Tezos_clic.arg
     ~long:"dal-node"
     ~placeholder:"dal-node-endpoint"
     ~doc:
       (Format.sprintf
          "The address of the dal node from which the smart rollup node \
-          downloads slots. Default value is %s"
-         (Uri.to_string default))
+          downloads slots. When not provided, the rollup node will not support \
+          the DAL. In production, a DAL node must be provided if DAL is \
+          enabled and used in the rollup.")
     (Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s)))
 
 let rpc_port_arg =
@@ -269,8 +269,7 @@ let config_init_command =
           rpc_port = Option.value ~default:default_rpc_port rpc_port;
           reconnection_delay =
             Option.value ~default:default_reconnection_delay reconnection_delay;
-          dal_node_endpoint =
-            Option.value ~default:default_dal_node_endpoint dal_node_endpoint;
+          dal_node_endpoint;
           metrics_addr;
           fee_parameters = Operator_purpose_map.empty;
           mode;
@@ -318,9 +317,7 @@ let run_command =
             rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
             rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
             dal_node_endpoint =
-              Option.value
-                ~default:configuration.dal_node_endpoint
-                dal_node_endpoint;
+              Option.either dal_node_endpoint configuration.dal_node_endpoint;
             reconnection_delay =
               Option.value
                 ~default:configuration.reconnection_delay

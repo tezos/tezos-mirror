@@ -60,7 +60,7 @@ type t = {
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
-  dal_node_endpoint : Uri.t;
+  dal_node_endpoint : Uri.t option;
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;
@@ -86,8 +86,6 @@ let default_rpc_port = 8932
 let default_metrics_port = 9933
 
 let default_reconnection_delay = 2.0 (* seconds *)
-
-let default_dal_node_endpoint = Uri.of_string "http://127.0.0.1:10732"
 
 let tez t = Tez.of_mutez_exn Int64.(mul (of_int t) 1_000_000L)
 
@@ -581,10 +579,7 @@ let encoding : t Data_encoding.t =
              Loser_mode.encoding
              Loser_mode.no_failures))
        (obj4
-          (dft
-             "DAL node endpoint"
-             Tezos_rpc.Encoding.uri_encoding
-             default_dal_node_endpoint)
+          (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
           (dft "batcher" batcher_encoding default_batcher)
           (dft
              "injector_retention_period"
