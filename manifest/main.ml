@@ -3498,6 +3498,20 @@ let octez_scoru_wasm_tests_helpers =
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
+let octez_scoru_wasm_durable_snapshot =
+  private_lib
+    "tezos_scoru_wasm_durable_snapshot"
+    ~path:"src/lib_scoru_wasm/test/durable_snapshot"
+    ~opam:"tezos-scoru-wasm-durable-snasphot"
+    ~synopsis:"Durable storage implementation which was originally realised"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_webassembly_interpreter_extra |> open_;
+      ]
+    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+
 let _octez_scoru_wasm_benchmark =
   private_exe
     "benchmark_scoru_wasm"
@@ -3530,6 +3544,7 @@ let _octez_scoru_wasm_tests =
         octez_context_disk;
         octez_base_test_helpers |> open_;
         octez_test_helpers |> open_;
+        octez_scoru_wasm_durable_snapshot;
         octez_scoru_wasm;
         qcheck_alcotest;
         alcotest_lwt;
