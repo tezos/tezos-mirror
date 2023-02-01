@@ -114,6 +114,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Client_keys.register ~protocols ;
   Client_run_view.register ~protocols ;
   Comparable_datatype.register ~protocols ;
+  Contract_baker.register ~protocols ;
   Contract_big_map_to_self.register ~protocols ;
   Contract_entrypoints.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
