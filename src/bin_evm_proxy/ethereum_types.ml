@@ -43,3 +43,51 @@ let quantity_encoding =
     (fun (Qty q) -> z_to_hexa q)
     (fun q -> Qty (Z.of_string q))
     Data_encoding.string
+
+(** Ethereum block level. *)
+type block_height = Block_height of Z.t [@@ocaml.unboxed]
+
+let block_height_of_z z = Block_height z
+
+let block_height_encoding =
+  Data_encoding.conv
+    (fun (Block_height h) -> z_to_hexa h)
+    (fun h -> Block_height (Z.of_string h))
+    Data_encoding.string
+
+(** Ethereum block params in RPCs. *)
+type block_param = Hash_param of block_height | Earliest | Latest | Pending
+
+let block_param_encoding =
+  let open Data_encoding in
+  union
+    [
+      (let tag = "hex" in
+       case
+         ~title:tag
+         (Tag 0)
+         block_height_encoding
+         (function Hash_param h -> Some h | _ -> None)
+         (fun h -> Hash_param h));
+      (let tag = "earliest" in
+       case
+         ~title:tag
+         (Tag 1)
+         (constant tag)
+         (function Earliest -> Some () | _ -> None)
+         (fun () -> Earliest));
+      (let tag = "latest" in
+       case
+         ~title:tag
+         (Tag 2)
+         (constant tag)
+         (function Latest -> Some () | _ -> None)
+         (fun () -> Latest));
+      (let tag = "pending" in
+       case
+         ~title:tag
+         (Tag 3)
+         (constant tag)
+         (function Pending -> Some () | _ -> None)
+         (fun () -> Pending));
+    ]

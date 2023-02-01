@@ -53,6 +53,10 @@ module Mock = struct
 
   (* Default chain_id for ethereum custom networks with Ganache. *)
   let chain_id = qty_f (Z.of_int 1337)
+
+  let block_height = block_height_of_z Z.zero
+
+  let balance = qty_f @@ Z.of_int64 Int64.max_int
 end
 
 let dispatch dir =
@@ -62,6 +66,11 @@ let dispatch dir =
       | Network_id.Input _ ->
           Lwt.return_ok (Network_id.Output (Ok Mock.chain_id))
       | Chain_id.Input _ -> Lwt.return_ok (Chain_id.Output (Ok Mock.chain_id))
+      | Get_balance.Input _ ->
+          Lwt.return_ok (Get_balance.Output (Ok Mock.balance))
+      | Block_number.Input _ ->
+          Format.printf "Accessing blockNumber\n%!" ;
+          Lwt.return_ok (Block_number.Output (Ok Mock.block_height))
       | _ -> Error_monad.failwith "Unsupported method\n%!")
 
 let directory = Directory.empty |> version |> dispatch

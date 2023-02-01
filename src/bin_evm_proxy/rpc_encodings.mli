@@ -183,3 +183,13 @@ module Accounts :
   METHOD
     with type m_input = unit
      and type m_output = Ethereum_types.address list
+
+module Get_balance :
+  METHOD
+    with type m_input = Ethereum_types.address * Ethereum_types.block_param
+     and type m_output = Ethereum_types.quantity
+
+module Block_number :
+  METHOD
+    with type m_input = unit
+     and type m_output = Ethereum_types.block_height

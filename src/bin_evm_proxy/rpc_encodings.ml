@@ -221,8 +221,42 @@ module Accounts = MethodMaker (struct
   let method_ = "eth_accounts"
 end)
 
+module Get_balance = MethodMaker (struct
+  open Ethereum_types
+
+  type input = address * block_param
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_getBalance"
+end)
+
+module Block_number = MethodMaker (struct
+  open Ethereum_types
+
+  type input = unit
+
+  type output = block_height
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = block_height_encoding
+
+  let method_ = "eth_blockNumber"
+end)
+
 let methods : (module METHOD) list =
-  [(module Network_id); (module Chain_id); (module Accounts)]
+  [
+    (module Network_id);
+    (module Chain_id);
+    (module Accounts);
+    (module Get_balance);
+    (module Block_number);
+  ]
 
 module Input = struct
   type t = input
