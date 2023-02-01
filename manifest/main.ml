@@ -3286,6 +3286,23 @@ let octez_dac_node_lib =
         octez_stdlib_unix |> open_;
       ]
 
+let _octez_dac_node_lib_tests =
+  test
+    "main"
+    ~path:"src/lib_dac_node/test"
+    ~opam:"tezos-dac-node-lib-test"
+    ~synopsis:"Test for dac node lib"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_test_helpers |> open_;
+        octez_base_test_helpers |> open_;
+        octez_dac_node_lib |> open_;
+        alcotest_lwt;
+      ]
+
 let octez_node_config =
   public_lib
     "octez-node-config"
