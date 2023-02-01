@@ -39,8 +39,7 @@ class unix_cctxt ~rpc_config : cctxt =
            rpc_config.media_type)
   end
 
-let make_unix_cctxt ~addr ~port =
-  let endpoint = Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port) in
+let make_unix_cctxt endpoint =
   let rpc_config =
     {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
   in
