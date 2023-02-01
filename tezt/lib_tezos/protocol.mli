@@ -65,6 +65,9 @@ val demo_noops_hash : string
 (** Hash of protocol demo_counter *)
 val demo_counter_hash : string
 
+(** Hash of protocol zero *)
+val protocol_zero_hash : string
+
 (** Get the location of the parameter file.
 
     This returns the path to one of the parameter files of the ["parameters"]
