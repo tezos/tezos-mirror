@@ -85,12 +85,12 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let rec inode_tree (depth, width) =
       if depth <= 0 then
-        let+ hash = hash in
+        let+ hash in
         Blinded_inode hash
       else
         oneof
           [
-            (let+ hash = hash in
+            (let+ hash in
              Blinded_inode hash);
             (let* size = int_bound 3 in
              let size = size + 1 in
@@ -302,12 +302,12 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let rec inode_tree (depth, width) =
       if depth <= 0 then
-        let+ hash = hash in
+        let+ hash in
         Blinded_inode hash
       else
         oneof
           [
-            (let+ hash = hash in
+            (let+ hash in
              Blinded_inode hash);
             (let* size = int_bound 3 in
              let size = size + 1 in

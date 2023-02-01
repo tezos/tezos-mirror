@@ -67,7 +67,7 @@ struct
     let open Lwt.Syntax in
     fold
       (fun k v acc ->
-        let* acc = acc in
+        let* acc in
         f k v acc)
       q
       (Lwt.return acc)

@@ -35,13 +35,13 @@ let assert_err e = e = Error ()
 
 let assert_err_s e =
   let open Lwt_syntax in
-  let* e = e in
+  let* e in
   assert (e = Error ()) ;
   return_unit
 
 let assert_err_p e =
   let open Lwt_syntax in
-  let* e = e in
+  let* e in
   assert (e = Error (Support.Test_trace.make ())) ;
   return_unit
 

@@ -560,7 +560,7 @@ let eq_e ?pp (a : ('a, 'trace) result) (b : ('a, 'trace) result) = eq ?pp a b
 let eq_s ?pp a b =
   Lwt_main.run
     (let open Lwt_syntax in
-    let+ a = a and+ b = b in
+    let+ a and+ b in
     eq ?pp a b)
 
 (** [eq_es] is a duplicate of {!eq_s} for consistency
@@ -588,7 +588,7 @@ let eq_es ?pp (a : ('a, 'b) result Lwt.t) (b : ('a, 'b) result Lwt.t) =
 let eq_es_ep ?pp es ep =
   Lwt_main.run
     (let open Lwt_syntax in
-    let+ es = es and+ ep = ep in
+    let+ es and+ ep in
     match (es, ep) with
     | Ok ok_es, Ok ok_ep -> eq ?pp ok_es ok_ep
     | Error error_es, Error trace_ep ->
@@ -611,7 +611,7 @@ let eq_es_ep ?pp es ep =
 let eq_ep ?pp a b =
   Lwt_main.run
     (let open Lwt_syntax in
-    let+ a = a and+ b = b in
+    let+ a and+ b in
     match (a, b) with
     | Ok ok_es, Ok ok_ep -> eq ?pp ok_es ok_ep
     | Error _, Error _ ->

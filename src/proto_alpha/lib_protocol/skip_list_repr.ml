@@ -438,7 +438,7 @@ end) : S = struct
 
     let assume_some o f =
       let open Monad_syntax in
-      let* o = o in
+      let* o in
       match o with None -> return false | Some x -> f x
 
     let valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path =

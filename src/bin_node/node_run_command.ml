@@ -557,7 +557,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         | _ -> Lwt.return_unit)
       node
   in
-  let*? node = node in
+  let*? node in
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         let*! () = Event.(emit shutting_down_node) () in

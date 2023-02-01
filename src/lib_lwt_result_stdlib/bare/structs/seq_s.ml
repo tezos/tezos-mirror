@@ -47,7 +47,7 @@ let return_s p () = Lwt.map (fun x -> Cons (x, empty)) p
 let cons item t () = Lwt.return (Cons (item, t))
 
 let cons_s item t () =
-  let* item = item in
+  let* item in
   return (Cons (item, t))
 
 let rec append ta tb () =

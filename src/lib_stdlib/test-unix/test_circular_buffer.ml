@@ -112,7 +112,7 @@ module Constant = struct
     Array.iteri
       (fun i data ->
         ignore
-          (let* data = data in
+          (let* data in
            let _ = Buff.read data circular_buffer ~into:buff ~offset:0 in
            assert (
              Bytes.sub buff 0 (Buff.length data)
@@ -130,7 +130,7 @@ module Constant = struct
     Array.iter
       (fun (i, data) ->
         ignore
-          (let* data = data in
+          (let* data in
            let max_iter = 10 in
            let rec exhaust data offset iter =
              let length = Buff.length data in

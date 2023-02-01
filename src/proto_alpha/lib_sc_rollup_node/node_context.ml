@@ -228,7 +228,7 @@ let trace_lwt_result_with x =
 module Lwt_result_option_syntax = struct
   let ( let** ) a f =
     let open Lwt_result_syntax in
-    let* a = a in
+    let* a in
     match a with None -> return_none | Some a -> f a
 end
 

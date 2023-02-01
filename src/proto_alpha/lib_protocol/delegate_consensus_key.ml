@@ -219,7 +219,7 @@ let activate ctxt ~new_cycle =
     ~order:`Undefined
     ~init:(ok ctxt)
     ~f:(fun delegate ctxt ->
-      let*? ctxt = ctxt in
+      let*? ctxt in
       let delegate = Contract_repr.Implicit delegate in
       let* update =
         Storage.Contract.Pending_consensus_keys.find (ctxt, delegate) new_cycle

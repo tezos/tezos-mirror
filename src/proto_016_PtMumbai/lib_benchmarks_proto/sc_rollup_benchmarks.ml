@@ -154,7 +154,7 @@ module Pvm_state_generator = struct
           gen_tree
             (tree_depth - 1)
             (let rec kont' nb_subtrees acc_subtrees subtree =
-               let*! subtree = subtree in
+               let*! subtree in
                let acc_subtrees = subtree :: acc_subtrees in
                let nb_subtrees = nb_subtrees + 1 in
                if nb_subtrees = tree_branching_factor then

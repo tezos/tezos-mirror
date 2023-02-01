@@ -609,7 +609,7 @@ let on_disconnection w peer_id =
   match P2p_peer.Error_table.find nv.active_peers peer_id with
   | None -> return_unit
   | Some pv -> (
-      let*! pv = pv in
+      let*! pv in
       match pv with
       | Ok pv ->
           let*! () = Peer_validator.shutdown pv in

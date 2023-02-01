@@ -417,7 +417,7 @@ let test_inclusion_proofs_depending_on_history_capacity
   in
   let proof s v =
     let open Lwt_result_syntax in
-    let*! v = v in
+    let*! v in
     match Environment.wrap_tzresult v with
     | Ok v -> return v
     | Error _ -> tzfail (err (s ^ ": Expecting some inclusion proof."))

@@ -275,7 +275,7 @@ module Nack = struct
     let open Lwt_result_syntax in
     let* info, auth_fd = accept sched socket in
     let* () = tzassert info.incoming __POS__ in
-    let*! id2 = id2 in
+    let*! id2 in
     let* () =
       tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
     in
@@ -284,7 +284,7 @@ module Nack = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let*! conn = P2p_socket.accept ~canceler auth_fd encoding in
     let* () = tzassert (is_rejected conn) __POS__ in
@@ -309,7 +309,7 @@ module Nacked = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
     sync ch
@@ -342,7 +342,7 @@ module Simple_message = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let* () = P2p_socket.write_sync conn simple_msg2 in
@@ -382,7 +382,7 @@ module Chunked_message = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let* conn =
       P2p_socket.accept ~canceler ~binary_chunks_size:21 auth_fd encoding
@@ -426,7 +426,7 @@ module Oversized_message = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let* () = P2p_socket.write_sync conn simple_msg2 in
@@ -456,7 +456,7 @@ module Close_on_read = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let* () = sync ch in
@@ -487,7 +487,7 @@ module Close_on_write = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let* () = sync ch in
@@ -533,7 +533,7 @@ module Garbled_data = struct
 
   let client _ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let*! err = P2p_socket.read conn in
