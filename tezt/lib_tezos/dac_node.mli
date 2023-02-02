@@ -25,12 +25,12 @@
 
 (** Spawn Data-availability-committee (DAC) nodes and control them. *)
 
-(** DAC Node state *)
+(** DAC Node state. *)
 type t
 
-(** Creates a DAC node *)
-
-val create :
+(** Creates a DAC node to run in legacy mode, using the specified threshold
+    and list of dac members. *)
+val create_legacy :
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
@@ -38,6 +38,64 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  threshold:int ->
+  dac_members:string list ->
+  node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Creates a DAC node to run in coordinator mode, using the specified
+    threshold, list of dac members and operator. *)
+val create_coordinator :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  threshold:int ->
+  dac_members:string list ->
+  node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Creates a DAC node to run in dac_member mode, using the specified address,
+    coordinator rpc host and port. *)
+val create_dac_member :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?coordinator_rpc_host:string ->
+  ?coordinator_rpc_port:int ->
+  address:string ->
+  node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Creates a DAC node to run in observer mode, using the specified coordinator
+    rpc host and port. *)
+val create_observer :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?coordinator_rpc_host:string ->
+  ?coordinator_rpc_port:int ->
   node:Node.t ->
   client:Client.t ->
   unit ->
@@ -45,6 +103,10 @@ val create :
 
 (** Get the name of an dac node. *)
 val name : t -> string
+
+(** Get the mode in which a dac node is configured to run. Returned values can
+    be either "Legacy", "Coordinator", "Dac_member" or "Observer". *)
+val mode : t -> string
 
 (** Get the RPC host given as [--rpc-addr] to an dac node. *)
 val rpc_host : t -> string
@@ -57,6 +119,9 @@ val endpoint : t -> string
 
 (** Get the data-dir of an dac node. *)
 val data_dir : t -> string
+
+(** Get the reveal-data-dir of an dac node. *)
+val reveal_data_dir : t -> string
 
 (** [run ?wait_ready ?env node] launches the given dac
     node where env is a map of environment variable.
@@ -92,26 +157,6 @@ val wait : t -> Unix.process_status Lwt.t
     configuration file.
 *)
 val init_config : t -> string Lwt.t
-
-(** DAC related functions. *)
-module Dac : sig
-  (** [set_parameters ?threshold dac_node] Runs
-    [octez-dac-node set dac parameters --data-dir data_dir], where
-    [data_dir = dac_node.persistent_state.data_dir]. If the optional integer
-    parameter [~threshold] is passed, then the dac node configuration file is
-    updated with the dac threshold indicated. If the [~reveal_data_dir]
-    optional argument is passed, then the dac node configuration file is
-    updated with the corresponding reveal_data_dir. If no optional arguments are
-    passed, the configuration file of the dac node is left unchanged.
-*)
-  val set_parameters :
-    ?threshold:int -> ?reveal_data_dir:string -> t -> unit Lwt.t
-
-  (** [add_committee_member dac_node] runs
-    [octez-dac-node add data availability committee member alias --data-dir data-dir],
-    where [data-dir = dac_node.persistent_state.data_dir]. *)
-  val add_committee_member : address:string -> t -> unit Lwt.t
-end
 
 module Config_file : sig
   (** C node configuration files. *)
