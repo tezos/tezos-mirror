@@ -1763,22 +1763,29 @@ let () =
     (function Contents_list_error s -> Some s | _ -> None)
     (fun s -> Contents_list_error s)
 
-let check_signature (type kind) key chain_id
-    ({shell; protocol_data} : kind operation) =
+let serialize_unsigned_operation (type kind)
+    ({shell; protocol_data} : kind operation) : bytes =
+  Data_encoding.Binary.to_bytes_exn
+    unsigned_operation_encoding
+    (shell, Contents_list protocol_data.contents)
+
+let unsigned_operation_length (type kind)
+    ({shell; protocol_data} : kind operation) : int =
+  Data_encoding.Binary.length
+    unsigned_operation_encoding
+    (shell, Contents_list protocol_data.contents)
+
+let check_signature (type kind) key chain_id (op : kind operation) =
+  let serialized_operation = serialize_unsigned_operation op in
   let check ~watermark signature =
-    let unsigned_operation =
-      Data_encoding.Binary.to_bytes_exn
-        unsigned_operation_encoding
-        (shell, Contents_list protocol_data.contents)
-    in
-    if Signature.check ~watermark key signature unsigned_operation then Ok ()
+    if Signature.check ~watermark key signature serialized_operation then Ok ()
     else error Invalid_signature
   in
-  match protocol_data.signature with
+  match op.protocol_data.signature with
   | None -> error Missing_signature
   | Some signature ->
       let watermark =
-        match protocol_data.contents with
+        match op.protocol_data.contents with
         | Single (Preendorsement _) -> to_watermark (Preendorsement chain_id)
         | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
         | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
@@ -2497,3 +2504,7 @@ let compare (oph1, op1) (oph2, op2) =
   else
     let cmp = compare_operation_weight (weight_of op1) (weight_of op2) in
     if Compare.Int.(cmp = 0) then cmp_h else cmp
+
+module Internal_for_benchmarking = struct
+  let serialize_unsigned_operation = serialize_unsigned_operation
+end

@@ -4870,6 +4870,8 @@ module Operation : sig
 
   type error += Invalid_signature (* `Permanent *)
 
+  val unsigned_operation_length : _ operation -> int
+
   val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val pack : 'kind operation -> packed_operation
