@@ -1,10 +1,12 @@
+open Proto_compat
+
 type tick = Z.t
 
 let zero = Z.zero
 
 let one = Z.one
 
-let of_int32 i = if i < 0l then None else Some (Z.of_int32 i)
+let of_int32 i = if Compare.Int32.(i < 0l) then None else Some (Z.of_int32 i)
 
 let of_int32_exn i =
   match of_int32 i with
@@ -21,7 +23,7 @@ let to_int32_exn t =
         (Invalid_argument
            "Ticks cannot be contained in the signed int32 representation")
 
-let of_int64 i = if i < 0L then None else Some (Z.of_int64 i)
+let of_int64 i = if Compare.Int64.(i < 0L) then None else Some (Z.of_int64 i)
 
 let of_int64_exn i =
   match of_int64 i with
@@ -40,7 +42,7 @@ let to_int64_exn t =
 
 let to_z t = t
 
-let of_z z = if Z.Compare.(z < Z.zero) then None else Some z
+let of_z z = if Compare.Z.(z < Z.zero) then None else Some z
 
 let ( + ) = Z.add
 

@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-lwt-result-stdlib
+  tezos-stdlib
   zarith
   tezos-lazy-containers)
  (preprocess (pps ppx_deriving.show))
