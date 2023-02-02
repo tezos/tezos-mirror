@@ -27,8 +27,9 @@ open Protocol_client_context
 open Protocol
 open Alpha_context
 open Injector_common
+open Injector_sigs
 
-module Request : sig
+module Request (L1_operation : INJECTOR_OPERATION) : sig
   type ('a, 'b) t =
     | Add_pending : L1_operation.t -> (unit, error trace) t
     | New_tezos_head :

@@ -66,71 +66,6 @@ type retry_action =
       (** The error for the failing operation should be propagated at a higher
           level. *)
 
-(** Information stored about an L1 operation that was injected on a Tezos
-    node. *)
-type injected_info = {
-  op : L1_operation.t;  (** The L1 manager operation. *)
-  oph : Operation_hash.t;
-      (** The hash of the operation which contains [op] (this can be an L1 batch
-          of several manager operations). *)
-  op_index : int;
-      (** The index of the operation [op] in the L1 batch corresponding to [oph].  *)
-}
-
-(** Information stored about an L1 operation that was included in a Tezos
-    block. *)
-type included_info = {
-  op : L1_operation.t;  (** The L1 manager operation. *)
-  oph : Operation_hash.t;
-      (** The hash of the operation which contains [op] (this can be an L1 batch
-          of several manager operations). *)
-  op_index : int;
-      (** The index of the operation [op] in the L1 batch corresponding to [oph].  *)
-  l1_block : Block_hash.t;
-      (** The hash of the L1 block in which the operation was included. *)
-  l1_level : int32;  (** The level of [l1_block]. *)
-}
-
-(** Status of an operation in the injector. *)
-type status =
-  | Pending of L1_operation.t  (** The operation is pending injection. *)
-  | Injected of injected_info
-      (** The operation has been injected successfully in the node. *)
-  | Included of included_info
-      (** The operation has been included in a L1 block. *)
-
-let injected_info_encoding =
-  let open Data_encoding in
-  conv
-    (fun ({op; oph; op_index} : injected_info) -> (op, (oph, op_index)))
-    (fun (op, (oph, op_index)) -> {op; oph; op_index})
-  @@ merge_objs
-       L1_operation.encoding
-       (obj1
-          (req
-             "layer1"
-             (obj2
-                (req "operation_hash" Operation_hash.encoding)
-                (req "operation_index" int31))))
-
-let included_info_encoding =
-  let open Data_encoding in
-  conv
-    (fun {op; oph; op_index; l1_block; l1_level} ->
-      (op, (oph, op_index, l1_block, l1_level)))
-    (fun (op, (oph, op_index, l1_block, l1_level)) ->
-      {op; oph; op_index; l1_block; l1_level})
-  @@ merge_objs
-       L1_operation.encoding
-       (obj1
-          (req
-             "layer1"
-             (obj4
-                (req "operation_hash" Operation_hash.encoding)
-                (req "operation_index" int31)
-                (req "block_hash" Block_hash.encoding)
-                (req "level" int32))))
-
 (** Signature for tags used in injector  *)
 module type TAG = sig
   include Stdlib.Set.OrderedType
@@ -142,6 +77,45 @@ module type TAG = sig
   val encoding : t Data_encoding.t
 end
 
+module type PARAM_OPERATION = sig
+  (** The abstract type of operations to inject *)
+  type t
+
+  (** An encoding for injector's operations *)
+  val encoding : t Data_encoding.t
+
+  (** Convert an injector operation to a manager_operation of the protocol *)
+  val to_manager_operation : t -> packed_manager_operation
+
+  (** Pretty-printing injector's operations *)
+  val pp : Format.formatter -> t -> unit
+end
+
+(** Internal representation of injector operations. *)
+module type INJECTOR_OPERATION = sig
+  type operation
+
+  (** Hash with b58check encoding iop(53), for hashes of injector operations *)
+  module Hash : Tezos_crypto.Intfs.HASH
+
+  (** Alias for L1 operations hashes *)
+  type hash = Hash.t
+
+  (** The type of L1 operations that are injected on Tezos. These have a hash
+      attached to them that allows tracking and retrieving their status. *)
+  type t = private {hash : hash; operation : operation}
+
+  (** [make op] returns an L1 operation with the corresponding hash. *)
+  val make : operation -> t
+
+  (** Encoding for L1 operations *)
+  val encoding : t Data_encoding.t
+
+  (** Pretty printer for L1 operations. Only the relevant part for the rollup node
+      is printed. *)
+  val pp : Format.formatter -> t -> unit
+end
+
 (** Module type for parameter of functor {!Injector_functor.Make}. *)
 module type PARAMETERS = sig
   (** The type of the state that the injector can access *)
@@ -149,6 +123,9 @@ module type PARAMETERS = sig
 
   (** A module which contains the different tags for the injector *)
   module Tag : TAG
+
+  (** A module for the injector operations *)
+  module Operation : PARAM_OPERATION
 
   (** Where to put the events for this injector  *)
   val events_section : string list
@@ -160,22 +137,21 @@ module type PARAMETERS = sig
   (** Action (see {!retry_action}) to be taken on unsuccessful operation (see
       {!unsuccessful_status}). *)
   val retry_unsuccessful_operation :
-    state -> 'a manager_operation -> unsuccessful_status -> retry_action Lwt.t
+    state -> Operation.t -> unsuccessful_status -> retry_action Lwt.t
 
   (** The tag of a manager operation. This is used to send operations to the
       correct queue automatically (when signer is not provided) and to recover
       persistent information. *)
-  val operation_tag : 'a manager_operation -> Tag.t option
+  val operation_tag : Operation.t -> Tag.t
 
   (** Returns the {e approximate upper-bounds} for the fee and limits of an
       operation, used to compute an upper bound on the size (in bytes) for this
       operation. *)
-  val approximate_fee_bound :
-    state -> 'a manager_operation -> approximate_fee_bound
+  val approximate_fee_bound : state -> Operation.t -> approximate_fee_bound
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)
-  val fee_parameter : state -> 'a manager_operation -> Injection.fee_parameter
+  val fee_parameter : state -> Operation.t -> Injection.fee_parameter
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
@@ -185,8 +161,7 @@ module type PARAMETERS = sig
      be included in the injected L1 batch. {b Note}: Returning [`At_least_one]
      allows to incrementally build "or-batches" by iteratively removing
      operations that fail from the desired batch. *)
-  val batch_must_succeed :
-    packed_manager_operation list -> [`All | `At_least_one]
+  val batch_must_succeed : Operation.t list -> [`All | `At_least_one]
 end
 
 (** Output signature for functor {!Injector_functor.Make}. *)
@@ -194,6 +169,47 @@ module type S = sig
   type state
 
   type tag
+
+  type operation
+
+  module L1_operation : INJECTOR_OPERATION with type operation = operation
+
+  (** Information stored about an L1 operation that was injected on a Tezos
+    node. *)
+  type injected_info = {
+    op : L1_operation.t;  (** The injector operation. *)
+    oph : Operation_hash.t;
+        (** The hash of the operation which contains [op] (this can be an L1 batch
+          of several manager operations). *)
+    op_index : int;
+        (** The index of the operation [op] in the L1 batch corresponding to [oph]. *)
+  }
+
+  (** Information stored about an L1 operation that was included in a Tezos
+    block. *)
+  type included_info = {
+    op : L1_operation.t;  (** The injector operation. *)
+    oph : Operation_hash.t;
+        (** The hash of the operation which contains [op] (this can be an L1 batch
+          of several manager operations). *)
+    op_index : int;
+        (** The index of the operation [op] in the L1 batch corresponding to [oph]. *)
+    l1_block : Block_hash.t;
+        (** The hash of the L1 block in which the operation was included. *)
+    l1_level : int32;  (** The level of [l1_block]. *)
+  }
+
+  (** Status of an operation in the injector. *)
+  type status =
+    | Pending of operation  (** The operation is pending injection. *)
+    | Injected of injected_info
+        (** The operation has been injected successfully in the node. *)
+    | Included of included_info
+        (** The operation has been included in a L1 block. *)
+
+  val injected_info_encoding : injected_info Data_encoding.t
+
+  val included_info_encoding : included_info Data_encoding.t
 
   (** Initializes the injector with the rollup node state, for a list of
       signers, and start the workers. Each signer has its own worker with a
@@ -217,9 +233,7 @@ module type S = sig
       corresponding tag. It returns the hash of the operation in the injector
       queue. *)
   val add_pending_operation :
-    ?source:public_key_hash ->
-    'a manager_operation ->
-    L1_operation.hash tzresult Lwt.t
+    ?source:public_key_hash -> operation -> L1_operation.Hash.t tzresult Lwt.t
 
   (** Notify the injector of a new Tezos head. The injector marks the operations
       appropriately (for instance reverted operations that are part of a
@@ -242,5 +256,5 @@ module type S = sig
   val shutdown : unit -> unit Lwt.t
 
   (** The status of an operation in the injector.  *)
-  val operation_status : L1_operation.hash -> status option
+  val operation_status : L1_operation.Hash.t -> status option
 end

@@ -26,4 +26,7 @@
 open Injector_sigs
 
 module Make (P : PARAMETERS) :
-  S with type state := P.state and type tag := P.Tag.t
+  S
+    with type state := P.state
+     and type tag := P.Tag.t
+     and type operation := P.Operation.t

@@ -23,26 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Injector_sigs
 
-(** Hash with b58check encoding mop(53), for hashes of L1 manager operations *)
-module Hash : Tezos_crypto.Intfs.HASH
-
-(** Alias for L1 operations hashes *)
-type hash = Hash.t
-
-(** The type of L1 operations that are injected on Tezos by the rollup node *)
-type t = private {
-  hash : hash;  (** The hash of the L1 manager operation (without the source) *)
-  manager_operation : packed_manager_operation;  (** The manager operation *)
-}
-
-(** [make op] returns an L1 operation with the corresponding hash. *)
-val make : 'a manager_operation -> t
-
-(** Encoding for L1 operations *)
-val encoding : t Data_encoding.t
-
-(** Pretty printer for L1 operations. Only the relevant part for the rollup node
-    is printed. *)
-val pp : Format.formatter -> t -> unit
+module Make (O : PARAM_OPERATION) : INJECTOR_OPERATION with type operation = O.t

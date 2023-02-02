@@ -31,8 +31,5 @@ type error += No_worker_for_source of Signature.Public_key_hash.t
     injected. *)
 type error += No_worker_for_tag of string
 
-(** Error when the injector does not handle the operation. *)
-type error += No_worker_for_operation of L1_operation.t
-
 (** Error when a step of the injector failed. *)
 type error += Step_failed of string
