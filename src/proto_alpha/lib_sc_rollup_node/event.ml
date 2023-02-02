@@ -113,6 +113,16 @@ module Simple = struct
       ~level:Info
       ~msg:"{log}"
       ("log", Data_encoding.string)
+
+  let warn_dal_enabled_no_node =
+    declare_0
+      ~section
+      ~name:"dal_enabled_no_node"
+      ~level:Warning
+      ~msg:
+        "Warning: DAL is enabled in the protocol but no DAL node was provided \
+         for the rollup node."
+      ()
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -144,3 +154,5 @@ let kernel_debug msg = Simple.(emit kernel_debug) msg
 
 let kernel_debug_dont_wait msg =
   Simple.(emit__dont_wait__use_with_care kernel_debug) msg
+
+let warn_dal_enabled_no_node () = Simple.(emit warn_dal_enabled_no_node) ()

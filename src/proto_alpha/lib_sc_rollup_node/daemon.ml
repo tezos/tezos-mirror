@@ -170,8 +170,7 @@ module Make (PVM : Pvm.S) = struct
         in
         tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
     | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
-      ->
-        assert (Node_context.dal_enabled node_ctxt) ;
+      when Node_context.dal_supported node_ctxt ->
         let*! () =
           Node_context.save_slot_header
             node_ctxt
@@ -285,7 +284,7 @@ module Make (PVM : Pvm.S) = struct
       Inbox.process_head node_ctxt head
     in
     let* () =
-      when_ (Node_context.dal_enabled node_ctxt) @@ fun () ->
+      when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
       Dal_slots_tracker.process_head node_ctxt head
     in
     let* () = process_l1_block_operations ~finalized:false node_ctxt head in
@@ -568,11 +567,6 @@ let run ~data_dir (configuration : Configuration.t)
   let open Lwt_result_syntax in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
-  let dal_cctxt =
-    Dal_node_client.make_unix_cctxt
-      ~addr:configuration.dal_node_addr
-      ~port:configuration.dal_node_port
-  in
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
@@ -582,8 +576,6 @@ let run ~data_dir (configuration : Configuration.t)
         ())
       configuration.sc_rollup_node_operators
   in
-  let* node_ctxt =
-    Node_context.init cctxt dal_cctxt ~data_dir Read_write configuration
-  in
+  let* node_ctxt = Node_context.init cctxt ~data_dir Read_write configuration in
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration

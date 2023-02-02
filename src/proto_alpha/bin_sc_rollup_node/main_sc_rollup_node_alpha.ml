@@ -117,17 +117,17 @@ let metrics_addr_arg =
     ~doc:"The address of the smart rollup node metrics server."
     Client_proto_args.string_parameter
 
-let dal_node_addr_arg =
-  let default = Configuration.default_dal_node_addr in
+let dal_node_endpoint_arg =
   Tezos_clic.arg
-    ~long:"dal-node-addr"
-    ~placeholder:"dal-node-address|ip"
+    ~long:"dal-node"
+    ~placeholder:"dal-node-endpoint"
     ~doc:
       (Format.sprintf
          "The address of the dal node from which the smart rollup node \
-          downloads slots. Default value is %s"
-         default)
-    Client_proto_args.string_parameter
+          downloads slots. When not provided, the rollup node will not support \
+          the DAL. In production, a DAL node must be provided if DAL is \
+          enabled and used in the rollup.")
+    (Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s)))
 
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
@@ -137,18 +137,6 @@ let rpc_port_arg =
     ~doc:
       (Format.sprintf
          "The port the smart rollup node listens to. Default value is %s"
-         default)
-    Client_proto_args.int_parameter
-
-let dal_node_port_arg =
-  let default = Configuration.default_dal_node_port |> string_of_int in
-  Tezos_clic.arg
-    ~long:"dal-node-port"
-    ~placeholder:"dal-node-port"
-    ~doc:
-      (Format.sprintf
-         "The port of the dal node from which the smart rollup node downloads \
-          slots from. Default value is %s"
          default)
     Client_proto_args.int_parameter
 
@@ -228,15 +216,14 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args9
+    (args8
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
        metrics_addr_arg
        loser_mode
        reconnection_delay_arg
-       dal_node_addr_arg
-       dal_node_port_arg
+       dal_node_endpoint_arg
        injector_retention_period_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
@@ -249,8 +236,7 @@ let config_init_command =
            metrics_addr,
            loser_mode,
            reconnection_delay,
-           dal_node_addr,
-           dal_node_port,
+           dal_node_endpoint,
            injector_retention_period )
          mode
          sc_rollup_address
@@ -283,10 +269,7 @@ let config_init_command =
           rpc_port = Option.value ~default:default_rpc_port rpc_port;
           reconnection_delay =
             Option.value ~default:default_reconnection_delay reconnection_delay;
-          dal_node_addr =
-            Option.value ~default:default_dal_node_addr dal_node_addr;
-          dal_node_port =
-            Option.value ~default:default_dal_node_port dal_node_port;
+          dal_node_endpoint;
           metrics_addr;
           fee_parameters = Operator_purpose_map.empty;
           mode;
@@ -311,20 +294,18 @@ let run_command =
   command
     ~group
     ~desc:"Run the rollup daemon."
-    (args7
+    (args6
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
-       dal_node_addr_arg
-       dal_node_port_arg
+       dal_node_endpoint_arg
        reconnection_delay_arg
        metrics_addr_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
-           dal_node_addr,
-           dal_node_port,
+           dal_node_endpoint,
            reconnection_delay,
            metrics_addr )
          cctxt ->
@@ -335,10 +316,8 @@ let run_command =
             configuration with
             rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
             rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-            dal_node_addr =
-              Option.value ~default:configuration.dal_node_addr dal_node_addr;
-            dal_node_port =
-              Option.value ~default:configuration.dal_node_port dal_node_port;
+            dal_node_endpoint =
+              Option.either dal_node_endpoint configuration.dal_node_endpoint;
             reconnection_delay =
               Option.value
                 ~default:configuration.reconnection_delay

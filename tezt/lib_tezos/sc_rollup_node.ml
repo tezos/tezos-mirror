@@ -145,12 +145,13 @@ let spawn_config_init sc_node ?loser_mode rollup_address =
   match sc_node.persistent_state.dal_node with
   | None -> []
   | Some dal_node ->
-      [
-        "--dal-node-addr";
-        Dal_node.rpc_host dal_node;
-        "--dal-node-port";
-        Int.to_string @@ Dal_node.rpc_port dal_node;
-      ]
+      let endpoint =
+        sf
+          "http://%s:%d"
+          (Dal_node.rpc_host dal_node)
+          (Dal_node.rpc_port dal_node)
+      in
+      ["--dal-node"; endpoint]
 
 let config_init sc_node ?loser_mode rollup_address =
   let process = spawn_config_init sc_node ?loser_mode rollup_address in

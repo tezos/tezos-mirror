@@ -106,6 +106,8 @@ let check_confirmation_status_and_download
     let* {commitment; _} =
       Node_context.get_slot_header node_ctxt ~published_in_block_hash index
     in
+    let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
+    (* DAL must be configured for this point to be reached *)
     let* pages = get_slot_pages dal_cctxt commitment in
     let save_pages node_ctxt =
       Node_context.save_confirmed_slot

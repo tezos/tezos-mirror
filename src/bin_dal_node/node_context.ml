@@ -46,7 +46,10 @@ let init config store cctxt =
   let neighbors_cctxts =
     List.map
       (fun Configuration.{addr; port} ->
-        Dal_node_client.make_unix_cctxt ~addr ~port)
+        let endpoint =
+          Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port)
+        in
+        Dal_node_client.make_unix_cctxt endpoint)
       config.Configuration.neighbors
   in
   {

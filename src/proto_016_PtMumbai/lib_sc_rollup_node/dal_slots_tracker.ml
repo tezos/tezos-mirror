@@ -190,6 +190,8 @@ let download_and_save_slots
                ~published_in_block_hash:published_block_hash
                s_slot
            in
+           (* DAL must be configured for this point to be reached *)
+           let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
            (* The slot with index s_slot is confirmed. We can
               proceed retrieving it from the dal node and save it
               in the store. *)

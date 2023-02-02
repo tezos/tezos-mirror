@@ -60,8 +60,7 @@ type t = {
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
-  dal_node_addr : string;
-  dal_node_port : int;
+  dal_node_endpoint : Uri.t option;
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;
@@ -87,10 +86,6 @@ let default_rpc_port = 8932
 let default_metrics_port = 9933
 
 let default_reconnection_delay = 2.0 (* seconds *)
-
-let default_dal_node_addr = "127.0.0.1"
-
-let default_dal_node_port = 10732
 
 let tez t = Tez.of_mutez_exn Int64.(mul (of_int t) 1_000_000L)
 
@@ -495,8 +490,7 @@ let encoding : t Data_encoding.t =
            fee_parameters;
            mode;
            loser_mode;
-           dal_node_addr;
-           dal_node_port;
+           dal_node_endpoint;
            batcher;
            injector_retention_period;
            l2_blocks_cache_size;
@@ -510,8 +504,7 @@ let encoding : t Data_encoding.t =
           fee_parameters,
           mode,
           loser_mode ),
-        ( dal_node_addr,
-          dal_node_port,
+        ( dal_node_endpoint,
           batcher,
           injector_retention_period,
           l2_blocks_cache_size ) ))
@@ -524,8 +517,7 @@ let encoding : t Data_encoding.t =
              fee_parameters,
              mode,
              loser_mode ),
-           ( dal_node_addr,
-             dal_node_port,
+           ( dal_node_endpoint,
              batcher,
              injector_retention_period,
              l2_blocks_cache_size ) ) ->
@@ -544,8 +536,7 @@ let encoding : t Data_encoding.t =
         fee_parameters;
         mode;
         loser_mode;
-        dal_node_addr;
-        dal_node_port;
+        dal_node_endpoint;
         batcher;
         injector_retention_period;
         l2_blocks_cache_size;
@@ -588,9 +579,8 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj5
-          (dft "DAL node address" string default_dal_node_addr)
-          (dft "DAL node port" uint16 default_dal_node_port)
+       (obj4
+          (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
           (dft "batcher" batcher_encoding default_batcher)
           (dft
              "injector_retention_period"

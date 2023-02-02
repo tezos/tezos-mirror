@@ -36,8 +36,9 @@ type 'a store constraint 'a = [< `Read | `Write > `Read]
 type 'a t = {
   cctxt : Protocol_client_context.full;
       (** Client context used by the rollup node. *)
-  dal_cctxt : Dal_node_client.cctxt;
-      (** Client context to query the dal node. *)
+  dal_cctxt : Dal_node_client.cctxt option;
+      (** DAL client context to query the dal node, if the rollup node supports
+          the DAL. *)
   data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
@@ -97,13 +98,12 @@ val is_accuser : _ t -> bool
 *)
 val get_fee_parameter : _ t -> Configuration.purpose -> Injection.fee_parameter
 
-(** [init cctxt dal_cctxt ~data_dir mode configuration] initializes the rollup
+(** [init cctxt ~data_dir mode configuration] initializes the rollup
     representation. The rollup origination level and kind are fetched via an RPC
     call to the layer1 node that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
-  Dal_node_client.cctxt ->
   data_dir:string ->
   'a Store_sigs.mode ->
   Configuration.t ->
@@ -120,8 +120,9 @@ val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
     stored in [node_ctxt]. *)
 val metadata : _ t -> Sc_rollup.Metadata.t
 
-(** Returns [true] if the DAL is enabled for the current protocol. *)
-val dal_enabled : _ t -> bool
+(** Returns [true] if the rollup node supports the DAL and if DAL is enabled for
+    the current protocol. *)
+val dal_supported : _ t -> bool
 
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)
