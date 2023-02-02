@@ -102,16 +102,13 @@ let get_level_info cctxt level =
   in
   return level_info
 
-(* Determines whether the current block is in the nonce revelation stage by
- * comparing its position in the cycle with the nonce revelation threshold, not
- * by querying the [Seed_computation] RPC. *)
-let is_in_nonce_revelation_stage state (level_info : Level.t) =
+let is_in_nonce_revelation_stage constants (level : Level.t) =
   let open Lwt_result_syntax in
-  let {Constants.parametric = {nonce_revelation_threshold; _}; _} =
-    state.constants
-  in
-  let position_in_cycle = level_info.cycle_position in
-  return (Int32.compare position_in_cycle nonce_revelation_threshold < 0)
+  let {Constants.parametric = {nonce_revelation_threshold; _}; _} = constants in
+  return
+    (Vdf_helpers.is_in_nonce_revelation_stage
+       ~nonce_revelation_threshold
+       ~level)
 
 (* Checks if the VDF setup saved in the state is equal to the one computed
    from a seed *)
@@ -345,7 +342,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
     return_unit
   else
     (* If the chain is in the nonce revelation stage, there is nothing to do. *)
-    let* out = is_in_nonce_revelation_stage state level_info in
+    let* out = is_in_nonce_revelation_stage state.constants level_info in
     if out then
       let*! () =
         emit_with_level "Skipping, still in nonce revelation stage" level
