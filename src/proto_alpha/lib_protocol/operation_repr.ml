@@ -1776,22 +1776,21 @@ let check_signature (type kind) key chain_id
   in
   match protocol_data.signature with
   | None -> error Missing_signature
-  | Some signature -> (
-      match protocol_data.contents with
-      | Single (Preendorsement _) ->
-          check ~watermark:(to_watermark (Preendorsement chain_id)) signature
-      | Single (Endorsement _) ->
-          check ~watermark:(to_watermark (Endorsement chain_id)) signature
-      | Single (Dal_attestation _) ->
-          check ~watermark:(to_watermark (Dal_attestation chain_id)) signature
-      | Single
-          ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-          | Vdf_revelation _ | Double_endorsement_evidence _
-          | Double_preendorsement_evidence _ | Double_baking_evidence _
-          | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
-          check ~watermark:Generic_operation signature
-      | Cons (Manager_operation _, _ops) ->
-          check ~watermark:Generic_operation signature)
+  | Some signature ->
+      let watermark =
+        match protocol_data.contents with
+        | Single (Preendorsement _) -> to_watermark (Preendorsement chain_id)
+        | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
+        | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
+        | Single
+            ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
+            | Vdf_revelation _ | Double_endorsement_evidence _
+            | Double_preendorsement_evidence _ | Double_baking_evidence _
+            | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
+            Generic_operation
+        | Cons (Manager_operation _, _ops) -> Generic_operation
+      in
+      check ~watermark signature
 
 let hash_raw = Operation.hash
 
