@@ -226,6 +226,12 @@ module Cost_of : sig
 
     val dip : Gas.cost
 
+    type algo = Ed25519 | Secp256k1 | P256 | Bls
+
+    val algo_of_public_key : Signature.public_key -> algo
+
+    val check_signature_on_algo : algo -> int -> Gas.cost
+
     val check_signature : Signature.public_key -> bytes -> Gas.cost
 
     val blake2b : bytes -> Gas.cost

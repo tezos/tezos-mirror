@@ -2032,7 +2032,8 @@ module Manager = struct
         record_trace Gas.Gas_limit_too_high
 
   let check_contents (type kind) vi batch_state
-      (contents : kind Kind.manager contents) remaining_block_gas =
+      (contents : kind Kind.manager contents) ~consume_gas_for_sig_check
+      remaining_block_gas =
     let open Lwt_result_syntax in
     let (Manager_operation
           {source; fee; counter = _; operation; gas_limit; storage_limit}) =
@@ -2048,12 +2049,21 @@ module Manager = struct
            Gas.Arith.(fp total_gas_used <= remaining_block_gas)
            Gas.Block_quota_exceeded
     in
+    (* Part of the gas cost of the operation which is independent of
+       the contents of the operation. It is
+       Michelson_v1_gas.Cost_of.manager_operation constant plus the
+       cost of checking the signature if the operation is the first of
+       the batch. *)
+    let fixed_gas_cost =
+      let manager_op_cost = Michelson_v1_gas.Cost_of.manager_operation in
+      match consume_gas_for_sig_check with
+      | None -> manager_op_cost
+      | Some gas_for_sig_check -> Gas.(manager_op_cost +@ gas_for_sig_check)
+    in
     let*? remaining_gas =
       record_trace
         Insufficient_gas_for_manager
-        (Gas.consume_from
-           (Gas.Arith.fp gas_limit)
-           Michelson_v1_gas.Cost_of.manager_operation)
+        (Gas.consume_from (Gas.Arith.fp gas_limit) fixed_gas_cost)
     in
     let*? () = check_storage_limit vi storage_limit in
     let*? () =
@@ -2126,27 +2136,49 @@ module Manager = struct
     return {total_gas_used; balance; is_allocated}
 
   (** This would be [fold_left_es (check_contents vi) batch_state
-      contents_list] if [contents_list] were an ordinary [list]. *)
+     contents_list] if [contents_list] were an ordinary [list].  The
+     [consume_gas_for_sig_check] arg indicates whether or not gas for
+     checking the signature of the batch should be consumed; it is
+     [None] if the cost has already been consumed and [Some cost] if
+     the cost to be consumed is [cost] and remains to be
+     consumed. This cost is consumed in the first operation of the
+     batch. *)
   let rec check_contents_list :
       type kind.
       info ->
       batch_state ->
       kind Kind.manager contents_list ->
+      consume_gas_for_sig_check:Gas.cost option ->
       Gas.Arith.fp ->
       Gas.Arith.fp tzresult Lwt.t =
-   fun vi batch_state contents_list remaining_gas ->
+   fun vi batch_state contents_list ~consume_gas_for_sig_check remaining_gas ->
     let open Lwt_result_syntax in
     match contents_list with
     | Single contents ->
         let* batch_state =
-          check_contents vi batch_state contents remaining_gas
+          check_contents
+            vi
+            batch_state
+            contents
+            ~consume_gas_for_sig_check
+            remaining_gas
         in
         return batch_state.total_gas_used
     | Cons (contents, tail) ->
         let* batch_state =
-          check_contents vi batch_state contents remaining_gas
+          check_contents
+            vi
+            batch_state
+            contents
+            ~consume_gas_for_sig_check
+            remaining_gas
         in
-        check_contents_list vi batch_state tail remaining_gas
+        check_contents_list
+          vi
+          batch_state
+          tail
+          ~consume_gas_for_sig_check:None
+          remaining_gas
 
   let check_manager_operation vi ~check_signature
       (operation : _ Kind.manager operation) remaining_block_gas =
@@ -2155,8 +2187,18 @@ module Manager = struct
     let* batch_state, source_pk =
       check_sanity_and_find_public_key vi contents_list
     in
+    let operation_length = Operation.unsigned_operation_length operation in
+    let signature_checking_gas_cost =
+      Michelson_v1_gas.Cost_of.Interpreter.(
+        check_signature_on_algo (algo_of_public_key source_pk) operation_length)
+    in
     let* gas_used =
-      check_contents_list vi batch_state contents_list remaining_block_gas
+      check_contents_list
+        vi
+        batch_state
+        contents_list
+        ~consume_gas_for_sig_check:(Some signature_checking_gas_cost)
+        remaining_block_gas
     in
     let*? () =
       if check_signature then
