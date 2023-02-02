@@ -39,6 +39,16 @@ val inject_block :
   Tezos_base.Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 
+(** Inject an operation.
+
+    @return operation hash of the newly injected operation
+*)
+val inject_operation :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  packed_operation ->
+  Operation_hash.t tzresult Lwt.t
+
 (** Preapply a block using the node validation mechanism.*)
 val preapply_block :
   #Protocol_client_context.full ->

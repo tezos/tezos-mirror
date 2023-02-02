@@ -41,6 +41,12 @@ let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
     signed_shell_header_bytes
     operations
 
+let inject_operation cctxt ~chain operation =
+  let encoded_op =
+    Data_encoding.Binary.to_bytes_exn Operation.encoding operation
+  in
+  Shell_services.Injection.operation cctxt ~chain encoded_op
+
 let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
   Block_services.Helpers.Preapply.block
     cctxt
