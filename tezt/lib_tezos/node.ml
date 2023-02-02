@@ -55,6 +55,7 @@ type argument =
   | Metrics_addr of string
   | Cors_origin of string
   | Disable_mempool
+  | Version
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -83,6 +84,7 @@ let make_argument = function
   | Metrics_addr metrics_addr -> ["--metrics-addr"; metrics_addr]
   | Cors_origin cors_origin -> ["--cors-origin"; cors_origin]
   | Disable_mempool -> ["--disable-mempool"]
+  | Version -> ["--version"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -103,7 +105,8 @@ let is_redundant = function
   | No_bootstrap_peers, No_bootstrap_peers
   | Disable_operations_precheck, Disable_operations_precheck
   | Media_type _, Media_type _
-  | Metadata_size_limit _, Metadata_size_limit _ ->
+  | Metadata_size_limit _, Metadata_size_limit _
+  | Version, Version ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -124,7 +127,8 @@ let is_redundant = function
   | Peer _, _
   | Metrics_addr _, _
   | Cors_origin _, _
-  | Disable_mempool, _ ->
+  | Disable_mempool, _
+  | Version, _ ->
       false
 
 type 'a known = Unknown | Known of 'a
@@ -849,3 +853,10 @@ let upgrade_storage node =
     node
     ["upgrade"; "storage"; "--data-dir"; node.persistent_state.data_dir]
   |> Process.check
+
+let get_version node =
+  let version_flag = make_argument Version in
+  let* output =
+    spawn_command node version_flag |> Process.check_and_read_stdout
+  in
+  return @@ String.trim output
