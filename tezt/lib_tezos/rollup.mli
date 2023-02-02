@@ -235,6 +235,8 @@ module Dal : sig
     val cryptobox_config_to_json : Cryptobox.Config.t -> JSON.t
   end
 
+  val endpoint : Dal_node.t -> string
+
   (** Abstract version of a slot to deal with messages content which
      are smaller than the expected size of a slot. *)
   type slot

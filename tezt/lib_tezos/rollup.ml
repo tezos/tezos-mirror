@@ -568,6 +568,12 @@ module Dal = struct
           ])
   end
 
+  let endpoint dal_node =
+    Printf.sprintf
+      "http://%s:%d"
+      (Dal_node.rpc_host dal_node)
+      (Dal_node.rpc_port dal_node)
+
   module Committee = struct
     type member = {attestor : string; first_shard_index : int; power : int}
 

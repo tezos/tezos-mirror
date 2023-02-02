@@ -461,6 +461,7 @@ val bake_for :
   ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
+  ?dal_node_endpoint:string ->
   ?expect_failure:bool ->
   t ->
   unit Lwt.t
@@ -486,6 +487,7 @@ val bake_for_and_wait :
   ?force:bool ->
   ?context_path:string ->
   ?node:Node.t ->
+  ?dal_node_endpoint:string ->
   t ->
   unit Lwt.t
 
@@ -502,6 +504,7 @@ val spawn_bake_for :
   ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
+  ?dal_node_endpoint:string ->
   t ->
   Process.t
 
