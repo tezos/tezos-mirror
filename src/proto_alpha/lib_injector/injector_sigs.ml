@@ -71,6 +71,8 @@ type injected_info = {
   oph : Operation_hash.t;
       (** The hash of the operation which contains [op] (this can be an L1 batch
           of several manager operations). *)
+  op_index : int;
+      (** The index of the operation [op] in the L1 batch corresponding to [oph].  *)
 }
 
 (** Information stored about an L1 operation that was included in a Tezos
@@ -80,6 +82,8 @@ type included_info = {
   oph : Operation_hash.t;
       (** The hash of the operation which contains [op] (this can be an L1 batch
           of several manager operations). *)
+  op_index : int;
+      (** The index of the operation [op] in the L1 batch corresponding to [oph].  *)
   l1_block : Block_hash.t;
       (** The hash of the L1 block in which the operation was included. *)
   l1_level : int32;  (** The level of [l1_block]. *)
@@ -96,25 +100,32 @@ type status =
 let injected_info_encoding =
   let open Data_encoding in
   conv
-    (fun ({op; oph} : injected_info) -> (op, oph))
-    (fun (op, oph) -> {op; oph})
-  @@ merge_objs
-       L1_operation.encoding
-       (obj1
-          (req "layer1" (obj1 (req "operation_hash" Operation_hash.encoding))))
-
-let included_info_encoding =
-  let open Data_encoding in
-  conv
-    (fun {op; oph; l1_block; l1_level} -> (op, (oph, l1_block, l1_level)))
-    (fun (op, (oph, l1_block, l1_level)) -> {op; oph; l1_block; l1_level})
+    (fun ({op; oph; op_index} : injected_info) -> (op, (oph, op_index)))
+    (fun (op, (oph, op_index)) -> {op; oph; op_index})
   @@ merge_objs
        L1_operation.encoding
        (obj1
           (req
              "layer1"
-             (obj3
+             (obj2
                 (req "operation_hash" Operation_hash.encoding)
+                (req "operation_index" int31))))
+
+let included_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {op; oph; op_index; l1_block; l1_level} ->
+      (op, (oph, op_index, l1_block, l1_level)))
+    (fun (op, (oph, op_index, l1_block, l1_level)) ->
+      {op; oph; op_index; l1_block; l1_level})
+  @@ merge_objs
+       L1_operation.encoding
+       (obj1
+          (req
+             "layer1"
+             (obj4
+                (req "operation_hash" Operation_hash.encoding)
+                (req "operation_index" int31)
                 (req "block_hash" Block_hash.encoding)
                 (req "level" int32))))
 

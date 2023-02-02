@@ -293,7 +293,9 @@ module Make (Parameters : PARAMETERS) = struct
   let add_injected_operations state oph operations =
     let open Lwt_result_syntax in
     let infos =
-      List.map (fun op -> (op.L1_operation.hash, {op; oph})) operations
+      List.map
+        (fun (op_index, op) -> (op.L1_operation.hash, {op; oph; op_index}))
+        operations
     in
     let* () =
       Injected_operations.replace_seq
@@ -305,18 +307,22 @@ module Make (Parameters : PARAMETERS) = struct
   (** [add_included_operations state oph l1_block l1_level operations] marks the
     [operations] as included (in the L1 batch [oph]) in the Tezos block
     [l1_block] of level [l1_level]. *)
-  let add_included_operations state oph l1_block l1_level operations =
+  let add_included_operations state l1_block l1_level
+      (operations : injected_info list) =
     let open Lwt_result_syntax in
     let*! () =
       Event.(emit3 included)
         state
         l1_block
         l1_level
-        (List.map (fun o -> o.L1_operation.hash) operations)
+        (List.map
+           (fun (o : injected_info) -> o.op.L1_operation.hash)
+           operations)
     in
     let infos =
       List.map
-        (fun op -> (op.L1_operation.hash, {op; oph; l1_block; l1_level}))
+        (fun ({op; oph; op_index} : injected_info) ->
+          (op.L1_operation.hash, {op; oph; op_index; l1_block; l1_level}))
         operations
     in
     let* () =
@@ -514,6 +520,17 @@ module Make (Parameters : PARAMETERS) = struct
               simulate_operations ~must_succeed state operations
         else fail trace
     | Ok (_, op, _, result) ->
+        let nb_ops = List.length operations in
+        let nb_packed_ops =
+          let {protocol_data = Operation_data {contents; _}; _} = op in
+          Operation.to_list (Contents_list contents) |> List.length
+        in
+        (* packed_op can have reveal operations added automatically. *)
+        let start_index = nb_packed_ops - nb_ops in
+        (* Add indexes of operations in the packed, i.e. batched, operation. *)
+        let operations =
+          List.mapi (fun i op -> (i + start_index, op)) operations
+        in
         return (op, operations, Apply_results.Contents_result_list result)
 
   let inject_on_node state ~nb
@@ -570,7 +587,7 @@ module Make (Parameters : PARAMETERS) = struct
                  "Unexpected error: length of operations and result differ in \
                   simulation");
           ]
-        (fun acc op (Apply_results.Contents_result result) ->
+        (fun acc (_index, op) (Apply_results.Contents_result result) ->
           match result with
           | Apply_results.Manager_operation_result
               {
@@ -729,7 +746,8 @@ module Make (Parameters : PARAMETERS) = struct
             (* Injection succeeded, remove from pending and add to injected *)
             let* () =
               List.iter_es
-                (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
+                (fun (_index, op) ->
+                  Op_queue.remove state.queue op.L1_operation.hash)
                 injected_operations
             in
             add_injected_operations state oph injected_operations
@@ -778,7 +796,7 @@ module Make (Parameters : PARAMETERS) = struct
                 | i :: rest -> (i, rest)
               in
               match result with
-              | Applied _ -> return (injected, info.op :: included, to_retry)
+              | Applied _ -> return (injected, info :: included, to_retry)
               | _ -> (
                   let status =
                     match result with
@@ -794,7 +812,7 @@ module Make (Parameters : PARAMETERS) = struct
                       status
                   in
                   match retry with
-                  | Retry -> return (injected, included, info.op :: to_retry)
+                  | Retry -> return (injected, included, info :: to_retry)
                   | Forget -> return (injected, included, to_retry)
                   | Abort err -> fail err))
         in
@@ -807,16 +825,11 @@ module Make (Parameters : PARAMETERS) = struct
         in
         assert (unhandled_injected = []) ;
         let* () =
-          add_included_operations
-            state
-            operation.hash
-            block
-            level
-            (List.rev included)
+          add_included_operations state block level (List.rev included)
         in
         List.iter_es
           (add_pending_operation ~retry:true state)
-          (List.rev to_retry)
+          (List.rev_map (fun ({op; _} : injected_info) -> op) to_retry)
 
   (** [register_included_operations state block level oph] marks the known (by
     this injector) manager operations contained in [block] as being included. *)
