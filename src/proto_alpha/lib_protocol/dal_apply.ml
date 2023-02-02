@@ -41,7 +41,7 @@ let only_if_dal_feature_enabled ctxt ~default f =
 let slot_of_int_e n =
   let open Result_syntax in
   match Dal.Slot_index.of_int_opt n with
-  | None -> tzfail Dal_errors.Dal_slot_index_above_hard_limit
+  | None -> tzfail @@ Dal_errors.Dal_slot_index_above_hard_limit {given = n}
   | Some slot_index -> return slot_index
 
 let validate_attestation ctxt op =
