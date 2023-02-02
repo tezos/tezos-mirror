@@ -1,49 +1,45 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test)
+(library
+ (name src_lib_context_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-context.sigs
   tezos-context.disk
   tezos-context.memory
+  tezos-context.encoding
   tezos-stdlib-unix
   tezos-test-helpers
   tezos-test-helpers-extra
-  alcotest-lwt)
+  qcheck-alcotest
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
-  -open Tezos_test_helpers)
- (modules test_context test))
-
-(rule
- (alias runtest)
- (package tezos-context)
- (action (run %{dep:./test.exe})))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_context test_merkle_proof))
 
 (executable
- (name test_merkle_proof)
+ (name main)
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-context.disk
-  tezos-context.encoding
-  tezos-stdlib-unix
-  qcheck-alcotest
-  tezos-test-helpers)
- (flags
-  (:standard)
-  -open Tezos_base.TzPervasives
-  -open Tezos_context_disk
-  -open Tezos_stdlib_unix
-  -open Tezos_test_helpers)
- (modules test_merkle_proof))
+  src_lib_context_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
- (alias runtest)
+ (alias runtezt)
  (package tezos-context)
- (action (run %{dep:./test_merkle_proof.exe})))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

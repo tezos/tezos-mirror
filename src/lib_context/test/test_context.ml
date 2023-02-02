@@ -693,4 +693,8 @@ module Generic_memory =
     end)
     (Tezos_context_memory.Context)
 
-let tests = List.concat [Generic_disk.tests; Generic_memory.tests]
+let () =
+  Lwt_main.run
+    (Alcotest_lwt.run
+       "tezos-context"
+       [("context", List.concat [Generic_disk.tests; Generic_memory.tests])])
