@@ -109,18 +109,18 @@ let operation_status (operation : Protocol.operation_receipt) ~index :
 module Make (Parameters : PARAMETERS) = struct
   module Tags = Injector_tags.Make (Parameters.Tag)
   module Tags_table = Hashtbl.Make (Parameters.Tag)
-  module Operation = Parameters.Operation
-  module L1_operation = L1_operation.Make (Operation)
-  module Request = Request (L1_operation)
+  module POperation = Parameters.Operation
+  module Inj_operation = Injector_operation.Make (POperation)
+  module Request = Request (Inj_operation)
 
   type injected_info = {
-    op : L1_operation.t;
+    op : Inj_operation.t;
     oph : Operation_hash.t;
     op_index : int;
   }
 
   type included_info = {
-    op : L1_operation.t;
+    op : Inj_operation.t;
     oph : Operation_hash.t;
     op_index : int;
     l1_block : Block_hash.t;
@@ -128,7 +128,7 @@ module Make (Parameters : PARAMETERS) = struct
   }
 
   type status =
-    | Pending of Operation.t
+    | Pending of POperation.t
     | Injected of injected_info
     | Included of included_info
 
@@ -138,7 +138,7 @@ module Make (Parameters : PARAMETERS) = struct
       (fun ({op; oph; op_index} : injected_info) -> (op, (oph, op_index)))
       (fun (op, (oph, op_index)) -> {op; oph; op_index})
     @@ merge_objs
-         L1_operation.encoding
+         Inj_operation.encoding
          (obj1
             (req
                "layer1"
@@ -154,7 +154,7 @@ module Make (Parameters : PARAMETERS) = struct
       (fun (op, (oph, op_index, l1_block, l1_level)) ->
         {op; oph; op_index; l1_block; l1_level})
     @@ merge_objs
-         L1_operation.encoding
+         Inj_operation.encoding
          (obj1
             (req
                "layer1"
@@ -169,19 +169,19 @@ module Make (Parameters : PARAMETERS) = struct
       (struct
         let name = "operations_queue"
       end)
-      (L1_operation.Hash)
-      (L1_operation)
+      (Inj_operation.Hash)
+      (Inj_operation)
 
   module Injected_operations = Disk_persistence.Make_table (struct
-    include L1_operation.Hash.Table
+    include Inj_operation.Hash.Table
 
     type value = injected_info
 
     let name = "injected_operations"
 
-    let string_of_key = L1_operation.Hash.to_b58check
+    let string_of_key = Inj_operation.Hash.to_b58check
 
-    let key_of_string = L1_operation.Hash.of_b58check_opt
+    let key_of_string = Inj_operation.Hash.of_b58check_opt
 
     let value_encoding = injected_info_encoding
   end)
@@ -189,7 +189,7 @@ module Make (Parameters : PARAMETERS) = struct
   module Injected_ophs = Disk_persistence.Make_table (struct
     include Operation_hash.Table
 
-    type value = L1_operation.Hash.t list
+    type value = Inj_operation.Hash.t list
 
     let name = "injected_ophs"
 
@@ -197,7 +197,7 @@ module Make (Parameters : PARAMETERS) = struct
 
     let key_of_string = Operation_hash.of_b58check_opt
 
-    let value_encoding = Data_encoding.list L1_operation.Hash.encoding
+    let value_encoding = Data_encoding.list Inj_operation.Hash.encoding
   end)
 
   (** The part of the state which gathers information about injected
@@ -212,15 +212,15 @@ module Make (Parameters : PARAMETERS) = struct
   }
 
   module Included_operations = Disk_persistence.Make_table (struct
-    include L1_operation.Hash.Table
+    include Inj_operation.Hash.Table
 
     type value = included_info
 
     let name = "included_operations"
 
-    let string_of_key = L1_operation.Hash.to_b58check
+    let string_of_key = Inj_operation.Hash.to_b58check
 
-    let key_of_string = L1_operation.Hash.of_b58check_opt
+    let key_of_string = Inj_operation.Hash.of_b58check_opt
 
     let value_encoding = included_info_encoding
   end)
@@ -228,7 +228,7 @@ module Make (Parameters : PARAMETERS) = struct
   module Included_in_blocks = Disk_persistence.Make_table (struct
     include Block_hash.Table
 
-    type value = int32 * L1_operation.Hash.t list
+    type value = int32 * Inj_operation.Hash.t list
 
     let name = "included_in_blocks"
 
@@ -238,7 +238,7 @@ module Make (Parameters : PARAMETERS) = struct
 
     let value_encoding =
       let open Data_encoding in
-      obj2 (req "level" int32) (req "l1_ops" (list L1_operation.Hash.encoding))
+      obj2 (req "level" int32) (req "l1_ops" (list Inj_operation.Hash.encoding))
   end)
 
   (** The part of the state which gathers information about
@@ -276,7 +276,7 @@ module Make (Parameters : PARAMETERS) = struct
 
   module Event = struct
     include
-      Injector_events.Make (Parameters) (Tags) (Operation) (L1_operation)
+      Injector_events.Make (Parameters) (Tags) (POperation) (Inj_operation)
         (Request)
 
     let emit1 e state x = emit e (state.signer.pkh, state.tags, x)
@@ -310,7 +310,7 @@ module Make (Parameters : PARAMETERS) = struct
         ~warn_unreadable
         ~capacity:50_000
         ~data_dir
-        ~filter:(filter (fun op -> op.L1_operation.operation))
+        ~filter:(filter (fun op -> op.Inj_operation.operation))
     in
     let*! () = emit_event_loaded "operations_queue" @@ Op_queue.length queue in
     (* Very coarse approximation for the number of operation we expect for each
@@ -386,7 +386,7 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       Event.(emit1 (if retry then retry_operation else add_pending))
         state
-        op.L1_operation.operation
+        op.Inj_operation.operation
     in
     let* () = Op_queue.replace state.queue op.hash op in
     let*! () =
@@ -401,7 +401,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let infos =
       List.map
-        (fun (op_index, op) -> (op.L1_operation.hash, {op; oph; op_index}))
+        (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
         operations
     in
     let* () =
@@ -423,13 +423,13 @@ module Make (Parameters : PARAMETERS) = struct
         l1_block
         l1_level
         (List.map
-           (fun (o : injected_info) -> o.op.L1_operation.hash)
+           (fun (o : injected_info) -> o.op.Inj_operation.hash)
            operations)
     in
     let infos =
       List.map
         (fun ({op; oph; op_index} : injected_info) ->
-          (op.L1_operation.hash, {op; oph; op_index; l1_block; l1_level}))
+          (op.Inj_operation.hash, {op; oph; op_index; l1_block; l1_level}))
         operations
     in
     let* () =
@@ -504,7 +504,7 @@ module Make (Parameters : PARAMETERS) = struct
 
   let fee_parameter_of_operations state ops =
     List.fold_left
-      (fun acc {L1_operation.operation; _} ->
+      (fun acc {Inj_operation.operation; _} ->
         let param = Parameters.fee_parameter state operation in
         Injection.
           {
@@ -549,7 +549,7 @@ module Make (Parameters : PARAMETERS) = struct
       quotas) and [results] are the results of the simulation. See
       {!inject_operations} for the specification of [must_succeed]. *)
   let rec simulate_operations ~must_succeed state
-      (operations : L1_operation.t list) =
+      (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let open Annotated_manager_operation in
     let force =
@@ -566,14 +566,14 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       Event.(emit2 simulating_operations)
         state
-        (List.map (fun o -> o.L1_operation.operation) operations)
+        (List.map (fun o -> o.Inj_operation.operation) operations)
         force
     in
     let fee_parameter = fee_parameter_of_operations state.state operations in
     let annotated_operations =
       List.map
-        (fun {L1_operation.operation; _} ->
-          let (Manager operation) = Operation.to_manager_operation operation in
+        (fun {Inj_operation.operation; _} ->
+          let (Manager operation) = POperation.to_manager_operation operation in
           Annotated_manager_operation
             (Injection.prepare_manager_operation
                ~fee:Limit.unknown
@@ -650,7 +650,6 @@ module Make (Parameters : PARAMETERS) = struct
   let inject_on_node state ~nb
       {shell; protocol_data = Operation_data {contents; _}} =
     let open Lwt_result_syntax in
-    let open Alpha_context in
     let unsigned_op = (shell, Contents_list contents) in
     let unsigned_op_bytes =
       Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
@@ -685,7 +684,7 @@ module Make (Parameters : PARAMETERS) = struct
     "or-batches" by iteratively removing operations that fail from the desired
     batch. *)
   let rec inject_operations ~must_succeed state
-      (operations : L1_operation.t list) =
+      (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let* packed_op, operations, result =
       trace (Step_failed "simulation")
@@ -703,7 +702,7 @@ module Make (Parameters : PARAMETERS) = struct
               let*! () =
                 Event.(emit2 dropping_operation)
                   state
-                  op.L1_operation.operation
+                  op.Inj_operation.operation
                   error
               in
               failure := true ;
@@ -733,12 +732,12 @@ module Make (Parameters : PARAMETERS) = struct
   let size_l1_batch state rev_ops =
     let contents_list =
       List.map
-        (fun (op : L1_operation.t) ->
+        (fun (op : Inj_operation.t) ->
           let {fee; counter; gas_limit; storage_limit} =
             Parameters.approximate_fee_bound state.state op.operation
           in
           let (Manager operation) =
-            Operation.to_manager_operation op.operation
+            POperation.to_manager_operation op.operation
           in
           let contents =
             Manager_operation
@@ -755,7 +754,7 @@ module Make (Parameters : PARAMETERS) = struct
         rev_ops
     in
     let (Contents_list contents) =
-      match Alpha_context.Operation.of_list contents_list with
+      match Operation.of_list contents_list with
       | Error _ ->
           (* Cannot happen: rev_ops is non empty and contains only manager
              operations *)
@@ -770,12 +769,12 @@ module Make (Parameters : PARAMETERS) = struct
         protocol_data = Operation_data {contents; signature = Some signature};
       }
     in
-    Data_encoding.Binary.length Alpha_context.Operation.encoding operation
+    Data_encoding.Binary.length Operation.encoding operation
 
   (** Retrieve as many operations from the queue while remaining below the size
     limit. *)
   let get_operations_from_queue ~size_limit state =
-    let exception Reached_limit of L1_operation.t list in
+    let exception Reached_limit of Inj_operation.t list in
     let rev_ops =
       try
         Op_queue.fold
@@ -801,7 +800,7 @@ module Make (Parameters : PARAMETERS) = struct
               let*! retry =
                 Parameters.retry_unsuccessful_operation
                   state.state
-                  op.L1_operation.operation
+                  op.Inj_operation.operation
                   (Failed err)
               in
               match retry with
@@ -825,7 +824,7 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       Event.(emit1 considered_operations_info)
         state
-        (List.map (fun o -> o.L1_operation.operation) operations_to_inject)
+        (List.map (fun o -> o.Inj_operation.operation) operations_to_inject)
     in
     match operations_to_inject with
     | [] -> return_unit
@@ -837,7 +836,9 @@ module Make (Parameters : PARAMETERS) = struct
         in
         let must_succeed =
           Parameters.batch_must_succeed
-          @@ List.map (fun op -> op.L1_operation.operation) operations_to_inject
+          @@ List.map
+               (fun op -> op.Inj_operation.operation)
+               operations_to_inject
         in
         let*! res =
           inject_operations ~must_succeed state operations_to_inject
@@ -851,7 +852,7 @@ module Make (Parameters : PARAMETERS) = struct
             let* () =
               List.iter_es
                 (fun (_index, op) ->
-                  Op_queue.remove state.queue op.L1_operation.hash)
+                  Op_queue.remove state.queue op.Inj_operation.hash)
                 injected_operations
             in
             add_injected_operations state oph injected_operations
@@ -861,12 +862,12 @@ module Make (Parameters : PARAMETERS) = struct
               Event.(emit1 dropped_operations)
                 state
                 (List.map
-                   (fun o -> o.L1_operation.operation)
+                   (fun o -> o.Inj_operation.operation)
                    operations_to_drop)
             in
             let* () =
               List.iter_es
-                (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
+                (fun op -> Op_queue.remove state.queue op.Inj_operation.hash)
                 operations_to_drop
             in
             return_unit)
@@ -1187,16 +1188,16 @@ module Make (Parameters : PARAMETERS) = struct
 
   let add_pending_operation ?source op =
     let open Lwt_result_syntax in
-    let l1_operation = L1_operation.make op in
+    let operation = Inj_operation.make op in
     let*? w =
       match source with
       | Some source -> worker_of_signer source
       | None -> worker_of_tag (Parameters.operation_tag op)
     in
     let*! (_pushed : bool) =
-      Worker.Queue.push_request w (Request.Add_pending l1_operation)
+      Worker.Queue.push_request w (Request.Add_pending operation)
     in
-    return l1_operation.hash
+    return operation.hash
 
   let new_tezos_head h reorg =
     let open Lwt_syntax in

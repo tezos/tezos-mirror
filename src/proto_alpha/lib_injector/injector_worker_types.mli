@@ -29,9 +29,9 @@ open Alpha_context
 open Injector_common
 open Injector_sigs
 
-module Request (L1_operation : INJECTOR_OPERATION) : sig
+module Request (Inj_operation : INJECTOR_OPERATION) : sig
   type ('a, 'b) t =
-    | Add_pending : L1_operation.t -> (unit, error trace) t
+    | Add_pending : Inj_operation.t -> (unit, error trace) t
     | New_tezos_head :
         Alpha_block_services.block_info * Alpha_block_services.block_info reorg
         -> (unit, error trace) t

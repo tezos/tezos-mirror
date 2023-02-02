@@ -30,8 +30,8 @@ module Make
     (Parameters : PARAMETERS)
     (Tags : module type of Injector_tags.Make (Parameters.Tag))
     (Operation : PARAM_OPERATION)
-    (L1_operation : INJECTOR_OPERATION with type operation = Operation.t)
-    (Request : module type of Request (L1_operation)) =
+    (Inj_operation : INJECTOR_OPERATION with type operation = Operation.t)
+    (Request : module type of Request (Inj_operation)) =
     struct
       include Internal_event.Simple
 
@@ -139,7 +139,7 @@ module Make
         Format.fprintf
           ppf
           "@[%a@]"
-          (Format.pp_print_list L1_operation.Hash.pp)
+          (Format.pp_print_list Inj_operation.Hash.pp)
           operations
 
       let number_of_operations_in_queue =
@@ -221,7 +221,7 @@ module Make
           ~level:Notice
           ("block", Block_hash.encoding)
           ("level", Data_encoding.int32)
-          ("operations", Data_encoding.list L1_operation.Hash.encoding)
+          ("operations", Data_encoding.list Inj_operation.Hash.encoding)
           ~pp3:pp_operations_hash_list
 
       let revert_operations =
@@ -229,7 +229,7 @@ module Make
           ~name:"revert_operations"
           ~msg:"reverting operations: {operations}"
           ~level:Notice
-          ("operations", Data_encoding.list L1_operation.Hash.encoding)
+          ("operations", Data_encoding.list Inj_operation.Hash.encoding)
           ~pp1:pp_operations_hash_list
 
       let confirmed_level =

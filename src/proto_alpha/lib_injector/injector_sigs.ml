@@ -172,12 +172,12 @@ module type S = sig
 
   type operation
 
-  module L1_operation : INJECTOR_OPERATION with type operation = operation
+  module Inj_operation : INJECTOR_OPERATION with type operation = operation
 
   (** Information stored about an L1 operation that was injected on a Tezos
     node. *)
   type injected_info = {
-    op : L1_operation.t;  (** The injector operation. *)
+    op : Inj_operation.t;  (** The injector operation. *)
     oph : Operation_hash.t;
         (** The hash of the operation which contains [op] (this can be an L1 batch
           of several manager operations). *)
@@ -188,7 +188,7 @@ module type S = sig
   (** Information stored about an L1 operation that was included in a Tezos
     block. *)
   type included_info = {
-    op : L1_operation.t;  (** The injector operation. *)
+    op : Inj_operation.t;  (** The injector operation. *)
     oph : Operation_hash.t;
         (** The hash of the operation which contains [op] (this can be an L1 batch
           of several manager operations). *)
@@ -233,7 +233,7 @@ module type S = sig
       corresponding tag. It returns the hash of the operation in the injector
       queue. *)
   val add_pending_operation :
-    ?source:public_key_hash -> operation -> L1_operation.Hash.t tzresult Lwt.t
+    ?source:public_key_hash -> operation -> Inj_operation.Hash.t tzresult Lwt.t
 
   (** Notify the injector of a new Tezos head. The injector marks the operations
       appropriately (for instance reverted operations that are part of a
@@ -256,5 +256,5 @@ module type S = sig
   val shutdown : unit -> unit Lwt.t
 
   (** The status of an operation in the injector.  *)
-  val operation_status : L1_operation.Hash.t -> status option
+  val operation_status : Inj_operation.Hash.t -> status option
 end
