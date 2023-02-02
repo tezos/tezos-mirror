@@ -1765,11 +1765,11 @@ let () =
 
 let check_signature (type kind) key chain_id
     ({shell; protocol_data} : kind operation) =
-  let check ~watermark contents signature =
+  let check ~watermark signature =
     let unsigned_operation =
       Data_encoding.Binary.to_bytes_exn
         unsigned_operation_encoding
-        (shell, contents)
+        (shell, Contents_list protocol_data.contents)
     in
     if Signature.check ~watermark key signature unsigned_operation then Ok ()
     else error Invalid_signature
@@ -1778,35 +1778,20 @@ let check_signature (type kind) key chain_id
   | None -> error Missing_signature
   | Some signature -> (
       match protocol_data.contents with
-      | Single (Preendorsement _) as contents ->
-          check
-            ~watermark:(to_watermark (Preendorsement chain_id))
-            (Contents_list contents)
-            signature
-      | Single (Endorsement _) as contents ->
-          check
-            ~watermark:(to_watermark (Endorsement chain_id))
-            (Contents_list contents)
-            signature
-      | Single (Dal_attestation _) as contents ->
-          check
-            ~watermark:(to_watermark (Dal_attestation chain_id))
-            (Contents_list contents)
-            signature
+      | Single (Preendorsement _) ->
+          check ~watermark:(to_watermark (Preendorsement chain_id)) signature
+      | Single (Endorsement _) ->
+          check ~watermark:(to_watermark (Endorsement chain_id)) signature
+      | Single (Dal_attestation _) ->
+          check ~watermark:(to_watermark (Dal_attestation chain_id)) signature
       | Single
           ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
           | Vdf_revelation _ | Double_endorsement_evidence _
           | Double_preendorsement_evidence _ | Double_baking_evidence _
           | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
-          check
-            ~watermark:Generic_operation
-            (Contents_list protocol_data.contents)
-            signature
+          check ~watermark:Generic_operation signature
       | Cons (Manager_operation _, _ops) ->
-          check
-            ~watermark:Generic_operation
-            (Contents_list protocol_data.contents)
-            signature)
+          check ~watermark:Generic_operation signature)
 
 let hash_raw = Operation.hash
 
