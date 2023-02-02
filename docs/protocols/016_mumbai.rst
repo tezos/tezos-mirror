@@ -73,7 +73,7 @@ Breaking Changes
 Ticket User-experience
 ----------------------
 
-- Allow implicit accounts to receive and send tickets. (MR :gl: `!6108`, :gl: `!6490`)
+- Allow implicit accounts to receive and send tickets. (MR :gl:`!6108`, :gl:`!6490`)
 
 RPC Changes
 -----------

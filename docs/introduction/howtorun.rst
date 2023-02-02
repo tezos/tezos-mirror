@@ -169,7 +169,9 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   octez-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+
+where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
@@ -182,6 +184,8 @@ Note that ``--liquidity-baking-toggle-vote`` must be placed
     **Remember that having two bakers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
     If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
+
+However, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
 
 
 .. note::

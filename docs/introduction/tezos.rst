@@ -16,10 +16,12 @@ Octez
 ~~~~~
 
 Octez is an implementation of Tezos software, including a node, a client, a baker, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
-This implementation is available at https://gitlab.com/tezos/tezos.
-The source code is placed under the MIT Open Source License.
+The source code is placed under the MIT Open Source License, and
+is available at https://gitlab.com/tezos/tezos.
 
 The current release of Octez is :doc:`../releases/version-15`.
+
+For installing instructions, see :doc:`./howtoget`.
 
 .. _tezos_community:
 
@@ -39,8 +41,9 @@ The Community
 
 - A few community-run websites collect useful Tezos links:
 
-    - https://www.tezos.help
-    - https://tezoscommons.org/
+    - https://www.tezos.help (resources classified by their kind: organisations, block explorers, wallets, etc.)
+    - https://tezoscommons.org/ (featured resources classified by approach: technology, developing, contributing, etc.)
+    - https://tezos.com/developer-portal/ (resources for developers of applications built on Tezos)
 
 - More resources can be found in the :doc:`support` page.
 
@@ -75,4 +78,4 @@ This website
 
 This website (https://tezos.gitlab.io/) provides online technical documentation. This documentation is about :ref:`octez`, although it also documents Tezos in general.
 
-The technical documentation is automatically generated from the master branch of the :ref:`Octez <octez>` repository.
+The technical documentation is an integral part of the :ref:`Octez <octez>` repository, and is automatically generated from the master branch, following `Docs as Code <https://www.writethedocs.org/guide/docs-as-code/>`_ best practices.
