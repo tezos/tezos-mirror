@@ -707,7 +707,7 @@ let () =
       Format.fprintf
         ppf
         "@[Specified@ --network@ has@ chain@ name@ %s,@ but@ current@ \
-         configuration@ implies@ expected@ chain@ name@ %s.@ Use:@ tezos-node \
+         configuration@ implies@ expected@ chain@ name@ %s.@ Use:@ octez-node \
          config init --network <NETWORK>@ to@ configure@ your@ node.@]"
         command_line_chain_name
         configuration_file_chain_name)
