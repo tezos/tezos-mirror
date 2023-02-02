@@ -58,3 +58,9 @@ val init :
 val restart : t -> unit Lwt.t
 
 val on_event : t -> (event -> unit) -> unit
+
+(** [Helpers] models functions from [Lib_delegate.Vdf_helpers]. *)
+module Helpers : sig
+  val is_in_nonce_revelation_stage :
+    nonce_revelation_threshold:int32 -> level:RPC.level -> bool
+end
