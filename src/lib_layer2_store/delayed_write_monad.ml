@@ -63,7 +63,7 @@ let ignore {result; _} = result
 module Lwt_result_syntax = struct
   let bind f a =
     let open Lwt_result_syntax in
-    let* a = a in
+    let* a in
     let* b = f a.result in
     let write =
       match (a.write, b.write) with

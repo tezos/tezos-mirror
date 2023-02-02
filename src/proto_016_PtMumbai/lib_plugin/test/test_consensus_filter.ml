@@ -53,11 +53,11 @@ module Generator = struct
   let of_result = Result.value_f ~default:(fun _ -> assert false)
 
   let small_nat_32 =
-    let+ small_nat = small_nat in
+    let+ small_nat in
     Int32.of_int small_nat
 
   let small_signed_32 =
-    let+ small_signed_int = small_signed_int in
+    let+ small_signed_int in
     Int32.of_int small_signed_int
 
   let dup gen =

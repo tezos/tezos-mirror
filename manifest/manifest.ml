@@ -939,6 +939,12 @@ end
 (*                                 TARGETS                                   *)
 (*****************************************************************************)
 
+let default_ocaml_dependency =
+  (* ocamlformat is set to produce code compatible with this version; thus, the
+     code may contain syntactic constructs which are not available beforehand;
+     e.g., let-punning in binding-operator *)
+  Version.at_least "4.14"
+
 module Target = struct
   let invalid_argf x = Printf.ksprintf invalid_arg x
 
@@ -1014,7 +1020,7 @@ module Target = struct
     modes : Dune.mode list option;
     modules : modules;
     modules_without_implementation : string list;
-    ocaml : Version.constraints option;
+    ocaml : Version.constraints;
     opam : string option;
     opam_bug_reports : string option;
     opam_doc : string option;
@@ -1263,14 +1269,14 @@ module Target = struct
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags ?foreign_stubs
       ?ctypes ?implements ?inline_tests ?js_compatible ?js_of_ocaml
       ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
-      ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
-      ?(optional = false) ?(preprocess = []) ?(preprocessor_deps = [])
-      ?(private_modules = []) ?profile ?(opam_only_deps = [])
-      ?(release_status = Auto_opam) ?static ?synopsis ?description
-      ?(time_measurement_ppx = false) ?(virtual_modules = [])
-      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ~path names =
+      ?(modules_without_implementation = []) ?(npm_deps = [])
+      ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
+      ?opam_homepage ?(opam_with_test = Always) ?(optional = false)
+      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
+      ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
+      ?synopsis ?description ?(time_measurement_ppx = false)
+      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
+      ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -2474,10 +2480,19 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     match
       List.filter_map
-        (fun (internal : Target.internal) -> internal.ocaml)
+        (fun (internal : Target.internal) ->
+          if internal.ocaml == default_ocaml_dependency then None
+          else Some internal.ocaml)
         internals
     with
-    | [] -> depends
+    | [] ->
+        {
+          Opam.package = "ocaml";
+          version = default_ocaml_dependency;
+          with_test = Never;
+          optional = false;
+        }
+        :: depends
     | versions ->
         {
           Opam.package = "ocaml";

@@ -131,7 +131,7 @@ let begin_construction ~timestamp ~protocol_data
 
 let ( let** ) x k =
   let open Lwt_result_syntax in
-  let*! x = x in
+  let*! x in
   let*? x = Environment.wrap_tzresult x in
   k x
 

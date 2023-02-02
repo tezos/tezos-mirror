@@ -85,7 +85,7 @@ module Testing = struct
     let eq a b = Assert.equal ~pp a b
 
     let eq_s a b =
-      let+ b = b in
+      let+ b in
       Assert.equal ~pp a b
 
     let eq_s_catch a b =
@@ -113,7 +113,7 @@ module Testing = struct
     let eq a b = Assert.equal ~pp a b
 
     let eq_s a b =
-      let+ b = b in
+      let+ b in
       eq a b
 
     let eq_s_catch a b =
@@ -143,7 +143,7 @@ module Testing = struct
     let eq a b = Assert.equal ~pp a b
 
     let eq_s a b =
-      let+ b = b in
+      let+ b in
       Assert.equal ~pp a b
 
     let eq_s_catch a b =

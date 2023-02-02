@@ -347,7 +347,7 @@ let get_queue () =
 
 let handle_request_error rq =
   let open Lwt_syntax in
-  let* rq = rq in
+  let* rq in
   match rq with
   | Ok res -> return_ok res
   | Error (Worker.Request_error errs) -> Lwt.return_error errs

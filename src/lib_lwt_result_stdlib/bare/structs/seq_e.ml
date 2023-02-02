@@ -43,7 +43,7 @@ let empty () = Ok Nil
 let return x () = Ok (Cons (x, empty))
 
 let return_e r () =
-  let* r = r in
+  let* r in
   Ok (Cons (r, empty))
 
 let interrupted e () = Error e
@@ -51,7 +51,7 @@ let interrupted e () = Error e
 let cons item t () = Ok (Cons (item, t))
 
 let cons_e item t () =
-  let* item = item in
+  let* item in
   Ok (Cons (item, t))
 
 let rec append ta tb () =

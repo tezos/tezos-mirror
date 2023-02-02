@@ -73,11 +73,11 @@ let cons_e item t () =
 
 let cons_s item t () =
   let open Lwt_syntax in
-  let* item = item in
+  let* item in
   return_ok (Cons (item, t))
 
 let cons_es item t () =
-  let* item = item in
+  let* item in
   return (Cons (item, t))
 
 let rec append ta tb () =

@@ -86,7 +86,7 @@ let restart_block_stream cctxt chain state =
 
 let log_errors_and_continue ~name p =
   let open Lwt_syntax in
-  let* p = p in
+  let* p in
   match p with
   | Ok () -> return_unit
   | Error errs -> Events.(emit vdf_daemon_error) (name, errs)

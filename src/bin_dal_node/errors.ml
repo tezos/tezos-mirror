@@ -68,7 +68,7 @@ let other_result v =
 
 let other_lwt_result v =
   let open Lwt_syntax in
-  let* v = v in
+  let* v in
   return @@ other_result v
 
 (* Helpers to cast the errors into tzresult monad. *)
@@ -93,12 +93,12 @@ let error_to_tzresult e =
 
 let to_option_tzresult ?(none = fun _e -> false) r =
   let open Lwt_result_syntax in
-  let*! r = r in
+  let*! r in
   match r with
   | Ok s -> return_some s
   | Error err -> if none err then return_none else error_to_tzresult err
 
 let to_tzresult r =
   let open Lwt_result_syntax in
-  let*! r = r in
+  let*! r in
   match r with Ok s -> return s | Error e -> error_to_tzresult e

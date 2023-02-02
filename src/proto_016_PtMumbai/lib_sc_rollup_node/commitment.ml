@@ -47,7 +47,7 @@ open Alpha_context
 module Lwt_result_option_syntax = struct
   let ( let** ) a f =
     let open Lwt_result_syntax in
-    let* a = a in
+    let* a in
     match a with None -> return_none | Some a -> f a
 end
 
@@ -55,7 +55,7 @@ module Lwt_result_option_list_syntax = struct
   (** A small monadic combinator to return an empty list on None results. *)
   let ( let*& ) x f =
     let open Lwt_result_syntax in
-    let* x = x in
+    let* x in
     match x with None -> return_nil | Some x -> f x
 end
 

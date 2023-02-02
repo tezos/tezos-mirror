@@ -1426,8 +1426,8 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   and state_hash_other =
     Sc_rollup_client.state_hash ~hooks sc_rollup_other_client
   in
-  let*! state_hash = state_hash in
-  let*! state_hash_other = state_hash_other in
+  let*! state_hash in
+  let*! state_hash_other in
   Check.((state_hash = state_hash_other) string)
     ~error_msg:
       "State hash of other rollup node is %R but the first rollup node has %L" ;

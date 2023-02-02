@@ -300,7 +300,7 @@ let test_staker_injectivity () =
      once. *)
   let* _, _, defender, res = staker_injectivity_gen ~refuter2_plays:true in
   let open Lwt_syntax in
-  let* res = res in
+  let* res in
   Assert.proto_error
     ~loc:__LOC__
     res

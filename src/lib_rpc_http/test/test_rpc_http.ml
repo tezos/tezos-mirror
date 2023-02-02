@@ -85,7 +85,7 @@ module Generator = struct
     let open Gen in
     let rec add_to_policy policy n =
       if n > 0 then
-        let* acl = acl and* endpoint = addr_port_id in
+        let* acl and* endpoint = addr_port_id in
         add_to_policy (put_policy (endpoint, acl) policy) (n - 1)
       else pure policy
     in
@@ -116,7 +116,7 @@ module Generator = struct
   let find_policy_setup : find_policy_setup Gen.t =
     let open Gen in
     let generate_entry =
-      let* endpoint = addr_port_id and* acl = acl in
+      let* endpoint = addr_port_id and* acl in
       pure (endpoint, acl)
     in
     let* p = policy

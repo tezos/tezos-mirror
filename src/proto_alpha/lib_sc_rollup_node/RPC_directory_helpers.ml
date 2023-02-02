@@ -48,14 +48,14 @@ module Make_directory (S : PARAM) = struct
   let register0 service f =
     let open Lwt_result_syntax in
     register (Tezos_rpc.Service.subst0 service) @@ fun ctxt query input ->
-    let*? ctxt = ctxt in
+    let*? ctxt in
     f ctxt query input
 
   let register1 service f =
     let open Lwt_result_syntax in
     register (Tezos_rpc.Service.subst1 service)
     @@ fun (ctxt, arg) query input ->
-    let*? ctxt = ctxt in
+    let*? ctxt in
     f ctxt arg query input
 
   let build_directory node_ctxt =

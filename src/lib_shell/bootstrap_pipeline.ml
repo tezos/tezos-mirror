@@ -486,7 +486,7 @@ let rec validation_worker_loop pipeline =
       Bootstrap_pipeline_event.(emit requesting_validation)
         (hash, pipeline.peer_id)
     in
-    let* operations = operations in
+    let* operations in
     let* () =
       protect ~canceler:pipeline.canceler (fun () ->
           let*! r =

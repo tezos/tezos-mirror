@@ -53,7 +53,7 @@ module Authentication = struct
 
   let client _ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* _, auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let*! () = P2p_socket.close conn in
@@ -99,7 +99,7 @@ module Nack = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* _, auth_fd = connect sched addr port id2 in
     let*! _conn = P2p_socket.accept ~canceler auth_fd Data_encoding.bytes in
     sync ch
@@ -164,7 +164,7 @@ module Read_and_write = struct
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
-    let*! id2 = id2 in
+    let*! id2 in
     let* _, auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd Data_encoding.bytes in
     let* () =
