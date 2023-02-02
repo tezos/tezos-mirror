@@ -29,7 +29,8 @@ open Injector_sigs
 module Parameters :
   PARAMETERS
     with type state = Node_context.ro
-     and type Tag.t = Configuration.purpose = struct
+     and type Tag.t = Configuration.purpose
+     and type Operation.t = L1_operation.t = struct
   type state = Node_context.ro
 
   let events_section = ["sc_rollup.injector"]
@@ -53,6 +54,8 @@ module Parameters :
         (List.map (fun t -> (string_of_tag t, t)) Configuration.purposes)
   end
 
+  module Operation = L1_operation
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Very coarse approximation for the number of operation we
      expect for each block *)
@@ -63,20 +66,15 @@ module Parameters :
     | Timeout -> 1
     | Refute -> 1
 
-  let operation_tag (type kind) (operation : kind manager_operation) :
-      Tag.t option =
-    match operation with
-    | Sc_rollup_add_messages _ -> Some Add_messages
-    | Sc_rollup_cement _ -> Some Cement
-    | Sc_rollup_publish _ -> Some Publish
-    | Sc_rollup_timeout _ -> Some Timeout
-    | Sc_rollup_refute _ -> Some Refute
-    | _ -> None
+  let operation_tag : Operation.t -> Tag.t = function
+    | Add_messages _ -> Add_messages
+    | Cement _ -> Cement
+    | Publish _ -> Publish
+    | Timeout _ -> Timeout
+    | Refute _ -> Refute
 
   let fee_parameter node_ctxt operation =
-    match operation_tag operation with
-    | None -> Configuration.default_fee_parameter ()
-    | Some tag -> Node_context.get_fee_parameter node_ctxt tag
+    Node_context.get_fee_parameter node_ctxt (operation_tag operation)
 
   (* Below are dummy values that are only used to approximate the
      size. It is thus important that they remain above the real
@@ -98,8 +96,7 @@ module Parameters :
      {!Injector_sigs.Parameter.batch_must_succeed}. *)
   let batch_must_succeed _ = `At_least_one
 
-  let retry_unsuccessful_operation (type kind) _node_ctxt
-      (op : kind manager_operation) status =
+  let retry_unsuccessful_operation _node_ctxt (op : Operation.t) status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->
@@ -140,34 +137,10 @@ module Parameters :
           return Retry
         else
           match op with
-          | Sc_rollup_timeout _ | Sc_rollup_refute _ | Sc_rollup_cement _
-          | Sc_rollup_add_messages _ ->
+          | Timeout _ | Refute _ | Cement _ | Add_messages _ ->
               (* Failing timeout and refutation operations can be ignored. *)
               return Forget
-          | Sc_rollup_publish _ -> return (Abort error)
-          | Reveal _ | Transaction _ | Origination _ | Delegation _
-          | Update_consensus_key _ | Register_global_constant _
-          | Set_deposits_limit _ | Increase_paid_storage _
-          | Tx_rollup_origination | Tx_rollup_submit_batch _
-          | Tx_rollup_commit _ | Tx_rollup_return_bond _
-          | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
-          | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _
-          | Transfer_ticket _ | Dal_publish_slot_header _
-          | Sc_rollup_originate _ | Sc_rollup_execute_outbox_message _
-          | Sc_rollup_recover_bond _ | Zk_rollup_origination _
-          | Zk_rollup_publish _ | Zk_rollup_update _ ->
-              (* These operations should never be handled by this injector *)
-              assert false)
-
-  let operation_tag (type kind) (operation : kind manager_operation) :
-      Tag.t option =
-    match operation with
-    | Sc_rollup_add_messages _ -> Some Add_messages
-    | Sc_rollup_cement _ -> Some Cement
-    | Sc_rollup_publish _ -> Some Publish
-    | Sc_rollup_timeout _ -> Some Timeout
-    | Sc_rollup_refute _ -> Some Refute
-    | _ -> None
+          | Publish _ -> return (Abort error))
 end
 
 include Injector_functor.Make (Parameters)

@@ -57,22 +57,6 @@ let () =
     (function No_worker_for_tag t -> Some t | _ -> None)
     (fun t -> No_worker_for_tag t)
 
-type error += No_worker_for_operation of L1_operation.t
-
-let () =
-  register_error_kind
-    ~id:"injector.no_worker_for_operation"
-    ~title:"This operation is not supported by injector"
-    ~description:
-      "An L1 operation could not be queued because the injector does not \
-       handle it."
-    ~pp:(fun ppf op ->
-      Format.fprintf ppf "No worker for operation %a" L1_operation.pp op)
-    `Permanent
-    Data_encoding.(obj1 (req "operation" L1_operation.encoding))
-    (function No_worker_for_operation op -> Some op | _ -> None)
-    (fun op -> No_worker_for_operation op)
-
 type error += Step_failed of string
 
 let () =

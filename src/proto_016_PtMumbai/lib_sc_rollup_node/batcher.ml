@@ -29,13 +29,13 @@ open Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
 module L2_batched_message = struct
-  type t = {content : string; l1_hash : L1_operation.hash}
+  type t = {content : string; l1_hash : Injector.Inj_operation.hash}
 end
 
 module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
 
 module type S = sig
-  type status = Pending_batch | Batched of L1_operation.hash
+  type status = Pending_batch | Batched of Injector.Inj_operation.hash
 
   val init :
     Configuration.batcher ->
@@ -63,7 +63,7 @@ end
 module Make (Simulation : Simulation.S) : S = struct
   module PVM = Simulation.PVM
 
-  type status = Pending_batch | Batched of L1_operation.hash
+  type status = Pending_batch | Batched of Injector.Inj_operation.hash
 
   type state = {
     node_ctxt : Node_context.ro;
@@ -81,7 +81,7 @@ module Make (Simulation : Simulation.S) : S = struct
   let inject_batch state (l2_messages : L2_message.t list) =
     let open Lwt_result_syntax in
     let messages = List.map L2_message.content l2_messages in
-    let operation = Sc_rollup_add_messages {messages} in
+    let operation = L1_operation.Add_messages {messages} in
     let+ l1_hash =
       Injector.add_pending_operation ~source:state.signer operation
     in

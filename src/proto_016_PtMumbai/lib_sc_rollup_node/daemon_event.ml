@@ -153,23 +153,25 @@ let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 let included_operation (type kind) ~finalized
     (operation : kind Protocol.Alpha_context.manager_operation)
     (result : kind Protocol.Apply_results.manager_operation_result) =
-  let operation = L1_operation.make operation in
-  match result with
-  | Applied _ when finalized ->
-      Simple.(emit finalized_successful_operation) operation
-  | _ when finalized ->
-      (* No events for finalized non successful operations  *)
-      Lwt.return_unit
-  | Applied _ -> Simple.(emit included_successful_operation) operation
-  | result ->
-      let status, errors =
-        match result with
-        | Applied _ -> assert false
-        | Failed (_, e) -> (`Failed, Some e)
-        | Backtracked (_, e) -> (`Backtracked, e)
-        | Skipped _ -> (`Skipped, None)
-      in
-      Simple.(emit included_failed_operation) (operation, status, errors)
+  match L1_operation.of_manager_operation operation with
+  | None -> Lwt.return_unit
+  | Some operation -> (
+      match result with
+      | Applied _ when finalized ->
+          Simple.(emit finalized_successful_operation) operation
+      | _ when finalized ->
+          (* No events for finalized non successful operations  *)
+          Lwt.return_unit
+      | Applied _ -> Simple.(emit included_successful_operation) operation
+      | result ->
+          let status, errors =
+            match result with
+            | Applied _ -> assert false
+            | Failed (_, e) -> (`Failed, Some e)
+            | Backtracked (_, e) -> (`Backtracked, e)
+            | Skipped _ -> (`Skipped, None)
+          in
+          Simple.(emit included_failed_operation) (operation, status, errors))
 
 let wrong_initial_pvm_state_hash actual_hash expected_hash =
   Simple.(emit wrong_initial_pvm_state_hash (actual_hash, expected_hash))
