@@ -122,7 +122,7 @@ val metadata : _ t -> Sc_rollup.Metadata.t
 
 (** Returns [true] if the rollup node supports the DAL and if DAL is enabled for
     the current protocol. *)
-val dal_enabled : _ t -> bool
+val dal_supported : _ t -> bool
 
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)

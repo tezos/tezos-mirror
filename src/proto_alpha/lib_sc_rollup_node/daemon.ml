@@ -170,7 +170,7 @@ module Make (PVM : Pvm.S) = struct
         in
         tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
     | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
-      when Node_context.dal_enabled node_ctxt ->
+      when Node_context.dal_supported node_ctxt ->
         let*! () =
           Node_context.save_slot_header
             node_ctxt
@@ -284,7 +284,7 @@ module Make (PVM : Pvm.S) = struct
       Inbox.process_head node_ctxt head
     in
     let* () =
-      when_ (Node_context.dal_enabled node_ctxt) @@ fun () ->
+      when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
       Dal_slots_tracker.process_head node_ctxt head
     in
     let* () = process_l1_block_operations ~finalized:false node_ctxt head in
