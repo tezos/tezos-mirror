@@ -430,18 +430,12 @@ let inject_preendorsements state ~preendorsements =
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
     (fun (delegate, operation) ->
-      let encoded_op =
-        Data_encoding.Binary.to_bytes_exn Operation.encoding operation
-      in
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_preendorsement (delegate, err))
           >>= fun () -> return_unit)
         (fun () ->
-          Shell_services.Injection.operation
-            cctxt
-            ~chain:(`Hash chain_id)
-            encoded_op
+          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
           Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
           return_unit))
@@ -558,17 +552,16 @@ let inject_endorsements state ~endorsements =
   sign_endorsements state endorsements >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, signed_operation) ->
-      let encoded_op =
-        Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
-      in
-      Shell_services.Injection.operation
-        cctxt
-        ~chain:(`Hash chain_id)
-        encoded_op
-      >>=? fun oph ->
-      Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
-      return_unit)
+    (fun (delegate, operation) ->
+      protect
+        ~on_error:(fun err ->
+          Events.(emit failed_to_inject_endorsement (delegate, err))
+          >>= fun () -> return_unit)
+        (fun () ->
+          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
+          >>=? fun oph ->
+          Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
+          return_unit))
     signed_operations
 
 let inject_dal_attestations state attestations =
