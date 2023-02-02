@@ -25,7 +25,7 @@
 
 type error +=
   | Dal_feature_disabled
-  | Dal_slot_index_above_hard_limit
+  | Dal_slot_index_above_hard_limit of {given : int}
   | Dal_attestation_unexpected_size of {expected : int; got : int}
   | Dal_publish_slot_header_future_level of {
       provided : Raw_level_repr.t;
@@ -102,16 +102,19 @@ let () =
     ~id:"dal_slot_index_negative_orabove_hard_limit"
     ~title:"DAL slot index negative or above hard limit"
     ~description
-    ~pp:(fun ppf () ->
+    ~pp:(fun ppf given ->
       Format.fprintf
         ppf
-        "%s: Maximum allowed %a."
+        "%s (given %Ld): Maximum allowed %a."
         description
+        given
         Dal_slot_index_repr.pp
         Dal_slot_index_repr.max_value)
-    Data_encoding.unit
-    (function Dal_slot_index_above_hard_limit -> Some () | _ -> None)
-    (fun () -> Dal_slot_index_above_hard_limit) ;
+    (obj1 (req "given" Data_encoding.int64))
+    (function
+      | Dal_slot_index_above_hard_limit {given} -> Some (Int64.of_int given)
+      | _ -> None)
+    (fun n -> Dal_slot_index_above_hard_limit {given = Int64.to_int n}) ;
   let description = "Unexpected level in the future in slot header" in
   register_error_kind
     `Temporary

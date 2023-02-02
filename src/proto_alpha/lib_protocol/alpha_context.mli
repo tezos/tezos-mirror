@@ -3136,7 +3136,7 @@ module Dal_errors : sig
      from Dal_slot_repr or Dal_attestation_repr. *)
   type error +=
     | Dal_feature_disabled
-    | Dal_slot_index_above_hard_limit
+    | Dal_slot_index_above_hard_limit of {given : int}
     | Dal_attestation_unexpected_size of {expected : int; got : int}
     | Dal_publish_slot_header_future_level of {
         provided : Raw_level.t;
