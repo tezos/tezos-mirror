@@ -970,7 +970,7 @@ let octez_crypto_dal =
       ]
 
 let _octez_crypto_dal_tests =
-  tests
+  tezt
     ["test_dal_cryptobox"]
     ~path:"src/lib_crypto_dal/test"
     ~opam:"tezos-crypto-dal"
@@ -981,7 +981,7 @@ let _octez_crypto_dal_tests =
         octez_crypto_dal |> open_;
         octez_error_monad |> open_;
         data_encoding |> open_;
-        alcotest;
+        alcotezt;
         qcheck_alcotest;
         octez_bls12_381_polynomial_internal;
         octez_test_helpers;
