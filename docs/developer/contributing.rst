@@ -552,12 +552,19 @@ Because of the amendment procedure that governs the protocol, the
 workflow for protocol development is significantly different from
 master.
 
-Before a proposal, a new directory, e.g. ``proto-005-PsBabyM1``, is
-created from ``proto_alpha`` where the development continues.
+Protocol snapshots
+~~~~~~~~~~~~~~~~~~
+
+Before a proposal, a new directory, e.g. ``proto-005-PsBabyM1/``, is
+created from ``proto_alpha/`` where the development continues.
+These directories are called *protocol snapshots*.
 
 The hash of each active or candidate protocol is computed from the directory
-``src/proto_0*/lib_protocol``, so every change in these directories
+``src/proto_0*/lib_protocol/``, so every change in these directories
 is forbidden.
+However, the protocol snapshots contain other subdirectories than the frozen ``lib_protocol/``, implementing protocol-dependent code. For instance, ``lib_client/`` implements commands in the Octez client that can invoke protocol-dependent functionalities, such as transfers between accounts.
+
+Thereby, if your MR changes code in the protocol snapshot directories (outside the frozen ``lib_protocol/``), you may consider patching the corresponding code for the other protocols as well (at least the ones which are still in use), when applicable.
 
 The Migration
 ~~~~~~~~~~~~~
