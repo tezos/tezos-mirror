@@ -3,7 +3,7 @@
 
 (library
  (name tezos_scoru_wasm_durable_snapshot)
- (package tezos-scoru-wasm-durable-snasphot)
+ (package tezos-scoru-wasm-durable-snapshot)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

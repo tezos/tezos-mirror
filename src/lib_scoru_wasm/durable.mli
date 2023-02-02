@@ -87,7 +87,7 @@ val find_value :
 val find_value_exn :
   t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t Lwt.t
 
-(** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of
+(** [copy_tree_exn tree ?edit_readonly from_key to_key] produces a new tree in which a copy of
     the entire subtree at from_key is copied to to_key.
 
     [~edit_readonly:true] allows a a tree to be copied into a readonly location.
@@ -138,7 +138,7 @@ val hash_exn : t -> key -> Context_hash.t Lwt.t
     key without fetching it. *)
 val set_value_exn : t -> ?edit_readonly:bool -> key -> string -> t Lwt.t
 
-(** [write_value ?edit_readonly durable key offset bytes] writes
+(** [write_value_exn ?edit_readonly durable key offset bytes] writes
     [bytes] to [key], starting at the given [offset].
 
     If no value at [key] exists, it is created.

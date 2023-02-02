@@ -10,7 +10,6 @@
   tezos-context.disk
   tezos-base-test-helpers
   tezos-test-helpers
-  tezos_scoru_wasm_durable_snapshot
   tezos-scoru-wasm
   qcheck-alcotest
   alcotest-lwt

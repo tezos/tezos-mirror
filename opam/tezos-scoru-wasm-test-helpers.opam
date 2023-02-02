@@ -18,6 +18,7 @@ depends: [
   "tezos-base-test-helpers"
   "tezos-test-helpers"
   "tezos-scoru-wasm"
+  "tezos-scoru-wasm-durable-snapshot"
   "tezos-scoru-wasm-fast"
   "tezos-scoru-wasm-helpers"
   "qcheck-alcotest" { >= "0.20" }

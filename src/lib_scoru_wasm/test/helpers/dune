@@ -13,6 +13,7 @@
   tezos-base-test-helpers
   tezos-test-helpers
   tezos-scoru-wasm
+  tezos_scoru_wasm_durable_snapshot
   tezos-scoru-wasm-fast
   tezos-scoru-wasm-helpers
   qcheck-alcotest
