@@ -8,6 +8,7 @@
  (libraries
   tezos-lwt-result-stdlib
   tezos-stdlib
+  tezos-error-monad
   zarith
   tezos-lazy-containers)
  (preprocess (pps ppx_deriving.show))
