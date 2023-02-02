@@ -25,9 +25,8 @@ module Bindings (F : Cstubs.FOREIGN) = struct
   let init_zksnark_params =
     foreign
       "librustzcash_init_zksnark_params"
-      (ocaml_bytes @-> size_t @-> ocaml_string @-> ocaml_bytes @-> size_t
-     @-> ocaml_string @-> ptr uchar @-> size_t @-> ocaml_string
-     @-> returning void)
+      (ocaml_bytes @-> size_t @-> ocaml_bytes @-> size_t @-> ptr uchar
+     @-> size_t @-> returning void)
 
   let nsk_to_nk =
     foreign
@@ -63,14 +62,14 @@ module Bindings (F : Cstubs.FOREIGN) = struct
 
   let sapling_compute_cm =
     foreign
-      "librustzcash_sapling_compute_cm"
-      (ocaml_bytes @-> ocaml_bytes @-> uint64_t @-> ocaml_bytes @-> ocaml_bytes
-     @-> returning bool)
+      "librustzcash_sapling_compute_cmu"
+      (bool @-> ocaml_bytes @-> ocaml_bytes @-> uint64_t @-> ocaml_bytes
+     @-> ocaml_bytes @-> returning bool)
 
   let sapling_ka_agree =
     foreign
       "librustzcash_sapling_ka_agree"
-      (ocaml_bytes @-> ocaml_bytes @-> ocaml_bytes @-> returning bool)
+      (bool @-> ocaml_bytes @-> ocaml_bytes @-> ocaml_bytes @-> returning bool)
 
   let sapling_ka_derivepublic =
     foreign
@@ -96,23 +95,23 @@ module Bindings (F : Cstubs.FOREIGN) = struct
   (* ZIP32 functions *)
   let zip32_xsk_master =
     foreign
-      "librustzcash_zip32_xsk_master"
+      "librustzcash_zip32_sapling_xsk_master"
       (ocaml_bytes @-> size_t @-> ocaml_bytes @-> returning void)
 
   let zip32_xfvk_address =
     foreign
-      "librustzcash_zip32_xfvk_address"
+      "librustzcash_zip32_find_sapling_address"
       (ocaml_bytes @-> ocaml_bytes @-> ocaml_bytes @-> ocaml_bytes
-     @-> returning bool)
+     @-> ocaml_bytes @-> returning bool)
 
   let zip32_xsk_derive =
     foreign
-      "librustzcash_zip32_xsk_derive"
+      "librustzcash_zip32_sapling_xsk_derive"
       (ocaml_bytes @-> uint32_t @-> ocaml_bytes @-> returning void)
 
   let zip32_xfvk_derive =
     foreign
-      "librustzcash_zip32_xfvk_derive"
+      "librustzcash_zip32_sapling_xfvk_derive"
       (ocaml_bytes @-> uint32_t @-> ocaml_bytes @-> returning bool)
 
   (* Prover *)
@@ -146,7 +145,7 @@ module Bindings (F : Cstubs.FOREIGN) = struct
   let verification_ctx_init =
     foreign
       "librustzcash_sapling_verification_ctx_init"
-      (void @-> returning (ptr void))
+      (bool @-> returning (ptr void))
 
   let verification_ctx_free =
     foreign
