@@ -601,15 +601,13 @@ module Dal = struct
 
   type slot = string
 
-  let make_slot ?(padding = true) slot client =
-    let* parameters = Parameters.from_client client in
-    let expected_size = parameters.cryptobox.slot_size in
-    let slot_size = String.length slot in
+  let make_slot ?(padding = true) ~slot_size slot =
     if String.contains slot '\000' then
       Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
-    if slot_size < expected_size && padding then
-      return (pad (expected_size - slot_size) slot)
-    else return slot
+    let actual_slot_size = String.length slot in
+    if actual_slot_size < slot_size && padding then
+      pad (slot_size - actual_slot_size) slot
+    else slot
 
   let content_of_slot slot =
     (* We make the assumption that the content of a slot (for test
