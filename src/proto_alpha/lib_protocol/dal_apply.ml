@@ -52,7 +52,7 @@ let validate_attestation ctxt op =
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4163
      check the signature of the attestor as well *)
   let Dal.Attestation.{attestor; attestation; level = given} = op in
-  let* max_index = Dal.number_of_slots ctxt |> slot_of_int_e in
+  let* max_index = Dal.number_of_slots ctxt - 1 |> slot_of_int_e in
   let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
   let size = Dal.Attestation.occupied_size_in_bits attestation in
   let* () =
