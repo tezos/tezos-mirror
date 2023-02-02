@@ -56,13 +56,7 @@ let sc_originate block contract parameters_ty =
   let open Lwt_result_syntax in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
-    Op.sc_rollup_origination
-      ~counter:(Manager_counter.Internal_for_tests.of_int 0)
-      (B block)
-      contract
-      kind
-      ~boot_sector:""
-      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
+    Sc_rollup_helpers.origination_op ~parameters_ty (B block) contract kind
   in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr operation in

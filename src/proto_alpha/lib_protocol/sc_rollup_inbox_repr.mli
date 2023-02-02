@@ -145,12 +145,12 @@ module V1 : sig
     On the other hand, we think of this type as representing a single
     proof-step back through the history of the inbox; given a hash that
     appears at some point later in the inbox this type proves that that
-    hash points to this particular combination of a level tree and
-    further back-pointers.
+    hash points to this particular combination of a witness and further
+    back-pointers.
 
     In terms of size, this type is a small set of hashes; one for the
-    current level tree and `O(log2(ix))` in the back-pointers, where
-    [ix] is the index of the cell in the skip list. That is, [ix] is the
+    current witness and `O(log2(ix))` in the back-pointers, where [ix]
+    is the index of the cell in the skip list. That is, [ix] is the
     number of non-empty levels between now and the origination level of
     the rollup.
   *)
@@ -201,7 +201,7 @@ module V1 : sig
   val equal_history_proof : history_proof -> history_proof -> bool
 
   (** [old_levels_messages inbox] returns the latest skip list cell of the inbox
-      history that is not up to change (i.e. not the current level tree). *)
+      history that is not up to change (i.e. not the current witness). *)
   val old_levels_messages : t -> history_proof
 
   (** [current_witness inbox] returns the current witness of the inbox, i.e. the
@@ -264,26 +264,6 @@ val add_messages_no_history :
     prevents to create a mid-level snapshot for a refutation game if new
     messages are added before and/or after in the same block. *)
 val take_snapshot : t -> history_proof
-
-(** Given a inbox [A] at some level [L] and another inbox [B] at some level [L'
-    >= L], an [inclusion_proof] guarantees that [A] is an older version of [B].
-
-    To be more precise, an [inclusion_proof] guarantees that the previous levels
-    [level_tree]s of [A] are included in the previous levels [level_tree]s of
-    [B]. The current [level_tree] of [A] and [B] are not considered.
-
-    The size of this proof is O(log2 (L' - L)). *)
-type inclusion_proof
-
-val inclusion_proof_encoding : inclusion_proof Data_encoding.t
-
-val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
-
-(** [verify_inclusion_proof proof snapshot] returns [A] iff [proof] is a minimal
-    and valid proof that [A] is included in [snapshot], fails otherwise. [A] is
-    part of the proof. *)
-val verify_inclusion_proof :
-  inclusion_proof -> history_proof -> history_proof tzresult
 
 (** An inbox proof has three parameters:
 
@@ -363,6 +343,19 @@ val genesis :
   t tzresult
 
 module Internal_for_tests : sig
+  (** Given a inbox [A] at some level [L] and another inbox [B] at some level
+      [L' >= L], an [inclusion_proof] guarantees that [A] is an older version of
+      [B].
+
+      To be more precise, an [inclusion_proof] guarantees that the previous
+      levels [witness]s of [A] are included in the previous levels [witness]s of
+      [B]. The current [witness] of [A] and [B] are not considered.
+
+      The size of this proof is O(log2 (L' - L)). *)
+  type inclusion_proof = history_proof list
+
+  val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
+
   (** [produce_inclusion_proof get_history a b] exploits [get_history]
       to produce a self-contained proof that [a] is an older version of [b]. *)
   val produce_inclusion_proof :
@@ -371,11 +364,44 @@ module Internal_for_tests : sig
     Raw_level_repr.t ->
     (inclusion_proof * history_proof) tzresult Lwt.t
 
+  (** [verify_inclusion_proof proof snapshot] returns [A] iff [proof] is a minimal
+      and valid proof that [A] is included in [snapshot], fails otherwise. [A] is
+      part of the proof. *)
+  val verify_inclusion_proof :
+    inclusion_proof -> history_proof -> history_proof tzresult
+
+  type payloads_proof = {
+    proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
+    payload : Sc_rollup_inbox_message_repr.serialized option;
+  }
+
+  val pp_payloads_proof : Format.formatter -> payloads_proof -> unit
+
+  val produce_payloads_proof :
+    (Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t Lwt.t) ->
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
+    index:Z.t ->
+    payloads_proof tzresult Lwt.t
+
+  val verify_payloads_proof :
+    payloads_proof ->
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
+    Z.t ->
+    Sc_rollup_inbox_message_repr.serialized option tzresult
+
   (** Allows to create a dumb {!serialized_proof} from a string, instead of
       serializing a proof with {!to_serialized_proof}. *)
   val serialized_proof_of_string : string -> serialized_proof
 
   val get_level_of_history_proof : history_proof -> Raw_level_repr.t
+
+  type level_proof = {
+    hash : Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t;
+    level : Raw_level_repr.t;
+  }
+
+  val level_proof_of_history_proof : history_proof -> level_proof
 end
 
 type inbox = t

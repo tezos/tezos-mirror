@@ -140,11 +140,11 @@ let contract_originate block account =
     ~storage:"Unit"
     block
 
-let context_init ty =
+let context_init parameters_ty =
   let open Lwt_result_syntax in
   let* b, c = Test_sc_rollup.context_init T1 in
   let* contract, _script, b = contract_originate b c in
-  let* b, rollup = sc_originate b c ty in
+  let* b, rollup = sc_originate b c ~parameters_ty in
   return (b, c, contract, rollup)
 
 let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =

@@ -3438,15 +3438,6 @@ module Sc_rollup : sig
 
     val take_snapshot : t -> history_proof
 
-    type inclusion_proof
-
-    val inclusion_proof_encoding : inclusion_proof Data_encoding.t
-
-    val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
-
-    val verify_inclusion_proof :
-      inclusion_proof -> history_proof -> history_proof tzresult
-
     type proof
 
     val pp_proof : Format.formatter -> proof -> unit
@@ -3488,13 +3479,47 @@ module Sc_rollup : sig
       t tzresult
 
     module Internal_for_tests : sig
+      type inclusion_proof = history_proof list
+
+      val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
+
       val produce_inclusion_proof :
         (Hash.t -> history_proof option Lwt.t) ->
         history_proof ->
         Raw_level.t ->
         (inclusion_proof * history_proof) tzresult Lwt.t
 
+      val verify_inclusion_proof :
+        inclusion_proof -> history_proof -> history_proof tzresult
+
+      type payloads_proof = {
+        proof : Inbox_merkelized_payload_hashes.proof;
+        payload : Inbox_message.serialized option;
+      }
+
+      val pp_payloads_proof : Format.formatter -> payloads_proof -> unit
+
+      val produce_payloads_proof :
+        (Inbox_merkelized_payload_hashes.Hash.t ->
+        Inbox_merkelized_payload_hashes.History.t Lwt.t) ->
+        Inbox_merkelized_payload_hashes.Hash.t ->
+        index:Z.t ->
+        payloads_proof tzresult Lwt.t
+
+      val verify_payloads_proof :
+        payloads_proof ->
+        Inbox_merkelized_payload_hashes.Hash.t ->
+        Z.t ->
+        Inbox_message.serialized option tzresult
+
       val serialized_proof_of_string : string -> serialized_proof
+
+      type level_proof = {
+        hash : Inbox_merkelized_payload_hashes.Hash.t;
+        level : Raw_level_repr.t;
+      }
+
+      val level_proof_of_history_proof : history_proof -> level_proof
     end
 
     val add_external_messages : context -> string list -> context tzresult Lwt.t

@@ -34,11 +34,6 @@ let get_inbox ctxt =
 let add_messages ctxt messages =
   let open Lwt_result_syntax in
   let open Raw_context in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3292
-
-     The carbonation needs to be activated again with the new internal inbox's
-     design, i.e. the skip list.
-  *)
   let current_messages = Sc_rollup_in_memory_inbox.current_messages ctxt in
   let*? ctxt =
     List.fold_left_e

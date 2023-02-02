@@ -273,12 +273,12 @@ type serialized_proof = string
 
 let serialized_proof_encoding = Data_encoding.(string Hex)
 
-type level_tree_proof = {
+type payloads_proof = {
   proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
   payload : Sc_rollup_inbox_message_repr.serialized option;
 }
 
-let level_tree_proof_encoding =
+let payloads_proof_encoding =
   let open Data_encoding in
   conv
     (fun {proof; payload} -> (proof, (payload :> string option)))
@@ -385,8 +385,22 @@ let inclusion_proof_encoding =
   let open Data_encoding in
   list history_proof_encoding
 
-let pp_inclusion_proof fmt proof =
-  Format.pp_print_list pp_history_proof fmt proof
+let pp_inclusion_proof = Format.pp_print_list pp_history_proof
+
+let pp_payloads_proof fmt {proof; payload} =
+  Format.fprintf
+    fmt
+    "payload: %a@,@[<v 2>proof:@,%a@]"
+    Format.(
+      pp_print_option
+        ~none:(fun fmt () -> pp_print_string fmt "None")
+        (fun fmt payload ->
+          pp_print_string
+            fmt
+            (Sc_rollup_inbox_message_repr.unsafe_to_string payload)))
+    payload
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.pp_proof
+    proof
 
 (* See the main docstring for this type (in the mli file) for
    definitions of the three proof parameters [starting_point],
@@ -399,23 +413,22 @@ let pp_inclusion_proof fmt proof =
    and [message_proof] is a tree proof showing that
 
    [exists witness .
-   (hash_level_tree witness = history_proof.content.hash)
+   (hash witness = history_proof.content.hash)
    AND (get_messages_payload n witness = (_, message))]
 
    Note: in the case that [message] is [None] this shows that there's no
    value at the index [n]; in this case we also must check that
    [history_proof] equals [snapshot]. *)
-type proof = {
-  inclusion_proof : inclusion_proof;
-  message_proof : level_tree_proof;
-}
+type proof = {inclusion_proof : inclusion_proof; message_proof : payloads_proof}
 
-let pp_proof fmt {inclusion_proof; message_proof = _} =
+let pp_proof fmt {inclusion_proof; message_proof} =
   Format.fprintf
     fmt
-    "inclusion proof: %a@"
-    (Format.pp_print_list pp_history_proof)
+    "@[<v>@[<v 2>inclusion proof:@,%a@]@,@[<v 2>payloads proof:@,%a@]@]"
+    pp_inclusion_proof
     inclusion_proof
+    pp_payloads_proof
+    message_proof
 
 let proof_encoding =
   let open Data_encoding in
@@ -424,7 +437,7 @@ let proof_encoding =
     (fun (inclusion_proof, message_proof) -> {inclusion_proof; message_proof})
     (obj2
        (req "inclusion_proof" inclusion_proof_encoding)
-       (req "message_proof" level_tree_proof_encoding))
+       (req "message_proof" payloads_proof_encoding))
 
 let of_serialized_proof = Data_encoding.Binary.of_string_opt proof_encoding
 
@@ -519,11 +532,11 @@ let verify_payloads_proof {proof; payload} head_cell_hash n =
     tzfail
       (Inbox_proof_error
          "Provided message counter is out of the valid range [0 -- (max_index \
-          + 1)] ")
+          + 1)]")
 
-(** [produce_payloads_proof get_paylooads_history head_cell_hash ~index]
+(** [produce_payloads_proof get_payloads_history head_cell_hash ~index]
 
-    [get_paylooads_history cell_hash] is a function that returns an
+    [get_payloads_history cell_hash] is a function that returns an
     {!Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t}. The returned
     history must contains the cell with hash [cell_hash], all its ancestor cell
     and their associated payload.
@@ -541,10 +554,10 @@ let verify_payloads_proof {proof; payload} head_cell_hash n =
    - else a proof that [index] is out of bound for [head_cell]. It returns the
    proof and no payload.
 *)
-let produce_payloads_proof get_paylooads_history head_cell_hash ~index =
+let produce_payloads_proof get_payloads_history head_cell_hash ~index =
   let open Lwt_result_syntax in
   (* We first retrieve the history of cells for this level. *)
-  let*! payloads_history = get_paylooads_history head_cell_hash in
+  let*! payloads_history = get_payloads_history head_cell_hash in
   (* We then fetch the actual head cell in the history. *)
   let*? head_cell =
     match
@@ -560,7 +573,7 @@ let produce_payloads_proof get_paylooads_history head_cell_hash ~index =
   let head_cell_max_index =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index head_cell
   in
-  (* if [index <= level_tree_max_index] then the index belongs to this level, we
+  (* if [index <= head_cell_max_index] then the index belongs to this level, we
      prove its existence. Else the index is out of bounds, we prove its
      non-existence. *)
   let target_index = Compare.Z.(min index head_cell_max_index) in
@@ -583,7 +596,7 @@ let produce_payloads_proof get_paylooads_history head_cell_hash ~index =
 let verify_inclusion_proof inclusion_proof snapshot_history_proof =
   let open Result_syntax in
   let rec aux (hash_map, ptr_list) = function
-    | [] -> error (Inbox_proof_error "inclusion proof is empty")
+    | [] -> tzfail (Inbox_proof_error "inclusion proof is empty")
     | [target] ->
         let target_ptr = hash_history_proof target in
         let hash_map = Hash.Map.add target_ptr target hash_map in
@@ -820,13 +833,37 @@ let genesis ~predecessor_timestamp ~predecessor level =
   return {level; old_levels_messages = Skip_list.genesis level_proof}
 
 module Internal_for_tests = struct
+  type nonrec inclusion_proof = inclusion_proof
+
+  let pp_inclusion_proof = pp_inclusion_proof
+
   let produce_inclusion_proof = produce_inclusion_proof
+
+  let verify_inclusion_proof = verify_inclusion_proof
 
   let serialized_proof_of_string x = x
 
   let get_level_of_history_proof (history_proof : history_proof) =
     let ({level; _} : level_proof) = Skip_list.content history_proof in
     level
+
+  type nonrec payloads_proof = payloads_proof = {
+    proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
+    payload : Sc_rollup_inbox_message_repr.serialized option;
+  }
+
+  let pp_payloads_proof = pp_payloads_proof
+
+  let produce_payloads_proof = produce_payloads_proof
+
+  let verify_payloads_proof = verify_payloads_proof
+
+  type nonrec level_proof = level_proof = {
+    hash : Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t;
+    level : Raw_level_repr.t;
+  }
+
+  let level_proof_of_history_proof = Skip_list.content
 end
 
 type inbox = t
