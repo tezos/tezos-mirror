@@ -239,12 +239,11 @@ module Dal : sig
      are smaller than the expected size of a slot. *)
   type slot
 
-  (** [make_slot ?padding content client] produces a slot. If
-     [padding=true] (which is the default), then the content is padded
-     to reach the expected size given by the [slot_size] field of
-     {!type:Cryptobox.parameters}. [client] is used to get the
-     corresponding parameters (see {!val: Parameters.from_client}). *)
-  val make_slot : ?padding:bool -> string -> Client.t -> slot Lwt.t
+  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
+      (which is the default), then the content is padded to reach the expected
+      size given by [slot_size] (which is usually obtained from
+      {!type:Cryptobox.parameters}). *)
+  val make_slot : ?padding:bool -> slot_size:int -> string -> slot
 
   (** [content_of_slot slot] retrieves the original content of a slot
      by removing the padding. *)
