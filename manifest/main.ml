@@ -892,7 +892,7 @@ let _octez_crypto_tests =
     ~js_compatible:true
 
 let _octez_crypto_tests_unix =
-  tests
+  tezt
     ["test_crypto_box"]
     ~path:"src/lib_crypto/test-unix"
     ~opam:"tezos-crypto"
@@ -905,8 +905,7 @@ let _octez_crypto_tests_unix =
         zarith_stubs_js;
         octez_hacl;
         data_encoding |> open_;
-        alcotest;
-        alcotest_lwt;
+        alcotezt;
         lwt_unix;
         qcheck_alcotest;
         octez_test_helpers |> open_;
