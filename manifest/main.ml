@@ -2732,12 +2732,12 @@ let octez_client_base =
         ]
 
 let _octez_client_base_tests =
-  tests
+  tezt
     ["bip39_tests"; "pbkdf_tests"]
     ~path:"src/lib_client_base/test"
     ~opam:"tezos-client-base"
     ~with_macos_security_framework:true
-    ~deps:[octez_base; octez_client_base |> open_; alcotest]
+    ~deps:[octez_base; octez_client_base |> open_; alcotezt]
     ~js_compatible:true
     ~modes:[Native; JS]
 
