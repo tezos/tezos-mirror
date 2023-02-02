@@ -428,7 +428,6 @@ def assert_run_script_success(
 def assert_run_script_failwith(
     client: Client, contract: str, param: str, storage: str
 ) -> None:
-
     pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
         client.run_script(contract, param, storage, trace_stack=True)
@@ -454,7 +453,7 @@ def assert_typecheck_failure(
 def suball(replacements: List[Tuple[Pattern, str]], string: str) -> str:
     """Apply all the replacements in `replacements`, in order, to `string`
     using re.sub"""
-    for (pattern, replacement) in replacements:
+    for pattern, replacement in replacements:
         string = re.sub(pattern, replacement, string)
     return string
 

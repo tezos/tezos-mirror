@@ -1670,7 +1670,6 @@ class Client:
     def sapling_gen_key(
         self, key_name: str, force: bool = False, args: List[str] = None
     ) -> client_output.SaplingGenKeyResult:
-
         cmd = ['sapling', 'gen', 'key', key_name, '--unencrypted']
         args = args or []
         if force:
@@ -1714,7 +1713,6 @@ class Client:
         force: bool = False,
         args: List[str] = None,
     ) -> None:
-
         mnemonic_str = " ".join(mnemonic)
         cmd = [
             'sapling',
@@ -1739,7 +1737,6 @@ class Client:
         index: int,
         force: bool = False,
     ) -> client_output.SaplingDeriveKeyResult:
-
         cmd = [
             'sapling',
             'derive',
@@ -1761,7 +1758,6 @@ class Client:
     def sapling_get_balance(
         self, key_name: str, contract_name: str, args: List[str] = None
     ) -> client_output.SaplingGetBalanceResult:
-
         cmd = [
             'sapling',
             'get',

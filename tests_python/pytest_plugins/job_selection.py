@@ -105,10 +105,10 @@ def knapsack(items: List[Tuple[Any, float]], bag_count: int) -> List[Bag]:
     for _ in range(0, bag_count):
         knapsack.append({'total_weight': 0.0, 'items': []})
 
-    for (item, weight) in items:
+    for item, weight in items:
         min_index = 0
         min_total_weight = knapsack[0]['total_weight']
-        for (index, bag) in enumerate(knapsack[1:]):
+        for index, bag in enumerate(knapsack[1:]):
             if bag['total_weight'] < min_total_weight:
                 min_total_weight = bag['total_weight']
                 min_index = index + 1
@@ -169,7 +169,7 @@ def tabulate(
     for row in [headers_s] + rows_s:
         width = cell_width[0]
         print(f'{{0: <{width}}}'.format(str(row[0])), end="")
-        for (col_idx, col) in enumerate(row[1:]):
+        for col_idx, col in enumerate(row[1:]):
             width = cell_width[col_idx + 1]
             print(f'{{0: >{width}}}'.format(str(col)), end="")
         print()
