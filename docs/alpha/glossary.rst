@@ -16,12 +16,12 @@ Protocol
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
     to abuse the network in another similar way), another delegate_ can make an
-    accusation, by providing evidence of the offense. The delegate_ making the accusation is called the accuser.\
+    accusation, by providing evidence of the offense. The delegate_ injecting the accusation in a newly baked block is called the accuser.\
 
     The accuser is awarded some funds from the security deposit of the accused.
 
-    When using :ref:`Octez <octez>`, accusations are handled by the
-    accuser daemon.
+    When using :ref:`Octez <octez>`, accusation operations are emitted by the
+    accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
 _`Account`
     An account is an address managed by the protocol.

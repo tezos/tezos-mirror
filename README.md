@@ -80,6 +80,4 @@ to study and to maximize the throughput of the voting procedure.
 
 ## Community
 
-Links to community websites are gathered in the following community portals:
-- https://www.tezos.help/
-- https://developers.tezos.com/ (for developers of applications built on Tezos)
+Links to community websites are gathered at <https://tezos.gitlab.io/introduction/tezos.html#the-community>.
