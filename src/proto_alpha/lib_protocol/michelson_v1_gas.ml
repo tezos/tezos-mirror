@@ -304,6 +304,13 @@ module Cost_of = struct
       | P256 _ -> P256
       | Bls _ -> Bls
 
+    let algo_of_public_key_hash (pkh : Signature.public_key_hash) =
+      match pkh with
+      | Ed25519 _ -> Ed25519
+      | Secp256k1 _ -> Secp256k1
+      | P256 _ -> P256
+      | Bls _ -> Bls
+
     let check_signature_on_algo algo length =
       match algo with
       | Ed25519 -> cost_N_ICheck_signature_ed25519 length
