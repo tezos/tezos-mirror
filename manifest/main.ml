@@ -219,7 +219,11 @@ let lwt_unix = external_sublib lwt "lwt.unix"
 
 let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 
-let mtime = external_lib ~js_compatible:true "mtime" V.(at_least "1.2.0")
+let mtime =
+  external_lib
+    ~js_compatible:true
+    "mtime"
+    V.(at_least "1.4.0" && less_than "2.0.0")
 
 let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
@@ -310,7 +314,7 @@ let aches = external_lib ~js_compatible:true "aches" V.(at_least "1.0.0")
 let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
 
 let secp256k1_internal =
-  let version = V.(at_least "0.3.0") in
+  let version = V.(at_least "0.4.0") in
   external_lib
     ~npm_deps:[Npm.make "@nomadic-labs/secp256k1-wasm" version]
     ~js_compatible:true
