@@ -3151,8 +3151,8 @@ let octez_client_base_unix =
     ~linkall:true
 
 let _octez_client_base_unix_tests =
-  test
-    "test_mockup_wallet"
+  tezt
+    ["test_mockup_wallet"]
     ~path:"src/lib_client_base_unix/test"
     ~opam:"tezos-client-base-unix"
     ~with_macos_security_framework:true
@@ -3162,8 +3162,7 @@ let _octez_client_base_unix_tests =
         octez_mockup_commands;
         octez_client_base_unix;
         octez_base_test_helpers |> open_;
-        alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_benchmark =
