@@ -80,8 +80,7 @@ type t = {
     Decide whether we want to handle connections to multiple
     Dal nodes for different slot indexes.
   *)
-  dal_node_addr : string;
-  dal_node_port : int;
+  dal_node_endpoint : Uri.t;
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;
@@ -133,11 +132,8 @@ val default_fee_parameter : ?purpose:purpose -> unit -> Injection.fee_parameter
     with {!default_fee_parameter} for all purposes. *)
 val default_fee_parameters : fee_parameters
 
-(** [default_dal_node_addr] is the default value for [dal_node_addr]. *)
-val default_dal_node_addr : string
-
-(** [default_dal_node_port] is the default value for [dal_node_port]. *)
-val default_dal_node_port : int
+(** [default_dal_node_endpoint] is the default value for [dal_node_endpoint]. *)
+val default_dal_node_endpoint : Uri.t
 
 (** [default_batcher] is the default configuration parameters for the batcher. *)
 val default_batcher : batcher

@@ -569,12 +569,7 @@ let run ~data_dir (configuration : Configuration.t)
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
   let dal_cctxt =
-    let dal_endpoint =
-      Uri.of_string
-        ("http://" ^ configuration.dal_node_addr ^ ":"
-        ^ string_of_int configuration.dal_node_port)
-    in
-    Dal_node_client.make_unix_cctxt dal_endpoint
+    Dal_node_client.make_unix_cctxt configuration.dal_node_endpoint
   in
   let open Configuration in
   let* () =
