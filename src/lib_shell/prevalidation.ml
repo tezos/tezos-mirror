@@ -27,53 +27,6 @@
 
 open Shell_operation
 
-type error +=
-  | Operation_replacement of {
-      old_hash : Operation_hash.t;
-      new_hash : Operation_hash.t;
-    }
-  | Operation_conflict of {new_hash : Operation_hash.t}
-
-let () =
-  register_error_kind
-    `Temporary
-    ~id:"prevalidation.operation_replacement"
-    ~title:"Operation replacement"
-    ~description:"The operation has been replaced."
-    ~pp:(fun ppf (old_hash, new_hash) ->
-      Format.fprintf
-        ppf
-        "The operation %a has been replaced with %a."
-        Operation_hash.pp
-        old_hash
-        Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj2
-       (Data_encoding.req "old_hash" Operation_hash.encoding)
-       (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function
-      | Operation_replacement {old_hash; new_hash} -> Some (old_hash, new_hash)
-      | _ -> None)
-    (fun (old_hash, new_hash) -> Operation_replacement {old_hash; new_hash}) ;
-  register_error_kind
-    `Temporary
-    ~id:"prevalidation.operation_conflict"
-    ~title:"Operation conflict"
-    ~description:
-      "The operation cannot be added because the mempool already contains a \
-       conflicting operation."
-    ~pp:(fun ppf new_hash ->
-      Format.fprintf
-        ppf
-        "The operation %a cannot be added because the mempool already contains \
-         a conflicting operation that should not be replaced (e.g. an \
-         operation from the same manager with better fees)."
-        Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj1 (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function Operation_conflict {new_hash} -> Some new_hash | _ -> None)
-    (fun new_hash -> Operation_conflict {new_hash})
-
 module type CHAIN_STORE = sig
   type chain_store
 
@@ -256,6 +209,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
   let translate_proto_add_result (proto_add_result : Proto.Mempool.add_result)
       op : (replacement, error_classification) result =
     let open Result in
+    let open Validation_errors in
     match proto_add_result with
     | Added -> return_none
     | Replaced {removed} ->
