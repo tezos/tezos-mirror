@@ -26,12 +26,14 @@ depends: [
   "lwt_log"
   "conf-libev"
   "uri" { >= "3.1.0" }
+  "tezt" { with-test & >= "3.0.0" }
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: yet-another local-extension of the OCaml standard library (unix-specific fragment)"

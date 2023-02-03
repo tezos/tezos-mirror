@@ -505,7 +505,7 @@ let _octez_stdlib_tests =
     ~js_compatible:true
 
 let _octez_stdlib_test_unix =
-  tests
+  tezt
     [
       "test_lwt_pipe";
       "test_circular_buffer";
@@ -517,8 +517,7 @@ let _octez_stdlib_test_unix =
     ~deps:
       [
         octez_stdlib |> open_;
-        alcotest;
-        alcotest_lwt;
+        alcotezt;
         lwt_log;
         bigstring;
         lwt_unix;
@@ -1037,8 +1036,8 @@ let octez_stdlib_unix =
       ]
 
 let _octez_stdlib_unix_test =
-  test
-    "test_key_value_store_fuzzy"
+  tezt
+    ["test_key_value_store_fuzzy"]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"tezos-stdlib-unix"
     ~deps:
@@ -1046,7 +1045,7 @@ let _octez_stdlib_unix_test =
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_stdlib_unix |> open_;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_clic =
