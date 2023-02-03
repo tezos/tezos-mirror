@@ -8,6 +8,13 @@ mistakes that you can make when writing or interacting with contracts on
 the Tezos blockchain and alternative ways to write code that avoid these
 problems.
 
+This list is not exhaustive and will never be. The following resources
+partially complement it:
+- https://opentezos.com/smart-contracts/avoiding-flaws/
+- https://ligolang.org/docs/tutorials/security/
+- https://github.com/InferenceAG/TezosSmartContractDetails
+- https://medium.com/protofire-blog/recommendations-to-enhance-security-of-tezos-smart-contracts-d14c0e53a6d3
+
 Note: We are currently reworking the concurrency model of Michelson (how
 and when sub-transactions are made), so that some of these patterns will
 be prevented by the language itself.
