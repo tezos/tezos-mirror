@@ -10,6 +10,7 @@ problems.
 
 This list is not exhaustive and will never be. The following resources
 partially complement it:
+
 - https://opentezos.com/smart-contracts/avoiding-flaws/
 - https://ligolang.org/docs/tutorials/security/
 - https://github.com/InferenceAG/TezosSmartContractDetails
