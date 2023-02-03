@@ -488,6 +488,45 @@ let sign_endorsements state endorsements =
           return_some (delegate, operation))
     endorsements
 
+let sign_dal_attestations state attestations =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  (* N.b. signing a lot of operations may take some time *)
+  (* Don't parallelize signatures: the signer might not be able to
+     handle concurrent requests *)
+  let shell =
+    {
+      Tezos_base.Operation.branch =
+        state.level_state.latest_proposal.predecessor.hash;
+    }
+  in
+  List.filter_map_es
+    (fun (((consensus_key, _) as delegate), consensus_content) ->
+      let watermark = Operation.(to_watermark (Dal_attestation chain_id)) in
+      let contents = Single (Dal_attestation consensus_content) in
+      let unsigned_operation = (shell, Contents_list contents) in
+      let unsigned_operation_bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Operation.unsigned_encoding
+          unsigned_operation
+      in
+      Client_keys.sign
+        cctxt
+        ~watermark
+        consensus_key.secret_key_uri
+        unsigned_operation_bytes
+      >>= function
+      | Error err ->
+          Events.(emit skipping_attestation (delegate, err)) >>= fun () ->
+          return_none
+      | Ok signature ->
+          let protocol_data =
+            Operation_data {contents; signature = Some signature}
+          in
+          let operation : Operation.packed = {shell; protocol_data} in
+          return_some (delegate, operation))
+    attestations
+
 let inject_endorsements state ~endorsements =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -506,6 +545,94 @@ let inject_endorsements state ~endorsements =
       Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
       return_unit)
     signed_operations
+
+let inject_dal_attestations state attestations =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  sign_dal_attestations state attestations >>=? fun signed_operations ->
+  List.iter_ep
+    (fun (delegate, signed_operation) ->
+      let encoded_op =
+        Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
+      in
+      Shell_services.Injection.operation
+        cctxt
+        ~chain:(`Hash chain_id)
+        encoded_op
+      >>=? fun oph ->
+      Events.(emit attestation_injected (oph, delegate)) >>= fun () ->
+      return_unit)
+    signed_operations
+
+let no_dal_node_warning_counter = ref 0
+
+let only_if_dal_feature_enabled state ~default_value f =
+  let open Constants in
+  let Parametric.{dal = {feature_enable; _}; _} =
+    state.global_state.constants.parametric
+  in
+  if feature_enable then
+    match state.global_state.dal_node_rpc_ctxt with
+    | None ->
+        incr no_dal_node_warning_counter ;
+        (if !no_dal_node_warning_counter mod 10 = 1 then
+         Events.(emit no_dal_node ())
+        else Lwt.return_unit)
+        >>= fun () -> return default_value
+    | Some ctxt -> f ctxt
+  else return default_value
+
+let get_dal_attestations state ~level =
+  only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
+      let delegates =
+        SlotMap.bindings state.level_state.delegate_slots.own_delegate_slots
+        |> List.map (fun (_slot, (consensus_key_and_delegate, _slots)) ->
+               consensus_key_and_delegate)
+        |> List.sort_uniq compare
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4666
+           This sorting can be avoided. *)
+      in
+      let signing_key delegate = (fst delegate).public_key_hash in
+      List.fold_left_es
+        (fun acc delegate ->
+          Node_rpc.get_attestable_slots
+            dal_node_rpc_ctxt
+            (signing_key delegate)
+            ~level
+          >>=? fun res ->
+          match res with
+          | Tezos_dal_node_services.Services.Types.Not_in_committee ->
+              return acc
+          | Attestable_slots attestation ->
+              return ((delegate, attestation) :: acc))
+        []
+        delegates
+      >>=? fun attestations ->
+      List.map
+        (fun (delegate, attestation_flags) ->
+          let attestation =
+            List.fold_left_i
+              (fun i acc flag ->
+                match Dal.Slot_index.of_int_opt i with
+                | Some index when flag -> Dal.Attestation.commit acc index
+                | None | Some _ -> acc)
+              Dal.Attestation.empty
+              attestation_flags
+          in
+          ( delegate,
+            Dal.Attestation.
+              {
+                attestor = signing_key delegate;
+                attestation;
+                level = Raw_level.of_int32_exn level;
+              } ))
+        attestations
+      |> return)
+
+let get_and_inject_dal_attestations state =
+  let level = Int32.succ state.level_state.current_level in
+  get_dal_attestations state ~level >>=? fun attestations ->
+  inject_dal_attestations state attestations
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
@@ -631,7 +758,12 @@ let rec perform_action ~state_recorder state (action : action) =
       inject_endorsements state ~endorsements >>=? fun () ->
       (* We wait for endorsements to trigger the [Quorum_reached]
          event *)
-      start_waiting_for_endorsement_quorum state >>= fun () -> return state
+      start_waiting_for_endorsement_quorum state >>= fun () ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4667
+         Also inject attestations for the migration block. *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
+         Don't inject multiple attestations? *)
+      get_and_inject_dal_attestations state >>=? fun () -> return state
   | Update_to_level level_update ->
       update_to_level state level_update >>=? fun (new_state, new_action) ->
       perform_action ~state_recorder new_state new_action

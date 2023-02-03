@@ -569,6 +569,16 @@ let create_round_durations constants =
   Environment.wrap_tzresult
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
+let create_dal_node_rpc_ctxt endpoint =
+  let open Tezos_rpc_http_client_unix in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  let media_types =
+    Tezos_rpc_http.Media_type.Command_line.of_command_line rpc_config.media_type
+  in
+  new RPC_client_unix.http_ctxt rpc_config media_types
+
 let create_initial_state cctxt ?(synchronize = true) ~chain config
     operation_worker ~(current_proposal : Baking_state.proposal) delegates =
   (* FIXME? consider saved endorsable value *)
@@ -598,6 +608,10 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       validation_mode;
       delegates;
       cache;
+      dal_node_rpc_ctxt =
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
+           Treat case when no endpoint was given and DAL is enabled *)
+        Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint;
     }
   in
   let chain = `Hash chain_id in

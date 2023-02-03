@@ -3222,8 +3222,8 @@ let _octez_layer2_indexed_store_test =
       ]
 
 let octez_dal_node_services =
-  private_lib
-    "tezos_dal_node_services"
+  public_lib
+    "tezos-dal-node-services"
     ~path:"src/lib_dal_node_services"
     ~opam:"tezos-dal-node-services"
     ~synopsis:"Tezos: `tezos-dal-node` RPC services"
@@ -4697,6 +4697,7 @@ module Protocol = Protocol
             octez_context_ops |> if_ N.(number >= 011) |> open_;
             octez_rpc;
             octez_rpc_http |> open_;
+            octez_dal_node_services |> if_ N.(number >= 017);
             lwt_canceler;
             lwt_exit;
             uri;

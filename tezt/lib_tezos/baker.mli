@@ -60,7 +60,11 @@ val on_event : t -> (event -> unit) -> unit
 
     The resulting promise is fulfilled as soon as the baker has been spawned.  It
     continues running in the background.*)
-val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
+val run :
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  t ->
+  unit Lwt.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
@@ -116,7 +120,11 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     passed. The default value is [Some Pass].
 
     [operations_pool] is passed to the baker daemon through the flag
-    [--operations-pool]. *)
+    [--operations-pool].
+
+    If [dal_node] is specified, then it is the DAL node that the baker queries
+    in order to determine the attestations it sends to the L1 node. A
+    [--dal_node] argument is passed to specify the DAL node's endpoint. *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -127,6 +135,7 @@ val create :
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
   Node.t ->
   Client.t ->
   t
@@ -164,17 +173,23 @@ val create :
     [votefile], [liquidity_baking_toggle_vote] respectively
     [operations_pool] are passed to the baker daemon through the flags
     [--votefile], [--liquidity-baking-toggle-vote] respectively
-    [--operations-pool]. *)
+    [--operations-pool].
+
+    If [dal_node] is specified, then it is the DAL node that the baker queries
+    in order to determine the attestations it sends to the L1 node. A
+    [--dal_node] argument is passed to specify the DAL node's endpoint. *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?runner:Runner.t ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
   Node.t ->
   Client.t ->
   t Lwt.t

@@ -140,6 +140,7 @@ type global_state = {
   (* the delegates on behalf of which the baker is running *)
   delegates : consensus_key list;
   cache : cache;
+  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
 let prequorum_encoding =

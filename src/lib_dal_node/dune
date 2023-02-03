@@ -8,7 +8,7 @@
  (libraries
   tezos-base
   tezos-base.unix
-  tezos_dal_node_services
+  tezos-dal-node-services
   tezos-client-base
   tezos-protocol-updater
   tezos-client-base-unix

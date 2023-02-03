@@ -25,6 +25,7 @@
   tezos-context-ops
   tezos-rpc
   tezos-rpc-http
+  tezos-dal-node-services
   lwt-canceler
   lwt-exit
   uri)

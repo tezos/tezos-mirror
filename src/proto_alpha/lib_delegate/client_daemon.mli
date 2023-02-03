@@ -36,6 +36,7 @@ module Baker : sig
       Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote ->
     ?per_block_vote_file:string ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
+    ?dal_node_endpoint:Uri.t ->
     chain:Shell_services.chain ->
     context_path:string ->
     keep_alive:bool ->

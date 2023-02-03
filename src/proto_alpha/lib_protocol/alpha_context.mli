@@ -2965,6 +2965,8 @@ module Dal : sig
 
     val empty : t
 
+    val commit : t -> Slot_index.t -> t
+
     val is_attested : t -> Slot_index.t -> bool
 
     val occupied_size_in_bits : t -> int

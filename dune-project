@@ -83,7 +83,7 @@
 (package (name tezos-dal-016-PtMumbai))
 (package (name tezos-dal-alpha))
 (package (name tezos-dal-node-lib)(allow_empty))
-(package (name tezos-dal-node-services)(allow_empty))
+(package (name tezos-dal-node-services))
 (package (name tezos-embedded-protocol-000-Ps9mPmXa))
 (package (name tezos-embedded-protocol-001-PtCJ7pwo))
 (package (name tezos-embedded-protocol-002-PsYLVpVv))

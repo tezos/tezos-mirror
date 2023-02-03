@@ -223,6 +223,7 @@ module Dal : sig
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      attestation_threshold : int;
       blocks_per_epoch : int;
     }
 
@@ -234,6 +235,8 @@ module Dal : sig
      the record {!type:Cryptobox.Config.t}. *)
     val cryptobox_config_to_json : Cryptobox.Config.t -> JSON.t
   end
+
+  val endpoint : Dal_node.t -> string
 
   (** Abstract version of a slot to deal with messages content which
      are smaller than the expected size of a slot. *)

@@ -513,6 +513,7 @@ module Dal = struct
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      attestation_threshold : int;
       blocks_per_epoch : int;
     }
 
@@ -531,6 +532,9 @@ module Dal = struct
       let page_size = JSON.(json |-> "page_size" |> as_int) in
       let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
       let attestation_lag = JSON.(json |-> "attestation_lag" |> as_int) in
+      let attestation_threshold =
+        JSON.(json |-> "attestation_threshold" |> as_int)
+      in
       let blocks_per_epoch = JSON.(json |-> "blocks_per_epoch" |> as_int) in
       let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
       return
@@ -541,6 +545,7 @@ module Dal = struct
               {number_of_shards; redundancy_factor; slot_size; page_size};
           number_of_slots;
           attestation_lag;
+          attestation_threshold;
           blocks_per_epoch;
         }
 
@@ -567,6 +572,12 @@ module Dal = struct
             ("use_mock_srs_for_testing", parameters);
           ])
   end
+
+  let endpoint dal_node =
+    Printf.sprintf
+      "http://%s:%d"
+      (Dal_node.rpc_host dal_node)
+      (Dal_node.rpc_port dal_node)
 
   module Committee = struct
     type member = {attestor : string; first_shard_index : int; power : int}

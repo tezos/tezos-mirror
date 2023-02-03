@@ -498,7 +498,7 @@ module Actions = struct
       ~section
       ~name:"skipping_preendorsement"
       ~level:Error
-      ~msg:"skipping preendorsement for {delegate} -- {trace}"
+      ~msg:"unable to sign preendorsement for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -509,7 +509,18 @@ module Actions = struct
       ~section
       ~name:"skipping_endorsement"
       ~level:Error
-      ~msg:"skipping endorsement for {delegate} -- {trace}"
+      ~msg:"unable to sign endorsement for {delegate} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let skipping_attestation =
+    declare_2
+      ~section
+      ~name:"skipping_attestation"
+      ~level:Error
+      ~msg:"unable to sign attestation for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -554,6 +565,17 @@ module Actions = struct
       ~name:"endorsement_injected"
       ~level:Notice
       ~msg:"injected endorsement {ophash} for {delegate}"
+      ~pp1:Operation_hash.pp
+      ("ophash", Operation_hash.encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+
+  let attestation_injected =
+    declare_2
+      ~section
+      ~name:"attestation_injected"
+      ~level:Notice
+      ~msg:"injected attestation {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
@@ -675,6 +697,16 @@ module Actions = struct
       ( "value",
         Protocol.Alpha_context.Liquidity_baking
         .liquidity_baking_toggle_vote_encoding )
+
+  let no_dal_node =
+    declare_0
+      ~section
+      ~name:"no_dal_node"
+      ~level:Notice
+      ~msg:
+        "DAL feature enabled, but no DAL node specified: cannot fetch \
+         attestations"
+      ()
 end
 
 module VDF = struct

@@ -47,6 +47,7 @@ module Parameters = struct
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
     operations_pool : string option;
+    dal_node : Dal_node.t option;
   }
 
   type session_state = {mutable ready : bool}
@@ -89,8 +90,8 @@ let liquidity_baking_votefile ?path vote =
   votefile
 
 let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
-    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?operations_pool node
-    client =
+    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?operations_pool
+    ?dal_node node client =
   let baker =
     create
       ~path:(Protocol.baker protocol)
@@ -108,12 +109,13 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
         votefile;
         liquidity_baking_toggle_vote;
         operations_pool;
+        dal_node;
       }
   in
   on_stdout baker (handle_raw_stdout baker) ;
   baker
 
-let run ?event_level (baker : t) =
+let run ?event_level ?event_sections_levels (baker : t) =
   (match baker.status with
   | Not_running -> ()
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
@@ -139,6 +141,16 @@ let run ?event_level (baker : t) =
       Fun.id
       baker.persistent_state.operations_pool
   in
+  let dal_node_endpoint =
+    Cli_arg.optional_arg
+      "dal-node"
+      (fun node ->
+        Printf.sprintf
+          "http://%s:%d"
+          (Dal_node.rpc_host node)
+          (Dal_node.rpc_port node))
+      baker.persistent_state.dal_node
+  in
   let arguments =
     [
       "--endpoint";
@@ -151,14 +163,22 @@ let run ?event_level (baker : t) =
       "node";
       Node.data_dir node;
     ]
-    @ liquidity_baking_toggle_vote @ votefile @ operations_pool @ delegates
+    @ liquidity_baking_toggle_vote @ votefile @ operations_pool
+    @ dal_node_endpoint @ delegates
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
     trigger_ready baker None ;
     unit
   in
-  run ?event_level baker {ready = false} arguments ~on_terminate ?runner
+  run
+    ?event_level
+    ?event_sections_levels
+    baker
+    {ready = false}
+    arguments
+    ~on_terminate
+    ?runner
 
 let check_event ?where baker name promise =
   let* result = promise in
@@ -176,8 +196,9 @@ let wait_for_ready baker =
         resolver :: baker.persistent_state.pending_ready ;
       check_event baker "Baker started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
-    ?liquidity_baking_toggle_vote ?operations_pool node client =
+let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
+    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?operations_pool
+    ?dal_node node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -189,10 +210,11 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
       ?votefile
       ?liquidity_baking_toggle_vote
       ?operations_pool
+      ?dal_node
       ~delegates
       node
       client
   in
-  let* () = run baker in
+  let* () = run ?event_sections_levels baker in
   let* () = wait_for_ready baker in
   return baker

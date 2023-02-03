@@ -468,6 +468,16 @@ let baking_minimal_timestamp state =
       current_mempool
       (List.map snd signed_endorsements)
   in
+  let dal_attestation_level = Int32.succ latest_proposal.block.shell.level in
+  let* own_dal_attestations =
+    Baking_actions.get_dal_attestations state ~level:dal_attestation_level
+  in
+  let* signed_dal_attestations =
+    Baking_actions.sign_dal_attestations state own_dal_attestations
+  in
+  let pool =
+    Operation_pool.add_operations pool (List.map snd signed_dal_attestations)
+  in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =
     {
@@ -492,7 +502,7 @@ let baking_minimal_timestamp state =
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?(minimal_timestamp = false) ?extra_operations
-    ?(monitor_node_mempool = true) ?context_path delegates =
+    ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint delegates =
   let open Lwt_result_syntax in
   let config =
     Baking_configuration.make
@@ -502,6 +512,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?context_path
       ?force
       ?extra_operations
+      ?dal_node_endpoint
       ()
   in
   let* block_stream, current_proposal = get_current_proposal cctxt in
