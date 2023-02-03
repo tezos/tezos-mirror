@@ -25,10 +25,7 @@
 
 (** A [ready_ctx] value contains globally needed informations for a running dac
     node. It is available when the DAC plugin has been loaded. *)
-type ready_ctxt = {
-  dac_plugin : (module Dac_plugin.T);
-  data_streamer : (module Data_streamer.S);
-}
+type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
 
 (** The status of the dac node. *)
 type status = Ready of ready_ctxt | Starting

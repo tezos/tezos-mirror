@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022-2023 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,57 +22,27 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+type t = bytes
 
-exception Status_already_ready
+module type Reveal_hash_mapper = sig
+  type reveal_hash
 
-type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
+  val of_reveal_hash : reveal_hash -> t
 
-type status = Ready of ready_ctxt | Starting
+  val to_reveal_hash : t -> reveal_hash
 
-type t = {
-  mutable status : status;
-  config : Configuration.t;
-  tezos_node_cctxt : Client_context.full;
-}
+  val encoding : t Data_encoding.t
+end
 
-let init config cctxt = {status = Starting; config; tezos_node_cctxt = cctxt}
+module Make (H : Dac_plugin.Protocol_reveal_hash) = struct
+  (* NB: Safe since failure case only occurs if [buffer_size] is given. *)
+  let of_reveal_hash proto_reveal_hash =
+    Data_encoding.Binary.to_bytes_exn H.encoding proto_reveal_hash
 
-let set_ready ctxt ~dac_plugin =
-  match ctxt.status with
-  | Starting ->
-      let (module Dac_plugin : Dac_plugin.T) = dac_plugin in
+  (** NB: Safe since the [Dac_hash.t] could only be constructed from a
+      [H.t]. *)
+  let to_reveal_hash dac_hash =
+    Data_encoding.Binary.of_bytes_exn H.encoding dac_hash
 
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4681
-         Currently, Dac only supports coordinator functionalities but we might
-         want to filter this capability out depending on the profile.
-      *)
-      ctxt.status <- Ready {dac_plugin}
-  | Ready _ -> raise Status_already_ready
-
-type error += Node_not_ready
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dac.node.not.ready"
-    ~title:"DAC Node not ready"
-    ~description:"DAC node is starting. It's not ready to respond to RPCs."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "DAC node is starting. It's not ready to respond to RPCs.")
-    Data_encoding.(unit)
-    (function Node_not_ready -> Some () | _ -> None)
-    (fun () -> Node_not_ready)
-
-let get_ready ctxt =
-  let open Result_syntax in
-  match ctxt.status with
-  | Ready ctxt -> Ok ctxt
-  | Starting -> fail [Node_not_ready]
-
-let get_config ctxt = ctxt.config
-
-let get_status ctxt = ctxt.status
-
-let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
+  let encoding = Data_encoding.conv to_reveal_hash of_reveal_hash H.encoding
+end

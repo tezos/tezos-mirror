@@ -26,11 +26,8 @@
 (* Component for streaming published root page hashes to subscribers. *)
 
 module type S = sig
-  (* Protocol hash type used for reveal_preimage. *)
-  type hash
-
   (* [publish hash] publishes a root page [hash] to all attached subscribers. *)
-  val publish : hash -> unit tzresult Lwt.t
+  val publish : Dac_hash.t -> unit tzresult Lwt.t
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4680
      Access Dac coordinator details via some [Dac_client.cctx].
@@ -42,15 +39,13 @@ module type S = sig
   val subscribe :
     coordinator_host:string ->
     coordinator_port:int ->
-    hash Lwt_stream.t * Lwt_watcher.stopper
+    Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4510
    Implement useful streaming.
 *)
 module Make (P : Dac_plugin.T) : S = struct
-  type hash = P.hash
-
   let publish _hash = Lwt_result_syntax.return_unit
 
   let subscribe ~coordinator_host ~coordinator_port =

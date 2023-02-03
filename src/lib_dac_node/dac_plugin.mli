@@ -23,9 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Protocol's reveal_hash type. Usually [Protocol.Sc_rollup_reveal_hash.t]. *)
+module type Protocol_reveal_hash = sig
+  type t
+
+  val encoding : t Data_encoding.t
+end
+
 module type T = sig
-  (* Protocol's reveal_hash type. Usually [Protocol.Sc_rollup_reveal_hash.t]. *)
-  type hash
+  module Protocol_reveal_hash : Protocol_reveal_hash
 
   module Proto : Registered_protocol.T
 
