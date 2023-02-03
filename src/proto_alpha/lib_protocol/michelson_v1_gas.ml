@@ -38,7 +38,7 @@ module Cost_of = struct
 
   let int_size_in_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
 
-  let manager_operation_int = 1_000
+  let manager_operation_int = 100
 
   let manager_operation = step_cost @@ S.safe_int manager_operation_int
 

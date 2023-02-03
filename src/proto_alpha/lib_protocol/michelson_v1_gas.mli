@@ -33,6 +33,11 @@
 open Alpha_context
 
 module Cost_of : sig
+  (* The [manager_operation] cost is consumed each time a manager
+     operation (internal or external alike) is applied. This cost is
+     meant to cover the resources used in {!Apply} either directly
+     (dispatching on operation kinds) or indirectly (in particular in
+     the production of operation results). *)
   val manager_operation : Gas.cost
 
   module Interpreter : sig
