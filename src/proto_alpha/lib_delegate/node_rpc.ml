@@ -35,6 +35,7 @@ let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
     Data_encoding.Binary.to_bytes_exn Block_header.encoding signed_block_header
   in
   Shell_services.Injection.block
+    ~async:true
     cctxt
     ~chain
     ~force
@@ -45,7 +46,10 @@ let inject_operation cctxt ~chain operation =
   let encoded_op =
     Data_encoding.Binary.to_bytes_exn Operation.encoding operation
   in
-  Shell_services.Injection.operation cctxt ~chain encoded_op
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4875
+     `Shell_services.Injection.operation` should be used instead once
+     the needed changes in the protocol are in place. *)
+  Shell_services.Injection.private_operation cctxt ~async:true ~chain encoded_op
 
 let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
   Block_services.Helpers.Preapply.block
