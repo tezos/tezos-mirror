@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
-open Protocol
-open Alpha_context
 open Injector_common
 open Injector_sigs
 
@@ -33,7 +30,7 @@ module Request (Inj_operation : INJECTOR_OPERATION) : sig
   type ('a, 'b) t =
     | Add_pending : Inj_operation.t -> (unit, error trace) t
     | New_tezos_head :
-        Alpha_block_services.block_info * Alpha_block_services.block_info reorg
+        (Block_hash.t * int32) * (Block_hash.t * int32) reorg
         -> (unit, error trace) t
     | Inject : (unit, error trace) t
 
@@ -45,4 +42,4 @@ module Request (Inj_operation : INJECTOR_OPERATION) : sig
        and type view := view
 end
 
-module Name : Worker_intf.NAME with type t = public_key_hash
+module Name : Worker_intf.NAME with type t = Signature.public_key_hash

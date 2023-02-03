@@ -23,13 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
 open Protocol
 open Alpha_context
 open Injector_common
 open Injector_worker_types
 open Injector_sigs
 open Injector_errors
+module Block_cache =
+  Aches_lwt.Lache.Make_result
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
 (* This is the Tenderbake finality for blocks. *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2815
@@ -828,18 +830,32 @@ struct
           (add_pending_operation ~retry:true state)
           (List.rev to_retry)
 
-  (** [register_included_operations state block level oph] marks the known (by
-    this injector) manager operations contained in [block] as being included. *)
-  let register_included_operations state
-      (block : Alpha_block_services.block_info) =
+  (** Retrieve operation hashes of a block with a small LRU cache. *)
+  let manager_operations_hashes_of_block =
+    let blocks_ops_cache = Block_cache.create 32 in
+    fun state block_hash ->
+      Block_cache.bind_or_put
+        blocks_ops_cache
+        block_hash
+        (fun block_hash ->
+          Tezos_shell_services.Shell_services.Blocks.Operation_hashes
+          .operation_hashes_in_pass
+            state.cctxt
+            ~chain:state.cctxt#chain
+            ~block:(`Hash (block_hash, 0))
+            Proto_client.manager_pass)
+        Lwt.return
+
+  (** [register_included_operations state (block, level)] marks the known (by
+      this injector) manager operations contained in [block] as being included. *)
+  let register_included_operations state (block_hash, level) =
+    let open Lwt_result_syntax in
+    let* operation_hashes =
+      manager_operations_hashes_of_block state block_hash
+    in
     List.iter_es
-      (List.iter_es (fun (op : Alpha_block_services.operation) ->
-           register_included_operation
-             state
-             block.hash
-             block.header.shell.level
-             op.hash))
-      block.Alpha_block_services.operations
+      (fun oph -> register_included_operation state block_hash level oph)
+      operation_hashes
 
   (** [revert_included_operations state block] marks the known (by this injector)
     manager operations contained in [block] as not being included any more,
@@ -895,16 +911,14 @@ struct
     that are in the alternative branch of the reorganization and then registers
     the effect of the new branch (the newly included operation and confirmed
     operations).  *)
-  let on_new_tezos_head state (head : Alpha_block_services.block_info)
-      (reorg : Alpha_block_services.block_info reorg) =
+  let on_new_tezos_head state (head_hash, head_level)
+      (reorg : (Block_hash.t * int32) reorg) =
     let open Lwt_result_syntax in
-    let*! () = Event.(emit1 new_tezos_head) state head.hash in
+    let*! () = Event.(emit1 new_tezos_head) state head_hash in
     let* () =
       List.iter_es
-        (fun removed_block ->
-          revert_included_operations
-            state
-            removed_block.Alpha_block_services.hash)
+        (fun (removed_block, _) ->
+          revert_included_operations state removed_block)
         (List.rev reorg.old_chain)
     in
     let* () =
@@ -914,11 +928,7 @@ struct
     in
     (* Head is already included in the reorganization, so no need to process it
        separately. *)
-    let confirmed_level =
-      Int32.sub
-        head.Alpha_block_services.header.shell.level
-        (Int32.of_int confirmations)
-    in
+    let confirmed_level = Int32.sub head_level (Int32.of_int confirmations) in
     if confirmed_level >= 0l then register_confirmed_level state confirmed_level
     else return_unit
 
