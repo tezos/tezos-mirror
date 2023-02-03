@@ -68,11 +68,11 @@ Fatal error:
   
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
+{ "balance": "99999566", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"99999393"
+"99999566"
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "4"
