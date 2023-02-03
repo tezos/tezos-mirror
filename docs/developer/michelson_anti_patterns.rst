@@ -16,10 +16,6 @@ partially complement it:
 - https://github.com/InferenceAG/TezosSmartContractDetails
 - https://medium.com/protofire-blog/recommendations-to-enhance-security-of-tezos-smart-contracts-d14c0e53a6d3
 
-Note: We are currently reworking the concurrency model of Michelson (how
-and when sub-transactions are made), so that some of these patterns will
-be prevented by the language itself.
-
 Refunding to a list of contracts
 --------------------------------
 
