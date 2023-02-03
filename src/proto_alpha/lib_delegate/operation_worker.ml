@@ -247,6 +247,21 @@ let is_valid_consensus_content (candidate : candidate) consensus_content =
 
 let cancel_monitoring state = state.proposal_watched <- None
 
+let reset_monitoring state =
+  Lwt_mutex.with_lock state.lock @@ fun () ->
+  match state.proposal_watched with
+  | None -> Lwt.return_unit
+  | Some (Pqc_watch pqc_watched) ->
+      pqc_watched.current_voting_power <- 0 ;
+      pqc_watched.preendorsements_count <- 0 ;
+      pqc_watched.preendorsements_received <- [] ;
+      Lwt.return_unit
+  | Some (Qc_watch qc_watched) ->
+      qc_watched.current_voting_power <- 0 ;
+      qc_watched.endorsements_count <- 0 ;
+      qc_watched.endorsements_received <- [] ;
+      Lwt.return_unit
+
 let update_monitoring ?(should_lock = true) state ops =
   (if should_lock then Lwt_mutex.with_lock state.lock else fun f -> f ())
   @@ fun () ->
@@ -484,11 +499,10 @@ let create ?(monitor_node_operations = true)
           Lwt_stream.get operation_stream >>= function
           | None ->
               (* When the stream closes, it means a new head has been set,
-                 we cancel the monitoring and flush current operations *)
+                 we reset the monitoring and flush current operations *)
               Events.(emit end_of_stream ()) >>= fun () ->
               op_stream_stopper () ;
-              cancel_monitoring state ;
-              worker_loop ()
+              reset_monitoring state >>= fun () -> worker_loop ()
           | Some ops ->
               state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops ;
