@@ -34,6 +34,15 @@ type approximate_fee_bound = {
   storage_limit : Z.t;
 }
 
+type fee_parameter = {
+  minimal_fees : Tez.t;
+  minimal_nanotez_per_byte : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t;
+  force_low_fee : bool;
+  fee_cap : Tez.t;
+  burn_cap : Tez.t;
+}
+
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
   | `Delay_block of float
@@ -57,6 +66,13 @@ type unsuccessful_status =
   | Failed of error trace  (** The operation failed with the provided error. *)
 
 type operation_status = Successful | Unsuccessful of unsuccessful_status
+
+type simulation_status = {index_in_batch : int; status : operation_status}
+
+type 'unsigned_op simulation_result = {
+  operations_statuses : simulation_status list;
+  unsigned_operation : 'unsigned_op;
+}
 
 (** Action to be taken for unsuccessful operation. *)
 type retry_action =
@@ -151,7 +167,7 @@ module type PARAMETERS = sig
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)
-  val fee_parameter : state -> Operation.t -> Injection.fee_parameter
+  val fee_parameter : state -> Operation.t -> fee_parameter
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
@@ -162,6 +178,69 @@ module type PARAMETERS = sig
      allows to incrementally build "or-batches" by iteratively removing
      operations that fail from the desired batch. *)
   val batch_must_succeed : Operation.t list -> [`All | `At_least_one]
+end
+
+module type PROTOCOL_CLIENT = sig
+  type state
+
+  type operation
+
+  type unsigned_operation
+
+  (** The validation pass of manager operations. *)
+  val manager_pass : int
+
+  (** [operation_status block oph ~index] returns the status of the operation at
+      position [index] in the L1 batch [oph] included in the block [block]. It
+      returns [None] if the operation with the given index is not in the
+      block. *)
+  val operation_status :
+    state ->
+    Block_hash.t ->
+    Operation_hash.t ->
+    index:int ->
+    operation_status option tzresult Lwt.t
+
+  (** Size of an operation in bytes according to the protocol. This only
+      accounts for the actual content of the corresponding manager operation
+      (and not its fees, gas, etc.). *)
+  val operation_size : operation -> int
+
+  (** An upper bound of the overhead added to manager operations in
+      bytes. Typically, this would include the source, fees, counter, gas limit,
+      and storage limit. *)
+  val operation_size_overhead : int
+
+  (** Simulating a batch of operations. This function returns the simulation
+      result for each of these operations (with its associated index in the
+      batch, in case there is a revelation operation added) together with a
+      Tezos raw unsigned operation that can be directly injected on a node if
+      one wishes to. *)
+  val simulate_operations :
+    #Client_context.full ->
+    force:bool ->
+    source:Signature.public_key_hash ->
+    src_pk:Signature.public_key ->
+    successor_level:bool ->
+    fee_parameter:fee_parameter ->
+    operation list ->
+    ( unsigned_operation simulation_result,
+      [`Exceeds_quotas of tztrace | `TzError of tztrace] )
+    result
+    Lwt.t
+
+  (** Sign an unsigned operation an return the serialized signed operation,
+      ready for injection. *)
+  val sign_operation :
+    #Client_context.full ->
+    Client_keys.sk_uri ->
+    unsigned_operation ->
+    bytes tzresult Lwt.t
+
+  (** [time_until_next_block state block_header] computes the time until the
+      block following [block_header], with respect to the current time. *)
+  val time_until_next_block :
+    state -> Tezos_base.Block_header.t option -> Ptime.span
 end
 
 (** Output signature for functor {!Injector_functor.Make}. *)

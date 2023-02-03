@@ -54,59 +54,12 @@ let injector_context (cctxt : #Protocol_client_context.full) =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
-let manager_operation_result_status (type kind)
-    (op_result : kind Apply_results.manager_operation_result) : operation_status
-    =
-  match op_result with
-  | Applied _ -> Successful
-  | Backtracked (_, None) -> Unsuccessful Backtracked
-  | Skipped _ -> Unsuccessful Skipped
-  | Backtracked (_, Some err)
-  (* Backtracked because internal operation failed *)
-  | Failed (_, err) ->
-      Unsuccessful (Failed (Environment.wrap_tztrace err))
-
-let operation_result_status (type kind)
-    (op_result : kind Apply_results.contents_result) : operation_status =
-  match op_result with
-  | Preendorsement_result _ -> Successful
-  | Endorsement_result _ -> Successful
-  | Dal_attestation_result _ -> Successful
-  | Seed_nonce_revelation_result _ -> Successful
-  | Vdf_revelation_result _ -> Successful
-  | Double_endorsement_evidence_result _ -> Successful
-  | Double_preendorsement_evidence_result _ -> Successful
-  | Double_baking_evidence_result _ -> Successful
-  | Activate_account_result _ -> Successful
-  | Proposals_result -> Successful
-  | Ballot_result -> Successful
-  | Drain_delegate_result _ -> Successful
-  | Manager_operation_result {operation_result; _} ->
-      manager_operation_result_status operation_result
-
-let operation_contents_status (type kind)
-    (contents : kind Apply_results.contents_result_list) ~index :
-    operation_status tzresult =
-  let rec rec_status :
-      type kind. int -> kind Apply_results.contents_result_list -> _ =
-   fun n -> function
-    | Apply_results.Single_result _ when n <> 0 ->
-        error_with "No operation with index %d" index
-    | Single_result result -> Ok (operation_result_status result)
-    | Cons_result (result, _rest) when n = 0 ->
-        Ok (operation_result_status result)
-    | Cons_result (_result, rest) -> rec_status (n - 1) rest
-  in
-  rec_status index contents
-
-let operation_status (operation : Protocol.operation_receipt) ~index :
-    operation_status tzresult =
-  match (operation : _) with
-  | No_operation_metadata ->
-      error_with "Cannot find operation status because metadata is missing"
-  | Operation_metadata {contents} -> operation_contents_status contents ~index
-
-module Make (Parameters : PARAMETERS) = struct
+module Make
+    (Parameters : PARAMETERS)
+    (Proto_client : PROTOCOL_CLIENT
+                      with type state := Parameters.state
+                       and type operation := Parameters.Operation.t) =
+struct
   module Tags = Injector_tags.Make (Parameters.Tag)
   module Tags_table = Hashtbl.Make (Parameters.Tag)
   module POperation = Parameters.Operation
@@ -506,34 +459,32 @@ module Make (Parameters : PARAMETERS) = struct
     List.fold_left
       (fun acc {Inj_operation.operation; _} ->
         let param = Parameters.fee_parameter state operation in
-        Injection.
-          {
-            minimal_fees = Tez.max acc.minimal_fees param.minimal_fees;
-            minimal_nanotez_per_byte =
-              Q.max acc.minimal_nanotez_per_byte param.minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit =
-              Q.max
-                acc.minimal_nanotez_per_gas_unit
-                param.minimal_nanotez_per_gas_unit;
-            force_low_fee = acc.force_low_fee || param.force_low_fee;
-            fee_cap =
-              WithExceptions.Result.get_ok
-                ~loc:__LOC__
-                Tez.(acc.fee_cap +? param.fee_cap);
-            burn_cap =
-              WithExceptions.Result.get_ok
-                ~loc:__LOC__
-                Tez.(acc.burn_cap +? param.burn_cap);
-          })
-      Injection.
         {
-          minimal_fees = Tez.zero;
-          minimal_nanotez_per_byte = Q.zero;
-          minimal_nanotez_per_gas_unit = Q.zero;
-          force_low_fee = false;
-          fee_cap = Tez.zero;
-          burn_cap = Tez.zero;
-        }
+          minimal_fees = Tez.max acc.minimal_fees param.minimal_fees;
+          minimal_nanotez_per_byte =
+            Q.max acc.minimal_nanotez_per_byte param.minimal_nanotez_per_byte;
+          minimal_nanotez_per_gas_unit =
+            Q.max
+              acc.minimal_nanotez_per_gas_unit
+              param.minimal_nanotez_per_gas_unit;
+          force_low_fee = acc.force_low_fee || param.force_low_fee;
+          fee_cap =
+            WithExceptions.Result.get_ok
+              ~loc:__LOC__
+              Tez.(acc.fee_cap +? param.fee_cap);
+          burn_cap =
+            WithExceptions.Result.get_ok
+              ~loc:__LOC__
+              Tez.(acc.burn_cap +? param.burn_cap);
+        })
+      {
+        minimal_fees = Tez.zero;
+        minimal_nanotez_per_byte = Q.zero;
+        minimal_nanotez_per_gas_unit = Q.zero;
+        force_low_fee = false;
+        fee_cap = Tez.zero;
+        burn_cap = Tez.zero;
+      }
       ops
 
   (** Returns the first half of the list [ops] if there is more than two
@@ -551,7 +502,6 @@ module Make (Parameters : PARAMETERS) = struct
   let rec simulate_operations ~must_succeed state
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
-    let open Annotated_manager_operation in
     let force =
       match operations with
       | [] -> assert false
@@ -563,114 +513,67 @@ module Make (Parameters : PARAMETERS) = struct
              succeed *)
           match must_succeed with `All -> false | `At_least_one -> true)
     in
-    let*! () =
-      Event.(emit2 simulating_operations)
-        state
-        (List.map (fun o -> o.Inj_operation.operation) operations)
-        force
+    let op_operations =
+      List.map (fun o -> o.Inj_operation.operation) operations
     in
+    let*! () = Event.(emit2 simulating_operations) state op_operations force in
     let fee_parameter = fee_parameter_of_operations state.state operations in
-    let annotated_operations =
-      List.map
-        (fun {Inj_operation.operation; _} ->
-          let (Manager operation) = POperation.to_manager_operation operation in
-          Annotated_manager_operation
-            (Injection.prepare_manager_operation
-               ~fee:Limit.unknown
-               ~gas_limit:Limit.unknown
-               ~storage_limit:Limit.unknown
-               operation))
-        operations
-    in
-    let (Manager_list annot_op) =
-      Annotated_manager_operation.manager_of_list annotated_operations
-    in
     let*! simulation_result =
-      Injection.inject_manager_operation
+      Proto_client.simulate_operations
         state.cctxt
-        ~simulation:true (* Only simulation here *)
         ~force
-        ~chain:state.cctxt#chain
-        ~block:(`Head 0)
         ~source:state.signer.pkh
         ~src_pk:state.signer.pk
-        ~src_sk:state.signer.sk
         ~successor_level:true
-          (* Operations are simulated in the next block, which is important for rollups
-             and ok for other applications. *)
-        ~fee:Limit.unknown
-        ~gas_limit:Limit.unknown
-        ~storage_limit:Limit.unknown
+          (* Operations are simulated in the next block, which is important for
+             rollups and ok for other applications. *)
         ~fee_parameter
-        annot_op
+        op_operations
     in
     match simulation_result with
-    | Error trace ->
+    | Error (`TzError trace) -> fail trace
+    | Error (`Exceeds_quotas trace) -> (
         let*! () =
           Event.(emit1 number_of_operations_in_queue)
             state
             (Op_queue.length state.queue)
         in
-        let exceeds_quota =
-          TzTrace.fold
-            (fun exceeds -> function
-              | Environment.Ecoproto_error
-                  (Gas.Block_quota_exceeded | Gas.Operation_quota_exceeded) ->
-                  true
-              | _ -> exceeds)
-            false
-            trace
+        (* We perform a dichotomy by injecting the first half of the
+           operations (we are not looking to maximize the number of operations
+           injected because of the cost of simulation). Only the operations
+           which are actually injected will be removed from the queue so the
+           other half will be reconsidered later. *)
+        match keep_half operations with
+        | None ->
+            fail
+            @@ TzTrace.cons
+                 (Exn (Failure "Quotas exceeded when simulating one operation"))
+                 trace
+        | Some operations -> simulate_operations ~must_succeed state operations)
+    | Ok {operations_statuses; unsigned_operation} ->
+        let*? results =
+          List.combine
+            ~when_different_lengths:
+              [
+                Exn
+                  (Failure
+                     "Injector: Not the same number of results as operations \
+                      in simulation.");
+              ]
+            operations
+            operations_statuses
         in
-        if exceeds_quota then
-          (* We perform a dichotomy by injecting the first half of the
-             operations (we are not looking to maximize the number of operations
-             injected because of the cost of simulation). Only the operations
-             which are actually injected will be removed from the queue so the
-             other half will be reconsidered later. *)
-          match keep_half operations with
-          | None -> fail trace
-          | Some operations ->
-              simulate_operations ~must_succeed state operations
-        else fail trace
-    | Ok (_, op, _, result) ->
-        let nb_ops = List.length operations in
-        let nb_packed_ops =
-          let {protocol_data = Operation_data {contents; _}; _} = op in
-          Alpha_context.Operation.to_list (Contents_list contents)
-          |> List.length
-        in
-        (* packed_op can have reveal operations added automatically. *)
-        let start_index = nb_packed_ops - nb_ops in
-        (* Add indexes of operations in the packed, i.e. batched, operation. *)
-        let operations =
-          List.mapi (fun i op -> (i + start_index, op)) operations
-        in
-        return (op, operations, Apply_results.Contents_result_list result)
+        return (results, unsigned_operation)
 
-  let inject_on_node state ~nb
-      {shell; protocol_data = Operation_data {contents; _}} =
+  let inject_on_node state ~nb unsigned_op =
     let open Lwt_result_syntax in
-    let unsigned_op = (shell, Contents_list contents) in
-    let unsigned_op_bytes =
-      Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
-    in
-    let* signature =
-      Client_keys.sign
-        state.cctxt
-        ~watermark:Signature.Generic_operation
-        state.signer.sk
-        unsigned_op_bytes
-    in
-    let op : _ Operation.t =
-      {shell; protocol_data = {contents; signature = Some signature}}
-    in
-    let op_bytes =
-      Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
+    let* signed_op_bytes =
+      Proto_client.sign_operation state.cctxt state.signer.sk unsigned_op
     in
     Tezos_shell_services.Shell_services.Injection.operation
       state.cctxt
       ~chain:state.cctxt#chain
-      op_bytes
+      signed_op_bytes
     >>=? fun oph ->
     let*! () = Event.(emit2 injected) state nb oph in
     return oph
@@ -686,32 +589,30 @@ module Make (Parameters : PARAMETERS) = struct
   let rec inject_operations ~must_succeed state
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
-    let* packed_op, operations, result =
+    let* operations_results, raw_op =
       trace (Step_failed "simulation")
       @@ simulate_operations ~must_succeed state operations
     in
-    let (Contents_result_list contents_result) = result in
     let failure = ref false in
-    let* rev_non_failing_operations =
-      List.fold_left_es
-        (fun acc (index, op) ->
-          let open Lwt_result_syntax in
-          let*? status = operation_contents_status contents_result ~index in
+    let*! rev_non_failing_operations =
+      List.fold_left_s
+        (fun acc (op, {status; _}) ->
+          let open Lwt_syntax in
           match status with
           | Unsuccessful (Failed error) ->
-              let*! () =
+              let+ () =
                 Event.(emit2 dropping_operation)
                   state
                   op.Inj_operation.operation
                   error
               in
               failure := true ;
-              return acc
+              acc
           | Successful | Unsuccessful (Backtracked | Skipped | Other_branch) ->
               (* Not known to be failing *)
               return (op :: acc))
         []
-        operations
+        operations_results
     in
     if !failure then
       (* Invariant: must_succeed = `At_least_one, otherwise the simulation would
@@ -723,7 +624,12 @@ module Make (Parameters : PARAMETERS) = struct
       (* Inject on node for real *)
       let+ oph =
         trace (Step_failed "injection")
-        @@ inject_on_node ~nb:(List.length operations) state packed_op
+        @@ inject_on_node ~nb:(List.length operations) state raw_op
+      in
+      let operations =
+        List.map
+          (fun (op, {index_in_batch; _}) -> (index_in_batch, op))
+          operations_results
       in
       (oph, operations)
 
@@ -877,10 +783,9 @@ module Make (Parameters : PARAMETERS) = struct
       of level [level], by moving the successful ones from the "injected" state
       to the "included" state, and re-queuing the operations that should be
       retried.  *)
-  let register_included_operation state block level
-      (operation : Alpha_block_services.operation) =
+  let register_included_operation state block level oph =
     let open Lwt_result_syntax in
-    let* injected_infos = remove_injected_operation state operation.hash in
+    let* injected_infos = remove_injected_operation state oph in
     match injected_infos with
     | [] ->
         (* No operations injected by us *)
@@ -889,24 +794,20 @@ module Make (Parameters : PARAMETERS) = struct
         let* included, to_retry =
           List.fold_left_es
             (fun (included, to_retry) (info : injected_info) ->
-              let*? receipt =
-                match operation.receipt with
-                | Empty ->
-                    error_with
-                      "Empty receipt for %a"
-                      Operation_hash.pp
-                      operation.hash
-                | Too_large ->
-                    error_with
-                      "Receipt too large for %a"
-                      Operation_hash.pp
-                      operation.hash
-                | Receipt r -> Ok r
+              let* status =
+                Proto_client.operation_status
+                  state.state
+                  block
+                  oph
+                  ~index:info.op_index
               in
-              let*? status = operation_status receipt ~index:info.op_index in
               match status with
-              | Successful -> return (info :: included, to_retry)
-              | Unsuccessful status -> (
+              | None ->
+                  failwith
+                    "Cannot get status for an operation which is not included \
+                     in the block"
+              | Some Successful -> return (info :: included, to_retry)
+              | Some (Unsuccessful status) -> (
                   let*! retry =
                     Parameters.retry_unsuccessful_operation
                       state.state
@@ -937,7 +838,7 @@ module Make (Parameters : PARAMETERS) = struct
              state
              block.hash
              block.header.shell.level
-             op))
+             op.hash))
       block.Alpha_block_services.operations
 
   (** [revert_included_operations state block] marks the known (by this injector)
@@ -1217,37 +1118,6 @@ module Make (Parameters : PARAMETERS) = struct
         true
     | Some tags -> not (Tags.disjoint state.tags tags)
 
-  let time_until_next_block constants (header : Tezos_base.Block_header.t) =
-    let open Result_syntax in
-    let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _}
-        =
-      constants.Constants.parametric
-    in
-    let next_level_timestamp =
-      let* durations =
-        Round.Durations.create
-          ~first_round_duration:minimal_block_delay
-          ~delay_increment_per_round
-      in
-      let* predecessor_round = Fitness.round_from_raw header.shell.fitness in
-      Round.timestamp_of_round
-        durations
-        ~predecessor_timestamp:header.shell.timestamp
-        ~predecessor_round
-        ~round:Round.zero
-    in
-    let next_level_timestamp =
-      Result.value
-        next_level_timestamp
-        ~default:
-          (WithExceptions.Result.get_ok
-             ~loc:__LOC__
-             Timestamp.(header.shell.timestamp +? minimal_block_delay))
-    in
-    Ptime.diff
-      (Time.System.of_protocol_exn next_level_timestamp)
-      (Time.System.now ())
-
   let delay_stategy state header f =
     let open Lwt_syntax in
     match state.strategy with
@@ -1259,7 +1129,7 @@ module Make (Parameters : PARAMETERS) = struct
               state.constants.Constants.parametric.minimal_block_delay
               |> Period.to_seconds |> Int64.to_float
           | Some header ->
-              time_until_next_block state.constants header
+              Proto_client.time_until_next_block state.constants header
               |> Ptime.Span.to_float_s
         in
         let delay = time_until_next_block *. delay_factor in
