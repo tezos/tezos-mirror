@@ -433,7 +433,10 @@ val wait_for_level : t -> int -> int Lwt.t
     Returns [0] if the node is not running or if no [head_increment] or
     [branch_switch] event was received yet. This makes this function equivalent
     to [wait_for_level node 0] except that it does not actually wait for the
-    level to be known. *)
+    level to be known.
+
+    Note that, as the node's status is updated only on head
+    increments, this value is wrong just after a snapshot import. *)
 val get_level : t -> int
 
 (** Wait for the node to read its identity.
