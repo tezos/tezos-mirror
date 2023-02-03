@@ -1,0 +1,14 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/big_map_store.tz --details
+Well typed
+Gas remaining: 1039996.856 units remaining
+{ storage (big_map nat nat) ;
+  parameter unit ;
+  code { DROP
+         /* [] */ ;
+         EMPTY_BIG_MAP nat nat
+         /* [ big_map nat nat ] */ ;
+         NIL operation
+         /* [ list operation : big_map nat nat ] */ ;
+         PAIR
+         /* [ pair (list operation) (big_map nat nat) ] */ } }

@@ -1,0 +1,17 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/comb-literals.tz --details
+Well typed
+Gas remaining: 1039993.270 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { PUSH (list (pair nat nat nat nat))
+              { Pair 0 3 6 9 ; Pair 1 (Pair 4 (Pair 7 10)) ; { 2 ; 5 ; 8 ; 11 } }
+         /* [ list (pair nat nat nat nat) : pair unit unit ] */ ;
+         DROP 2
+         /* [] */ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

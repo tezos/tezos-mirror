@@ -36,14 +36,7 @@ let hooks = Tezos_regression.hooks
 
 let check_contract protocol client ~contract ~input ~expected_storage =
   let* actual_storage =
-    Client.run_script_at
-      ~hooks
-      ~storage:"None"
-      ~prefix:(Michelson_script.pytest_prefix protocol)
-      ~input
-      client
-      contract
-      protocol
+    Client.run_script_at ~hooks ~storage:"None" ~input client contract protocol
   in
   Check.(
     (actual_storage = Format.asprintf "(Some %s)" expected_storage)
@@ -393,7 +386,6 @@ let register ~protocols =
           ~hooks
           ~storage:"Unit"
           ~input
-          ~prefix:(Michelson_script.pytest_prefix protocol)
           client
           ["mini_scenarios"; "groth16"]
           protocol
@@ -418,7 +410,6 @@ let register ~protocols =
           ~hooks
           ~storage:"0"
           ~input:random_bytes
-          ~prefix:(Michelson_script.pytest_prefix protocol)
           client
           ["mini_scenarios"; "groth16"]
           protocol

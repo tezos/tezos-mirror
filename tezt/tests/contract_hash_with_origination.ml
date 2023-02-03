@@ -34,14 +34,7 @@
 
 let test_contract_hash_with_origination ~protocol () =
   let* client = Client.init_mockup ~protocol () in
-  let prg =
-    Michelson_script.(
-      find
-        ~prefix:(Michelson_script.pytest_prefix protocol)
-        ["opcodes"; "noop"]
-        protocol
-      |> path)
-  in
+  let prg = Michelson_script.(find ["opcodes"; "noop"] protocol |> path) in
   let script = read_file prg in
   let* contract =
     Client.originate_contract

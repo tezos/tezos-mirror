@@ -65,12 +65,7 @@ let test_ill_typecheck script error_pattern =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script_path =
-    Michelson_script.(
-      find
-        ~prefix:(Michelson_script.pytest_prefix protocol)
-        ["ill_typed"; script]
-        protocol
-      |> path)
+    Michelson_script.(find ["ill_typed"; script] protocol |> path)
   in
   Client.spawn_typecheck_script ~script:script_path client
   |> Process.check_error ~msg:error_pattern
@@ -101,9 +96,7 @@ let test_legacy_typecheck protocols =
 let register ~protocols =
   protocols
   |> List.iter (fun protocol ->
-         Michelson_script.find_all_legacy
-           ~prefix:(Michelson_script.pytest_prefix protocol)
-           protocol
+         Michelson_script.find_all_legacy protocol
          |> List.iter (fun michelson_script ->
                 test_deprecated_typecheck
                   michelson_script

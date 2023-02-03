@@ -53,7 +53,6 @@ let test_operation_size =
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["opcodes"; "munch"]
       protocol
@@ -64,7 +63,6 @@ let test_operation_size =
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["opcodes"; "bytes"]
       protocol

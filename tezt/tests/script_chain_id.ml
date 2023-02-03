@@ -43,7 +43,6 @@ let test_chain_id_opcode =
       ~src:Constant.bootstrap2.alias
       ~burn_cap:Tez.one
       ~init:"Unit"
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["opcodes"; "chain_id"]
       protocol
@@ -69,7 +68,6 @@ let test_chain_id_authentication =
       ~src:Constant.bootstrap2.alias
       ~burn_cap:Tez.one
       ~init:(sf {|Pair 0 "%s"|} pubkey)
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "authentication"]
       protocol

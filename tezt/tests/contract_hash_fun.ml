@@ -61,7 +61,6 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
               Client.run_script_at
                 ~storage:"None"
                 ~input
-                ~prefix:(Michelson_script.pytest_prefix protocol)
                 client
                 ["opcodes"; hash_fun_name]
                 protocol

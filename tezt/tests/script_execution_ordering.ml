@@ -62,7 +62,6 @@ let test_execution_ordering =
   let originate_storer () =
     let* _alias, contract =
       Client.originate_contract_at
-        ~prefix:(Michelson_script.pytest_prefix protocol)
         ~amount:Tez.zero
         ~src:Constant.bootstrap1.alias
         ~init:{|""|}
@@ -77,7 +76,6 @@ let test_execution_ordering =
   let originate_appender ~storer ~argument =
     let* _alias, contract =
       Client.originate_contract_at
-        ~prefix:(Michelson_script.pytest_prefix protocol)
         ~amount:Tez.zero
         ~src:Constant.bootstrap1.alias
         ~init:(sf "Pair %S %S" storer argument)
@@ -93,7 +91,6 @@ let test_execution_ordering =
     let storage = sf "{%s}" (String.concat "; " (List.map (sf "%S") callees)) in
     let* _alias, contract =
       Client.originate_contract_at
-        ~prefix:(Michelson_script.pytest_prefix protocol)
         ~amount:Tez.zero
         ~src:Constant.bootstrap1.alias
         ~init:storage

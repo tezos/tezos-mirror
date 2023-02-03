@@ -1,0 +1,166 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/parameterized_multisig.tz --details
+Well typed
+Gas remaining: 1039940.583 units remaining
+{ storage (pair bool (pair (map nat (pair bool bool)) (pair key key))) ;
+  parameter (or nat (pair signature nat)) ;
+  code { DUP
+         /* [ pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key
+            : pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key ] */ ;
+         CAR
+         /* [ or nat (pair signature nat)
+            : pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key ] */ ;
+         DIP { CDDR }
+         /* [ or nat (pair signature nat) : pair (map nat (pair bool bool)) key key ] */ ;
+         IF_LEFT
+           { DIP { DUP
+                   /* [ pair (map nat (pair bool bool)) key key
+                      : pair (map nat (pair bool bool)) key key ] */ ;
+                   CAR
+                   /* [ map nat (pair bool bool) : pair (map nat (pair bool bool)) key key ] */ }
+             /* [ nat : map nat (pair bool bool) : pair (map nat (pair bool bool)) key key ] */ ;
+             GET
+             /* [ option (pair bool bool) : pair (map nat (pair bool bool)) key key ] */ ;
+             IF_NONE
+               { PUSH bool False /* [ bool : pair (map nat (pair bool bool)) key key ] */ }
+               { DUP
+                 /* [ pair bool bool : pair bool bool : pair (map nat (pair bool bool)) key key ] */ ;
+                 CAR
+                 /* [ bool : pair bool bool : pair (map nat (pair bool bool)) key key ] */ ;
+                 DIP { CDR /* [ bool : pair (map nat (pair bool bool)) key key ] */ }
+                 /* [ bool : bool : pair (map nat (pair bool bool)) key key ] */ ;
+                 AND
+                 /* [ bool : pair (map nat (pair bool bool)) key key ] */ } ;
+             PAIR
+             /* [ pair bool (map nat (pair bool bool)) key key ] */ }
+           { DUP
+             /* [ pair signature nat : pair signature nat
+                : pair (map nat (pair bool bool)) key key ] */ ;
+             CAR
+             /* [ signature : pair signature nat : pair (map nat (pair bool bool)) key key ] */ ;
+             DIP { CDR
+                   /* [ nat : pair (map nat (pair bool bool)) key key ] */ ;
+                   DUP
+                   /* [ nat : nat : pair (map nat (pair bool bool)) key key ] */ ;
+                   PACK
+                   /* [ bytes : nat : pair (map nat (pair bool bool)) key key ] */ ;
+                   BLAKE2B
+                   /* [ bytes : nat : pair (map nat (pair bool bool)) key key ] */ }
+             /* [ signature : bytes : nat : pair (map nat (pair bool bool)) key key ] */ ;
+             PAIR
+             /* [ pair signature bytes : nat : pair (map nat (pair bool bool)) key key ] */ ;
+             SWAP
+             /* [ nat : pair signature bytes : pair (map nat (pair bool bool)) key key ] */ ;
+             DIP { DIP { DUP
+                         /* [ pair (map nat (pair bool bool)) key key
+                            : pair (map nat (pair bool bool)) key key ] */ ;
+                         CDR
+                         /* [ pair key key : pair (map nat (pair bool bool)) key key ] */ ;
+                         DIP { CAR /* [ map nat (pair bool bool) ] */ }
+                         /* [ pair key key : map nat (pair bool bool) ] */ ;
+                         DUP
+                         /* [ pair key key : pair key key : map nat (pair bool bool) ] */ }
+                   /* [ pair signature bytes : pair key key : pair key key
+                      : map nat (pair bool bool) ] */ ;
+                   SWAP
+                   /* [ pair key key : pair signature bytes : pair key key
+                      : map nat (pair bool bool) ] */ ;
+                   CAR
+                   /* [ key : pair signature bytes : pair key key : map nat (pair bool bool) ] */ ;
+                   DIP { DUP
+                         /* [ pair signature bytes : pair signature bytes : pair key key
+                            : map nat (pair bool bool) ] */ ;
+                         UNPAIR
+                         /* [ signature : bytes : pair signature bytes : pair key key
+                            : map nat (pair bool bool) ] */ }
+                   /* [ key : signature : bytes : pair signature bytes : pair key key
+                      : map nat (pair bool bool) ] */ ;
+                   CHECK_SIGNATURE
+                   /* [ bool : pair signature bytes : pair key key : map nat (pair bool bool) ] */ }
+             /* [ nat : bool : pair signature bytes : pair key key
+                : map nat (pair bool bool) ] */ ;
+             SWAP
+             /* [ bool : nat : pair signature bytes : pair key key
+                : map nat (pair bool bool) ] */ ;
+             IF { DIP { DROP
+                        /* [ pair key key : map nat (pair bool bool) ] */ ;
+                        SWAP
+                        /* [ map nat (pair bool bool) : pair key key ] */ ;
+                        DUP
+                        /* [ map nat (pair bool bool) : map nat (pair bool bool) : pair key key ] */ }
+                  /* [ nat : map nat (pair bool bool) : map nat (pair bool bool) : pair key key ] */ ;
+                  DUP
+                  /* [ nat : nat : map nat (pair bool bool) : map nat (pair bool bool)
+                     : pair key key ] */ ;
+                  DIP { GET
+                        /* [ option (pair bool bool) : map nat (pair bool bool) : pair key key ] */ ;
+                        IF_NONE
+                          { PUSH (pair bool bool)
+                                 (Pair False False)
+                            /* [ pair bool bool : map nat (pair bool bool) : pair key key ] */ }
+                          { /* [ pair bool bool : map nat (pair bool bool) : pair key key ] */ } ;
+                        CDR
+                        /* [ bool : map nat (pair bool bool) : pair key key ] */ ;
+                        PUSH bool True
+                        /* [ bool : bool : map nat (pair bool bool) : pair key key ] */ ;
+                        PAIR
+                        /* [ pair bool bool : map nat (pair bool bool) : pair key key ] */ ;
+                        SOME
+                        /* [ option (pair bool bool) : map nat (pair bool bool) : pair key key ] */ }
+                  /* [ nat : option (pair bool bool) : map nat (pair bool bool) : pair key key ] */ }
+                { DIP { DIP { DUP
+                              /* [ pair key key : pair key key : map nat (pair bool bool) ] */ ;
+                              CDR
+                              /* [ key : pair key key : map nat (pair bool bool) ] */ }
+                        /* [ pair signature bytes : key : pair key key : map nat (pair bool bool) ] */ ;
+                        SWAP
+                        /* [ key : pair signature bytes : pair key key : map nat (pair bool bool) ] */ ;
+                        DIP { UNPAIR /* [ signature : bytes : pair key key : map nat (pair bool bool) ] */ }
+                        /* [ key : signature : bytes : pair key key : map nat (pair bool bool) ] */ ;
+                        CHECK_SIGNATURE
+                        /* [ bool : pair key key : map nat (pair bool bool) ] */ }
+                  /* [ nat : bool : pair key key : map nat (pair bool bool) ] */ ;
+                  SWAP
+                  /* [ bool : nat : pair key key : map nat (pair bool bool) ] */ ;
+                  IF { DUP
+                       /* [ nat : nat : pair key key : map nat (pair bool bool) ] */ ;
+                       DIP { DIP { SWAP
+                                   /* [ map nat (pair bool bool) : pair key key ] */ ;
+                                   DUP
+                                   /* [ map nat (pair bool bool) : map nat (pair bool bool) : pair key key ] */ }
+                             /* [ nat : map nat (pair bool bool) : map nat (pair bool bool) : pair key key ] */ ;
+                             GET
+                             /* [ option (pair bool bool) : map nat (pair bool bool) : pair key key ] */ }
+                       /* [ nat : option (pair bool bool) : map nat (pair bool bool) : pair key key ] */ ;
+                       SWAP
+                       /* [ option (pair bool bool) : nat : map nat (pair bool bool) : pair key key ] */ ;
+                       IF_NONE
+                         { PUSH (pair bool bool)
+                                (Pair False False)
+                           /* [ pair bool bool : nat : map nat (pair bool bool) : pair key key ] */ }
+                         { /* [ pair bool bool : nat : map nat (pair bool bool) : pair key key ] */ } ;
+                       CAR
+                       /* [ bool : nat : map nat (pair bool bool) : pair key key ] */ ;
+                       PUSH bool True
+                       /* [ bool : bool : nat : map nat (pair bool bool) : pair key key ] */ ;
+                       SWAP
+                       /* [ bool : bool : nat : map nat (pair bool bool) : pair key key ] */ ;
+                       PAIR
+                       /* [ pair bool bool : nat : map nat (pair bool bool) : pair key key ] */ ;
+                       SOME
+                       /* [ option (pair bool bool) : nat : map nat (pair bool bool) : pair key key ] */ ;
+                       SWAP
+                       /* [ nat : option (pair bool bool) : map nat (pair bool bool) : pair key key ] */ }
+                     { FAIL } } ;
+             UPDATE
+             /* [ map nat (pair bool bool) : pair key key ] */ ;
+             PAIR
+             /* [ pair (map nat (pair bool bool)) key key ] */ ;
+             PUSH bool False
+             /* [ bool : pair (map nat (pair bool bool)) key key ] */ ;
+             PAIR
+             /* [ pair bool (map nat (pair bool bool)) key key ] */ } ;
+         NIL operation
+         /* [ list operation : pair bool (map nat (pair bool bool)) key key ] */ ;
+         PAIR
+         /* [ pair (list operation) bool (map nat (pair bool bool)) key key ] */ } }

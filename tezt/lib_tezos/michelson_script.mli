@@ -57,13 +57,6 @@ type t = {
     the "prefix", where michelson scripts will be searched for. *)
 val default_prefix : string
 
-(** This is the directory used as prefix for scripts stored in the [tests_python].
-
-    FIXME: #4008
-    This function is temporary and will be removed once [tests_python/contracts_*] is merged
-    in to the default prefix. *)
-val pytest_prefix : Protocol.t -> string
-
 (** Find a Michelson script file.
 
     Usage: [find name protocol]

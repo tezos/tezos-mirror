@@ -25,13 +25,6 @@
 
 let default_prefix = "michelson_test_scripts"
 
-let pytest_prefix protocol =
-  sf
-    "tests_python/contracts_%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-
 type version_range = {range_start : int; range_end : int option}
 
 let unversioned_range = {range_start = 0; range_end = None}

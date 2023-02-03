@@ -1,0 +1,25 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz --details
+Well typed
+Gas remaining: 1039992.323 units remaining
+{ parameter mutez ;
+  storage bls12_381_fr ;
+  code { CAR
+         /* [ mutez ] */ ;
+         PUSH mutez 1
+         /* [ mutez : mutez ] */ ;
+         SWAP
+         /* [ mutez : mutez ] */ ;
+         EDIV
+         /* [ option (pair nat mutez) ] */ ;
+         ASSERT_SOME ;
+         CAR
+         /* [ nat ] */ ;
+         PUSH bls12_381_fr 1
+         /* [ bls12_381_fr : nat ] */ ;
+         MUL
+         /* [ bls12_381_fr ] */ ;
+         NIL operation
+         /* [ list operation : bls12_381_fr ] */ ;
+         PAIR
+         /* [ pair (list operation) bls12_381_fr ] */ } }

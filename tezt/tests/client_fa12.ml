@@ -82,7 +82,6 @@ let register_fa12_test ~title ?(tags = []) test_body protocols =
              ~src:Account.Bootstrap.keys.(0).public_key_hash
              ~init:initial_storage
              ~burn_cap:(Tez.of_int 2)
-             ~prefix:(Michelson_script.pytest_prefix protocol)
              client
              fa12_script.name
              protocol
@@ -135,7 +134,6 @@ let test_check_contract_fail =
       ~src:Constant.bootstrap1.alias
       ~init
       ~burn_cap:(Tez.of_int 2)
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["entrypoints"; "manager"]
       protocol

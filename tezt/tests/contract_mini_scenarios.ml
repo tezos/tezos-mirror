@@ -39,7 +39,6 @@ let test_replay client ~protocol =
       ~src:Constant.bootstrap1.alias
       ~init:"Unit"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "replay"]
       protocol
@@ -92,7 +91,6 @@ let test_create_contract client ~protocol =
       ~src:Constant.bootstrap1.alias
       ~init:"Unit"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "create_contract"]
       protocol
@@ -130,7 +128,6 @@ let test_default_account client ~protocol =
       ~src:"bootstrap1"
       ~init:"Unit"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "default_account"]
       protocol
@@ -176,7 +173,6 @@ let test_preimage_and_signature client ~protocol =
       ~src:"bootstrap1"
       ~init
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "reveal_signed_preimage"]
       protocol
@@ -251,7 +247,6 @@ let test_vote_for_delegate client ~protocol =
       ~src:"bootstrap1"
       ~init
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "vote_for_delegate"]
       protocol
@@ -410,7 +405,6 @@ let test_multiple_entrypoints_counter client ~protocol =
       ~src:"bootstrap5"
       ~init:"None"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "multiple_entrypoints_counter"]
       protocol
@@ -431,10 +425,7 @@ let test_multiple_entrypoints_counter client ~protocol =
    receive a transaction. *)
 let test_contract_noop client ~protocol =
   let burn_cap = Tez.one in
-  let prg =
-    Michelson_script.(
-      find ~prefix:(pytest_prefix protocol) ["opcodes"; "noop"] protocol |> path)
-  in
+  let prg = Michelson_script.(find ["opcodes"; "noop"] protocol |> path) in
   let* () = Client.remember_script client ~alias:"noop" ~src:("file:" ^ prg) in
   let* () = Client.typecheck_script client ~script:prg in
   let* _contract =
@@ -468,7 +459,6 @@ let test_contract_hardlimit client ~protocol =
       ~src:"bootstrap1"
       ~init:"3"
       ~burn_cap
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "hardlimit"]
       protocol

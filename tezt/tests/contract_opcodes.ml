@@ -59,12 +59,7 @@ let register_opcode_tests ?supports parameterization protocols =
   @@ fun protocol ->
     let client = Client.create_with_mode Mockup in
     let script_path =
-      Michelson_script.(
-        find
-          ~prefix:(Michelson_script.pytest_prefix protocol)
-          ["opcodes"; script]
-          protocol
-        |> path)
+      Michelson_script.(find ["opcodes"; script] protocol |> path)
     in
     let* run_script_res_storage =
       Client.run_script

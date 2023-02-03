@@ -231,7 +231,6 @@ let test_originated_no_default =
       ~amount:Tez.zero
       ~src:"bootstrap1"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["entrypoints"; "simple_entrypoints"]
       protocol
@@ -268,7 +267,6 @@ let test_originated_with_default =
       ~src:"bootstrap1"
       ~init:initial_storage
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["entrypoints"; "delegatable_target"]
       protocol

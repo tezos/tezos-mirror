@@ -46,7 +46,6 @@ let test_self_address_transfer =
       ~src:"bootstrap1"
       ~init:"Unit"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       client
       ["mini_scenarios"; "self_address_sender"]
@@ -59,7 +58,6 @@ let test_self_address_transfer =
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["mini_scenarios"; "self_address_receiver"]
       protocol

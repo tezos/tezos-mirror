@@ -5,7 +5,6 @@ import subprocess
 from typing import List, Optional
 import pytest
 from process.process_utils import format_command
-from . import constants
 
 
 def tezos_home() -> str:
@@ -50,15 +49,9 @@ class MichelsonScriptLocator:
     )
     built = False
 
-    def __init__(self, protocol_hash: str, protocol_version: int):
+    def __init__(self, protocol_version: int):
         self.protocol_version = protocol_version
-        self.prefix = (
-            path.join(TEZOS_HOME, 'tests_python', 'contracts_alpha')
-            if protocol_hash == constants.ALPHA
-            else path.join(
-                TEZOS_HOME, 'tests_python', f'contracts_{protocol_version:03}'
-            )
-        )
+        self.prefix = path.join(TEZOS_HOME, 'michelson_test_scripts')
 
     def run(
         self,
