@@ -141,7 +141,7 @@ let () =
     ~title:"Bad data directory"
     ~description:
       "The data directory could not be read. This could be because it was \
-       generated with an old version of the tezos-node program. Deleting and \
+       generated with an old version of the octez-node program. Deleting and \
        regenerating this directory may fix the problem."
     ~pp:(fun ppf () -> Format.fprintf ppf "Bad data directory.")
     Data_encoding.empty

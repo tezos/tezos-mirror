@@ -90,7 +90,7 @@ let rpc_tls : string option Term.t =
 
 let data_dir : string option Term.t =
   let doc =
-    "Path to the data-dir of a running tezos-node, for reading the `context` \
+    "Path to the data-dir of a running octez-node, for reading the `context` \
      subdirectory to obtain data instead of using the ../raw/bytes RPC (hereby \
      reducing the node's IO)."
   in
