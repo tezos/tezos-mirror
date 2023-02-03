@@ -1204,7 +1204,8 @@ struct
     let acceptable_pass op =
       match acceptable_passes op with [n] -> Some n | _ -> None
 
-    (* Fake mempool *)
+    (* Fake mempool that can be successfully initialized but cannot
+       accept any operations. *)
     module Mempool = struct
       type t = unit
 
@@ -1239,7 +1240,11 @@ struct
       let encoding = Data_encoding.unit
 
       let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-        Lwt.return_ok ((), Unchanged)
+        let msg =
+          "The mempool cannot accept any operations because it does not \
+           support the current protocol."
+        in
+        Lwt.return_error (Validation_error [Exn (Failure msg)])
 
       let remove_operation () _ = ()
 

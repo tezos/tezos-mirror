@@ -550,3 +550,7 @@ module Manager = struct
     let block = sf "head~%d" offset in
     RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 end
+
+let conflict_error =
+  rex
+    {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}

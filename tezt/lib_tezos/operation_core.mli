@@ -427,3 +427,9 @@ module Manager : sig
   *)
   val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
 end
+
+(** Regular expression recognizing the mempool error that arises when
+    the operation conflicts with another previously validated operation.
+
+    Intended to be provided as the [error] argument to {!val:inject}. *)
+val conflict_error : rex

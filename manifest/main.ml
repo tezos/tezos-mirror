@@ -3693,8 +3693,6 @@ end = struct
 
     let ( >= ) a b = compare_asymmetric a b >= 0
 
-    let ( <> ) a b = compare_asymmetric a b <> 0
-
     let ( == ) a b = compare_asymmetric a b == 0
   end
 
@@ -4513,10 +4511,14 @@ module Protocol = Protocol
     in
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
-      only_if (active && N.(number <> 011)) @@ fun () ->
+      only_if active @@ fun () ->
       tests
-        (["test_consensus_filter"; "test_filter_state"; "test_plugin"]
-        @ if N.(number >= 015) then ["test_conflict_handler"] else [])
+        [
+          "test_consensus_filter";
+          "test_filter_state";
+          "test_plugin";
+          "test_conflict_handler";
+        ]
         ~path:(path // "lib_plugin/test")
         ~synopsis:"Tezos/Protocol: protocol plugin tests"
         ~opam:(sf "tezos-protocol-plugin-%s-tests" name_dash)
@@ -5516,11 +5518,6 @@ let _octez_shell_tests =
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
-      "legacy_test_prevalidation";
-      "legacy_test_prevalidation_t";
-      "legacy_test_prevalidator_classification";
-      "legacy_test_prevalidator_classification_operations";
-      "legacy_test_prevalidator_pending_operations";
       "test_peer_validator";
     ]
     ~path:"src/lib_shell/test"
