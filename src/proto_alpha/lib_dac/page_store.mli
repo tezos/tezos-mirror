@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,56 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
 open Environment.Error_monad
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4651
+   Integrate the pages backend with preimage data manager. *)
+
 type error +=
-  | Cannot_write_dac_page_to_disk of string
-  | Cannot_read_dac_page_from_disk of string
+  | Cannot_write_page_to_page_storage of {
+      hash : Protocol.Sc_rollup_reveal_hash.t;
+      content : bytes;
+    }
+  | Cannot_read_page_from_page_storage of Protocol.Sc_rollup_reveal_hash.t
 
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"cannot_write_dac_page_to_disk"
-    ~title:"Cannot write Dac page to disk"
-    ~description:"Cannot write Dac page to disk"
-    ~pp:(fun ppf b58_hash ->
-      Format.fprintf ppf "Could not write dac page for hash %s" b58_hash)
-    Data_encoding.(obj1 (req "hash" string))
-    (function
-      | Cannot_write_dac_page_to_disk b58_hash -> Some b58_hash | _ -> None)
-    (fun b58_hash -> Cannot_write_dac_page_to_disk b58_hash)
+(** [S] is the module type defining the backend required for
+    persisting DAC pages data onto the page storage. *)
+module type S = sig
+  (** [t] represents an instance of a storage backened. *)
+  type t
 
-module type REVEAL_HASH = module type of Sc_rollup_reveal_hash
+  (** [configuration] is the type of the configuration which can
+      be used to initialize the store.*)
+  type configuration
 
-module Make (Hash : REVEAL_HASH) = struct
-  type t = string
+  (** [hash] is the hash of preimages.*)
+  type hash
 
-  let path data_dir hash =
-    let hash = Hash.to_hex hash in
-    Filename.(concat data_dir hash)
+  (** [init configuration] initializes a page store using the information
+      provided in [configuration]. *)
+  val init : configuration -> t
 
-  let save_bytes data_dir hash page_contents =
-    let open Lwt_result_syntax in
-    let path = path data_dir hash in
-    let*! result =
-      Lwt_utils_unix.with_atomic_open_out path @@ fun chan ->
-      Lwt_utils_unix.write_bytes chan page_contents
-    in
-    match result with
-    | Ok () -> return ()
-    | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_hex hash)
+  (** [save t ~hash content] writes [content] of page onto storage
+      backend [t] under given [key].
 
-  let load_bytes data_dir hash =
-    let open Lwt_result_syntax in
-    let path = path data_dir hash in
-    let+ data =
-      Lwt.catch
-        (fun () -> Lwt.map Result.ok (Lwt_utils_unix.read_file path))
-        (fun _exn ->
-          tzfail @@ Cannot_read_dac_page_from_disk (Hash.to_hex hash))
-    in
-    Bytes.of_string data
+      When writing fails it returns a [Cannot_write_page_to_page_storage]
+      error.
+
+      We require [write_page] to be atomic.*)
+  val save : t -> hash:hash -> content:bytes -> unit tzresult Lwt.t
+
+  (** [load t ~hash] returns [content] of the storage backend [t]
+      represented by a key. When reading fails it returns a
+      [Cannot_read_page_from_page_storage] error. *)
+  val load : t -> hash:hash -> bytes tzresult Lwt.t
 end
 
-module Reveal_hash = Make (Sc_rollup_reveal_hash)
+(** [Filesystem] is an implementation of the page store backed up by
+    the local filesystem. The configuration is a string denoting the
+    path where files will be saved. A page is saved as a file whose
+    name is the hex encoded hash of its content. *)
+module Filesystem :
+  S
+    with type configuration = string
+     and type hash = Protocol.Sc_rollup_reveal_hash.t
