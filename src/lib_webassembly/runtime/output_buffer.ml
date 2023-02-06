@@ -1,4 +1,5 @@
 open Proto_compat
+open Error_monad
 
 type output_info = {
   outbox_level : int32;  (** The outbox level at which the message exists.*)
@@ -128,7 +129,7 @@ let move_outbox_forward buffer =
     @raise Full_outbox if the last outbox is full.
 *)
 let push_message buffer msg =
-  let open Lwt.Syntax in
+  let open Lwt_syntax in
   match buffer.last_level with
   | None ->
       (* Note that this should be an impossible case since the outbox should be
@@ -160,7 +161,7 @@ let get_outbox buffer level =
       this level.
 *)
 let get_message buffer {outbox_level; message_index} =
-  let open Lwt.Syntax in
+  let open Lwt_syntax in
   let* outbox = get_outbox buffer outbox_level in
   if not (is_message_available outbox message_index) then raise Invalid_id
   else Messages.get message_index outbox
