@@ -205,3 +205,8 @@ module Get_block_by_number :
 
 module Gas_price :
   METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
+
+module Get_transaction_count :
+  METHOD
+    with type m_input = Ethereum_types.address * Ethereum_types.block_param
+     and type m_output = Ethereum_types.quantity

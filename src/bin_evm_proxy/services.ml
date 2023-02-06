@@ -62,6 +62,8 @@ module Mock = struct
 
   let gas_price = qty_f Z.one
 
+  let transaction_count = qty_f Z.zero
+
   let block =
     {
       number = Some (block_height_of_z Z.zero);
@@ -100,6 +102,8 @@ let dispatch dir =
         | Get_block_by_number.Input _ ->
             return (Get_block_by_number.Output (Ok Mock.block))
         | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
+        | Get_transaction_count.Input _ ->
+            return (Get_transaction_count.Output (Ok Mock.transaction_count))
         | _ -> Error_monad.failwith "Unsupported method\n%!"
       in
       return (output, id))

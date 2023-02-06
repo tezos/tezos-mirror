@@ -280,6 +280,20 @@ module Gas_price = MethodMaker (struct
   let method_ = "eth_gasPrice"
 end)
 
+module Get_transaction_count = MethodMaker (struct
+  open Ethereum_types
+
+  type input = address * block_param
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_getTransactionCount"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Network_id);
@@ -289,6 +303,7 @@ let methods : (module METHOD) list =
     (module Block_number);
     (module Get_block_by_number);
     (module Gas_price);
+    (module Get_transaction_count);
   ]
 
 module Input = struct
