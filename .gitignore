@@ -88,3 +88,8 @@ __pycache__
 
 # Output of the update_opam_repo script
 opam_repo.patch
+
+# Rust
+target
+
+evm_mockup_kernel.wasm

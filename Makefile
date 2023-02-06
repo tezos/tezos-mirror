@@ -480,3 +480,7 @@ clean: coverage-clean clean-old-names
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
+
+.PHONY: build-kernels
+build-kernels:
+	make -f kernels.mk build-kernels
