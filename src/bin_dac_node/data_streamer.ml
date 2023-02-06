@@ -23,32 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Component for streaming published root page hashes to subscribers. *)
-
-module type S = sig
-  (* [publish hash] publishes a root page [hash] to all attached subscribers. *)
-  val publish : Dac_hash.t -> unit tzresult Lwt.t
-
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4680
-     Access Dac coordinator details via some [Dac_client.cctx].
-  *)
-
-  (* [subscribe coordinator_host coordinator_port] returns an Lwt_stream of hashes and
-     a function to close the stream.
-  *)
-  val subscribe :
-    coordinator_host:string ->
-    coordinator_port:int ->
-    Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper
-end
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4510
-   Implement useful streaming.
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4740
+    Implement a useful Root_hash_streamer
 *)
-module Make (P : Dac_plugin.T) : S = struct
-  let publish _hash = Lwt_result_syntax.return_unit
+module Root_hash_streamer = struct
+  type t = unit
 
-  let subscribe ~coordinator_host ~coordinator_port =
-    let _unused = (coordinator_host, coordinator_port) in
-    Lwt_watcher.create_fake_stream ()
+  type configuration = unit
+
+  let init (_configuration : configuration) = ()
+
+  let publish (_streamer : t) (_hash : Dac_hash.t) =
+    Lwt_result_syntax.return_unit
+
+  let make_subscription (_streamer : t) :
+      (Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t =
+    Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()
 end
