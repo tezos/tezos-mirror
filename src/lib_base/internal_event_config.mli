@@ -29,12 +29,25 @@
     internal-events framework. It allows one to activate registered
     event sinks.  *)
 
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4850
+    Config override default values, but the env TEZOS_EVENTS_CONFIG
+    does not. Is that what we want ? *)
+
 open Error_monad
 
 type t
 
-(** The default configuration is empty (it doesn't activate any sink). *)
-val default : t
+(** The empty configuration. It doesn't activate any sink. *)
+val empty : t
+
+(** The configuration with only an lwt-log sink. *)
+val lwt_log : t
+
+(** Check if the configuration is empty. *)
+val is_empty : t -> bool
+
+(** Allows to make custom list of uris. *)
+val make_custom : Uri.t list -> t
 
 (** The serialization format. *)
 val encoding : t Data_encoding.t

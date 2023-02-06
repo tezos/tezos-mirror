@@ -1,7 +1,7 @@
 Logging
 =======
 
-Logging features in Tezos allow to monitor its execution and be informed in real
+Logging features in Octez allow to monitor its execution and be informed in real
 time about *events* of interest, such as errors, completion of certain steps,
 etc. This is why various software components emit *events* throughout the
 codebase (see :doc:`../developer/event_logging_framework`), the logging
@@ -202,8 +202,12 @@ where ``<section-dirname>`` is either ``no-section`` or
 Global Defaults
 ---------------
 
-By default, only the ``lwt-log://`` sinks are activated and configured to
-output events of level at least ``Notice``.
+- ``lwt-log://`` sinks are activated by default and configured to
+  output events of level at least ``Notice``. Their goal is the stdout logging.
+
+- A file-descriptor-sink is activated to store logs from last seven days with
+  an ``Info`` level. The path is ``<node-data-dir>/daily-logs/``.
+
 
 JSON Configuration Format
 -------------------------

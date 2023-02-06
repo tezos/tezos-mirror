@@ -374,6 +374,26 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
           (fun x -> x);
       ])
 
+let make_default_internal_events ~data_dir =
+  (* By default the node has two logs output:
+     - on stdout using Lwt_log using the configured verbosity
+     - on disk, with a 7 days rotation with an info verbosity level *)
+  Internal_event_config.make_custom
+    [
+      Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ();
+      Uri.make
+        ~scheme:"file-descriptor-path"
+        ~path:(data_dir // "daily-logs" // "daily.log")
+        ~query:
+          [
+            ("create-dirs", ["true"]);
+            ("daily-logs", ["7"]);
+            ("section-prefix", [":info"]);
+            ("format", ["pp"]);
+          ]
+        ();
+    ]
+
 type t = {
   data_dir : string;
   disable_config_validation : bool;
@@ -443,7 +463,7 @@ let default_config =
     p2p = default_p2p;
     rpc = default_rpc;
     log = Lwt_log_sink_unix.default_cfg;
-    internal_events = Internal_event_config.default;
+    internal_events = Internal_event_config.empty;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
@@ -732,7 +752,7 @@ let encoding =
           "internal-events"
           ~description:"Configuration of the structured logging framework"
           Internal_event_config.encoding
-          Internal_event_config.default)
+          Internal_event_config.empty)
        (dft
           "shell"
           ~description:"Configuration of network parameters"

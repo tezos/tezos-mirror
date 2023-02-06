@@ -27,8 +27,14 @@ open Error_monad
 
 type t = {active_sinks : Uri.t list}
 
-let default =
+let lwt_log =
   {active_sinks = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()]}
+
+let empty = {active_sinks = []}
+
+let is_empty {active_sinks} = active_sinks = []
+
+let make_custom active_sinks = {active_sinks}
 
 let encoding =
   let open Data_encoding in

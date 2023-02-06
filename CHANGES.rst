@@ -56,6 +56,9 @@ Node
 - Added an option ``create-dirs`` to file-descriptor sinks to allow
   the node to create the log directory and its parents if they don't exist.
 
+- Added a default node configuration that enables disk logs as a
+  file-descriptor-sink in the data directory of the node with a 7 days rotation.
+
 Client
 ------
 
