@@ -112,10 +112,10 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
   in
   return (node, client, dal_parameters)
 
-let with_layer1 ?additional_bootstrap_accounts ?minimal_block_delay
-    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
-    ?dal_enable ?event_sections_levels ?node_arguments ?activation_timestamp f
-    ~protocol =
+let with_layer1 ?custom_constants ?additional_bootstrap_accounts
+    ?minimal_block_delay ?attestation_lag ?attestation_threshold
+    ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
+    ?node_arguments ?activation_timestamp f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter
@@ -135,6 +135,7 @@ let with_layer1 ?additional_bootstrap_accounts ?minimal_block_delay
   in
   let* node, client, dal_parameters =
     setup_node
+      ?custom_constants
       ?additional_bootstrap_accounts
       ?event_sections_levels
       ?node_arguments
@@ -184,9 +185,9 @@ let with_dal_node tezos_node tezos_client f key =
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
-    ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?event_sections_levels ?node_arguments ?activation_timestamp variant
-    scenario =
+    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?minimal_block_delay variant scenario =
   let description = "Testing DAL L1 integration" in
   test
     ~__FILE__
@@ -194,6 +195,8 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ~custom_constants
+        ?minimal_block_delay
         ?attestation_lag
         ?commitment_period
         ?challenge_window
@@ -206,9 +209,9 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
       scenario protocol parameters cryptobox node client)
 
 let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
-    ?minimal_block_delay ?attestation_lag ?attestation_threshold
-    ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?activation_timestamp variant scenario =
+    ?custom_constants ?minimal_block_delay ?attestation_lag
+    ?attestation_threshold ?commitment_period ?challenge_window
+    ?(dal_enable = true) ?activation_timestamp variant scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
@@ -216,6 +219,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ~custom_constants
         ?minimal_block_delay
         ?attestation_lag
         ?attestation_threshold
@@ -228,9 +232,10 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
       with_dal_node node client @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
-let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
-    ?(dal_enable = true) ?commitment_period ?challenge_window
-    ?minimal_block_delay ?activation_timestamp variant scenario =
+let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
+    ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
+    ?commitment_period ?challenge_window ?minimal_block_delay
+    ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -238,6 +243,9 @@ let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ~custom_constants
+        ?node_arguments
+        ?attestation_lag
         ?commitment_period
         ?challenge_window
         ?minimal_block_delay
