@@ -2657,8 +2657,6 @@ module Zk_rollup = struct
       |> Process.check_and_read_stdout ~expect_failure
     in
     let address = extract_zku_address client_output in
-    let* () = bake_for client in
-    Log.info "epoxy originate" ;
     Lwt.return address
 
   let publish ?(expect_failure = false) client ~src ~zk_rollup ~ops_file
@@ -2683,8 +2681,6 @@ module Zk_rollup = struct
           ])
       |> Process.check ~expect_failure
     in
-    let* () = bake_for client in
-    Log.info "epoxy publish" ;
     Lwt.return_unit
 
   let update ?(expect_failure = false) client ~src ~zk_rollup ~update_file
@@ -2709,8 +2705,6 @@ module Zk_rollup = struct
           ])
       |> Process.check ~expect_failure
     in
-    let* () = bake_for client in
-    Log.info "epoxy update" ;
     Lwt.return_unit
 end
 
