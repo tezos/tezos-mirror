@@ -1576,7 +1576,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let*! downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
   in
-  let expected_number_of_downloaded_or_unconfirmed_slots = 0 in
+  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
   Check.(
     List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)
@@ -1611,7 +1611,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   in
   (* 10. Verify that rollup node has downloaded slot 1, slot 0 is
         unconfirmed, and slot 2 has not been downloaded *)
-  let expected_number_of_downloaded_or_unconfirmed_slots = 1 in
+  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
   Check.(
     List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)

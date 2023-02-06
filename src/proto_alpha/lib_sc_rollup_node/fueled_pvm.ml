@@ -228,7 +228,7 @@ module Make (PVM : Pvm.S) = struct
               | Some fuel ->
                   go fuel (Int64.succ current_tick) failing_ticks next_state)
           | Needs_reveal (Request_dal_page page_id) -> (
-              let>* content_opt =
+              let* content_opt =
                 Dal_pages_request.page_content
                   ~dal_attestation_lag
                   node_ctxt
