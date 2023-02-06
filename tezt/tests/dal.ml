@@ -2052,6 +2052,243 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
   in
   check_attestations first_level
 
+(** End-to-end DAL Tests.  *)
+
+(* This function publishes the DAL slot whose index is [slot_index] for the
+   levels between [from] and [into] with a payload equal to the slot's
+   publish_level.
+
+   The publication consists in sending the slot to a DAL node, computing its
+   shards on the DAL node and associating it to a slot index and published
+   level. On the L1 side, a manager operation publish_slot_header is also sent.
+
+   The function returns the sum of the payloads submitted via DAL. *)
+let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
+    =
+  (* We add the successive slots' contents (that is, published_level-s) injected
+     into DAL and L1, and store the result in [!sum]. The final value is then
+     returned by this function. *)
+  let sum = ref 0 in
+  let loop ~from ~into ~task =
+    fold
+      (into - from + 1)
+      ()
+      (fun index () ->
+        let current_level = index + from in
+        task current_level)
+  in
+  let task current_level =
+    let* level = Node.wait_for_level l1_node current_level in
+    (* We expected to advance level by level, otherwise, the test should fail. *)
+    Check.(
+      (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
+    let (publish_level as payload) = level + 1 in
+    sum := !sum + payload ;
+    Log.info
+      "[e2e.slot_producer] publish slot %d for level %d with payload %d"
+      slot_index
+      publish_level
+      payload ;
+    let* _index, _commitment =
+      publish_and_store_slot
+        ~slot_size
+        ~level:publish_level
+        l1_node
+        l1_client
+        dal_node
+        Constant.bootstrap3
+        slot_index
+        (sf " %d " payload)
+    in
+    unit
+  in
+  let* () = loop ~from ~into ~task in
+  Log.info "[e2e.slot_producer] will terminate" ;
+  return !sum
+
+(* This function allows to run an end-to-end test involving L1, DAL and rollup
+   nodes. For that it:
+
+   - It configures the PVM Arith's DAL parameters with those of L1 (via an inbox
+   message). The PVM is asked to track slot index 5;
+
+   - It starts a baker daemon with all available bootstrap delegates;
+
+   - It starts a [slot_producer] Lwt promise, that will publish
+   [number_of_dal_slots] slots on L1 and on the DAL node. The slots' content is
+   basically the level at which they are published;
+
+   - Once the slots are processed and attested; an inbox message is sent to the
+   Arith PVM to sum all the received integers and to store the result in a
+   variable called "value";
+
+   - We finally check that there is a "value" variable in the PVM whose payload
+   is the sum of levels as returned by [slot_producer].
+*)
+let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
+    _sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
+  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let current_level = Node.get_level l1_node in
+  Log.info "[e2e.startup] current level is %d@." current_level ;
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+
+  Log.info
+    "[e2e.configure_pvm] configure PVM with DAL parameters via inbox message@." ;
+  let Rollup.Dal.Parameters.{attestation_lag; cryptobox; _} = parameters in
+  (* We ask the Arith PVM of [_sc_rollup_address] to track the slot index 5 of
+     the DAL. *)
+  let tracked_slot_index = 5 in
+  let* () =
+    let pages_per_slot = cryptobox.slot_size / cryptobox.page_size in
+    let config =
+      sf " dal:%d:%d:%d " attestation_lag pages_per_slot tracked_slot_index
+    in
+    send_messages ~bake:false l1_client [config]
+  in
+  (* Argument ~keys:[] allows to bake with all available delegates. *)
+  let* () = Client.bake_for_and_wait l1_client ~keys:[] in
+  Log.info "[e2e.pvm] PVM Arith configured@." ;
+
+  Log.info
+    "[e2e.start_baker] spawn a baker daemon with all bootstrap accounts@." ;
+  let* _baker = Baker.init ~dal_node ~protocol l1_node l1_client in
+
+  (* To be sure that we just moved to [start_dal_slots_level], we wait and extra
+     level. *)
+  let* start_dal_slots_level =
+    Node.wait_for_level l1_node (1 + Node.get_level l1_node)
+  in
+  let end_dal_slots_level = start_dal_slots_level + number_of_dal_slots - 1 in
+
+  Log.info
+    "[e2e.start_slot_producer] from level %d to level %d@."
+    start_dal_slots_level
+    end_dal_slots_level ;
+  (* The slot producer will publish [number_of_dal_slots] sucessive slots of
+     size [slot_size] with index [tracked_slots]. *)
+  let* expected_value =
+    slot_producer
+      ~slot_index:tracked_slot_index
+      ~from:start_dal_slots_level
+      ~into:end_dal_slots_level
+      ~slot_size
+      dal_node
+      l1_node
+      l1_client
+  in
+
+  (* Wait until the last published slot is included and attested. *)
+  let* _lvl =
+    Node.wait_for_level l1_node (end_dal_slots_level + attestation_lag + 1)
+  in
+
+  Log.info
+    "[e2e.sum_and_store] send an inbox messsage to the PVM to sum the received \
+     payloads are store the result in a 'value' variable@." ;
+  let* () =
+    let level = Node.get_level l1_node in
+    (* We send instructions "+...+ value" to the PVM of [number_of_dal_slots -
+       1] additions, so that it sums the received slots' contents and store the
+       result in a variable called "value". *)
+    let do_sum = String.make (number_of_dal_slots - 1) '+' in
+    let* () = send_messages ~bake:false l1_client [do_sum ^ " value"] in
+    (* Wait sufficiently many levels so that the PVM interprets the message. *)
+    let* _lvl = Node.wait_for_level l1_node (level + 2) in
+    unit
+  in
+  Log.info
+    "[e2e.final_check] check that the sum stored in the PVM is %d@."
+    expected_value ;
+  check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+
+(** Register end-to-end DAL Tests. *)
+
+(* These are the parameters we vary for end-to-end tests. *)
+type e2e_test = {
+  constants : Protocol.constants;
+  attestation_lag : int;
+  block_delay : int;
+  number_of_dal_slots : int;
+}
+
+let e2e_tests =
+  let test1 =
+    {
+      constants = Protocol.Constants_test;
+      attestation_lag = 1;
+      block_delay = 6;
+      number_of_dal_slots = 2;
+    }
+  in
+  let test2 =
+    {
+      constants = Protocol.Constants_test;
+      attestation_lag = 2;
+      block_delay = 4;
+      number_of_dal_slots = 2;
+    }
+  in
+  let mainnet1 =
+    {
+      constants = Protocol.Constants_mainnet;
+      attestation_lag = 1;
+      block_delay = 15;
+      number_of_dal_slots = 1;
+    }
+  in
+  [test1; test2; mainnet1]
+
+let constants_to_string = function
+  | Protocol.Constants_mainnet -> "mainnet"
+  | Protocol.Constants_sandbox -> "sandbox"
+  | Protocol.Constants_test -> "testnet"
+
+(* This function allows to register new (end-to-end) tests using
+   [scenario_with_all_nodes] helper. For that, it instantiate function
+   [e2e_test_script] with the various configurations in [e2e_tests]. *)
+let register_end_to_end_tests ~protocols =
+  (* (Mainnet) Tests below are probably flaky because they depend on CPU
+     spec/time, as we start a baker daemon, and we set a low block time to avoid
+     monopolizing the CI. If it is an issue, those tests could be moved to long
+     tests in the future. *)
+  List.iter
+    (fun test ->
+      let {constants; attestation_lag; block_delay; number_of_dal_slots} =
+        test
+      in
+      let network = constants_to_string constants in
+      let title =
+        sf
+          "e2e_%s_lag-%d_latency-%d_slots-%d"
+          network
+          attestation_lag
+          block_delay
+          number_of_dal_slots
+      in
+      let activation_timestamp =
+        (* and starts it in the past enough so that one can bake
+           [expected_bake_for_blocks] with the bake for command, without hitting
+           a "Block in the future" error *and* continue from there with baker
+           daemons (which cannot bake in the past) without a hitch.
+
+           In the test, we have two [bake_for] invocations: one for the rollup
+           origination and another to configure the PVM. Baker daemon is then
+           started. *)
+        let expected_bake_for_occurrences = 2 in
+        Ptime.Span.of_int_s (expected_bake_for_occurrences * block_delay)
+      in
+      scenario_with_all_nodes
+        ~custom_constants:constants
+        ~attestation_lag
+        ~activation_timestamp:(Ago activation_timestamp)
+        ~minimal_block_delay:(string_of_int block_delay)
+        ~tags:["e2e"; network]
+        title
+        (e2e_test_script ~number_of_dal_slots)
+        protocols)
+    e2e_tests
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -2149,4 +2386,7 @@ let register ~protocols =
   scenario_with_all_nodes
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
-    protocols
+    protocols ;
+
+  (* Register end-to-end tests *)
+  register_end_to_end_tests ~protocols
