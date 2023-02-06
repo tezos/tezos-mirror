@@ -117,18 +117,6 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       in
       return @@ Some {published_block_hash; confirmed_slots_indexes}
 
-let is_slot_confirmed node_ctxt (Layer1.{hash; _} as head) slot_index =
-  let open Lwt_result_syntax in
-  let* slots_info_opt = slots_info node_ctxt head in
-  match slots_info_opt with
-  | None -> tzfail @@ Layer1_services.Cannot_read_block_metadata hash
-  | Some {confirmed_slots_indexes; _} ->
-      let*? is_confirmed =
-        Environment.wrap_tzresult
-        @@ Bitset.mem confirmed_slots_indexes (Dal.Slot_index.to_int slot_index)
-      in
-      return is_confirmed
-
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3884
    avoid going back and forth between bitsets and lists of slot indexes. *)
 let to_slot_index_list (constants : Constants.Parametric.t) bitset =

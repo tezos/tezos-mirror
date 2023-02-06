@@ -601,43 +601,6 @@ module Global = struct
                  (req "contents" (list Dal.Page.content_encoding)))
         (path / "dal" / "confirmed_slot_pages")
 
-    type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
-
-    let dal_slot_page_query =
-      let open Tezos_rpc.Query in
-      let req name f = function
-        | None ->
-            raise
-              (Invalid (Format.sprintf "Query parameter %s is required" name))
-        | Some arg -> f arg
-      in
-      let invalid_parameter i =
-        raise (Invalid (Format.asprintf "Invalid parameter (%d)" i))
-      in
-      query (fun raw_index raw_page ->
-          let index = req "index" Dal.Slot_index.of_int_opt raw_index in
-          let page = req "page" (fun p -> p) raw_page in
-          match index with
-          | None -> invalid_parameter @@ Option.value ~default:0 raw_index
-          | Some index ->
-              if page < 0 then invalid_parameter page else {index; page})
-      |+ opt_field "index" Tezos_rpc.Arg.int (fun q ->
-             Some (Dal.Slot_index.to_int q.index))
-      |+ opt_field "slot_page" Tezos_rpc.Arg.int (fun q -> Some q.page)
-      |> seal
-
-    let dal_slot_page =
-      Tezos_rpc.Service.get_service
-        ~description:
-          "Data availability downloaded slot pages for a given block hash"
-        ~query:dal_slot_page_query
-        ~output:
-          Data_encoding.(
-            obj2
-              (req "result" string)
-              (opt "contents" Dal.Page.content_encoding))
-        (path / "dal" / "slot_page")
-
     module Outbox = struct
       let level_param =
         let destruct s =
