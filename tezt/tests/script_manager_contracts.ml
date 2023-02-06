@@ -184,15 +184,16 @@ let test_manager_contracts =
     Client.get_balance_for ~account:"bootstrap2" client
   in
   let amount = Tez.of_mutez_int 10_001_000 in
+  let fee = Tez.of_mutez_int 0_000_475 in
   let* () =
     Client.transfer
       ~amount
       ~giver:"bootstrap2"
       ~receiver:"manager"
       ~gas_limit:((128 * 15450) + 108)
+      ~fee
       client
   in
-  let fee = Tez.of_mutez_int 0_000_475 in
   let* () = check_balance ~__LOC__ "manager" Tez.(balance + amount) in
   let* () =
     check_balance ~__LOC__ "bootstrap2" Tez.(balance_bootstrap - fee - amount)
@@ -224,15 +225,16 @@ let test_manager_contracts =
     Client.get_balance_for ~account:"bootstrap2" client
   in
   let amount = Tez.of_int 10 in
+  let fee = Tez.of_mutez_int 0_000_824 in
   let* () =
     Client.transfer
       ~amount
       ~giver:"manager"
       ~receiver:"manager2"
       ~gas_limit:((128 * 44950) + 112)
+      ~fee
       client
   in
-  let fee = Tez.of_mutez_int 0_000_824 in
   let* () = check_balance ~__LOC__ "manager" Tez.(balance - amount) in
   let* () = check_balance ~__LOC__ "manager2" Tez.(balance_dest + amount) in
   let* () = check_balance ~__LOC__ "bootstrap2" Tez.(balance_bootstrap - fee) in
