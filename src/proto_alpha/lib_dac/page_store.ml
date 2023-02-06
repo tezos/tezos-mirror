@@ -36,7 +36,7 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"cannot_write_dac_page_to_page_store"
+    ~id:"cannot_write_page_to_page_storage"
     ~title:"Cannot write DAC page to page store"
     ~description:"Persisting DAC page with given key and content failed"
     ~pp:(fun ppf (key, content) ->
