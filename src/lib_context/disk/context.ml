@@ -183,6 +183,14 @@ module Events = struct
       ~pp2:Time.System.Span.pp_hum
       ("finalisation", Time.System.Span.encoding)
 
+  let split_context =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"split_context"
+      ~msg:"splitting context into a new chunk"
+      ()
+
   let gc_failure =
     declare_1
       ~section
@@ -394,7 +402,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let is_gc_allowed index = Store.Gc.is_allowed index.repo
 
-  let split index = Store.split index.repo
+  let split index =
+    let open Lwt_syntax in
+    let* () = Events.(emit split_context ()) in
+    Store.split index.repo ;
+    Lwt.return_unit
 
   let export_snapshot index context_hash ~path =
     let open Lwt_syntax in

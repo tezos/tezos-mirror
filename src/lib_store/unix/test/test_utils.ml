@@ -195,7 +195,7 @@ let register_gc store =
     in
     return_unit
   in
-  Store.Chain.register_gc_callback chain_store gc
+  Store.Chain.register_gc_callback chain_store (Some gc)
 
 let wrap_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.Archive) ?(allow_testchains = true)
