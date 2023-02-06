@@ -64,6 +64,10 @@ module Mock = struct
 
   let transaction_count = qty_f Z.zero
 
+  (* Transaction's hash must be an alphanumeric 66 utf8 byte
+     hex (chars: a-fA-F) string *)
+  let transaction_hash = hash_f @@ "0x" ^ String.make 64 'a'
+
   let block =
     {
       number = Some (block_height_of_z Z.zero);
@@ -104,6 +108,8 @@ let dispatch dir =
         | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
         | Get_transaction_count.Input _ ->
             return (Get_transaction_count.Output (Ok Mock.transaction_count))
+        | Send_raw_transaction.Input _ ->
+            return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
         | _ -> Error_monad.failwith "Unsupported method\n%!"
       in
       return (output, id))

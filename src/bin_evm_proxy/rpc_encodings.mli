@@ -210,3 +210,8 @@ module Get_transaction_count :
   METHOD
     with type m_input = Ethereum_types.address * Ethereum_types.block_param
      and type m_output = Ethereum_types.quantity
+
+module Send_raw_transaction :
+  METHOD
+    with type m_input = Ethereum_types.hash
+     and type m_output = Ethereum_types.hash
