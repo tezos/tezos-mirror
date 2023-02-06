@@ -202,3 +202,6 @@ module Get_block_by_number :
   METHOD
     with type m_input = Ethereum_types.block_param * bool
      and type m_output = Ethereum_types.block
+
+module Gas_price :
+  METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
