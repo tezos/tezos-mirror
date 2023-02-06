@@ -252,6 +252,8 @@ let raw_connect sched addr port =
   let fd = P2p_io_scheduler.register sched fd in
   Lwt.return_ok fd
 
+exception Cant_connect
+
 (** [connect ?proof_of_work_target sched addr port] connect
    and performs [P2p_socket.authenticate] with the given
    [proof_of_work_target]. *)
@@ -259,8 +261,7 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
   let open Lwt_result_syntax in
   let*! r = raw_connect sched addr port in
   match r with
-  | Error (`Connection_refused | `Unexpected_error _) ->
-      Lwt.fail Alcotest.Test_error
+  | Error (`Connection_refused | `Unexpected_error _) -> Lwt.fail Cant_connect
   | Ok fd ->
       P2p_socket.authenticate
         ~canceler
