@@ -1668,6 +1668,25 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   | None -> return ()
   | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
 
+let check_saved_value_in_pvm ~name ~expected_value sc_client =
+  let*! encoded_value =
+    Sc_rollup_client.state_value ~hooks sc_client ~key:(sf "vars/%s" name)
+  in
+  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+  | Error error ->
+      failwith
+        (Format.asprintf
+           "The arithmetic PVM has an unexpected state: %a"
+           Data_encoding.Binary.pp_read_error
+           error)
+  | Ok value ->
+      Check.(
+        (value = expected_value)
+          int
+          ~error_msg:
+            "Invalid value in rollup state (current = %L, expected = %R)") ;
+      return ()
+
 let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -1725,23 +1744,7 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* _lvl =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
-  let*! encoded_value =
-    Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
-  in
-  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-  | Error error ->
-      failwith
-        (Format.asprintf
-           "The arithmetic PVM has an unexpected state: %a"
-           Data_encoding.Binary.pp_read_error
-           error)
-  | Ok value ->
-      Check.(
-        (value = expected_value)
-          int
-          ~error_msg:
-            "Invalid value in rollup state (current = %L, expected = %R)") ;
-      return ()
+  check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
 
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
