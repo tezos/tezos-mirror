@@ -22,10 +22,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+type dac_plugin_module = (module Dac_plugin.T)
 
 (** A [ready_ctx] value contains globally needed informations for a running dac
     node. It is available when the DAC plugin has been loaded. *)
-type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
+type ready_ctxt = {dac_plugin : dac_plugin_module}
 
 (** The status of the dac node. *)
 type status = Ready of ready_ctxt | Starting
@@ -42,12 +43,12 @@ val init : Configuration.t -> Client_context.full -> t
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt ~dac_plugin] updates
+(** [set_ready ctxt dac_plugin_module] updates
     in place the status value to [Ready], and initializes the inner
     [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
-val set_ready : t -> dac_plugin:(module Tezos_dac_node_lib.Dac_plugin.T) -> unit
+val set_ready : t -> dac_plugin_module -> unit
 
 type error += Node_not_ready
 
@@ -64,3 +65,7 @@ val get_status : t -> status
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Client_context.full
+
+(** [get_dac_hash_encoding ctxt] returns the [Dac_hash.t] encoding derived from 
+    [Dac_plugin.Protocol_reveal_hash.encoding] *)
+val get_dac_hash_encoding : t -> Dac_plugin.Dac_hash.t Data_encoding.t tzresult
