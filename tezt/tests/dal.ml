@@ -62,11 +62,11 @@ let dal_enable_param dal_enable =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
-    ?activation_timestamp ?(event_sections_levels = []) ?(node_arguments = [])
-    () =
+let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
+    ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
+    ?(node_arguments = []) () =
   (* Temporary setup to initialise the node. *)
-  let base = Either.right (protocol, None) in
+  let base = Either.right (protocol, custom_constants) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
   let* client = Client.init_mockup ~parameter_file ~protocol () in
   let nodes_args =
