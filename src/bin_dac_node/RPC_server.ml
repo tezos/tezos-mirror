@@ -27,12 +27,11 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-let start configuration cctxt ctxt dac_pks_opt dac_sk_uris =
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
+   Move this to RPC_server.Legacy once all operating modes are supported. *)
+let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
+    dac_pks_opt dac_sk_uris =
   let open Lwt_syntax in
-  let Configuration.
-        {rpc_addr; rpc_port; dac = {reveal_data_dir; threshold; _}; _} =
-    configuration
-  in
   let dir =
     Tezos_rpc.Directory.register_dynamic_directory
       Tezos_rpc.Directory.empty
@@ -49,10 +48,10 @@ let start configuration cctxt ctxt dac_pks_opt dac_sk_uris =
                  threshold)
         | Starting -> Lwt.return Tezos_rpc.Directory.empty)
   in
-  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string rpc_addr in
+  let rpc_address = P2p_addr.of_string_exn rpc_address in
+  let host = Ipaddr.V6.to_string rpc_address in
   let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.default rpc_addr in
+  let acl = RPC_server.Acl.default rpc_address in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in

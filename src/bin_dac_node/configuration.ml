@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,13 +24,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type dac = {
-  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+type coordinator = {
   threshold : int;
-  reveal_data_dir : string;
+  dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
 }
 
-type t = {data_dir : string; rpc_addr : string; rpc_port : int; dac : dac}
+type dac_member = {
+  coordinator_rpc_address : string;
+  coordinator_rpc_port : int;
+  address : Tezos_crypto.Aggregate_signature.public_key_hash;
+}
+
+type observer = {coordinator_rpc_address : string; coordinator_rpc_port : int}
+
+type legacy = {
+  threshold : int;
+  dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+}
+
+type mode =
+  | Coordinator of coordinator
+  | Dac_member of dac_member
+  | Observer of observer
+  | Legacy of legacy
+
+type t = {
+  data_dir : string;
+  rpc_address : string;
+  rpc_port : int;
+  reveal_data_dir : string;
+  mode : mode;
+}
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dac-node"
 
@@ -39,7 +64,7 @@ let relative_filename data_dir = Filename.concat data_dir "config.json"
 
 let filename config = relative_filename config.data_dir
 
-let default_rpc_addr = "127.0.0.1"
+let default_rpc_address = "127.0.0.1"
 
 let default_rpc_port = 10832
 
@@ -52,47 +77,113 @@ let default_reveal_data_dir =
     (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
     "wasm_2_0_0"
 
-let default_dac =
-  {
-    addresses = default_dac_addresses;
-    threshold = default_dac_threshold;
-    reveal_data_dir = default_reveal_data_dir;
-  }
+let coordinator_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun ({threshold; dac_members_addresses} : coordinator) ->
+        (threshold, dac_members_addresses, false))
+      (fun (threshold, dac_members_addresses, legacy) ->
+        if legacy then Error "legacy flag should be set to false"
+        else Ok {threshold; dac_members_addresses})
+      (obj3
+         (req "threshold" uint8)
+         (req
+            "dac_members"
+            (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
+         (req "legacy" bool)))
 
-let dac_encoding : dac Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {addresses; threshold; reveal_data_dir} ->
-      (addresses, threshold, reveal_data_dir))
-    (fun (addresses, threshold, reveal_data_dir) ->
-      {addresses; threshold; reveal_data_dir})
-    (obj3
-       (req
-          "addresses"
-          (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
-       (req "threshold" uint8)
-       (req "reveal-data-dir" string))
+let dac_member_encoding =
+  Data_encoding.(
+    conv
+      (fun {coordinator_rpc_address; coordinator_rpc_port; address} ->
+        (coordinator_rpc_address, coordinator_rpc_port, address))
+      (fun (coordinator_rpc_address, coordinator_rpc_port, address) ->
+        {coordinator_rpc_address; coordinator_rpc_port; address})
+      (obj3
+         (req "coordinator_rpc_address" string)
+         (req "coordinator_rpc_port" int16)
+         (req
+            "address"
+            Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
+
+let observer_encoding =
+  Data_encoding.(
+    conv
+      (fun {coordinator_rpc_address; coordinator_rpc_port} ->
+        (coordinator_rpc_address, coordinator_rpc_port))
+      (fun (coordinator_rpc_address, coordinator_rpc_port) ->
+        {coordinator_rpc_address; coordinator_rpc_port})
+      (obj2
+         (req "coordinator_rpc_address" string)
+         (req "coordinator_rpc_port" int16)))
+
+let legacy_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun {threshold; dac_members_addresses} ->
+        (threshold, dac_members_addresses, true))
+      (fun (threshold, dac_members_addresses, legacy) ->
+        if legacy then Ok {threshold; dac_members_addresses}
+        else Error "legacy flag should be set to true")
+      (obj3
+         (dft "threshold" uint8 default_dac_threshold)
+         (dft
+            "dac_members"
+            (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
+            default_dac_addresses)
+         (req "legacy" bool)))
+
+let mode_config_encoding =
+  Data_encoding.(
+    union
+      [
+        case
+          ~title:"coordinator"
+          (Tag 0)
+          coordinator_encoding
+          (function Coordinator config -> Some config | _ -> None)
+          (function config -> Coordinator config);
+        case
+          ~title:"dac_member"
+          (Tag 1)
+          dac_member_encoding
+          (function Dac_member config -> Some config | _ -> None)
+          (function config -> Dac_member config);
+        case
+          ~title:"observer"
+          (Tag 2)
+          observer_encoding
+          (function Observer config -> Some config | _ -> None)
+          (function config -> Observer config);
+        case
+          ~title:"legacy"
+          (Tag 3)
+          legacy_encoding
+          (function Legacy config -> Some config | _ -> None)
+          (function config -> Legacy config);
+      ])
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc_addr; rpc_port; dac} ->
-      (data_dir, rpc_addr, rpc_port, dac))
-    (fun (data_dir, rpc_addr, rpc_port, dac) ->
-      {data_dir; rpc_addr; rpc_port; dac})
-    (obj4
+    (fun {data_dir; rpc_address; rpc_port; reveal_data_dir; mode} ->
+      (data_dir, rpc_address, rpc_port, reveal_data_dir, mode))
+    (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, mode) ->
+      {data_dir; rpc_address; rpc_port; reveal_data_dir; mode})
+    (obj5
        (dft
           "data-dir"
           ~description:"Location of the data dir"
           string
           default_data_dir)
-       (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+       (dft "rpc-addr" ~description:"RPC address" string default_rpc_address)
        (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
        (dft
-          "dac"
-          ~description:"Data Availability Committee"
-          dac_encoding
-          default_dac))
+          "reveal_data_dir"
+          ~description:"Reveal data directory"
+          string
+          default_reveal_data_dir)
+       (req "mode" ~description:"Running mode" mode_config_encoding))
 
 type error += DAC_node_unable_to_write_configuration_file of string
 
