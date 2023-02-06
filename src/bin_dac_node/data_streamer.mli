@@ -23,23 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Component for streaming published root page hashes to subscribers. *)
+(** [Root_hash_streamer] manages the pub-sub mechanism for streaming root 
+    page hashes from publishers to subscribers. Root hash refers to the
+    root hash of the DAC payload Merkle tree.
+*)
+module Root_hash_streamer : sig
+  type t
 
-module type S = sig
-  (* [publish hash] publishes a root page [hash] to all attached subscribers. *)
-  val publish : Dac_hash.t -> unit tzresult Lwt.t
+  (* Streamer configuration. *)
+  type configuration
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4680
-     Access Dac coordinator details via some [Dac_client.cctx].
+  (** Initializes a [Root_hash_streamer.t] *)
+  val init : configuration -> t
+
+  (** [publish streamer root_hash] publishes a [root_hash] to all attached 
+      subscribers in [streamer].
+   *)
+  val publish : t -> Dac_hash.t -> unit tzresult Lwt.t
+
+  (** [make_subscription streamer] returns a new stream of hashes for the subscriber to
+      consume. An [Lwt_watcher.stopper] function is also returned for the 
+      subscriber to close the stream.
   *)
-
-  (* [subscribe coordinator_host coordinator_port] returns an Lwt_stream of hashes and
-     a function to close the stream.
-  *)
-  val subscribe :
-    coordinator_host:string ->
-    coordinator_port:int ->
-    Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper
+  val make_subscription :
+    t -> (Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
 end
-
-module Make (P : Dac_plugin.T) : S
