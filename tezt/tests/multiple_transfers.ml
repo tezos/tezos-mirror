@@ -168,9 +168,10 @@ let test_multiple_transfer =
     in
     let source_fee =
       if payer = source then
-        let fee_first_transfer = Tez.of_mutez_int 0_000_352 in
-        let fee_second_transfer = Tez.of_mutez_int 0_000_256 in
-        Tez.(fee_first_transfer + fee_second_transfer)
+        Tez.of_mutez_int
+          (match protocol with
+          | Alpha -> 0_000_434
+          | Lima | Mumbai -> 0_000_608)
       else Tez.zero
     in
     Check.(
