@@ -1,3 +1,5 @@
+open Proto_compat
+
 type output_info = {
   outbox_level : int32;  (** The outbox level at which the message exists.*)
   message_index : Z.t;  (** The index of the message in the outbox. *)
@@ -40,7 +42,7 @@ let first_level buffer = Option.map fst (level_range buffer)
 
 let get_outbox_last_message_index messages =
   let last_message_index = Z.pred (Messages.num_elements messages) in
-  if Z.Compare.(last_message_index < Z.zero) then None
+  if Compare.Z.(last_message_index < Z.zero) then None
   else Some last_message_index
 
 (** Predicates on the outboxes *)
@@ -48,19 +50,19 @@ let get_outbox_last_message_index messages =
 let is_outbox_full message_limit outbox =
   match get_outbox_last_message_index outbox with
   | Some last_message_index ->
-      Z.Compare.(last_message_index >= Z.pred message_limit)
+      Compare.Z.(last_message_index >= Z.pred message_limit)
   | None -> false
 
 let is_outbox_available buffer level =
   match level_range buffer with
   | None -> false
   | Some (first_level, last_level) ->
-      level <= last_level && level >= first_level
+      Compare.Int32.(level <= last_level && level >= first_level)
 
 let is_message_available messages index =
   match get_outbox_last_message_index messages with
   | None -> false
-  | Some last_message -> Z.Compare.(index <= last_message && index >= Z.zero)
+  | Some last_message -> Compare.Z.(index <= last_message && index >= Z.zero)
 
 (** Outboxes creation and manipulation *)
 
@@ -88,7 +90,7 @@ let alloc ~validity_period ~message_limit ~last_level =
 
 (** [is_initialized buffer] returns [true] if the output buffer has been
     initialized. *)
-let is_initialized {last_level; _} = last_level <> None
+let is_initialized {last_level; _} = Option.is_some last_level
 
 (** [initialize_outbox buffer level] initialize the output_buffer with a fresh
     inbox at the given level.
@@ -96,7 +98,7 @@ let is_initialized {last_level; _} = last_level <> None
    @raise Already_initialized_outbox if the output_buffer has already been initialized
 *)
 let initialize_outbox buffer level =
-  if level < 0l then raise Invalid_level
+  if Compare.Int32.(level < 0l) then raise Invalid_level
   else
     match buffer.last_level with
     | None ->
@@ -145,7 +147,8 @@ let push_message buffer msg =
 
 let get_outbox buffer level =
   if not (is_outbox_available buffer level) then
-    if level < 0l then raise Invalid_level else raise Outdated_level
+    if Compare.Int32.(level < 0l) then raise Invalid_level
+    else raise Outdated_level
   else Outboxes.get level buffer.outboxes
 
 (** [get_message outboxes message_info] finds a message in the output buffer.
@@ -168,6 +171,6 @@ module Internal_for_tests = struct
       outboxes = level_map;
       validity_period = Int32.min_int;
       last_level = Some Int32.max_int;
-      message_limit = Z.of_int @@ Int.max_int;
+      message_limit = Z.of_int max_int;
     }
 end
