@@ -31,9 +31,9 @@ module JSONRPC = struct
 
   (** Ids in the JSON-RPC specification can be either a string, a number or NULL
       (which is represented by the option type). *)
-  type id = Id_string of string | Id_float of float
+  type id_repr = Id_string of string | Id_float of float
 
-  let id_encoding =
+  let id_repr_encoding =
     let open Data_encoding in
     union
       [
@@ -51,10 +51,12 @@ module JSONRPC = struct
           (fun i -> Id_float i);
       ]
 
+  type id = id_repr option
+
   type 'params request = {
     method_ : string;
     parameters : 'params option;
-    id : id option;
+    id : id;
   }
 
   let request_encoding method_ parameters_encoding =
@@ -66,7 +68,7 @@ module JSONRPC = struct
            (req "jsonrpc" (constant version))
            (req "method" (constant method_))
            (opt "params" parameters_encoding)
-           (opt "id" id_encoding)))
+           (opt "id" id_repr_encoding)))
 
   type 'data error = {code : int; message : string; data : 'data option}
 
@@ -82,7 +84,7 @@ module JSONRPC = struct
 
   type ('result, 'data_error) response = {
     value : ('result, 'data_error error) result;
-    id : id option;
+    id : id;
   }
 
   let response_encoding result_encoding error_data_encoding =
@@ -107,7 +109,7 @@ module JSONRPC = struct
            (req "jsonrpc" (constant version))
            (opt "result" result_encoding)
            (opt "error" (error_encoding error_data_encoding))
-           (req "id" (option id_encoding))))
+           (req "id" (option id_repr_encoding))))
 end
 
 type input = ..
@@ -148,15 +150,17 @@ module type METHOD = sig
 
   val request_encoding : m_input JSONRPC.request Data_encoding.t
 
-  val request : m_input option -> m_input JSONRPC.request
+  val request : m_input option -> JSONRPC.id -> m_input JSONRPC.request
 
   val response_encoding : (m_output, Error.t) JSONRPC.response Data_encoding.t
 
   val response :
     (m_output, Error.t JSONRPC.error) result ->
+    JSONRPC.id ->
     (m_output, Error.t) JSONRPC.response
 
-  val response_ok : m_output -> (m_output, Error.t) JSONRPC.response
+  val response_ok :
+    m_output -> JSONRPC.id -> (m_output, Error.t) JSONRPC.response
 end
 
 module MethodMaker (M : METHOD_DEF) :
@@ -173,14 +177,14 @@ module MethodMaker (M : METHOD_DEF) :
 
   let request_encoding = JSONRPC.request_encoding M.method_ M.input_encoding
 
-  let request parameters = JSONRPC.{method_; parameters; id = None}
+  let request parameters id = JSONRPC.{method_; parameters; id}
 
   let response_encoding =
     JSONRPC.response_encoding M.output_encoding Error.encoding
 
-  let response value = JSONRPC.{value; id = None}
+  let response value id = JSONRPC.{value; id}
 
-  let response_ok result = response (Ok result)
+  let response_ok result id = response (Ok result) id
 end
 
 module Network_id = MethodMaker (struct
@@ -281,8 +285,8 @@ module Input = struct
       ~title:M.method_
       (Tag tag_id)
       M.request_encoding
-      (function M.Input input -> Some (M.request input) | _ -> None)
-      (fun {parameters; _} -> M.Input parameters)
+      (function M.Input input, id -> Some (M.request input id) | _ -> None)
+      (fun {parameters; id; _} -> (M.Input parameters, id))
 
   let encoding =
     let open Data_encoding in
@@ -299,9 +303,9 @@ module Output = struct
       (Tag tag_id)
       M.response_encoding
       (function
-        | M.Output accounts -> Some JSONRPC.{value = accounts; id = None}
+        | M.Output accounts, id -> Some JSONRPC.{value = accounts; id}
         | _ -> None)
-      (fun {value = req; _} -> M.Output req)
+      (fun {value = req; id} -> (M.Output req, id))
 
   let encoding =
     let open Data_encoding in

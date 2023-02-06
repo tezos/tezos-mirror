@@ -85,18 +85,20 @@ module Mock = struct
 end
 
 let dispatch dir =
-  Directory.register0 dir dispatch_service (fun () input ->
-      match input with
-      | Accounts.Input _ -> Lwt.return_ok (Accounts.Output (Ok []))
-      | Network_id.Input _ ->
-          Lwt.return_ok (Network_id.Output (Ok Mock.chain_id))
-      | Chain_id.Input _ -> Lwt.return_ok (Chain_id.Output (Ok Mock.chain_id))
-      | Get_balance.Input _ ->
-          Lwt.return_ok (Get_balance.Output (Ok Mock.balance))
-      | Block_number.Input _ ->
-          Lwt.return_ok (Block_number.Output (Ok Mock.block_height))
-      | Get_block_by_number.Input _ ->
-          Lwt.return_ok (Get_block_by_number.Output (Ok Mock.block))
-      | _ -> Error_monad.failwith "Unsupported method\n%!")
+  Directory.register0 dir dispatch_service (fun () (input, id) ->
+      let open Lwt_result_syntax in
+      let* output =
+        match input with
+        | Accounts.Input _ -> return (Accounts.Output (Ok []))
+        | Network_id.Input _ -> return (Network_id.Output (Ok Mock.chain_id))
+        | Chain_id.Input _ -> return (Chain_id.Output (Ok Mock.chain_id))
+        | Get_balance.Input _ -> return (Get_balance.Output (Ok Mock.balance))
+        | Block_number.Input _ ->
+            return (Block_number.Output (Ok Mock.block_height))
+        | Get_block_by_number.Input _ ->
+            return (Get_block_by_number.Output (Ok Mock.block))
+        | _ -> Error_monad.failwith "Unsupported method\n%!"
+      in
+      return (output, id))
 
 let directory = Directory.empty |> version |> dispatch

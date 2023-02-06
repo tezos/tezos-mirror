@@ -33,9 +33,11 @@ module JSONRPC : sig
   (** Ids in the JSON-RPC specification can be either a string, a number or NULL
       (which is represented by the option type). Note that MetaMask uses ids
       that only fit in 64 bits, which is not supported by Data_encoding. *)
-  type id = Id_string of string | Id_float of float
+  type id_repr = Id_string of string | Id_float of float
 
-  val id_encoding : id Data_encoding.t
+  val id_repr_encoding : id_repr Data_encoding.t
+
+  type id = id_repr option
 
   (** JSON-RPC Request object:
       { "jsonrpc" : "2.0",
@@ -47,7 +49,7 @@ module JSONRPC : sig
   type 'params request = {
     method_ : string;
     parameters : 'params option;  (** `params` is optional. *)
-    id : id option;  (** `id` is optional. *)
+    id : id;  (** `id` is optional. *)
   }
 
   val request_encoding :
@@ -74,7 +76,7 @@ module JSONRPC : sig
       choice of using the result type as representation. *)
   type ('result, 'data_error) response = {
     value : ('result, 'data_error error) result;
-    id : id option;
+    id : id;
   }
 
   val response_encoding :
@@ -137,17 +139,19 @@ module type METHOD = sig
   val request_encoding : m_input JSONRPC.request Data_encoding.t
 
   (** [request input] builds a request object of the current method. *)
-  val request : m_input option -> m_input JSONRPC.request
+  val request : m_input option -> JSONRPC.id -> m_input JSONRPC.request
 
   val response_encoding : (m_output, Error.t) JSONRPC.response Data_encoding.t
 
   (** [response output] returns a response object for the method. *)
   val response :
     (m_output, Error.t JSONRPC.error) result ->
+    JSONRPC.id ->
     (m_output, Error.t) JSONRPC.response
 
-  (** [response_ok output] is a shortcut for [response (Ok output)]. *)
-  val response_ok : m_output -> (m_output, Error.t) JSONRPC.response
+  (** [response_ok output] is a shortcut for [reponse (Ok output)]. *)
+  val response_ok :
+    m_output -> JSONRPC.id -> (m_output, Error.t) JSONRPC.response
 end
 
 (** Builds a full Method module out of a method description. *)
@@ -162,7 +166,7 @@ val methods : (module METHOD) list
 module Input : sig
   type t = input
 
-  val encoding : input Data_encoding.t
+  val encoding : (input * JSONRPC.id) Data_encoding.t
 end
 
 (** [Output] defines the output encoding matching the defined methods in
@@ -170,7 +174,7 @@ end
 module Output : sig
   type nonrec 'a result = ('a, error JSONRPC.error) result
 
-  val encoding : output Data_encoding.t
+  val encoding : (output * JSONRPC.id) Data_encoding.t
 end
 
 module Network_id :
