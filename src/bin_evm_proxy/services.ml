@@ -131,6 +131,8 @@ let dispatch dir =
               (Get_transaction_receipt.Output (Ok Mock.transaction_receipt))
         | Send_raw_transaction.Input _ ->
             return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
+        | Send_transaction.Input _ ->
+            return (Send_transaction.Output (Ok Mock.transaction_hash))
         | _ -> Error_monad.failwith "Unsupported method\n%!"
       in
       return (output, id))

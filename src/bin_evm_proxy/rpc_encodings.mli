@@ -220,3 +220,8 @@ module Send_raw_transaction :
   METHOD
     with type m_input = Ethereum_types.hash
      and type m_output = Ethereum_types.hash
+
+module Send_transaction :
+  METHOD
+    with type m_input = Ethereum_types.transaction
+     and type m_output = Ethereum_types.hash

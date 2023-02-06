@@ -394,3 +394,29 @@ let transaction_receipt_encoding =
           (req "type" hash_encoding)
           (req "status" quantity_encoding)
           (req "root" hash_encoding)))
+
+type transaction = {
+  from : address;
+  to_ : address;
+  gas : quantity;
+  gasPrice : quantity;
+  value : quantity option;
+  data : hash;
+  nonce : quantity option;
+}
+
+let transaction_encoding =
+  let open Data_encoding in
+  conv
+    (fun {from; to_; gas; gasPrice; value; data; nonce} ->
+      (from, to_, gas, gasPrice, value, data, nonce))
+    (fun (from, to_, gas, gasPrice, value, data, nonce) ->
+      {from; to_; gas; gasPrice; value; data; nonce})
+    (obj7
+       (req "from" address_encoding)
+       (req "to" address_encoding)
+       (req "gas" quantity_encoding)
+       (req "gasPrice" quantity_encoding)
+       (opt "value" quantity_encoding)
+       (req "data" hash_encoding)
+       (opt "nonce" quantity_encoding))
