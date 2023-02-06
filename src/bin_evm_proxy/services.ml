@@ -90,6 +90,24 @@ module Mock = struct
       transaction = [];
       uncles = [];
     }
+
+  let transaction_receipt =
+    {
+      transactionHash = transaction_hash;
+      transactionIndex = qty_f Z.one;
+      blockHash = block_hash_of_string @@ String.make 32 'a';
+      blockNumber = qty_f Z.one;
+      from = Address "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
+      to_ = Address "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+      cumulativeGasUsed = gas_price;
+      effectiveGasPrice = gas_price;
+      gasUsed = gas_price;
+      logs = [];
+      logsBloom = hash_f @@ String.make 256 'a';
+      type_ = hash_f "0x00";
+      status = qty_f Z.one;
+      root = hash_f @@ String.make 32 'a';
+    }
 end
 
 let dispatch dir =
@@ -108,6 +126,9 @@ let dispatch dir =
         | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
         | Get_transaction_count.Input _ ->
             return (Get_transaction_count.Output (Ok Mock.transaction_count))
+        | Get_transaction_receipt.Input _ ->
+            return
+              (Get_transaction_receipt.Output (Ok Mock.transaction_receipt))
         | Send_raw_transaction.Input _ ->
             return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
         | _ -> Error_monad.failwith "Unsupported method\n%!"

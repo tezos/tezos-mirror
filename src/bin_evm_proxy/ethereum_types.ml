@@ -236,3 +236,161 @@ let block_encoding =
           (req "timestamp" quantity_encoding)
           (req "transaction" (list hash_encoding))
           (req "uncles" (list hash_encoding))))
+
+type transaction_log = {
+  address : address;
+  topics : hash list;
+  data : hash;
+  blockNumber : quantity;
+  transactionHash : hash;
+  transactionIndex : quantity;
+  blockHash : block_hash;
+  logIndex : quantity;
+  removed : bool;
+}
+
+let transaction_log_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           address;
+           topics;
+           data;
+           blockNumber;
+           transactionHash;
+           transactionIndex;
+           blockHash;
+           logIndex;
+           removed;
+         } ->
+      ( address,
+        topics,
+        data,
+        blockNumber,
+        transactionHash,
+        transactionIndex,
+        blockHash,
+        logIndex,
+        removed ))
+    (fun ( address,
+           topics,
+           data,
+           blockNumber,
+           transactionHash,
+           transactionIndex,
+           blockHash,
+           logIndex,
+           removed ) ->
+      {
+        address;
+        topics;
+        data;
+        blockNumber;
+        transactionHash;
+        transactionIndex;
+        blockHash;
+        logIndex;
+        removed;
+      })
+    (obj9
+       (req "address" address_encoding)
+       (req "topics" (list hash_encoding))
+       (req "data" hash_encoding)
+       (req "blockNumber" quantity_encoding)
+       (req "transactionHash" hash_encoding)
+       (req "transactionIndex" quantity_encoding)
+       (req "blockHash" block_hash_encoding)
+       (req "logIndex" quantity_encoding)
+       (req "removed" bool))
+
+type transaction_receipt = {
+  transactionHash : hash;
+  transactionIndex : quantity;
+  blockHash : block_hash;
+  blockNumber : quantity;
+  from : address;
+  to_ : address;
+  cumulativeGasUsed : quantity;
+  effectiveGasPrice : quantity;
+  gasUsed : quantity;
+  logs : transaction_log list;
+  logsBloom : hash;
+  type_ : hash;
+  status : quantity;
+  root : hash;
+}
+
+let transaction_receipt_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           transactionHash;
+           transactionIndex;
+           blockHash;
+           blockNumber;
+           from;
+           to_;
+           cumulativeGasUsed;
+           effectiveGasPrice;
+           gasUsed;
+           logs;
+           logsBloom;
+           type_;
+           status;
+           root;
+         } ->
+      ( ( transactionHash,
+          transactionIndex,
+          blockHash,
+          blockNumber,
+          from,
+          to_,
+          cumulativeGasUsed,
+          effectiveGasPrice,
+          gasUsed,
+          logs ),
+        (logsBloom, type_, status, root) ))
+    (fun ( ( transactionHash,
+             transactionIndex,
+             blockHash,
+             blockNumber,
+             from,
+             to_,
+             cumulativeGasUsed,
+             effectiveGasPrice,
+             gasUsed,
+             logs ),
+           (logsBloom, type_, status, root) ) ->
+      {
+        transactionHash;
+        transactionIndex;
+        blockHash;
+        blockNumber;
+        from;
+        to_;
+        cumulativeGasUsed;
+        effectiveGasPrice;
+        gasUsed;
+        logs;
+        logsBloom;
+        type_;
+        status;
+        root;
+      })
+    (merge_objs
+       (obj10
+          (req "transactionHash" hash_encoding)
+          (req "transactionIndex" quantity_encoding)
+          (req "blockHash" block_hash_encoding)
+          (req "blockNumber" quantity_encoding)
+          (req "from" address_encoding)
+          (req "to" address_encoding)
+          (req "cumulativeGasUsed" quantity_encoding)
+          (req "effectiveGasPrice" quantity_encoding)
+          (req "gasUsed" quantity_encoding)
+          (req "logs" (list transaction_log_encoding)))
+       (obj4
+          (req "logsBloom" hash_encoding)
+          (req "type" hash_encoding)
+          (req "status" quantity_encoding)
+          (req "root" hash_encoding)))

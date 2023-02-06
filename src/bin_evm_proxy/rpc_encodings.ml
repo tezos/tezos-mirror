@@ -294,6 +294,20 @@ module Get_transaction_count = MethodMaker (struct
   let method_ = "eth_getTransactionCount"
 end)
 
+module Get_transaction_receipt = MethodMaker (struct
+  open Ethereum_types
+
+  type input = hash
+
+  type output = transaction_receipt
+
+  let input_encoding = Data_encoding.tup1 hash_encoding
+
+  let output_encoding = transaction_receipt_encoding
+
+  let method_ = "eth_getTransactionReceipt"
+end)
+
 module Send_raw_transaction = MethodMaker (struct
   open Ethereum_types
 
@@ -318,6 +332,7 @@ let methods : (module METHOD) list =
     (module Get_block_by_number);
     (module Gas_price);
     (module Get_transaction_count);
+    (module Get_transaction_receipt);
     (module Send_raw_transaction);
   ]
 
