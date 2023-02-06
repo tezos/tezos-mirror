@@ -157,16 +157,21 @@ let download_and_save_slots
   let*! () =
     List.iter_p
       (fun s_slot ->
-        Node_context.save_unconfirmed_slot
+        Node_context.save_slot_status
           node_context
           current_block_hash
-          s_slot)
+          s_slot
+          `Unconfirmed)
       not_confirmed
   in
   List.iter_ep
     (fun s_slot ->
       let*! () =
-        Node_context.save_confirmed_slot node_context current_block_hash s_slot
+        Node_context.save_slot_status
+          node_context
+          current_block_hash
+          s_slot
+          `Confirmed
       in
       let*! () =
         Dal_slots_tracker_event.slot_has_been_confirmed

@@ -348,33 +348,34 @@ val get_slot_indexes :
 val save_slot_header :
   rw -> published_in_block_hash:Block_hash.t -> Dal.Slot.Header.t -> unit Lwt.t
 
-(** [processed_slot t ~confirmed_in_block_hash index] returns [None] if the slot
-    pages was never processed nor downloaded, [Some `Unconfirmed] if the slot
-    was not confirmed and [Some `Confirmed] if the slot is confirmed and the
-    associated pages are available. *)
-val processed_slot :
+(** [find_slot_status t ~confirmed_in_block_hash index] returns [None] if the
+    slot's block is not processed yet, [Some `Unconfirmed] if the slot was not
+    confirmed and [Some `Confirmed] if the slot is confirmed and the associated
+    pages are available. *)
+val find_slot_status :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
   Dal.Slot_index.t ->
   [`Unconfirmed | `Confirmed] option Lwt.t
 
-(** [processed_slots_with_statuses t ~confirmed_in_block_hash] lists the list of
+(** [list_slots_statuses t ~confirmed_in_block_hash] lists the list of
     slots indices with their respective statuses that are saved for the given
     [confirmed_in_block_hash] *)
-val list_processed_slots_with_statuses :
+val list_slots_statuses :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
   (Dal.Slot_index.t * [`Confirmed | `Unconfirmed]) list Lwt.t
 
-(** [save_unconfirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
-    that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
+(** [save_slot_status node_ctxt hash slot_index status] saves in
+    [node_ctxt.store] that [slot_index] has status [status] in the
+    block with hash in [node_ctxt.store].
 *)
-val save_unconfirmed_slot : rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
-
-(** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
-    that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
-*)
-val save_confirmed_slot : rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
+val save_slot_status :
+  rw ->
+  Block_hash.t ->
+  Dal.Slot_index.t ->
+  [`Confirmed | `Unconfirmed] ->
+  unit Lwt.t
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)

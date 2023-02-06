@@ -223,12 +223,11 @@ module Levels_to_hashes =
     end))
     (Tezos_store_shared.Block_key)
 
-(** stores slots whose data have been considered and pages stored to disk (if
-    they are confirmed). *)
-module Dal_processed_slots =
+(** Store attestation statuses for DAL slots on L1. *)
+module Dal_slots_statuses =
   Irmin_store.Make_nested_map
     (struct
-      let path = ["dal"; "processed_slots"]
+      let path = ["dal"; "slots_statuses"]
     end)
     (struct
       type key = Block_hash.t
@@ -245,25 +244,32 @@ module Dal_processed_slots =
       let name = "slot_index"
     end)
     (struct
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4780.
+
+         Rename Confirm-ed/ation to Attest-ed/ation in the rollup node. *)
       type value = [`Confirmed | `Unconfirmed]
 
-      let name = "slot_processing_status"
+      let name = "slot_status"
 
       let encoding =
+        (* We don't use
+           Data_encoding.string_enum because a union is more storage-efficient. *)
         let open Data_encoding in
-        let mk_case constr ~tag ~title =
-          case
-            ~title
-            (Tag tag)
-            (obj1 (req "kind" (constant title)))
-            (fun x -> if x = constr then Some () else None)
-            (fun () -> constr)
-        in
         union
           ~tag_size:`Uint8
           [
-            mk_case `Confirmed ~tag:0 ~title:"Confirmed";
-            mk_case `Unconfirmed ~tag:1 ~title:"Unconfirmed";
+            case
+              ~title:"Confirmed"
+              (Tag 0)
+              (obj1 (req "kind" (constant "Confirmed")))
+              (function `Confirmed -> Some () | `Unconfirmed -> None)
+              (fun () -> `Confirmed);
+            case
+              ~title:"Unconfirmed"
+              (Tag 1)
+              (obj1 (req "kind" (constant "Unconfirmed")))
+              (function `Unconfirmed -> Some () | `Confirmed -> None)
+              (fun () -> `Unconfirmed);
           ]
     end)
 

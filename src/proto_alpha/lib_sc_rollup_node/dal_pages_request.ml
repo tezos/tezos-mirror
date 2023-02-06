@@ -121,7 +121,7 @@ let slot_pages ~dal_attestation_lag node_ctxt
       node_ctxt
   in
   let*! processed =
-    Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
+    Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
   | Some `Confirmed ->
@@ -143,7 +143,7 @@ let page_content ~dal_attestation_lag node_ctxt page_id =
       node_ctxt
   in
   let*! processed =
-    Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
+    Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
   | Some `Confirmed -> (

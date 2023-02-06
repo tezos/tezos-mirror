@@ -53,9 +53,7 @@ end
 let get_dal_processed_slots node_ctxt block =
   let open Lwt_result_syntax in
   let*! list =
-    Node_context.list_processed_slots_with_statuses
-      node_ctxt
-      ~confirmed_in_block_hash:block
+    Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
   in
   return list
 
