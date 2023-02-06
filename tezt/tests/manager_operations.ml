@@ -1833,7 +1833,8 @@ module Tx_rollup = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Deserialization of transfer ticket"
-        (* TX rollups activated with (Proto 13) Jakarta  *)
+        (* TX rollups activated with (Proto 13) Jakarta and removed in
+           (Proto 16) Mumbai. *)
       ~supports:(Protocol.Between_protocols (13, 15))
       ~tags:
         [
@@ -1874,72 +1875,6 @@ module Tx_rollup = struct
     in
     unit
 
-  let transfer_ticket_no_overdraft =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"Deserialization of transfer ticket to implicit account"
-        (* Ticket transfer to implicit accounts was introduced in (Proto 16) M *)
-      ~supports:(Protocol.From_protocol 16)
-      ~tags:
-        [
-          "precheck";
-          "deserialization";
-          "gas";
-          "transfer_ticket";
-          "tx_rollup";
-          "canary";
-        ]
-    @@ fun protocol ->
-    let* nodes = Helpers.init ~protocol () in
-    let size_kB = 20 in
-    let min_deserialization_gas =
-      (* contents *) deserialization_gas ~size_kB + (* ty *) 1
-    in
-    let* _oph =
-      Memchecks.with_applied_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:["failed"]
-        ~expected_errors:[["gas_exhausted.operation"]]
-      (* Does not fail in precheck, so is applied (as failed) *)
-      @@ fun () ->
-      Operation.inject_transfer_ticket
-        ~protocol
-        ~source:Constant.bootstrap1
-        ~gas_limit:(min_deserialization_gas + 1000)
-          (* we add 1000 (the gas for manager operation) to avoid failing with
-             gas_exhausted right after precheck *)
-        ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
-        ~ty:(`Json (`O [("prim", `String "bytes")]))
-        ~ticketer:Constant.bootstrap2.public_key_hash
-        ~amount:1
-        ~destination:Constant.bootstrap1.public_key_hash
-        ~entrypoint:"default"
-        nodes.main.client
-    in
-    let* _oph =
-      Memchecks.with_applied_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:["failed"]
-        ~expected_errors:[["Negative_ticket_balance"]]
-      (* Does not fail in precheck, is applied with expected failure *)
-      @@ fun () ->
-      Operation.inject_transfer_ticket
-        ~protocol
-        ~source:Constant.bootstrap1
-        ~gas_limit:(min_deserialization_gas + 10000)
-          (* we add 10000 (the gas for manager operation) to make sure it goes all the way to trial application *)
-        ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
-        ~ty:(`Json (`O [("prim", `String "bytes")]))
-        ~ticketer:Constant.bootstrap2.public_key_hash
-        ~amount:1
-        ~destination:Constant.bootstrap1.public_key_hash
-        ~entrypoint:"default"
-        nodes.main.client
-    in
-    unit
-
   (* This test makes sure that the deserialization is performed in the
      precheck. The operation should be refused because there isn't enough gas to
      deserialize the micheline parameters. *)
@@ -1947,8 +1882,9 @@ module Tx_rollup = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Deserialization of transfer ticket too large"
-        (* TX rollups activated with (Proto 13) Jakarta  *)
-      ~supports:(Protocol.From_protocol 13)
+        (* TX rollups activated with (Proto 13) Jakarta and removed in
+           (Proto 16) Mumbai. *)
+      ~supports:(Protocol.Between_protocols (13, 15))
       ~tags:
         ["precheck"; "deserialization"; "gas"; "transfer_ticket"; "tx_rollup"]
     @@ fun protocol ->
@@ -1975,8 +1911,7 @@ module Tx_rollup = struct
 
   let register ~protocols =
     transfer_ticket_deserialization_canary protocols ;
-    transfer_ticket_deserialization_too_large protocols ;
-    transfer_ticket_no_overdraft protocols
+    transfer_ticket_deserialization_too_large protocols
 end
 
 let register ~protocols =
