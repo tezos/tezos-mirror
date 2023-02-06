@@ -30,7 +30,7 @@
 let replace_variables string =
   let replacements =
     [
-      ("sh1\\w{71}\\b", "[DAL_SLOT_HEADER]");
+      ("sh\\w{72}\\b", "[DAL_SLOT_HEADER]");
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
          Remove this regexp as soon as the WASM PVM stabilizes. *)
       ("srs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");

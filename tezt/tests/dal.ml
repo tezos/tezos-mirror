@@ -1480,24 +1480,35 @@ let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
 let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     sc_rollup_node sc_rollup_address node client _pvm_name =
+  (* Check that the rollup node downloaded the confirmed slots to which it is
+     subscribed:
+
+     0. run dl node.
+
+     1. Send three slots to dal node and obtain corresponding headers.
+
+     2. Run rollup node for an originated rollup.
+
+     3. Setting the parameters of the PVM. Rollup node subscribes to slots 0, 2,
+     4 and 6.
+
+     4. Publish the three slot headers for slots with indexes 0, 1 and 2.
+
+     5. Check that the slot_headers are fetched by the rollup node.
+
+     6. Attest only slots 1 and 2.
+
+     7. Only slots 1 and 2 are attested. No slot is currently pre-downloaded by
+     the rollup.
+
+     8. Bake a block so that the rollup node interprets the previously published
+     & attested slot(s).
+
+     9. Verify that rollup node has downloaded slot 2. Slot 0 is unconfirmed,
+     and slot 1 has not been downloaded.
+  *)
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let split_slot = split_slot dal_node ~slot_size in
-
-  (* Check that the rollup node stores the slots published in a block, along with slot headers:
-     0. Run dal node
-     1. Send three slots to dal node and obtain corresponding headers
-     2. Run rollup node for an originated rollup
-     3. (Rollup node is implicitely subscribed to all slots)
-     4. Publish the three slot headers for slots 0, 1, 2
-     5. Check that the rollup node fetched the slot headers from L1
-     6. After lag levels, attest only slots 1 and 2
-     7. Check that two slots have been attested
-     8. Send external messages to trigger the request of dal pages for
-        slots 0 and 1
-     9. Wait for the rollup node PVM to process the input and request
-        the slots
-     10. Check the first page of the two attested slots' content
-  *)
 
   (* 0. run dl node. *)
 
@@ -1508,6 +1519,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let* commitment_1, proof_1 = split_slot slot_contents_1 in
   let slot_contents_2 = " 400 " in
   let* commitment_2, proof_2 = split_slot slot_contents_2 in
+
   (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -1526,7 +1538,21 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       "Current level has moved past origination level (current = %L, expected \
        = %R)" ;
 
-  (* 3. (Rollup node is implicitely subscribed to all slots) *)
+  (* 3. Setting the parameters of the PVM. Rollup node subscribes to slots 0, 2,
+     4 and 6. *)
+  let attestation_lag = 1 in
+  let number_of_pages = 256 in
+  let subscribed_slots = "0:2:4:6" in
+  let messages =
+    [
+      Format.sprintf
+        "dal:%d:%d:%s"
+        attestation_lag
+        number_of_pages
+        subscribed_slots;
+    ]
+  in
+  let* () = send_messages client messages in
 
   (* 4. Publish the three slot headers for slots with indexes 0, 1 and 2. *)
   let* _op_hash =
@@ -1559,7 +1585,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   (* 5. Check that the slot_headers are fetched by the rollup node. *)
   let* () = Client.bake_for_and_wait client in
   let* slots_published_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 2)
   in
   let*! slots_headers =
     Sc_rollup_client.dal_slot_headers ~hooks sc_rollup_client
@@ -1572,7 +1598,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   Check.(commitments = expected_commitments)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
-  (* 6. attest only slots 1 and 2. *)
+
+  (* 6. Attest only slots 1 and 2. *)
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let nb_slots = parameters.number_of_slots in
   let* _ops_hashes = dal_attestations ~nb_slots [2; 1] client in
@@ -1585,6 +1612,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     ~error_msg:
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
+
   (* 7. Check that two slots have been attested. *)
   let*! downloaded_slots =
     Sc_rollup_client.get_dal_processed_slots ~hooks sc_rollup_client
@@ -1592,24 +1620,19 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let downloaded_confirmed_slots =
     List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
   in
-  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
+  let expected_number_of_confirmed_slots = 2 in
+
   Check.(
-    List.length downloaded_confirmed_slots
-    = expected_number_of_downloaded_or_unconfirmed_slots)
+    List.length downloaded_confirmed_slots = expected_number_of_confirmed_slots)
     Check.int
     ~error_msg:
       "Unexpected number of slots that have been either downloaded or \
        unconfirmed (current = %L, expected = %R)" ;
-  (* 8 Sends message to import dal pages from slots 0 and 1 of published_level
-     to the PVM. *)
-  let published_level_as_string = Int.to_string slots_published_level in
-  let messages =
-    [
-      "dal:" ^ published_level_as_string ^ ":0:0";
-      "dal:" ^ published_level_as_string ^ ":1:0";
-    ]
-  in
-  let* () = send_messages client messages in
+
+  (* 8. Bake a block so that the rollup node interprets the previously published
+     & attested slot(s). *)
+  let* () = Client.bake_for_and_wait client in
+
   let* level =
     Sc_rollup_node.wait_for_level sc_rollup_node (slot_confirmed_level + 1)
   in
@@ -1618,7 +1641,9 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     ~error_msg:
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
-  (* 9. Wait for the rollup node to download the attested slots. *)
+
+  (* 9. Verify that rollup node has downloaded slot 2. Slot 0 is unconfirmed,
+     and slot 1 has not been downloaded. *)
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
   let*! downloaded_slots =
     Sc_rollup_client.get_dal_processed_slots
@@ -1629,10 +1654,9 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
   in
   (* 10. Check the first page of the two attested slots' content. *)
-  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
+  let expected_number_of_confirmed_slots = 2 in
   Check.(
-    List.length downloaded_confirmed_slots
-    = expected_number_of_downloaded_or_unconfirmed_slots)
+    List.length downloaded_confirmed_slots = expected_number_of_confirmed_slots)
     Check.int
     ~error_msg:
       "Unexpected number of slots that have been either downloaded or \
@@ -1703,43 +1727,13 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
       - the page 0 of slot 0 contains 10,
       - the page 0 of slot 1 contains 200,
       - the page 0 of slot 2 contains 400.
-     Only slot 1 is confirmed. Below, we expect to have value = 302. *)
-  let expected_value = 302 in
+     Only slot 1 abd 2 are confirmed. But PVM Arith only interprets even
+     slots, we expect to have value = 502
+     (including the values 99 and 3 send via Inbox).
+  *)
+  let expected_value = 502 in
   (* The code should be adapted if the current level changes. *)
-  assert (level = 5) ;
-  let* () =
-    send_messages
-      client
-      [
-        " 99 3 ";
-        (* Total sum is now 99 + 3 = 102 *)
-        " dal:3:1:0 ";
-        (* Page 0 of Slot 1 contains 200, total sum is 302. *)
-        " dal:3:1:1 ";
-        " dal:3:0:0 ";
-        (* Slot 0 is not confirmed, total sum doesn't change. *)
-        " dal:3:0:2 ";
-        (* Page 2 of Slot 0 empty, total sum unchanged. *)
-        (* Page 1 of Slot 1 is empty, total sum unchanged. *)
-        " dal:2:1:0 ";
-        (* It's too late to import a page published at level 5. *)
-        " dal:5:1:0 ";
-        (* It's too early to import a page published at level 7. *)
-        " dal:3:10000:0 ";
-        " dal:3:0:100000 ";
-        " dal:3:-10000:0 ";
-        " dal:3:0:-100000 ";
-        " dal:3:expecting_integer:0 ";
-        " dal:3:0:expecting_integer ";
-        (* The 6 pages requests above are ignored by the PVM because
-           slot/page ID is out of bounds or illformed. *)
-        " dal:1002147483647:1:1 "
-        (* Level is about Int32.max_int, directive should be ignored. *);
-        "   + + value";
-      ]
-  in
-
-  (* Slot 1 is not confirmed, hence the total sum doesn't change. *)
+  let* () = send_messages client [" 99 3 "; " + + value"] in
   let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* _lvl =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
@@ -2130,8 +2124,8 @@ let register ~protocols =
     test_dal_node_get_assigned_shard_indices
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "dal node GET \
-     /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+    "dal node GET /profiles/<public_key_hash>/attested_levels/<level>/att\n\
+     estable_slots"
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes

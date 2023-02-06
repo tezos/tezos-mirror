@@ -870,7 +870,19 @@ module Arith_test_pvm = struct
               let* state_hash = state_hash state in
               let our_states = (tick, state_hash) :: our_states in
               go ~our_states (consume_fuel fuel) (tick + 1) state
-          | _ -> return (state, fuel, tick, our_states))
+          | Needs_reveal (Request_dal_page _pid) ->
+              (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4160
+                 We assume that there are no confirmed Dal slots.
+                 We'll reuse the infra to provide Dal pages in the future. *)
+              let input = Sc_rollup.(Reveal (Dal_page None)) in
+              let* state = set_input input state in
+              let* state_hash = state_hash state in
+              let our_states = (tick, state_hash) :: our_states in
+              go ~our_states (consume_fuel fuel) (tick + 1) state
+          | Needs_reveal (Reveal_raw_data _)
+          | Needs_reveal Reveal_metadata
+          | Initial | First_after _ ->
+              return (state, fuel, tick, our_states))
     in
     go ~our_states fuel start_tick state
 
