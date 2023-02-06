@@ -526,7 +526,8 @@ let sign_dal_attestations state attestations =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some
+            (delegate, operation, consensus_content.Dal.Attestation.attestation))
     attestations
 
 let inject_endorsements state ~endorsements =
@@ -553,7 +554,7 @@ let inject_dal_attestations state attestations =
   let chain_id = state.global_state.chain_id in
   sign_dal_attestations state attestations >>=? fun signed_operations ->
   List.iter_ep
-    (fun (delegate, signed_operation) ->
+    (fun (delegate, signed_operation, (attestation : Dal.Attestation.t)) ->
       let encoded_op =
         Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
       in
@@ -562,8 +563,9 @@ let inject_dal_attestations state attestations =
         ~chain:(`Hash chain_id)
         encoded_op
       >>=? fun oph ->
-      Events.(emit attestation_injected (oph, delegate)) >>= fun () ->
-      return_unit)
+      let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
+      Events.(emit attestation_injected (oph, delegate, bitset_int))
+      >>= fun () -> return_unit)
     signed_operations
 
 let no_dal_node_warning_counter = ref 0

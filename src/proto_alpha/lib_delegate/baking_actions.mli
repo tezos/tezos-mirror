@@ -103,7 +103,9 @@ val inject_endorsements :
 val sign_dal_attestations :
   state ->
   (consensus_key_and_delegate * Dal.Attestation.operation) list ->
-  (consensus_key_and_delegate * packed_operation) list tzresult Lwt.t
+  (consensus_key_and_delegate * packed_operation * Dal.Attestation.t) list
+  tzresult
+  Lwt.t
 
 val get_dal_attestations :
   state ->
