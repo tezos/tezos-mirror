@@ -358,24 +358,13 @@ val processed_slot :
   Dal.Slot_index.t ->
   [`Unconfirmed | `Confirmed] option Lwt.t
 
-(** [list_slot_pages t ~confirmed_in_block_hash] lists all slots and their pages
-    that were confirmed and stored by the rollup node for
-    [confirmed_in_block_hash]. *)
-val list_slot_pages :
+(** [processed_slots_with_statuses t ~confirmed_in_block_hash] lists the list of
+    slots indices with their respective statuses that are saved for the given
+    [confirmed_in_block_hash] *)
+val list_processed_slots_with_statuses :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
-  ((Dal.Slot_index.t * int) * bytes) list Lwt.t
-
-(** [find_slot_page t ~confirmed_in_block_hash slot_index page_index] retrieves
-    a pages (with index [page_index]) for a slot [slot_index] that was confirmed
-    in the provided block hash. It returns [None] if the slot was not processed
-    or if the page index is out of bounds. *)
-val find_slot_page :
-  _ t ->
-  confirmed_in_block_hash:Block_hash.t ->
-  slot_index:Dal.Slot_index.t ->
-  page_index:int ->
-  bytes option Lwt.t
+  (Dal.Slot_index.t * [`Confirmed | `Unconfirmed]) list Lwt.t
 
 (** [save_unconfirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
@@ -384,9 +373,8 @@ val save_unconfirmed_slot : rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
 
 (** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
-    The contents of the slot are set to [pages] in [node_ctxt.store]. *)
-val save_confirmed_slot :
-  rw -> Block_hash.t -> Dal.Slot_index.t -> bytes list -> unit Lwt.t
+*)
+val save_confirmed_slot : rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)

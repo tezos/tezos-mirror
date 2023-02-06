@@ -584,22 +584,21 @@ module Global = struct
         ~output:(Data_encoding.list Dal.Slot.Header.encoding)
         (path / "dal" / "slot_headers")
 
-    let dal_confirmed_slot_pages =
+    let dal_slot_status_encoding : [`Confirmed | `Unconfirmed] Data_encoding.t =
+      Data_encoding.string_enum
+        [("confirmed", `Confirmed); ("unconfirmed", `Unconfirmed)]
+
+    let dal_processed_slots =
       Tezos_rpc.Service.get_service
-        ~description:
-          "Data availability confirmed & downloaded slot pages for a given \
-           block hash"
+        ~description:"Data availability processed slots and their statuses"
         ~query:Tezos_rpc.Query.empty
         ~output:
-          (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
-               Estimate size of binary encoding and add a check_size to the
-             encoding. *)
           Data_encoding.(
             list
             @@ obj2
                  (req "index" Dal.Slot_index.encoding)
-                 (req "contents" (list Dal.Page.content_encoding)))
-        (path / "dal" / "confirmed_slot_pages")
+                 (req "status" dal_slot_status_encoding))
+        (path / "dal" / "processed_slots")
 
     module Outbox = struct
       let level_param =

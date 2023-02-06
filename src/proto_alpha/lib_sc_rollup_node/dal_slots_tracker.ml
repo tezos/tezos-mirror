@@ -135,8 +135,8 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
 *)
 
 let download_and_save_slots
-    ({Node_context.dal_cctxt; protocol_constants; _} as node_context)
-    ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
+    ({Node_context.protocol_constants; _} as node_context) ~current_block_hash
+    {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
     Bitset.fill ~length:protocol_constants.parametric.dal.number_of_slots
@@ -165,26 +165,8 @@ let download_and_save_slots
   in
   List.iter_ep
     (fun s_slot ->
-      (* fails if slot_header is missing but the slot with index s_slot has been
-           confirmed. This scenario should not be possible. *)
-      let* {commitment; _} =
-        Node_context.get_slot_header
-          node_context
-          ~published_in_block_hash:published_block_hash
-          s_slot
-      in
-      (* DAL must be configured for this point to be reached *)
-      let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
-      (* The slot with index s_slot is confirmed. We can
-         proceed retrieving it from the dal node and save it
-         in the store. *)
-      let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
       let*! () =
-        Node_context.save_confirmed_slot
-          node_context
-          current_block_hash
-          s_slot
-          pages
+        Node_context.save_confirmed_slot node_context current_block_hash s_slot
       in
       let*! () =
         Dal_slots_tracker_event.slot_has_been_confirmed

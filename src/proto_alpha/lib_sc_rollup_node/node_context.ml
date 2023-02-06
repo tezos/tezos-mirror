@@ -613,16 +613,10 @@ let processed_slot {store; _} ~confirmed_in_block_hash slot_index =
     ~primary_key:confirmed_in_block_hash
     ~secondary_key:slot_index
 
-let list_slot_pages {store; _} ~confirmed_in_block_hash =
-  Store.Dal_slot_pages.list_secondary_keys_with_values
+let list_processed_slots_with_statuses {store; _} ~confirmed_in_block_hash =
+  Store.Dal_processed_slots.list_secondary_keys_with_values
     store.irmin_store
     ~primary_key:confirmed_in_block_hash
-
-let find_slot_page {store; _} ~confirmed_in_block_hash ~slot_index ~page_index =
-  Store.Dal_slot_pages.find
-    store.irmin_store
-    ~primary_key:confirmed_in_block_hash
-    ~secondary_key:(slot_index, page_index)
 
 let save_unconfirmed_slot {store; _} current_block_hash slot_index =
   (* No page is actually saved *)
@@ -632,20 +626,9 @@ let save_unconfirmed_slot {store; _} current_block_hash slot_index =
     ~secondary_key:slot_index
     `Unconfirmed
 
-let save_confirmed_slot {store; _} current_block_hash slot_index pages =
+let save_confirmed_slot {store; _} current_block_hash slot_index =
   (* Adding multiple entries with the same primary key amounts to updating the
      contents of an in-memory map, hence pages must be added sequentially. *)
-  let open Lwt_syntax in
-  let* () =
-    List.iteri_s
-      (fun page_number page ->
-        Store.Dal_slot_pages.add
-          store.irmin_store
-          ~primary_key:current_block_hash
-          ~secondary_key:(slot_index, page_number)
-          page)
-      pages
-  in
   Store.Dal_processed_slots.add
     store.irmin_store
     ~primary_key:current_block_hash
