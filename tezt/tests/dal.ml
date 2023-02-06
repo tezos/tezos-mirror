@@ -1467,14 +1467,14 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
-let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
-    client msgs =
+let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
+    ?(alter_final_msg = Fun.id) client msgs =
   let msg =
     alter_final_msg
     @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
   in
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
-  Client.bake_for_and_wait client
+  if bake then Client.bake_for_and_wait client else unit
 
 let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
