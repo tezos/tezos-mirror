@@ -925,7 +925,8 @@ module Deserialisation = struct
     let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas =
-      Constant.manager_operation_gas_cost + deserialization_gas ~size_kB
+      Constant.manager_operation_gas_cost ~protocol
+      + deserialization_gas ~size_kB
     in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->

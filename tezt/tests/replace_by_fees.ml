@@ -106,7 +106,7 @@ let default_fee = 1000
 let replacement_fee = minimal_replacement_fee default_fee
 
 (* Default gas limit used in the tests of this module *)
-let default_gas = 1000 + Constant.manager_operation_gas_cost
+let default_gas = 2000
 
 (* Default transferred amount used in the tests of this module *)
 let default_amount = 1
