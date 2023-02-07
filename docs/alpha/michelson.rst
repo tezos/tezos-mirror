@@ -799,76 +799,15 @@ element is accessed by ``GET (2n)``.
 Operations on sets
 ~~~~~~~~~~~~~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 -  ``EMPTY_SET 'elt``: Build a new, empty set for elements of a given
-   type.
-
-   The ``'elt`` type must be comparable (the ``COMPARE``
-   primitive must be defined over it).
-
-::
-
-    :: 'S   ->   set 'elt : 'S
-
-    > EMPTY_SET _ / S  =>  {} : S
-
--  ``MEM``: Check for the presence of an element in a set.
-
-::
-
-    :: 'elt : set 'elt : 'S   ->  bool : 'S
-
-    > MEM / x : {} : S  =>  false : S
-    > MEM / x : { hd ; <tl> } : S  =>  r : S
-        iff COMPARE / x : hd : []  =>  1 : []
-        where MEM / x : { <tl> } : S  =>  r : S
-    > MEM / x : { hd ; <tl> } : S  =>  true : S
-        iff COMPARE / x : hd : []  =>  0 : []
-    > MEM / x : { hd ; <tl> } : S  =>  false : S
-        iff COMPARE / x : hd : []  =>  -1 : []
-
+   type (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_SET>`__).
+-  ``MEM``: Check for the presence of an element in a set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
 -  ``UPDATE``: Inserts or removes an element in a set, replacing a
-   previous value.
-
-::
-
-    :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
-
-    > UPDATE / x : false : {} : S  =>  {} : S
-    > UPDATE / x : true : {} : S  =>  { x } : S
-    > UPDATE / x : v : { hd ; <tl> } : S  =>  { hd ; <tl'> } : S
-        iff COMPARE / x : hd : []  =>  1 : []
-        where UPDATE / x : v : { <tl> } : S  =>  { <tl'> } : S
-    > UPDATE / x : false : { hd ; <tl> } : S  =>  { <tl> } : S
-        iff COMPARE / x : hd : []  =>  0 : []
-    > UPDATE / x : true : { hd ; <tl> } : S  =>  { hd ; <tl> } : S
-        iff COMPARE / x : hd : []  =>  0 : []
-    > UPDATE / x : false : { hd ; <tl> } : S  =>  { hd ; <tl> } : S
-        iff COMPARE / x : hd : []  =>  -1 : []
-    > UPDATE / x : true : { hd ; <tl> } : S  =>  { x ; hd ; <tl> } : S
-        iff COMPARE / x : hd : []  =>  -1 : []
-
--  ``ITER body``: Apply the body expression to each element of a set.
-   The body sequence has access to the stack.
-
-::
-
-    :: (set 'elt) : 'A   ->  'A
-       iff body :: [ 'elt : 'A -> 'A ]
-
-    > ITER body / {} : S  =>  S
-    > ITER body / { hd ; <tl> } : S  =>  ITER body / { <tl> } : S'
-       iff body / hd : S  =>  S'
-
-
--  ``SIZE``: Get the cardinality of the set.
-
-::
-
-    :: set 'elt : 'S -> nat : 'S
-
-    > SIZE / {} : S  =>  0 : S
-    > SIZE / { _ ; <tl> } : S  =>  1 + s : S
-        where SIZE / { <tl> } : S  =>  s : S
+   previous value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
+-  ``ITER body``: Apply the body expression to each element of a set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
+-  ``SIZE``: Get the cardinality of the set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
 
 Operations on maps
 ~~~~~~~~~~~~~~~~~~
