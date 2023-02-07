@@ -80,9 +80,9 @@ type state =
 
 exception Step_error of state
 
-let string_of_byte b = Printf.sprintf "%02x" b
+let string_of_byte b = Format.sprintf "%02x" b
 
-let string_of_multi n = Printf.sprintf "%02lx" n
+let string_of_multi n = Format.sprintf "%02lx" n
 
 let position_ file pos = Source.{file; line = -1; column = pos}
 

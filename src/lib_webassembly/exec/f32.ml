@@ -14,5 +14,5 @@ include Fxx.Make (struct
 
   let bare_nan = 0x7f80_0000l
 
-  let to_hex_string = Printf.sprintf "%lx"
+  let to_hex_string = Format.sprintf "%lx"
 end)
