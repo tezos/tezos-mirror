@@ -44,6 +44,15 @@ Node
 - Fixed a bug raising an error when a context split was called on a
   context that was created with Octez v13 (or earlier).
 
+- Deprecated the RPC ``GET /monitor/valid_blocks`` and introduced
+  ``GET /monitor/validated_blocks`` and ``GET /monitor/applied_blocks``
+  which respectively returns validated blocks, which are not yet applied
+  nor stored, and applied blocks which are fully applied and stored by
+  the node. (MR :gl: `!7513`)
+
+- Replaced some "precheck" occurrences with "validate" in event and
+  error identifiers and messages. (MR :gl: `!7513`)
+
 Client
 ------
 
