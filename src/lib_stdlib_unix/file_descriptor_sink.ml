@@ -227,6 +227,12 @@ end) : Internal_event.SINK with type t = t = struct
             | "" | "/" -> fail_parsing uri "Missing path configuration."
             | path -> return path
           in
+          let allow_create_dir = flag "create-dirs" in
+          let*! () =
+            if allow_create_dir then
+              Lwt_utils_unix.create_dir (Filename.dirname path)
+            else Lwt.return_unit
+          in
           let open Lwt_result_syntax in
           let time_ext, rotation =
             match rotate with

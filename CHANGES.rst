@@ -53,6 +53,9 @@ Node
 - Replaced some "precheck" occurrences with "validate" in event and
   error identifiers and messages. (MR :gl: `!7513`)
 
+- Added an option ``create-dirs`` to file-descriptor sinks to allow
+  the node to create the log directory and its parents if they don't exist.
+
 Client
 ------
 
