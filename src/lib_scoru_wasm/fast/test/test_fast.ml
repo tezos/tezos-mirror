@@ -141,7 +141,10 @@ let test_against_both ?write_debug ?(set_input = Wasm_utils.set_full_input_step)
   in
 
   let* initial_tree =
-    Wasm_utils.initial_tree ~max_tick:11_000_000_000L ~from_binary kernel
+    Wasm_utils.initial_tree
+      ~ticks_per_snapshot:Wasm_utils.production_max_tick
+      ~from_binary
+      kernel
   in
 
   (* make sure to start in correct state *)
@@ -758,7 +761,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set () =
   in
   let*! initial_tree =
     Wasm_utils.initial_tree
-      ~max_tick:11_000_000_000L
+      ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary:false
       kernel_bounded_reboot
   in
@@ -828,7 +831,7 @@ let test_check_nb_ticks () =
   in
   let*! initial_tree =
     Wasm_utils.initial_tree
-      ~max_tick:11_000_000_000L
+      ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary:false
       kernel_bounded_reboot
   in

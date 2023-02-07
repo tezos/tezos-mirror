@@ -48,16 +48,18 @@ let wat2wasm code =
 
 let default_max_tick = 100000L
 
+let production_max_tick = 11_000_000_000L
+
 let default_outbox_validity_period = 10l
 
 let default_outbox_message_limit = Z.of_int32 100l
 
-let initial_tree ?(max_tick = default_max_tick)
+let initial_tree ?(ticks_per_snapshot = default_max_tick)
     ?(max_reboots = Constants.maximum_reboots_per_input) ?(from_binary = false)
     ?(outbox_validity_period = default_outbox_validity_period)
     ?(outbox_message_limit = default_outbox_message_limit) code =
   let open Lwt.Syntax in
-  let max_tick_Z = Z.of_int64 max_tick in
+  let max_tick_Z = Z.of_int64 ticks_per_snapshot in
   let* tree = empty_tree () in
   let* tree = Wasm.initial_state tree in
   let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
@@ -126,7 +128,10 @@ let rec eval_to_snapshot ?(reveal_builtins = reveal_builtins) ?write_debug
   | Input_required | Reveal_required _ ->
       Stdlib.failwith "Cannot reach snapshot point"
 
-let rec eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
+(** [eval_until_input_requested tree] will either
+    - return tree if input is required
+    - or run compute_step_many to reach a point where input is required *)
+let eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
     ?write_debug ?after_fast_exec ?(fast_exec = false)
     ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
@@ -139,13 +144,7 @@ let rec eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
   match info.input_request with
   | No_input_required ->
       let* tree, _ = run ?reveal_builtins ?write_debug ~max_steps tree in
-      eval_until_input_requested
-        ~reveal_builtins
-        ?write_debug
-        ?after_fast_exec
-        ~fast_exec
-        ~max_steps
-        tree
+      return tree
   | Input_required | Reveal_required _ -> return tree
 
 let eval_until_input_or_reveal_requested =
