@@ -23,29 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Unit_test : sig
-  (**
-   * Example: [spec "Data_streamer.ml" Test_data_streamer.tests]
-   * Unit tests needs tag in log (like "[UNIT] some test description here...")
-   * This function handles such meta data *)
-  val spec :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
+(** Testing
+    -------
+    Component:  Lib_dac_node Data_streamer
+    Invocation: dune exec src/lib_dac_node/test/main.exe \
+                  -- test "^\[Unit\] Data_streamer.ml$"   
+    Subject:    Tests for the data streamer component.
+*)
 
-  (** Tests with description string without [Unit] are skipped *)
-  val _skip :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
-end = struct
-  let spec unit_name test_cases = ("[Unit] " ^ unit_name, test_cases)
+let dac_hash_1 = "hash_1"
 
-  let _skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
-end
+let assert_equal_string expected actual =
+  Assert.equal
+    ~loc:__LOC__
+    ~eq:String.equal
+    ~pp:Format.pp_print_string
+    expected
+    actual
 
-let () =
-  Alcotest_lwt.run
-    "protocol > unit"
-    [Unit_test.spec "Data_streamer.ml" Test_data_streamer.tests]
-  |> Lwt_main.run
+let test_simple_pub_sub () =
+  let open Lwt_result_syntax in
+  let open Data_streamer in
+  let streamer = init () in
+  let* stream, stopper = handle_subscribe streamer in
+  let* () = publish streamer dac_hash_1 in
+  let*! next = Lwt_stream.next stream in
+  let () = Lwt_watcher.shutdown stopper in
+  let*! is_empty = Lwt_stream.is_empty stream in
+  let () = Assert.assert_true "Expected empty stream." is_empty in
+  return @@ assert_equal_string dac_hash_1 next
+
+let tests = [Tztest.tztest "Simple pub sub" `Quick test_simple_pub_sub]
