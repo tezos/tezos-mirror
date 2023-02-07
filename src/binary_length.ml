@@ -69,6 +69,7 @@ let rec length : type x. x Encoding.t -> x -> int =
   | RangedFloat _ -> Binary_size.float
   | Bytes (`Fixed n, _) -> n
   | String (`Fixed n, _) -> n
+  | Bigstring (`Fixed n, _) -> n
   | Padded (e, n) -> length e value + n
   | String_enum (_, arr) ->
       Binary_size.integer_to_size @@ Binary_size.enum_size arr
@@ -89,6 +90,7 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Ignore -> 0
   | Bytes (`Variable, _) -> Bytes.length value
   | String (`Variable, _) -> String.length value
+  | Bigstring (`Variable, _) -> Bigstringaf.length value
   | Array {length_limit; length_encoding; elts} ->
       (match length_limit with
       | No_limit -> ()
@@ -195,6 +197,7 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | RangedFloat _ -> Some Binary_size.float
   | Bytes (`Fixed n, _) -> Some n
   | String (`Fixed n, _) -> Some n
+  | Bigstring (`Fixed n, _) -> Some n
   | Padded (e, n) ->
       let* s = maximum_length e in
       Some (s + n)
@@ -211,6 +214,7 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Ignore -> Some 0
   | Bytes (`Variable, _) -> None
   | String (`Variable, _) -> None
+  | Bigstring (`Variable, _) -> None
   | Array {length_limit; length_encoding; elts = e} ->
       let* es =
         match length_limit with

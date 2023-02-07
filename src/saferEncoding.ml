@@ -104,6 +104,7 @@ let rec check_dup_fields : type a. Mu_visited.t -> SSet.t -> a t -> SSet.t =
   | Float -> assert false
   | Bytes _ -> assert false
   | String _ -> assert false
+  | Bigstring _ -> assert false
 
 let obj1 f1 =
   let o = obj1 f1 in

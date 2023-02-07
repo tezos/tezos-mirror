@@ -302,6 +302,16 @@ module Encoding : sig
   (** same as [bytes' Hex] *)
   val bytes : Bytes.t encoding
 
+  type bigstring =
+    (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
+  (** same as [string'] but for bigstring. *)
+  val bigstring :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    ?string_json_repr:string_json_repr ->
+    unit ->
+    bigstring encoding
+
   (** {3 Descriptor combinators} *)
 
   (** Combinator to make an optional value
@@ -331,7 +341,7 @@ module Encoding : sig
   (** Array combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
-       prefixed its size in bytes
+       prefixed by its size in bytes
 
       @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
@@ -363,7 +373,7 @@ module Encoding : sig
   (** List combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
-        prefixed its size in bytes
+        prefixed by its size in bytes
 
       @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
@@ -1020,6 +1030,10 @@ let encoding_t =
     val bytes : int -> Bytes.t encoding
 
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
+    val bigstring :
+      ?string_json_repr:string_json_repr -> int -> bigstring encoding
+
+    (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val bytes' : string_json_repr -> int -> Bytes.t encoding
 
     (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
@@ -1108,6 +1122,9 @@ let expr_encoding =
 
     val bytes' : string_json_repr -> Bytes.t encoding
 
+    val bigstring :
+      ?string_json_repr:string_json_repr -> unit -> bigstring encoding
+
     (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val array : ?max_length:int -> 'a encoding -> 'a array encoding
@@ -1133,6 +1150,8 @@ let expr_encoding =
         the specified bound. E.g.,
         [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
 
+        @raise Invalid_argument if specified bound is negative or null.
+
         @raise Invalid_argument if [length_kind] is unset and the specified
         bound is larger than 2^30. *)
     val string' :
@@ -1153,6 +1172,21 @@ let expr_encoding =
 
     (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding
+
+    (** Same as [string] but for {!type-bigstring}.
+
+        @param [?string_json_repr] defaults to [Hex].
+
+        @raise Invalid_argument if [length_kind] is set but it cannot accommodate
+        the specified bound. E.g.,
+        [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
+
+        @raise Invalid_argument if specified bound is negative or null. *)
+    val bigstring :
+      ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+      ?string_json_repr:string_json_repr ->
+      int ->
+      bigstring encoding
   end
 
   (** Mark an encoding as being of dynamic size.

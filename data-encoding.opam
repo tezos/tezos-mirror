@@ -19,6 +19,7 @@ depends: [
   "crowbar" { >= "0.2" & with-test }
   "ppx_expect" { with-test }
   "either"
+  "bigstringaf"
   "ppx_hash"
   "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
   "odoc" { with-doc }

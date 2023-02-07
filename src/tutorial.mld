@@ -964,6 +964,22 @@ the size of the string. E.g., [`Uint8] will only be able to support strings
 up to 255 bytes long. Also note that for internal consistency and compatibility
 with 32-bit machines, [`N] is actually limited in range to 2^30.
 
+[bigstring: unit -> string encoding] (dynamic) is a combinator for
+the [bigstring] type. The [bigstring] type is an alias for a [Bigarray] type to
+represent strings (also used in other libraries such as [Bigstringaf]). In
+binary the data is represented like a [string]. In JSON, it is represented as a
+hex-encoded String literal.
+
+The optional parameter [?length_kind] allows you to control the representation
+of the size-header of the string. Note that the size header imposes a limit on
+the size of the string. E.g., [`Uint8] will only be able to support strings
+up to 255 bytes long. Also note that for internal consistency and compatibility
+with 32-bit machines, [`N] is actually limited in range to 2^30.
+
+The optional parameter [?string_json_repr] allows you to modify the
+representation of the string in JSON. Pass the value [Plain] to represent the
+data as a String literal.
+
 [bytes' : string_json_repr -> bytes encoding] (dynamic) is a combinator for
 the [bytes] type. In binary it is represented like a [bytes]. In JSON, it's
 representation depends on the [string_json_repr] parameter: with [Plain] it is
@@ -1079,6 +1095,16 @@ type [bytes] of statically known length. In binary it is identical to
 [Fixed.string]. In JSON it fails with in the same cases as [Fixed.length] but it
 uses the hexadecimal encoding described in [bytes].
 
+[Fixed.bigstring: int -> string encoding] (fixed:n) is a combinator for values
+of the [bigstring] type of statically known length. The [bigstring] type is an
+alias for a [Bigarray] type to represent strings (also used in other libraries
+such as [Bigstringaf]). In binary the data is represented like a [Fixed.string].
+In JSON, it is represented as a hex-encoded String literal.
+
+The optional parameter [?string_json_repr] allows you to modify the
+representation of the string in JSON. Pass the value [Plain] to represent the
+data as a String literal.
+
 [Fixed.add_padding: 'a encoding -> int -> 'a encoding] (fixed:+n) is a
 combinator which adds blank bytes in binary and has no effect in JSON. In
 binary [Fixed.add_padding e n] is represented as [e] followed by [n] null
@@ -1121,6 +1147,17 @@ header. This is a variable size encoding.
 encoding. In binary it represents data as the raw bytes which compose the
 value, without a size header. This is a variable size encoding.
 
+[Variable.bigstring: unit -> string encoding] (variable) is a combinator for
+values of the [bigstring] type. The [bigstring] type is an alias for a
+[Bigarray] type to represent strings (also used in other libraries such as
+[Bigstringaf]). In binary the data is represented as the raw bytes which compose
+the value, without a size header. This is a variable-size encoding. In JSON, it
+is represented as a hex-encoded String literal.
+
+The optional parameter [?string_json_repr] allows you to modify the
+representation of the string in JSON. Pass the value [Plain] to represent the
+data as a String literal.
+
 [Variable.list: 'a encoding -> 'a list encoding] (variable) is a combinator for
 the [list] parametric type. For JSON, it is similar to [list]: represented as a
 list literal. For binary, it is represented as the concatenation of the bytes
@@ -1160,6 +1197,17 @@ header followed by the byte content of the bytes payload. The size of the size
 header depends on the bound of the size of the bytes. Specifically, the size
 header is the smallest integer size that can accommodate the lengths within the
 bound: either a uint8, uint16, or int31.
+
+[Bounded.bigstring: unit -> string encoding] (dynamic) is a combinator for
+values of the [bigstring] type of statically bounded length. The [bigstring]
+type is an alias for a [Bigarray] type to represent strings (also used in other
+libraries such as [Bigstringaf]). In binary the data is represented as the raw
+bytes which compose the value, without a size header. This is a variable-size
+encoding. In JSON, it is represented as a hex-encoded String literal.
+
+The optional parameter [?string_json_repr] allows you to modify the
+representation of the string in JSON. Pass the value [Plain] to represent the
+data as a String literal.
 
 {2 ADT combinators: records (and other products)}
 
