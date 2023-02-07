@@ -99,14 +99,19 @@ type 'a desc =
   | Bool : bool desc
   | Int8 : int desc
   | Uint8 : int desc
-  | Int16 : int desc
-  | Uint16 : int desc
-  | Int31 : int desc
-  | Int32 : Int32.t desc
-  | Int64 : Int64.t desc
+  | Int16 : TzEndian.endianness -> int desc
+  | Uint16 : TzEndian.endianness -> int desc
+  | Int31 : TzEndian.endianness -> int desc
+  | Int32 : TzEndian.endianness -> Int32.t desc
+  | Int64 : TzEndian.endianness -> Int64.t desc
   | N : Z.t desc
   | Z : Z.t desc
-  | RangedInt : {minimum : int; maximum : int} -> int desc
+  | RangedInt : {
+      minimum : int;
+      endianness : TzEndian.endianness;
+      maximum : int;
+    }
+      -> int desc
   | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
   | Bytes : Kind.length * string_json_repr -> Bytes.t desc
@@ -231,14 +236,14 @@ and classify_desc : type a. a desc -> Kind.t =
   | Bool -> `Fixed Binary_size.bool
   | Int8 -> `Fixed Binary_size.int8
   | Uint8 -> `Fixed Binary_size.uint8
-  | Int16 -> `Fixed Binary_size.int16
-  | Uint16 -> `Fixed Binary_size.uint16
-  | Int31 -> `Fixed Binary_size.int31
-  | Int32 -> `Fixed Binary_size.int32
-  | Int64 -> `Fixed Binary_size.int64
+  | Int16 _ -> `Fixed Binary_size.int16
+  | Uint16 _ -> `Fixed Binary_size.uint16
+  | Int31 _ -> `Fixed Binary_size.int31
+  | Int32 _ -> `Fixed Binary_size.int32
+  | Int64 _ -> `Fixed Binary_size.int64
   | N -> `Dynamic
   | Z -> `Dynamic
-  | RangedInt {minimum; maximum} ->
+  | RangedInt {minimum; endianness = _; maximum} ->
       `Fixed Binary_size.(integer_to_size @@ range_to_size ~minimum ~maximum)
   | Float -> `Fixed Binary_size.float
   | RangedFloat _ -> `Fixed Binary_size.float
@@ -354,11 +359,11 @@ let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
   | Bool -> false
   | Int8 -> false
   | Uint8 -> false
-  | Int16 -> false
-  | Uint16 -> false
-  | Int31 -> false
-  | Int32 -> false
-  | Int64 -> false
+  | Int16 _ -> false
+  | Uint16 _ -> false
+  | Int31 _ -> false
+  | Int32 _ -> false
+  | Int64 _ -> false
   | N -> false
   | Z -> false
   | RangedInt _ -> false
@@ -539,26 +544,53 @@ let int8 = make @@ Int8
 
 let uint8 = make @@ Uint8
 
-let int16 = make @@ Int16
+module Big_endian = struct
+  let int16 = make @@ Int16 TzEndian.Big_endian
 
-let uint16 = make @@ Uint16
+  let uint16 = make @@ Uint16 TzEndian.Big_endian
 
-let int31 = make @@ Int31
+  let int31 = make @@ Int31 TzEndian.Big_endian
 
-let int32 = make @@ Int32
+  let int32 = make @@ Int32 TzEndian.Big_endian
 
-let ranged_int minimum maximum =
-  let minimum = min minimum maximum and maximum = max minimum maximum in
-  if
-    minimum < Binary_size.min_int `Int31 || Binary_size.max_int `Int31 < maximum
-  then invalid_arg "Data_encoding.ranged_int" ;
-  make @@ RangedInt {minimum; maximum}
+  let ranged_int minimum maximum =
+    (* NOTE: all [ranged_*] combinator, support out-of-order arguments. E.g.,
+       [ranged_int 1000 0] is a valid encoding equivalent to [ranged_int 0 1000] *)
+    let minimum = min minimum maximum and maximum = max minimum maximum in
+    if
+      minimum < Binary_size.min_int `Int31
+      || Binary_size.max_int `Int31 < maximum
+    then invalid_arg "Data_encoding.ranged_int" ;
+    make @@ RangedInt {minimum; endianness = TzEndian.Big_endian; maximum}
+
+  let int64 = make @@ Int64 TzEndian.Big_endian
+end
+
+include Big_endian
 
 let ranged_float minimum maximum =
   let minimum = min minimum maximum and maximum = max minimum maximum in
   make @@ RangedFloat {minimum; maximum}
 
-let int64 = make @@ Int64
+module Little_endian = struct
+  let int16 = make @@ Int16 TzEndian.Little_endian
+
+  let uint16 = make @@ Uint16 TzEndian.Little_endian
+
+  let int31 = make @@ Int31 TzEndian.Little_endian
+
+  let int32 = make @@ Int32 TzEndian.Little_endian
+
+  let ranged_int minimum maximum =
+    let minimum = min minimum maximum and maximum = max minimum maximum in
+    if
+      minimum < Binary_size.min_int `Int31
+      || Binary_size.max_int `Int31 < maximum
+    then invalid_arg "Data_encoding.ranged_int" ;
+    make @@ RangedInt {minimum; endianness = TzEndian.Little_endian; maximum}
+
+  let int64 = make @@ Int64 TzEndian.Little_endian
+end
 
 let n = make @@ N
 
@@ -713,11 +745,11 @@ let rec is_obj : type a. Mu_visited.t -> a t -> bool =
   | Bool -> false
   | Int8 -> false
   | Uint8 -> false
-  | Int16 -> false
-  | Uint16 -> false
-  | Int31 -> false
-  | Int32 -> false
-  | Int64 -> false
+  | Int16 _ -> false
+  | Uint16 _ -> false
+  | Int31 _ -> false
+  | Int32 _ -> false
+  | Int64 _ -> false
   | N -> false
   | Z -> false
   | RangedInt _ -> false
@@ -761,11 +793,11 @@ let rec is_tup : type a. Mu_visited.t -> a t -> bool =
   | Bool -> false
   | Int8 -> false
   | Uint8 -> false
-  | Int16 -> false
-  | Uint16 -> false
-  | Int31 -> false
-  | Int32 -> false
-  | Int64 -> false
+  | Int16 _ -> false
+  | Uint16 _ -> false
+  | Int31 _ -> false
+  | Int32 _ -> false
+  | Int64 _ -> false
   | N -> false
   | Z -> false
   | RangedInt _ -> false
@@ -1028,11 +1060,11 @@ let rec is_nullable : type t. Mu_visited.t -> t encoding -> bool =
   | Bool -> false
   | Int8 -> false
   | Uint8 -> false
-  | Int16 -> false
-  | Uint16 -> false
-  | Int31 -> false
-  | Int32 -> false
-  | Int64 -> false
+  | Int16 _ -> false
+  | Uint16 _ -> false
+  | Int31 _ -> false
+  | Int32 _ -> false
+  | Int64 _ -> false
   | N -> false
   | Z -> false
   | RangedInt _ -> false

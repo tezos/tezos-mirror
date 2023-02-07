@@ -73,15 +73,19 @@ type 'a desc =
   | Bool : bool desc
   | Int8 : int desc
   | Uint8 : int desc
-  | Int16 : int desc
-  | Uint16 : int desc
-  | Int31 : int desc
-  | Int32 : Int32.t desc
-  | Int64 : Int64.t desc
+  | Int16 : TzEndian.endianness -> int desc
+  | Uint16 : TzEndian.endianness -> int desc
+  | Int31 : TzEndian.endianness -> int desc
+  | Int32 : TzEndian.endianness -> Int32.t desc
+  | Int64 : TzEndian.endianness -> Int64.t desc
   | N : Z.t desc  (** An arbitrary-precision natural number *)
   | Z : Z.t desc  (** An arbitrary-precision integer *)
-  | RangedInt : {minimum : int; maximum : int} -> int desc
-      (** Note: the encoding size is determined by range *)
+  | RangedInt : {
+      minimum : int;
+      endianness : TzEndian.endianness;
+      maximum : int;
+    }
+      -> int desc  (** Note: the encoding size is determined by range *)
   | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
   | Bytes : Kind.length * string_json_repr -> Bytes.t desc
@@ -225,6 +229,34 @@ val int31 : int encoding
 val int32 : int32 encoding
 
 val int64 : int64 encoding
+
+module Big_endian : sig
+  val int16 : int encoding
+
+  val uint16 : int encoding
+
+  val int31 : int encoding
+
+  val int32 : int32 encoding
+
+  val int64 : int64 encoding
+
+  val ranged_int : int -> int -> int encoding
+end
+
+module Little_endian : sig
+  val int16 : int encoding
+
+  val uint16 : int encoding
+
+  val int31 : int encoding
+
+  val int32 : int32 encoding
+
+  val int64 : int64 encoding
+
+  val ranged_int : int -> int -> int encoding
+end
 
 val n : Z.t encoding
 

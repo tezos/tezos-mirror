@@ -38,9 +38,9 @@ type field_descr =
 
 and layout =
   | Zero_width
-  | Int of integer_extended
+  | Int of integer_extended * TzEndian.endianness
   | Bool
-  | RangedInt of int * int
+  | RangedInt of int * TzEndian.endianness * int
   | RangedFloat of float * float
   | Float
   | Bytes

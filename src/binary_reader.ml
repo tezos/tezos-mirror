@@ -59,55 +59,66 @@ let read_atom size conv state =
 module Atom = struct
   let uint8 = read_atom Binary_size.uint8 TzEndian.get_uint8_string
 
-  let uint16 = read_atom Binary_size.int16 TzEndian.get_uint16_string
+  let uint16 endianness state =
+    read_atom Binary_size.uint16 (TzEndian.get_uint16_string endianness) state
 
   let int8 = read_atom Binary_size.int8 TzEndian.get_int8_string
 
-  let int16 = read_atom Binary_size.int16 TzEndian.get_int16_string
+  let int16 endianness state =
+    read_atom Binary_size.int16 (TzEndian.get_int16_string endianness) state
 
-  let int32 = read_atom Binary_size.int32 TzEndian.get_int32_string
+  let int32 endianness state =
+    read_atom Binary_size.int32 (TzEndian.get_int32_string endianness) state
 
-  let int64 = read_atom Binary_size.int64 TzEndian.get_int64_string
+  let int64 endianness state =
+    read_atom Binary_size.int64 (TzEndian.get_int64_string endianness) state
 
   let float = read_atom Binary_size.float TzEndian.get_double_string
 
   let bool state = int8 state <> 0
 
-  let uint30 =
-    read_atom Binary_size.uint30 @@ fun buffer ofs ->
-    let v = Int32.to_int (TzEndian.get_int32_string buffer ofs) in
-    if v < 0 then
-      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
-    v
+  let uint30 endianness state =
+    read_atom
+      Binary_size.uint30
+      (fun buffer ofs ->
+        let v32 = TzEndian.get_int32_string endianness buffer ofs in
+        let v = Int32.to_int v32 in
+        if v < 0 then
+          raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
+        v)
+      state
 
-  let int31 =
-    read_atom Binary_size.int31 @@ fun buffer ofs ->
-    let r32 = TzEndian.get_int32_string buffer ofs in
-    let r = Int32.to_int r32 in
-    if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
-      raise_read_error
-        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
-    r
+  let int31 endianness state =
+    read_atom
+      Binary_size.int31
+      (fun buffer ofs ->
+        let r32 = TzEndian.get_int32_string endianness buffer ofs in
+        let r = Int32.to_int r32 in
+        if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
+          raise_read_error
+            (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
+        r)
+      state
 
-  let int = function
-    | `Int31 -> int31
-    | `Int16 -> int16
-    | `Int8 -> int8
-    | `Uint30 -> uint30
-    | `Uint16 -> uint16
-    | `Uint8 -> uint8
+  let int kind endianness state =
+    match kind with
+    | `Int31 -> int31 endianness state
+    | `Int16 -> int16 endianness state
+    | `Int8 -> int8 state
+    | `Uint30 -> uint30 endianness state
+    | `Uint16 -> uint16 endianness state
+    | `Uint8 -> uint8 state
 
-  let ranged_int ~minimum ~maximum state =
-    let read_int =
+  let ranged_int ~minimum ~endianness ~maximum state =
+    let ranged =
       match Binary_size.range_to_size ~minimum ~maximum with
-      | `Int8 -> int8
-      | `Int16 -> int16
-      | `Int31 -> int31
-      | `Uint8 -> uint8
-      | `Uint16 -> uint16
-      | `Uint30 -> uint30
+      | `Int8 -> int8 state
+      | `Int16 -> int16 endianness state
+      | `Int31 -> int31 endianness state
+      | `Uint8 -> uint8 state
+      | `Uint16 -> uint16 endianness state
+      | `Uint30 -> uint30 endianness state
     in
-    let ranged = read_int state in
     let ranged = if minimum > 0 then ranged + minimum else ranged in
     if not (minimum <= ranged && ranged <= maximum) then
       raise_read_error (Invalid_int {min = minimum; v = ranged; max = maximum}) ;
@@ -191,8 +202,8 @@ module Atom = struct
     let read_index =
       match Binary_size.enum_size arr with
       | `Uint8 -> uint8
-      | `Uint16 -> uint16
-      | `Uint30 -> uint30
+      | `Uint16 -> uint16 TzEndian.default_endianness
+      | `Uint30 -> uint30 TzEndian.default_endianness
     in
     let index = read_index state in
     if index >= Array.length arr then raise_read_error No_case_matched ;
@@ -205,7 +216,9 @@ module Atom = struct
   let fixed_length_string length =
     read_atom length @@ fun buf ofs -> String.sub buf ofs length
 
-  let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
+  let tag = function
+    | `Uint8 -> uint8
+    | `Uint16 -> uint16 TzEndian.default_endianness
 end
 
 (** Main recursive reading function, in continuation passing style. *)
@@ -220,11 +233,11 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Bool -> Atom.bool state
   | Int8 -> Atom.int8 state
   | Uint8 -> Atom.uint8 state
-  | Int16 -> Atom.int16 state
-  | Uint16 -> Atom.uint16 state
-  | Int31 -> Atom.int31 state
-  | Int32 -> Atom.int32 state
-  | Int64 -> Atom.int64 state
+  | Int16 endianness -> Atom.int16 endianness state
+  | Uint16 endianness -> Atom.uint16 endianness state
+  | Int31 endianness -> Atom.int31 endianness state
+  | Int32 endianness -> Atom.int32 endianness state
+  | Int64 endianness -> Atom.int64 endianness state
   | N -> Atom.n state
   | Z -> Atom.z state
   | Float -> Atom.float state
@@ -237,7 +250,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let v = read_rec e state in
       ignore (Atom.fixed_length_string n state : string) ;
       v
-  | RangedInt {minimum; maximum} -> Atom.ranged_int ~minimum ~maximum state
+  | RangedInt {minimum; endianness; maximum} ->
+      Atom.ranged_int ~minimum ~endianness ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
   | String_enum (_, arr) -> Atom.string_enum arr state
   | Array {length_limit; length_encoding = None; elts = e} ->
@@ -340,7 +354,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let sz =
         match kind with
         | `N -> Atom.uint30_like_n state
-        | #Binary_size.unsigned_integer as kind -> Atom.int kind state
+        | #Binary_size.unsigned_integer as kind ->
+            Atom.int kind TzEndian.default_endianness state
       in
       let remaining = check_remaining_bytes state sz in
       state.remaining_bytes <- sz ;

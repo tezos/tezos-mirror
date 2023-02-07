@@ -103,56 +103,72 @@ let read_atom resume size conv state k =
 
 (** Reader for all the atomic types. *)
 module Atom = struct
-  let uint8 r = read_atom r Binary_size.uint8 TzEndian.get_uint8
+  let uint8 r st k = read_atom r Binary_size.uint8 TzEndian.get_uint8 st k
 
-  let uint16 r = read_atom r Binary_size.int16 TzEndian.get_uint16
+  let uint16 endianness r st k =
+    read_atom r Binary_size.uint16 (TzEndian.get_uint16 endianness) st k
 
-  let int8 r = read_atom r Binary_size.int8 TzEndian.get_int8
+  let int8 r st k = read_atom r Binary_size.int8 TzEndian.get_int8 st k
 
-  let int16 r = read_atom r Binary_size.int16 TzEndian.get_int16
+  let int16 endianness r st k =
+    read_atom r Binary_size.int16 (TzEndian.get_int16 endianness) st k
 
-  let int32 r = read_atom r Binary_size.int32 TzEndian.get_int32
+  let int32 endianness r st k =
+    read_atom r Binary_size.int32 (TzEndian.get_int32 endianness) st k
 
-  let int64 r = read_atom r Binary_size.int64 TzEndian.get_int64
+  let int64 endianness r st k =
+    read_atom r Binary_size.int64 (TzEndian.get_int64 endianness) st k
 
   let float r = read_atom r Binary_size.float TzEndian.get_double
 
   let bool resume state k =
     int8 resume state @@ fun (v, state) -> k (v <> 0, state)
 
-  let uint30 r =
-    read_atom r Binary_size.uint30 @@ fun buffer ofs ->
-    let v = Int32.to_int (TzEndian.get_int32 buffer ofs) in
-    if v < 0 then
-      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
-    v
+  let uint30 endianness r st k =
+    read_atom
+      r
+      Binary_size.uint30
+      (fun buffer ofs ->
+        let v32 = TzEndian.get_int32 endianness buffer ofs in
+        let v = Int32.to_int v32 in
+        if v < 0 then
+          raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
+        v)
+      st
+      k
 
-  let int31 r =
-    read_atom r Binary_size.int31 @@ fun buffer ofs ->
-    let r32 = TzEndian.get_int32 buffer ofs in
-    let r = Int32.to_int r32 in
-    if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
-      raise_read_error
-        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
-    r
+  let int31 endianness r st k =
+    read_atom
+      r
+      Binary_size.int31
+      (fun buffer ofs ->
+        let r32 = TzEndian.get_int32 endianness buffer ofs in
+        let r = Int32.to_int r32 in
+        if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
+          raise_read_error
+            (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
+        r)
+      st
+      k
 
-  let int = function
-    | `Int31 -> int31
-    | `Int16 -> int16
-    | `Int8 -> int8
-    | `Uint30 -> uint30
-    | `Uint16 -> uint16
-    | `Uint8 -> uint8
+  let int kind endianness r st k =
+    match kind with
+    | `Int31 -> int31 endianness r st k
+    | `Int16 -> int16 endianness r st k
+    | `Int8 -> int8 r st k
+    | `Uint30 -> uint30 endianness r st k
+    | `Uint16 -> uint16 endianness r st k
+    | `Uint8 -> uint8 r st k
 
-  let ranged_int ~minimum ~maximum resume state k =
-    let read_int =
+  let ranged_int ~minimum ~endianness ~maximum resume state k =
+    let read_int resume state k =
       match Binary_size.range_to_size ~minimum ~maximum with
-      | `Int8 -> int8
-      | `Int16 -> int16
-      | `Int31 -> int31
-      | `Uint8 -> uint8
-      | `Uint16 -> uint16
-      | `Uint30 -> uint30
+      | `Int8 -> int8 resume state k
+      | `Int16 -> int16 endianness resume state k
+      | `Int31 -> int31 endianness resume state k
+      | `Uint8 -> uint8 resume state k
+      | `Uint16 -> uint16 endianness resume state k
+      | `Uint30 -> uint30 endianness resume state k
     in
     read_int resume state @@ fun (ranged, state) ->
     let ranged = if minimum > 0 then ranged + minimum else ranged in
@@ -251,8 +267,8 @@ module Atom = struct
     let read_index =
       match Binary_size.enum_size arr with
       | `Uint8 -> uint8
-      | `Uint16 -> uint16
-      | `Uint30 -> uint30
+      | `Uint16 -> uint16 TzEndian.default_endianness
+      | `Uint30 -> uint30 TzEndian.default_endianness
     in
     read_index resume state @@ fun (index, state) ->
     if index >= Array.length arr then Error No_case_matched
@@ -264,7 +280,9 @@ module Atom = struct
   let fixed_length_string length r =
     read_atom r length @@ fun buf ofs -> Bytes.sub_string buf ofs length
 
-  let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
+  let tag = function
+    | `Uint8 -> uint8
+    | `Uint16 -> uint16 TzEndian.default_endianness
 end
 
 let rec skip n state k =
@@ -299,11 +317,11 @@ let rec read_rec :
   | Bool -> Atom.bool resume state k
   | Int8 -> Atom.int8 resume state k
   | Uint8 -> Atom.uint8 resume state k
-  | Int16 -> Atom.int16 resume state k
-  | Uint16 -> Atom.uint16 resume state k
-  | Int31 -> Atom.int31 resume state k
-  | Int32 -> Atom.int32 resume state k
-  | Int64 -> Atom.int64 resume state k
+  | Int16 endianness -> Atom.int16 endianness resume state k
+  | Uint16 endianness -> Atom.uint16 endianness resume state k
+  | Int31 endianness -> Atom.int31 endianness resume state k
+  | Int32 endianness -> Atom.int32 endianness resume state k
+  | Int64 endianness -> Atom.int64 endianness resume state k
   | N -> Atom.n resume state k
   | Z -> Atom.z resume state k
   | Float -> Atom.float resume state k
@@ -318,8 +336,8 @@ let rec read_rec :
   | Padded (e, n) ->
       read_rec false e state @@ fun (v, state) ->
       skip n state @@ fun state -> k (v, state)
-  | RangedInt {minimum; maximum} ->
-      Atom.ranged_int ~minimum ~maximum resume state k
+  | RangedInt {minimum; endianness; maximum} ->
+      Atom.ranged_int ~minimum ~endianness ~maximum resume state k
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum resume state k
   | String_enum (_, arr) -> Atom.string_enum arr resume state k
@@ -417,7 +435,8 @@ let rec read_rec :
   | Dynamic_size {kind; encoding = e} ->
       (match kind with
       | `N -> Atom.uint30_like_n resume state
-      | #Binary_size.unsigned_integer as kind -> Atom.int kind resume state)
+      | #Binary_size.unsigned_integer as kind ->
+          Atom.int kind TzEndian.default_endianness resume state)
       @@ fun (sz, state) ->
       let remaining = check_remaining_bytes state sz in
       let state = {state with remaining_bytes = Some sz} in

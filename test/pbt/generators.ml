@@ -95,6 +95,12 @@ type _ ty =
   | Int31_like_Z : int * int -> int ty
   | Int32 : int32 ty
   | Int64 : int64 ty
+  | Int16_le : int ty
+  | UInt16_le : int ty
+  | Int31_le : int ty
+  | RangedInt_le : int * int -> int ty
+  | Int32_le : int32 ty
+  | Int64_le : int64 ty
   | Float : float ty
   | RangedFloat : float * float -> float ty
   | Bool : bool ty
@@ -187,6 +193,12 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Int31_like_Z (low, high) -> Crowbar.pp ppf "int31asz:[%d;%d]" low high
   | Int32 -> Crowbar.pp ppf "int32"
   | Int64 -> Crowbar.pp ppf "int64"
+  | Int16_le -> Crowbar.pp ppf "int16_le"
+  | UInt16_le -> Crowbar.pp ppf "uint16_le"
+  | Int31_le -> Crowbar.pp ppf "int31_le"
+  | RangedInt_le (low, high) -> Crowbar.pp ppf "rangedint_le:[%d;%d]" low high
+  | Int32_le -> Crowbar.pp ppf "int32_le"
+  | Int64_le -> Crowbar.pp ppf "int64_le"
   | Float -> Crowbar.pp ppf "float"
   | RangedFloat (low, high) -> Crowbar.pp ppf "rangedfloat:[%g;%g]" low high
   | Bool -> Crowbar.pp ppf "bool"
@@ -605,6 +617,56 @@ let full_int64 : int64 full =
 
     let encoding = Data_encoding.int64
   end)
+
+let full_rangedint_le low high : int full =
+  assert (low < high) ;
+  make_int
+    (RangedInt (low, high))
+    Crowbar.(
+      if low < 0 && high > 0 then
+        (* special casing this avoids overflow on 32bit machines *)
+        choose [range high; map [range (-low)] (fun v -> -v)]
+      else map [range (high - low)] (fun v -> v + low))
+    (Data_encoding.Little_endian.ranged_int low high)
+
+let full_int32_le : int32 full =
+  (module struct
+    type t = int32
+
+    let ty = Int32
+
+    let eq = Int32.equal
+
+    let pp ppf v = Crowbar.pp ppf "%ld" v
+
+    let gen = Crowbar.int32
+
+    let encoding = Data_encoding.Little_endian.int32
+  end)
+
+let full_int64_le : int64 full =
+  (module struct
+    type t = int64
+
+    let ty = Int64
+
+    let eq = Int64.equal
+
+    let pp ppf v = Crowbar.pp ppf "%Ld" v
+
+    let gen = Crowbar.int64
+
+    let encoding = Data_encoding.Little_endian.int64
+  end)
+
+let full_int16_le : int full =
+  make_int Int16 Crowbar.int16 Data_encoding.Little_endian.int16
+
+let full_uint16_le : int full =
+  make_int UInt16 Crowbar.uint16 Data_encoding.Little_endian.uint16
+
+let full_int31_le : int full =
+  make_int Int31 int31 Data_encoding.Little_endian.int31
 
 let make_float ty gen encoding : float full =
   (module struct
@@ -2059,6 +2121,12 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Int31_like_Z (low, high) -> full_int31_like_z low high
   | Int32 -> full_int32
   | Int64 -> full_int64
+  | Int16_le -> full_int16_le
+  | UInt16_le -> full_uint16_le
+  | Int31_le -> full_int31_le
+  | RangedInt_le (low, high) -> full_rangedint_le low high
+  | Int32_le -> full_int32_le
+  | Int64_le -> full_int64_le
   | Float -> full_float
   | RangedFloat (low, high) -> full_rangedfloat low high
   | Bool -> full_bool

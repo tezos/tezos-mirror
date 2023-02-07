@@ -43,9 +43,9 @@ type field_descr =
 
 and layout =
   | Zero_width
-  | Int of integer_extended
+  | Int of integer_extended * TzEndian.endianness
   | Bool
-  | RangedInt of int * int
+  | RangedInt of int * TzEndian.endianness * int
   | RangedFloat of float * float
   | Float
   | Bytes
@@ -87,38 +87,51 @@ module Printer_ast = struct
     | `Variable -> Format.fprintf ppf "Variable"
     | `Dynamic -> Format.fprintf ppf "Determined from data"
 
-  let pp_int ppf (int : integer_extended) =
+  let pp_int ppf ((int : integer_extended), (endianness : TzEndian.endianness))
+      =
+    let is_single_byte =
+      match int with
+      | `Int16 | `Int31 | `Uint30 | `Int32 | `Int64 | `Uint16 -> false
+      | `Int8 | `Uint8 -> true
+    in
     Format.fprintf
       ppf
-      "%s"
+      "%s%s integer"
       (match int with
-      | `Int16 -> "signed 16-bit integer"
-      | `Int31 -> "signed 31-bit integer"
-      | `Uint30 -> "unsigned 30-bit integer"
-      | `Int32 -> "signed 32-bit integer"
-      | `Int64 -> "signed 64-bit integer"
-      | `Int8 -> "signed 8-bit integer"
-      | `Uint16 -> "unsigned 16-bit integer"
-      | `Uint8 -> "unsigned 8-bit integer")
+      | `Int16 -> "signed 16-bit"
+      | `Int31 -> "signed 31-bit"
+      | `Uint30 -> "unsigned 30-bit"
+      | `Int32 -> "signed 32-bit"
+      | `Int64 -> "signed 64-bit"
+      | `Int8 -> "signed 8-bit"
+      | `Uint16 -> "unsigned 16-bit"
+      | `Uint8 -> "unsigned 8-bit")
+      (match endianness with
+      | _ when is_single_byte -> ""
+      | Big_endian -> " big-endian"
+      | Little_endian -> " little-endian")
 
   let rec pp_layout ppf = function
     | Zero_width -> ()
-    | Int integer -> Format.fprintf ppf "%a" pp_int integer
+    | Int (integer, endianness) ->
+        Format.fprintf ppf "%a" pp_int (integer, endianness)
     | Bool -> Format.fprintf ppf "boolean (0 for false, 255 for true)"
-    | RangedInt (minimum, maximum) when minimum <= 0 ->
+    | RangedInt (minimum, endianness, maximum) when minimum <= 0 ->
         Format.fprintf
           ppf
           "%a in the range %d to %d"
           pp_int
-          (Binary_size.range_to_size ~minimum ~maximum :> integer_extended)
+          ( (Binary_size.range_to_size ~minimum ~maximum :> integer_extended),
+            endianness )
           minimum
           maximum
-    | RangedInt (minimum, maximum) (* when minimum > 0 *) ->
+    | RangedInt (minimum, endianness, maximum) (* when minimum > 0 *) ->
         Format.fprintf
           ppf
           "%a in the range %d to %d (shifted by %d)"
           pp_int
-          (Binary_size.range_to_size ~minimum ~maximum :> integer_extended)
+          ( (Binary_size.range_to_size ~minimum ~maximum :> integer_extended),
+            endianness )
           minimum
           maximum
           minimum
@@ -138,7 +151,7 @@ module Printer_ast = struct
           ppf
           "%a encoding an enumeration (see %s)"
           pp_int
-          (size :> integer_extended)
+          ((size :> integer_extended), TzEndian.default_endianness)
           reference
     | Seq (data, len) -> (
         Format.fprintf ppf "sequence of " ;
@@ -196,7 +209,8 @@ module Printer_ast = struct
               "%a"
               pp_size
               (`Fixed (Binary_size.integer_to_size size));
-            string_of_layout (Int (size :> integer_extended));
+            string_of_layout
+              (Int ((size :> integer_extended), TzEndian.default_endianness));
           ]
     | Dynamic_size_field (None, 1, (#Binary_size.unsigned_integer as size)) ->
         Some
@@ -206,7 +220,8 @@ module Printer_ast = struct
               "%a"
               pp_size
               (`Fixed (Binary_size.integer_to_size size));
-            string_of_layout (Int (size :> integer_extended));
+            string_of_layout
+              (Int ((size :> integer_extended), TzEndian.default_endianness));
           ]
     | Dynamic_size_field (_, i, (#Binary_size.unsigned_integer as size)) ->
         Some
@@ -216,7 +231,8 @@ module Printer_ast = struct
               "%a"
               pp_size
               (`Fixed (Binary_size.integer_to_size size));
-            string_of_layout (Int (size :> integer_extended));
+            string_of_layout
+              (Int ((size :> integer_extended), TzEndian.default_endianness));
           ]
     | Anonymous_field (kind, desc) ->
         if not (is_zero_size_kind kind) then
@@ -279,7 +295,7 @@ module Printer_ast = struct
                 "%s (Enumeration: %a):"
                 descr.title
                 pp_int
-                (size :> integer_extended);
+                ((size :> integer_extended), TzEndian.default_endianness);
             description = descr.description;
           },
           Table
@@ -425,6 +441,10 @@ module Encoding = struct
   let integer_extended_encoding =
     string_enum (("Int64", `Int64) :: ("Int32", `Int32) :: integer_cases)
 
+  let endianness_encoding =
+    string_enum
+      [("Big", TzEndian.Big_endian); ("Little", TzEndian.Little_endian)]
+
   let limit_enc =
     union
       [
@@ -461,11 +481,17 @@ module Encoding = struct
             case
               ~title:"Int"
               (Tag 1)
-              (obj2
+              (obj3
                  (req "size" integer_extended_encoding)
+                 (dft
+                    "endianness"
+                    endianness_encoding
+                    TzEndian.default_endianness)
                  (req "kind" (constant "Int")))
-              (function Int integer -> Some (integer, ()) | _ -> None)
-              (fun (integer, _) -> Int integer);
+              (function
+                | Int (integer, endianness) -> Some (integer, endianness, ())
+                | _ -> None)
+              (fun (integer, endianness, ()) -> Int (integer, endianness));
             case
               ~title:"Bool"
               (Tag 2)
@@ -475,13 +501,20 @@ module Encoding = struct
             case
               ~title:"RangedInt"
               (Tag 3)
-              (obj3
+              (obj4
                  (req "min" int31)
+                 (dft
+                    "endianness"
+                    endianness_encoding
+                    TzEndian.default_endianness)
                  (req "max" int31)
                  (req "kind" (constant "RangedInt")))
               (function
-                | RangedInt (min, max) -> Some (min, max, ()) | _ -> None)
-              (fun (min, max, _) -> RangedInt (min, max));
+                | RangedInt (min, endianness, max) ->
+                    Some (min, endianness, max, ())
+                | _ -> None)
+              (fun (min, endianness, max, ()) ->
+                RangedInt (min, endianness, max));
             case
               ~title:"RangedFloat"
               (Tag 4)

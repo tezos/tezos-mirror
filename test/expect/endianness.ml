@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Like most other [.mli] files in this directory, this is not intended for
-    end-users. Instead, the interface from this file is used internally to
-    assemble the end-user-intended module {!Data_encoding}. Refer to that module
-    for doucmentation. *)
+open Data_encoding
 
-type endianness = Big_endian | Little_endian [@@deriving hash]
+let pp encoding s =
+  let binary = Result.get_ok @@ Binary.to_string encoding s in
+  Seq.iter
+    (fun char -> Format.printf "\\x%02x" (Char.code char))
+    (String.to_seq binary) ;
+  Format.printf "\n"
 
-val default_endianness : endianness
-
-val get_int32 : endianness -> bytes -> int -> int32
-
-val get_int32_string : endianness -> string -> int -> int32
-
-val set_int32 : endianness -> bytes -> int -> int32 -> unit
-
-val set_int8 : bytes -> int -> int -> unit
-
-val get_int8 : bytes -> int -> int
-
-val get_int8_string : string -> int -> int
-
-val set_int16 : endianness -> bytes -> int -> int -> unit
-
-val get_int16 : endianness -> bytes -> int -> int
-
-val get_int16_string : endianness -> string -> int -> int
-
-val set_int64 : endianness -> bytes -> int -> int64 -> unit
-
-val get_int64 : endianness -> bytes -> int -> int64
-
-val get_int64_string : endianness -> string -> int -> int64
-
-val get_uint8 : bytes -> int -> int
-
-val get_uint8_string : string -> int -> int
-
-val get_uint16 : endianness -> bytes -> int -> int
-
-val get_uint16_string : endianness -> string -> int -> int
-
-val set_double : bytes -> int -> float -> unit
-
-val get_double : bytes -> int -> float
-
-val get_double_string : string -> int -> float
+let%expect_test _ =
+  pp uint8 0 ;
+  [%expect {| \x00 |}] ;
+  pp uint16 300 ;
+  [%expect {| \x01\x2c |}] ;
+  pp Little_endian.uint16 300 ;
+  [%expect {| \x2c\x01 |}] ;
+  pp int16 300 ;
+  [%expect {| \x01\x2c |}] ;
+  pp Little_endian.int16 300 ;
+  [%expect {| \x2c\x01 |}] ;
+  pp int16 (-300) ;
+  [%expect {| \xfe\xd4 |}] ;
+  pp Little_endian.int16 (-300) ;
+  [%expect {| \xd4\xfe |}] ;
+  pp int31 300300 ;
+  [%expect {| \x00\x04\x95\x0c |}] ;
+  pp Little_endian.int31 300300 ;
+  [%expect {| \x0c\x95\x04\x00 |}] ;
+  pp int31 (-300300) ;
+  [%expect {| \xff\xfb\x6a\xf4 |}] ;
+  pp Little_endian.int31 (-300300) ;
+  [%expect {| \xf4\x6a\xfb\xff |}] ;
+  pp int32 300300l ;
+  [%expect {| \x00\x04\x95\x0c |}] ;
+  pp Little_endian.int32 300300l ;
+  [%expect {| \x0c\x95\x04\x00 |}] ;
+  pp int32 (-300300l) ;
+  [%expect {| \xff\xfb\x6a\xf4 |}] ;
+  pp Little_endian.int32 (-300300l) ;
+  [%expect {| \xf4\x6a\xfb\xff |}] ;
+  pp int64 300300300300L ;
+  [%expect {| \x00\x00\x00\x45\xeb\x4a\xf0\x0c |}] ;
+  pp Little_endian.int64 300300300300L ;
+  [%expect {| \x0c\xf0\x4a\xeb\x45\x00\x00\x00 |}] ;
+  pp int64 (-300300300300L) ;
+  [%expect {| \xff\xff\xff\xba\x14\xb5\x0f\xf4 |}] ;
+  pp Little_endian.int64 (-300300300300L) ;
+  [%expect {| \xf4\x0f\xb5\x14\xba\xff\xff\xff |}] ;
+  pp (ranged_int 33 333333) 300 ;
+  [%expect {| \x00\x00\x01\x0b |}] ;
+  pp Little_endian.(ranged_int 33 333333) 300 ;
+  [%expect {| \x0b\x01\x00\x00 |}] ;
+  ()
