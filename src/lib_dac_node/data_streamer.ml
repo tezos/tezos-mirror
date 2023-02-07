@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4740
-    Implement a useful Root_hash_streamer
-*)
+type 'a t = 'a Lwt_watcher.input
 
-type 'a t = unit
+let init () = Lwt_watcher.create_input ()
 
-let init () = ()
+let publish streamer hash =
+  Lwt_result_syntax.return @@ Lwt_watcher.notify streamer hash
 
-let publish (_streamer : 'a t) (_hash : 'a) = Lwt_result_syntax.return_unit
-
-let handle_subscribe (_streamer : 'a t) :
-    ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t =
-  Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()
+let handle_subscribe streamer =
+  Lwt_result_syntax.return @@ Lwt_watcher.create_stream streamer
