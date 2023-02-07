@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_hacl/runtest
+    Invocation:   dune exec src/lib_hacl/test/main.exe
     Subject:      Tests the consistency between the [DIRECT_HASH] and
                   [INCREMENTAL_HASH] interfaces of hashes SHA256 and
                   SHA512.
@@ -100,6 +100,7 @@ let () =
   | Other "js_of_ocaml" -> ()
   | Other _ | Native | Bytecode ->
       Alcotest.run
+        ~__FILE__
         "tezos-crypto-shaX-props"
         [
           ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
