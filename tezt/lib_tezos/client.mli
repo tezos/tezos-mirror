@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -101,6 +101,7 @@ val additional_bootstraps : t -> Account.key list
     to an endpoint. Most commands require an endpoint to be specified (either with [create]
     or with the command itself). *)
 val create :
+  ?runner:Runner.t ->
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
@@ -113,6 +114,7 @@ val create :
 
 (** Create a client like [create] but do not assume [Client] as the mode. *)
 val create_with_mode :
+  ?runner:Runner.t ->
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
