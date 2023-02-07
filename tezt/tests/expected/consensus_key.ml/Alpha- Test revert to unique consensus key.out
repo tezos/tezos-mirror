@@ -4,6 +4,7 @@
 
 ./octez-client --wait none register key dummy_account_0 as delegate with consensus key dummy_account_1
 Node is bootstrapped.
+Estimated gas: 1000 units (will add 0 for safety)
 Estimated storage: no bytes added
 Estimated gas: 1000 units (will add 0 for safety)
 Estimated storage: no bytes added
