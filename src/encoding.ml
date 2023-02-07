@@ -28,6 +28,9 @@ open Hash_builtin
 
 type limit = No_limit | At_most of int | Exactly of int [@@deriving hash]
 
+type bigstring =
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
 module Kind = struct
   type t = [`Fixed of int | `Dynamic | `Variable] [@@deriving hash]
 
@@ -116,7 +119,7 @@ type 'a desc =
   | Float : float desc
   | Bytes : Kind.length * string_json_repr -> Bytes.t desc
   | String : Kind.length * string_json_repr -> string desc
-  | Bigstring : Kind.length * string_json_repr -> Bigstringaf.t desc
+  | Bigstring : Kind.length * string_json_repr -> bigstring desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : {
@@ -619,9 +622,6 @@ let bytes' ?length_kind json_repr =
   dynamic_size ?kind:length_kind (Variable.bytes' json_repr)
 
 let bytes = bytes' Hex
-
-type bigstring =
-  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
 let bigstring ?length_kind ?(string_json_repr = Hex) () =
   dynamic_size ?kind:length_kind (Variable.bigstring ~string_json_repr ())

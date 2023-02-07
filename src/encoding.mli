@@ -35,6 +35,9 @@
 
 type limit = No_limit | At_most of int | Exactly of int [@@deriving hash]
 
+type bigstring =
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
@@ -92,7 +95,7 @@ type 'a desc =
       (** A mutable string *)
   | String : Kind.length * string_json_repr -> string desc
       (** An immutable string *)
-  | Bigstring : Kind.length * string_json_repr -> Bigstringaf.t desc
+  | Bigstring : Kind.length * string_json_repr -> bigstring desc
   | Padded : 'a t * int -> 'a desc
       (** The [int] indicates how many null bytes should be added on the right
           of the value. *)
@@ -282,9 +285,6 @@ val bytes : Bytes.t encoding
 
 val bytes' :
   ?length_kind:Binary_size.length -> string_json_repr -> Bytes.t encoding
-
-type bigstring =
-  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
 val bigstring :
   ?length_kind:Binary_size.length ->
