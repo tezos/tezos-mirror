@@ -60,6 +60,8 @@ module Mock = struct
 
   let balance = qty_f @@ Z.of_int64 Int64.max_int
 
+  let code = hash_f @@ String.make 100 'a'
+
   let gas_price = qty_f Z.one
 
   let transaction_count = qty_f Z.zero
@@ -123,6 +125,7 @@ let dispatch dir =
             return (Block_number.Output (Ok Mock.block_height))
         | Get_block_by_number.Input _ ->
             return (Get_block_by_number.Output (Ok Mock.block))
+        | Get_code.Input _ -> return (Get_code.Output (Ok Mock.code))
         | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
         | Get_transaction_count.Input _ ->
             return (Get_transaction_count.Output (Ok Mock.transaction_count))
