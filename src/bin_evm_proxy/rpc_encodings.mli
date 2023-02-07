@@ -235,3 +235,8 @@ module Eth_call :
   METHOD
     with type m_input = Ethereum_types.call * Ethereum_types.block_param
      and type m_output = Ethereum_types.hash
+
+module Get_estimate_gas :
+  METHOD
+    with type m_input = Ethereum_types.call
+     and type m_output = Ethereum_types.quantity

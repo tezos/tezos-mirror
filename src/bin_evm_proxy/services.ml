@@ -139,6 +139,8 @@ let dispatch dir =
         | Send_transaction.Input _ ->
             return (Send_transaction.Output (Ok Mock.transaction_hash))
         | Eth_call.Input _ -> return (Eth_call.Output (Ok Mock.call))
+        | Get_estimate_gas.Input _ ->
+            return (Get_estimate_gas.Output (Ok Mock.gas_price))
         | _ -> Error_monad.failwith "Unsupported method\n%!"
       in
       return (output, id))

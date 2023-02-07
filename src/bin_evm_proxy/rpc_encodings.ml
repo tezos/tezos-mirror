@@ -364,6 +364,20 @@ module Eth_call = MethodMaker (struct
   let method_ = "eth_call"
 end)
 
+module Get_estimate_gas = MethodMaker (struct
+  open Ethereum_types
+
+  type input = call
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.tup1 call_encoding
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_estimateGas"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Network_id);
@@ -379,6 +393,7 @@ let methods : (module METHOD) list =
     (module Send_transaction);
     (module Send_raw_transaction);
     (module Eth_call);
+    (module Get_estimate_gas);
   ]
 
 module Input = struct
