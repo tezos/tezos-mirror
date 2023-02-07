@@ -230,3 +230,8 @@ module Send_transaction :
   METHOD
     with type m_input = Ethereum_types.transaction
      and type m_output = Ethereum_types.hash
+
+module Eth_call :
+  METHOD
+    with type m_input = Ethereum_types.call * Ethereum_types.block_param
+     and type m_output = Ethereum_types.hash

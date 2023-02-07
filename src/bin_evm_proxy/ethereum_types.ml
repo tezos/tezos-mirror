@@ -420,3 +420,27 @@ let transaction_encoding =
        (opt "value" quantity_encoding)
        (req "data" hash_encoding)
        (opt "nonce" quantity_encoding))
+
+type call = {
+  from : address option;
+  to_ : address;
+  gas : quantity option;
+  gasPrice : quantity option;
+  value : quantity option;
+  data : hash option;
+}
+
+let call_encoding =
+  let open Data_encoding in
+  conv
+    (fun {from; to_; gas; gasPrice; value; data} ->
+      (from, to_, gas, gasPrice, value, data))
+    (fun (from, to_, gas, gasPrice, value, data) ->
+      {from; to_; gas; gasPrice; value; data})
+    (obj6
+       (opt "from" address_encoding)
+       (req "to" address_encoding)
+       (opt "gas" quantity_encoding)
+       (opt "gasPrice" quantity_encoding)
+       (opt "value" quantity_encoding)
+       (req "data" (option hash_encoding)))

@@ -110,6 +110,8 @@ module Mock = struct
       status = qty_f Z.one;
       root = hash_f @@ String.make 32 'a';
     }
+
+  let call = hash_f "0x"
 end
 
 let dispatch dir =
@@ -136,6 +138,7 @@ let dispatch dir =
             return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
         | Send_transaction.Input _ ->
             return (Send_transaction.Output (Ok Mock.transaction_hash))
+        | Eth_call.Input _ -> return (Eth_call.Output (Ok Mock.call))
         | _ -> Error_monad.failwith "Unsupported method\n%!"
       in
       return (output, id))

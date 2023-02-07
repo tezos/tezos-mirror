@@ -350,6 +350,20 @@ module Send_transaction = MethodMaker (struct
   let method_ = "eth_sendTransaction"
 end)
 
+module Eth_call = MethodMaker (struct
+  open Ethereum_types
+
+  type input = call * block_param
+
+  type output = hash
+
+  let input_encoding = Data_encoding.tup2 call_encoding block_param_encoding
+
+  let output_encoding = hash_encoding
+
+  let method_ = "eth_call"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Network_id);
@@ -364,6 +378,7 @@ let methods : (module METHOD) list =
     (module Get_transaction_receipt);
     (module Send_transaction);
     (module Send_raw_transaction);
+    (module Eth_call);
   ]
 
 module Input = struct
