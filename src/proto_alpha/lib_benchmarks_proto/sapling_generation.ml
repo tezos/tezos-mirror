@@ -429,7 +429,7 @@ let save ~filename ~txs =
     match Data_encoding.Binary.to_string sapling_dataset_encoding txs with
     | Error err ->
         Format.eprintf
-          "Sapling_generation.save: encoding failed (%a); exiting"
+          "Sapling_generation.save: encoding failed (%a); exiting@."
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
@@ -448,7 +448,7 @@ let load_file filename =
            Lwt.return result
        | Error err ->
            Format.eprintf
-             "Sapling_generation.load: can't load file (%a); exiting"
+             "Sapling_generation.load: can't load file (%a); exiting@."
              Data_encoding.Binary.pp_read_error
              err ;
            exit 1 )

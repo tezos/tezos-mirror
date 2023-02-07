@@ -136,7 +136,7 @@ module Michelson_gen_cmd = struct
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
-            Printf.eprintf "Error while parsing --min-size argument." ;
+            Format.eprintf "Error while parsing --min-size argument.@." ;
             exit 1)
     in
     Tezos_clic.arg
@@ -150,7 +150,7 @@ module Michelson_gen_cmd = struct
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
-            Printf.eprintf "Error while parsing --max-size argument." ;
+            Format.eprintf "Error while parsing --max-size argument.@." ;
             exit 1)
     in
     Tezos_clic.arg
@@ -164,7 +164,7 @@ module Michelson_gen_cmd = struct
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
-            Printf.eprintf "Error while parsing --burn-in argument." ;
+            Format.eprintf "Error while parsing --burn-in argument.@." ;
             exit 1)
     in
     Tezos_clic.arg
@@ -178,7 +178,7 @@ module Michelson_gen_cmd = struct
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
-            Printf.eprintf "Error while parsing --seed argument." ;
+            Format.eprintf "Error while parsing --seed argument.@." ;
             exit 1)
     in
     Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed

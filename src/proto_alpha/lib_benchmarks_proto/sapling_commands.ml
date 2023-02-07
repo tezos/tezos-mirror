@@ -40,12 +40,12 @@ module Sapling_gen_cmd = struct
            match int_of_string parsed with
            | exception Failure _ ->
                Format.eprintf
-                 "Ill-formatted --max-%s option (expected integer), exiting"
+                 "Ill-formatted --max-%s option (expected integer), exiting@."
                  name ;
                exit 1
            | res when res < 0 ->
                Format.eprintf
-                 "--max-%s should be a  positive integer, exiting"
+                 "--max-%s should be a  positive integer, exiting@."
                  name ;
                exit 1
            | res -> return res))
@@ -56,7 +56,7 @@ module Sapling_gen_cmd = struct
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
-            Printf.eprintf "Error while parsing --seed argument." ;
+            Format.eprintf "Error while parsing --seed argument.@." ;
             exit 1)
     in
     Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
