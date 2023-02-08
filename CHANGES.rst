@@ -140,6 +140,9 @@ Node
 
 - Fixed a bug that caused a context corruption when using an old context.
 
+- **Breaking Change**: disabled snapshot export support for storage
+  that was created with Octez v13 (or earlier).
+
 Client
 ------
 

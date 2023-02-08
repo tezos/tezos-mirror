@@ -90,6 +90,7 @@ type error +=
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Wrong_snapshot_file of {filename : string}
   | Invalid_chain_store_export of Chain_id.t * string
+  | Cannot_export_snapshot_format
 
 let () =
   let open Data_encoding in
@@ -576,7 +577,22 @@ let () =
           Some (chain_id, store_dir)
       | _ -> None)
     (fun (chain_id, store_dir) ->
-      Invalid_chain_store_export (chain_id, store_dir))
+      Invalid_chain_store_export (chain_id, store_dir)) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.cannot_export_snapshot_format"
+    ~title:"Cannot export snapshot format"
+    ~description:"Cannot export snapshot format"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Cannot export snapshot with a storage that was created with Octez v13 \
+         (or earlier). Please refer to the documentation and consider \
+         switching to the default minimal indexing strategy to enable snapshot \
+         exports. ")
+    unit
+    (function Cannot_export_snapshot_format -> Some () | _ -> None)
+    (fun () -> Cannot_export_snapshot_format)
 
 (* This module handles snapshot's versioning system. *)
 module Version = struct
@@ -2500,12 +2516,15 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export_context snapshot_exporter ~context_dir context_hash =
     let open Lwt_result_syntax in
     let*! context_index = Context.init ~readonly:true context_dir in
-    Animation.three_dots ~progress_display_mode:Auto ~msg:"Exporting context"
-    @@ fun () ->
-    Lwt.finalize
-      (fun () ->
-        Exporter.export_context snapshot_exporter context_index context_hash)
-      (fun () -> Context.close context_index)
+    let is_gc_allowed = Context.is_gc_allowed context_index in
+    if not is_gc_allowed then tzfail Cannot_export_snapshot_format
+    else
+      Animation.three_dots ~progress_display_mode:Auto ~msg:"Exporting context"
+      @@ fun () ->
+      Lwt.finalize
+        (fun () ->
+          Exporter.export_context snapshot_exporter context_index context_hash)
+        (fun () -> Context.close context_index)
 
   let export_rolling snapshot_exporter ~store_dir ~context_dir ~block ~rolling
       genesis =
