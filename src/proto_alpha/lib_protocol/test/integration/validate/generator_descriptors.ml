@@ -116,7 +116,10 @@ let voting_context_params params =
 
 let ballot_exploration_prelude state =
   let open Lwt_result_syntax in
-  let* ctxt = Context.to_alpha_ctxt (B state.block) in
+  let* ctxt =
+    let+ i = Incremental.begin_construction state.block in
+    Incremental.alpha_ctxt i
+  in
   let blocks_per_cycle = Alpha_context.Constants.blocks_per_cycle ctxt in
   let rem =
     Int32.rem state.block.Block.header.Block_header.shell.level blocks_per_cycle
@@ -232,7 +235,10 @@ let ballot_promotion_descriptor =
         ( On 2,
           fun state ->
             let open Lwt_result_syntax in
-            let* ctxt = Context.to_alpha_ctxt (B state.block) in
+            let* ctxt =
+              let+ incr = Incremental.begin_construction state.block in
+              Incremental.alpha_ctxt incr
+            in
             let blocks_per_cycle =
               Alpha_context.Constants.blocks_per_cycle ctxt
             in
@@ -410,7 +416,10 @@ let double_baking_descriptor =
             let c = Block_hash.compare hash1 hash2 in
             if c < 0 then (bh1, bh2) else (bh2, bh1)
           in
-          let* ctxt = Context.to_alpha_ctxt (B state.block) in
+          let* ctxt =
+            let+ incr = Incremental.begin_construction state.block in
+            Incremental.alpha_ctxt incr
+          in
           let blocks_per_cycle =
             Alpha_context.Constants.blocks_per_cycle ctxt
           in
@@ -455,7 +464,10 @@ let double_baking_descriptor =
    delegate updates its key to this key. *)
 let drain_delegate_prelude state =
   let open Lwt_result_syntax in
-  let* ctxt = Context.to_alpha_ctxt (B state.block) in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction state.block in
+    Incremental.alpha_ctxt incr
+  in
   let blocks_per_cycle = Alpha_context.Constants.blocks_per_cycle ctxt in
   let rem =
     Int32.rem state.block.Block.header.Block_header.shell.level blocks_per_cycle
@@ -636,7 +648,10 @@ let dal_attestation_descriptor =
     candidates_generator =
       (fun state ->
         let gen (delegate, _) =
-          let* ctxt = Context.to_alpha_ctxt (B state.block) in
+          let* ctxt =
+            let+ incr = Incremental.begin_construction state.block in
+            Incremental.alpha_ctxt incr
+          in
           let* op =
             dal_slot_availibility ctxt delegate >|= Environment.wrap_tzresult
           in

@@ -1294,7 +1294,7 @@ let test_older_cemented_commitment () =
       (Some 1)
   in
   let* max_num_stored_cemented_commitments =
-    let* ctxt = Context.to_alpha_ctxt (I incr) in
+    let ctxt = Incremental.alpha_ctxt incr in
     return
     @@ Alpha_context.Constants.max_number_of_stored_cemented_commitments ctxt
   in
@@ -2986,7 +2986,10 @@ let init_with_4_conflicts () =
 
 let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
   let open Lwt_result_syntax in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let* (p1_point, p2_point), _ctxt =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
@@ -3171,7 +3174,10 @@ let test_conflict_point_on_a_branch () =
   let* ( ( {commitment = _; hash = conflict_pA_hash},
            {commitment = _; hash = conflict_pB_hash} ),
          _ctxt ) =
-    let* ctxt = Block.to_alpha_ctxt block in
+    let* ctxt =
+      let+ incr = Incremental.begin_construction block in
+      Incremental.alpha_ctxt incr
+    in
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
       rollup

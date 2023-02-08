@@ -36,10 +36,6 @@ val pred_branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
-(** Either retrieve the alpha context (in the [Incremental] case) or
-    build one (in the [Block] case). *)
-val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
-
 (** Given a context, returns the list of endorsers charactized by
     the [level], the public key hash of the [delegate], its [consensus_key]
     and its assigned [slots].
