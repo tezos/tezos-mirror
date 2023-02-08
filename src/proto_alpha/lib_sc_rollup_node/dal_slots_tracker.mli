@@ -22,8 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Protocol
-open Alpha_context
 
 (** The rollup node keeps the list of dal slots for each block it needs to
     process.  This is to determine whether the inbox for a given block will need
@@ -32,11 +30,6 @@ open Alpha_context
     declared available.
 
     The state of slots per block is persistent.  *)
-
-(** [is_slot_confirmed node_ctxt head slot_index] checks whether the slot
-    with index [slot_index] has been confirmed in [head]. *)
-val is_slot_confirmed :
-  _ Node_context.t -> Layer1.head -> Dal.Slot_index.t -> bool tzresult Lwt.t
 
 (** [process_head node_ctxt head] performs the following operations:
     {ul

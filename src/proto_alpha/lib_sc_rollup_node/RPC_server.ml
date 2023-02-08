@@ -50,50 +50,12 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_confirmed_slot_pages node_ctxt block =
+let get_dal_processed_slots node_ctxt block =
   let open Lwt_result_syntax in
-  let*! slot_pages =
-    Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash:block
+  let*! list =
+    Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
   in
-  (* Slot pages are sorted in lexicographic order of slot index and page
-     number.*)
-  let slot_rev_pages_map =
-    List.fold_left
-      (fun map ((index, _page), page) ->
-        Slot_pages_map.update
-          index
-          (function None -> Some [page] | Some pages -> Some (page :: pages))
-          map)
-      Slot_pages_map.empty
-      slot_pages
-  in
-  let slot_pages_map =
-    Slot_pages_map.map (fun pages -> List.rev pages) slot_rev_pages_map
-  in
-  return @@ Slot_pages_map.bindings slot_pages_map
-
-let get_dal_slot_page node_ctxt block slot_index slot_page =
-  let open Lwt_result_syntax in
-  let*! processed =
-    Node_context.processed_slot
-      node_ctxt
-      ~confirmed_in_block_hash:block
-      slot_index
-  in
-  match processed with
-  | None -> return ("Slot page has not been downloaded", None)
-  | Some `Unconfirmed -> return ("Slot was not confirmed", None)
-  | Some `Confirmed -> (
-      let*! contents_opt =
-        Node_context.find_slot_page
-          node_ctxt
-          ~confirmed_in_block_hash:block
-          ~slot_index
-          ~page_index:slot_page
-      in
-      match contents_opt with
-      | None -> assert false
-      | Some _contents -> return ("Slot page is available", contents_opt))
+  return list
 
 module Global_directory = Make_directory (struct
   include Sc_rollup_services.Global
@@ -351,14 +313,8 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
 
   let () =
     Block_directory.register0
-      Sc_rollup_services.Global.Block.dal_confirmed_slot_pages
-    @@ fun (node_ctxt, block) () () ->
-    get_dal_confirmed_slot_pages node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_page
-    @@ fun (node_ctxt, block) {index; page} () ->
-    get_dal_slot_page node_ctxt block index page
+      Sc_rollup_services.Global.Block.dal_processed_slots
+    @@ fun (node_ctxt, block) () () -> get_dal_processed_slots node_ctxt block
 
   let () =
     Outbox_directory.register0 Sc_rollup_services.Global.Block.Outbox.messages

@@ -117,18 +117,6 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       in
       return @@ Some {published_block_hash; confirmed_slots_indexes}
 
-let is_slot_confirmed node_ctxt (Layer1.{hash; _} as head) slot_index =
-  let open Lwt_result_syntax in
-  let* slots_info_opt = slots_info node_ctxt head in
-  match slots_info_opt with
-  | None -> tzfail @@ Layer1_services.Cannot_read_block_metadata hash
-  | Some {confirmed_slots_indexes; _} ->
-      let*? is_confirmed =
-        Environment.wrap_tzresult
-        @@ Bitset.mem confirmed_slots_indexes (Dal.Slot_index.to_int slot_index)
-      in
-      return is_confirmed
-
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3884
    avoid going back and forth between bitsets and lists of slot indexes. *)
 let to_slot_index_list (constants : Constants.Parametric.t) bitset =
@@ -147,8 +135,8 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
 *)
 
 let download_and_save_slots
-    ({Node_context.dal_cctxt; protocol_constants; _} as node_context)
-    ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
+    ({Node_context.protocol_constants; _} as node_context) ~current_block_hash
+    {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
     Bitset.fill ~length:protocol_constants.parametric.dal.number_of_slots
@@ -159,59 +147,40 @@ let download_and_save_slots
     @@ to_slot_index_list protocol_constants.parametric
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
-  let*? _confirmed =
+  let*? confirmed =
     Environment.wrap_tzresult
     @@ to_slot_index_list protocol_constants.parametric confirmed_slots_indexes
   in
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/2766.
-     As part of the clean rollup storage workflow, we should make sure that
-     pages for old slots are removed from the storage when not needed anymore.
-  *)
   (* The contents of each slot index are written to a different location on
      disk, therefore calls to store contents for different slot indexes can
      be parallelized. *)
   let*! () =
     List.iter_p
       (fun s_slot ->
-        Node_context.save_unconfirmed_slot
+        Node_context.save_slot_status
           node_context
           current_block_hash
-          s_slot)
+          s_slot
+          `Unconfirmed)
       not_confirmed
   in
-  let* () =
-    [] (* Preparing for the pre-fetching logic. *)
-    |> List.iter_ep (fun s_slot ->
-           (* fails if slot_header is missing but the slot with index s_slot has been
-                confirmed. This scenario should not be possible. *)
-           let* {commitment; _} =
-             Node_context.get_slot_header
-               node_context
-               ~published_in_block_hash:published_block_hash
-               s_slot
-           in
-           (* DAL must be configured for this point to be reached *)
-           let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
-           (* The slot with index s_slot is confirmed. We can
-              proceed retrieving it from the dal node and save it
-              in the store. *)
-           let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
-           let*! () =
-             Node_context.save_confirmed_slot
-               node_context
-               current_block_hash
-               s_slot
-               pages
-           in
-           let*! () =
-             Dal_slots_tracker_event.slot_has_been_confirmed
-               s_slot
-               published_block_hash
-               current_block_hash
-           in
-           return_unit)
-  in
-  return_unit
+  List.iter_ep
+    (fun s_slot ->
+      let*! () =
+        Node_context.save_slot_status
+          node_context
+          current_block_hash
+          s_slot
+          `Confirmed
+      in
+      let*! () =
+        Dal_slots_tracker_event.slot_has_been_confirmed
+          s_slot
+          published_block_hash
+          current_block_hash
+      in
+      return_unit)
+    confirmed
 
 module Confirmed_slots_history = struct
   (** [confirmed_slots_with_headers node_ctxt confirmations_info] returns the

@@ -1476,14 +1476,12 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      4. Publish the three slot headers for slots 0, 1, 2
      5. Check that the rollup node fetched the slot headers from L1
      6. After lag levels, attest only slots 1 and 2
-     7. Check that no slots are downloaded by the rollup node if
-        the PVM does not request them
+     7. Check that two slots have been attested
      8. Send external messages to trigger the request of dal pages for
         slots 0 and 1
      9. Wait for the rollup node PVM to process the input and request
         the slots
-     10. Check that requested confirmed slots (slot 1) is downloaded from
-        dal node, while unconfirmed slot (slot 0) is not downloaded
+     10. Check the first page of the two attested slots' content
   *)
 
   (* 0. run dl node. *)
@@ -1572,11 +1570,14 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     ~error_msg:
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
-  (* 7. Check that no slots have been downloaded *)
-  let*! downloaded_confirmed_slots =
-    Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
+  (* 7. Check that two slots have been attested. *)
+  let*! downloaded_slots =
+    Sc_rollup_client.get_dal_processed_slots ~hooks sc_rollup_client
   in
-  let expected_number_of_downloaded_or_unconfirmed_slots = 0 in
+  let downloaded_confirmed_slots =
+    List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
+  in
+  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
   Check.(
     List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)
@@ -1604,14 +1605,16 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
        expected = %R)" ;
   (* 9. Wait for the rollup node to download the attested slots. *)
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
-  let*! downloaded_confirmed_slots =
-    Sc_rollup_client.dal_downloaded_confirmed_slot_pages
+  let*! downloaded_slots =
+    Sc_rollup_client.get_dal_processed_slots
       ~block:confirmed_level_as_string
       sc_rollup_client
   in
-  (* 10. Verify that rollup node has downloaded slot 1, slot 0 is
-        unconfirmed, and slot 2 has not been downloaded *)
-  let expected_number_of_downloaded_or_unconfirmed_slots = 1 in
+  let downloaded_confirmed_slots =
+    List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
+  in
+  (* 10. Check the first page of the two attested slots' content. *)
+  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
   Check.(
     List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)
@@ -1622,26 +1625,30 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let submitted_slots_contents =
     [slot_contents_0; slot_contents_1; slot_contents_2]
   in
-  List.iter
-    (fun i ->
-      let index = i + 1 in
-      let confirmed_slot_index, confirmed_slot_contents =
-        List.nth downloaded_confirmed_slots i
-      in
-      let relevant_page = List.nth confirmed_slot_contents 0 in
-      let confirmed_slot_content = List.nth submitted_slots_contents index in
-      let message =
-        String.sub relevant_page 0 (String.length confirmed_slot_content)
-      in
-      Check.(confirmed_slot_index = index)
-        Check.int
-        ~error_msg:
-          "Index of confirmed slot is not as expected (current = %L, expected \
-           = %R)" ;
-      Check.(message = confirmed_slot_content)
-        Check.string
-        ~error_msg:"unexpected message in slot (current = %L, expected = %R)")
-    [0] ;
+  let* () =
+    Lwt_list.iteri_s
+      (fun index (slot_index, _status) ->
+        Check.(
+          (index + 1 = slot_index)
+            int
+            ~error_msg:"unexpected slot index (current = %L, expected = %R)") ;
+        let slot_commitment = List.nth commitments slot_index in
+        let* slot_pages =
+          RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_commitment)
+        in
+        let relevant_page = List.nth slot_pages 0 in
+        let confirmed_slot_content =
+          List.nth submitted_slots_contents slot_index
+        in
+        let message =
+          String.sub relevant_page 0 (String.length confirmed_slot_content)
+        in
+        Check.(message = confirmed_slot_content)
+          Check.string
+          ~error_msg:"unexpected message in slot (current = %L, expected = %R)" ;
+        unit)
+      downloaded_confirmed_slots
+  in
   match expand_test with
   | None -> return ()
   | Some f -> f ~protocol client sc_rollup_address sc_rollup_node

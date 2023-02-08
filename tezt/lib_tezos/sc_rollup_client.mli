@@ -213,13 +213,14 @@ val dal_slot_headers :
   t ->
   slot_header list Runnable.process
 
-(** [dal_downloaded_confirmed_slot_pages ?block client] returns the confirmed
-    slots downloaded after processing the [block] (default ["head"]). *)
-val dal_downloaded_confirmed_slot_pages :
+(** [get_dal_processed_slots ?block client] returns the slots indices that have
+    been marked by the rollup node as confirmed or unconfirmed for block [block]
+    (default ["head"]), with their statuses. *)
+val get_dal_processed_slots :
   ?hooks:Process.hooks ->
   ?block:string ->
   t ->
-  (int * string list) list Runnable.process
+  (int * string) list Runnable.process
 
 (** [simulate ?block client ?reveal_pages messages] simulates the evaluation of
     input [messages] for the rollup PVM at [block] (default
