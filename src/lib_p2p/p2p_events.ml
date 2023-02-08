@@ -311,7 +311,7 @@ module P2p_connect_handler = struct
       ~msg:"new connection to {addr}:{port}#{peer}"
       ~level:Info
       ("addr", P2p_addr.encoding)
-      ("port", Data_encoding.option Data_encoding.int16)
+      ("port", Data_encoding.option Data_encoding.uint16)
       ("peer", P2p_peer.Id.encoding)
 
   let trigger_maintenance_too_many_connections =
