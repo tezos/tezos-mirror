@@ -62,11 +62,11 @@ let dal_enable_param dal_enable =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
-    ?activation_timestamp ?(event_sections_levels = []) ?(node_arguments = [])
-    () =
+let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
+    ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
+    ?(node_arguments = []) () =
   (* Temporary setup to initialise the node. *)
-  let base = Either.right (protocol, None) in
+  let base = Either.right (protocol, custom_constants) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
   let* client = Client.init_mockup ~parameter_file ~protocol () in
   let nodes_args =
@@ -112,10 +112,10 @@ let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
   in
   return (node, client, dal_parameters)
 
-let with_layer1 ?additional_bootstrap_accounts ?minimal_block_delay
-    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
-    ?dal_enable ?event_sections_levels ?node_arguments ?activation_timestamp f
-    ~protocol =
+let with_layer1 ?custom_constants ?additional_bootstrap_accounts
+    ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
+    ?attestation_threshold ?commitment_period ?challenge_window ?dal_enable
+    ?event_sections_levels ?node_arguments ?activation_timestamp f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter
@@ -132,9 +132,13 @@ let with_layer1 ?additional_bootstrap_accounts ?minimal_block_delay
     @ dal_enable_param dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
+    @ make_string_parameter
+        ["delay_increment_per_round"]
+        delay_increment_per_round
   in
   let* node, client, dal_parameters =
     setup_node
+      ?custom_constants
       ?additional_bootstrap_accounts
       ?event_sections_levels
       ?node_arguments
@@ -171,7 +175,8 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
-  let* () = Client.bake_for_and_wait tezos_client in
+  (* Argument ~keys:[] allows to bake with all available delegates. *)
+  let* () = Client.bake_for_and_wait tezos_client ~keys:[] in
   f rollup_address sc_rollup_node configuration_filename
 
 let with_dal_node tezos_node tezos_client f key =
@@ -183,9 +188,9 @@ let with_dal_node tezos_node tezos_client f key =
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
-    ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?event_sections_levels ?node_arguments ?activation_timestamp variant
-    scenario =
+    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?minimal_block_delay ?delay_increment_per_round variant scenario =
   let description = "Testing DAL L1 integration" in
   test
     ~__FILE__
@@ -193,6 +198,9 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ~custom_constants
+        ?minimal_block_delay
+        ?delay_increment_per_round
         ?attestation_lag
         ?commitment_period
         ?challenge_window
@@ -205,9 +213,9 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
       scenario protocol parameters cryptobox node client)
 
 let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
-    ?minimal_block_delay ?attestation_lag ?attestation_threshold
-    ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?activation_timestamp variant scenario =
+    ?custom_constants ?minimal_block_delay ?delay_increment_per_round
+    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
+    ?(dal_enable = true) ?activation_timestamp variant scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
@@ -215,7 +223,9 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ~custom_constants
         ?minimal_block_delay
+        ?delay_increment_per_round
         ?attestation_lag
         ?attestation_threshold
         ?commitment_period
@@ -227,9 +237,10 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
       with_dal_node node client @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
-let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
-    ?(dal_enable = true) ?commitment_period ?challenge_window
-    ?minimal_block_delay ?activation_timestamp variant scenario =
+let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
+    ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
+    ?commitment_period ?challenge_window ?minimal_block_delay
+    ?delay_increment_per_round ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -237,9 +248,13 @@ let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ~custom_constants
+        ?node_arguments
+        ?attestation_lag
         ?commitment_period
         ?challenge_window
         ?minimal_block_delay
+        ?delay_increment_per_round
         ?activation_timestamp
         ~protocol
         ~dal_enable
@@ -1452,14 +1467,14 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
-let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
-    client msgs =
+let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
+    ?(alter_final_msg = Fun.id) client msgs =
   let msg =
     alter_final_msg
     @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
   in
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
-  Client.bake_for_and_wait client
+  if bake then Client.bake_for_and_wait client else unit
 
 let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
@@ -1653,6 +1668,25 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   | None -> return ()
   | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
 
+let check_saved_value_in_pvm ~name ~expected_value sc_client =
+  let*! encoded_value =
+    Sc_rollup_client.state_value ~hooks sc_client ~key:(sf "vars/%s" name)
+  in
+  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+  | Error error ->
+      failwith
+        (Format.asprintf
+           "The arithmetic PVM has an unexpected state: %a"
+           Data_encoding.Binary.pp_read_error
+           error)
+  | Ok value ->
+      Check.(
+        (value = expected_value)
+          int
+          ~error_msg:
+            "Invalid value in rollup state (current = %L, expected = %R)") ;
+      return ()
+
 let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -1710,23 +1744,7 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* _lvl =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
-  let*! encoded_value =
-    Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
-  in
-  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-  | Error error ->
-      failwith
-        (Format.asprintf
-           "The arithmetic PVM has an unexpected state: %a"
-           Data_encoding.Binary.pp_read_error
-           error)
-  | Ok value ->
-      Check.(
-        (value = expected_value)
-          int
-          ~error_msg:
-            "Invalid value in rollup state (current = %L, expected = %R)") ;
-      return ()
+  check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
 
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
