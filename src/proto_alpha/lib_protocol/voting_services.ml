@@ -100,6 +100,13 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Data_encoding.int64
       RPC_path.(path / "total_voting_power")
+
+  let delegate_proposal_count =
+    RPC_service.get_service
+      ~description:"Number of votes casted during the current period."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int31
+      RPC_path.(path / "proposal_count" /: Signature.Public_key_hash.rpc_arg)
 end
 
 let register () =
@@ -120,7 +127,9 @@ let register () =
   register0 ~chunked:false S.current_proposal (fun ctxt () () ->
       Vote.find_current_proposal ctxt) ;
   register0 ~chunked:false S.total_voting_power (fun ctxt () () ->
-      Vote.get_total_voting_power_free ctxt)
+      Vote.get_total_voting_power_free ctxt) ;
+  register1 ~chunked:false S.delegate_proposal_count (fun ctxt pkh () () ->
+      Vote.get_delegate_proposal_count ctxt pkh)
 
 let ballots ctxt block = RPC_context.make_call0 S.ballots ctxt block () ()
 
@@ -145,3 +154,6 @@ let current_proposal ctxt block =
 
 let total_voting_power ctxt block =
   RPC_context.make_call0 S.total_voting_power ctxt block () ()
+
+let delegate_proposal_count ctxt block pkh =
+  RPC_context.make_call1 S.delegate_proposal_count ctxt block pkh () ()
