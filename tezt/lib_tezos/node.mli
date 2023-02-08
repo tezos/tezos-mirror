@@ -83,6 +83,7 @@ type argument =
   | Metrics_addr of string  (** [--metrics-addr] *)
   | Cors_origin of string  (** [--cors-origin] *)
   | Disable_mempool  (** [--disable-mempool] *)
+  | Version  (** [--version] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -516,3 +517,6 @@ val send_raw_data : t -> data:string -> unit Lwt.t
 
 (** [upgrade_storage node] upprades the given [node] storage. *)
 val upgrade_storage : t -> unit Lwt.t
+
+(** Run [octez-node --version] and return the node's version. *)
+val get_version : t -> string Lwt.t

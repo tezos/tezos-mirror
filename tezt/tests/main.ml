@@ -43,6 +43,7 @@ let alpha_can_stitch_from_its_predecessor = false
 (* Tests that are protocol-independent.
    They do not take a protocol as a parameter and thus need to be registered only once. *)
 let register_protocol_independent_tests () =
+  Binaries.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_config.register_protocol_independent () ;

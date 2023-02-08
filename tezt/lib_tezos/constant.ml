@@ -42,6 +42,17 @@ let dal_node = "./octez-dal-node"
 
 let dac_node = "./octez-dac-node"
 
+(* TODO: tezos/tezos#4803
+   Can we do better than to depend on script-inputs?
+*)
+(* We use the [released-executables] script input as source of released
+   executable binaries to test. *)
+let released_executables = "./script-inputs/released-executables"
+
+(* We use the [experimental-executables] script input as source of
+   experimental executable binaries to test. *)
+let experimental_executables = "./script-inputs/experimental-executables"
+
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)
 let activator : Account.key =
