@@ -17,13 +17,15 @@ depends: [
   "aches-lwt" { >= "1.0.0" }
   "tezos-stdlib-unix"
   "tezos-context"
+  "tezt" { with-test & >= "3.0.0" }
   "tezos-error-monad" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: layer2 storage utils"

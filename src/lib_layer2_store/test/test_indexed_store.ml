@@ -599,4 +599,7 @@ let () =
     (test_gen `Parallel)
     R.check_run
 
-let () = QCheck_base_runner.run_tests_main (List.rev !tests)
+let () =
+  Alcotest.run
+    "tezos-layer2-store"
+    [("indexed-store", List.map QCheck_alcotest.to_alcotest !tests)]
