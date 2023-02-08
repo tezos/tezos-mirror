@@ -84,3 +84,7 @@ type error +=
       expected_peer_id : P2p_peer.Id.t;
       received_peer_id : P2p_peer.Id.t;
     }
+
+(* P2P maintenance *)
+
+type error += Maintenance_disabled

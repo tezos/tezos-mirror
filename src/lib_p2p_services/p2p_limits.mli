@@ -34,8 +34,9 @@ type t = {
       (** Delay granted to a peer to perform authentication. *)
   greylist_timeout : Time.System.Span.t;
       (** GC delay for the greylists tables. *)
-  maintenance_idle_time : Time.System.Span.t;
-      (** How long to wait at most before running a maintenance loop. *)
+  maintenance_idle_time : Time.System.Span.t option;
+      (** How long to wait at most before running a maintenance loop. If None,
+          the maintenance is disabled. *)
   min_connections : int;
       (** Strict minimum number of connections (triggers an urgent maintenance) *)
   expected_connections : int;

@@ -119,30 +119,37 @@ let may_create_discovery_worker _limits config pool =
 
 let create_maintenance_worker limits pool connect_handler config triggers log =
   let open P2p_limits in
-  let maintenance_config =
-    {
-      P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
-      private_mode = config.private_mode;
-      min_connections = limits.min_connections;
-      max_connections = limits.max_connections;
-      expected_connections = limits.expected_connections;
-      time_between_looking_for_peers =
-        Ptime.Span.of_int_s 5
-        (* Empirical value. Enough to observe changes in the network,
-           and not too long to discover new peers quickly. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/1655
-           Check whether the value is optimal or not through integration tests
-        *);
-    }
-  in
-  let discovery = may_create_discovery_worker limits config pool in
-  P2p_maintenance.create
-    ?discovery
-    maintenance_config
-    pool
-    connect_handler
-    triggers
-    ~log
+  let open Lwt_syntax in
+  match limits.maintenance_idle_time with
+  | None ->
+      let* () = Events.(emit maintenance_disabled) () in
+      return_none
+  | Some maintenance_idle_time ->
+      let maintenance_config =
+        {
+          P2p_maintenance.maintenance_idle_time;
+          private_mode = config.private_mode;
+          min_connections = limits.min_connections;
+          max_connections = limits.max_connections;
+          expected_connections = limits.expected_connections;
+          time_between_looking_for_peers =
+            Ptime.Span.of_int_s 5
+            (* Empirical value. Enough to observe changes in the network,
+               and not too long to discover new peers quickly. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/1655
+               Check whether the value is optimal or not through integration tests
+            *);
+        }
+      in
+      let discovery = may_create_discovery_worker limits config pool in
+      return_some
+        (P2p_maintenance.create
+           ?discovery
+           maintenance_config
+           pool
+           connect_handler
+           triggers
+           ~log)
 
 let may_create_welcome_worker config limits connect_handler =
   config.listening_port
@@ -163,7 +170,7 @@ module Real = struct
     io_sched : P2p_io_scheduler.t;
     pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t;
     connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t;
-    maintenance : ('msg, 'peer_meta, 'conn_meta) P2p_maintenance.t;
+    maintenance : ('msg, 'peer_meta, 'conn_meta) P2p_maintenance.t option;
     welcome : P2p_welcome.t option;
     watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
     triggers : P2p_trigger.t;
@@ -212,7 +219,7 @@ module Real = struct
            answerer)
     in
     let connect_handler = Lazy.force connect_handler in
-    let maintenance =
+    let*! maintenance =
       create_maintenance_worker limits pool connect_handler config triggers log
     in
     let* welcome = may_create_welcome_worker config limits connect_handler in
@@ -232,14 +239,21 @@ module Real = struct
 
   let peer_id {config; _} = config.identity.peer_id
 
-  let maintain {maintenance; _} () = P2p_maintenance.maintain maintenance
+  let maintain {maintenance; _} () =
+    let open Lwt_result_syntax in
+    match maintenance with
+    | Some maintenance ->
+        let*! () = P2p_maintenance.maintain maintenance in
+        return_unit
+    | None -> tzfail P2p_errors.Maintenance_disabled
 
   let activate t () =
     Events.(emit__dont_wait__use_with_care activate_network)
       t.config.identity.peer_id ;
     (match t.welcome with None -> () | Some w -> P2p_welcome.activate w) ;
-    P2p_maintenance.activate t.maintenance ;
-    ()
+    match t.maintenance with
+    | Some maintenance -> P2p_maintenance.activate maintenance
+    | None -> ()
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4597
      Implement [roll] function. *)
@@ -252,7 +266,11 @@ module Real = struct
     let* () = Events.(emit shutdown_welcome_worker) () in
     let* () = Option.iter_s P2p_welcome.shutdown net.welcome in
     let* () = Events.(emit shutdown_maintenance_worker) () in
-    let* () = P2p_maintenance.shutdown net.maintenance in
+    let* () =
+      Option.iter_s
+        (fun maintenance -> P2p_maintenance.shutdown maintenance)
+        net.maintenance
+    in
     let* () = Events.(emit shutdown_connection_pool) () in
     let* () = P2p_pool.destroy net.pool in
     let* () = Events.(emit shutdown_connection_handler) () in
@@ -441,7 +459,7 @@ end
 type ('msg, 'peer_meta, 'conn_meta) t = {
   announced_version : Network_version.t;
   peer_id : P2p_peer.Id.t;
-  maintain : unit -> unit Lwt.t;
+  maintain : unit -> unit tzresult Lwt.t;
   roll : unit -> unit Lwt.t;
   shutdown : unit -> unit Lwt.t;
   connections : unit -> ('msg, 'peer_meta, 'conn_meta) connection list;
@@ -581,7 +599,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
   {
     announced_version;
     peer_id = Fake.id.peer_id;
-    maintain = Lwt.return;
+    maintain = Lwt_result_syntax.return;
     roll = Lwt.return;
     shutdown = Lwt.return;
     connections = (fun () -> []);

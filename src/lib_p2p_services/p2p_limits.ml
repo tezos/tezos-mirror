@@ -27,7 +27,7 @@ type t = {
   connection_timeout : Time.System.Span.t;
   authentication_timeout : Time.System.Span.t;
   greylist_timeout : Time.System.Span.t;
-  maintenance_idle_time : Time.System.Span.t;
+  maintenance_idle_time : Time.System.Span.t option;
   min_connections : int;
   expected_connections : int;
   max_connections : int;
@@ -57,7 +57,7 @@ let default =
     authentication_timeout = Time.System.Span.of_seconds_exn 5.;
     greylist_timeout;
     maintenance_idle_time =
-      Time.System.Span.of_seconds_exn 120. (* two minutes *);
+      Some (Time.System.Span.of_seconds_exn 120.) (* two minutes *);
     min_connections = 10;
     expected_connections = 50;
     max_connections = 100;
@@ -291,6 +291,7 @@ let encoding : t Data_encoding.t =
              "maintenance-idle-time"
              ~description:
                "How long to wait at most, in seconds, before running a \
-                maintenance loop."
-             Time.System.Span.encoding
+                maintenance loop. If null -- decoding to None -- is provided \
+                then the maintenance is disabled."
+             (option Time.System.Span.encoding)
              default.maintenance_idle_time)))

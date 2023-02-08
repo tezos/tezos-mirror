@@ -422,3 +422,23 @@ let () =
       | _ -> None)
     (fun (point, expected_peer_id, received_peer_id) ->
       Identity_check_failure {point; expected_peer_id; received_peer_id})
+
+(****************************** p2p maintenance ******************************)
+
+type error += Maintenance_disabled
+
+let () =
+  (* Maintenance_disabled *)
+  let description =
+    "Attempt to trigger the maintenance failed as the maintenance is disabled."
+  in
+
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_maintenance.disabled"
+    ~title:"Maintenance disabled"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Maintenance_disabled -> Some () | _ -> None)
+    (fun () -> Maintenance_disabled)
