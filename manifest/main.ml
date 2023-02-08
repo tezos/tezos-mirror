@@ -2963,7 +2963,7 @@ let octez_mockup_commands =
     ~modules:["mockup_wallet"; "mockup_commands"]
 
 let _octez_mockup_tests =
-  tests
+  tezt
     ["test_mockup_args"; "test_fuzzing_mockup_args"; "test_persistence"]
     ~path:"src/lib_mockup/test"
     ~opam:"tezos-mockup"
@@ -2977,7 +2977,7 @@ let _octez_mockup_tests =
         octez_mockup_registration;
         octez_client_base;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_proxy =
