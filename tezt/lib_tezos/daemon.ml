@@ -205,7 +205,8 @@ module Make (X : PARAMETERS) = struct
           | None when Buffer.length buff >= max_event_size ->
               Format.ksprintf
                 failwith
-                "Could not parse event after %d bytes."
+                "Could not parse daemon %s event after %d bytes."
+                daemon.name
                 max_event_size
           | None -> loop ()
           | Some json -> return (Some json))
