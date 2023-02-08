@@ -71,12 +71,11 @@ let get_last_published_commitment =
 let hex_encode (input : string) : string =
   match Hex.of_string input with `Hex s -> s
 
-let load_kernel_file name : string =
+let load_kernel_file
+    ?(base = "src/proto_alpha/lib_protocol/test/integration/wasm_kernel") name :
+    string =
   let open Tezt.Base in
-  let kernel_file =
-    project_root // Filename.dirname __FILE__
-    // "../../src/proto_alpha/lib_protocol/test/integration/wasm_kernel" // name
-  in
+  let kernel_file = project_root // base // name in
   read_file kernel_file
 
 (* [read_kernel filename] reads binary encoded WebAssembly module (e.g. `foo.wasm`)
@@ -88,7 +87,8 @@ let load_kernel_file name : string =
    Note that this uses [Tezos_scoru_wasm.Gather_floppies.Complete_kernel], so
    the kernel must fit into a single Tezos operation.
 *)
-let read_kernel name : string = hex_encode (load_kernel_file (name ^ ".wasm"))
+let read_kernel ?base name : string =
+  hex_encode (load_kernel_file ?base (name ^ ".wasm"))
 
 (* Number of levels needed to process a head as finalized. This value should
    be the same as `node_context.block_finality_time`, where `node_context` is
@@ -4429,6 +4429,26 @@ let test_recover_bond_of_stakers =
   in
   unit
 
+(** {2 EVM Proxy server tests. } *)
+
+let evm_kernel () = read_kernel ~base:"./" "evm_mockup_kernel"
+
+let test_originate_evm_kernel =
+  Protocol.register_test ~__FILE__ ~tags:["evm"] ~title:"Originate EVM kernel"
+  @@ fun protocol ->
+  let* _tezos_node, tezos_client = setup_l1 protocol in
+  let* _sc_rollup =
+    originate_sc_rollup
+      ~kind:"wasm_2_0_0"
+      ~boot_sector:(evm_kernel ())
+      ~parameters_ty:"string"
+      ~src:Constant.bootstrap1.alias
+      tezos_client
+  in
+  unit
+
+let register_evm_proxy_server ~protocols = test_originate_evm_kernel protocols
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -4647,4 +4667,5 @@ let register ~protocols =
   register ~kind:"arith" ~protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
            re-enable Mumbai when DAC is separated from Dal node. *)
-  test_tx_kernel_e2e [Alpha]
+  test_tx_kernel_e2e [Alpha] ;
+  register_evm_proxy_server ~protocols
