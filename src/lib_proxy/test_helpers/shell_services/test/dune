@@ -1,22 +1,37 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_block_services)
+(library
+ (name src_lib_proxy_test_helpers_shell_services_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-test-helpers
   tezos-shell-services
   tezos_proxy_test_helpers_shell_services
   qcheck-alcotest
-  alcotest-lwt)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_block_services))
+
+(executable
+ (name main)
+ (libraries
+  src_lib_proxy_test_helpers_shell_services_test_tezt_lib
+  tezt)
+ (modules main))
+
+(rule (alias runtezt) (package tezos-proxy) (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-proxy)
- (action (run %{dep:./test_block_services.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

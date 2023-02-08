@@ -3007,14 +3007,16 @@ let octez_proxy_test_helpers_shell_services =
         octez_test_helpers |> open_;
         qcheck_core;
         octez_context_memory;
-        alcotest_lwt;
+        lwt_unix;
+        alcotezt;
       ]
     ~bisect_ppx:false
     ~linkall:true
+    ~release_status:Released
 
 let _octez_shell_service_test_helpers_tests =
-  test
-    "test_block_services"
+  tezt
+    ["test_block_services"]
     ~path:"src/lib_proxy/test_helpers/shell_services/test"
     ~opam:"tezos-proxy"
     ~deps:
@@ -3025,16 +3027,17 @@ let _octez_shell_service_test_helpers_tests =
         octez_shell_services;
         octez_proxy_test_helpers_shell_services;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let _octez_proxy_tests =
-  tests
+  tezt
     [
       "test_proxy";
       "test_fuzzing_proxy_getter";
       "test_light";
       "test_fuzzing_light";
+      "light_lib";
     ]
     ~path:"src/lib_proxy/test"
     ~with_macos_security_framework:true
@@ -3049,7 +3052,7 @@ let _octez_proxy_tests =
         octez_test_helpers |> open_;
         octez_proxy_test_helpers_shell_services;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
         uri;
       ]
 

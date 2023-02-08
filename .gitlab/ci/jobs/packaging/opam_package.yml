@@ -1519,7 +1519,7 @@ opam:tezos-validation:
 opam:tezos-version:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-version
 
@@ -1547,7 +1547,7 @@ opam:tezos-webassembly-interpreter-extra:
 opam:tezos-workers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-workers
 

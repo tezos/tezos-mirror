@@ -68,6 +68,8 @@
   src_lib_rpc_http_test_tezt_lib
   src_lib_requester_test_tezt_lib
   src_lib_proxy_server_config_test_tezt_lib
+  src_lib_proxy_test_helpers_shell_services_test_tezt_lib
+  src_lib_proxy_test_tezt_lib
   src_lib_protocol_environment_test_shell_context_tezt_lib
   src_lib_protocol_environment_test_tezt_lib
   src_lib_p2p_tezt_tezt_lib
