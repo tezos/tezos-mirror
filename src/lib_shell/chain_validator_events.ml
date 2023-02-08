@@ -151,53 +151,46 @@ let disconnection =
     ("peer_id", P2p_peer.Id.encoding)
 
 let ignore_head =
-  declare_4
+  declare_2
     ~section
     ~name:"ignore_head"
-    ~msg:
-      "Current head is better than {view} (level {level}, timestamp \
-       {timestamp}, fitness {fitness}), we do not switch"
+    ~msg:"current head is better than {view} (level {level}), we do not switch"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
-    ~pp3:Time.Protocol.pp_hum
-    ~pp4:Fitness.pp
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
-    ("timestamp", Time.Protocol.encoding)
-    ("fitness", Fitness.encoding)
 
 let branch_switch =
-  declare_4
+  declare_2
     ~section
     ~name:"branch_switch"
-    ~msg:
-      "Update current head to {view} (level {level}, timestamp {timestamp}, \
-       fitness {fitness}), changing branch"
+    ~msg:"switching branch to {view} ({level})"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
-    ~pp3:Time.Protocol.pp_hum
-    ~pp4:Fitness.pp
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
-    ("timestamp", Time.Protocol.encoding)
-    ("fitness", Fitness.encoding)
 
 let head_increment =
-  declare_4
+  declare_2
     ~section
     ~name:"head_increment"
-    ~msg:
-      "Update current head to {view} (level {level}, timestamp {timestamp}, \
-       fitness {fitness}), same branch"
+    ~msg:"head is now {view} ({level})"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
-    ~pp3:Time.Protocol.pp_hum
-    ~pp4:Fitness.pp
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
+
+let block_info =
+  declare_2
+    ~section
+    ~name:"block_info"
+    ~msg:"treated block has timestamp {timestamp} with fitness {fitness}"
+    ~level:Info
+    ~pp1:Time.Protocol.pp_hum
+    ~pp2:Fitness.pp
     ("timestamp", Time.Protocol.encoding)
     ("fitness", Fitness.encoding)
 

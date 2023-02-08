@@ -701,11 +701,12 @@ let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
 
 let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
     request_status =
+  let open Lwt_syntax in
   let nv = Worker.state w in
   Prometheus.Counter.inc_one
     nv.parameters.metrics.worker_counters.worker_completion_count ;
   match req with
-  | Request.Validated {block; _} -> (
+  | Request.Validated {block; _} ->
       let level = Store.Block.level block in
       let () =
         Shell_metrics.Worker.update_timestamps
@@ -737,11 +738,13 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
       let fitness = Store.Block.fitness block in
       let block_hash = Request.Hash (Store.Block.hash block) in
       let timestamp = Store.Block.timestamp block in
-      let event_infos = (block_hash, level, timestamp, fitness) in
-      match update with
-      | Ignored_head -> Events.(emit ignore_head) event_infos
-      | Branch_switch -> Events.(emit branch_switch) event_infos
-      | Head_increment -> Events.(emit head_increment) event_infos)
+      let* () =
+        match update with
+        | Ignored_head -> Events.(emit ignore_head) (block_hash, level)
+        | Branch_switch -> Events.(emit branch_switch) (block_hash, level)
+        | Head_increment -> Events.(emit head_increment) (block_hash, level)
+      in
+      Events.(emit block_info) (timestamp, fitness)
   | Request.Notify_head (peer_id, _, _, _) -> Events.(emit notify_head) peer_id
   | Request.Notify_branch (peer_id, _) -> Events.(emit notify_branch) peer_id
   | Request.Disconnection peer_id -> Events.(emit disconnection) peer_id
