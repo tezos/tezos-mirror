@@ -137,7 +137,7 @@ val balance :
 (** [transfer_n ?origin ctxt givers receiver] transfers [amount] Tez from [giver] to
     [receiver] for each [(giver, amount)] pair in [givers], and returns a new
     context, and the list of corresponding balance updates. The function behaves
-    as though [transfer giver receiver amount] was invoked for each pair
+    as though [transfer ?origin ctxt giver receiver amount] was invoked for each pair
     [(giver, amount)] in [givers], however a single balance update is generated
     for the total amount transferred to [receiver].
     When [givers] is an empty list, the function does nothing to the context,
