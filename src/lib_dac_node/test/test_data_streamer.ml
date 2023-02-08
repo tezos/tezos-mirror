@@ -33,6 +33,8 @@
 
 let dac_hash_1 = "hash_1"
 
+let dac_hash_2 = "hash_2"
+
 let assert_equal_string expected actual =
   Assert.equal
     ~loc:__LOC__
@@ -53,4 +55,36 @@ let test_simple_pub_sub () =
   let () = Assert.assert_true "Expected empty stream." is_empty in
   return @@ assert_equal_string dac_hash_1 next
 
-let tests = [Tztest.tztest "Simple pub sub" `Quick test_simple_pub_sub]
+let test_subscription_time () =
+  (* 1. subscriber_1 subscribes to the streamer component.
+     2. [dac_hash_1] is published via the streamer component.
+     3. subscriber_2 subscribes to the streamer component.
+     4. [dac_hash_2] is published via streamer component.
+
+     As such we expect:
+     - subscriber_1 first element inside the stream is [dac_hash_1]
+       and second one is [dac_hash_2].
+     - subscriber_2 first element inside the stream is [dac_hash_2].
+
+     Note that subscriber_2 does not receive [dac_hash_1] as it was published
+     before his/her subscription to the streaming component.
+  *)
+  let open Lwt_result_syntax in
+  let open Data_streamer in
+  let streamer = init () in
+  let* stream_1, _stopper_1 = handle_subscribe streamer in
+  let* () = publish streamer dac_hash_1 in
+  let* stream_2, _stopper_2 = handle_subscribe streamer in
+  let* () = publish streamer dac_hash_2 in
+  let*! subscriber_1_first = Lwt_stream.next stream_1 in
+  let () = assert_equal_string dac_hash_1 subscriber_1_first in
+  let*! subscriber_1_second = Lwt_stream.next stream_1 in
+  let () = assert_equal_string dac_hash_2 subscriber_1_second in
+  let*! subscriber_2_first = Lwt_stream.next stream_2 in
+  return @@ assert_equal_string dac_hash_2 subscriber_2_first
+
+let tests =
+  [
+    Tztest.tztest "Simple pub sub" `Quick test_simple_pub_sub;
+    Tztest.tztest "Test order of subscription" `Quick test_subscription_time;
+  ]
