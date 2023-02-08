@@ -6623,6 +6623,7 @@ let _octez_shell_tests =
       "test_node";
       "test_peer_validator";
       "test_prevalidation";
+      "test_prevalidator_bounding";
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";

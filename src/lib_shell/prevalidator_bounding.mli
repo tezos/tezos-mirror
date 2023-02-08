@@ -64,6 +64,7 @@ val default_config : config
     possible to use it in a {!Data_encoding.merge_objs}. *)
 val config_encoding : config Data_encoding.t
 
+(** Interface of a mempool bounding module. *)
 module type T = sig
   (** Internal overview of all the valid operations present in the mempool. *)
   type state
@@ -107,5 +108,35 @@ module type T = sig
   val remove_operation : state -> Operation_hash.t -> state
 end
 
+(** Build a mempool bounding module. *)
 module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   T with type protocol_operation = Proto.operation
+
+module Internal_for_tests : sig
+  (** Module type that includes [T] above, but is also aware of the
+      exact definition of the [state], so that the tests can access its
+      fields and check its invariants. *)
+  module type T = sig
+    type protocol_operation
+
+    type operation := protocol_operation Shell_operation.operation
+
+    module Opset : Set.S with type elt = operation
+
+    type state = {
+      opset : Opset.t;
+      ophmap : operation Operation_hash.Map.t;
+      minop : operation option;
+      cardinal : int;
+      total_bytes : int;
+    }
+
+    include
+      T
+        with type protocol_operation := protocol_operation
+         and type state := state
+  end
+
+  module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+    T with type protocol_operation = Proto.operation
+end

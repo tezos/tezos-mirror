@@ -46,6 +46,7 @@ let config_encoding : config Data_encoding.t =
 
 open Shell_operation
 
+(* Interface for a [Bounding] module. *)
 module type T = sig
   type state
 
@@ -62,8 +63,30 @@ module type T = sig
   val remove_operation : state -> Operation_hash.t -> state
 end
 
+(* Include [T] but additionally aware of the state's exact definition:
+   this is useful for the tests. *)
+module type T_for_tests = sig
+  type protocol_operation
+
+  type operation := protocol_operation Shell_operation.operation
+
+  module Opset : Set.S with type elt = operation
+
+  type state = {
+    opset : Opset.t;
+    ophmap : operation Operation_hash.Map.t;
+    minop : operation option;
+    cardinal : int;
+    total_bytes : int;
+  }
+
+  include
+    T with type protocol_operation := protocol_operation and type state := state
+end
+
+(* Build a [Bounding] module. *)
 module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
-  T with type protocol_operation = Proto.operation = struct
+  T_for_tests with type protocol_operation = Proto.operation = struct
   type protocol_operation = Proto.operation
 
   type operation = protocol_operation Shell_operation.operation
@@ -183,4 +206,10 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
            should actually be rejected. *)
         None
       else Some (state, removed)
+end
+
+module Internal_for_tests = struct
+  module type T = T_for_tests
+
+  module Make = Make
 end
