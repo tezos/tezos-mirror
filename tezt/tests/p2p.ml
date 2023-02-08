@@ -184,18 +184,30 @@ let wait_connections node nb_conns_target =
     ~arg:()
 
 module Maintenance = struct
-  (* Test.
-     Initialize a node with a short maintenance idle time and an other node
-     with the same maintenance idle time but with the maintenance disabled.
-     Waits the node with the maintenance enabled performs 2 passes and 2 times
-     the maintenance idle time. Then checks that the node with the maintenance
-     disabled has not perform a maintenance pass. *)
+  (*
+     The following test checks that when the maintenance is
+     deactivated by the configuration file of the node, the
+     maintenance is not triggered.
+
+     To do so, we run two nodes, one with the maintenance activated
+     and one without.
+
+     We use a third node as a target node to see whether the two
+     previous node can connect to it. Only the one with the
+     maintenance activated can. To trigger two steps of maintenance,
+     we restart the target node.
+
+     Meanwhile, we check that when the time for two maintenance steps
+     has elapsed, the node with the maintenance deactivated did not
+     trigger any maintenance step. *)
   let test_disabled () =
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-disabled"
       ~tags:["p2p"; "node"; "maintenance"]
     @@ fun () ->
+    (* We set the maintenance idle time to 5 seconds to make the test
+       shorter. *)
     let maintenance_idle_time = 5. in
     (* [create_node name peer] initializes a node with:
        - the name [name],
@@ -225,71 +237,70 @@ module Maintenance = struct
       let* () = Node.run node params in
       Node.wait_for_ready node
     in
-    (* [neighbour_node] is the node that will be known by both [disabled_node]
-       and [enabled_node].
-       Note that it is not symmetric, [neighbour_node] doesn't know disabled
-       and enabled nodes and so should not initiate connections.
-    *)
-    let* neighbour_node = Node.init ~name:"neighbour" [Connections 2] in
-    (* [disabled_node] is the node that is the subject of this test. We try to
-       verify that it won't perform a maintenance pass.
-       Whereas it knowns neighbour node, it should not try to connect with it
-       because the maintenance is disabled.*)
-    let* disabled_node = create_node "disabled" neighbour_node in
-    (* Sets, before [disabled_node] is running, a function that will make the
-       test fails immediately when a maintenance event has been seen from
-       [disabled_node]. *)
+    (* [target_node] is the node that will be known by both
+       [disabled_node] and [enabled_node].  Note that this is not
+       symmetric, [neighbour_node] doesn't know the two others so
+       should not initiate connections. *)
+    let* target_node = Node.init ~name:"target-node" [Connections 2] in
+    (* [disabled_node] is the node that is the subject of this
+       test. We try to verify that it won't perform a maintenance
+       pass.  Whereas it knowns the target node, it should not try to
+       connect with it because the maintenance is disabled.*)
+    let* disabled_node = create_node "no-maintenance-node" target_node in
+    (* The test should fail if the node with the maintenance
+       deactivated emits such an event. *)
     let _ =
       Node.wait_for disabled_node "maintenance_started.v0" (fun _ ->
           Test.fail "A maintenance step started on the disabled node.")
     in
     let* () = run_node disabled_node [Disable_p2p_maintenance] in
-    (* [enabled_node] is used to have a halt condition for the success of this
-       test. Its maintenance should start by establishing a connection with
-       [neighbour_node]. To trigger a second maintenance pass, [neighbour_node]
-       is restarted.*)
-    let* enabled_node = create_node "enabled" neighbour_node in
-    let maintenance_ended_promise =
-      let* () =
-        Node.wait_for enabled_node "maintenance_ended.v0" (fun _ -> Some ())
-      in
-      Log.info "The first maintenance step of enabled node ended." ;
-      let started_promise =
-        let* () =
-          Node.wait_for enabled_node "maintenance_started.v0" (fun _ -> Some ())
-        in
-        Log.info "The second maintenance step of enabled node started." ;
-        unit
-      in
-      let ended_promise =
-        let* () =
-          Node.wait_for enabled_node "maintenance_ended.v0" (fun _ -> Some ())
-        in
-        Log.info "The second maintenance step of enabled node ended." ;
-        unit
-      in
-      (* Restart the neighbour to trigger the maintenance. *)
-      let* () = Node.terminate neighbour_node in
-      let* () = started_promise in
-      (* Removes the peers.json file of [neighbour_node] to be sure it will not
-         initiate the connection. *)
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4782
-         When deleting peers.json file, the test can be stuck a while with 0
-         connections for [enabled_node]. Reconnection delay ? *)
-      (* Node.remove_peers_json_file neighbour_node ; *)
-      let* () = Node.run neighbour_node [] in
-      ended_promise
+    (* This node is used to observe the maintenance steps when it is
+       activated by default. Its maintenance should start by
+       establishing a connection with [target_node]. To trigger the
+       maintenance a second time, [target_node] is restarted.*)
+    let* enabled_node = create_node "with-maintenance-node" target_node in
+    (* This timer is used to check that after two steps of
+       maintenance, the node with the maintenance deactivated did
+       not triggered any maintenance step. *)
+    let time = maintenance_idle_time *. 2. in
+    let sleep_promise time = Lwt_unix.sleep time in
+    let first_step_of_maintenance_started =
+      Node.wait_for enabled_node "maintenance_started.v0" (fun _ -> Some ())
+    in
+    let first_step_of_maintenance_ended =
+      Node.wait_for enabled_node "maintenance_ended.v0" (fun _ -> Some ())
     in
     let* () = run_node enabled_node [] in
-    let sleep_promise =
-      let* () = Lwt_unix.sleep (maintenance_idle_time *. 2.) in
-      Log.info "Timer of twice the maintenance idle time ended." ;
-      unit
+    let* () = first_step_of_maintenance_started in
+    let* () = first_step_of_maintenance_ended in
+    Log.info "The first maintenance step of enabled node ended." ;
+
+    let second_step_of_maintenance_started =
+      Node.wait_for enabled_node "maintenance_started.v0" (fun _ -> Some ())
     in
-    let* () = maintenance_ended_promise
+    let* () = Node.terminate target_node in
+    (* Restart the neighbour to trigger the maintenance. *)
+    let* () = second_step_of_maintenance_started in
+    Log.info "The second maintenance step of enabled node started." ;
+
+    let second_step_of_maintenance_ended =
+      Node.wait_for enabled_node "maintenance_ended.v0" (fun _ -> Some ())
+    in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4782
+
+       We should dlete the peer.json file of [target_node] to be sure
+       it will not initiate a connection. However, by doing so, the
+       test can be stuck for a while with no connection. This could be
+       due to the reconnection delay maybe? *)
+    (* Node.remove_peers_json_file neighbour_node ; *)
+    let* () = Node.run target_node [] in
+    let* () = second_step_of_maintenance_ended in
+    Log.info "The second maintenance step of enabled node ended." ;
+
     (* Waits twice the [maintenance_idle_time] to check that the maintenance of
        [disabled_node] is not triggered by the timer. *)
-    and* () = sleep_promise in
+    let* () = sleep_promise time in
+    Log.info "%f secons elapsed corresponding to two steps of maintenance" time ;
     unit
 
   (* Test.
