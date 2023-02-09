@@ -110,7 +110,7 @@ module Test = struct
             | `Shard_index_out_of_range _ ) ->
             false)
 
-  let test_erasure_code_failure () =
+  let test_erasure_code_failure_not_enough_shards () =
     let redundancy_factor = 2 in
     let number_of_shards = 1 lsl 4 in
     let slot_size = 1 lsl 10 in
@@ -144,6 +144,37 @@ module Test = struct
     | Error (`Not_enough_shards _) -> assert true
     | Ok _ | Error (`Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _)
       ->
+        assert false
+
+  let test_erasure_code_failure_out_of_range () =
+    let redundancy_factor = 2 in
+    let number_of_shards = 1 lsl 4 in
+    let slot_size = 1 lsl 10 in
+    let msg_size = slot_size / 16 in
+    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+    let params =
+      ({redundancy_factor; slot_size; page_size = 1 lsl 5; number_of_shards}
+        : Cryptobox.parameters)
+    in
+    init params ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    (let* t = Cryptobox.make params in
+     let* p = Cryptobox.polynomial_from_slot t slot in
+     let enc_shards = Cryptobox.shards_from_polynomial t p in
+     let c =
+       Seq.take (number_of_shards / redundancy_factor) enc_shards
+       |> Seq.map (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
+              {index = index + 1000; share})
+     in
+     let* decoded_slot = Cryptobox.polynomial_from_shards t c in
+     let decoded_msg =
+       Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
+     in
+     return decoded_msg)
+    |> function
+    | Error (`Shard_index_out_of_range _) -> assert true
+    | Ok _ -> assert false
+    | Error (`Fail _ | `Slot_wrong_size _ | `Not_enough_shards _) ->
         assert false
 
   (* Tests that a page is included in a slot. *)
@@ -288,7 +319,10 @@ let test =
     (fun (test_name, test_func) ->
       Alcotest.test_case test_name `Quick test_func)
     [
-      ("test erasure code failure", Test.test_erasure_code_failure)
+      ( "erasure code failure: not enough shards",
+        Test.test_erasure_code_failure_not_enough_shards );
+      ( "erasure code failure: shard indices out of range",
+        Test.test_erasure_code_failure_out_of_range )
       (*("test_collision_page_size", Test.test_collision_page_size);*);
     ]
 
