@@ -35,7 +35,6 @@ let version_service =
 
 let version dir =
   Directory.register0 dir version_service (fun () () ->
-      Format.printf "Version\n%!" ;
       Lwt.return_ok Tezos_version.Bin_version.version_string)
 
 let dispatch_service =
