@@ -400,7 +400,7 @@ module Inner = struct
              "For the given parameters, the minimum number of shards is %d. \
               Got %d."
              (redundancy_factor * 4)
-             shard_size))
+             number_of_shards))
     else if k > srs_g1_length then
       (* the committed polynomials have degree t.k - 1 at most,
          so t.k coefficients. *)
