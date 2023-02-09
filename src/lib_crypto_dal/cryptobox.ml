@@ -617,14 +617,17 @@ module Inner = struct
        polynomials (as composition preserves injectivity). *)
     Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
-  (* The pages are arranged in cosets to evaluate in batch with Kate
-     amortized. *)
+  (* [polynomial_to_slot] is the left-inverse function of
+     [polynomial_from_slot]. *)
   let polynomial_to_bytes t p =
+    (* The last operation of [polynomial_from_slot] is the interpolation,
+       so we undo it with an evaluation on the same domain [t.domain_k]. *)
     let eval =
       Evaluations.evaluation_fft t.domain_k p |> Evaluations.to_array
     in
     let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
+    (* Reverse permutation from [polynomial_from_slot]. *)
     for page = 0 to t.pages_per_slot - 1 do
       for elt = 0 to t.page_length - 1 do
         let idx = (elt * t.pages_per_slot) + page in
