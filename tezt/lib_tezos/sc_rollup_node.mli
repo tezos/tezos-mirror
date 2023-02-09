@@ -62,6 +62,7 @@ type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 val create :
   protocol:Protocol.t ->
   ?runner:Runner.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
