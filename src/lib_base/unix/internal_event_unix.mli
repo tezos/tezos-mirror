@@ -40,6 +40,10 @@ module Configuration : sig
   val of_file : string -> t tzresult Lwt.t
 end
 
+(** This is the environment variable name that contains the a list of
+    URIs on which events can be reported (see {!val:init}). *)
+val env_var_name : string
+
 (** Initialize the internal-event sinks by looking at the
     [?configuration] argument and then at the (whitespace separated) list
     of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI

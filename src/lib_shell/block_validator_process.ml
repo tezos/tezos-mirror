@@ -597,8 +597,27 @@ module External_validator_process = struct
       ["octez-validator"; "--socket-dir"; socket_dir]
       @ match vp.readonly with true -> ["--readonly"] | false -> []
     in
+    let env = Unix.environment () in
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
+
+       We unset the [env_var_name] environment variable environment
+       variable so that events emitted by the external validator
+       process are not mixed up with the events that could be printed
+       by the external validator. This is a temporary fix and a better
+       solution would be welcome! *)
+    let env =
+      Array.to_seq env
+      |> Seq.filter (fun binding ->
+             match String.split_on_char '=' binding with
+             | env_var_name :: _
+               when env_var_name
+                    = Tezos_base_unix.Internal_event_unix.env_var_name ->
+                 false
+             | _ -> true)
+      |> Array.of_seq
+    in
     let process =
-      Lwt_process.open_process_none (vp.process_path, Array.of_list args)
+      Lwt_process.open_process_none ~env (vp.process_path, Array.of_list args)
     in
     let socket_path =
       External_validation.socket_path ~socket_dir ~pid:process#pid
