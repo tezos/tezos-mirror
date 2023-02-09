@@ -999,14 +999,16 @@ module Inner = struct
                   Scalar.of_bytes_exn dst
               | _ -> Scalar.(copy zero))
         in
-        Ok
-          (verify
-             t
-             cm
-             t.srs.kate_amortized_srs_g2_pages
-             domain
-             (Domains.get t.domain_k page_index, slot_page_evaluations)
-             proof)
+        if
+          verify
+            t
+            cm
+            t.srs.kate_amortized_srs_g2_pages
+            domain
+            (Domains.get t.domain_k page_index, slot_page_evaluations)
+            proof
+        then Ok ()
+        else Error `Invalid_page
 end
 
 include Inner

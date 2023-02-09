@@ -1415,7 +1415,8 @@ struct
       match verify_page t sh ~page_index:page.index page.content proof with
       | Error `Page_length_mismatch -> Ok false
       | Error `Segment_index_out_of_range -> Error `Segment_index_out_of_range
-      | Ok r -> Ok r
+      | Error `Invalid_page -> Ok false
+      | Ok () -> Ok true
 
     let commitment_proof_encoding = Commitment_proof.encoding
   end

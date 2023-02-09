@@ -197,11 +197,11 @@ module Test = struct
          let page = Bytes.sub slot (page_index * page_size) page_size in
          Cryptobox.verify_page t cm ~page_index page pi)
         |> function
-        | Ok check -> check
+        | Ok () -> true
         | Error (`Fail s) when is_in_acceptable_errors s -> true
         | Error
             ( `Fail _ | `Slot_wrong_size _ | `Page_length_mismatch
-            | `Segment_index_out_of_range ) ->
+            | `Segment_index_out_of_range | `Invalid_page ) ->
             false)
 
   (* Tests that a shard comes from the erasure-encoded slot. *)
