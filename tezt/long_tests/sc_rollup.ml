@@ -133,7 +133,7 @@ let with_fresh_rollup ~protocol ?kind ~boot_sector f tezos_node tezos_client
       ~protocol
       Operator
       tezos_node
-      tezos_client
+      ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
   in
   let* configuration_filename =

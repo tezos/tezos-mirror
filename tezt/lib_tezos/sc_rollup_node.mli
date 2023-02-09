@@ -65,6 +65,7 @@ val create :
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
+  base_dir:string ->
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
@@ -73,7 +74,6 @@ val create :
   ?dal_node:Dal_node.t ->
   mode ->
   Node.t ->
-  Client.t ->
   t
 
 (** Get the name of an sc node. *)

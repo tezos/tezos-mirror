@@ -301,7 +301,7 @@ let setup_rollup ~protocol ~kind ?(mode = Sc_rollup_node.Operator) ?boot_sector
       ~protocol
       mode
       tezos_node
-      tezos_client
+      ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
   in
   let* _filename = Sc_rollup_node.config_init sc_rollup_node sc_rollup in
@@ -1404,7 +1404,7 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
       ~protocol
       mode
       node'
-      client'
+      ~base_dir:(Client.base_dir client')
       ~operators
       ~default_operator:Constant.bootstrap3.alias
   in
@@ -1629,7 +1629,7 @@ let commitment_stored_robust_to_failures protocol sc_rollup_node
       ~protocol
       Operator
       node
-      client'
+      ~base_dir:(Client.base_dir client')
       ~default_operator:bootstrap2_key
   in
   let* _configuration_filename =
@@ -2003,7 +2003,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
       ~protocol
       Operator
       node
-      client'
+      ~base_dir:(Client.base_dir client')
       ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
@@ -2142,7 +2142,7 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
       ~protocol
       Operator
       node
-      client'
+      ~base_dir:(Client.base_dir client')
       ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
@@ -2209,7 +2209,7 @@ let _test_reinject_failed_commitment ~protocol ~kind =
       ~protocol
       Operator
       node
-      client
+      ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap5.public_key_hash
   in
   let* _configuration_filename =
@@ -2680,7 +2680,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
           ~protocol
           Operator
           node
-          client
+          ~base_dir:(Client.base_dir client)
           ~default_operator:bootstrap2_key)
       loser_modes
   in
@@ -3231,7 +3231,7 @@ let test_late_rollup_node =
       ~protocol
       Operator
       node
-      client
+      ~base_dir:(Client.base_dir client)
       ~default_operator:
         Constant.bootstrap1.alias (* Same as other rollup_node *)
   in
@@ -3285,7 +3285,7 @@ let test_late_rollup_node_2 =
       ~protocol
       Operator
       node
-      client
+      ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap2.alias
   in
   let* _configuration_filename =
@@ -3620,7 +3620,7 @@ let test_tx_kernel_e2e protocol =
       ~protocol
       Operator
       node
-      client
+      ~base_dir:(Client.base_dir client)
       ~default_operator:bootstrap1_key
   in
   (* Prepare DAL/DAC: put reveal data in rollup node directory. *)
