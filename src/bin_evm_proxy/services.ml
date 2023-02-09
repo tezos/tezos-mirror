@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_rpc
+open Rpc_encodings
 
 let version_service =
   Service.get_service
@@ -37,4 +38,65 @@ let version dir =
       Format.printf "Version\n%!" ;
       Lwt.return_ok Tezos_version.Bin_version.version_string)
 
-let directory = Directory.empty |> version
+let dispatch_service =
+  Service.post_service
+    ~query:Query.empty
+    ~input:Input.encoding
+    ~output:Output.encoding
+    Path.(root)
+
+(** Mocked values used until we can retrieve the specific values from an EVM kernel. *)
+module Mock = struct
+  open Ethereum_types
+
+  let hash_f = hash_of_string
+
+  let qty_f = quantity_of_z
+
+  (* Default chain_id for ethereum custom networks with Ganache. *)
+  let chain_id = qty_f (Z.of_int 1337)
+
+  let block_height = block_height_of_z Z.zero
+
+  let balance = qty_f @@ Z.of_int64 Int64.max_int
+
+  let block =
+    {
+      number = Some (block_height_of_z Z.zero);
+      hash = Some (block_hash_of_string @@ String.make 32 'a');
+      parent = block_hash_of_string (String.make 32 'a');
+      nonce = hash_f @@ String.make 8 'a';
+      sha3Uncles = hash_f @@ String.make 32 'a';
+      logsBloom = Some (hash_f @@ String.make 256 'a');
+      transactionRoot = hash_f @@ String.make 32 'a';
+      stateRoot = hash_f @@ String.make 32 'a';
+      receiptRoot = hash_f @@ String.make 32 'a';
+      miner = hash_f @@ String.make 20 'b';
+      difficulty = qty_f Z.one;
+      totalDifficulty = qty_f Z.one;
+      extraData = "";
+      size = qty_f @@ Z.of_int 12345;
+      gasLimit = qty_f @@ Z.of_int 1111111;
+      gasUsed = qty_f Z.zero;
+      timestamp = qty_f Z.zero;
+      transaction = [];
+      uncles = [];
+    }
+end
+
+let dispatch dir =
+  Directory.register0 dir dispatch_service (fun () input ->
+      match input with
+      | Accounts.Input _ -> Lwt.return_ok (Accounts.Output (Ok []))
+      | Network_id.Input _ ->
+          Lwt.return_ok (Network_id.Output (Ok Mock.chain_id))
+      | Chain_id.Input _ -> Lwt.return_ok (Chain_id.Output (Ok Mock.chain_id))
+      | Get_balance.Input _ ->
+          Lwt.return_ok (Get_balance.Output (Ok Mock.balance))
+      | Block_number.Input _ ->
+          Lwt.return_ok (Block_number.Output (Ok Mock.block_height))
+      | Get_block_by_number.Input _ ->
+          Lwt.return_ok (Get_block_by_number.Output (Ok Mock.block))
+      | _ -> Error_monad.failwith "Unsupported method\n%!")
+
+let directory = Directory.empty |> version |> dispatch
