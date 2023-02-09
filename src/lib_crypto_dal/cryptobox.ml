@@ -617,18 +617,6 @@ module Inner = struct
        polynomials (as composition preserves injectivity). *)
     Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
-  let eval_coset t eval slot offset page =
-    for elt = 0 to t.page_length - 1 do
-      let idx = (elt * t.pages_per_slot) + page in
-      let coeff = Scalar.to_bytes (Array.get eval idx) in
-      if elt = t.page_length - 1 then (
-        Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
-        offset := !offset + t.remaining_bytes)
-      else (
-        Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
-        offset := !offset + scalar_bytes_amount)
-    done
-
   (* The pages are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_to_bytes t p =
@@ -638,7 +626,16 @@ module Inner = struct
     let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
     for page = 0 to t.pages_per_slot - 1 do
-      eval_coset t eval slot offset page
+      for elt = 0 to t.page_length - 1 do
+        let idx = (elt * t.pages_per_slot) + page in
+        let coeff = Scalar.to_bytes (Array.get eval idx) in
+        if elt = t.page_length - 1 then (
+          Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
+          offset := !offset + t.remaining_bytes)
+        else (
+          Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
+          offset := !offset + scalar_bytes_amount)
+      done
     done ;
     slot
 
