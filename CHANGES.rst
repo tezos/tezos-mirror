@@ -192,6 +192,10 @@ Baker
   should make sure that their operations' signatures are correct.
   (MR :gl:`!7490`)
 
+- Made the baker discard legacy or corrupted Tenderbake's saved
+  states in order to avoid unexpected crashes when the baker gets
+  updated, or when a new protocol's baker starts. (MR :gl:`!7640`)
+
 Accuser
 -------
 
