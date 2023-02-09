@@ -312,7 +312,7 @@ module Polynomial_impl = struct
 
   let linear polys coeffs =
     let nb_polys = List.length polys in
-    assert (nb_polys = List.length coeffs) ;
+    assert (List.compare_length_with coeffs nb_polys = 0) ;
     let res_size =
       List.fold_left (fun res_size p -> max (length p) res_size) 0 polys
     in
