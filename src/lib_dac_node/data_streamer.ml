@@ -29,9 +29,7 @@
 module Root_hash_streamer = struct
   type 'a t = unit
 
-  type configuration = unit
-
-  let init (_configuration : configuration) = ()
+  let init () = ()
 
   let publish (_streamer : 'a t) (_hash : 'a) = Lwt_result_syntax.return_unit
 

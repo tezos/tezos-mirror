@@ -31,11 +31,8 @@ module Root_hash_streamer : sig
       is the type of the data that we stream. *)
   type 'a t
 
-  (* Streamer configuration. *)
-  type configuration
-
   (** Initializes a [Root_hash_streamer.t] *)
-  val init : configuration -> 'a t
+  val init : unit -> 'a t
 
   (** [publish streamer data] publishes [data] to all attached 
       subscribers of the [streamer].
