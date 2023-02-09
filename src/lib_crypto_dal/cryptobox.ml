@@ -912,16 +912,30 @@ module Inner = struct
       ~preprocess
       p'
 
-  let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
-    let d_n = Domains.build_power_of_two t.evaluations_log in
-    let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
-    verify
-      t
-      cm
-      t.srs.kate_amortized_srs_g2_shards
-      domain
-      (Domains.get d_n shard_index, shard_evaluations)
-      proof
+  let verify_shard (t : t) cm {index = shard_index; share = shard_evaluations}
+      proof =
+    if shard_index < 0 || shard_index >= t.number_of_shards then
+      Error
+        (`Shard_index_out_of_range
+          (Printf.sprintf
+             "Shard index out of range: got index %d, expected index within \
+              range [%d, %d]."
+             shard_index
+             0
+             (t.number_of_shards - 1)))
+    else
+      let d_n = Domains.build_power_of_two t.evaluations_log in
+      let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
+      if
+        verify
+          t
+          cm
+          t.srs.kate_amortized_srs_g2_shards
+          domain
+          (Domains.get d_n shard_index, shard_evaluations)
+          proof
+      then Ok ()
+      else Error `Invalid_shard
 
   let _prove_single t p z =
     let q, _ =

@@ -105,10 +105,7 @@ module Test = struct
         |> function
         | Ok decoded_msg -> Bytes.equal msg decoded_msg
         | Error (`Fail s) when is_in_acceptable_errors s -> true
-        | Error
-            ( `Fail _ |  `Not_enough_shards _
-            | `Slot_wrong_size _ ) ->
-            false)
+        | Error (`Fail _ | `Not_enough_shards _ | `Slot_wrong_size _) -> false)
 
   let test_erasure_code_failure () =
     let redundancy_factor = 2 in
@@ -194,14 +191,16 @@ module Test = struct
              (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
              enc_shards
          with
-         | None -> return true
+         | None -> (* The shard index is within the bounds *) assert false
          | Some shard ->
-             return
-               (Cryptobox.verify_shard t cm shard shard_proofs.(shard_index)))
+             Cryptobox.verify_shard t cm shard shard_proofs.(shard_index))
         |> function
-        | Ok check -> check
+        | Ok () -> true
         | Error (`Fail s) when is_in_acceptable_errors s -> true
-        | Error (`Fail _ | `Slot_wrong_size _) -> false)
+        | Error
+            ( `Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _
+            | `Invalid_shard ) ->
+            false)
 
   (* Tests that the slot behind the commitment has its size bounded
      by [t.slot_size]. *)
