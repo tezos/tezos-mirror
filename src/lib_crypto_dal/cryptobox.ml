@@ -602,11 +602,17 @@ module Inner = struct
     in
     loop 0 Seq.empty
 
+  module ShardSet = Set.Make (struct
+    type t = shard
+
+    let compare a b = Int.compare a.index b.index
+  end)
+
   (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
   let compute_n t eval_a' shards =
     let w = Domains.get t.domain_n 1 in
     let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
-    Seq.iter
+    ShardSet.iter
       (fun {index; share} ->
         for j = 0 to Array.length share - 1 do
           let c_i = share.(j) in
@@ -630,57 +636,36 @@ module Inner = struct
     (share_scalar_len * Scalar.size_in_bytes) + 4
 
   let polynomial_from_shards t shards =
-    if t.k > Seq.length shards * t.shard_size then
+    let shards =
+      (* We always consider the first k codeword vector components,
+         the ShardSet allows collecting distinct indices.
+         [Seq.take] doesn't raise any exceptions as t.k / t.shard_size
+         is (strictly) positive. *)
+      Seq.take (t.k / t.shard_size) shards |> ShardSet.of_seq
+    in
+    (* There should be t.k / t.shard_size distinct shard indices. *)
+    if t.k / t.shard_size > ShardSet.cardinal shards then
       Error
         (`Not_enough_shards
           (Printf.sprintf
              "there must be at least %d shards to decode"
              (t.k / t.shard_size)))
     else
-      (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}).
-         Let w be a primitive nth root of unity and
-         Ω_0 = {w^{number_of_shards j}}_{j=0 to (n/number_of_shards)-1}
-         be the (n/number_of_shards)-th roots of unity and Ω_i = w^i Ω_0.
-
-         Together, the Ω_i's form a partition of the subgroup of the n-th roots
-         of unity: 𝕌_n = disjoint union_{i ∈ {0, ..., number_of_shards-1}} Ω_i.
-
-         Let Z_j := Prod_{w ∈ Ω_j} (x − w). For a random set of shards
-         S⊆{0, ..., number_of_shards-1} of length k/shard_size, we reorganize the
-         product A(x) = Prod_{i=0}^{k-1} (x − w^{z_i}) into
-         A(x) = Prod_{j ∈ S} Z_j.
-
-         Moreover, Z_0 = x^|Ω_0| - 1 since x^|Ω_0| - 1 contains all roots of Z_0
-         and conversely. Multiplying each term of the polynomial by the root w^j
-         entails Z_j = x^|Ω_0| − w^{j*|Ω_0|}.
-
-         The intermediate products Z_j have a lower Hamming weight (=2) than
-         when using other ways of grouping the z_i's into shards.
-
-         This also reduces the depth of the recursion tree of the poly_mul
-         function from log(k) to log(number_of_shards), so that the decoding time
-         reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
+      (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}). *)
       let mul acc i =
+        (* The complexity of mul_xn is linear in [t.shard_size]. *)
         Polynomials.mul_xn
           acc
           t.shard_size
           (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)))
       in
-
       let partition_products seq =
-        Seq.fold_left
-          (fun (l, r) {index; _} -> (mul r index, l))
-          (Polynomials.one, Polynomials.one)
+        ShardSet.fold
+          (fun {index; _} (l, r) -> (mul r index, l))
           seq
+          (Polynomials.one, Polynomials.one)
       in
-
-      let shards =
-        (* We always consider the first k codeword vector components. *)
-        Seq.take (t.k / t.shard_size) shards
-      in
-
       let p1, p2 = partition_products shards in
-
       let a_poly = fft_mul t.domain_2k [p1; p2] in
 
       (* 2. Computing formal derivative of A(x). *)
