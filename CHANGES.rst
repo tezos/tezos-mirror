@@ -61,6 +61,11 @@ Node
 
 - **Breaking Change**: Removed section in stdout logs lines
 
+- Removed the ``indexing-strategy`` option from the ``TEZOS_CONTEXT``
+  environment variable to prevent the usage of the ``always``
+  indexing strategy. For now, only the ``minimal`` indexing strategy
+  is allowed.
+
 Client
 ------
 
