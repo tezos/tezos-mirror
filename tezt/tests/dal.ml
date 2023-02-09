@@ -399,8 +399,8 @@ let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
   in
   iter 1
 
-let publish_slot ?force ~source ?level ?fee ?error ~index ~commitment ~proof
-    node client =
+let publish_slot ?counter ?force ~source ?level ?fee ?error ~index ~commitment
+    ~proof node client =
   let level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
@@ -409,7 +409,7 @@ let publish_slot ?force ~source ?level ?fee ?error ~index ~commitment ~proof
       ?error
       ?force
       [
-        make ~source ?fee
+        make ~source ?fee ?counter
         @@ dal_publish_slot_header ~index ~level ~commitment ~proof;
       ]
       client)
@@ -941,8 +941,8 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?force ?level ?(fee = 1_200) node client dal_node
-    source index content ~slot_size =
+let publish_and_store_slot ?counter ?force ?level ?(fee = 1_200) node client
+    dal_node source index content ~slot_size =
   let slot_level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
@@ -972,7 +972,17 @@ let publish_and_store_slot ?force ?level ?(fee = 1_200) node client dal_node
       (`String proof)
   in
   let* _ =
-    publish_slot ?force ~source ~fee ~index ~commitment ~proof node client
+    publish_slot
+      ~level:slot_level
+      ?counter
+      ?force
+      ~source
+      ~fee
+      ~index
+      ~commitment
+      ~proof
+      node
+      client
   in
   return (index, slot_commitment)
 
