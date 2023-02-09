@@ -11,10 +11,9 @@ function onlyUnique(value, index, self) {
 }
 const getHead = function (server) {
     let level;
-    return axios
-        .get(server + "head.json")
-        .then(json => {
-            let json_data = json.data
+    return d3
+        .json(server + "head.json")
+        .then(json_data => {
             level = json_data["level"]
             console.log(level)
         })
@@ -27,10 +26,10 @@ function populate_v1(server_address, beg, end) {
     var range_block = range(beg, end);
     return Promise.all(
         range_block.map((height) => {
-            return axios
-                .get(server_address + height + ".json")
+            return d3
+                .json(server_address + height + ".json")
                 .then(json_data => {
-                    dict_data[height] = json_data.data;
+                    dict_data[height] = json_data;
                 }, error => { console.log(error) })
 
         })).then(_ => { return dict_data })
