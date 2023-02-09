@@ -23,29 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Root_hash_streamer] manages the pub-sub mechanism for streaming root 
-    page hashes from publishers to subscribers. Root hash refers to the
-    root hash of the DAC payload Merkle tree.
+(** [Root_hash_streamer] is an in-memory data structure for handling pub-sub
+    mechanism of streaming data from publishers to subscribers.
 *)
 module Root_hash_streamer : sig
-  type t
+  (** ['a t] represents an instance of [Root_hash_streamer], where ['a]
+      is the type of the data that we stream. *)
+  type 'a t
 
   (* Streamer configuration. *)
   type configuration
 
   (** Initializes a [Root_hash_streamer.t] *)
-  val init : configuration -> t
+  val init : configuration -> 'a t
 
-  (** [publish streamer root_hash] publishes a [root_hash] to all attached 
-      subscribers in [streamer].
+  (** [publish streamer data] publishes [data] to all attached 
+      subscribers of the [streamer].
    *)
-  val publish : t -> Dac_plugin.Dac_hash.t -> unit tzresult Lwt.t
+  val publish : 'a t -> 'a -> unit tzresult Lwt.t
 
-  (** [make_subscription streamer] returns a new stream of hashes for the subscriber to
-      consume. An [Lwt_watcher.stopper] function is also returned for the 
-      subscriber to close the stream.
+  (** [make_subscription streamer] returns a new stream of data for the
+      subscriber to consume. An [Lwt_watcher.stopper] function is also returned
+      for the subscriber to close the stream.
   *)
   val make_subscription :
-    t ->
-    (Dac_plugin.Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
+    'a t -> ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
 end

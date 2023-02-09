@@ -27,17 +27,15 @@
     Implement a useful Root_hash_streamer
 *)
 module Root_hash_streamer = struct
-  type t = unit
+  type 'a t = unit
 
   type configuration = unit
 
   let init (_configuration : configuration) = ()
 
-  let publish (_streamer : t) (_hash : Dac_plugin.Dac_hash.t) =
-    Lwt_result_syntax.return_unit
+  let publish (_streamer : 'a t) (_hash : 'a) = Lwt_result_syntax.return_unit
 
-  let make_subscription (_streamer : t) :
-      (Dac_plugin.Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
-      =
+  let make_subscription (_streamer : 'a t) :
+      ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t =
     Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()
 end
