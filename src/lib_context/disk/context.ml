@@ -771,19 +771,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false)
-      ?(indexing_strategy : Tezos_context_helpers.Env.indexing_strategy option)
-      ?index_log_size:tbl_log_size root =
+  let init ?patch_context ?(readonly = false) ?index_log_size:tbl_log_size root
+      =
     let open Lwt_syntax in
-    let module I = Irmin_pack.Indexing_strategy in
-    let indexing_strategy : I.t =
-      Option.value
-        indexing_strategy
-        ~default:Tezos_context_helpers.Env.(v.indexing_strategy)
-      |> function
-      | `Always -> I.always
-      | `Minimal -> I.minimal
-    in
+    (* Forces the context to use the minimal indexing strategy. *)
+    let indexing_strategy = Irmin_pack.Indexing_strategy.minimal in
     let+ repo =
       let index_log_size =
         Option.value
@@ -1065,19 +1057,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     type import = Snapshot.Import.process
 
     let v_import ?(in_memory = false) idx =
-      let indexing_strategy = Tezos_context_helpers.Env.v.indexing_strategy in
       let on_disk =
-        match indexing_strategy with
-        | `Always ->
-            Some `Reuse
-            (* reuse index when importing a snaphot with the always indexing
-               strategy. *)
-        | `Minimal ->
-            if in_memory then None
-            else
-              (* by default the import is using an on-disk index. *)
-              let index_on_disk = Filename.concat idx.path "index_snapshot" in
-              Some (`Path index_on_disk)
+        if in_memory then None
+        else
+          (* by default the import is using an on-disk index. *)
+          let index_on_disk = Filename.concat idx.path "index_snapshot" in
+          Some (`Path index_on_disk)
       in
       Snapshot.Import.v ?on_disk idx.repo
 
