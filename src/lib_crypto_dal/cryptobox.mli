@@ -157,9 +157,7 @@ val encoded_share_size : t -> int
      more than the number of required shards, then the original data
      can be recomputed. *)
 val polynomial_from_shards :
-  t ->
-  shard Seq.t ->
-  (polynomial, [> `Invert_zero of string | `Not_enough_shards of string]) result
+  t -> shard Seq.t -> (polynomial, [> `Not_enough_shards of string]) result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
      encoding the original [polynomial]. *)
