@@ -107,7 +107,7 @@ module Test = struct
         | Error (`Fail s) when is_in_acceptable_errors s -> true
         | Error
             ( `Fail _ | `Not_enough_shards _ | `Slot_wrong_size _
-            | `Shard_index_out_of_range _ ) ->
+            | `Shard_index_out_of_range _ | `Invalid_shard_length _ ) ->
             false)
 
   let test_erasure_code_failure_not_enough_shards () =
@@ -138,8 +138,10 @@ module Test = struct
      Cryptobox.polynomial_from_shards t c)
     |> function
     | Error (`Not_enough_shards _) -> assert true
-    | Ok _ | Error (`Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _)
-      ->
+    | Ok _
+    | Error
+        ( `Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _
+        | `Invalid_shard_length _ ) ->
         assert false
 
   let test_erasure_code_failure_out_of_range () =
@@ -166,7 +168,9 @@ module Test = struct
     |> function
     | Error (`Shard_index_out_of_range _) -> assert true
     | Ok _ -> assert false
-    | Error (`Fail _ | `Slot_wrong_size _ | `Not_enough_shards _) ->
+    | Error
+        ( `Fail _ | `Slot_wrong_size _ | `Not_enough_shards _
+        | `Invalid_shard_length _ ) ->
         assert false
 
   (* Tests that a page is included in a slot. *)
