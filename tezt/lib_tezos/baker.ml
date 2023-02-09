@@ -46,6 +46,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
+    force_apply : bool;
     operations_pool : string option;
     dal_node : Dal_node.t option;
   }
@@ -90,8 +91,8 @@ let liquidity_baking_votefile ?path vote =
   votefile
 
 let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
-    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?operations_pool
-    ?dal_node node client =
+    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
+    ?operations_pool ?dal_node node client =
   let baker =
     create
       ~path:(Protocol.baker protocol)
@@ -108,6 +109,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
         pending_ready = [];
         votefile;
         liquidity_baking_toggle_vote;
+        force_apply;
         operations_pool;
         dal_node;
       }
@@ -134,6 +136,9 @@ let run ?event_level ?event_sections_levels (baker : t) =
       "liquidity-baking-toggle-vote"
       liquidity_baking_vote_to_string
       baker.persistent_state.liquidity_baking_toggle_vote
+  in
+  let force_apply =
+    Cli_arg.optional_switch "force-apply" baker.persistent_state.force_apply
   in
   let operations_pool =
     Cli_arg.optional_arg
@@ -163,7 +168,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
       "node";
       Node.data_dir node;
     ]
-    @ liquidity_baking_toggle_vote @ votefile @ operations_pool
+    @ liquidity_baking_toggle_vote @ votefile @ force_apply @ operations_pool
     @ dal_node_endpoint @ delegates
   in
   let on_terminate _ =
@@ -197,8 +202,8 @@ let wait_for_ready baker =
       check_event baker "Baker started." promise
 
 let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
-    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?operations_pool
-    ?dal_node node client =
+    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?force_apply
+    ?operations_pool ?dal_node node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -209,6 +214,7 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
       ?runner
       ?votefile
       ?liquidity_baking_toggle_vote
+      ?force_apply
       ?operations_pool
       ?dal_node
       ~delegates

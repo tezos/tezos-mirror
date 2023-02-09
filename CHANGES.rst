@@ -59,6 +59,21 @@ Client
 Baker
 -----
 
+- Changed the baker default semantics so that it performs a light
+  validation of operations to classify them instead of fully applying
+  them. Hence, the block production is now more
+  time/cpu/disk-efficient. In this mode, application-dependent checks
+  are disabled. Setting the ``--force-apply`` flag on the command line
+  restores the previous behavior. (MR :gl:`!7490`)
+
+- **Breaking Change**: Disabled the verification of signature of
+  operations in the baker when baking a block. The baker must always
+  be provided operations with a valid signature, otherwise produced
+  blocks will be invalid and rejected by local nodes during their
+  injection. Default setups are not affected but external mempools
+  should make sure that their operations' signatures are correct.
+  (MR :gl:`!7490`)
+
 Accuser
 -------
 

@@ -37,6 +37,7 @@ module Baker : sig
     ?per_block_vote_file:string ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
     ?dal_node_endpoint:Uri.t ->
+    ?force_apply:bool ->
     chain:Shell_services.chain ->
     context_path:string ->
     keep_alive:bool ->

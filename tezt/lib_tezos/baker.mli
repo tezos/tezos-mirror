@@ -119,8 +119,8 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
     passed. The default value is [Some Pass].
 
-    [operations_pool] is passed to the baker daemon through the flag
-    [--operations-pool].
+    [operations_pool] and [force_apply] are passed to the baker daemon through
+    the flag [--operations-pool] and [--force_apply].
 
     If [dal_node] is specified, then it is the DAL node that the baker queries
     in order to determine the attestations it sends to the L1 node. A
@@ -134,6 +134,7 @@ val create :
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?force_apply:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   Node.t ->
@@ -170,10 +171,10 @@ val create :
     baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [votefile], [liquidity_baking_toggle_vote] respectively
+    [votefile], [liquidity_baking_toggle_vote], [force_apply] respectively
     [operations_pool] are passed to the baker daemon through the flags
-    [--votefile], [--liquidity-baking-toggle-vote] respectively
-    [--operations-pool].
+    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply]
+    respectively [--operations-pool].
 
     If [dal_node] is specified, then it is the DAL node that the baker queries
     in order to determine the attestations it sends to the L1 node. A
@@ -188,6 +189,7 @@ val init :
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?force_apply:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   Node.t ->
