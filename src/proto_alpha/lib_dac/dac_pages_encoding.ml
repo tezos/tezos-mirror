@@ -59,42 +59,19 @@ type version = int
 
 (* Versioning to configure content and hash serialization. *)
 module type VERSION = sig
-  val contents_version : version
+  val content_version : version
 
   val hashes_version : version
 end
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4651
-   Use proper page store interface.*)
-
-(** Temporary bare-bone Page_store interface. Represents the minimal behaviour
-    required for a working encoding scheme. 
-*)
-module type Page_store = sig
-  type t
-
-  (* Hash type used to represent pages *)
-  type hash
-
-  (** [save_bytes page_store hash page] saves a [page] of data to file named [hash] 
-      using [page_store] 
-  *)
-  val save_bytes : t -> hash -> bytes -> unit tzresult Lwt.t
-
-  (** [load_bytes page_store hash] loads and returns [page] of data from a file
-      named [hash] using [page_store] 
-  *)
-  val load_bytes : t -> hash -> bytes tzresult Lwt.t
-end
-
 module type Hashing_scheme = sig
-  include Dac_preimage_data_manager.REVEAL_HASH
+  include module type of Sc_rollup_reveal_hash
 
   val scheme : supported_hashes
 end
 
 (** [Dac_codec] is a module for encoding a payload as a whole and returnining
-    the calculated root hash. 
+    the calculated root hash.
 *)
 module type Dac_codec = sig
   (* Hash type used to represent pages *)
@@ -104,16 +81,16 @@ module type Dac_codec = sig
   type page_store
 
   (** [serialize_payload page_store payload] serializes a [payload] into pages
-      suitable to be read by a PVM's `reveal_preimage` and stores it into 
-      [page_store]. The serialization scheme  is some hash-based encoding 
+      suitable to be read by a PVM's `reveal_preimage` and stores it into
+      [page_store]. The serialization scheme  is some hash-based encoding
       scheme such that a root hash is produced that represents the payload.
   *)
   val serialize_payload : page_store:page_store -> bytes -> hash tzresult Lwt.t
 
   (** [deserialize_payload page_store hash] deserializes a payload from [hash]
       using some hash-based encoding scheme. Any payload serialized by
-      [serialize_payload] can de deserialized from its root hash by 
-      [deserialize_payload], that is, these functions are inverses of each 
+      [serialize_payload] can de deserialized from its root hash by
+      [deserialize_payload], that is, these functions are inverses of each
       other.
   *)
   val deserialize_payload :
@@ -121,9 +98,9 @@ module type Dac_codec = sig
 end
 
 (** [Buffered_dac_codec] partially constructs a Dac external message payload by
-    aggregating  messages one message at a time. [add] maintains partially 
-    constructed pages in a buffer [t] and persist full pages to [page_store]. 
-    [finalize] is called to end the aggeragation process and calculate the 
+    aggregating  messages one message at a time. [add] maintains partially
+    constructed pages in a buffer [t] and persist full pages to [page_store].
+    [finalize] is called to end the aggeragation process and calculate the
     resulting root hash.
 *)
 module type Buffered_dac_codec = sig
@@ -139,16 +116,16 @@ module type Buffered_dac_codec = sig
   (* Returns an empty buffer *)
   val empty : unit -> t
 
-  (** [add page_store buffer message] adds a [message] to [buffer]. The 
+  (** [add page_store buffer message] adds a [message] to [buffer]. The
       [buffer] is serialized to [page_store] when it is full. Serialization
-      logic is dependent on the encoding scheme.  
+      logic is dependent on the encoding scheme.
   *)
   val add : page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
 
   (** [finalize page_store buffer] serializes the [buffer] to [page_store] and
       returns a root hash that represents the final payload. The serialization
-      logic is dependent on the encoding scheme. [buffer] is emptied after 
-      this call.  
+      logic is dependent on the encoding scheme. [buffer] is emptied after
+      this call.
   *)
   val finalize : page_store:page_store -> t -> hash tzresult Lwt.t
 
@@ -254,8 +231,8 @@ module Merkle_tree = struct
 
   (** Makes a [Buffered_dac_codec].
 
-      It uses an in-memory data structure that enables aggregating DAC messages/payload. 
-      Data is serialized with respect to [page_encoding], by storing the full 
+      It uses an in-memory data structure that enables aggregating DAC messages/payload.
+      Data is serialized with respect to [page_encoding], by storing the full
       payload in the shape of a k-ary merkle tree onto the disk.
       During the proccess of partial serialization, the minimum amount of data
       is kept in memory, by eagerly persisting the full pages of a given merkle
@@ -265,21 +242,21 @@ module Merkle_tree = struct
       Starting with an [empty] serializer, splitting arbitrary [payload] into
       chunks of arbitrary size, and adding them to the serializer from left to
       right, should result in same root hash as adding all the payload data in
-      one chunk, provided it could fit into the memory.         
+      one chunk, provided it could fit into the memory.
      *)
 
   module Make_buffered
       (H : Hashing_scheme)
-      (S : Page_store with type hash := H.t)
+      (S : Page_store.S with type hash := H.t)
       (V : VERSION)
       (C : CONFIG) =
   struct
     (* Even numbers are used for versioning Contents pages, odd numbers are used
        for versioning Hashes pages. *)
     module V = struct
-      let contents_version_tag =
-        assert (V.contents_version < max_version) ;
-        2 * V.contents_version
+      let content_version_tag =
+        assert (V.content_version < max_version) ;
+        2 * V.content_version
 
       let hashes_version_tag =
         assert (V.hashes_version < max_version) ;
@@ -322,8 +299,8 @@ module Merkle_tree = struct
           ~tag_size:`Uint8
           [
             case
-              ~title:"contents"
-              (Tag V.contents_version_tag)
+              ~title:"content"
+              (Tag V.content_version_tag)
               bytes
               (function Contents payload -> Some payload | _ -> None)
               (fun payload -> Contents payload);
@@ -347,9 +324,9 @@ module Merkle_tree = struct
       | Ok raw_page -> Ok raw_page
       | Error _ -> error Cannot_serialize_page_payload
 
-    let store_page ~page_store page =
+    let store_page ~page_store raw_page =
       let open Lwt_result_syntax in
-      let*? serialized_page = serialize_page page in
+      let*? serialized_page = serialize_page raw_page in
       (* Hashes are computed from raw pages, each of which consists of a
          preamble of 5 bytes followed by a page payload - a raw sequence
          of bytes from the original payload for Contents pages, and a
@@ -357,7 +334,7 @@ module Merkle_tree = struct
          bytes is part of the sequence of bytes which is hashed.
       *)
       let hash = hash serialized_page in
-      let* () = S.save_bytes page_store hash serialized_page in
+      let* () = S.save page_store ~hash ~content:serialized_page in
       return hash
 
     let is_empty_page_data = function
@@ -367,11 +344,11 @@ module Merkle_tree = struct
     let max_hashes_per_page =
       (C.max_page_size - page_preamble_size) / hash_bytes_size
 
-    (** Represents data that is held in-memory and is yet to be persisted to the disk 
-        - effectively acting as a buffer, making sure that all [pages] of the given 
-        level that are written to the disk are full (with the exception of last one 
+    (** Represents data that is held in-memory and is yet to be persisted to the disk
+        - effectively acting as a buffer, making sure that all [pages] of the given
+        level that are written to the disk are full (with the exception of last one
         upon finalization). For every existing level written onto to the disk, the stack
-        holds a corresponding [page_data] in-memory representation. 
+        holds a corresponding [page_data] in-memory representation.
       *)
     module Merkle_level = struct
       let init_level page_data = page_data
@@ -462,10 +439,10 @@ module Merkle_tree = struct
 
     (** Adds a [page_data] to the bottom level of the in-memory merkle tree repr.
           If [page_data] inside level exceeds its [max_page_size], then we split it
-          into valid full [page]/s and a leftover that is smaller or equal to 
+          into valid full [page]/s and a leftover that is smaller or equal to
           [max_page_size].
-          
-          Full pages are eagerly stored to disk and parent hashes are added 
+
+          Full pages are eagerly stored to disk and parent hashes are added
           in batch to next level. The leftover represents the content
           of current level. Procedure repeats recursively if necessarily.
 
@@ -490,7 +467,7 @@ module Merkle_tree = struct
           to disk. The data is fully serialized after the call to [finalize].
           This guarantees that only the last [page] in the given level could be
           partially filled.
-          
+
           Throws [Payload_cannot_be_empty] in case of empty payload *)
     let add ~page_store stack payload =
       let open Lwt_result_syntax in
@@ -561,26 +538,26 @@ module Merkle_tree = struct
         outlined above, but it is not guaranteed in more general cases.
      *)
     let deserialize_payload ~page_store root_hash =
-      let rec go retrieved_hashes retrieved_contents =
+      let rec go retrieved_hashes retrieved_content =
         let open Lwt_result_syntax in
         match retrieved_hashes with
-        | [] -> return @@ Bytes.concat Bytes.empty retrieved_contents
+        | [] -> return @@ Bytes.concat Bytes.empty retrieved_content
         | hash :: hashes -> (
-            let* serialized_page = S.load_bytes page_store hash in
+            let* serialized_page = S.load page_store ~hash in
             let*? page = deserialize_page serialized_page in
             match page with
             | Hashes page_hashes ->
                 (* Hashes are saved in reverse order. *)
                 (go [@tailcall])
                   (List.rev_append page_hashes hashes)
-                  retrieved_contents
-            | Contents contents ->
+                  retrieved_content
+            | Contents content ->
                 (* Because hashes are saved in reversed order, content pages
                    will be retrieved in reverse order. By always appending a
                    conetent page to the list of retrieved content pages,
-                   we ensure that pages are saved in `retrieved_contents` in
+                   we ensure that pages are saved in `retrieved_content` in
                    their original order. *)
-                (go [@tailcall]) hashes (contents :: retrieved_contents))
+                (go [@tailcall]) hashes (content :: retrieved_content))
       in
       go [root_hash] []
   end
@@ -592,8 +569,8 @@ module Merkle_tree = struct
     type page_store = B.page_store
 
     (** Main function for computing the pages of a Merkle tree from a sequence
-        of bytes. Each page is processed and persisted to [page_store] such that 
-        the original payload can be  reconstructed from its Merkle tree root; 
+        of bytes. Each page is processed and persisted to [page_store] such that
+        the original payload can be  reconstructed from its Merkle tree root;
         The function [serialize_payload] returns the root hash of the Merkle
         tree constructed. *)
     let serialize_payload ~page_store payload =
@@ -612,10 +589,10 @@ module Merkle_tree = struct
 
         let scheme = Sc_rollup_reveal_hash.Blake2B
       end)
-      (Dac_preimage_data_manager.Reveal_hash)
+      (Page_store.Filesystem)
       (struct
-        (* Cntents_version_tag used in contents pages is 0. *)
-        let contents_version = 0
+        (* Cntents_version_tag used in content pages is 0. *)
+        let content_version = 0
 
         (* Hashes_version_tag used in hashes pages is 1. *)
         let hashes_version = 0
@@ -644,21 +621,14 @@ module Hash_chain = struct
     val serialize_page : page -> string
   end
 
-  module Make (Hashing_scheme : sig
-    include Dac_preimage_data_manager.REVEAL_HASH
+  module Make (H : Hashing_scheme) (P : PAGE_FMT with type h = H.t) = struct
+    type h = H.t
 
-    val scheme : supported_hashes
-  end)
-  (P : PAGE_FMT with type h = Hashing_scheme.t) =
-  struct
-    type h = Hashing_scheme.t
+    let hash bytes = H.hash_bytes ~scheme:H.scheme [bytes]
 
-    let hash bytes =
-      Hashing_scheme.hash_bytes ~scheme:Hashing_scheme.scheme [bytes]
+    let to_hex = H.to_hex
 
-    let to_hex = Hashing_scheme.to_hex
-
-    let link_chunks chunks : (Hashing_scheme.t * bytes) list =
+    let link_chunks chunks : (H.t * bytes) list =
       let rec link_chunks_rev linked_pages rev_pages =
         match rev_pages with
         | [] -> linked_pages

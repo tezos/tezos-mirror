@@ -58,8 +58,6 @@ module Registration = struct
 end
 
 module DAC = struct
-  module Hash_storage = Dac_preimage_data_manager.Reveal_hash
-
   let store_preimage_request_encoding =
     Data_encoding.(
       obj2
@@ -117,17 +115,14 @@ module DAC = struct
       (data, pagination_scheme) =
     let open Lwt_result_syntax in
     let open Dac_pages_encoding in
-    let page_store = reveal_data_dir in
+    let page_store = Page_store.Filesystem.init reveal_data_dir in
     let* root_hash =
       match pagination_scheme with
       | Merkle_tree_V0 -> Merkle_tree.V0.serialize_payload ~page_store data
       | Hash_chain_V0 ->
           Hash_chain.V0.serialize_payload
             ~for_each_page:(fun (hash, content) ->
-              Dac_preimage_data_manager.Reveal_hash.save_bytes
-                page_store
-                hash
-                content)
+              Page_store.Filesystem.save page_store ~hash ~content)
             data
     in
     let* signature, witnesses =

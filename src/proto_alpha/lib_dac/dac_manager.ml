@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Reveal_hash = struct
-  module Storage = Dac_preimage_data_manager.Reveal_hash
+  module Storage = Page_store.Filesystem
   module Signatures = Dac_signature_manager.Reveal_hash
   module External_message = Dac_external_message_manager.Reveal_hash
 end

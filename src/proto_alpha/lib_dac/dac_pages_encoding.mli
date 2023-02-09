@@ -49,42 +49,19 @@ type version = int
 
 (* Versioning to configure content and hash serialization. *)
 module type VERSION = sig
-  val contents_version : version
+  val content_version : version
 
   val hashes_version : version
 end
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4651
-   Use proper page store interface.*)
-
-(** Temporary bare-bone Page_store interface. Represents the minimal behaviour
-    required for a working encoding scheme. 
-*)
-module type Page_store = sig
-  type t
-
-  (* Hash type used to represent pages *)
-  type hash
-
-  (** [save_bytes page_store hash page] saves a [page] of data to file named [hash] 
-      using [page_store] 
-  *)
-  val save_bytes : t -> hash -> bytes -> unit tzresult Lwt.t
-
-  (** [load_bytes page_store hash] loads and returns [page] of data from a file
-      named [hash] using [page_store] 
-  *)
-  val load_bytes : t -> hash -> bytes tzresult Lwt.t
-end
-
 module type Hashing_scheme = sig
-  include Dac_preimage_data_manager.REVEAL_HASH
+  include module type of Protocol.Sc_rollup_reveal_hash
 
   val scheme : supported_hashes
 end
 
 (** [Dac_codec] is a module for encoding a payload as a whole and returnining
-    the calculated root hash. 
+    the calculated root hash.
 *)
 module type Dac_codec = sig
   (* Hash type used to represent pages *)
@@ -94,16 +71,16 @@ module type Dac_codec = sig
   type page_store
 
   (** [serialize_payload page_store payload] serializes a [payload] into pages
-      suitable to be read by a PVM's `reveal_preimage` and stores it into 
-      [page_store]. The serialization scheme  is some hash-based encoding 
+      suitable to be read by a PVM's `reveal_preimage` and stores it into
+      [page_store]. The serialization scheme  is some hash-based encoding
       scheme such that a root hash is produced that represents the payload.
   *)
   val serialize_payload : page_store:page_store -> bytes -> hash tzresult Lwt.t
 
   (** [deserialize_payload page_store hash] deserializes a payload from [hash]
       using some hash-based encoding scheme. Any payload serialized by
-      [serialize_payload] can de deserialized from its root hash by 
-      [deserialize_payload], that is, these functions are inverses of each 
+      [serialize_payload] can de deserialized from its root hash by
+      [deserialize_payload], that is, these functions are inverses of each
       other.
   *)
   val deserialize_payload :
@@ -111,9 +88,9 @@ module type Dac_codec = sig
 end
 
 (** [Buffered_dac_codec] partially constructs a Dac external message payload by
-    aggregating  messages one message at a time. [add] maintains partially 
-    constructed pages in a buffer [t] and persist full pages to [page_store]. 
-    [finalize] is called to end the aggeragation process and calculate the 
+    aggregating  messages one message at a time. [add] maintains partially
+    constructed pages in a buffer [t] and persist full pages to [page_store].
+    [finalize] is called to end the aggeragation process and calculate the
     resulting root hash.
 *)
 module type Buffered_dac_codec = sig
@@ -129,16 +106,16 @@ module type Buffered_dac_codec = sig
   (* Returns an empty buffer *)
   val empty : unit -> t
 
-  (** [add page_store buffer message] adds a [message] to [buffer]. The 
+  (** [add page_store buffer message] adds a [message] to [buffer]. The
       [buffer] is serialized to [page_store] when it is full. Serialization
-      logic is dependent on the encoding scheme.  
+      logic is dependent on the encoding scheme.
   *)
   val add : page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
 
   (** [finalize page_store buffer] serializes the [buffer] to [page_store] and
       returns a root hash that represents the final payload. The serialization
-      logic is dependent on the encoding scheme. [buffer] is emptied after 
-      this call.  
+      logic is dependent on the encoding scheme. [buffer] is emptied after
+      this call.
   *)
   val finalize : page_store:page_store -> t -> hash tzresult Lwt.t
 
@@ -160,8 +137,8 @@ end
           are referred to as `Contents pages`. Contents pages constitute the
           leaves of the Merkle tree being built,
       }
-      {li Each contents page (each of which is a sequence of bytes consisting
-        of the preamble followed by the actual contents from the original
+      {li Each content page (each of which is a sequence of bytes consisting
+        of the preamble followed by the actual content from the original
         payload) is then hashed. The size of each hash is fixed. The hashes are
         concatenated together, and the resulting sequence of bytes is split
         into pages of the same size of `Hashes pages`, each of which is
@@ -188,7 +165,7 @@ module Merkle_tree : sig
   *)
   module V0 :
     Dac_codec
-      with type page_store = string
+      with type page_store = Page_store.Filesystem.t
        and type hash = Protocol.Sc_rollup_reveal_hash.t
 
   (**/**)
@@ -196,7 +173,7 @@ module Merkle_tree : sig
   module Internal_for_tests : sig
     module Make_buffered
         (H : Hashing_scheme)
-        (S : Page_store with type hash := H.t)
+        (S : Page_store.S with type hash := H.t)
         (V : VERSION)
         (C : CONFIG) :
       Buffered_dac_codec with type hash = H.t and type page_store = S.t
@@ -206,8 +183,8 @@ module Merkle_tree : sig
   end
 end
 
-(** Encoding of DAC payload as a Hash Chain/Merkle List. The encoding implementation 
-    is specific to the Arith PVM. 
+(** Encoding of DAC payload as a Hash Chain/Merkle List. The encoding implementation
+    is specific to the Arith PVM.
  *)
 module Hash_chain : sig
   module V0 : sig
