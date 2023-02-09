@@ -608,29 +608,6 @@ module Inner = struct
     let compare a b = Int.compare a.index b.index
   end)
 
-  (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}.
-     The shard indices are checked to be within bounds by
-     [polynomial_from_shards]. *)
-  let compute_n t eval_a' shards =
-    let w = Domains.get t.domain_n 1 in
-    let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
-    ShardSet.iter
-      (fun {index; share} ->
-        for j = 0 to Array.length share - 1 do
-          let c_i = share.(j) in
-          let z_i = (t.number_of_shards * j) + index in
-          let x_i = Scalar.pow w (Z.of_int z_i) in
-          let tmp = Evaluations.get eval_a' z_i in
-          Scalar.mul_inplace tmp tmp x_i ;
-          (* The call below never fails by construction, so we don't
-             catch exceptions *)
-          Scalar.inverse_exn_inplace tmp tmp ;
-          Scalar.mul_inplace tmp tmp c_i ;
-          n_poly.(z_i) <- tmp
-        done)
-      shards ;
-    n_poly
-
   let encoded_share_size t =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
        Improve shard size computation *)
@@ -688,7 +665,27 @@ module Inner = struct
       (* 3. Computing A'(w^i) = A_i(w^i). *)
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
-      (* 4. Computing N(x). *)
+      (* 4. Computing the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
+      let compute_n t eval_a' shards =
+        let w = Domains.get t.domain_n 1 in
+        let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
+        ShardSet.iter
+          (fun {index; share} ->
+            for j = 0 to Array.length share - 1 do
+              let c_i = share.(j) in
+              let z_i = (t.number_of_shards * j) + index in
+              let x_i = Scalar.pow w (Z.of_int z_i) in
+              let tmp = Evaluations.get eval_a' z_i in
+              Scalar.mul_inplace tmp tmp x_i ;
+              (* The call below never fails by construction, so we don't
+                 catch exceptions. *)
+              Scalar.inverse_exn_inplace tmp tmp ;
+              Scalar.mul_inplace tmp tmp c_i ;
+              n_poly.(z_i) <- tmp
+            done)
+          shards ;
+        n_poly
+      in
       let n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
