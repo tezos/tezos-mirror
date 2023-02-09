@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,6 +53,7 @@ type t = {
   base_dir : string;
   mutable additional_bootstraps : Account.key list;
   mutable mode : mode;
+  runner : Runner.t option;
 }
 
 type stresstest_gas_estimation = {
@@ -95,18 +97,20 @@ let address ?(hostname = false) ?from peer =
   | Some endpoint ->
       Runner.address ~hostname ?from:(runner endpoint) (runner peer)
 
-let create_with_mode ?(path = Constant.tezos_client)
+let create_with_mode ?runner ?(path = Constant.tezos_client)
     ?(admin_path = Constant.tezos_admin_client) ?name
     ?(color = Log.Color.FG.blue) ?base_dir mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
-    match base_dir with None -> Temp.dir name | Some dir -> dir
+    match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
   let additional_bootstraps = [] in
-  {path; admin_path; name; color; base_dir; additional_bootstraps; mode}
+  {path; admin_path; name; color; base_dir; additional_bootstraps; mode; runner}
 
-let create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
+let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
+    ?media_type () =
   create_with_mode
+    ?runner
     ?path
     ?admin_path
     ?name
@@ -171,6 +175,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
   let protocol_arg = optional_arg "protocol" Fun.id protocol_hash in
   let config_file_arg = optional_arg "config-file" Fun.id config_file in
   Process.spawn
+    ?runner:client.runner
     ~name:client.name
     ~color:client.color
     ~env
