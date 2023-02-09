@@ -32,6 +32,7 @@ type t = {
   sc_node : Sc_rollup_node.t;
   base_dir : string;
   color : Log.Color.t;
+  runner : Runner.t option;
 }
 
 type commitment = {
@@ -103,13 +104,14 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ~protocol ?name ?base_dir ?(color = Log.Color.FG.green) sc_node =
+let create ~protocol ?runner ?name ?base_dir ?(color = Log.Color.FG.green)
+    sc_node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let path = Protocol.sc_rollup_client protocol in
   let base_dir =
-    match base_dir with None -> Temp.dir name | Some dir -> dir
+    match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
-  {name; path; sc_node; base_dir; color}
+  {name; path; sc_node; base_dir; color; runner}
 
 let base_dir_arg sc_client = ["--base-dir"; sc_client.base_dir]
 
@@ -119,6 +121,7 @@ let endpoint_arg sc_client =
 let spawn_command ?hooks sc_client command =
   let process =
     Process.spawn
+      ?runner:sc_client.runner
       ~name:sc_client.name
       ~color:sc_client.color
       ?hooks
