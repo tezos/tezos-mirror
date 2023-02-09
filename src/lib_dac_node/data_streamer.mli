@@ -39,10 +39,10 @@ module Root_hash_streamer : sig
    *)
   val publish : 'a t -> 'a -> unit tzresult Lwt.t
 
-  (** [make_subscription streamer] returns a new stream of data for the
+  (** [handle_subscribe streamer] returns a new stream of data for the
       subscriber to consume. An [Lwt_watcher.stopper] function is also returned
       for the subscriber to close the stream.
   *)
-  val make_subscription :
+  val handle_subscribe :
     'a t -> ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
 end

@@ -33,7 +33,7 @@ module Root_hash_streamer = struct
 
   let publish (_streamer : 'a t) (_hash : 'a) = Lwt_result_syntax.return_unit
 
-  let make_subscription (_streamer : 'a t) :
+  let handle_subscribe (_streamer : 'a t) :
       ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t =
     Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()
 end
