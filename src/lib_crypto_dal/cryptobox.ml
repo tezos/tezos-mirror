@@ -608,7 +608,9 @@ module Inner = struct
     let compare a b = Int.compare a.index b.index
   end)
 
-  (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
+  (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}.
+     The shard indices are checked to be within bounds by
+     [polynomial_from_shards]. *)
   let compute_n t eval_a' shards =
     let w = Domains.get t.domain_n 1 in
     let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
@@ -650,6 +652,18 @@ module Inner = struct
           (Printf.sprintf
              "there must be at least %d shards to decode"
              (t.k / t.shard_size)))
+    else if
+      ShardSet.exists
+        (fun {index; _} -> index >= t.number_of_shards || index < 0)
+        shards
+    then
+      Error
+        (`Shard_index_out_of_range
+          (Printf.sprintf
+             "At least one shard index out of range: expected indexes within \
+              range [%d, %d]."
+             0
+             (t.number_of_shards - 1)))
     else
       (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}). *)
       let mul acc i =

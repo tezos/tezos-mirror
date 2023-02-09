@@ -155,9 +155,18 @@ val encoded_share_size : t -> int
      [C.redundancy_factor] the total number of shards. It is
      guaranteed that for any share with different indices, if there is
      more than the number of required shards, then the original data
-     can be recomputed. *)
+     can be recomputed.
+
+     Returns [Error (`Not_enough_shards msg)] if there aren't at least
+     [t.number_of_shards / t.redundancy_factor] distinct shards, or
+     [Error (`Shard_index_out_of_range msg)] if at least one shard index
+     is not within the range [0, t.number_of_shards - 1]. *)
 val polynomial_from_shards :
-  t -> shard Seq.t -> (polynomial, [> `Not_enough_shards of string]) result
+  t ->
+  shard Seq.t ->
+  ( polynomial,
+    [> `Not_enough_shards of string | `Shard_index_out_of_range of string] )
+  result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
      encoding the original [polynomial]. *)

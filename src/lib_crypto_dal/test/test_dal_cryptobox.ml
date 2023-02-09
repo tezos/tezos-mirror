@@ -105,7 +105,10 @@ module Test = struct
         |> function
         | Ok decoded_msg -> Bytes.equal msg decoded_msg
         | Error (`Fail s) when is_in_acceptable_errors s -> true
-        | Error (`Fail _ | `Not_enough_shards _ | `Slot_wrong_size _) -> false)
+        | Error
+            ( `Fail _ | `Not_enough_shards _ | `Slot_wrong_size _
+            | `Shard_index_out_of_range _ ) ->
+            false)
 
   let test_erasure_code_failure () =
     let redundancy_factor = 2 in
@@ -139,7 +142,9 @@ module Test = struct
      return decoded_msg)
     |> function
     | Error (`Not_enough_shards _) -> assert true
-    | Ok _ | Error (`Fail _ | `Slot_wrong_size _) -> assert false
+    | Ok _ | Error (`Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _)
+      ->
+        assert false
 
   (* Tests that a page is included in a slot. *)
   let test_page_proofs =
