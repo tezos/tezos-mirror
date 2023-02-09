@@ -70,6 +70,5 @@ val diff : t -> t -> t
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
 
-module Internal_for_tests : sig
-  val to_z : t -> Z.t
-end
+(** [to_z t] Returns the sum of powers of two of the given bitset. *)
+val to_z : t -> Z.t

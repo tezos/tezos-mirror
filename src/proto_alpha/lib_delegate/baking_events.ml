@@ -571,15 +571,17 @@ module Actions = struct
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let attestation_injected =
-    declare_2
+    declare_3
       ~section
       ~name:"attestation_injected"
       ~level:Notice
-      ~msg:"injected attestation {ophash} for {delegate}"
+      ~msg:"injected attestation {ophash} with bitset {bitset} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp3:Z.pp_print
+      ("bitset", Data_encoding.n)
 
   let synchronizing_round =
     declare_1

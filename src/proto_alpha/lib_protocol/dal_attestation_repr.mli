@@ -42,7 +42,7 @@
    that aims to be provided with endorsement operations. To avoid
    overloading the network, this representation should be compact.  *)
 
-type t
+type t = private Bitset.t
 
 (** The shape of Dal attestation operations injected by delegates. *)
 type operation = {

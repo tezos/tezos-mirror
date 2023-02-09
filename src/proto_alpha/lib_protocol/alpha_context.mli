@@ -2949,7 +2949,7 @@ module Dal : sig
   (** This module re-exports definitions from {!Dal_attestation_repr} and
       {!Raw_context.Dal}. *)
   module Attestation : sig
-    type t
+    type t = private Bitset.t
 
     type operation = {
       attestor : public_key_hash;

@@ -62,6 +62,4 @@ let () =
 
 let occupied_size_in_bits = Z.numbits
 
-module Internal_for_tests = struct
-  let to_z z = z
-end
+let to_z z = z
