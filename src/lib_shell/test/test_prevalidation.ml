@@ -191,39 +191,30 @@ let pp_classification fmt classification =
   | `Refused trace -> print_error_classification "Refused" trace
   | `Outdated trace -> print_error_classification "Outdated" trace
 
-let check_classification_is_exn loc
-    (classification : Prevalidator_classification.classification) =
-  match classification with
+let unexpected_classification ~__LOC__ expected classification =
+  Test.fail
+    "%s:@.Expected classification %s, but got %a"
+    __LOC__
+    expected
+    pp_classification
+    classification
+
+let assert_success ~__LOC__ = function
+  | `Prechecked -> ()
+  | classification ->
+      unexpected_classification ~__LOC__ "Prechecked" classification
+
+let assert_operation_conflict ~__LOC__ = function
+  | `Branch_delayed [Validation_errors.Operation_conflict _] -> ()
+  | cl ->
+      unexpected_classification
+        ~__LOC__
+        "Branch_delayed: [Operation_conflict]"
+        cl
+
+let assert_exn ~__LOC__ = function
   | `Branch_delayed [Exn _] -> ()
-  | _ ->
-      QCheck2.Test.fail_reportf
-        "%s:@.Expected classification (Branch_delayed: [Exn]), but got %a"
-        loc
-        pp_classification
-        classification
-
-let pp_expected fmt = function
-  | `Prechecked -> Format.fprintf fmt "Prechecked"
-  | `Branch_delayed -> Format.fprintf fmt "Branch_delayed"
-  | `Branch_refused -> Format.fprintf fmt "Branch_refused"
-  | `Refused -> Format.fprintf fmt "Refused"
-
-let check_classification loc ~expected
-    (classification : Prevalidator_classification.classification) =
-  match (expected, classification) with
-  | `Prechecked, `Prechecked
-  | `Branch_delayed, `Branch_delayed _
-  | `Branch_refused, `Branch_refused _
-  | `Refused, `Refused _ ->
-      ()
-  | _ ->
-      QCheck2.Test.fail_reportf
-        "%s:@.Expected classification %a, but got %a"
-        loc
-        pp_expected
-        expected
-        pp_classification
-        classification
+  | cl -> unexpected_classification ~__LOC__ "Branch_delayed: [Exn]" cl
 
 type error += Branch_delayed_error | Branch_refused_error | Refused_error
 
@@ -253,6 +244,38 @@ let () =
     "test.refused_error"
     (function Refused_error -> Some () | _ -> None)
     (fun () -> Refused_error)
+
+let assert_replacement ~__LOC__ = function
+  (* Replaced by the protocol *)
+  | `Outdated [Validation_errors.Operation_replacement _] -> ()
+  (* Replaced by the filter *)
+  | `Branch_delayed [Branch_delayed_error] -> ()
+  | classification ->
+      unexpected_classification
+        ~__LOC__
+        "Outdated: [Operation_replacement] or Branch_delayed: \
+         [Branch_delayed_error]"
+        classification
+
+let assert_branch_delayed_error ~__LOC__ = function
+  | `Branch_delayed [Branch_delayed_error] -> ()
+  | cl ->
+      unexpected_classification
+        ~__LOC__
+        "Branch_delayed: [Branch_delayed_error]"
+        cl
+
+let assert_branch_refused_error ~__LOC__ = function
+  | `Branch_refused [Branch_refused_error] -> ()
+  | cl ->
+      unexpected_classification
+        ~__LOC__
+        "Branch_refused: [Branch_refused_error]"
+        cl
+
+let assert_refused_error ~__LOC__ = function
+  | `Refused [Refused_error] -> ()
+  | cl -> unexpected_classification ~__LOC__ "Refused: [Refused_error]" cl
 
 type proto_replacement = Replacement | No_replacement
 
@@ -338,7 +361,7 @@ module Toy_proto :
     let add_operation ?check_signature:_ ?conflict_handler _info
         (state, desired_outcome) (oph, op) =
       if Option.is_none conflict_handler then
-        QCheck2.Test.fail_reportf
+        Test.fail
           "Prevalidation should always call [Proto.Mempool.add_operation] with \
            an explicit [conflict_handler]." ;
       match desired_outcome with
@@ -507,16 +530,16 @@ let () =
     (* Check the classification. *)
     (match (proto_outcome, filter_outcome) with
     | Proto_success _, (F_no_replace | F_replace) ->
-        check_classification __LOC__ ~expected:`Prechecked classification
-    | (Proto_unchanged | Proto_branch_delayed), _
-    | Proto_success _, F_branch_delayed ->
-        check_classification __LOC__ ~expected:`Branch_delayed classification
+        assert_success ~__LOC__ classification
+    | Proto_unchanged, _ -> assert_operation_conflict ~__LOC__ classification
+    | Proto_branch_delayed, _ | Proto_success _, F_branch_delayed ->
+        assert_branch_delayed_error ~__LOC__ classification
     | Proto_branch_refused, _ | Proto_success _, F_branch_refused ->
-        check_classification __LOC__ ~expected:`Branch_refused classification
+        assert_branch_refused_error ~__LOC__ classification
     | Proto_refused, _ | Proto_success _, F_refused ->
-        check_classification __LOC__ ~expected:`Refused classification
+        assert_refused_error ~__LOC__ classification
     | Proto_crash, _ | Proto_success _, F_crash ->
-        check_classification_is_exn __LOC__ classification) ;
+        assert_exn ~__LOC__ classification) ;
     (* Check whether the new operation has been added, whether there
        is a replacement, and when there is one, whether it has been removed. *)
     let proto_ophmap = get_mempool_operations state in
@@ -530,11 +553,12 @@ let () =
           when not (Operation_hash.Map.is_empty proto_ophmap_before) -> (
             match replacements with
             | [] | _ :: _ :: _ -> assert false
-            | [(removed, _)] ->
+            | [(removed, replacement_classification)] ->
                 assert (Operation_hash.Map.mem removed proto_ophmap_before) ;
                 assert (Operation_hash.Set.mem removed filter_state_before) ;
                 assert (not (Operation_hash.Map.mem removed proto_ophmap)) ;
-                assert (not (Operation_hash.Set.mem removed filter_state)))
+                assert (not (Operation_hash.Set.mem removed filter_state)) ;
+                assert_replacement ~__LOC__ replacement_classification)
         | _ -> assert (List.is_empty replacements))
     | _ ->
         assert (not (Operation_hash.Map.mem op.hash proto_ophmap)) ;
