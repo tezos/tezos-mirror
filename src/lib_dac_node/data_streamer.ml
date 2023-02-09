@@ -26,14 +26,13 @@
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4740
     Implement a useful Root_hash_streamer
 *)
-module Root_hash_streamer = struct
-  type 'a t = unit
 
-  let init () = ()
+type 'a t = unit
 
-  let publish (_streamer : 'a t) (_hash : 'a) = Lwt_result_syntax.return_unit
+let init () = ()
 
-  let handle_subscribe (_streamer : 'a t) :
-      ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t =
-    Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()
-end
+let publish (_streamer : 'a t) (_hash : 'a) = Lwt_result_syntax.return_unit
+
+let handle_subscribe (_streamer : 'a t) :
+    ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t =
+  Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()

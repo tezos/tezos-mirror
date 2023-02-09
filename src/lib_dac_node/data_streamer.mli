@@ -23,26 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Root_hash_streamer] is an in-memory data structure for handling pub-sub
+(** [Data_streamer] is an in-memory data structure for handling pub-sub
     mechanism of streaming data from publishers to subscribers.
 *)
-module Root_hash_streamer : sig
-  (** ['a t] represents an instance of [Root_hash_streamer], where ['a]
-      is the type of the data that we stream. *)
-  type 'a t
 
-  (** Initializes a [Root_hash_streamer.t] *)
-  val init : unit -> 'a t
+(** ['a t] represents an instance of [Data_streamer], where ['a]
+    is the type of the data that we stream. *)
+type 'a t
 
-  (** [publish streamer data] publishes [data] to all attached 
-      subscribers of the [streamer].
-   *)
-  val publish : 'a t -> 'a -> unit tzresult Lwt.t
+(** Initializes an instance of [Data_streamer.t]. *)
+val init : unit -> 'a t
 
-  (** [handle_subscribe streamer] returns a new stream of data for the
-      subscriber to consume. An [Lwt_watcher.stopper] function is also returned
-      for the subscriber to close the stream.
-  *)
-  val handle_subscribe :
-    'a t -> ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
-end
+(** [publish streamer data] publishes [data] to all attached 
+    subscribers of the [streamer]. *)
+val publish : 'a t -> 'a -> unit tzresult Lwt.t
+
+(** [handle_subscribe streamer] returns a new stream of data for the
+    subscriber to consume. An [Lwt_watcher.stopper] function is also returned
+    for the subscriber to close the stream. *)
+val handle_subscribe :
+  'a t -> ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
