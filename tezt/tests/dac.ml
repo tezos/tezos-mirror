@@ -127,7 +127,7 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dac_node f tezos_node
       ~protocol
       Operator
       tezos_node
-      tezos_client
+      ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:bootstrap1_key
   in
   let* configuration_filename =

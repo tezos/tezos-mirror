@@ -30,13 +30,13 @@ type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
+    base_dir : string;
     operators : (string * string) list;
     default_operator : string option;
     rpc_host : string;
     rpc_port : int;
     mode : mode;
     dal_node : Dal_node.t option;
-    client : Client.t;
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
@@ -93,7 +93,7 @@ let endpoint sc_node =
 
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
-let base_dir sc_node = Client.base_dir sc_node.persistent_state.client
+let base_dir sc_node = sc_node.persistent_state.base_dir
 
 let operators_params sc_node =
   let acc =
@@ -253,9 +253,9 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create ~protocol ?runner ?name ?color ?data_dir ?event_pipe
+let create ~protocol ?runner ?name ?color ?data_dir ~base_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
-    ?(dal_node : Dal_node.t option) mode (node : Node.t) (client : Client.t) =
+    ?(dal_node : Dal_node.t option) mode (node : Node.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -273,13 +273,13 @@ let create ~protocol ?runner ?name ?color ?data_dir ?event_pipe
       ?event_pipe
       {
         data_dir;
+        base_dir;
         rpc_host;
         rpc_port;
         operators;
         default_operator;
         mode;
         node;
-        client;
         dal_node;
         pending_ready = [];
         pending_level = [];
