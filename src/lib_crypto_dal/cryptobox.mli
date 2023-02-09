@@ -119,13 +119,28 @@ val polynomial_evaluate : polynomial -> scalar -> scalar
 
 (** [polynomial_from_slot t slot] returns a polynomial from the a slot [slot].
 
-      Fails with [`Slot_wrong_size] when the slot size is different from
-      [CONFIGURATION.slot_size]. *)
-val polynomial_from_slot :
-  t -> bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
+    Requires:
+    - [Bytes.length slot] is the slot size declared in [t].
 
-(** [polynomial_to_slot t polynomial] returns a slot from a [polynomial]. *)
-val polynomial_to_bytes : t -> polynomial -> bytes
+    Ensures:
+    - For any [slot] satisfying [Bytes.length slot] is equal to the
+      declared slot size of [t],
+      [polynomial_to_slot (polynomial_from_slot slot) = slot].
+
+    Fails with [`Slot_wrong_size] when the slot size is not equal to
+    the value slot size declared in [t].
+
+    Note:
+    - [polynomial_from_slot] is injective. *)
+val polynomial_from_slot :
+  t -> slot -> (polynomial, [> `Slot_wrong_size of string]) Result.t
+
+(** [polynomial_to_slot t polynomial] returns a slot from a [polynomial].
+
+    Ensures:
+    - For any [slot] satisfying [Bytes.length slot = parameters.slot_size],
+      [polynomial_to_slot (polynomial_from_slot slot) = slot]. *)
+val polynomial_to_slot : t -> polynomial -> slot
 
 (** [commit polynomial] returns the commitment associated to a
      polynomial [p].
