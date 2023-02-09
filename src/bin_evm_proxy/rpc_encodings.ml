@@ -29,8 +29,6 @@
 module JSONRPC = struct
   let version = "2.0"
 
-  let version_field = Data_encoding.(dft "jsonrpc" string version)
-
   (** Ids in the JSON-RPC specification can be either a string, a number or NULL
       (which is represented by the option type). *)
   type id = Id_string of string | Id_float of float
@@ -62,10 +60,10 @@ module JSONRPC = struct
   let request_encoding method_ parameters_encoding =
     Data_encoding.(
       conv
-        (fun {parameters; id; _} -> (version, (), parameters, id))
-        (fun (_, _, parameters, id) -> {method_; parameters; id})
+        (fun {parameters; id; _} -> ((), (), parameters, id))
+        (fun ((), (), parameters, id) -> {method_; parameters; id})
         (obj4
-           version_field
+           (req "jsonrpc" (constant version))
            (req "method" (constant method_))
            (opt "params" parameters_encoding)
            (opt "id" id_encoding)))
@@ -94,8 +92,8 @@ module JSONRPC = struct
           let result, error =
             match value with Ok r -> (Some r, None) | Error e -> (None, Some e)
           in
-          (version, result, error, id))
-        (fun (_, result, error, id) ->
+          ((), result, error, id))
+        (fun ((), result, error, id) ->
           let value =
             match (result, error) with
             | Some r, None -> Ok r
@@ -106,7 +104,7 @@ module JSONRPC = struct
           in
           {value; id})
         (obj4
-           version_field
+           (req "jsonrpc" (constant version))
            (opt "result" result_encoding)
            (opt "error" (error_encoding error_data_encoding))
            (req "id" (option id_encoding))))
