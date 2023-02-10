@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation_t.exe
+    Invocation:   dune exec src/lib_shell/test/test_prevalidation.exe
     Subject:      Unit tests for {!Prevalidation.T}
 *)
 
@@ -659,10 +659,10 @@ let () =
     "mempool-prevalidation"
     [
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test create '0' *)
+         dune exec src/lib_shell/test/test_prevalidation.exe -- test create '0' *)
       ("create", [register_test "[create] succeeds" test_create]);
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test add_operation '0' *)
+         dune exec src/lib_shell/test/test_prevalidation.exe -- test add_operation '0' *)
       ( "add_operation",
         [
           register_test
@@ -670,7 +670,7 @@ let () =
             test_add_operation;
         ] );
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test remove_operation '0' *)
+         dune exec src/lib_shell/test/test_prevalidation.exe -- test remove_operation '0' *)
       ( "remove_operation",
         [register_test "Test remove_operation" test_remove_operation] );
     ]
