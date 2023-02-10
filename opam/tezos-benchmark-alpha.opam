@@ -21,7 +21,7 @@ depends: [
   "tezos-crypto"
   "hashcons"
   "tezos-alpha-test-helpers"
-  "prbnmcn-stats" { = "0.0.4" }
+  "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [
   ["rm" "-r" "vendors"]

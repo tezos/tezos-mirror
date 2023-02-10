@@ -18,7 +18,7 @@ depends: [
   "tezos-shell-benchmarks"
   "tezos-benchmarks-proto-alpha"
   "pyml"
-  "prbnmcn-stats" { = "0.0.4" }
+  "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [
   ["rm" "-r" "vendors"]

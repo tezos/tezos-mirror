@@ -13,9 +13,7 @@
   tezos-micheline
   tezos-clic
   data-encoding
-  prbnmcn-cgrph
-  prbnmcn-dagger
-  prbnmcn-dagger-stats
+  prbnmcn-linalg
   prbnmcn-stats
   pringo
   pyml
