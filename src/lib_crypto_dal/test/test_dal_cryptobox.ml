@@ -135,11 +135,7 @@ module Test = struct
          (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
          enc_shards
      in
-     let* decoded_slot = Cryptobox.polynomial_from_shards t c in
-     let decoded_msg =
-       Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
-     in
-     return decoded_msg)
+     Cryptobox.polynomial_from_shards t c)
     |> function
     | Error (`Not_enough_shards _) -> assert true
     | Ok _ | Error (`Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _)
@@ -166,11 +162,7 @@ module Test = struct
        |> Seq.map (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
               {index = index + 1000; share})
      in
-     let* decoded_slot = Cryptobox.polynomial_from_shards t c in
-     let decoded_msg =
-       Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
-     in
-     return decoded_msg)
+     Cryptobox.polynomial_from_shards t c)
     |> function
     | Error (`Shard_index_out_of_range _) -> assert true
     | Ok _ -> assert false
