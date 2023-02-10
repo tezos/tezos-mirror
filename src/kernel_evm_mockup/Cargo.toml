@@ -9,3 +9,11 @@ edition = '2021'
 
 [lib]
 crate-type = ["cdylib"]
+
+[dependencies]
+kernel = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4", default-features = false }
+host = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4"  }
+debug = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4" }
+mock_runtime = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4", default-features = false }
+
+num-bigint = "0.3"
