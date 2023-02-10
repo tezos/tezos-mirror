@@ -652,6 +652,70 @@ module Make (Context : P) :
       let pp = Raw_level_repr.pp
     end)
 
+    type dal_slots_list = Dal_slot_index_repr.t list
+
+    let dal_slots_list_encoding =
+      Data_encoding.list Dal_slot_index_repr.encoding
+
+    let pp_dal_slots_list =
+      Format.pp_print_list
+        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ":")
+        Dal_slot_index_repr.pp
+
+    type dal_parameters = {
+      attestation_lag : int32;
+      number_of_pages : int32;
+      tracked_slots : dal_slots_list;
+    }
+
+    module Dal_parameters = Make_var (struct
+      type t = dal_parameters
+
+      let initial =
+        (* This initial value is, from a semantic point of vue, equivalent to
+           have [None], as no slot is tracked.
+
+           For the initial values of the fields, only [tracked_slots]'s content
+           matters. Setting it the empty set means that the rollup is not
+           subscribed to the DAL. *)
+        {attestation_lag = 1l; number_of_pages = 0l; tracked_slots = []}
+
+      let encoding =
+        let open Data_encoding in
+        conv
+          (fun {attestation_lag; number_of_pages; tracked_slots} ->
+            (attestation_lag, number_of_pages, tracked_slots))
+          (fun (attestation_lag, number_of_pages, tracked_slots) ->
+            {attestation_lag; number_of_pages; tracked_slots})
+          (obj3
+             (req "attestation_lag" int32)
+             (req "number_of_pages" int32)
+             (req "tracked_slots" dal_slots_list_encoding))
+
+      let name = "dal_parameters"
+
+      let pp fmt {attestation_lag; number_of_pages; tracked_slots} =
+        Format.fprintf
+          fmt
+          "dal:%ld:%ld:%a"
+          attestation_lag
+          number_of_pages
+          pp_dal_slots_list
+          tracked_slots
+    end)
+
+    module Dal_remaining_slots = Make_var (struct
+      type t = dal_slots_list
+
+      let initial = []
+
+      let encoding = dal_slots_list_encoding
+
+      let name = "dal_remaining_slots"
+
+      let pp = pp_dal_slots_list
+    end)
+
     module Message_counter = Make_var (struct
       type t = Z.t option
 
@@ -953,10 +1017,111 @@ module Make (Context : P) :
     let* () = Code.clear in
     return ()
 
+  (** Compute and set the next Dal page to request if any. Otherwise, request
+     the next inbox message.
+
+     The value of [target] allows to compute the next page to request: either
+     the first one the PVM is subscribed to, or the one after the given
+     (slot_index, page_index) page. *)
+  let next_dal_page dal_params ~target =
+    let open Monad.Syntax in
+    let open Dal_slot_repr in
+    let module Index = Dal_slot_index_repr in
+    let* case =
+      match (dal_params, target) with
+      | {tracked_slots = []; _}, `First_page _published_level ->
+          (* PVM subscribed to no slot. *)
+          return `Inbox_message
+      | {tracked_slots = index :: rest; _}, `First_page published_level ->
+          (* Initiate the DAL data fetching process with the first page of the
+             first slot. *)
+          let* () = Dal_remaining_slots.set rest in
+          return (`Dal (published_level, index, 0))
+      | ( {number_of_pages; _},
+          `Page_after {Page.slot_id = {published_level; index}; page_index} )
+        -> (
+          (* We already read some DAL pages for the published level. Try one of
+             the following in this order:
+              - Attempt to move to the next page of the current slot;
+              - In case all pages have been read; attempt to move to the next slot;
+              - In case all slots have been read; request the next inbox message. *)
+          let page_index = page_index + 1 in
+          if Compare.Int.(page_index < Int32.to_int number_of_pages) then
+            return (`Dal (published_level, index, page_index))
+          else
+            let* remaining_slots = Dal_remaining_slots.get in
+            match remaining_slots with
+            | index :: rest ->
+                let* () = Dal_remaining_slots.set rest in
+                return (`Dal (published_level, index, 0))
+            | [] -> return `Inbox_message)
+    in
+    match case with
+    | `Dal (published_level, index, page_index) ->
+        let page_id = {Page.slot_id = {published_level; index}; page_index} in
+        let* () = Required_reveal.set @@ Some (Request_dal_page page_id) in
+        Status.set Waiting_for_reveal
+    | `Inbox_message ->
+        let* () = Required_reveal.set None in
+        Status.set Waiting_for_input_message
+
+  (** Request a Dal page or an input message depending on the value of the given
+     [published_level] argument and on the content of the {Required_reveal.get}.
+  *)
+  let update_waiting_for_data_status =
+    let open Dal_slot_repr in
+    let module Index = Dal_slot_index_repr in
+    fun ?published_level () ->
+      let open Monad.Syntax in
+      let* dal_params = Dal_parameters.get in
+      if List.is_empty dal_params.tracked_slots then
+        (* This rollup doesn't track any DAL slot. *)
+        Status.set Waiting_for_input_message
+      else
+        let* required_reveal = Required_reveal.get in
+        (* Depending on whether [?published_level] is set, and on the value stored
+           in [required_reveal], the next data to request may either be a DAL page
+           or an inbox message. *)
+        match (published_level, required_reveal) with
+        | None, None ->
+            (* The default case is to request an inbox message. *)
+            Status.set Waiting_for_input_message
+        | Some published_level, None ->
+            (* We are explictely asked to start fetching DAL pages. *)
+            next_dal_page dal_params ~target:(`First_page published_level)
+        | Some published_level, Some (Request_dal_page page_id) ->
+            (* We are moving to the next level, and there are no explicit inbox
+               messages in the previous level. *)
+            let* remaining_slots = Dal_remaining_slots.get in
+            assert (
+              let slot_id = page_id.Page.slot_id in
+              let page_index = page_id.Page.page_index in
+              Compare.Int.(
+                Int32.to_int
+                @@ Raw_level_repr.diff published_level slot_id.published_level
+                = 1
+                && List.is_empty remaining_slots
+                && page_index = Int32.to_int dal_params.number_of_pages - 1)) ;
+            next_dal_page dal_params ~target:(`First_page published_level)
+        | None, Some (Request_dal_page page_id) ->
+            (* We are in the same level, fetch the next page. *)
+            next_dal_page dal_params ~target:(`Page_after page_id)
+        | _, Some Reveal_metadata ->
+            (* Should not happen. *)
+            assert false
+        | _, Some (Reveal_raw_data _) ->
+            (* Note that, providing a DAC input via a DAL page will interrupt
+               the interpretation of the next DAL pages of the same level, as the
+               content of [Required_reveal] is lost. We should use two
+               distinct states if we don't want this to happen. *)
+            let* () = Required_reveal.set None in
+            Status.set Waiting_for_input_message
+
   let set_inbox_message_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
+    let deserialized = Sc_rollup_inbox_message_repr.deserialize payload in
     let* payload =
-      match Sc_rollup_inbox_message_repr.deserialize payload with
+      match deserialized with
       | Error _ -> return None
       | Ok (External payload) -> return (Some payload)
       | Ok (Internal (Transfer {payload; destination; _})) -> (
@@ -989,11 +1154,39 @@ module Make (Context : P) :
         let* () = Next_message.set (Some msg) in
         let* () = start_parsing in
         return ()
-    | None ->
+    | None -> (
         let* () = Current_level.set inbox_level in
         let* () = Message_counter.set (Some message_counter) in
-        let* () = Status.set Waiting_for_input_message in
-        return ()
+        match deserialized with
+        | Ok (Internal Start_of_level) -> (
+            let* dal_params = Dal_parameters.get in
+            let inbox_level = Raw_level_repr.to_int32 inbox_level in
+            (* the [published_level]'s pages to request is [inbox_level -
+               endorsement_lag - 1]. *)
+            let lvl =
+              Int32.sub (Int32.sub inbox_level dal_params.attestation_lag) 1l
+            in
+            match Raw_level_repr.of_int32 lvl with
+            | Error _ ->
+                (* Too early. We cannot request DAL data yet. *)
+                return ()
+            | Ok published_level -> (
+                let* metadata = Metadata.get in
+                match metadata with
+                | None ->
+                    assert false
+                    (* Setting Metadata should be the first input provided to the
+                       PVM. *)
+                | Some {origination_level; _} ->
+                    if Raw_level_repr.(origination_level >= published_level)
+                    then
+                      (* We can only fetch DAL data that are published after
+                         the rollup's origination level. *)
+                      Status.set Waiting_for_input_message
+                    else
+                      (* Start fetching DAL data for this [published_level]. *)
+                      update_waiting_for_data_status ~published_level ()))
+        | _ -> Status.set Waiting_for_input_message)
 
   let reveal_monadic reveal_data =
     (*
@@ -1021,13 +1214,9 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_input_message in
         return ()
     | PS.Dal_page None ->
-        (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
-           Below, we set the status to [Waiting_for_input_message] because the
-           inbox is the only source of automatically fetched data.
-           Once the issue above is handled (auto-fetch of Dal pages with EOL/SOL),
-           the implementation should be adapted. *)
-        let* () = Status.set Waiting_for_input_message in
-        return ()
+        (* We may either move to the next DAL page or to the next inbox
+           message. *)
+        update_waiting_for_data_status ()
     | PS.Dal_page (Some data) ->
         let* () = Next_message.set (Some (Bytes.to_string data)) in
         let* () = start_parsing in
@@ -1102,7 +1291,9 @@ module Make (Context : P) :
   let stop_evaluating outcome =
     let open Monad.Syntax in
     let* () = Evaluation_result.set (Some outcome) in
-    Status.set Waiting_for_input_message
+    (* Once the evaluation of the current input is done, we either request the
+       next DAL page or the next inbox message. *)
+    update_waiting_for_data_status ()
 
   let parse : unit t =
     let open Monad.Syntax in
@@ -1233,67 +1424,35 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_reveal in
         return ()
 
-  let evaluate_dal_page_request =
-    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-       - We should rather provide DAL parameters to PVM via metadata (and handle
-         the case where parameters are updated on L1).
-       - It's better to use EOL/SOL to request DAL pages once unique inbox MR
-         is merged. *)
-    (* The parameters below are those of mainnet in protocol constants, divided
-       by 16. *)
-    let attestation_lag = 1l in
-    let page_size = 4096 / 64 in
-    let slot_size = (1 lsl 20) / 64 in
-    let number_of_slots = 256 / 64 in
-    let number_of_pages = slot_size / page_size in
-    let mk_slot_index slot_str =
+  let evaluate_dal_parameters dal_directive =
+    let dal_params =
+      (* Dal pages import directive is [dal:<e>:<num_p>:<s1>:<s2>:...:<sn>]. See
+         mli file.*)
       let open Option_syntax in
-      let* index = Option.map Int32.to_int @@ Int32.of_string_opt slot_str in
-      if Compare.Int.(index < 0 || index >= number_of_slots) then None
-      else Dal_slot_index_repr.of_int_opt index
+      match String.split_on_char ':' dal_directive with
+      | attestation_lag :: number_of_pages :: tracked_slots ->
+          let* attestation_lag = Int32.of_string_opt attestation_lag in
+          let* number_of_pages = Int32.of_string_opt number_of_pages in
+          let* tracked_slots =
+            let rec aux acc sl =
+              match sl with
+              | [] -> return (List.rev acc)
+              | s :: rest ->
+                  let* dal_slot_int = int_of_string_opt s in
+                  let* dal_slot = Dal_slot_index_repr.of_int_opt dal_slot_int in
+                  (aux [@tailcall]) (dal_slot :: acc) rest
+            in
+            aux [] tracked_slots
+          in
+          Some {attestation_lag; number_of_pages; tracked_slots}
+      | _ -> None
     in
-    let mk_page_index page_str =
-      let open Option_syntax in
-      let* index = Option.map Int32.to_int @@ Int32.of_string_opt page_str in
-      if Compare.Int.(index < 0 || index >= number_of_pages) then None
-      else Some index
-    in
-    fun raw_page_id ->
-      let mk_page_id current_lvl =
-        (* Dal pages import directive is [dal:<LVL>:<SID>:<PID>]. See mli file.*)
-        let open Option_syntax in
-        match String.split_on_char ':' raw_page_id with
-        | [lvl; slot; page] ->
-            let* lvl = Int32.of_string_opt lvl in
-            let* lvl = Bounded.Non_negative_int32.of_value lvl in
-            let published_level = Raw_level_repr.of_int32_non_negative lvl in
-            let delta = Raw_level_repr.diff current_lvl published_level in
-            (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
-               Putting delta > 0l doesn't work here because of the way the node
-               currently fetches blocks' data and calls the PVM.
-               This will be changed, in particular once EOL is used to fetch DAL
-               data.
-
-               More generally, the whole condition below will be reworked. *)
-            if
-              Compare.Int32.(
-                delta > 1l && delta <= Int32.mul 2l attestation_lag)
-            then
-              let* index = mk_slot_index slot in
-              let* page_index = mk_page_index page in
-              let slot_id = Dal_slot_repr.Header.{published_level; index} in
-              Some Dal_slot_repr.Page.{slot_id; page_index}
-            else None
-        | _ -> None
-      in
-      let open Monad.Syntax in
-      let* current_lvl = Current_level.get in
-      match mk_page_id current_lvl with
-      | Some page_id ->
-          let* () = Required_reveal.set (Some (Request_dal_page page_id)) in
-          let* () = Status.set Waiting_for_reveal in
-          return ()
-      | None -> stop_evaluating false
+    let open Monad.Syntax in
+    match dal_params with
+    | None -> stop_evaluating false
+    | Some dal_params ->
+        let* () = Dal_parameters.set dal_params in
+        Status.set Waiting_for_input_message
 
   let remove_prefix prefix input input_len =
     let prefix_len = String.length prefix in
@@ -1323,7 +1482,7 @@ module Make (Context : P) :
         | Some hash -> evaluate_preimage_request hash
         | None -> (
             match remove_prefix "dal:" x len with
-            | Some pid -> evaluate_dal_page_request pid
+            | Some dal_directive -> evaluate_dal_parameters dal_directive
             | None -> (
                 let* v = Stack.top in
                 match v with

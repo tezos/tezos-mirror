@@ -25,11 +25,6 @@
 
 (** This module provides a temporary toy rollup to be used as a demo. *)
 
-(*
-   FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
-   Use EOL/SOL once merged to import Dal pages.
-*)
-
 (**
 
    This rollup is a stack machine equipped with addition.
@@ -53,9 +48,19 @@
    - an input [hash:<HASH>] is interpreted as a directive to request the DAC
      data whose hash is <HASH> ;
 
-   - an input [dal:<LVL>:<SID>:<PID>] is interpreted as a directive to request
-     the DAL page whose index is <PID> belonging to slot index <SID> confirmed
-     at level <LVL> (i.e published at level LVL - attestation_lag) ;
+   - an input [dal:<e>:<num_p>:<s1>:<s2>:...:<sn>] is interpreted as a directive
+   to provide the DAL parameters to the PVM, where:
+     - <e> is the attestation lag;
+     - <num_p> is the number of pages;
+     - each <si> is a slot to which the PVM subscribes to for [current level -
+     attestation_lag - 1].
+
+    DAL parameters can be set at most once. At each Start_of_level of some level
+    [L] inbox message and if DAL is enabled for the rollup (via the directive
+    above), the PVM will request the pages of the slots it is subscribed to. The
+    (attested) slots that are actually fetched at level [L] are those published
+    at level [L - e - 1]. Note that providing some DAC data via a DAL page will
+    prevent from fetching the subsequent DAL pages.
 
    If a message is not syntactically correct or does not evaluate
    correctly, the machine stops its evaluation and waits for the next
