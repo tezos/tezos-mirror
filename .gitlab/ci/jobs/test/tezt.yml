@@ -30,6 +30,12 @@ tezt:
     - .tezt_template
   variables:
     TESTS: "/synchronisation_threshold"
+  dependencies:
+    - "build_x86_64"
+    - "build_kernels"
+  needs:
+    - "build_x86_64"
+    - "build_kernels"
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 30
