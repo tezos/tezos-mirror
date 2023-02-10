@@ -363,6 +363,7 @@ check-linting:
 	@scripts/lint.sh --check-scripts
 	@scripts/lint.sh --check-ocamlformat
 	@scripts/lint.sh --check-coq-attributes
+	@scripts/lint.sh --check-rust-toolchain
 	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:
