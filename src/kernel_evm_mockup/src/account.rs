@@ -8,6 +8,8 @@ pub type OwnedHash = Vec<u8>;
 
 pub type Hash<'a> = &'a Vec<u8>;
 
+// Simple representation of an account, only contains fixed-sized values (no
+// code nor storage).
 pub struct Account {
     pub hash: OwnedHash,
     pub nonce: u64, // initially 0, updated after each transaction
