@@ -254,12 +254,12 @@ end)
 module Get_block_by_number = MethodMaker (struct
   open Ethereum_types
 
-  type input = block_height * bool
+  type input = block_param * bool
 
   type output = block
 
   let input_encoding =
-    Data_encoding.tup2 block_height_encoding Data_encoding.bool
+    Data_encoding.tup2 block_param_encoding Data_encoding.bool
 
   let output_encoding = block_encoding
 
