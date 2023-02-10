@@ -328,16 +328,17 @@ module Toy_proto :
           "Prevalidation should always call [Proto.Mempool.add_operation] with \
            an explicit [conflict_handler]." ;
       match (info : proto_add_outcome) with
-      | Proto_added ->
-          let state = Operation_hash.Map.add oph op state in
-          Lwt_result.return (state, Added)
-      | Proto_replaced ->
-          (* This outcome should not be used when the mempool is
-             empty. See [consistent_outcomes]. *)
+      (* To be able to replace an operation, we need the mempool to be
+         non-empty. If it is empty, then [Proto_replaced] falls back
+         to the behavior of [Proto_added]. *)
+      | Proto_replaced when not (Operation_hash.Map.is_empty state) ->
           let removed = random_oph_from_map state in
           let state = Operation_hash.Map.remove removed state in
           let state = Operation_hash.Map.add oph op state in
           Lwt_result.return (state, Replaced {removed})
+      | Proto_added | Proto_replaced ->
+          let state = Operation_hash.Map.add oph op state in
+          Lwt_result.return (state, Added)
       | Proto_unchanged -> Lwt_result.return (state, Unchanged)
       | Proto_branch_delayed ->
           Lwt_result.fail (Validation_error [Branch_delayed_error])
@@ -421,12 +422,15 @@ module Toy_filter = struct
         | Some replace_oph -> Operation_hash.Set.remove replace_oph filter_state
       in
       match config with
-      | F_no_replace ->
-          let filter_state = Operation_hash.Set.add oph filter_state in
-          Lwt_result.return (filter_state, `No_replace)
-      | F_replace ->
-          (* This outcome should not be used when the mempool is
-             empty. See [consistent_outcomes]. *)
+      (* To be able to replace an operation, we need the state to be
+         non-empty and [replace] to be [None]. Indeed, if we have
+         already removed an operation because of [replace], then the
+         state is not full and the filter shouldn't also remove an
+         operation. If these conditions are not fulfilled, then
+         [F_replace] falls back to the behavior of [F_no_replace]. *)
+      | F_replace
+        when (not (Operation_hash.Set.is_empty filter_state))
+             && Option.is_none replace ->
           let replace_oph =
             QCheck2.Gen.(
               generate1 (oneofl (Operation_hash.Set.elements filter_state)))
@@ -439,6 +443,9 @@ module Toy_filter = struct
             (replace_oph, `Branch_delayed [Branch_delayed_error])
           in
           Lwt_result.return (filter_state, `Replace replacement)
+      | F_no_replace | F_replace ->
+          let filter_state = Operation_hash.Set.add oph filter_state in
+          Lwt_result.return (filter_state, `No_replace)
       | F_branch_delayed ->
           Lwt_result.fail (`Branch_delayed [Branch_delayed_error])
       | F_branch_refused ->
@@ -449,35 +456,6 @@ module Toy_filter = struct
     let conflict_handler _ ~existing_operation:_ ~new_operation:_ = assert false
   end
 end
-
-(** Adjust the outcomes of [Proto.Mempool.add_operation] and
-    [Filter.Mempool.add_operation_and_enforce_mempool_bound] we wish to
-    test, to avoid asking these functions to return a result that
-    wouldn't make sense. *)
-let consistent_outcomes ~mempool_is_empty proto_outcome filter_outcome =
-  if mempool_is_empty then
-    (* If the mempool contains no valid operations, then there is no
-       operation to replace, so outcomes can be neither
-       [Proto_replaced] nor [F_replace]. *)
-    let proto_outcome =
-      match proto_outcome with
-      | Proto_replaced -> Proto_added
-      | _ -> proto_outcome
-    in
-    let filter_outcome =
-      match filter_outcome with
-      | F_replace -> F_no_replace
-      | _ -> filter_outcome
-    in
-    (proto_outcome, filter_outcome)
-  else
-    (* If the protocol already causes the removal of an old operation,
-       then the mempool is not full and the filter won't also remove
-       an operation. In other words, the outcomes [Proto_replaced] and
-       [F_replace] are incompatible. *)
-    match (proto_outcome, filter_outcome) with
-    | Proto_replaced, F_replace -> (Proto_replaced, F_no_replace)
-    | _ -> (proto_outcome, filter_outcome)
 
 (** Test [Prevalidation.add_operation].
 
@@ -501,10 +479,6 @@ let () =
     assert (
       not (Operation_hash.Map.mem op.Shell_operation.hash valid_ops_before)) ;
     assert (not (Operation_hash.Set.mem op.hash filter_state_before)) ;
-    let proto_outcome, filter_outcome =
-      let mempool_is_empty = Operation_hash.Map.is_empty valid_ops_before in
-      consistent_outcomes ~mempool_is_empty proto_outcome filter_outcome
-    in
     let state = P.Internal_for_tests.set_validation_info state proto_outcome in
     let*! ( state,
             (_op : Mock_protocol.operation Shell_operation.operation),
@@ -531,22 +505,20 @@ let () =
     let valid_ops = P.Internal_for_tests.get_valid_operations state in
     let filter_state = P.Internal_for_tests.get_filter_state state in
     (match (proto_outcome, filter_outcome) with
-    | Proto_added, F_no_replace ->
+    | (Proto_added | Proto_replaced), (F_no_replace | F_replace) -> (
         assert (Operation_hash.Map.mem op.hash valid_ops) ;
         assert (Operation_hash.Set.mem op.hash filter_state) ;
-        assert (List.is_empty replacements)
-    | Proto_added, F_replace | Proto_replaced, F_no_replace -> (
-        assert (Operation_hash.Map.mem op.hash valid_ops) ;
-        assert (Operation_hash.Set.mem op.hash filter_state) ;
-        match replacements with
-        | [] | _ :: _ :: _ -> assert false
-        | [(removed, _)] ->
-            assert (Operation_hash.Map.mem removed valid_ops_before) ;
-            assert (Operation_hash.Set.mem removed filter_state_before) ;
-            assert (not (Operation_hash.Map.mem removed valid_ops)) ;
-            assert (not (Operation_hash.Set.mem removed filter_state)))
-    | Proto_replaced, F_replace ->
-        (* [consistent_outcomes] makes this case impossible. *) assert false
+        match (proto_outcome, filter_outcome) with
+        | (Proto_replaced, _ | _, F_replace)
+          when not (Operation_hash.Map.is_empty valid_ops_before) -> (
+            match replacements with
+            | [] | _ :: _ :: _ -> assert false
+            | [(removed, _)] ->
+                assert (Operation_hash.Map.mem removed valid_ops_before) ;
+                assert (Operation_hash.Set.mem removed filter_state_before) ;
+                assert (not (Operation_hash.Map.mem removed valid_ops)) ;
+                assert (not (Operation_hash.Set.mem removed filter_state)))
+        | _ -> assert (List.is_empty replacements))
     | _ ->
         assert (not (Operation_hash.Map.mem op.hash valid_ops)) ;
         assert (not (Operation_hash.Set.mem op.hash filter_state)) ;
