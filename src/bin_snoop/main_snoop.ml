@@ -525,6 +525,47 @@ let solution_print_cmd solution_fns =
         solution)
     solution_fns
 
+let codegen_check_definitions_cmd files =
+  let map =
+    List.fold_left
+      (fun acc fn ->
+        match Codegen.Parser.get_cost_functions fn with
+        | Ok vs ->
+            Format.eprintf "%s have %d definitions@." fn (List.length vs) ;
+            List.fold_left
+              (fun acc v ->
+                String.Map.update
+                  v
+                  (fun old -> Some (fn :: Option.value ~default:[] old))
+                  acc)
+              acc
+              vs
+        | Error exn ->
+            Format.eprintf "%s: %s@." fn (Printexc.to_string exn) ;
+            exit 1)
+      String.Map.empty
+      files
+  in
+  let fail =
+    String.Map.fold
+      (fun v fns fail ->
+        match fns with
+        | [] -> assert false (* impossible *)
+        | [_] -> fail
+        | fns ->
+            Format.(
+              eprintf
+                "@[<2>%s: defined in multiple modules:@ @[<v>%a@]@]@."
+                v
+                (pp_print_list pp_print_string)
+                fns) ;
+            true)
+      map
+      false
+  in
+  if fail then exit 1 ;
+  Format.eprintf "Good. No duplicated cost function definitions found@."
+
 (* -------------------------------------------------------------------------- *)
 (* Entrypoint *)
 
@@ -559,4 +600,5 @@ let () =
           codegen_inferred_cmd solution codegen_options ~exclusions
       | Codegen_for_solutions {solutions; codegen_options; exclusions} ->
           codegen_for_solutions_cmd solutions codegen_options ~exclusions
+      | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
       | Solution_print solutions -> solution_print_cmd solutions)

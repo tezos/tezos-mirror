@@ -804,6 +804,31 @@ module Codegen_for_solutions_cmd = struct
       codegen_for_solutions_handler
 end
 
+module Codegen_check_definitions_cmd = struct
+  let codegen_check_definitions_handler () files () =
+    commandline_outcome_ref := Some (Codegen_check_definitions {files}) ;
+    Lwt.return_ok ()
+
+  let group = Codegen_cmd.group
+
+  let params =
+    Tezos_clic.(
+      prefixes ["check"; "definitions"; "of"]
+      @@ seq_of_param
+           (string
+              ~name:"MLFILE"
+              ~desc:"File containing cost function definitions"))
+
+  let command =
+    Tezos_clic.(
+      command
+        ~group
+        ~desc:"Check cost functions defined in the given .ml files"
+        no_options
+        params
+        codegen_check_definitions_handler)
+end
+
 module List_cmd = struct
   (* ------------------------------------------------------------------------- *)
 
@@ -1534,6 +1559,7 @@ let all_commands =
     Codegen_all_cmd.command;
     Codegen_inferred_cmd.command;
     Codegen_for_solutions_cmd.command;
+    Codegen_check_definitions_cmd.command;
     Generate_config_cmd.command;
     Solution_print_cmd.command;
   ]
