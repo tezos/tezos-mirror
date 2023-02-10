@@ -48,6 +48,14 @@ let dispatch_service =
 module Mock = struct
   open Ethereum_types
 
+  module Conv = struct
+    let pow_18 = String.make 18 '0'
+
+    (** WEI is the smallest denomination of ether.
+        1 ETH = 1,000,000,000,000,000,000 WEI (10^18). *)
+    let to_wei x = Z.of_string @@ Int.to_string x ^ pow_18
+  end
+
   let hash_f = hash_of_string
 
   let qty_f = quantity_of_z
@@ -57,11 +65,12 @@ module Mock = struct
 
   let block_height = block_height_of_z Z.zero
 
-  let balance = qty_f @@ Z.of_int64 Int64.max_int
+  let balance = qty_f @@ Conv.to_wei 1000
 
   let code = hash_f @@ String.make 100 'a'
 
-  let gas_price = qty_f Z.one
+  (* Gas limit must be at least 21000 *)
+  let gas_price = qty_f @@ Z.of_int 21000
 
   let transaction_count = qty_f Z.zero
 
