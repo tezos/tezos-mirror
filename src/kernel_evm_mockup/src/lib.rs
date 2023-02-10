@@ -2,5 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-#[no_mangle]
-pub extern "C" fn kernel_run() {}
+use host::rollup_core::RawRollupCore;
+use host::runtime::Runtime;
+
+use kernel::kernel_entry;
+mod account;
+mod error;
+mod wei;
+
+pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
+}
+
+kernel_entry!(main);
+
