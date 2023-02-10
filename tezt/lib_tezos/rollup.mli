@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -406,20 +407,24 @@ end
 module Dac : sig
   module RPC : sig
     (** [dac_store_preimage ~payload ~pagination_scheme] posts a [payload] to
-        dac/store_preimage using a given [pagination_scheme]. It returnst the
+        dac/store_preimage using a given [pagination_scheme]. It returns the
         base58 encoded root page hash, and the raw bytes that can
         be used as contents of a rollup message to trigger the request of
-        the payload in a Wasm rollup. *)
+        the payload in a WASM rollup. *)
     val dac_store_preimage :
       payload:string ->
       pagination_scheme:string ->
       (Dac_node.t, string * string) RPC_core.t
 
-    (** [dac_verify_signature data] requests the dal node to verify
+    (** [dac_verify_signature data] requests the DAL node to verify
          the signature of the external message [data] via
          the plugin/dac/verify_signature endpoint. The DAC committee
-         of the dal node must be the same that was used to produce the
+         of the DAL node must be the same that was used to produce the
          [data]. *)
     val dac_verify_signature : string -> (Dac_node.t, bool) RPC_core.t
+
+    (** [dac_retrieve_preimage page_hash] retrieves a [payload] in the 
+        dac/store_preimage from the base58 provided encoded page_hash *)
+    val dac_retrieve_preimage : string -> (Dac_node.t, string) RPC_core.t
   end
 end

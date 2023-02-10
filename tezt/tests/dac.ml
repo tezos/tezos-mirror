@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -384,6 +385,43 @@ let test_dac_node_handles_dac_store_preimage_hash_chain_V0 _protocol dac_node
   check_preimage payload recovered_preimage ;
   unit
 
+let test_dac_node_handles_dac_retrieve_preimage_merkle_V0 _protocol dac_node
+    sc_rollup_node _sc_rollup_address _node _client pvm_name =
+  let payload = "test" in
+  let* actual_rh, _l1_operation =
+    RPC.call
+      dac_node
+      (Rollup.Dac.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Merkle_tree_V0")
+  in
+  (* Expected reveal hash equals to the result of
+     [Tezos_dac_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
+  *)
+  let expected_rh =
+    "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+  in
+  check_valid_root_hash expected_rh actual_rh ;
+  let filename =
+    Filename.concat
+      (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
+      actual_rh
+  in
+  let cin = open_in filename in
+  let recovered_payload = really_input_string cin (in_channel_length cin) in
+  let () = close_in cin in
+  let recovered_preimage = Hex.of_string recovered_payload in
+  let* preimage =
+    RPC.call dac_node (Rollup.Dac.RPC.dac_retrieve_preimage expected_rh)
+  in
+  Check.(
+    (preimage = Hex.show recovered_preimage)
+      string
+      ~error_msg:
+        "Returned page does not match the expected one (Current: %L <> \
+         Expected: %R)") ;
+  unit
+
 let test_rollup_arith_uses_reveals protocol dac_node sc_rollup_node
     sc_rollup_address _node client _pvm_name =
   let* genesis_info =
@@ -549,6 +587,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_hash_chain_v0"
     test_dac_node_handles_dac_store_preimage_hash_chain_V0
+    protocols ;
+  scenario_with_all_nodes
+    ~tags:["dac"; "dac_node"]
+    "dac_retrieve_preimage"
+    test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
   scenario_with_all_nodes
     ~tags:["dac"; "dac_node"]

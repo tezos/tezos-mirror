@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -107,3 +108,17 @@ let of_hex hex =
   let open Option_syntax in
   let* hash = Hex.to_bytes (`Hex hex) in
   Data_encoding.Binary.of_bytes_opt encoding hash
+
+let rpc_arg =
+  let construct = to_hex in
+  let destruct hash =
+    match of_hex hash with
+    | None -> Error "Cannot parse reveal hash"
+    | Some reveal_hash -> Ok reveal_hash
+  in
+  RPC_arg.make
+    ~descr:"A reveal hash"
+    ~name:"reveal_hash"
+    ~destruct
+    ~construct
+    ()
