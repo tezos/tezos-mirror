@@ -2159,7 +2159,7 @@ let ty_traverse =
     | Sapling_state_t _ | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t
     | Bls12_381_g2_t | Bls12_381_fr_t ->
         (continue [@ocaml.tailcall]) accu
-    | Ticket_t (cty, _) -> aux f accu cty continue
+    | Ticket_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty continue
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
     | Pair_t (ty1, ty2, _, _) ->
         (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
