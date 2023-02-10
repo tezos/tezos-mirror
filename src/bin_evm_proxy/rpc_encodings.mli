@@ -202,3 +202,41 @@ module Get_block_by_number :
   METHOD
     with type m_input = Ethereum_types.block_param * bool
      and type m_output = Ethereum_types.block
+
+module Get_code :
+  METHOD
+    with type m_input = Ethereum_types.hash * Ethereum_types.block_param
+     and type m_output = Ethereum_types.hash
+
+module Gas_price :
+  METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
+
+module Get_transaction_count :
+  METHOD
+    with type m_input = Ethereum_types.address * Ethereum_types.block_param
+     and type m_output = Ethereum_types.quantity
+
+module Get_transaction_receipt :
+  METHOD
+    with type m_input = Ethereum_types.hash
+     and type m_output = Ethereum_types.transaction_receipt
+
+module Send_raw_transaction :
+  METHOD
+    with type m_input = Ethereum_types.hash
+     and type m_output = Ethereum_types.hash
+
+module Send_transaction :
+  METHOD
+    with type m_input = Ethereum_types.transaction
+     and type m_output = Ethereum_types.hash
+
+module Eth_call :
+  METHOD
+    with type m_input = Ethereum_types.call * Ethereum_types.block_param
+     and type m_output = Ethereum_types.hash
+
+module Get_estimate_gas :
+  METHOD
+    with type m_input = Ethereum_types.call
+     and type m_output = Ethereum_types.quantity

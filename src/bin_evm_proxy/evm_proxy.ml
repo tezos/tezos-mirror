@@ -38,14 +38,8 @@ let callback_log server conn req body =
   let open Lwt_syntax in
   let uri = req |> Request.uri |> Uri.to_string in
   let meth = req |> Request.meth |> Code.string_of_method in
-  let headers = req |> Request.headers |> Header.to_string in
   let* body_str = body |> Cohttp_lwt.Body.to_string in
-  Format.printf
-    "Uri: %s\nMethod: %s\nHeaders\nHeaders: %s\nBody: %s\n%!"
-    uri
-    meth
-    headers
-    body_str ;
+  Format.printf "Uri: %s\nMethod: %s\nBody: %s\n%!" uri meth body_str ;
   Tezos_rpc_http_server.RPC_server.resto_callback
     server
     conn

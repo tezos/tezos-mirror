@@ -266,6 +266,118 @@ module Get_block_by_number = MethodMaker (struct
   let method_ = "eth_getBlockByNumber"
 end)
 
+module Get_code = MethodMaker (struct
+  open Ethereum_types
+
+  type input = hash * block_param
+
+  type output = hash
+
+  let input_encoding = Data_encoding.tup2 hash_encoding block_param_encoding
+
+  let output_encoding = hash_encoding
+
+  let method_ = "eth_getCode"
+end)
+
+module Gas_price = MethodMaker (struct
+  open Ethereum_types
+
+  type input = unit
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_gasPrice"
+end)
+
+module Get_transaction_count = MethodMaker (struct
+  open Ethereum_types
+
+  type input = address * block_param
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_getTransactionCount"
+end)
+
+module Get_transaction_receipt = MethodMaker (struct
+  open Ethereum_types
+
+  type input = hash
+
+  type output = transaction_receipt
+
+  let input_encoding = Data_encoding.tup1 hash_encoding
+
+  let output_encoding = transaction_receipt_encoding
+
+  let method_ = "eth_getTransactionReceipt"
+end)
+
+module Send_raw_transaction = MethodMaker (struct
+  open Ethereum_types
+
+  type input = hash
+
+  type output = hash
+
+  let input_encoding = Data_encoding.tup1 hash_encoding
+
+  let output_encoding = hash_encoding
+
+  let method_ = "eth_sendRawTransaction"
+end)
+
+module Send_transaction = MethodMaker (struct
+  open Ethereum_types
+
+  type input = transaction
+
+  type output = hash
+
+  let input_encoding = transaction_encoding
+
+  let output_encoding = hash_encoding
+
+  let method_ = "eth_sendTransaction"
+end)
+
+module Eth_call = MethodMaker (struct
+  open Ethereum_types
+
+  type input = call * block_param
+
+  type output = hash
+
+  let input_encoding = Data_encoding.tup2 call_encoding block_param_encoding
+
+  let output_encoding = hash_encoding
+
+  let method_ = "eth_call"
+end)
+
+module Get_estimate_gas = MethodMaker (struct
+  open Ethereum_types
+
+  type input = call
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.tup1 call_encoding
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_estimateGas"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Network_id);
@@ -274,6 +386,14 @@ let methods : (module METHOD) list =
     (module Get_balance);
     (module Block_number);
     (module Get_block_by_number);
+    (module Get_code);
+    (module Gas_price);
+    (module Get_transaction_count);
+    (module Get_transaction_receipt);
+    (module Send_transaction);
+    (module Send_raw_transaction);
+    (module Eth_call);
+    (module Get_estimate_gas);
   ]
 
 module Input = struct

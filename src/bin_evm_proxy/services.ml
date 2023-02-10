@@ -35,7 +35,6 @@ let version_service =
 
 let version dir =
   Directory.register0 dir version_service (fun () () ->
-      Format.printf "Version\n%!" ;
       Lwt.return_ok Tezos_version.Bin_version.version_string)
 
 let dispatch_service =
@@ -49,6 +48,14 @@ let dispatch_service =
 module Mock = struct
   open Ethereum_types
 
+  module Conv = struct
+    let pow_18 = String.make 18 '0'
+
+    (** WEI is the smallest denomination of ether.
+        1 ETH = 1,000,000,000,000,000,000 WEI (10^18). *)
+    let to_wei x = Z.of_string @@ Int.to_string x ^ pow_18
+  end
+
   let hash_f = hash_of_string
 
   let qty_f = quantity_of_z
@@ -58,7 +65,18 @@ module Mock = struct
 
   let block_height = block_height_of_z Z.zero
 
-  let balance = qty_f @@ Z.of_int64 Int64.max_int
+  let balance = qty_f @@ Conv.to_wei 1000
+
+  let code = hash_f @@ String.make 100 'a'
+
+  (* Gas limit must be at least 21000 *)
+  let gas_price = qty_f @@ Z.of_int 21000
+
+  let transaction_count = qty_f Z.zero
+
+  (* Transaction's hash must be an alphanumeric 66 utf8 byte
+     hex (chars: a-fA-F) string *)
+  let transaction_hash = hash_f @@ "0x" ^ String.make 64 'a'
 
   let block =
     {
@@ -82,6 +100,26 @@ module Mock = struct
       transaction = [];
       uncles = [];
     }
+
+  let transaction_receipt =
+    {
+      transactionHash = transaction_hash;
+      transactionIndex = qty_f Z.one;
+      blockHash = block_hash_of_string @@ String.make 32 'a';
+      blockNumber = qty_f Z.one;
+      from = Address "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
+      to_ = Address "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+      cumulativeGasUsed = gas_price;
+      effectiveGasPrice = gas_price;
+      gasUsed = gas_price;
+      logs = [];
+      logsBloom = hash_f @@ String.make 256 'a';
+      type_ = hash_f "0x00";
+      status = qty_f Z.one;
+      root = hash_f @@ String.make 32 'a';
+    }
+
+  let call = hash_f "0x"
 end
 
 let dispatch dir =
@@ -97,6 +135,20 @@ let dispatch dir =
             return (Block_number.Output (Ok Mock.block_height))
         | Get_block_by_number.Input _ ->
             return (Get_block_by_number.Output (Ok Mock.block))
+        | Get_code.Input _ -> return (Get_code.Output (Ok Mock.code))
+        | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
+        | Get_transaction_count.Input _ ->
+            return (Get_transaction_count.Output (Ok Mock.transaction_count))
+        | Get_transaction_receipt.Input _ ->
+            return
+              (Get_transaction_receipt.Output (Ok Mock.transaction_receipt))
+        | Send_raw_transaction.Input _ ->
+            return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
+        | Send_transaction.Input _ ->
+            return (Send_transaction.Output (Ok Mock.transaction_hash))
+        | Eth_call.Input _ -> return (Eth_call.Output (Ok Mock.call))
+        | Get_estimate_gas.Input _ ->
+            return (Get_estimate_gas.Output (Ok Mock.gas_price))
         | _ -> Error_monad.failwith "Unsupported method\n%!"
       in
       return (output, id))
