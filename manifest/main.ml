@@ -329,10 +329,10 @@ let tar = external_lib "tar" V.True
 let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 
 let tezos_rust_lib =
-  opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.3")
+  opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.4")
 
 let tezos_rust_lib_sapling =
-  opam_only ~can_vendor:false "tezos-rust-libs" V.(at_least "1.1")
+  opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.4")
 
 let tls = external_lib "tls" V.(at_least "0.13.0")
 
