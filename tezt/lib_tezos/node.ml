@@ -795,6 +795,12 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?rpc_host ?rpc_port ?rpc_tls ?event_level
     ?event_sections_levels ?patch_config ?snapshot arguments =
+  (* The single process argument does not exist in the configuration
+     file of the node. It is only known as a command-line option. As a
+     consequence, we filter Singleprocess from the list of arguments
+     passed to create, and we readd it if necessary when calling
+     run. *)
+  let single_process = List.mem Singleprocess arguments in
   let node =
     create
       ?runner
@@ -808,7 +814,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?rpc_host
       ?rpc_port
       ?rpc_tls
-      arguments
+      (List.filter (fun x -> x <> Singleprocess) arguments)
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
@@ -822,7 +828,8 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     | Some (file, reconstruct) -> snapshot_import ~reconstruct node file
     | None -> unit
   in
-  let* () = run ?event_level ?event_sections_levels node [] in
+  let argument = if single_process then [Singleprocess] else [] in
+  let* () = run ?event_level ?event_sections_levels node argument in
   let* () = wait_for_ready node in
   return node
 

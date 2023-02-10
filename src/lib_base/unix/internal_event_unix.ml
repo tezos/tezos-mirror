@@ -36,6 +36,10 @@ module Configuration = struct
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 end
 
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
+
+   This environment variable is problematic when the octez-node in not
+   run with [Singleprocess]. *)
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
 let init ?lwt_log_sink ?(configuration = Configuration.default) () =
