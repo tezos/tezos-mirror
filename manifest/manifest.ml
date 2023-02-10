@@ -3390,10 +3390,17 @@ let generate_profiles ~default_profile =
   in
   String_map.iter generate_profile merged
 
+let precheck () =
+  check_circular_opam_deps () ;
+  check_js_of_ocaml () ;
+  check_opam_with_test_consistency () ;
+  if !has_error then exit 1
+
 let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
   Printexc.record_backtrace true ;
   try
     register_tezt_targets ~make_tezt_exe ;
+    precheck () ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
@@ -3417,16 +3424,12 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
     exit 1
 
-let check ?exclude () =
-  if !checks_done then failwith "Cannot run check twice" ;
-  checks_done := true ;
-  Target.can_register := false ;
+let postcheck ?exclude () =
   Printexc.record_backtrace true ;
   try
-    check_circular_opam_deps () ;
+    if !checks_done then failwith "Cannot run check twice" ;
+    checks_done := true ;
     check_for_non_generated_files ~remove_extra_files ?exclude () ;
-    check_js_of_ocaml () ;
-    check_opam_with_test_consistency () ;
     if !has_error then exit 1
   with exn ->
     Printexc.print_backtrace stderr ;
