@@ -61,3 +61,9 @@ val register : unit -> unit
 
 val total_voting_power :
   'a #RPC_context.simple -> 'a -> Int64.t shell_tzresult Lwt.t
+
+val delegate_proposal_count :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  int shell_tzresult Lwt.t

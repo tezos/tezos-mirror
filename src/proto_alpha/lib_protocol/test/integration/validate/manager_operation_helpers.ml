@@ -1186,7 +1186,14 @@ let expected_witness witness probes ~mode ctxt =
 let observe ~mode ~deallocated ctxt_pre ctxt_post op =
   let open Lwt_result_syntax in
   let check_deallocated ctxt contract =
-    let* actxt = Context.to_alpha_ctxt ctxt in
+    let* actxt =
+      let+ i =
+        match ctxt with
+        | Context.B b -> Incremental.begin_construction b
+        | I i -> return i
+      in
+      Incremental.alpha_ctxt i
+    in
     let*! res = Contract.must_be_allocated actxt contract in
     match Environment.wrap_tzresult res with
     | Ok () ->
