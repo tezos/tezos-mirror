@@ -2076,16 +2076,33 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
 (** End-to-end DAL Tests.  *)
 
 (* This function publishes the DAL slot whose index is [slot_index] for the
-   levels between [from] and [into] with a payload equal to the slot's
+   levels between [from + beforehand_slot_injection] and
+   [into + beforehand_slot_injection] with a payload equal to the slot's
    publish_level.
+
+   The parameter [beforehand_slot_injection] (whose value should be at least
+   one) allows, for a published level, to inject the slots an amount of blocks
+   ahead, In other terms, we have:
+
+   [published level = injection level + beforehand_slot_injection]
 
    The publication consists in sending the slot to a DAL node, computing its
    shards on the DAL node and associating it to a slot index and published
    level. On the L1 side, a manager operation publish_slot_header is also sent.
 
-   The function returns the sum of the payloads submitted via DAL. *)
-let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
-    =
+   Having the ability to inject some blocks ahead (thanks to
+   [beforehand_slot_injection]) allows some pipelining, as shards computation
+   may take an amount of time to complete.
+
+   The function returns the sum of the payloads submitted via DAL.
+*)
+let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
+    ~into dal_node l1_node l1_client =
+  Check.(
+    (beforehand_slot_injection >= 1)
+      int
+      ~error_msg:
+        "Value of beforehand_slot_injection should be at least 1 (got %L)") ;
   (* We add the successive slots' contents (that is, published_level-s) injected
      into DAL and L1, and store the result in [!sum]. The final value is then
      returned by this function. *)
@@ -2098,21 +2115,30 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
         let current_level = index + from in
         task current_level)
   in
+  let promises = ref [] in
+  let* counter =
+    Operation.get_next_counter ~source:Constant.bootstrap3 l1_client
+  in
+  let counter = ref counter in
   let task current_level =
     let* level = Node.wait_for_level l1_node current_level in
     (* We expected to advance level by level, otherwise, the test should fail. *)
     Check.(
       (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
-    let (publish_level as payload) = level + 1 in
+    let (publish_level as payload) = level + beforehand_slot_injection in
     sum := !sum + payload ;
     Log.info
-      "[e2e.slot_producer] publish slot %d for level %d with payload %d"
+      "[e2e.slot_producer] publish slot %d for level %d with payload %d at \
+       level %d"
       slot_index
       publish_level
-      payload ;
-    let* _index, _commitment =
+      payload
+      level ;
+    let promise =
       publish_and_store_slot
         ~slot_size
+        ~force:true
+        ~counter:!counter
         ~level:publish_level
         l1_node
         l1_client
@@ -2121,9 +2147,18 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
         slot_index
         (sf " %d " payload)
     in
+    incr counter ;
+    promises := promise :: !promises ;
     unit
   in
   let* () = loop ~from ~into ~task in
+  let l =
+    List.map (fun p ->
+        let* _p = p in
+        unit)
+    @@ List.rev !promises
+  in
+  let* () = Lwt.join l in
   Log.info "[e2e.slot_producer] will terminate" ;
   return !sum
 
