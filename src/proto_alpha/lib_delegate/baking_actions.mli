@@ -41,6 +41,11 @@ type block_to_bake = {
   round : Round.t;
   delegate : consensus_key_and_delegate;
   kind : block_kind;
+  force_apply : bool;
+      (** if true, while baking the block, try and apply the block and its
+          operations instead of only validating them. this can be permanently
+          set using the [--force-apply] flag (see [force_apply_switch_arg] in
+          [baking_commands.ml]). *)
 }
 
 type action =
