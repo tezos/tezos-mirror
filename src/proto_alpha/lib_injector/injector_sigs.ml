@@ -300,7 +300,7 @@ module type S = sig
       be useful to set this value to something [> 0] if we want to retrieve
       information about operations included on L1 for a given period. *)
   val init :
-    #Protocol_client_context.full ->
+    #Client_context.full ->
     data_dir:string ->
     ?retention_period:int ->
     state ->

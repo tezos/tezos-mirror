@@ -43,12 +43,10 @@ type injection_strategy = [`Each_block | `Delay_block of float]
 (** Builds a client context from another client context but uses logging instead
     of printing on stdout directly. This client context cannot make the injector
     exit. *)
-let injector_context (cctxt : #Protocol_client_context.full) =
+let injector_context (cctxt : #Client_context.full) : Client_context.full =
   let log _channel msg = Logs_lwt.info (fun m -> m "%s" msg) in
   object
-    inherit
-      Protocol_client_context.wrap_full
-        (new Client_context.proxy_context (cctxt :> Client_context.full))
+    inherit Client_context.proxy_context cctxt
 
     inherit! Client_context.simple_printer log
 
@@ -205,9 +203,8 @@ struct
 
   (** The internal state of each injector worker.  *)
   type state = {
-    cctxt : Protocol_client_context.full;
+    cctxt : Client_context.full;
         (** The client context which is used to perform the injections. *)
-    constants : Constants.t;  (** The constants of the protocol. *)
     signer : signer;  (** The signer for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
@@ -241,8 +238,8 @@ struct
     let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
-  let init_injector cctxt constants ~data_dir state ~retention_period ~signer
-      strategy tags =
+  let init_injector cctxt ~data_dir state ~retention_period ~signer strategy
+      tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -321,8 +318,7 @@ struct
 
     return
       {
-        cctxt = injector_context (cctxt :> #Protocol_client_context.full);
-        constants;
+        cctxt = injector_context (cctxt :> #Client_context.full);
         signer;
         tags;
         strategy;
@@ -940,8 +936,7 @@ struct
     type nonrec state = state
 
     type parameters = {
-      cctxt : Protocol_client_context.full;
-      constants : Constants.t;
+      cctxt : Client_context.full;
       data_dir : string;
       state : Parameters.state;
       retention_period : int;
@@ -982,13 +977,10 @@ struct
     type launch_error = error trace
 
     let on_launch _w signer
-        Types.
-          {cctxt; constants; data_dir; state; retention_period; strategy; tags}
-        =
+        Types.{cctxt; data_dir; state; retention_period; strategy; tags} =
       trace (Step_failed "initialization")
       @@ init_injector
            cctxt
-           constants
            ~data_dir
            state
            ~retention_period
@@ -1029,8 +1021,8 @@ struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
-  let init (cctxt : #Protocol_client_context.full) ~data_dir
-      ?(retention_period = 0) state ~signers =
+  let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
+      state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     let signers_map =
@@ -1056,9 +1048,6 @@ struct
         Signature.Public_key_hash.Map.empty
         signers
     in
-    let* constants =
-      Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
-    in
     Signature.Public_key_hash.Map.iter_es
       (fun signer (strategy, tags) ->
         let+ worker =
@@ -1066,8 +1055,7 @@ struct
             table
             signer
             {
-              cctxt = (cctxt :> Protocol_client_context.full);
-              constants;
+              cctxt = (cctxt :> Client_context.full);
               data_dir;
               state;
               retention_period;
@@ -1134,13 +1122,8 @@ struct
     | `Each_block -> f ()
     | `Delay_block delay_factor ->
         let time_until_next_block =
-          match header with
-          | None ->
-              state.constants.Constants.parametric.minimal_block_delay
-              |> Period.to_seconds |> Int64.to_float
-          | Some header ->
-              Proto_client.time_until_next_block state.constants header
-              |> Ptime.Span.to_float_s
+          Proto_client.time_until_next_block state.state header
+          |> Ptime.Span.to_float_s
         in
         let delay = time_until_next_block *. delay_factor in
         if delay <= 0. then f ()
