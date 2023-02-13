@@ -400,7 +400,7 @@ module Inner = struct
              "For the given parameters, the minimum number of shards is %d. \
               Got %d."
              (redundancy_factor * 4)
-             shard_size))
+             number_of_shards))
     else if k > srs_g1_length then
       (* the committed polynomials have degree t.k - 1 at most,
          so t.k coefficients. *)
@@ -602,26 +602,11 @@ module Inner = struct
     in
     loop 0 Seq.empty
 
-  (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
-  let compute_n t eval_a' shards =
-    let w = Domains.get t.domain_n 1 in
-    let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
-    Seq.iter
-      (fun {index; share} ->
-        for j = 0 to Array.length share - 1 do
-          let c_i = share.(j) in
-          let z_i = (t.number_of_shards * j) + index in
-          let x_i = Scalar.pow w (Z.of_int z_i) in
-          let tmp = Evaluations.get eval_a' z_i in
-          Scalar.mul_inplace tmp tmp x_i ;
-          (* The call below never fails by construction, so we don't
-             catch exceptions *)
-          Scalar.inverse_exn_inplace tmp tmp ;
-          Scalar.mul_inplace tmp tmp c_i ;
-          n_poly.(z_i) <- tmp
-        done)
-      shards ;
-    n_poly
+  module ShardSet = Set.Make (struct
+    type t = shard
+
+    let compare a b = Int.compare a.index b.index
+  end)
 
   let encoded_share_size t =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
@@ -630,57 +615,48 @@ module Inner = struct
     (share_scalar_len * Scalar.size_in_bytes) + 4
 
   let polynomial_from_shards t shards =
-    if t.k > Seq.length shards * t.shard_size then
+    let shards =
+      (* We always consider the first k codeword vector components,
+         the ShardSet allows collecting distinct indices.
+         [Seq.take] doesn't raise any exceptions as t.k / t.shard_size
+         is (strictly) positive. *)
+      Seq.take (t.k / t.shard_size) shards |> ShardSet.of_seq
+    in
+    (* There should be t.k / t.shard_size distinct shard indices. *)
+    if t.k / t.shard_size > ShardSet.cardinal shards then
       Error
         (`Not_enough_shards
           (Printf.sprintf
              "there must be at least %d shards to decode"
              (t.k / t.shard_size)))
+    else if
+      ShardSet.exists
+        (fun {index; _} -> index >= t.number_of_shards || index < 0)
+        shards
+    then
+      Error
+        (`Shard_index_out_of_range
+          (Printf.sprintf
+             "At least one shard index out of range: expected indexes within \
+              range [%d, %d]."
+             0
+             (t.number_of_shards - 1)))
     else
-      (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}).
-         Let w be a primitive nth root of unity and
-         Ω_0 = {w^{number_of_shards j}}_{j=0 to (n/number_of_shards)-1}
-         be the (n/number_of_shards)-th roots of unity and Ω_i = w^i Ω_0.
-
-         Together, the Ω_i's form a partition of the subgroup of the n-th roots
-         of unity: 𝕌_n = disjoint union_{i ∈ {0, ..., number_of_shards-1}} Ω_i.
-
-         Let Z_j := Prod_{w ∈ Ω_j} (x − w). For a random set of shards
-         S⊆{0, ..., number_of_shards-1} of length k/shard_size, we reorganize the
-         product A(x) = Prod_{i=0}^{k-1} (x − w^{z_i}) into
-         A(x) = Prod_{j ∈ S} Z_j.
-
-         Moreover, Z_0 = x^|Ω_0| - 1 since x^|Ω_0| - 1 contains all roots of Z_0
-         and conversely. Multiplying each term of the polynomial by the root w^j
-         entails Z_j = x^|Ω_0| − w^{j*|Ω_0|}.
-
-         The intermediate products Z_j have a lower Hamming weight (=2) than
-         when using other ways of grouping the z_i's into shards.
-
-         This also reduces the depth of the recursion tree of the poly_mul
-         function from log(k) to log(number_of_shards), so that the decoding time
-         reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
+      (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}). *)
       let mul acc i =
+        (* The complexity of mul_xn is linear in [t.shard_size]. *)
         Polynomials.mul_xn
           acc
           t.shard_size
           (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)))
       in
-
       let partition_products seq =
-        Seq.fold_left
-          (fun (l, r) {index; _} -> (mul r index, l))
-          (Polynomials.one, Polynomials.one)
+        ShardSet.fold
+          (fun {index; _} (l, r) -> (mul r index, l))
           seq
+          (Polynomials.one, Polynomials.one)
       in
-
-      let shards =
-        (* We always consider the first k codeword vector components. *)
-        Seq.take (t.k / t.shard_size) shards
-      in
-
       let p1, p2 = partition_products shards in
-
       let a_poly = fft_mul t.domain_2k [p1; p2] in
 
       (* 2. Computing formal derivative of A(x). *)
@@ -689,7 +665,27 @@ module Inner = struct
       (* 3. Computing A'(w^i) = A_i(w^i). *)
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
-      (* 4. Computing N(x). *)
+      (* 4. Computing the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
+      let compute_n t eval_a' shards =
+        let w = Domains.get t.domain_n 1 in
+        let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
+        ShardSet.iter
+          (fun {index; share} ->
+            for j = 0 to Array.length share - 1 do
+              let c_i = share.(j) in
+              let z_i = (t.number_of_shards * j) + index in
+              let x_i = Scalar.pow w (Z.of_int z_i) in
+              let tmp = Evaluations.get eval_a' z_i in
+              Scalar.mul_inplace tmp tmp x_i ;
+              (* The call below never fails by construction, so we don't
+                 catch exceptions. *)
+              Scalar.inverse_exn_inplace tmp tmp ;
+              Scalar.mul_inplace tmp tmp c_i ;
+              n_poly.(z_i) <- tmp
+            done)
+          shards ;
+        n_poly
+      in
       let n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
@@ -912,16 +908,30 @@ module Inner = struct
       ~preprocess
       p'
 
-  let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
-    let d_n = Domains.build_power_of_two t.evaluations_log in
-    let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
-    verify
-      t
-      cm
-      t.srs.kate_amortized_srs_g2_shards
-      domain
-      (Domains.get d_n shard_index, shard_evaluations)
-      proof
+  let verify_shard (t : t) cm {index = shard_index; share = shard_evaluations}
+      proof =
+    if shard_index < 0 || shard_index >= t.number_of_shards then
+      Error
+        (`Shard_index_out_of_range
+          (Printf.sprintf
+             "Shard index out of range: got index %d, expected index within \
+              range [%d, %d]."
+             shard_index
+             0
+             (t.number_of_shards - 1)))
+    else
+      let d_n = Domains.build_power_of_two t.evaluations_log in
+      let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
+      if
+        verify
+          t
+          cm
+          t.srs.kate_amortized_srs_g2_shards
+          domain
+          (Domains.get d_n shard_index, shard_evaluations)
+          proof
+      then Ok ()
+      else Error `Invalid_shard
 
   let _prove_single t p z =
     let q, _ =
@@ -989,14 +999,16 @@ module Inner = struct
                   Scalar.of_bytes_exn dst
               | _ -> Scalar.(copy zero))
         in
-        Ok
-          (verify
-             t
-             cm
-             t.srs.kate_amortized_srs_g2_pages
-             domain
-             (Domains.get t.domain_k page_index, slot_page_evaluations)
-             proof)
+        if
+          verify
+            t
+            cm
+            t.srs.kate_amortized_srs_g2_pages
+            domain
+            (Domains.get t.domain_k page_index, slot_page_evaluations)
+            proof
+        then Ok ()
+        else Error `Invalid_page
 end
 
 include Inner

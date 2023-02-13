@@ -155,11 +155,18 @@ val encoded_share_size : t -> int
      [C.redundancy_factor] the total number of shards. It is
      guaranteed that for any share with different indices, if there is
      more than the number of required shards, then the original data
-     can be recomputed. *)
+     can be recomputed.
+
+     Returns [Error (`Not_enough_shards msg)] if there aren't at least
+     [t.number_of_shards / t.redundancy_factor] distinct shards, or
+     [Error (`Shard_index_out_of_range msg)] if at least one shard index
+     is not within the range [0, t.number_of_shards - 1]. *)
 val polynomial_from_shards :
   t ->
   shard Seq.t ->
-  (polynomial, [> `Invert_zero of string | `Not_enough_shards of string]) result
+  ( polynomial,
+    [> `Not_enough_shards of string | `Shard_index_out_of_range of string] )
+  result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
      encoding the original [polynomial]. *)
@@ -168,12 +175,22 @@ val shards_from_polynomial : t -> polynomial -> shard Seq.t
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
 
-(** [verify_shard t commitment shard proof] allows to check
+(** [verify_shard t commitment shard proof] checks
      whether [shard] is a portion of the data corresponding to the
      [commitment] using [proof]. The verification time is
      constant. The [srs] should be the same as the one used to produce
-     the commitment. *)
-val verify_shard : t -> commitment -> shard -> shard_proof -> bool
+     the commitment.
+
+     Returns [Ok ()] if the verification succeeds. Returns
+     [Error `Invalid_shard] if the verification fails, or
+     [Error (`Shard_index_out_of_range msg)] if the shard index
+     is not within the range [0, t.number_of_shards - 1]. *)
+val verify_shard :
+  t ->
+  commitment ->
+  shard ->
+  shard_proof ->
+  (unit, [> `Shard_index_out_of_range of string | `Invalid_shard]) result
 
 (** [prove_commitment t polynomial] produces a proof that the
      slot represented by [polynomial] has its size bounded by

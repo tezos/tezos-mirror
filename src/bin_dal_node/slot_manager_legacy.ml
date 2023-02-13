@@ -114,7 +114,7 @@ type slot = bytes
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Ok p
-  | Error (`Invert_zero msg | `Not_enough_shards msg) ->
+  | Error (`Not_enough_shards msg | `Shard_index_out_of_range msg) ->
       Error [Merging_failed msg]
 
 let save_shards store cryptobox commitment shards =

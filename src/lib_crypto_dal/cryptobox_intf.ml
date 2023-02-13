@@ -117,10 +117,10 @@ module type VERIFIER = sig
   (** [pages_per_slot t] returns the number of expected pages per slot. *)
   val pages_per_slot : parameters -> int
 
-  (** [verify_page t srs commitment page page_proof] returns [Ok true]
+  (** [verify_page t srs commitment page page_proof] returns [Ok ()]
      if the [proof] certifies that the [slot_page] is indeed included
-     in the slot committed with commitment [commitment]. Returns [Ok
-     false] otherwise.
+     in the slot committed with commitment [commitment].
+     Returns [Error `Invalid_page] otherwise.
 
       Fails if the index of the page is out of range or if the page is
      not of the expected length [page_size] given for the
@@ -131,5 +131,8 @@ module type VERIFIER = sig
     page_index:int ->
     page ->
     page_proof ->
-    (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
+    ( unit,
+      [> `Segment_index_out_of_range | `Page_length_mismatch | `Invalid_page]
+    )
+    Result.t
 end
