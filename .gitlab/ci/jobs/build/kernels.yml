@@ -1,0 +1,19 @@
+build_kernels:
+  extends:
+    - .default_settings_template
+  stage: build
+  image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.2"
+  needs: [trigger]
+  script:
+    - make -f kernels.mk build-kernels
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+  cache:
+    - paths:
+        - cargo/
+  artifacts:
+    name: "build-kernels-$CI_COMMIT_REF_SLUG"
+    paths:
+      - evm_mockup_kernel.wasm
+    expire_in: 1 day
+    when: on_success

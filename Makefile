@@ -363,6 +363,7 @@ check-linting:
 	@scripts/lint.sh --check-scripts
 	@scripts/lint.sh --check-ocamlformat
 	@scripts/lint.sh --check-coq-attributes
+	@scripts/lint.sh --check-rust-toolchain
 	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:
@@ -480,3 +481,7 @@ clean: coverage-clean clean-old-names
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
+
+.PHONY: build-kernels
+build-kernels:
+	make -f kernels.mk build-kernels

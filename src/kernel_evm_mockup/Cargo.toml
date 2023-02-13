@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'evm_mockup_kernel'
+version = '0.1.0'
+edition = '2021'
+
+[lib]
+crate-type = ["cdylib"]
