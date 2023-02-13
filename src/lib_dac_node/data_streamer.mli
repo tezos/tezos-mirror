@@ -23,21 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4740
-    Implement a useful Root_hash_streamer
+(** [Data_streamer] is an in-memory data structure for handling pub-sub
+    mechanism of streaming data from publishers to subscribers.
 *)
-module Root_hash_streamer = struct
-  type t = unit
 
-  type configuration = unit
+(* TODO https://gitlab.com/tezos/tezos/-/issues/4848
+   To make [Data_streamer] interface implementation agnostic we should
+   replace [Lwt_watcher.stopper] with an abstract [stopper] type,
+   and add [unsubscribe] method that uses it.
+*)
 
-  let init (_configuration : configuration) = ()
+(** ['a t] represents an instance of [Data_streamer], where ['a]
+    is the type of the data that we stream. *)
+type 'a t
 
-  let publish (_streamer : t) (_hash : Dac_plugin.Dac_hash.t) =
-    Lwt_result_syntax.return_unit
+(** Initializes an instance of [Data_streamer.t]. *)
+val init : unit -> 'a t
 
-  let make_subscription (_streamer : t) :
-      (Dac_plugin.Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
-      =
-    Lwt_result_syntax.return @@ Lwt_watcher.create_fake_stream ()
-end
+(** [publish streamer data] publishes [data] to all attached 
+    subscribers of the [streamer]. *)
+val publish : 'a t -> 'a -> unit tzresult Lwt.t
+
+(** [handle_subscribe streamer] returns a new stream of data for the
+    subscriber to consume. An [Lwt_watcher.stopper] function is also returned
+    for the subscriber to close the stream. *)
+val handle_subscribe :
+  'a t -> ('a Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t

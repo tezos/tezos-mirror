@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,29 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Root_hash_streamer] manages the pub-sub mechanism for streaming root 
-    page hashes from publishers to subscribers. Root hash refers to the
-    root hash of the DAC payload Merkle tree.
-*)
-module Root_hash_streamer : sig
-  type t
+module Unit_test : sig
+  (**
+   * Example: [spec "Data_streamer.ml" Test_data_streamer.tests]
+   * Unit tests needs tag in log (like "[UNIT] some test description here...")
+   * This function handles such meta data *)
+  val spec :
+    string ->
+    unit Alcotest_lwt.test_case list ->
+    string * unit Alcotest_lwt.test_case list
 
-  (* Streamer configuration. *)
-  type configuration
+  (** Tests with description string without [Unit] are skipped *)
+  val _skip :
+    string ->
+    unit Alcotest_lwt.test_case list ->
+    string * unit Alcotest_lwt.test_case list
+end = struct
+  let spec unit_name test_cases = ("[Unit] " ^ unit_name, test_cases)
 
-  (** Initializes a [Root_hash_streamer.t] *)
-  val init : configuration -> t
-
-  (** [publish streamer root_hash] publishes a [root_hash] to all attached 
-      subscribers in [streamer].
-   *)
-  val publish : t -> Dac_plugin.Dac_hash.t -> unit tzresult Lwt.t
-
-  (** [make_subscription streamer] returns a new stream of hashes for the subscriber to
-      consume. An [Lwt_watcher.stopper] function is also returned for the 
-      subscriber to close the stream.
-  *)
-  val make_subscription :
-    t ->
-    (Dac_plugin.Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
+  let _skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
 end
+
+let () =
+  Alcotest_lwt.run
+    "protocol > unit"
+    [Unit_test.spec "Data_streamer.ml" Test_data_streamer.tests]
+  |> Lwt_main.run
