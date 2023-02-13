@@ -1128,12 +1128,17 @@ module that exports them (in our case, ``smart_rollup_core``).
 
 .. code:: rust
 
+   #[repr(C)]
+   pub struct ReadInputMessageInfo {
+       pub level: i32,
+       pub id: i32,
+   }
+
    #[link(wasm_import_module = "smart_rollup_core")]
    extern "C" {
        /// Returns the number of bytes written to `dst`, or an error code.
        pub fn read_input(
-           level: *mut i32,
-           id: *mut i32,
+           message_info: *mut ReadInputMessageInfo,
            dst: *mut u8,
            max_bytes: usize,
        ) -> i32;
@@ -1241,13 +1246,11 @@ fresh Rust Vector to receive the input.
        let mut payload = Vec::with_capacity(MAX_MESSAGE_SIZE as usize);
 
        // Placeholder values
-       let mut level = 0i32;
-       let mut id = 0i32;
+       let mut message_info = ReadInputMessageInfo { level: 0, id: 0 };
 
        let size = unsafe {
             host::read_input(
-               &mut level,
-               &mut id,
+               &mut message_info,
                payload.as_mut_ptr(),
                MAX_MESSAGE_SIZE,
            )
@@ -1256,8 +1259,8 @@ fresh Rust Vector to receive the input.
        if 0 < payload.len() {
            unsafe { payload.set_len(size as usize) };
            Some(Input {
-               level: level as u32,
-               id: id as u32,
+               level: message_info.level as u32,
+               id: message_info.id as u32,
                payload,
            })
        } else {
