@@ -6,6 +6,11 @@ build_kernels:
   needs: [trigger]
   script:
     - make -f kernels.mk build-kernels
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+  cache:
+    - paths:
+        - cargo/
   artifacts:
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:
