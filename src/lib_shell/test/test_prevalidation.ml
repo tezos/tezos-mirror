@@ -281,6 +281,11 @@ let proto_add_outcome_gen =
       (1, Proto_crash);
     ]
 
+(** Get a random operation hash from an [Operation_hash.Map.t].
+    Fail with [Invalid_argument] when the map is empty. *)
+let random_oph_from_map ophmap =
+  fst QCheck2.Gen.(generate1 (oneofl (Operation_hash.Map.bindings ophmap)))
+
 (** Mock protocol with a toy mempool that has an adjustable
     [add_operation] function: it behaves as instructed by the provided
     [proto_add_outcome].
@@ -327,14 +332,9 @@ module Toy_proto :
           let state = Operation_hash.Map.add oph op state in
           Lwt_result.return (state, Added)
       | Proto_replaced ->
-          let removed =
-            match Operation_hash.Map.choose state with
-            | Some (hash, _) -> hash
-            | None ->
-                (* This outcome should not be used when the mempool is
-                   empty. See [consistent_outcomes]. *)
-                assert false
-          in
+          (* This outcome should not be used when the mempool is
+             empty. See [consistent_outcomes]. *)
+          let removed = random_oph_from_map state in
           let state = Operation_hash.Map.remove removed state in
           let state = Operation_hash.Map.add oph op state in
           Lwt_result.return (state, Replaced {removed})
@@ -420,21 +420,21 @@ module Toy_filter = struct
         | None -> filter_state
         | Some replace_oph -> Operation_hash.Set.remove replace_oph filter_state
       in
-      let filter_state = Operation_hash.Set.add oph filter_state in
       match config with
-      | F_no_replace -> Lwt_result.return (filter_state, `No_replace)
+      | F_no_replace ->
+          let filter_state = Operation_hash.Set.add oph filter_state in
+          Lwt_result.return (filter_state, `No_replace)
       | F_replace ->
+          (* This outcome should not be used when the mempool is
+             empty. See [consistent_outcomes]. *)
           let replace_oph =
-            match Operation_hash.Set.choose filter_state with
-            | Some hash -> hash
-            | None ->
-                (* This outcome should not be used when the mempool is
-                   empty. See [consistent_outcomes]. *)
-                assert false
+            QCheck2.Gen.(
+              generate1 (oneofl (Operation_hash.Set.elements filter_state)))
           in
           let filter_state =
             Operation_hash.Set.remove replace_oph filter_state
           in
+          let filter_state = Operation_hash.Set.add oph filter_state in
           let replacement =
             (replace_oph, `Branch_delayed [Branch_delayed_error])
           in
@@ -624,8 +624,7 @@ let () =
   let test_remove (state, proto_ophmap_before, cardinal_before) =
     if QCheck2.Gen.(generate1 bool) then (
       (* Remove a present operation. *)
-      let present_ops = Operation_hash.Map.bindings proto_ophmap_before in
-      let oph = fst QCheck2.Gen.(generate1 (oneofl present_ops)) in
+      let oph = random_oph_from_map proto_ophmap_before in
       let state = P.remove_operation state oph in
       let proto_ophmap = get_valid_operations state in
       let filter_state = get_filter_state state in
