@@ -27,6 +27,12 @@
     mechanism of streaming data from publishers to subscribers.
 *)
 
+(* TODO https://gitlab.com/tezos/tezos/-/issues/4848
+   To make [Data_streamer] interface implementation agnostic we should
+   replace [Lwt_watcher.stopper] with an abstract [stopper] type,
+   and add [unsubscribe] method that uses it.
+*)
+
 (** ['a t] represents an instance of [Data_streamer], where ['a]
     is the type of the data that we stream. *)
 type 'a t
