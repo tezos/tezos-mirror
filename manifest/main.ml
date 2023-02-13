@@ -5052,7 +5052,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let injector =
-      only_if N.(number >= 013) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       public_lib
         (sf "tezos-injector-%s" name_dash)
         ~path:(path // "lib_injector")

@@ -116,8 +116,6 @@
 (package (name tezos-event-logging-test-helpers))
 (package (name tezos-expect-helper))
 (package (name tezos-hacl))
-(package (name tezos-injector-013-PtJakart))
-(package (name tezos-injector-014-PtKathma))
 (package (name tezos-injector-015-PtLimaPt))
 (package (name tezos-injector-016-PtMumbai))
 (package (name tezos-injector-alpha))
