@@ -15,6 +15,7 @@ depends: [
   "tezos-protocol-updater"
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
+  "tezos-rpc-http-server"
 ]
 build: [
   ["rm" "-r" "vendors"]

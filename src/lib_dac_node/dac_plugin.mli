@@ -23,43 +23,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Protocol.Sc_protocol_reveal_hash.t] is unknown to  modules outside the 
+(** [Protocol.Sc_protocol_reveal_hash.t] is unknown to  modules outside the
     protocol and only known at runtime. To avoid the proliferation of functors
-    in the dac node, [Dac_hash.t] hides the dynamic [Protocol.Sc_protocol_reveal_hash.t]
-    behind an abstract static type. An instance of [Dac_plugin.T] implement
-    the [Dac_plugin.Dac_hash] which are the functions that can operate on [Dac_hash.t].
+    in the dac node, [hash] hides the dynamic [Protocol.Sc_protocol_reveal_hash.t]
+    behind an abstract static type. An instance of [Dac_plugin.T] behaviour
+    of operations on [hash].
   *)
-module Dac_hash : sig
-  type t
 
-  val to_bytes : t -> bytes
-end
+type hash
+
+val hash_to_bytes : hash -> bytes
+
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
+    Fix static supported_hashes type *)
+type supported_hashes = Blake2B
 
 module type T = sig
-  (** [Dac_hash.t] operations that need to be derived from the protocol *)
-  module Dac_hash : sig
-    val encoding : Dac_hash.t Data_encoding.t
-  end
+  (** The encoding of reveal hashes. *)
+  val encoding : hash Data_encoding.t
+
+  (** [hash_string ~scheme ?key strings] hashes [strings] using the
+    supported hashing [scheme] given in input. *)
+  val hash_string :
+    scheme:supported_hashes -> ?key:string -> string list -> hash
+
+  (** [hash_bytes ~scheme ?key strings] hashes [bytes] using the
+      supported hashing [scheme] given in input. *)
+  val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> hash
+
+  (** [scheme_of_hash] hash returns the supported hashing scheme
+      that was used to obtain [hash]. *)
+  val scheme_of_hash : hash -> supported_hashes
+
+  (** [of_hex hex] decodes a hex into hash. *)
+  val of_hex : string -> hash option
+
+  (** [to_hex hash] encodes hash into hex. *)
+  val to_hex : hash -> string
+
+  (** [size ~scheme] returns the size of reveal hashes using the [scheme]
+      specified in input. *)
+  val size : scheme:supported_hashes -> int
+
+  (** Hash argument definition for RPC *)
+  val hash_rpc_arg : hash Tezos_rpc.Arg.arg
 
   module Proto : Registered_protocol.T
-
-  module RPC : sig
-    val rpc_services :
-      reveal_data_dir:string ->
-      #Client_context.wallet ->
-      Tezos_crypto.Aggregate_signature.public_key option list ->
-      Client_keys.aggregate_sk_uri option list ->
-      int ->
-      unit Tezos_rpc.Directory.directory
-  end
 end
 
-(** [register make_plugin] derives and registers a new [Dac_plugin.T] given an 
-    [of_bytes]. Implementers of plugin are responsible for providing the 
-    definition of this derivation. Functions that expose 
-    [Protocol.Sc_protocol_reveal_hash.t] can be wrapped into [Dac_hash.t] via 
+(** Dac plugin module type *)
+type t = (module T)
+
+(** [register make_plugin] derives and registers a new [Dac_plugin.T] given an
+    [of_bytes]. Implementers of plugin are responsible for providing the
+    definition of this derivation. Functions that expose
+    [Protocol.Sc_protocol_reveal_hash.t] can be wrapped into [hash] via
     [Dac_hash.to_bytes] and [of_bytes].
 *)
-val register : ((bytes -> Dac_hash.t) -> (module T)) -> unit
+val register : ((bytes -> hash) -> (module T)) -> unit
 
 val get : Protocol_hash.Table.key -> (module T) option

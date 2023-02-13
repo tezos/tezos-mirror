@@ -34,6 +34,10 @@
 
 module Protocol_reveal_hash = Protocol.Sc_rollup_reveal_hash
 
+let dac_plugin = Stdlib.Option.get (Dac_plugin.get Protocol.hash)
+
+module P = (val dac_plugin)
+
 (* Hash copied from
    https://gitlab.com/tezos/tezos/-/blob/master/tezt/tests/dac.ml#L331 *)
 let reveal_hash =
@@ -44,17 +48,8 @@ let reveal_hash =
 let assert_equal_bytes ~loc msg =
   Assert.equal ~loc Bytes.equal msg String.pp_bytes_hex
 
-let make_plugin_and_save_hash (proto : (module Dac_plugin.T) option ref)
-    make_plugin : (bytes -> Dac_plugin.Dac_hash.t) -> (module Dac_plugin.T) =
- fun f ->
-  let dac_plugin = make_plugin f in
-  proto := Option.some dac_plugin ;
-  dac_plugin
-
-let test_dac_hash_bin_encoding_roundtrips_with_reveal_hash () =
+let test_dac_hash_bin_encoding_roundtrip_with_reveal_hash () =
   let open Lwt_result_syntax in
-  let dac_plugin = Stdlib.Option.get (Dac_plugin.get Protocol.hash) in
-  let module Plugin = (val dac_plugin) in
   let to_bytes e a =
     Stdlib.Result.get_ok @@ Data_encoding.Binary.to_bytes e a
   in
@@ -62,8 +57,8 @@ let test_dac_hash_bin_encoding_roundtrips_with_reveal_hash () =
     Stdlib.Result.get_ok @@ Data_encoding.Binary.of_bytes e a
   in
   let reveal_hash_bytes = to_bytes Protocol_reveal_hash.encoding reveal_hash in
-  let dac_hash = from_bytes Plugin.Dac_hash.encoding reveal_hash_bytes in
-  let dac_hash_bytes = to_bytes Plugin.Dac_hash.encoding dac_hash in
+  let dac_hash = from_bytes P.encoding reveal_hash_bytes in
+  let dac_hash_bytes = to_bytes P.encoding dac_hash in
   let reveal_hash_decoded =
     from_bytes Protocol_reveal_hash.encoding dac_hash_bytes
   in
@@ -82,10 +77,64 @@ let test_dac_hash_bin_encoding_roundtrips_with_reveal_hash () =
     reveal_hash
     reveal_hash_decoded
 
+let test_dac_hash_hex_roundtrip_with_reveal_hash () =
+  let reveal_hash_hex = Protocol_reveal_hash.to_hex reveal_hash in
+  let dac_hash = Stdlib.Option.get @@ P.of_hex reveal_hash_hex in
+  let dac_hash_hex = P.to_hex dac_hash in
+  Assert.equal_string ~loc:__LOC__ reveal_hash_hex dac_hash_hex
+
+let test_dac_hash_hash_bytes_with_reveal_hash () =
+  let payload = Bytes.of_string "Hello world" in
+  let dac_hash = P.hash_bytes ~scheme:Blake2B [payload] in
+  let dac_hash =
+    Stdlib.Result.get_ok @@ Data_encoding.Binary.to_bytes P.encoding dac_hash
+  in
+  let reveal_hash = Protocol_reveal_hash.hash_bytes ~scheme:Blake2B [payload] in
+  let reveal_hash =
+    Stdlib.Result.get_ok
+    @@ Data_encoding.Binary.to_bytes Protocol_reveal_hash.encoding reveal_hash
+  in
+  assert_equal_bytes
+    ~loc:__LOC__
+    "Encoded bytes are not equal"
+    reveal_hash
+    dac_hash
+
+let test_dac_hash_hash_string_with_reveal_hash () =
+  let payload = "Hello world" in
+  let dac_hash = P.hash_string ~scheme:Blake2B [payload] in
+  let dac_hash =
+    Stdlib.Result.get_ok @@ Data_encoding.Binary.to_bytes P.encoding dac_hash
+  in
+  let reveal_hash =
+    Protocol_reveal_hash.hash_string ~scheme:Blake2B [payload]
+  in
+  let reveal_hash =
+    Stdlib.Result.get_ok
+    @@ Data_encoding.Binary.to_bytes Protocol_reveal_hash.encoding reveal_hash
+  in
+  assert_equal_bytes
+    ~loc:__LOC__
+    "Encoded bytes are not equal"
+    reveal_hash
+    dac_hash
+
 let tests =
   [
     Tztest.tztest
       "Binary encoding roundtrip test between Dac hash and reveal hash"
       `Quick
-      test_dac_hash_bin_encoding_roundtrips_with_reveal_hash;
+      test_dac_hash_bin_encoding_roundtrip_with_reveal_hash;
+    Tztest.tztest
+      "Hex encoding roundtrip test between Dac hash and reveal hash"
+      `Quick
+      test_dac_hash_hex_roundtrip_with_reveal_hash;
+    Tztest.tztest
+      "Hash bytes should be equal between Dac hash and reveal hash"
+      `Quick
+      test_dac_hash_hash_bytes_with_reveal_hash;
+    Tztest.tztest
+      "Hash string  should be equal between Dac hash and reveal hash"
+      `Quick
+      test_dac_hash_hash_string_with_reveal_hash;
   ]

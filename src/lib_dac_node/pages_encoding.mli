@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 TriliTech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +24,6 @@
 (*****************************************************************************)
 
 (** DAC pages encoding schemes *)
-
-open Environment.Error_monad
 
 type error +=
   | Payload_cannot_be_empty
@@ -54,19 +52,10 @@ module type VERSION = sig
   val hashes_version : version
 end
 
-module type Hashing_scheme = sig
-  include module type of Protocol.Sc_rollup_reveal_hash
-
-  val scheme : supported_hashes
-end
-
 (** [Dac_codec] is a module for encoding a payload as a whole and returnining
     the calculated root hash.
 *)
 module type Dac_codec = sig
-  (* Hash type used to represent pages *)
-  type hash
-
   (* Page store type *)
   type page_store
 
@@ -75,16 +64,23 @@ module type Dac_codec = sig
       [page_store]. The serialization scheme  is some hash-based encoding
       scheme such that a root hash is produced that represents the payload.
   *)
-  val serialize_payload : page_store:page_store -> bytes -> hash tzresult Lwt.t
+  val serialize_payload :
+    Dac_plugin.t ->
+    page_store:page_store ->
+    bytes ->
+    Dac_plugin.hash tzresult Lwt.t
 
-  (** [deserialize_payload page_store hash] deserializes a payload from [hash]
+  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload from [hash]
       using some hash-based encoding scheme. Any payload serialized by
       [serialize_payload] can de deserialized from its root hash by
       [deserialize_payload], that is, these functions are inverses of each
       other.
   *)
   val deserialize_payload :
-    page_store:page_store -> hash -> bytes tzresult Lwt.t
+    Dac_plugin.t ->
+    page_store:page_store ->
+    Dac_plugin.hash ->
+    bytes tzresult Lwt.t
 end
 
 (** [Buffered_dac_codec] partially constructs a Dac external message payload by
@@ -97,34 +93,36 @@ module type Buffered_dac_codec = sig
   (* Buffer type *)
   type t
 
-  (* Hash type used to represent pages *)
-  type hash
-
   (* Page store type *)
   type page_store
 
   (* Returns an empty buffer *)
   val empty : unit -> t
 
-  (** [add page_store buffer message] adds a [message] to [buffer]. The
+  (** [add dac_plugin page_store buffer message] adds a [message] to [buffer]. The
       [buffer] is serialized to [page_store] when it is full. Serialization
       logic is dependent on the encoding scheme.
   *)
-  val add : page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
+  val add :
+    Dac_plugin.t -> page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
 
-  (** [finalize page_store buffer] serializes the [buffer] to [page_store] and
+  (** [finalize dac_plugin page_store buffer] serializes the [buffer] to [page_store] and
       returns a root hash that represents the final payload. The serialization
       logic is dependent on the encoding scheme. [buffer] is emptied after
       this call.
   *)
-  val finalize : page_store:page_store -> t -> hash tzresult Lwt.t
+  val finalize :
+    Dac_plugin.t -> page_store:page_store -> t -> Dac_plugin.hash tzresult Lwt.t
 
-  (** [deserialize_payload page_store hash] deserializes a payload from [hash]
+  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload from [hash]
       using some hash-based encoding scheme. Any payload serialized by [add] +
       [finalize] can be deserialized by this function.
   *)
   val deserialize_payload :
-    page_store:page_store -> hash -> bytes tzresult Lwt.t
+    Dac_plugin.t ->
+    page_store:page_store ->
+    Dac_plugin.hash ->
+    bytes tzresult Lwt.t
 end
 
 (** Encoding of DAC payload as a Merkle tree with an arbitrary branching
@@ -163,23 +161,16 @@ module Merkle_tree : sig
      Remove `page_store = string` when Hash_chain is removed
      Context https://gitlab.com/tezos/tezos/-/merge_requests/7465#note_1247831273
   *)
-  module V0 :
-    Dac_codec
-      with type page_store = Page_store.Filesystem.t
-       and type hash = Protocol.Sc_rollup_reveal_hash.t
+  module V0 : Dac_codec with type page_store = Page_store.Filesystem.t
 
   (**/**)
 
   module Internal_for_tests : sig
-    module Make_buffered
-        (H : Hashing_scheme)
-        (S : Page_store.S with type hash := H.t)
-        (V : VERSION)
-        (C : CONFIG) :
-      Buffered_dac_codec with type hash = H.t and type page_store = S.t
+    module Make_buffered (S : Page_store.S) (V : VERSION) (C : CONFIG) :
+      Buffered_dac_codec with type page_store = S.t
 
     module Make (B : Buffered_dac_codec) :
-      Dac_codec with type hash := B.hash and type page_store := B.page_store
+      Dac_codec with type page_store := B.page_store
   end
 end
 
@@ -188,17 +179,13 @@ end
  *)
 module Hash_chain : sig
   module V0 : sig
-    type h = Protocol.Sc_rollup_reveal_hash.t
-
     val serialize_payload :
-      for_each_page:(h * bytes -> unit tzresult Lwt.t) ->
+      Dac_plugin.t ->
+      for_each_page:(Dac_plugin.hash * bytes -> unit tzresult Lwt.t) ->
       bytes ->
-      h tzresult Lwt.t
+      Dac_plugin.hash tzresult Lwt.t
 
-    val make_hash_chain : bytes -> ((h * bytes) list, 'a) result
-
-    val to_hex : h -> string
-
-    val hash : bytes -> h
+    val make_hash_chain :
+      Dac_plugin.t -> bytes -> ((Dac_plugin.hash * bytes) list, 'a) result
   end
 end

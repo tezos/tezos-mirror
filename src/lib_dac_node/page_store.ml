@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Trili Tech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,15 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Environment.Error_monad
-
 type error +=
-  | Cannot_write_page_to_page_storage of {
-      hash : Sc_rollup_reveal_hash.t;
-      content : bytes;
-    }
-  | Cannot_read_page_from_page_storage of Sc_rollup_reveal_hash.t
+  | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
+  | Cannot_read_page_from_page_storage of string
 
 let () =
   register_error_kind
@@ -44,10 +39,9 @@ let () =
         ppf
         "Unable to write the following DAC page to the page storage: {key=%s; \
          content=%s}"
-        (Sc_rollup_reveal_hash.to_hex key)
+        key
         (Bytes.to_string content))
-    Data_encoding.(
-      obj2 (req "key" Sc_rollup_reveal_hash.encoding) (req "content" bytes))
+    Data_encoding.(obj2 (req "key" Data_encoding.string) (req "content" bytes))
     (function
       | Cannot_write_page_to_page_storage {hash; content} -> Some (hash, content)
       | _ -> None)
@@ -61,8 +55,8 @@ let () =
       Format.fprintf
         ppf
         "Unable to read DAC page with {key=%s} from the page storage"
-        (Sc_rollup_reveal_hash.to_hex key))
-    Data_encoding.(obj1 (req "hash" Sc_rollup_reveal_hash.encoding))
+        key)
+    Data_encoding.(obj1 (req "hash" Data_encoding.string))
     (function
       | Cannot_read_page_from_page_storage hash -> Some hash | _ -> None)
     (fun hash -> Cannot_read_page_from_page_storage hash)
@@ -70,50 +64,53 @@ let () =
 module type S = sig
   type t
 
-  type hash
-
   type configuration
 
   val init : configuration -> t
 
-  val save : t -> hash:hash -> content:bytes -> unit tzresult Lwt.t
+  val save :
+    Dac_plugin.t ->
+    t ->
+    hash:Dac_plugin.hash ->
+    content:bytes ->
+    unit tzresult Lwt.t
 
-  val load : t -> hash:hash -> bytes tzresult Lwt.t
+  val load : Dac_plugin.t -> t -> hash:Dac_plugin.hash -> bytes tzresult Lwt.t
 end
 
 (** Implementation of dac pages storage using filesystem. *)
-module Filesystem :
-  S with type configuration = string and type hash = Sc_rollup_reveal_hash.t =
-struct
+module Filesystem : S with type configuration = string = struct
   (** [t] represents directory path *)
   type t = string
 
   type configuration = string
 
-  type hash = Protocol.Sc_rollup_reveal_hash.t
-
   let init data_dir = data_dir
 
-  let path data_dir key =
-    Filename.(concat data_dir @@ Protocol.Sc_rollup_reveal_hash.to_hex key)
+  let path data_dir hash_string_key =
+    Filename.(concat data_dir @@ hash_string_key)
 
-  let save data_dir ~hash ~content =
+  let save ((module P) : Dac_plugin.t) data_dir ~hash ~content =
     let open Lwt_result_syntax in
-    let path = path data_dir hash in
+    let hash_string = P.to_hex hash in
+    let path = path data_dir hash_string in
     let*! result =
       Lwt_utils_unix.with_atomic_open_out path @@ fun chan ->
       Lwt_utils_unix.write_bytes chan content
     in
     match result with
     | Ok () -> return ()
-    | Error _ -> tzfail @@ Cannot_write_page_to_page_storage {hash; content}
+    | Error _ ->
+        tzfail
+        @@ Cannot_write_page_to_page_storage {hash = hash_string; content}
 
-  let load data_dir ~hash =
+  let load ((module P) : Dac_plugin.t) data_dir ~hash =
     let open Lwt_result_syntax in
-    let path = path data_dir hash in
+    let hash_string = P.to_hex hash in
+    let path = path data_dir hash_string in
     Lwt.catch
       (fun () ->
         let*! result = Lwt_utils_unix.read_file path in
         return @@ String.to_bytes result)
-      (fun _exn -> tzfail @@ Cannot_read_page_from_page_storage hash)
+      (fun _exn -> tzfail @@ Cannot_read_page_from_page_storage hash_string)
 end

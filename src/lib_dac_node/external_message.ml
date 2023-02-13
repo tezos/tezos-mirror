@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,9 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-open Protocol
-open Environment.Error_monad
 
 type error += Could_not_serialize_rollup_external_message of string
 
@@ -48,36 +45,35 @@ let () =
       | _ -> None)
     (fun b58_hash -> Could_not_serialize_rollup_external_message b58_hash)
 
-module type REVEAL_HASH = module type of Sc_rollup_reveal_hash
+type t = {
+  root_hash : Dac_plugin.hash;
+  signature : Tezos_crypto.Aggregate_signature.signature;
+  witnesses : Z.t;
+      (** TODO: https://gitlab.com/tezos/tezos/-/issues/4853
+      Switch to BitSet.t which is ideal but it is not exposed outside 
+      the Protocol. *)
+}
 
-module Make
-    (Hashing_scheme : REVEAL_HASH) (Encoding_metadata : sig
-      val tag : int
+module Make (Encoding_metadata : sig
+  val tag : int
 
-      val title : string
-    end) =
+  val title : string
+end) =
 struct
-  type dac_message =
-    | Dac_message of {
-        root_hash : Hashing_scheme.t;
-        signature : Tezos_crypto.Aggregate_signature.t;
-        witnesses : Bitset.t;
-      }
-
-  let untagged_encoding =
+  let untagged_encoding dac_hash_encoding =
     Data_encoding.(
       conv
         (function
-          | Dac_message {root_hash; signature; witnesses} ->
+          | {root_hash; signature; witnesses} ->
               (root_hash, signature, witnesses))
         (fun (root_hash, signature, witnesses) ->
-          Dac_message {root_hash; signature; witnesses})
+          {root_hash; signature; witnesses})
         (obj3
-           (req "root_hash" Hashing_scheme.encoding)
+           (req "root_hash" dac_hash_encoding)
            (req "signature" Tezos_crypto.Aggregate_signature.encoding)
-           (req "witnesses" Bitset.encoding)))
+           (req "witnesses" z)))
 
-  let dac_message_encoding =
+  let dac_message_encoding encoding =
     Data_encoding.(
       union
         ~tag_size:`Uint8
@@ -85,30 +81,33 @@ struct
           case
             ~title:("dac_message_" ^ Encoding_metadata.title)
             (Tag Encoding_metadata.tag)
-            untagged_encoding
+            (untagged_encoding encoding)
             (fun msg -> Some msg)
             (fun msg -> msg);
         ])
 
-  let make root_hash signature witnesses =
-    let message = Dac_message {root_hash; signature; witnesses} in
-    let res = Data_encoding.Binary.to_bytes dac_message_encoding message in
+  let make ((module P) : Dac_plugin.t) root_hash signature witnesses =
+    let open Lwt_result_syntax in
+    let message = {root_hash; signature; witnesses} in
+    let res =
+      Data_encoding.Binary.to_bytes (dac_message_encoding P.encoding) message
+    in
     match res with
-    | Ok bytes -> Ok bytes
+    | Ok bytes -> return bytes
     | Error _ ->
-        error
-        @@ Could_not_serialize_rollup_external_message
-             (Hashing_scheme.to_hex root_hash)
+        tzfail
+        @@ Could_not_serialize_rollup_external_message (P.to_hex root_hash)
 
-  let of_bytes encoded_message =
-    Data_encoding.Binary.of_bytes_opt dac_message_encoding encoded_message
+  let of_bytes dac_hash_encoding encoded_message =
+    Data_encoding.Binary.of_bytes_opt
+      (dac_message_encoding dac_hash_encoding)
+      encoded_message
 end
 
-module Reveal_hash =
-  Make
-    (Sc_rollup_reveal_hash)
-    (struct
-      let tag = 42
+module Default = Make (struct
+  (** TODO: https://gitlab.com/tezos/tezos/-/issues/4854
+      Use a more ideal tag. *)
+  let tag = 42
 
-      let title = "reveal_hash_v0"
-    end)
+  let title = "reveal_hash_v0"
+end)

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -28,13 +28,9 @@
     decoded by the Sc-rollup kernels.
  *)
 
-open Protocol
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4682
     Remove `open Environment.Error_monad`
 *)
-open Environment.Error_monad
-
 type error +=
   | Payload_cannot_be_empty
   | Cannot_serialize_page_payload
@@ -64,19 +60,10 @@ module type VERSION = sig
   val hashes_version : version
 end
 
-module type Hashing_scheme = sig
-  include module type of Sc_rollup_reveal_hash
-
-  val scheme : supported_hashes
-end
-
 (** [Dac_codec] is a module for encoding a payload as a whole and returnining
     the calculated root hash.
 *)
 module type Dac_codec = sig
-  (* Hash type used to represent pages *)
-  type hash
-
   (* Page store type *)
   type page_store
 
@@ -85,16 +72,23 @@ module type Dac_codec = sig
       [page_store]. The serialization scheme  is some hash-based encoding
       scheme such that a root hash is produced that represents the payload.
   *)
-  val serialize_payload : page_store:page_store -> bytes -> hash tzresult Lwt.t
+  val serialize_payload :
+    Dac_plugin.t ->
+    page_store:page_store ->
+    bytes ->
+    Dac_plugin.hash tzresult Lwt.t
 
-  (** [deserialize_payload page_store hash] deserializes a payload from [hash]
+  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload from [hash]
       using some hash-based encoding scheme. Any payload serialized by
       [serialize_payload] can de deserialized from its root hash by
       [deserialize_payload], that is, these functions are inverses of each
       other.
   *)
   val deserialize_payload :
-    page_store:page_store -> hash -> bytes tzresult Lwt.t
+    Dac_plugin.t ->
+    page_store:page_store ->
+    Dac_plugin.hash ->
+    bytes tzresult Lwt.t
 end
 
 (** [Buffered_dac_codec] partially constructs a Dac external message payload by
@@ -107,34 +101,36 @@ module type Buffered_dac_codec = sig
   (* Buffer type *)
   type t
 
-  (* Hash type used to represent pages *)
-  type hash
-
   (* Page store type *)
   type page_store
 
   (* Returns an empty buffer *)
   val empty : unit -> t
 
-  (** [add page_store buffer message] adds a [message] to [buffer]. The
+  (** [add dac_plugin page_store buffer message] adds a [message] to [buffer]. The
       [buffer] is serialized to [page_store] when it is full. Serialization
       logic is dependent on the encoding scheme.
   *)
-  val add : page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
+  val add :
+    Dac_plugin.t -> page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
 
-  (** [finalize page_store buffer] serializes the [buffer] to [page_store] and
+  (** [finalize dac_plugin page_store buffer] serializes the [buffer] to [page_store] and
       returns a root hash that represents the final payload. The serialization
       logic is dependent on the encoding scheme. [buffer] is emptied after
       this call.
   *)
-  val finalize : page_store:page_store -> t -> hash tzresult Lwt.t
+  val finalize :
+    Dac_plugin.t -> page_store:page_store -> t -> Dac_plugin.hash tzresult Lwt.t
 
-  (** [deserialize_payload page_store hash] deserializes a payload from [hash]
+  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload from [hash]
       using some hash-based encoding scheme. Any payload serialized by [add] +
       [finalize] can be deserialized by this function.
   *)
   val deserialize_payload :
-    page_store:page_store -> hash -> bytes tzresult Lwt.t
+    Dac_plugin.t ->
+    page_store:page_store ->
+    Dac_plugin.hash ->
+    bytes tzresult Lwt.t
 end
 
 let () =
@@ -245,12 +241,7 @@ module Merkle_tree = struct
       one chunk, provided it could fit into the memory.
      *)
 
-  module Make_buffered
-      (H : Hashing_scheme)
-      (S : Page_store.S with type hash := H.t)
-      (V : VERSION)
-      (C : CONFIG) =
-  struct
+  module Make_buffered (S : Page_store.S) (V : VERSION) (C : CONFIG) = struct
     (* Even numbers are used for versioning Contents pages, odd numbers are used
        for versioning Hashes pages. *)
     module V = struct
@@ -265,26 +256,24 @@ module Merkle_tree = struct
 
     (** [page_data] is either [Cont_data] or [Hash_data] where each represents
         data not bound in size for [Contents] or [Hashes] page respectively. *)
-    type page_data = Cont_data of bytes | Hash_data of H.t list
+    type page_data = Cont_data of bytes | Hash_data of Dac_plugin.hash list
 
     type t = page_data Stack.t
 
-    type hash = H.t
-
     type page_store = S.t
 
-    let hash bytes = H.hash_bytes [bytes] ~scheme:H.scheme
+    let hash ((module P) : Dac_plugin.t) bytes =
+      P.hash_bytes [bytes] ~scheme:Blake2B
 
-    let hash_encoding = H.encoding
-
-    let hashes_encoding = Data_encoding.list hash_encoding
+    let hashes_encoding ((module P) : Dac_plugin.t) =
+      Data_encoding.list P.encoding
 
     (* The preamble of a serialized page contains 1 byte denoting the version,
        and 4 bytes encoding the size of the rest of the page. In total, 5
        bytes. *)
     let page_preamble_size = 5
 
-    let hash_bytes_size = H.size ~scheme:H.scheme
+    let hash_bytes_size ((module P) : Dac_plugin.t) = P.size ~scheme:Blake2B
 
     (** Payload pages are encoded as follows: the first byte is an integer,
         which is corresponds to either `payload_version` (for payload pages) or
@@ -293,7 +282,7 @@ module Merkle_tree = struct
         list of raw bytes (in the case of a payload page), or a list of hashes,
         which occupy 33 bytes each. I.e. 32 bytes for the inner hash and 1 byte
         for the tag identifying the hashing scheme. *)
-    let page_encoding =
+    let page_encoding dac_plugin =
       Data_encoding.(
         union
           ~tag_size:`Uint8
@@ -307,7 +296,7 @@ module Merkle_tree = struct
             case
               ~title:"hashes"
               (Tag V.hashes_version_tag)
-              hashes_encoding
+              (hashes_encoding dac_plugin)
               (function Hashes hashes -> Some hashes | _ -> None)
               (fun hashes -> Hashes hashes);
           ])
@@ -315,34 +304,34 @@ module Merkle_tree = struct
     (** Serialization function for a single page. It converts a page to a
         sequence of bytes using [page_encoding]. It also checks that the
         serialized page does not exceed [page_size] bytes. *)
-    let serialize_page page =
+    let serialize_page dac_plugin page =
       match
         Data_encoding.Binary.to_bytes
-          (Data_encoding.check_size C.max_page_size page_encoding)
+          (Data_encoding.check_size C.max_page_size (page_encoding dac_plugin))
           page
       with
       | Ok raw_page -> Ok raw_page
-      | Error _ -> error Cannot_serialize_page_payload
+      | Error _ -> Result_syntax.tzfail Cannot_serialize_page_payload
 
-    let store_page ~page_store raw_page =
+    let store_page dac_plugin ~page_store raw_page =
       let open Lwt_result_syntax in
-      let*? serialized_page = serialize_page raw_page in
+      let*? serialized_page = serialize_page dac_plugin raw_page in
       (* Hashes are computed from raw pages, each of which consists of a
          preamble of 5 bytes followed by a page payload - a raw sequence
          of bytes from the original payload for Contents pages, and a
          a sequence of serialized hashes for hashes pages. The preamble
          bytes is part of the sequence of bytes which is hashed.
       *)
-      let hash = hash serialized_page in
-      let* () = S.save page_store ~hash ~content:serialized_page in
+      let hash = hash dac_plugin serialized_page in
+      let* () = S.save dac_plugin page_store ~hash ~content:serialized_page in
       return hash
 
     let is_empty_page_data = function
       | Cont_data cont -> Bytes.empty = cont
       | Hash_data ls -> List.is_empty ls
 
-    let max_hashes_per_page =
-      (C.max_page_size - page_preamble_size) / hash_bytes_size
+    let max_hashes_per_page dac_plugin =
+      (C.max_page_size - page_preamble_size) / hash_bytes_size dac_plugin
 
     (** Represents data that is held in-memory and is yet to be persisted to the disk
         - effectively acting as a buffer, making sure that all [pages] of the given
@@ -368,21 +357,21 @@ module Merkle_tree = struct
         let open Result_syntax in
         (* 1 byte for the version size, 4 bytes for the size of the payload. *)
         let actual_page_size = C.max_page_size - page_preamble_size in
-        if actual_page_size <= 0 then error Non_positive_size_of_payload
+        if actual_page_size <= 0 then tzfail Non_positive_size_of_payload
         else
           let+ splitted_payload = String.chunk_bytes actual_page_size payload in
           List.map
             (fun cont -> Contents (String.to_bytes cont))
             splitted_payload
 
-      let split_hashes hashes =
-        let number_of_hashes = max_hashes_per_page in
+      let split_hashes dac_plugin hashes =
+        let number_of_hashes = max_hashes_per_page dac_plugin in
         (* Requiring a branching factor of at least 2 is necessary to ensure that
            the serialization process terminates. If only one hash were stored per page, then
            the number of pages at height `n-1` could be potentially equal to the number of
            pages at height `n`. *)
         if number_of_hashes < 2 then
-          error Merkle_tree_branching_factor_not_high_enough
+          Result_syntax.tzfail Merkle_tree_branching_factor_not_high_enough
         else
           let rec go aux list =
             match list with
@@ -393,7 +382,7 @@ module Merkle_tree = struct
           in
           Ok (go [] hashes)
 
-      let split page_data =
+      let split dac_plugin page_data =
         let leftover_with_full_pages ls =
           let open Lwt_result_syntax in
           match List.rev ls with
@@ -406,7 +395,7 @@ module Merkle_tree = struct
         let*? pages =
           match page_data with
           | Cont_data cont -> split_payload cont
-          | Hash_data ls -> split_hashes ls
+          | Hash_data ls -> split_hashes dac_plugin ls
         in
         leftover_with_full_pages pages
 
@@ -421,13 +410,13 @@ module Merkle_tree = struct
             (* We dont expect to get here *)
             tzfail Cannot_combine_pages_data_of_different_type
 
-      let process ~page_store level =
+      let process dac_plugin ~page_store level =
         let open Lwt_result_syntax in
-        let* level, pages = split level in
+        let* level, pages = split dac_plugin level in
         let* rev_hashes =
           List.fold_left_es
             (fun accm page ->
-              let* hash = store_page ~page_store page in
+              let* hash = store_page dac_plugin ~page_store page in
               return @@ (hash :: accm))
             []
             pages
@@ -448,17 +437,19 @@ module Merkle_tree = struct
 
           Throws [Payload_cannot_be_empty] if [page_data] is empty.
        *)
-    let rec add_rec ~page_store stack page_data =
+    let rec add_rec dac_plugin ~page_store stack page_data =
       let open Lwt_result_syntax in
       let open Merkle_level in
       let* merkle_level =
         if Stack.is_empty stack then return (init_level page_data)
         else add_page_data ~level:(Stack.pop stack) ~page_data
       in
-      let* merkle_level, page_data = process ~page_store merkle_level in
+      let* merkle_level, page_data =
+        process dac_plugin ~page_store merkle_level
+      in
       let* () =
         if not @@ is_empty_page_data page_data then
-          add_rec ~page_store stack page_data
+          add_rec dac_plugin ~page_store stack page_data
         else return ()
       in
       return @@ Stack.push merkle_level stack
@@ -469,12 +460,12 @@ module Merkle_tree = struct
           partially filled.
 
           Throws [Payload_cannot_be_empty] in case of empty payload *)
-    let add ~page_store stack payload =
+    let add dac_plugin ~page_store stack payload =
       let open Lwt_result_syntax in
       let* () =
         fail_unless (Bytes.length payload > 0) Payload_cannot_be_empty
       in
-      let number_of_hashes = max_hashes_per_page in
+      let number_of_hashes = max_hashes_per_page dac_plugin in
       (* Requiring a branching factor of at least 2 is necessary to ensure that
          the serialization process terminates. If only one hash were stored per page, then
          the number of pages at height `n-1` could be potentially equal to the number of
@@ -484,19 +475,19 @@ module Merkle_tree = struct
           (number_of_hashes > 1)
           Merkle_tree_branching_factor_not_high_enough
       in
-      add_rec ~page_store stack (Cont_data payload)
+      add_rec dac_plugin ~page_store stack (Cont_data payload)
 
     (** [finalize] returns a root hash of agggregated data, by eagerly storing
          every partially filled level on the stack. Starting at the bottom and
          adding stored page hash to next level, repeating this procedure until
          left with a single (root) hash. *)
-    let rec finalize ~page_store stack =
+    let rec finalize dac_plugin ~page_store stack =
       let open Merkle_level in
       let finalize_level page_data =
         let store_page = store_page ~page_store in
         match page_data with
-        | Cont_data cont -> store_page (Contents cont)
-        | Hash_data ls -> store_page (Hashes ls)
+        | Cont_data cont -> store_page dac_plugin (Contents cont)
+        | Hash_data ls -> store_page dac_plugin (Hashes ls)
       in
       let open Lwt_result_syntax in
       let* () =
@@ -506,21 +497,23 @@ module Merkle_tree = struct
       let merkle_level = Stack.pop stack in
       if is_empty merkle_level then
         (* If level is empty, there is nothing to hash *)
-        finalize ~page_store stack
+        finalize dac_plugin ~page_store stack
       else if Stack.is_empty stack && has_single_hash merkle_level then
         (* If top level of the tree and only one hash, then this is a root hash *)
         get_single_hash merkle_level
       else
         let* hash = finalize_level merkle_level in
-        let* () = add_rec ~page_store stack (Hash_data [hash]) in
-        finalize ~page_store stack
+        let* () = add_rec dac_plugin ~page_store stack (Hash_data [hash]) in
+        finalize dac_plugin ~page_store stack
 
     (** Deserialization function for a single page. A sequence of bytes is
         converted to a page using [page_encoding]. *)
-    let deserialize_page raw_page =
-      match Data_encoding.Binary.of_bytes page_encoding raw_page with
+    let deserialize_page dac_plugin raw_page =
+      match
+        Data_encoding.Binary.of_bytes (page_encoding dac_plugin) raw_page
+      with
       | Ok page -> Ok page
-      | Error _ -> error Cannot_deserialize_page
+      | Error _ -> Result_syntax.tzfail Cannot_deserialize_page
 
     (** Deserialization function for reconstructing the original payload from
         its Merkle tree root hash. The function [retrieve_page_from_hash]
@@ -537,14 +530,14 @@ module Merkle_tree = struct
         hash and pages are computed using the serialized_payload function
         outlined above, but it is not guaranteed in more general cases.
      *)
-    let deserialize_payload ~page_store root_hash =
+    let deserialize_payload dac_plugin ~page_store root_hash =
       let rec go retrieved_hashes retrieved_content =
         let open Lwt_result_syntax in
         match retrieved_hashes with
         | [] -> return @@ Bytes.concat Bytes.empty retrieved_content
         | hash :: hashes -> (
-            let* serialized_page = S.load page_store ~hash in
-            let*? page = deserialize_page serialized_page in
+            let* serialized_page = S.load dac_plugin page_store ~hash in
+            let*? page = deserialize_page dac_plugin serialized_page in
             match page with
             | Hashes page_hashes ->
                 (* Hashes are saved in reverse order. *)
@@ -564,8 +557,6 @@ module Merkle_tree = struct
 
   (** Derives a [Dac_codec] from [Buffered_dac_codec] sharing the same underlying encoding scheme. *)
   module Make (B : Buffered_dac_codec) = struct
-    type hash = B.hash
-
     type page_store = B.page_store
 
     (** Main function for computing the pages of a Merkle tree from a sequence
@@ -573,22 +564,17 @@ module Merkle_tree = struct
         the original payload can be  reconstructed from its Merkle tree root;
         The function [serialize_payload] returns the root hash of the Merkle
         tree constructed. *)
-    let serialize_payload ~page_store payload =
+    let serialize_payload dac_plugin ~page_store payload =
       let open Lwt_result_syntax in
       let stack = B.empty () in
-      let* () = B.add ~page_store stack payload in
-      B.finalize ~page_store stack
+      let* () = B.add dac_plugin ~page_store stack payload in
+      B.finalize dac_plugin ~page_store stack
 
     let deserialize_payload = B.deserialize_payload
   end
 
   module V0_Buffered =
     Make_buffered
-      (struct
-        include Sc_rollup_reveal_hash
-
-        let scheme = Sc_rollup_reveal_hash.Blake2B
-      end)
       (Page_store.Filesystem)
       (struct
         (* Cntents_version_tag used in content pages is 0. *)
@@ -610,25 +596,19 @@ module Merkle_tree = struct
 end
 
 module Hash_chain = struct
-  module type PAGE_FMT = sig
-    type h
+  module V0 = struct
+    type page = {succ_hash : Dac_plugin.hash; content : string}
 
-    type page = {succ_hash : h; content : string}
+    let hash ((module P) : Dac_plugin.t) bytes =
+      P.hash_bytes ~scheme:Blake2B [bytes]
 
-    val content_limit : int
+    let content_limit =
+      (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
 
-    (** Serializes a single page (an element in the hash link). *)
-    val serialize_page : page -> string
-  end
+    let serialize_page ((module P) : Dac_plugin.t) page =
+      Format.asprintf "%s hash:%s" page.content (P.to_hex page.succ_hash)
 
-  module Make (H : Hashing_scheme) (P : PAGE_FMT with type h = H.t) = struct
-    type h = H.t
-
-    let hash bytes = H.hash_bytes ~scheme:H.scheme [bytes]
-
-    let to_hex = H.to_hex
-
-    let link_chunks chunks : (H.t * bytes) list =
+    let link_chunks dac_plugin chunks : (Dac_plugin.hash * bytes) list =
       let rec link_chunks_rev linked_pages rev_pages =
         match rev_pages with
         | [] -> linked_pages
@@ -637,10 +617,10 @@ module Hash_chain = struct
               match linked_pages with
               | [] -> chunk
               | (succ_hash, _) :: _ ->
-                  P.serialize_page {succ_hash; content = chunk}
+                  serialize_page dac_plugin {succ_hash; content = chunk}
             in
             let page = Bytes.of_string page in
-            let hash = hash page in
+            let hash = hash dac_plugin page in
             (link_chunks_rev [@tailcall])
               ((hash, page) :: linked_pages)
               rev_chunks
@@ -648,44 +628,22 @@ module Hash_chain = struct
       let rev_chunks = List.rev chunks in
       link_chunks_rev [] rev_chunks
 
-    let make_hash_chain data =
+    let make_hash_chain dac_plugin data =
       let open Result_syntax in
-      let+ chunks = String.chunk_bytes P.content_limit data in
-      link_chunks chunks
+      let+ chunks = String.chunk_bytes content_limit data in
+      link_chunks dac_plugin chunks
 
     (** Main function for computing a hash chain from a byte sequence. Returns the
         chain head hash.[for_each_page] may be supplied to run post processing
         tasks on each page, for example, to persisit a serialized page to disk.
       *)
-    let serialize_payload ~for_each_page payload =
+    let serialize_payload dac_plugin ~for_each_page payload =
       let open Lwt_result_syntax in
       let* () =
         fail_unless (Bytes.length payload > 0) Payload_cannot_be_empty
       in
-      let*? hash_chain = make_hash_chain payload in
+      let*? hash_chain = make_hash_chain dac_plugin payload in
       let+ () = List.iter_es for_each_page hash_chain in
       Stdlib.List.hd hash_chain |> fst
   end
-
-  module V0 =
-    Make
-      (struct
-        include Sc_rollup_reveal_hash
-
-        let scheme = Sc_rollup_reveal_hash.Blake2B
-      end)
-      (struct
-        type h = Sc_rollup_reveal_hash.t
-
-        type page = {succ_hash : h; content : string}
-
-        let content_limit =
-          (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
-
-        let serialize_page page =
-          Format.asprintf
-            "%s hash:%s"
-            page.content
-            (Sc_rollup_reveal_hash.to_hex page.succ_hash)
-      end)
 end
