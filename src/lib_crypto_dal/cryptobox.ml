@@ -642,6 +642,12 @@ module Inner = struct
     done ;
     slot
 
+  (* Encoding a message P = (P_0, ... ,P_{k-1}) amounts to evaluate
+     its associated polynomial P(x)=sum_{i=0}^{k-1} P_i x^i at the
+     evaluation points [t.domain_n].
+
+     This can be achieved with an n-points discrete Fourier transform
+     supported by the [Scalar] field in time O(n log n). *)
   let encode t p =
     Evaluations.evaluation_fft t.domain_n p |> Evaluations.to_array
 
