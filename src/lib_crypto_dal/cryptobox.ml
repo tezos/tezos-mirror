@@ -1053,6 +1053,16 @@ module Internal_for_tests = struct
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
+
+  let make_dummy_shards t =
+    let len_shard = t.n / t.number_of_shards in
+    let rec loop index seq =
+      if index = t.number_of_shards then seq
+      else
+        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        loop (index + 1) (Seq.cons {index; share} seq)
+    in
+    loop 0 Seq.empty
 end
 
 module Config = struct

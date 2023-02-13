@@ -173,6 +173,44 @@ module Test = struct
         | `Invalid_shard_length _ ) ->
         assert false
 
+  (* Checking the shards' length to avoid out-of-bounds array accesses.
+     The function [polynomial_from_shards] returns an error if the shards
+     don't have the expected length. This could happen if the shards were
+     produced with a different set of parameters than the ones used by
+     [polynomial_from_shards].
+
+     Here, the number of shards is 16 with the first set of parameters t1
+     versus 32 for the second set of paramaters t2. *)
+  let test_erasure_code_failure_invalid_shard_length () =
+    let redundancy_factor = 2 in
+    let slot_size = 1 lsl 10 in
+    let params =
+      ({
+         redundancy_factor;
+         slot_size;
+         page_size = 1 lsl 5;
+         number_of_shards = 1 lsl 4;
+       }
+        : Cryptobox.parameters)
+    in
+    init params ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    (let* t1 = Cryptobox.make params in
+     let* t2 =
+       Cryptobox.make
+         {
+           redundancy_factor;
+           slot_size;
+           page_size = 1 lsl 5;
+           number_of_shards = 1 lsl 5;
+         }
+     in
+     let enc_shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
+     Cryptobox.polynomial_from_shards t2 enc_shards)
+    |> function
+    | Error (`Invalid_shard_length _) -> assert true
+    | _ -> assert false
+
   (* Tests that a page is included in a slot. *)
   let test_page_proofs =
     QCheck2.Test.make
@@ -318,7 +356,9 @@ let test =
       ( "erasure code failure: not enough shards",
         Test.test_erasure_code_failure_not_enough_shards );
       ( "erasure code failure: shard indices out of range",
-        Test.test_erasure_code_failure_out_of_range )
+        Test.test_erasure_code_failure_out_of_range );
+      ( "erasure code failure: invalid shard length",
+        Test.test_erasure_code_failure_invalid_shard_length )
       (*("test_collision_page_size", Test.test_collision_page_size);*);
     ]
 

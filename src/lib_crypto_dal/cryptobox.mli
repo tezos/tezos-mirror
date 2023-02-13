@@ -222,6 +222,9 @@ module Internal_for_tests : sig
      from test frameworks where tests with various parameters could be
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
+
+  (* Returns a default valid sequence of shards for the given parameters. *)
+  val make_dummy_shards : t -> shard Seq.t
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
