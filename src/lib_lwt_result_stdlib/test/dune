@@ -7,12 +7,12 @@
   test_list_basic
   test_list_basic_lwt
   test_seq_basic
-  test_generic
-  test_fuzzing_seq
-  test_fuzzing_list
-  test_fuzzing_set
   test_fuzzing_seq_tiered
-  test_fuzzing_option)
+  test_fuzzing_seq_against_stdlib
+  test_fuzzing_list_against_stdlib
+  test_fuzzing_option_against_stdlib
+  test_fuzzing_set_against_stdlib
+  test_fuzzing_map_against_stdlib)
  (libraries
   tezos-lwt-result-stdlib
   tezos-lwt-result-stdlib.examples.traces
@@ -48,29 +48,29 @@
 (rule
  (alias runtest)
  (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_generic.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_seq.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_list.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_set.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
  (action (run %{dep:./test_fuzzing_seq_tiered.exe})))
 
 (rule
  (alias runtest)
  (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_option.exe})))
+ (action (run %{dep:./test_fuzzing_seq_against_stdlib.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-lwt-result-stdlib)
+ (action (run %{dep:./test_fuzzing_list_against_stdlib.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-lwt-result-stdlib)
+ (action (run %{dep:./test_fuzzing_option_against_stdlib.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-lwt-result-stdlib)
+ (action (run %{dep:./test_fuzzing_set_against_stdlib.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-lwt-result-stdlib)
+ (action (run %{dep:./test_fuzzing_map_against_stdlib.exe})))

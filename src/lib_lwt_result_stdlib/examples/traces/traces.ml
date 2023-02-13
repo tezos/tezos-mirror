@@ -377,3 +377,17 @@ module Full : EXTENDED = struct
     | Seq (e, t) -> Seq (f e, wrap f t)
     | Singl e -> Singl (f e)
 end
+
+module Unit : S with type 'error trace = unit = struct
+  type 'error trace = unit
+
+  let make _ = ()
+
+  let cons _ () = ()
+
+  let cons_list _ _ = ()
+
+  let conp _ _ = ()
+
+  let conp_list _ _ = ()
+end
