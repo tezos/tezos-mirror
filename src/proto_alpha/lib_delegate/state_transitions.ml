@@ -413,7 +413,12 @@ let propose_fresh_block_action ~endorsements ?last_proposal
   in
   let kind = Fresh operation_pool in
   Events.(emit proposing_fresh_block (delegate, round)) >>= fun () ->
-  let block_to_bake = {predecessor; round; delegate; kind} in
+  let force_apply =
+    state.global_state.config.force_apply || Round.(round <> zero)
+    (* This is used as a safety net by applying blocks on round > 0, in case
+       validation-only did not produce a correct round-0 block. *)
+  in
+  let block_to_bake = {predecessor; round; delegate; kind; force_apply} in
   let updated_state = update_current_phase state Idle in
   Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
@@ -498,8 +503,13 @@ let propose_block_action state delegate round (proposal : proposal) =
       let kind =
         Reproposal {consensus_operations; payload_hash; payload_round; payload}
       in
+      let force_apply =
+        true
+        (* This is used as a safety net by applying blocks on round > 0, in case
+           validation-only did not produce a correct round-0 block. *)
+      in
       let block_to_bake =
-        {predecessor = proposal.predecessor; round; delegate; kind}
+        {predecessor = proposal.predecessor; round; delegate; kind; force_apply}
       in
       let updated_state = update_current_phase state Idle in
       Lwt.return @@ Inject_block {block_to_bake; updated_state}
