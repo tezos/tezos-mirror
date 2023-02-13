@@ -25,15 +25,6 @@
 
 open Protocol.Alpha_context
 
-(** Type to represent {e appoximate upper-bounds} for the fee and limits, used
-    to compute an upper bound on the size (in bytes) of an operation. *)
-type approximate_fee_bound = {
-  fee : Tez.t;
-  counter : Manager_counter.t;
-  gas_limit : Gas.Arith.integral;
-  storage_limit : Z.t;
-}
-
 type fee_parameter = {
   minimal_fees : Tez.t;
   minimal_nanotez_per_byte : Q.t;
@@ -100,9 +91,6 @@ module type PARAM_OPERATION = sig
   (** An encoding for injector's operations *)
   val encoding : t Data_encoding.t
 
-  (** Convert an injector operation to a manager_operation of the protocol *)
-  val to_manager_operation : t -> packed_manager_operation
-
   (** Pretty-printing injector's operations *)
   val pp : Format.formatter -> t -> unit
 end
@@ -159,11 +147,6 @@ module type PARAMETERS = sig
       correct queue automatically (when signer is not provided) and to recover
       persistent information. *)
   val operation_tag : Operation.t -> Tag.t
-
-  (** Returns the {e approximate upper-bounds} for the fee and limits of an
-      operation, used to compute an upper bound on the size (in bytes) for this
-      operation. *)
-  val approximate_fee_bound : state -> Operation.t -> approximate_fee_bound
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)

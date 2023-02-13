@@ -632,48 +632,23 @@ struct
       (oph, operations)
 
   (** Returns the (upper bound on) the size of an L1 batch of operations composed
-    of the manager operations [rev_ops]. *)
-  let size_l1_batch state rev_ops =
-    let contents_list =
-      List.map
-        (fun (op : Inj_operation.t) ->
-          let {fee; counter; gas_limit; storage_limit} =
-            Parameters.approximate_fee_bound state.state op.operation
-          in
-          let (Manager operation) =
-            POperation.to_manager_operation op.operation
-          in
-          let contents =
-            Manager_operation
-              {
-                source = state.signer.pkh;
-                operation;
-                fee;
-                counter;
-                gas_limit;
-                storage_limit;
-              }
-          in
-          Contents contents)
-        rev_ops
+    of the manager operations [ops]. *)
+  let size_l1_batch ops =
+    let size_shell_header =
+      (* Size of branch field *)
+      Block_hash.size
     in
-    let (Contents_list contents) =
-      match Operation.of_list contents_list with
-      | Error _ ->
-          (* Cannot happen: rev_ops is non empty and contains only manager
-             operations *)
-          assert false
-      | Ok packed_contents_list -> packed_contents_list
+    let signature_size = Signature.size Signature.zero in
+    let contents_size =
+      List.fold_left
+        (fun acc o ->
+          acc
+          + Proto_client.operation_size o.Inj_operation.operation
+          + Proto_client.operation_size_overhead)
+        0
+        ops
     in
-    let signature = Signature.zero in
-    let branch = Block_hash.zero in
-    let operation =
-      {
-        shell = {branch};
-        protocol_data = Operation_data {contents; signature = Some signature};
-      }
-    in
-    Data_encoding.Binary.length Operation.encoding operation
+    size_shell_header + contents_size + signature_size
 
   (** Retrieve as many operations from the queue while remaining below the size
     limit. *)
@@ -684,7 +659,7 @@ struct
         Op_queue.fold
           (fun _oph op ops ->
             let new_ops = op :: ops in
-            let new_size = size_l1_batch state new_ops in
+            let new_size = size_l1_batch new_ops in
             if new_size > size_limit then raise (Reached_limit ops) ;
             new_ops)
           state.queue
