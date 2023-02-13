@@ -78,7 +78,7 @@ module Handler = struct
       let*! dac_plugin = Dac_manager.resolve_plugin protocols in
       match dac_plugin with
       | Some dac_plugin ->
-          Node_context.set_ready ctxt ~dac_plugin ;
+          Node_context.set_ready ctxt dac_plugin ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit

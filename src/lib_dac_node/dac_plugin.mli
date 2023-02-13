@@ -23,15 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Protocol's reveal_hash type. Usually [Protocol.Sc_rollup_reveal_hash.t]. *)
-module type Protocol_reveal_hash = sig
+(** [Protocol.Sc_protocol_reveal_hash.t] is unknown to  modules outside the 
+    protocol and only known at runtime. To avoid the proliferation of functors
+    in the dac node, [Dac_hash.t] hides the dynamic [Protocol.Sc_protocol_reveal_hash.t]
+    behind an abstract static type. An instance of [Dac_plugin.T] implement
+    the [Dac_plugin.Dac_hash] which are the functions that can operate on [Dac_hash.t].
+  *)
+module Dac_hash : sig
   type t
 
-  val encoding : t Data_encoding.t
+  val to_bytes : t -> bytes
 end
 
 module type T = sig
-  module Protocol_reveal_hash : Protocol_reveal_hash
+  (** [Dac_hash.t] operations that need to be derived from the protocol *)
+  module Dac_hash : sig
+    val encoding : Dac_hash.t Data_encoding.t
+  end
 
   module Proto : Registered_protocol.T
 
@@ -46,6 +54,12 @@ module type T = sig
   end
 end
 
-val register : (module T) -> unit
+(** [register make_plugin] derives and registers a new [Dac_plugin.T] given an 
+    [of_bytes]. Implementers of plugin are responsible for providing the 
+    definition of this derivation. Functions that expose 
+    [Protocol.Sc_protocol_reveal_hash.t] can be wrapped into [Dac_hash.t] via 
+    [Dac_hash.to_bytes] and [of_bytes].
+*)
+val register : ((bytes -> Dac_hash.t) -> (module T)) -> unit
 
 val get : Protocol_hash.Table.key -> (module T) option

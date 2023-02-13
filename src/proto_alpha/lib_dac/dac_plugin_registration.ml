@@ -24,10 +24,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
-  module Protocol_reveal_hash = Protocol.Sc_rollup_reveal_hash
+module Make (Mapper : sig
+  val of_bytes : bytes -> Dac_plugin.Dac_hash.t
+end) : Dac_plugin.T = struct
+  module Dac_hash = struct
+    let to_bytes = Dac_plugin.Dac_hash.to_bytes
+
+    let to_reveal_hash dac_hash =
+      dac_hash |> to_bytes
+      |> Data_encoding.Binary.of_bytes_exn
+           Protocol.Sc_rollup_reveal_hash.encoding
+
+    let of_reveal_hash reveal_hash =
+      reveal_hash
+      |> Data_encoding.Binary.to_bytes_exn
+           Protocol.Sc_rollup_reveal_hash.encoding
+      |> Mapper.of_bytes
+
+    let encoding =
+      Data_encoding.conv
+        to_reveal_hash
+        of_reveal_hash
+        Protocol.Sc_rollup_reveal_hash.encoding
+  end
+
   module Proto = Registerer.Registered
   module RPC = RPC
 end
 
-let () = Dac_plugin.register (module Plugin)
+let make_plugin : (bytes -> Dac_plugin.Dac_hash.t) -> (module Dac_plugin.T) =
+ fun of_bytes ->
+  let module Plugin = Make (struct
+    let of_bytes = of_bytes
+  end) in
+  (module Plugin)
+
+let () = Dac_plugin.register make_plugin

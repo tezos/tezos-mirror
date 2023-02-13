@@ -39,12 +39,13 @@ module Root_hash_streamer : sig
   (** [publish streamer root_hash] publishes a [root_hash] to all attached 
       subscribers in [streamer].
    *)
-  val publish : t -> Dac_hash.t -> unit tzresult Lwt.t
+  val publish : t -> Dac_plugin.Dac_hash.t -> unit tzresult Lwt.t
 
   (** [make_subscription streamer] returns a new stream of hashes for the subscriber to
       consume. An [Lwt_watcher.stopper] function is also returned for the 
       subscriber to close the stream.
   *)
   val make_subscription :
-    t -> (Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
+    t ->
+    (Dac_plugin.Dac_hash.t Lwt_stream.t * Lwt_watcher.stopper) tzresult Lwt.t
 end

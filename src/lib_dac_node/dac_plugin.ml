@@ -23,15 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Protocol's reveal_hash type. Usually [Protocol.Sc_rollup_reveal_hash.t]. *)
-module type Protocol_reveal_hash = sig
-  type t
+module Dac_hash = struct
+  type t = bytes
 
-  val encoding : t Data_encoding.t
+  let to_bytes = Fun.id
 end
 
 module type T = sig
-  module Protocol_reveal_hash : Protocol_reveal_hash
+  module Dac_hash : sig
+    val encoding : Dac_hash.t Data_encoding.t
+  end
 
   module Proto : Registered_protocol.T
 
@@ -48,7 +49,9 @@ end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
 
-let register (module Plugin : T) =
+let register (make_plugin : (bytes -> Dac_hash.t) -> (module T)) : unit =
+  let dac_plugin = make_plugin Fun.id in
+  let module Plugin = (val dac_plugin) in
   assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
   Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
 

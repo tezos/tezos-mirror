@@ -9,6 +9,7 @@
   tezos-protocol-alpha
   tezos-base-test-helpers
   tezos-alpha-test-helpers
+  tezos_dac_node_lib
   alcotest-lwt)
  (flags
   (:standard)
@@ -17,7 +18,8 @@
   -open Tezos_dac_alpha
   -open Tezos_protocol_alpha
   -open Tezos_base_test_helpers
-  -open Tezos_alpha_test_helpers))
+  -open Tezos_alpha_test_helpers
+  -open Tezos_dac_node_lib))
 
 (rule
  (alias runtest)
