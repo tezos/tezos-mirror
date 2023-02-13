@@ -101,6 +101,12 @@ release:
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
 
+.PHONY: strip
+strip: all
+	@chmod +w $(ALL_EXECUTABLES)
+	@strip -s $(ALL_EXECUTABLES)
+	@chmod -w $(ALL_EXECUTABLES)
+
 .PHONY: static
 static:
 	@$(MAKE) build PROFILE=static OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES)"
