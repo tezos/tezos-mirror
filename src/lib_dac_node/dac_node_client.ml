@@ -38,13 +38,7 @@ class unix_cctxt ~rpc_config : cctxt =
   end
 
 let make_unix_cctxt ~scheme ~host ~port =
-  let endpoint =
-    Uri.with_uri
-      ~scheme:(Some scheme)
-      ~host:(Some host)
-      ~port:(Some port)
-      Uri.empty
-  in
+  let endpoint = Uri.make ~scheme ~host ~port () in
   let rpc_config =
     {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
   in
