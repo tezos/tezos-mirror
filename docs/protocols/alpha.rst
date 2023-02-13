@@ -45,11 +45,10 @@ Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
-:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`, :gl:`!7242`, :gl:`!7315`)
+:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`, :gl:`!7242`, :gl:`!7315`,
+:gl:`!7407`, :gl:`!7566`, :gl:`!7606`, :gl:`!7541`)
 
-Implement attestor in baker daemon. (MR :gl:`!7407`)
-
-Small bug fix in attestation validation: the computed max slot index was off by one. (MR :gl:`!7566`)
+Distribution of rollups data through reveal data channel. (MRs :gl:`!7571`)
 
 Breaking Changes
 ----------------
@@ -74,3 +73,5 @@ Internal
 --------
 
 - Update migration for Mumbai. (MR :gl:`!7428`)
+
+- Michelson: add a forgotten tailcall annotation (MR :gl:`!7656`)
