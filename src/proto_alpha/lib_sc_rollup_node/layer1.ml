@@ -26,7 +26,6 @@
 open Configuration
 open Protocol.Alpha_context
 open Plugin
-open Injector_common
 
 (**
 
@@ -241,25 +240,79 @@ let shutdown state =
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)
 let fetch_tezos_shell_header l1_ctxt hash =
+  let open Lwt_syntax in
   trace (Cannot_find_block hash)
-  @@ fetch_tezos_shell_header
-       l1_ctxt.cctxt
-       hash
-       ~find_in_cache:(fun h fetch_by_rpc ->
-         let res =
-           Blocks_cache.bind l1_ctxt.blocks_cache h (function
-               | Some block_info -> Lwt.return_some block_info.header.shell
-               | None -> Lwt.return_none)
-         in
-         match res with Some lwt -> lwt | None -> fetch_by_rpc h)
+  @@
+  let errors = ref None in
+  let fetch hash =
+    let* shell_header =
+      Tezos_shell_services.Shell_services.Blocks.Header.shell_header
+        l1_ctxt.cctxt
+        ~chain:`Main
+        ~block:(`Hash (hash, 0))
+        ()
+    in
+    match shell_header with
+    | Error errs ->
+        errors := Some errs ;
+        return_none
+    | Ok shell_header -> return_some shell_header
+  in
+  let+ shell_header =
+    let res =
+      Blocks_cache.bind l1_ctxt.blocks_cache hash (function
+          | Some block_info -> Lwt.return_some block_info.header.shell
+          | None -> Lwt.return_none)
+    in
+    match res with Some lwt -> lwt | None -> fetch hash
+  in
+  match (shell_header, !errors) with
+  | None, None ->
+      (* This should not happen if {!find_in_cache} behaves correctly,
+         i.e. calls {!fetch} for cache misses. *)
+      error_with
+        "Fetching Tezos block %a failed unexpectedly"
+        Block_hash.pp
+        hash
+  | None, Some errs -> Error errs
+  | Some shell_header, _ -> Ok shell_header
 
 (** [fetch_tezos_block l1_ctxt hash] returns a block info given a block
     hash. Looks for the block in the blocks cache first, and fetches it from the
     L1 node otherwise. *)
 let fetch_tezos_block l1_ctxt hash =
+  let open Lwt_syntax in
   trace (Cannot_find_block hash)
-  @@ fetch_tezos_block l1_ctxt.cctxt hash ~find_in_cache:(fun h fetch_by_rpc ->
-         Blocks_cache.bind_or_put l1_ctxt.blocks_cache h fetch_by_rpc Lwt.return)
+  @@
+  let errors = ref None in
+  let fetch hash =
+    let* block =
+      Alpha_block_services.info
+        cctxt
+        ~chain:`Main
+        ~block:(`Hash (hash, 0))
+        ~metadata:`Always
+        ()
+    in
+    match block with
+    | Error errs ->
+        errors := Some errs ;
+        return_none
+    | Ok block -> return_some block
+  in
+  let+ block =
+    Blocks_cache.bind_or_put l1_ctxt.blocks_cache hash fetch Lwt.return
+  in
+  match (block, !errors) with
+  | None, None ->
+      (* This should not happen if {!find_in_cache} behaves correctly,
+         i.e. calls {!fetch} for cache misses. *)
+      error_with
+        "Fetching Tezos block %a failed unexpectedly"
+        Block_hash.pp
+        hash
+  | None, Some errs -> Error errs
+  | Some block, _ -> Ok block
 
 let nth_predecessor l1_state n block =
   let open Lwt_result_syntax in

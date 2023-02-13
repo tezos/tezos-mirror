@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Injector_common
 open Injector_worker_types
 open Injector_sigs
@@ -458,7 +456,8 @@ struct
       (fun acc {Inj_operation.operation; _} ->
         let param = Parameters.fee_parameter state operation in
         {
-          minimal_fees = Tez.max acc.minimal_fees param.minimal_fees;
+          minimal_fees =
+            {mutez = Int64.max acc.minimal_fees.mutez param.minimal_fees.mutez};
           minimal_nanotez_per_byte =
             Q.max acc.minimal_nanotez_per_byte param.minimal_nanotez_per_byte;
           minimal_nanotez_per_gas_unit =
@@ -466,22 +465,16 @@ struct
               acc.minimal_nanotez_per_gas_unit
               param.minimal_nanotez_per_gas_unit;
           force_low_fee = acc.force_low_fee || param.force_low_fee;
-          fee_cap =
-            WithExceptions.Result.get_ok
-              ~loc:__LOC__
-              Tez.(acc.fee_cap +? param.fee_cap);
-          burn_cap =
-            WithExceptions.Result.get_ok
-              ~loc:__LOC__
-              Tez.(acc.burn_cap +? param.burn_cap);
+          fee_cap = {mutez = Int64.add acc.fee_cap.mutez param.fee_cap.mutez};
+          burn_cap = {mutez = Int64.add acc.burn_cap.mutez param.burn_cap.mutez};
         })
       {
-        minimal_fees = Tez.zero;
+        minimal_fees = {mutez = 0L};
         minimal_nanotez_per_byte = Q.zero;
         minimal_nanotez_per_gas_unit = Q.zero;
         force_low_fee = false;
-        fee_cap = Tez.zero;
-        burn_cap = Tez.zero;
+        fee_cap = {mutez = 0L};
+        burn_cap = {mutez = 0L};
       }
       ops
 
@@ -696,7 +689,7 @@ struct
     not exceed [size_limit]. Upon successful injection, the
     operations are removed from the queue and marked as injected. *)
   let inject_pending_operations
-      ?(size_limit = Constants.max_operation_data_length) state =
+      ?(size_limit = Proto_client.max_operation_data_length) state =
     let open Lwt_result_syntax in
     (* Retrieve and remove operations from pending *)
     let operations_to_inject = get_operations_from_queue ~size_limit state in

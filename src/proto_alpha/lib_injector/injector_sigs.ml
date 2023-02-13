@@ -23,15 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+type tez = {mutez : int64}
 
 type fee_parameter = {
-  minimal_fees : Tez.t;
+  minimal_fees : tez;
   minimal_nanotez_per_byte : Q.t;
   minimal_nanotez_per_gas_unit : Q.t;
   force_low_fee : bool;
-  fee_cap : Tez.t;
-  burn_cap : Tez.t;
+  fee_cap : tez;
+  burn_cap : tez;
 }
 
 type injection_strategy =
@@ -170,6 +170,8 @@ module type PROTOCOL_CLIENT = sig
 
   type unsigned_operation
 
+  val max_operation_data_length : int
+
   (** The validation pass of manager operations. *)
   val manager_pass : int
 
@@ -287,7 +289,7 @@ module type S = sig
     data_dir:string ->
     ?retention_period:int ->
     state ->
-    signers:(public_key_hash * injection_strategy * tag list) list ->
+    signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
   (** Add an operation as pending injection in the injector. If the source is
@@ -295,7 +297,9 @@ module type S = sig
       corresponding tag. It returns the hash of the operation in the injector
       queue. *)
   val add_pending_operation :
-    ?source:public_key_hash -> operation -> Inj_operation.Hash.t tzresult Lwt.t
+    ?source:Signature.public_key_hash ->
+    operation ->
+    Inj_operation.Hash.t tzresult Lwt.t
 
   (** Notify the injector of a new Tezos head. The injector marks the operations
       appropriately (for instance reverted operations that are part of a
