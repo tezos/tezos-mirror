@@ -362,6 +362,15 @@ val version : t -> unit Lwt.t
 (** Same as [version], but do not wait for the process to exit. *)
 val spawn_version : t -> Process.t
 
+(** Run [octez-client import secret key] for encrypted key *)
+val spawn_import_encrypted_secret_key :
+  ?hooks:Process_hooks.t ->
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.key ->
+  Process.t * Lwt_io.output_channel
+
 (** Run [octez-client import secret key]. *)
 val import_secret_key : ?endpoint:endpoint -> t -> Account.key -> unit Lwt.t
 
@@ -765,6 +774,10 @@ val multiple_transfers :
   t ->
   unit Runnable.process
 
+(** Run octez-client register key <delegate> as delegate. *)
+val register_delegate :
+  ?endpoint:endpoint -> delegate:string -> t -> string Lwt.t
+
 (** Run octez-client get delegate for <src>. Returns [Some address] if delegate
     is set or [None] otherwise. *)
 val get_delegate : ?endpoint:endpoint -> src:string -> t -> string option Lwt.t
@@ -777,6 +790,7 @@ val set_delegate :
   ?fee_cap:Tez.t ->
   ?force_low_fee:bool ->
   ?expect_failure:bool ->
+  ?simulation:bool ->
   src:string ->
   delegate:string ->
   t ->
@@ -2359,6 +2373,20 @@ val spawn_command :
   t ->
   string list ->
   Process.t
+
+(** Spawn a low-level client command as in [spawn_command] but with a channel to send data to the process [stdin]. *)
+val spawn_command_with_stdin :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
+  ?env:string String_map.t ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?admin:bool ->
+  ?protocol_hash:string ->
+  t ->
+  string list ->
+  Process.t * Lwt_io.output_channel
 
 (** Register public key for given account with given client. *)
 val spawn_register_key :

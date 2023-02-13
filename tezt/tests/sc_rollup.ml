@@ -2544,11 +2544,9 @@ let test_rollup_client_show_address ~kind =
     (account.aggregate_public_key = shown_account.aggregate_public_key)
       string
       ~error_msg:"Expecting %L, got %R as public key from the client.") ;
-  let (Unencrypted sk) = shown_account.aggregate_secret_key in
-  let (Unencrypted expected_sk) = shown_account.aggregate_secret_key in
   Check.(
-    (expected_sk = sk)
-      string
+    (shown_account.aggregate_secret_key = account.aggregate_secret_key)
+      Account.secret_key_typ
       ~error_msg:"Expecting %L, got %R as secret key from the client.") ;
   unit
 
