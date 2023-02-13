@@ -26,6 +26,7 @@
 open Configuration
 open Protocol.Alpha_context
 open Plugin
+open Protocol_client_context
 
 (**
 
@@ -288,7 +289,7 @@ let fetch_tezos_block l1_ctxt hash =
   let fetch hash =
     let* block =
       Alpha_block_services.info
-        cctxt
+        l1_ctxt.cctxt
         ~chain:`Main
         ~block:(`Hash (hash, 0))
         ~metadata:`Always
@@ -334,10 +335,11 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
       let* old_head_pred = get_predecessor l1_state old_head in
       let* new_head_pred = get_predecessor l1_state new_head in
       let reorg =
-        {
-          old_chain = old_head :: reorg.old_chain;
-          new_chain = new_head :: reorg.new_chain;
-        }
+        Injector_common.
+          {
+            old_chain = old_head :: reorg.old_chain;
+            new_chain = new_head :: reorg.new_chain;
+          }
       in
       aux reorg old_head_pred new_head_pred
   in
@@ -345,13 +347,14 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
      level *)
   let distance = Int32.(to_int @@ abs @@ sub new_head.level old_head.level) in
   let* old_head, new_head, reorg =
-    if old_head.level = new_head.level then return (old_head, new_head, no_reorg)
+    if old_head.level = new_head.level then
+      return (old_head, new_head, Injector_common.no_reorg)
     else if old_head.level < new_head.level then
       let+ new_head, new_chain = nth_predecessor l1_state distance new_head in
-      (old_head, new_head, {no_reorg with new_chain})
+      (old_head, new_head, {Injector_common.no_reorg with new_chain})
     else
       let+ old_head, old_chain = nth_predecessor l1_state distance old_head in
-      (old_head, new_head, {no_reorg with old_chain})
+      (old_head, new_head, {Injector_common.no_reorg with old_chain})
   in
   assert (old_head.level = new_head.level) ;
   aux reorg old_head new_head
@@ -362,7 +365,7 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
   match old_head with
   | `Level l ->
       (* No known tezos head, we want all blocks from l. *)
-      if new_head.level < l then return no_reorg
+      if new_head.level < l then return Injector_common.no_reorg
       else
         let* _block_at_l, new_chain =
           nth_predecessor
@@ -370,5 +373,5 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
             (Int32.sub new_head.level l |> Int32.to_int)
             new_head
         in
-        return {old_chain = []; new_chain}
+        return Injector_common.{old_chain = []; new_chain}
   | `Head old_head -> get_tezos_reorg_for_new_head l1_state old_head new_head

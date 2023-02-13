@@ -367,20 +367,20 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let notify_injector {Node_context.l1_ctxt; _} new_head
-      (reorg : Layer1.head Injector_common.reorg) =
+  let notify_injector new_head (reorg : Layer1.head Injector_common.reorg) =
     let open Lwt_result_syntax in
     let open Layer1 in
-    let* new_chain =
-      List.map_ep
-        (fun {hash; _} -> fetch_tezos_block l1_ctxt hash)
-        reorg.new_chain
-    and* old_chain =
-      List.map_ep
-        (fun {hash; _} -> fetch_tezos_block l1_ctxt hash)
-        reorg.old_chain
+    let new_chain =
+      List.map (fun {hash; level} -> (hash, level)) reorg.new_chain
     in
-    let*! () = Injector.new_tezos_head new_head {new_chain; old_chain} in
+    let old_chain =
+      List.map (fun {hash; level} -> (hash, level)) reorg.old_chain
+    in
+    let*! () =
+      Injector.new_tezos_head
+        (new_head.hash, new_head.level)
+        {new_chain; old_chain}
+    in
     return_unit
 
   (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
@@ -428,7 +428,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
     let* () = Components.Commitment.Publisher.publish_commitments () in
     let* () = Components.Commitment.Publisher.cement_commitments () in
-    let* () = notify_injector node_ctxt new_head reorg in
+    let* () = notify_injector head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let* () = Components.Refutation_game.process head node_ctxt in
     let* () = Components.Batcher.batch () in
