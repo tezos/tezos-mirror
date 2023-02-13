@@ -79,6 +79,7 @@
 (package (name tezos-crypto-dal))
 (package (name tezos-dac-alpha))
 (package (name tezos-dac-node-lib)(allow_empty))
+(package (name tezos-dac-node-lib-test)(allow_empty))
 (package (name tezos-dal-016-PtMumbai))
 (package (name tezos-dal-alpha))
 (package (name tezos-dal-node-lib)(allow_empty))
