@@ -362,7 +362,17 @@ val version : t -> unit Lwt.t
 (** Same as [version], but do not wait for the process to exit. *)
 val spawn_version : t -> Process.t
 
-(** Run [octez-client import secret key] for encrypted key *)
+(** Run [octez-client import secret key] for an encrypted key. *)
+val import_encrypted_secret_key :
+  ?hooks:Process_hooks.t ->
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.key ->
+  password:string ->
+  unit Lwt.t
+
+(** Same as [import_encrypted_secret_key], but do not wait for the process to exit. *)
 val spawn_import_encrypted_secret_key :
   ?hooks:Process_hooks.t ->
   ?force:bool ->

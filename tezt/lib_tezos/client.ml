@@ -513,6 +513,15 @@ let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
     (["import"; "secret"; "key"; key.alias; sk_uri]
     @ if force then ["--force"] else [])
 
+let import_encrypted_secret_key ?hooks ?force ?endpoint client
+    (key : Account.key) ~password =
+  let process, output_channel =
+    spawn_import_encrypted_secret_key ?hooks ?force ?endpoint client key
+  in
+  let* () = Lwt_io.write_line output_channel password in
+  let* () = Lwt_io.close output_channel in
+  Process.check process
+
 let spawn_import_secret_key ?endpoint client (key : Account.key) =
   let sk_uri =
     "unencrypted:"
