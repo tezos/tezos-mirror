@@ -86,6 +86,10 @@ Baker
   states in order to avoid unexpected crashes when the baker gets
   updated, or when a new protocol's baker starts. (MR :gl:`!7640`)
 
+- Restored previous behaviour from :gl:`!7490` for blocks at round
+  greater than 0. Application-dependent checks are re-enabled for
+  re-proposal and fresh blocks at round greater than 0.
+
 Accuser
 -------
 
