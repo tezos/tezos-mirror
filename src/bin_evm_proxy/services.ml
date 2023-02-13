@@ -145,6 +145,8 @@ let dispatch dir =
             return (Block_number.Output (Ok (Mock.block_height ())))
         | Get_block_by_number.Input _ ->
             return (Get_block_by_number.Output (Ok (Mock.block ())))
+        | Get_block_by_hash.Input _ ->
+            return (Get_block_by_hash.Output (Ok (Mock.block ())))
         | Get_code.Input _ -> return (Get_code.Output (Ok Mock.code))
         | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
         | Get_transaction_count.Input _ ->
