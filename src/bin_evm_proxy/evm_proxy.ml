@@ -68,11 +68,32 @@ let callback_log server conn req body =
     req
     (Cohttp_lwt.Body.of_string body_str)
 
+module Event = struct
+  let section = ["evm_proxy_server"]
+
+  let event_starting =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"start_evm_proxy_server"
+      ~msg:"starting the EVM proxy server"
+      ~level:Notice
+      ()
+
+  let event_is_ready =
+    Internal_event.Simple.declare_2
+      ~section
+      ~name:"evm_proxy_server_is_ready"
+      ~msg:"the EVM proxy server is listening to {addr}:{port}"
+      ~level:Notice
+      ("addr", Data_encoding.string)
+      ("port", Data_encoding.uint16)
+end
+
 let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
-  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string rpc_addr in
+  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string p2p_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
   let module Rollup_node_rpc = Rollup_node.Make (struct
@@ -96,6 +117,9 @@ let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
             (if debug then callback_log server
             else RPC_server.resto_callback server)
           node
+      in
+      let*! () =
+        Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
       in
       return server)
     (fun _ -> return server)
@@ -139,7 +163,8 @@ let main_command =
     (args3 rpc_addr_arg rpc_port_arg rollup_node_endpoint_arg)
     (prefixes ["run"] @@ stop)
     (fun (rpc_addr, rpc_port, rollup_node_endpoint) () ->
-      Format.printf "Starting server\n%!" ;
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Internal_event.Simple.emit Event.event_starting () in
       let config = make_config ?rpc_addr ?rpc_port ?rollup_node_endpoint () in
       let* server = start config in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
