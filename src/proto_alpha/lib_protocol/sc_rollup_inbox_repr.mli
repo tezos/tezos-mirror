@@ -402,6 +402,10 @@ module Internal_for_tests : sig
   }
 
   val level_proof_of_history_proof : history_proof -> level_proof
+
+  val expose_proof : proof -> inclusion_proof * payloads_proof
+
+  val make_proof : inclusion_proof -> payloads_proof -> proof
 end
 
 type inbox = t

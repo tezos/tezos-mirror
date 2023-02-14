@@ -864,6 +864,12 @@ module Internal_for_tests = struct
   }
 
   let level_proof_of_history_proof = Skip_list.content
+
+  let expose_proof {inclusion_proof; message_proof} =
+    (inclusion_proof, message_proof)
+
+  let make_proof inclusion_proof message_proof =
+    {inclusion_proof; message_proof}
 end
 
 type inbox = t

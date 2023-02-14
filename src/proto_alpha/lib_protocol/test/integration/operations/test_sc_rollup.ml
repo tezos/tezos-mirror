@@ -2599,12 +2599,8 @@ let full_history_inbox (genesis_predecessor_timestamp, genesis_predecessor)
   let open Sc_rollup_helpers in
   let payloads_per_levels =
     List.map
-      (fun ((predecessor_timestamp, predecessor), level, external_messages) ->
-        wrap_messages
-          ~predecessor_timestamp
-          ~predecessor
-          level
-          external_messages)
+      (fun (pred_info, level, external_messages) ->
+        wrap_messages ~pred_info level external_messages)
       all_external_messages
   in
   Sc_rollup_helpers.Node_inbox.construct_inbox

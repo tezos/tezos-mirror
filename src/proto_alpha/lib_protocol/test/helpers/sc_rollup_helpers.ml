@@ -368,23 +368,31 @@ let make_inputs predecessor_timestamp predecessor messages inbox_level =
   in
   [sol; info_per_level] @ external_inputs @ [eol]
 
+let predecessor_timestamp_and_hash_from_level level =
+  let level_int64 = Int64.of_int32 @@ Raw_level.to_int32 level in
+  let predecessor_timestamp = Time.Protocol.of_seconds level_int64 in
+  let hash = Block_hash.hash_string [Int64.to_string level_int64] in
+  (predecessor_timestamp, hash)
+
 (** Wrap messages, predecessor_timestamp and predecessor of a level into a
     [payloads_per_level] .*)
-let wrap_messages ?(predecessor_timestamp = Timestamp.of_seconds 0L)
-    ?(predecessor = Block_hash.zero) level messages : payloads_per_level =
+let wrap_messages level
+    ?(pred_info = predecessor_timestamp_and_hash_from_level level) messages :
+    payloads_per_level =
+  let predecessor_timestamp, predecessor = pred_info in
   let payloads = List.map make_external_inbox_message messages in
   let inputs = make_inputs predecessor_timestamp predecessor messages level in
   {payloads; predecessor_timestamp; predecessor; messages; level; inputs}
 
-(** An empty inbox level is a SOL,info_per_level and EOL. *)
-let make_empty_level ?predecessor_timestamp ?predecessor inbox_level =
-  wrap_messages ?predecessor_timestamp ?predecessor inbox_level []
+(** An empty inbox level is a SOL,IPL and EOL. *)
+let make_empty_level ?pred_info inbox_level =
+  wrap_messages ?pred_info inbox_level []
 
-let gen_messages inbox_level gen_message =
+let gen_messages ?pred_info inbox_level gen_message =
   let open QCheck2.Gen in
   let* input = gen_message in
   let* inputs = small_list gen_message in
-  return (wrap_messages inbox_level (input :: inputs))
+  return (wrap_messages ?pred_info inbox_level (input :: inputs))
 
 let gen_payloads_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
@@ -472,7 +480,7 @@ let pp_message_repr fmt {input_repr; message_repr} =
     | `Message msg -> msg
     | `EOL -> "EOL")
 
-(** An empty inbox level is a SOL and EOL. *)
+(** An empty inbox level is a SOL,IPL and EOL. *)
 let make_empty_level_repr inbox_level =
   let sol = {input_repr = make_sol_repr ~inbox_level; message_repr = `SOL} in
   let eol =
@@ -624,6 +632,12 @@ let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
     ~origination_proof
 
+let latest_level_proof inbox =
+  Sc_rollup.Inbox.Internal_for_tests.level_proof_of_history_proof
+  @@ Sc_rollup.Inbox.old_levels_messages inbox
+
+let latest_level_proof_hash inbox = (latest_level_proof inbox).hash
+
 module Node_inbox = struct
   type t = {
     inbox : Sc_rollup.Inbox.t;
@@ -712,6 +726,24 @@ module Node_inbox = struct
          inbox_snapshot
          (level, message_counter)
 
+  let produce_and_expose_proof node_inbox node_inbox_snapshot
+      (level, message_counter) =
+    let open Lwt_result_syntax in
+    let* proof, input =
+      produce_proof node_inbox node_inbox_snapshot (level, message_counter)
+    in
+    let exposed_proof = Sc_rollup.Inbox.Internal_for_tests.expose_proof proof in
+    return (exposed_proof, input)
+
+  let produce_payloads_proof {payloads_histories; _}
+      (head_cell_hash : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t)
+      message_counter =
+    Lwt.map Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.Internal_for_tests.produce_payloads_proof
+         (get_payloads_history payloads_histories)
+         head_cell_hash
+         ~index:message_counter
+
   let produce_inclusion_proof {history; _} inbox_snapshot level =
     Lwt.map Environment.wrap_tzresult
     @@ Sc_rollup.Inbox.Internal_for_tests.produce_inclusion_proof
@@ -777,14 +809,14 @@ module Protocol_inbox = struct
     in
     aux inbox payloads_per_levels
 
-  let add_new_level inbox messages =
+  let add_new_level ?pred_info inbox messages =
     let next_level = Raw_level.succ @@ Sc_rollup.Inbox.inbox_level inbox in
-    let messages_per_level = wrap_messages next_level messages in
+    let messages_per_level = wrap_messages ?pred_info next_level messages in
     fill_inbox inbox [messages_per_level]
 
-  let add_new_empty_level inbox =
+  let add_new_empty_level ?pred_info inbox =
     let next_level = Raw_level.succ @@ Sc_rollup.Inbox.inbox_level inbox in
-    let empty_level = [make_empty_level next_level] in
+    let empty_level = [make_empty_level ?pred_info next_level] in
     fill_inbox inbox empty_level
 
   let construct_inbox ?inbox_creation_level ?genesis_predecessor_timestamp
