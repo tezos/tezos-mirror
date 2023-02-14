@@ -14,7 +14,8 @@
   tezos-micheline
   tezos-client-base
   tezos-workers
-  tezos-shell)
+  tezos-shell
+  octez-crawler)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -23,4 +24,5 @@
   -open Tezos_stdlib_unix
   -open Tezos_micheline
   -open Tezos_client_base
-  -open Tezos_workers))
+  -open Tezos_workers
+  -open Octez_crawler))

@@ -31,19 +31,6 @@ type signer = {
   sk : Client_keys.sk_uri;
 }
 
-(** Type of chain reorganizations. *)
-type 'block reorg = {
-  old_chain : 'block list;
-      (** The blocks that were in the old chain and which are not in the new one. *)
-  new_chain : 'block list;
-      (** The blocks that are now in the new chain. The length of [old_chain] and
-      [new_chain] may be different. *)
-}
-
 (** Retrieve a signer from the client wallet. *)
 val get_signer :
   #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
-
-val no_reorg : 'a reorg
-
-val reorg_encoding : 'a Data_encoding.t -> 'a reorg Data_encoding.t

@@ -876,7 +876,7 @@ struct
     the effect of the new branch (the newly included operation and confirmed
     operations).  *)
   let on_new_tezos_head state (head_hash, head_level)
-      (reorg : (Block_hash.t * int32) reorg) =
+      (reorg : (Block_hash.t * int32) Reorg.t) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
     let* () =

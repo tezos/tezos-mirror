@@ -23,14 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Injector_common
 open Injector_sigs
 
 module Request (L1_operation : INJECTOR_OPERATION) = struct
   type ('a, 'b) t =
     | Add_pending : L1_operation.t -> (unit, error trace) t
     | New_tezos_head :
-        (Block_hash.t * int32) * (Block_hash.t * int32) reorg
+        (Block_hash.t * int32) * (Block_hash.t * int32) Reorg.t
         -> (unit, error trace) t
     | Inject : (unit, error trace) t
 
@@ -59,7 +58,7 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
            obj3
              (req "request" (constant "new_tezos_head"))
              (req "head" block_level)
-             (req "reorg" (reorg_encoding block_level)))
+             (req "reorg" (Reorg.encoding block_level)))
           (function
             | View (New_tezos_head (b, r)) -> Some ((), b, r) | _ -> None)
           (fun ((), b, r) -> View (New_tezos_head (b, r)));

@@ -18,6 +18,7 @@ depends: [
   "tezos-client-base"
   "tezos-workers"
   "tezos-shell"
+  "octez-crawler"
 ]
 build: [
   ["rm" "-r" "vendors"]

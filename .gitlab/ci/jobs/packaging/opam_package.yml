@@ -252,7 +252,12 @@ opam:octez-codec:
   variables:
     package: octez-codec
 
-# Ignoring unreleased package octez-crawler.
+opam:octez-crawler:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-crawler
 
 # Ignoring unreleased package octez-dac-node.
 
@@ -298,7 +303,7 @@ opam:octez-proxy-server:
 opam:octez-signer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: octez-signer
 
@@ -457,7 +462,7 @@ opam:tezos-clic:
 opam:tezos-client-000-Ps9mPmXa:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-client-000-Ps9mPmXa
 
@@ -747,7 +752,7 @@ opam:tezos-embedded-protocol-008-PtEdoTez:
 opam:tezos-embedded-protocol-009-PsFLoren:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-009-PsFLoren
 
@@ -950,7 +955,7 @@ opam:tezos-p2p:
 opam:tezos-p2p-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-p2p-services
 
@@ -1085,7 +1090,7 @@ opam:tezos-protocol-015-PtLimaPt:
 opam:tezos-protocol-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-016-PtMumbai
 
@@ -1275,7 +1280,7 @@ opam:tezos-protocol-plugin-016-PtMumbai-registerer:
 opam:tezos-protocol-plugin-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-plugin-alpha
 
