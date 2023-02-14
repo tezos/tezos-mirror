@@ -27,6 +27,13 @@ type config = {rpc_addr : string; rpc_port : int; debug : bool}
 
 let default_config = {rpc_addr = "127.0.0.1"; rpc_port = 8545; debug = true}
 
+let make_config ?rpc_addr ?rpc_port ?debug () =
+  {
+    rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
+    rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
+    debug = Option.value ~default:default_config.debug debug;
+  }
+
 let install_finalizer server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
@@ -74,12 +81,37 @@ let start {rpc_addr; rpc_port; debug} =
       return server)
     (fun _ -> return server)
 
+module Params = struct
+  let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
+
+  let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
+end
+
+let rpc_addr_arg =
+  Tezos_clic.arg
+    ~long:"rpc-addr"
+    ~placeholder:"ADDR"
+    ~doc:"The EVM proxy server rpc address."
+    Params.string
+
+let rpc_port_arg =
+  Tezos_clic.arg
+    ~long:"rpc-port"
+    ~placeholder:"PORT"
+    ~doc:"The EVM proxy server rpc port."
+    Params.int
+
 let main_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
-  command ~desc:"Start the RPC server" no_options stop (fun () () ->
+  command
+    ~desc:"Start the RPC server"
+    (args2 rpc_addr_arg rpc_port_arg)
+    (prefixes ["run"] @@ stop)
+    (fun (rpc_addr, rpc_port) () ->
       Format.printf "Starting server\n%!" ;
-      let*! server = start default_config in
+      let config = make_config ?rpc_addr ?rpc_port () in
+      let*! server = start config in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in
