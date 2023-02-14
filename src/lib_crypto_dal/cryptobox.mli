@@ -150,22 +150,22 @@ val shard_encoding : shard Data_encoding.t
 (** [encoded_share_size t] returns the size of a share in byte depending on [t] *)
 val encoded_share_size : t -> int
 
-(** [polynomial_from_shards t shares] computes the original polynomial
-     from [shares]. The proportion of shares needed is [1] over
-     [C.redundancy_factor] the total number of shards. It is
-     guaranteed that for any share with different indices, if there is
-     more than the number of required shards, then the original data
-     can be recomputed.
+(** [polynomial_from_shards t shards] computes the original polynomial
+    from [shards]. The proportion of shards needed is [1] over
+    [parameters.redundancy_factor] the total number of shards.
 
-     Returns [Error (`Not_enough_shards msg)] if there aren't at least
-     [t.number_of_shards / t.redundancy_factor] distinct shards, or
-     [Error (`Shard_index_out_of_range msg)] if at least one shard index
-     is not within the range [0, t.number_of_shards - 1]. *)
+    Returns [Error (`Not_enough_shards msg)] if there aren't at least
+    [parameters.number_of_shards / parameters.redundancy_factor] shards, or
+    [Error (`Shard_index_out_of_range msg)] if one shard index is not within the
+    range [0, parameters.number_of_shards - 1], or [Error (`Invalid_shard_length msg)]
+    if one shard is not of the expected length. *)
 val polynomial_from_shards :
   t ->
   shard Seq.t ->
   ( polynomial,
-    [> `Not_enough_shards of string | `Shard_index_out_of_range of string] )
+    [> `Not_enough_shards of string
+    | `Shard_index_out_of_range of string
+    | `Invalid_shard_length of string ] )
   result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
@@ -222,6 +222,9 @@ module Internal_for_tests : sig
      from test frameworks where tests with various parameters could be
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
+
+  (* Returns a default valid sequence of shards for the given parameters. *)
+  val make_dummy_shards : t -> shard Seq.t
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4380

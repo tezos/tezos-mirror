@@ -641,6 +641,16 @@ module Inner = struct
               range [%d, %d]."
              0
              (t.number_of_shards - 1)))
+    else if
+      ShardSet.exists
+        (fun {share; _} -> Array.length share <> t.shard_size)
+        shards
+    then
+      Error
+        (`Invalid_shard_length
+          (Printf.sprintf
+             "At least one shard of invalid length: expected length %d"
+             t.shard_size))
     else
       (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}). *)
       let mul acc i =
@@ -1043,6 +1053,16 @@ module Internal_for_tests = struct
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
+
+  let make_dummy_shards t =
+    let len_shard = t.n / t.number_of_shards in
+    let rec loop index seq =
+      if index = t.number_of_shards then seq
+      else
+        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        loop (index + 1) (Seq.cons {index; share} seq)
+    in
+    loop 0 Seq.empty
 end
 
 module Config = struct
