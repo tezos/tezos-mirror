@@ -1541,7 +1541,10 @@ module type EXPORTER = sig
     Cemented_block_store.Cemented_block_level_index.t
     * Cemented_block_store.Cemented_block_hash_index.t
 
-  val write_cemented_block_indexes : t -> unit Lwt.t
+  (* Removes potential lockfiles that could be created by the index
+     library to prevent writes during an internal index maintenance
+     procedure. *)
+  val clear_cemented_block_indexes_lockfiles : t -> unit Lwt.t
 
   val filter_cemented_block_indexes : t -> limit:int32 -> unit
 
@@ -1668,7 +1671,7 @@ module Raw_exporter : EXPORTER = struct
     in
     (fresh_level_index, fresh_hash_index)
 
-  let write_cemented_block_indexes t =
+  let clear_cemented_block_indexes_lockfiles t =
     let open Lwt_syntax in
     let* () =
       Lwt.catch
@@ -1921,7 +1924,7 @@ module Tar_exporter : EXPORTER = struct
     in
     (fresh_level_index, fresh_hash_index)
 
-  let write_cemented_block_indexes t =
+  let clear_cemented_block_indexes_lockfiles t =
     let open Lwt_syntax in
     let* () =
       Lwt.catch
@@ -2146,7 +2149,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         in
         Cemented_block_level_index.close fresh_level_index ;
         Cemented_block_hash_index.close fresh_hash_index ;
-        let*! () = Exporter.write_cemented_block_indexes snapshot_exporter in
+        let*! () =
+          Exporter.clear_cemented_block_indexes_lockfiles snapshot_exporter
+        in
         if should_filter_indexes && files <> [] then
           Exporter.filter_cemented_block_indexes
             snapshot_exporter
