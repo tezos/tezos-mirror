@@ -84,7 +84,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       return None
   | Some published_block_hash ->
       let* {metadata; _} =
-        Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash
+        Layer1.fetch_tezos_block node_ctxt.Node_context.cctxt hash
       in
       let*? metadata =
         Option.to_result
@@ -234,7 +234,7 @@ module Confirmed_slots_history = struct
           slot_index)
       relevant_slots_indexes
 
-  let read_slots_history_from_l1 {Node_context.l1_ctxt = {cctxt; _}; _} block =
+  let read_slots_history_from_l1 {Node_context.cctxt; _} block =
     let open Lwt_result_syntax in
     (* We return the empty Slots_history if DAL is not enabled. *)
     let* slots_list_opt =
