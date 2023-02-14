@@ -136,24 +136,24 @@ let conn_meta_config : unit P2p_params.conn_meta_config =
 
 let glob_port = ref None
 
-let rec listen ?port addr =
+let listen ?port addr =
   let open Lwt_syntax in
-  let tentative_port =
-    match port with None -> 49152 + Random.int 16384 | Some port -> port
-  in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-  Lwt.catch
-    (fun () ->
-      let* () = Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port)) in
-      Lwt_unix.listen main_socket 1 ;
-      Lwt.return (main_socket, tentative_port))
-    (function
-      | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
-        when port = None ->
-          listen addr
-      | exn -> Lwt.fail exn)
+  (* If [port] is [0], a fresh port is used. *)
+  let port_or_gen = Option.value port ~default:0 in
+  let* () = Lwt_unix.bind main_socket (ADDR_INET (uaddr, port_or_gen)) in
+  Lwt_unix.listen main_socket 1 ;
+  let port =
+    match port with
+    | Some port -> port
+    | None -> (
+        (* if [port] was [0], we get the port generated. *)
+        let addr = Lwt_unix.getsockname main_socket in
+        match addr with ADDR_INET (_, port) -> port | _ -> assert false)
+  in
+  Lwt.return (main_socket, port)
 
 let rec sync_nodes nodes =
   let open Lwt_result_syntax in
