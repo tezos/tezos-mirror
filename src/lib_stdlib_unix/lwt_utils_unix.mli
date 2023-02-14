@@ -81,6 +81,8 @@ val is_directory : string -> bool Lwt.t
 
 val remove_dir : string -> unit Lwt.t
 
+(** [create_dir ?perm dir] creates the directory at the path [dir] and
+    its parents recursively if they doesn't exist *)
 val create_dir : ?perm:int -> string -> unit Lwt.t
 
 (** [copy_dir ?perm src dst] copies the content of directory [src] in

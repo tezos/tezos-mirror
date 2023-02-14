@@ -1,7 +1,7 @@
 Logging
 =======
 
-Logging features in Tezos allow to monitor its execution and be informed in real
+Logging features in Octez allow to monitor its execution and be informed in real
 time about *events* of interest, such as errors, completion of certain steps,
 etc. This is why various software components emit *events* throughout the
 codebase (see :doc:`../developer/event_logging_framework`), the logging
@@ -112,6 +112,9 @@ Options available only for the ``file-descriptor-path://`` case:
   added as a suffix to the filename, prefixed by a dash. We recomend not to put
   your tezos logs in ``/var/log`` if you use this option, as you system would
   use ``logrotate`` automatically.
+- ``create-dirs=<bool>`` when ``true`` allows to create the directory where
+  the log files are stored and all its parents recursively if they don't
+  exist.
 
 Examples:
 
@@ -128,10 +131,11 @@ Examples:
 -  ``file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"``
    → Write only sections validator and rpc at debug level but exclude all
    other sections from the stream.
-- ``"file-descriptor-path:///tmp/node.log?daily-logs=5&section-prefix=:info"``
+- ``"file-descriptor-path:///tmp/node-logs/node.log?daily-logs=5&create-dirs=true&section-prefix=:info"``
    sets up daily log files with a history of up to 5 days and verbosity level
    ``info`` for all logs. Files will be named ``node-19700101.log`` in an
-   example of a file produced in 1970, January, the 1st.
+   example of a file produced in 1970, January, the 1st. The log directory
+   ``node-logs`` will be automatically created if it doesn't exist.
 
 The format of the events is (usually minified):
 
@@ -198,8 +202,12 @@ where ``<section-dirname>`` is either ``no-section`` or
 Global Defaults
 ---------------
 
-By default, only the ``lwt-log://`` sinks are activated and configured to
-output events of level at least ``Notice``.
+- ``lwt-log://`` sinks are activated by default and configured to
+  output events of level at least ``Notice``. Their goal is the stdout logging.
+
+- A file-descriptor-sink is activated to store logs from last seven days with
+  an ``Info`` level. The path is ``<node-data-dir>/daily-logs/``.
+
 
 JSON Configuration Format
 -------------------------

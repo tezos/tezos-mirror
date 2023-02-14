@@ -42,7 +42,7 @@ end
    run with [Singleprocess]. *)
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
-let init ?lwt_log_sink ?(configuration = Configuration.default) () =
+let init ?lwt_log_sink ?(configuration = Configuration.lwt_log) () =
   let _ =
     (* This is just here to force the linking (and hence
        initialization) of all these modules: *)

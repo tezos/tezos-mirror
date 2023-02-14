@@ -59,6 +59,8 @@
       last N days where N is the given parameter. It creates a file for each
       day and and adds the day of the year with format ["yyyymmdd"] to the
       path provided.
+    - ["create-dirs=true"] allows to create the directory where the log
+      files are stored and all its parents recursively if they don't exist.
 
     Examples:
 
