@@ -164,7 +164,7 @@ let mode_arg client =
 
 let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
-    ?config_file client command =
+    ?config_file ?(no_base_dir_warnings = false) client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -174,6 +174,9 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
   in
   let protocol_arg = optional_arg "protocol" Fun.id protocol_hash in
   let config_file_arg = optional_arg "config-file" Fun.id config_file in
+  let no_base_dir_warnings_arg =
+    optional_switch "no-base-dir-warnings" no_base_dir_warnings
+  in
   Process.spawn
     ?runner:client.runner
     ~name:client.name
@@ -186,7 +189,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ config_file_arg @ command
+  @ base_dir_arg client @ config_file_arg @ no_base_dir_warnings_arg @ command
 
 let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
@@ -1578,12 +1581,11 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     client
   |> Process.check
 
-let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
-    ?balance ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level
-    ~prg ~storage ~input client =
-  spawn_command ?hooks ?protocol_hash client
-  @@ optional_switch "no-base-dir-warnings" no_base_dir_warnings
-  @ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
+let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
+    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ~prg
+    ~storage ~input client =
+  spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
   @ optional_arg "payer" Fun.id payer
   @ optional_arg "source" Fun.id source
   @ optional_arg "balance" Tez.to_string balance
@@ -1592,13 +1594,14 @@ let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
   @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
 
-let spawn_run_script_at ?hooks ?balance ?self_address ?source ?payer ?prefix
-    ~storage ~input client script_name protocol =
+let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
+    ?payer ?prefix ~storage ~input client script_name protocol =
   let prg =
     Michelson_script.find ?prefix script_name protocol |> Michelson_script.path
   in
   spawn_run_script
     ?hooks
+    ?protocol_hash
     ?balance
     ?self_address
     ?source
@@ -1680,13 +1683,14 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
         "Cannot extract new storage from client_output: %s"
         client_output
 
-let run_script_at ?hooks ?balance ?self_address ?source ?payer ?prefix ~storage
-    ~input client name protocol =
+let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
+    ?prefix ~storage ~input client name protocol =
   let prg =
     Michelson_script.find name ?prefix protocol |> Michelson_script.path
   in
   run_script
     ?hooks
+    ?protocol_hash
     ?balance
     ?self_address
     ?source
@@ -1843,15 +1847,14 @@ let normalize_type ?hooks ~typ client =
 let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
   spawn_typecheck_data ~data ~typ ?gas ~legacy client |> Process.check
 
-let spawn_typecheck_script ?hooks ?protocol_hash ~script
-    ?(no_base_dir_warnings = false) ?(details = false) ?(emacs = false)
-    ?(no_print_source = false) ?gas ?(legacy = false) client =
+let spawn_typecheck_script ?hooks ?protocol_hash ~script ?no_base_dir_warnings
+    ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
+    ?(legacy = false) client =
   let gas_cmd =
     Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
   in
-  spawn_command ?hooks ?protocol_hash client
-  @@ optional_switch "no-base-dir-warnings" no_base_dir_warnings
-  @ ["typecheck"; "script"; script]
+  spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["typecheck"; "script"; script]
   @ Option.value ~default:[] gas_cmd
   @ (if details then ["--details"] else [])
   @ (if emacs then ["--emacs"] else [])
@@ -3940,3 +3943,19 @@ let prepare_multisig_transaction_set_threshold_and_public_keys ~multisig
     |> Process.check_and_read_stdout
   in
   return (String.trim client_output)
+
+let spawn_expand_macros ?endpoint ?hooks ?protocol_hash ?no_base_dir_warnings
+    client path =
+  spawn_command ?endpoint ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["expand"; "macros"; "in"; path]
+
+let expand_macros ?endpoint ?hooks ?protocol_hash ?no_base_dir_warnings client
+    path =
+  spawn_expand_macros
+    ?endpoint
+    ?hooks
+    ?protocol_hash
+    ?no_base_dir_warnings
+    client
+    path
+  |> Process.check_and_read_stdout

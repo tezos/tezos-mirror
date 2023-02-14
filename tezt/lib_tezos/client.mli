@@ -1283,6 +1283,7 @@ val spawn_run_script :
     Fails if the new storage cannot be extracted from the output. *)
 val run_script_at :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?balance:Tez.t ->
   ?self_address:string ->
   ?source:string ->
@@ -1298,6 +1299,7 @@ val run_script_at :
 (** Same as [run_script_at] but do not wait for the process to exit. *)
 val spawn_run_script_at :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?balance:Tez.t ->
   ?self_address:string ->
   ?source:string ->
@@ -2370,6 +2372,7 @@ val spawn_command :
   ?admin:bool ->
   ?protocol_hash:string ->
   ?config_file:string ->
+  ?no_base_dir_warnings:bool ->
   t ->
   string list ->
   Process.t
@@ -2835,4 +2838,24 @@ val spawn_prepare_multisig_transaction_set_threshold_and_public_keys :
   public_keys:string list ->
   ?bytes_only:bool ->
   t ->
+  Process.t
+
+(** Run [tezos-client expand macros in <script>]. *)
+val expand_macros :
+  ?endpoint:endpoint ->
+  ?hooks:Process_hooks.t ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  t ->
+  string ->
+  string Lwt.t
+
+(** Same as [expand_macros], but do not wait for the process to exit. *)
+val spawn_expand_macros :
+  ?endpoint:endpoint ->
+  ?hooks:Process_hooks.t ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  t ->
+  string ->
   Process.t

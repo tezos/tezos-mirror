@@ -309,6 +309,9 @@ let whitelist dirs ts =
   |> List.filter @@ fun (t : t) ->
      List.exists (fun dir -> List.equal String.equal dir t.dirname) dirs
 
+let find_all_in ?prefix ?maxdepth protocol dirs =
+  find_all ?prefix ?maxdepth protocol |> whitelist [dirs]
+
 let find_all_legacy ?prefix ?maxdepth protocol =
   find_all ?prefix ?maxdepth protocol |> whitelist [["legacy"]]
 

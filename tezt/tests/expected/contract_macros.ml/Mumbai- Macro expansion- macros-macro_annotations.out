@@ -1,0 +1,12 @@
+{ parameter unit ;
+  storage (pair (unit %truc) unit) ;
+  code { DROP ;
+         UNIT ;
+         UNIT ;
+         PAIR %truc ;
+         UNIT ;
+         DUP @new_storage 2 ;
+         DIP { DROP ; DROP } ;
+         NIL operation ;
+         PAIR } }
+

@@ -126,6 +126,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Contract_opcodes.register ~protocols ;
   Contract_typecheck_contract.register ~protocols ;
   Contract_typecheck_regression.register ~protocols ;
+  Contract_macros.register ~protocols ;
   Contract_mini_scenarios.register ~protocols ;
   Create_contract.register ~protocols ;
   Deposits_limit.register ~protocols ;

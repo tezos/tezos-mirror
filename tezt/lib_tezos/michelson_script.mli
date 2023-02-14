@@ -87,7 +87,7 @@ val default_prefix : string
 val find : ?prefix:string -> ?maxdepth:int -> string list -> Protocol.t -> t
 
 (** [find_all ?prefix ?maxdepth protocol] returns all Michelson scripts for a given
-    protocol respecting [filter] up to a maxdepth [maxdepth]. Setting [~maxdepth:1]
+    protocol up to a maxdepth [maxdepth]. Setting [~maxdepth:1]
     is useful when you don't want to recurse into subdirectories.
     
     For instance, assume the following files exist:
@@ -114,6 +114,10 @@ val find_all_res :
   ?maxdepth:int ->
   Protocol.t ->
   (t list, string * string) result
+
+(** [find_all_in protocol dirs] returns all scripts in the folders [dirs] for the given protocol. *)
+val find_all_in :
+  ?prefix:string -> ?maxdepth:int -> Protocol.t -> string list -> t list
 
 (** Returns all scripts in the [legacy] directory for the given protocol. *)
 val find_all_legacy : ?prefix:string -> ?maxdepth:int -> Protocol.t -> t list
