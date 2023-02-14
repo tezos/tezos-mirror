@@ -13,8 +13,8 @@
 
 #define Srs_val_g2(v) ((blst_p2_affine *)Caml_ba_data_val(v))
 
-CAMLprim value caml_srs_g1_pippenger_stubs(value res, value srs, value poly,
-                                           value start, value len) {
+CAMLprim value caml_bls12_381_polynomial_internal_srs_g1_pippenger_stubs(
+    value res, value srs, value poly, value start, value len) {
   CAMLparam5(res, srs, poly, start, len);
   int start_c = Int_val(start);
   int len_c = Int_val(len);
@@ -51,8 +51,8 @@ CAMLprim value caml_srs_g1_pippenger_stubs(value res, value srs, value poly,
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_srs_g2_pippenger_stubs(value res, value srs, value poly,
-                                           value start, value len) {
+CAMLprim value caml_bls12_381_polynomial_internal_srs_g2_pippenger_stubs(
+    value res, value srs, value poly, value start, value len) {
   CAMLparam5(res, srs, poly, start, len);
   int start_c = Int_val(start);
   int len_c = Int_val(len);

@@ -30,7 +30,7 @@ module Stubs = struct
   type fr_array = Fr_carray.t
 
   external compute_domain : fr_array -> int -> fr -> unit
-    = "caml_polynomial_compute_domain_stubs"
+    = "caml_bls12_381_polynomial_internal_polynomial_compute_domain_stubs"
     [@@noalloc]
   (** [compute_domain res n g] computes [[one; g; ..; g^{n-1}]] for a given
   blst_fr element [g]
@@ -42,7 +42,7 @@ module Stubs = struct
   - [res[i] = g^i] for [i = 0..(n-1)] *)
 
   external rescale : fr_array -> fr_array -> int -> int -> unit
-    = "caml_polynomial_evaluations_rescale_stubs"
+    = "caml_bls12_381_polynomial_internal_polynomial_evaluations_rescale_stubs"
     [@@noalloc]
   (** [rescale res a size_res size_a] writes the result of rescaling the evaluation
       representation of a polynomial [a] from [domain_a] of size [size_a] to
