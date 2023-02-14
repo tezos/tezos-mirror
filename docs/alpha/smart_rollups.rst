@@ -652,13 +652,13 @@ Remember that our running example rollup has been originated with:
       -burn-cap 999
 
 The fragment ``of type bytes`` of this command declares that the
-rollup is expecting values of type `bytes`. (Notice any Michelson type
+rollup is expecting values of type ``bytes``. (Notice any Michelson type
 could have been used instead. To transfer tickets to a rollup, this
 type must mention tickets.)
 
 Here is an example of a Michelson script that sends an internal
 message to the rollup of our running example. The payload of the
-internal message is the value passed as parameter of type `bytes`
+internal message is the value passed as parameter of type ``bytes``
 to the rollup.
 
 ::
@@ -1275,35 +1275,26 @@ WASM memory.
 Testing your Kernel
 """""""""""""""""""
 
-.. warning::
+.. note::
 
-   The ``octez-smart-rollup-wasm-debugger`` tool that is described in this
-   section is still under active development. A preliminary version can be found
-   in `the Octez repository <https://gitlab.com/tezos/tezos>`_.
+   ``octez-smart-rollup-wasm-debugger`` is available in the Octez
+   distribution starting with :doc:`/releases/version-16`.
 
-   However, ``octez-smart-rollup-wasm-debugger`` is **not** currently
-   considered a part of Octez, and is only provided for developers
-   interested in testing Tezos smart rollup
-   infrastructure before its release on mainnet.
-
-   To get the ``octez-smart-rollup-wasm-debugger`` executable, the
-   easiest way is to build Octez from source. See the `usual
-   instructions
-   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_.
-
-Testing a kernel without having to start a rollup node on a test network is very convenient. We provide a
-*read-eval-print-loop* (REPL) as a means to evaluate the WASM PVM
-without relying on any node and network:
+Testing a kernel without having to start a rollup node on a test
+network is very convenient. We provide a debugger as a means to
+evaluate the WASM PVM without relying on any node and network:
 ``octez-smart-rollup-wasm-debugger``.
 
 .. code:: sh
 
   octez-smart-rollup-wasm-debugger ${WASM_FILE} --inputs ${JSON_INPUTS} --rollup ${ROLLUP_ADDRESS}
 
-``octez-smart-rollup-wasm-debugger`` can take either a `.wasm` file (the binary
-representation of WebAssembly modules) or a `.wast` file (its textual
+``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a a ``.wasm`` file (the binary
+representation of WebAssembly modules) or as a ``.wast`` file (its textual
 representation), and actually parses and typechecks the kernel before
-giving it to the PVM. It can take a file containing inboxes and a
+giving it to the PVM.
+
+Besides the kernel file, the debugger can optionally take an input file containing inboxes and a
 rollup address. The expected contents of the inboxes is a JSON value,
 with the following schema:
 
@@ -1349,9 +1340,13 @@ two messages:
     ]
   ]
 
-Note that the `sender`, `source` and `destination` fields are optional
-and will be given default values by the debugger. If no input file is
-given, the inbox will be assumed empty.
+Note that the ``sender``, ``source`` and ``destination`` fields are optional
+and will be given default values by the debugger, respectively
+``KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT``,
+``tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU`` and
+``sr163Lv22CdE8QagCwf48PWDTquk6isQwv57``. If no input file is given, the
+inbox will be assumed empty. If the option ``--rollup`` is given, it
+replaces the default value for the rollup address.
 
 ``octez-smart-rollup-wasm-debugger`` is a debugger, as such it waits for user
 inputs to continue its execution. Its initial state is exactly the same as right
@@ -1362,14 +1357,14 @@ after its origination. Its current state can be inspected with the command
 
   > show status
   Status: Waiting for inputs
-  Internal state: Snapshot
+  Internal state: Collect
 
-At start, internally the kernel is in snapshot mode. It means it is
+At start, internally the kernel is in collection mode. It means it is
 not executing any WASM code, and initially it is waiting for inputs to
 proceed. It needs some inputs to continue its execution. The command
 ``load inputs`` will load the first inbox from the file given with the
-option `--input`, putting `Start_of_level` (and `End_of_level`) before
-(resp. after) these inputs.
+option ``--inputs``, putting ``Start_of_level`` and ``Info_per_level`` (and
+``End_of_level``) before (resp. after) these inputs.
 
 .. code::
 
@@ -1378,7 +1373,7 @@ option `--input`, putting `Start_of_level` (and `End_of_level`) before
 
   > show status
   Status: Evaluating
-  Internal state: Decode
+  Internal state: Snapshot
 
 At this point, the internal input buffer can be inspected with the
 command ``show inbox``.
@@ -1398,21 +1393,21 @@ command ``show inbox``.
     payload: End_of_level }
 
 The first input of an inbox at the beginning of a level is
-`Start_of_level`, and is represented by the message ``\000\001`` on
-the kernel side. We can now start a `kernel_run` evaluation:
+``Start_of_level``, and is represented by the message ``\000\001`` on
+the kernel side. We can now start a ``kernel_run`` evaluation:
 
 .. code::
 
   > step kernel_run
-  Evaluation took 10000 ticks so far
-  Status: Evaluating
-  Internal state: Snapshot
+  Evaluation took 11000000000 ticks so far
+  Status: Waiting for inputs
+  Internal state: Collect
 
 
-The memory of the interpreter is flushed between two `kernel_run`
-calls (at the `Snapshot` internal state), however the durable
-storage can be used as a persistent memory. Let's assume this kernel
-wrote data at key `/store/key`:
+The memory of the interpreter is flushed between two ``kernel_run``
+calls (at the ``Snapshot`` and ``Collect`` internal states), however the
+durable storage can be used as a persistent memory. Let's assume this
+kernel wrote data at key ``/store/key``:
 
 .. code::
 
@@ -1422,15 +1417,15 @@ wrote data at key `/store/key`:
 Since the representation of values is decided by the kernel, the debugger can only
 return its raw value. It is possible however to inspect the memory by stopping
 the PVM before its snapshot internal state, with ``step result``, and
-inspect the memory at pointer `n` and length `l`, and finaly evaluate until the
-next `kernel_run`:
+inspect the memory at pointer ``n`` and length ``l``, and finaly evaluate until the
+next ``kernel_run``:
 
 .. code::
 
   > step result
   Evaluation took 2500 ticks so far
   Status: Evaluating
-  Internal state: Eval (Result)
+  Internal state: Evaluation succeeded
 
   > show memory at p for l bytes
   `<hexadecimal value>`
@@ -1443,26 +1438,60 @@ next `kernel_run`:
 Once again, note that values from the memory are outputted as is,
 since the representation is internal to WASM.
 
-Finally, it is possible to evaluate the whole inbox with ``step inbox``:
+Finally, it is possible to evaluate the whole inbox with ``step inbox``. It will
+take care of the possible reboots asked by the kernel (through the usage of the
+``/kernel/env/reboot_flag`` flag) and stop at the next collection phase.
 
 .. code::
 
   > step inbox
-  Evaluation took 30000 ticks
+  Evaluation took 44000000000 ticks
   Status: Waiting for inputs
-  Internal state: Snapshot
+  Internal state: Collect
 
-It is also possible to show the outbox for any given level (``show outbox at level 0``)
+It is also possible to show the outbox for any given level (``show
+outbox at level 0``)
 
 .. code::
 
-  > show outbox
+  > show outbox at level 0
   Outbox has N messages:
   { unparsed_parameters: ..;
     destination: ..;
     entrypoint: ..; }
   ..
 
+The reveal channel described previously is available in the
+debugger, either automatically or through specific commands. The
+debugger can fill automatically preimages from files in a specific
+directory on the disk, by default in the ``preimage`` subdirectory of the
+working directory. It can be configured with the option
+``--preimage-dir <directory>``. In case there is no corresponding file
+found for the requested preimage, the debugger will ask for the
+hexadecimal value of the preimage:
+
+.. code::
+
+  > step inbox
+  Preimage for hash 0000[..] not found.
+  > 48656c6c6f207468657265210a
+  Hello there!
+  ...
+
+Metadata are automatically filled with level ``0`` as origination level
+and the configured smart rollup address (or the default one).
+
+Note that when stepping tick per tick (using the ``step tick`` command), it is
+possible to end up in a situation were the evaluation stops on ``Waiting for
+reveal``. If the expected value is a metadata, the command ``reveal metadata``
+will give the default metadata to the kernel. If the value expected is the
+preimage of a given hash, there are two possible solutions:
+
+* ``reveal preimage`` to read the value from the disk. In that case, the
+  debugger will look for a file of the same name as the expected hash in the
+  ``preimage`` subdirectory.
+* ``reveal preimage of <hex encoded value>`` can be used to feed a custom
+  preimage hash.
 
 Glossary
 --------
