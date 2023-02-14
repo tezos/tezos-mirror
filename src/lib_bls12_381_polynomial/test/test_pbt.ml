@@ -34,12 +34,16 @@ let polynomial =
 let count = 100
 
 let commutative name op =
-  QCheck.Test.make ~count ~name:(name ^ "_commutative")
+  QCheck.Test.make
+    ~count
+    ~name:(name ^ "_commutative")
     QCheck.(pair polynomial polynomial)
     (fun (p1, p2) -> P.(equal (op p1 p2) (op p2 p1)))
 
 let mul_distribute_add =
-  QCheck.Test.make ~count ~name:"mul_distibute_add"
+  QCheck.Test.make
+    ~count
+    ~name:"mul_distibute_add"
     QCheck.(triple polynomial polynomial polynomial)
     (fun (p1, p2, p3) -> P.(equal ((p1 + p2) * p3) ((p1 * p3) + (p2 * p3))))
 

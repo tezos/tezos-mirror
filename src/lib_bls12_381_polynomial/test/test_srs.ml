@@ -31,7 +31,8 @@ module Srs :
   Tezos_bls12_381_polynomial_internal.Srs.S_unsafe
     with type elt = Bls12_381.G1.t
      and type polynomial = Poly.t =
-  Tezos_bls12_381_polynomial_internal.Srs.Make (Tezos_bls12_381_polynomial_internal.Srs.Elt_g1)
+  Tezos_bls12_381_polynomial_internal.Srs.Make
+    (Tezos_bls12_381_polynomial_internal.Srs.Elt_g1)
 
 let test_get () =
   let srs = Srs.generate_insecure 1 Fr.one in
@@ -153,16 +154,20 @@ let test_vector_pippenger () =
     vectors
 
 let bigstring_of_file filename =
-  let fd = Unix.openfile filename [ Unix.O_RDONLY ] 0o440 in
+  let fd = Unix.openfile filename [Unix.O_RDONLY] 0o440 in
   Bigarray.array1_of_genarray
-  @@ Unix.map_file fd Bigarray.char Bigarray.c_layout false
-       [| (* [-1] means read the whole file *) -1 |]
+  @@ Unix.map_file
+       fd
+       Bigarray.char
+       Bigarray.c_layout
+       false
+       [|(* [-1] means read the whole file *) -1|]
 
 let test_load_from_file () =
   let bs = bigstring_of_file "srs_zcash_g1_5" in
   let max_size = 1 lsl 5 in
   let srs = Srs.of_bigstring bs ~len:max_size |> Result.get_ok in
-  assert (Srs.size srs = max_size);
+  assert (Srs.size srs = max_size) ;
   match Srs.of_bigstring bs ~len:(max_size + 1) with
   | Error (`End_of_file _) -> ()
   | _ -> assert false

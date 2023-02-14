@@ -34,37 +34,40 @@
 (* The Elt signature is extended with pippenger. *)
 module type GElt_sig = sig
   module G : Bls12_381.CURVE
+
   include Carray.Elt_sig with type t = G.affine
 
-  val uncompress : G.affine -> bytes -> int
   (** [uncompress res bs n] reads [n] bytes from [bs] and uncompresses
       them into an affine point in [res]. Returns 0 if successful. *)
+  val uncompress : G.affine -> bytes -> int
   (* This function is already bound in Bls12-381 but not exposed. *)
 
-  val pippenger : G.t -> Bigstringaf.t -> Polynomial.t -> int -> int -> int
   (** [pippenger res srs poly offset len] writes in [res] the
       multiexponentiation of [srs] with the polynomial [poly] starting at
       [offset] and for [len] elements. Returns 0 if successful. *)
+  val pippenger : G.t -> Bigstringaf.t -> Polynomial.t -> int -> int -> int
 end
 
 module type S = sig
   type polynomial
+
   type t [@@deriving repr]
+
   type elt
 
   val empty : t
 
-  val get : t -> int -> elt
   (** [get srs i] returns the [i]-th element of [srs] *)
+  val get : t -> int -> elt
 
-  val size : t -> int
   (** Returns the pippenger ctxt size, i.e. the number of elements the context
       is supposed to be called with *)
+  val size : t -> int
 
   val of_bigstring :
     ?len:int ->
     Bigstringaf.t ->
-    (t, [> `End_of_file of string | `Invalid_point of int ]) result
+    (t, [> `End_of_file of string | `Invalid_point of int]) result
 
   (** [of_bigstring ~len bs] reads [len] points of G in affine
       compressed format from [bs] and returns a Srs. If [len] is omitted the
@@ -91,9 +94,9 @@ module type S = sig
 
   val generate_insecure : int -> Bls12_381.Fr.t -> t
 
-  val pippenger : ?offset:int -> ?len:int -> t -> polynomial -> elt
   (** [pippenger ctxt poly] computes the multiscalar exponentiation using the
       SRS saved in the context and the coefficients of the given polynomial *)
+  val pippenger : ?offset:int -> ?len:int -> t -> polynomial -> elt
 
   (* TODO just for pack *)
   val to_array : ?len:int -> t -> elt array
@@ -104,10 +107,13 @@ module Make (Elt : GElt_sig) = struct
   module Carray = Carray.Make (Elt)
 
   type polynomial = Polynomial.Polynomial_unsafe.t
+
   type t = Carray.t [@@deriving repr]
+
   type elt = G.t
 
   let size = Carray.length
+
   let get p i = Carray.get p i |> G.jacobian_of_affine
 
   let to_array ?len data =
@@ -122,7 +128,7 @@ module Make (Elt : GElt_sig) = struct
     let xi = ref G.one in
     Array.init d (fun _ ->
         let res = !xi in
-        xi := G.mul !xi x;
+        xi := G.mul !xi x ;
         res)
     |> of_array
 
@@ -141,8 +147,12 @@ module Make (Elt : GElt_sig) = struct
         let* () =
           try
             Ok
-              (Bigstringaf.blit_to_bytes bs ~src_off:(i * size_compressed) buf
-                 ~dst_off:0 ~len:size_compressed)
+              (Bigstringaf.blit_to_bytes
+                 bs
+                 ~src_off:(i * size_compressed)
+                 buf
+                 ~dst_off:0
+                 ~len:size_compressed)
           with _ ->
             Error
               (`End_of_file
@@ -150,7 +160,7 @@ module Make (Elt : GElt_sig) = struct
         in
         let code = Elt.uncompress point buf in
         let* () = if code <> 0 then Error (`Invalid_point i) else Ok () in
-        Carray.set data point i;
+        Carray.set data point i ;
         loop (i + 1)
     in
     let* () = loop 0 in
@@ -169,11 +179,13 @@ module Make (Elt : GElt_sig) = struct
         raise
         @@ Invalid_argument
              (Format.sprintf
-                "pippenger: invalid len %d or offset %d for size %d" len offset
-                poly_length);
+                "pippenger: invalid len %d or offset %d for size %d"
+                len
+                offset
+                poly_length) ;
       let res = G.(copy zero) in
       let return_code = Elt.pippenger res srs poly offset len in
-      assert (return_code = 0);
+      assert (return_code = 0) ;
       res
 end
 
@@ -183,6 +195,7 @@ module Elt_g1 = struct
   type t = G.affine
 
   let size = G.size_in_bytes
+
   let allocate () = G.(affine_of_jacobian zero)
 
   external uncompress : t -> bytes -> int = "caml_blst_p1_uncompress_stubs"
@@ -199,6 +212,7 @@ module Elt_g2 = struct
   type t = G.affine
 
   let size = G.size_in_bytes
+
   let allocate () = G.(affine_of_jacobian zero)
 
   external uncompress : G.affine -> bytes -> int
@@ -256,8 +270,8 @@ module Checks = struct
     done
 
   let pairings (g1s, g2s) =
-    equality g1s g2s;
-    incrementation_g1 g1s g2s;
+    equality g1s g2s ;
+    incrementation_g1 g1s g2s ;
     incrementation_g2 g1s g2s
 end
 

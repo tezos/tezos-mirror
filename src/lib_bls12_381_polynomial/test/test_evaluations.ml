@@ -71,8 +71,8 @@ let test_is_zero () =
   let p_zero = Poly_c.zero in
   let domain = Domain.build_power_of_two 5 in
   let eval_zero = Eval.evaluation_fft domain p_zero in
-  assert (Eval.is_zero eval_zero);
-  assert (Eval.is_zero Eval.zero);
+  assert (Eval.is_zero eval_zero) ;
+  assert (Eval.is_zero Eval.zero) ;
   let p_one = Poly_c.one in
   let eval_one = Eval.evaluation_fft domain p_one in
   assert (not (Eval.is_zero eval_one))
@@ -109,7 +109,7 @@ let test_mul_zero () =
   let domain = Domain.build_power_of_two 5 in
   let eval_1 = Eval.evaluation_fft domain p_1 in
   let eval_2 = Eval.evaluation_fft domain p_2 in
-  let res_eval = Eval.mul_c ~evaluations:[ eval_1; eval_2 ] () in
+  let res_eval = Eval.mul_c ~evaluations:[eval_1; eval_2] () in
   let res = Eval.interpolation_fft domain res_eval in
   assert (Poly_c.equal res Poly_c.zero)
 
@@ -120,7 +120,7 @@ let test_mul_one () =
   let domain = Domain.build_power_of_two 5 in
   let eval_1 = Eval.evaluation_fft domain p_1 in
   let eval_2 = Eval.evaluation_fft domain p_2 in
-  let res_eval = Eval.mul_c ~evaluations:[ eval_1; eval_2 ] () in
+  let res_eval = Eval.mul_c ~evaluations:[eval_1; eval_2] () in
   let res = Eval.interpolation_fft domain res_eval in
   assert (Poly_c.equal res p_1)
 
@@ -132,12 +132,12 @@ let test_mul_commutativity () =
   let domain_2 = Domain.build_power_of_two 6 in
   let eval_1 = Eval.evaluation_fft domain_1 p_1 in
   let eval_2 = Eval.evaluation_fft domain_2 p_2 in
-  let res_eval = Eval.mul_c ~evaluations:[ eval_1; eval_2 ] () in
+  let res_eval = Eval.mul_c ~evaluations:[eval_1; eval_2] () in
   let res = Eval.interpolation_fft domain_2 res_eval in
-  let res_eval_swap = Eval.mul_c ~evaluations:[ eval_2; eval_1 ] () in
+  let res_eval_swap = Eval.mul_c ~evaluations:[eval_2; eval_1] () in
   let res_swap = Eval.interpolation_fft domain_2 res_eval_swap in
   let res_expected = Poly_c.mul p_1 p_2 in
-  assert (Poly_c.equal res res_expected);
+  assert (Poly_c.equal res res_expected) ;
   assert (Poly_c.equal res_swap res_expected)
 
 let test_mul_diff_size () =
@@ -178,7 +178,7 @@ let test_mul_diff_size_composition_gx () =
       polys
   in
   let res_eval =
-    Eval.mul_c ~evaluations:evals ~composition_gx:([ 0; 0; 1; 0; 1 ], 512) ()
+    Eval.mul_c ~evaluations:evals ~composition_gx:([0; 0; 1; 0; 1], 512) ()
   in
   let res = Eval.interpolation_fft domain_1 res_eval in
   let generator = Domain.get domain_1 1 in
@@ -209,9 +209,11 @@ let test_mul () =
       polys
   in
   let res_eval =
-    Eval.mul_c ~evaluations:evals
-      ~composition_gx:([ 0; 0; 1; 0; 1 ], 2048)
-      ~powers ()
+    Eval.mul_c
+      ~evaluations:evals
+      ~composition_gx:([0; 0; 1; 0; 1], 2048)
+      ~powers
+      ()
   in
   let res = Eval.interpolation_fft domain_1 res_eval in
   let generator = Domain.get domain_1 1 in
@@ -231,9 +233,11 @@ let test_mul () =
   let res_expected =
     List.fold_left2
       (fun acc poly power ->
-        assert (power >= 0);
+        assert (power >= 0) ;
         Poly_c.mul acc (power_poly poly power))
-      Poly_c.one polys powers
+      Poly_c.one
+      polys
+      powers
   in
   assert (Poly_c.equal res res_expected)
 
@@ -241,7 +245,7 @@ let test_linear_zero () =
   (* p_i = zero; res = p_1 + p_2 + p_3 = zero *)
   let domain = Domain.build_power_of_two 5 in
   let res_eval =
-    Eval.linear_c ~evaluations:[ Eval.zero; Eval.zero; Eval.zero ] ()
+    Eval.linear_c ~evaluations:[Eval.zero; Eval.zero; Eval.zero] ()
   in
   let res = Eval.interpolation_fft domain res_eval in
   assert (Poly_c.equal res Poly_c.zero)
@@ -252,8 +256,9 @@ let test_linear_zero_const () =
   let const = Fr.add Fr.one @@ Fr.random () in
   let res_eval =
     Eval.linear_c
-      ~evaluations:[ Eval.zero; Eval.zero; Eval.zero ]
-      ~add_constant:const ()
+      ~evaluations:[Eval.zero; Eval.zero; Eval.zero]
+      ~add_constant:const
+      ()
   in
   let res = Eval.interpolation_fft domain res_eval in
   assert (Poly_c.equal res (Poly_c.constant const))
@@ -263,8 +268,8 @@ let test_linear_zero_composition_gx () =
   let domain = Domain.build_power_of_two 5 in
   let res_eval =
     Eval.linear_c
-      ~evaluations:[ Eval.zero; Eval.zero; Eval.zero ]
-      ~composition_gx:([ 1; 0; 0 ], 32)
+      ~evaluations:[Eval.zero; Eval.zero; Eval.zero]
+      ~composition_gx:([1; 0; 0], 32)
       ()
   in
   let res = Eval.interpolation_fft domain res_eval in
@@ -295,7 +300,9 @@ let test_linear_diff_size () =
   let res_expected =
     List.fold_left2
       (fun acc poly coeff -> Poly_c.add acc (Poly_c.mul_by_scalar coeff poly))
-      (Poly_c.constant const) polys linear_coeffs
+      (Poly_c.constant const)
+      polys
+      linear_coeffs
   in
   assert (Poly_c.equal res res_expected)
 
@@ -318,8 +325,11 @@ let test_linear () =
   let linear_coeffs = List.init n (fun _i -> Fr.add Fr.one (Fr.random ())) in
   let const = Fr.add Fr.one (Fr.random ()) in
   let res_eval =
-    Eval.linear_c ~evaluations:evals ~linear_coeffs ~add_constant:const
-      ~composition_gx:([ 0; 0; 1; 0; 1 ], 128)
+    Eval.linear_c
+      ~evaluations:evals
+      ~linear_coeffs
+      ~add_constant:const
+      ~composition_gx:([0; 0; 1; 0; 1], 128)
       ()
   in
   let res = Eval.interpolation_fft domain_1 res_eval in
@@ -332,7 +342,9 @@ let test_linear () =
   let res_expected =
     List.fold_left2
       (fun acc poly coeff -> Poly_c.add acc (Poly_c.mul_by_scalar coeff poly))
-      (Poly_c.constant const) polys linear_coeffs
+      (Poly_c.constant const)
+      polys
+      linear_coeffs
   in
   assert (Poly_c.equal res res_expected)
 
@@ -348,7 +360,7 @@ let test_add () =
   let res = Eval.interpolation_fft domain_1 res_eval in
   let res_swap = Eval.interpolation_fft domain_1 res_eval_swap in
   let res_expected = Poly_c.add p_1 p_2 in
-  assert (Poly_c.equal res res_expected);
+  assert (Poly_c.equal res res_expected) ;
   assert (Poly_c.equal res_swap res_expected)
 
 let test_add_zero () =
@@ -380,9 +392,11 @@ let test_linear_with_powers_equal_length () =
   let res_expected =
     List.fold_left2
       (fun acc coeff poly -> Poly_c.add acc @@ Poly_c.mul_by_scalar coeff poly)
-      Poly_c.zero coeffs polys
+      Poly_c.zero
+      coeffs
+      polys
   in
-  assert (Poly_c.equal res res_expected);
+  assert (Poly_c.equal res res_expected) ;
   assert (Poly_c.equal res_linear res_expected)
 
 let test_linear_with_powers () =
@@ -406,7 +420,9 @@ let test_linear_with_powers () =
   let res_expected =
     List.fold_left2
       (fun acc coeff poly -> Poly_c.add acc @@ Poly_c.mul_by_scalar coeff poly)
-      Poly_c.zero coeffs polys
+      Poly_c.zero
+      coeffs
+      polys
   in
   assert (Poly_c.equal res res_expected)
 
@@ -426,10 +442,12 @@ let test_linear_with_powers_zeros () =
   let res_expected =
     List.fold_left2
       (fun acc coeff poly -> Poly_c.add acc @@ Poly_c.mul_by_scalar coeff poly)
-      Poly_c.zero coeffs polys
+      Poly_c.zero
+      coeffs
+      polys
   in
-  assert (Poly_c.equal res res_expected);
-  assert (Poly_c.equal res_linear res_expected);
+  assert (Poly_c.equal res res_expected) ;
+  assert (Poly_c.equal res_linear res_expected) ;
   assert (Poly_c.equal res Poly_c.zero)
 
 (* TODO: test inplace operations: mul_c; linear_c; add;

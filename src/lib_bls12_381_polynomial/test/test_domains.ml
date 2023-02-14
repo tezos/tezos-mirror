@@ -25,6 +25,7 @@
 
 module Fr = Bls12_381.Fr
 module Fr_generation = Tezos_bls12_381_polynomial_internal.Fr_carray
+
 module Domain = Tezos_bls12_381_polynomial_internal.Domain.Domain_unsafe
 
 let factors_naive n =
@@ -51,7 +52,8 @@ let primitive_nth_root_of_unity n factorization_n =
   if not (Z.divisible group_order n) then
     raise
       (Invalid_argument
-         (Format.sprintf "There do not exist %s-th roots of unity"
+         (Format.sprintf
+            "There do not exist %s-th roots of unity"
             (Z.to_string n)))
   else
     (* multiplies primitive roots of unity of order p^e from the factorization
@@ -60,7 +62,8 @@ let primitive_nth_root_of_unity n factorization_n =
       (fun primroot (p, e) ->
         let root_factor = primitive_root_of_unity_prime_power group_order p e in
         Fr.mul primroot root_factor)
-      Fr.one factorization_n
+      Fr.one
+      factorization_n
 
 let test_generator () =
   let generator = Fr_generation.generator in

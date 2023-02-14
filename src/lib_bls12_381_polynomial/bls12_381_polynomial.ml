@@ -27,6 +27,7 @@ module type S = sig
   type scalar
 
   module Domain : Domain.Domain_sig with type scalar = scalar
+
   module Polynomial : Polynomial.Polynomial_sig with type scalar = scalar
 
   module Evaluations :
@@ -37,11 +38,13 @@ module type S = sig
 
   module Srs : sig
     module Srs_g1 : Srs.S with type polynomial = Polynomial.t
+
     module Srs_g2 : Srs.S with type polynomial = Polynomial.t
 
     type t = Srs_g1.t * Srs_g2.t
 
     val generate_insecure : int -> int -> t
+
     val check : t -> unit
   end
 end

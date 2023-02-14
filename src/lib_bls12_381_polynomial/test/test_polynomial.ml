@@ -27,7 +27,9 @@ module Fr = Bls12_381.Fr
 module G1 = Bls12_381.G1
 module Fr_generation = Tezos_bls12_381_polynomial_internal.Fr_carray
 module Poly = Polynomial.MakeUnivariate (Fr)
+
 module Domain = Tezos_bls12_381_polynomial_internal.Domain.Domain_unsafe
+
 module Poly_c = Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_impl
 
 let p_of_c : Poly_c.t -> Poly.t =
@@ -39,33 +41,35 @@ let test_copy_polynomial () =
 
 let test_erase () =
   let poly = Poly_c.generate_biased_random_polynomial (Random.int 100) in
-  Poly_c.erase poly;
+  Poly_c.erase poly ;
   assert (Poly_c.equal poly Poly_c.zero)
 
 let test_get_zero () =
   let p = Poly_c.zero in
-  assert (Fr.(Poly_c.get p 0 = zero));
-  Helpers.must_fail (fun () -> ignore @@ Poly_c.get p (-1));
+  assert (Fr.(Poly_c.get p 0 = zero)) ;
+  Helpers.must_fail (fun () -> ignore @@ Poly_c.get p (-1)) ;
   Helpers.must_fail (fun () -> ignore @@ Poly_c.get p 1)
 
 let test_get_one () =
   let p = Poly_c.one in
-  assert (Fr.(Poly_c.get p 0 = one));
-  Helpers.must_fail (fun () -> ignore @@ Poly_c.get p (-1));
+  assert (Fr.(Poly_c.get p 0 = one)) ;
+  Helpers.must_fail (fun () -> ignore @@ Poly_c.get p (-1)) ;
   Helpers.must_fail (fun () -> ignore @@ Poly_c.get p 1)
 
 let test_get_random () =
-  let module Poly_c = Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_impl in
+  let module Poly_c =
+    Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_impl
+  in
   let module C_array = Tezos_bls12_381_polynomial_internal.Fr_carray in
   let degree = 1 + Random.int 100 in
-  let p = Poly_c.of_coefficients [ (Fr.one, degree) ] in
-  assert (Poly_c.length p = degree + 1);
+  let p = Poly_c.of_coefficients [(Fr.one, degree)] in
+  assert (Poly_c.length p = degree + 1) ;
   Helpers.repeat 10 (fun () ->
-      assert (Fr.eq (Poly_c.get p (Random.int (Poly_c.length p - 1))) Fr.zero));
+      assert (Fr.eq (Poly_c.get p (Random.int (Poly_c.length p - 1))) Fr.zero)) ;
   Helpers.(
     repeat 10 (fun () ->
         let i = Random.int 10 in
-        must_fail (fun () -> ignore @@ Poly_c.get p (-i - 1));
+        must_fail (fun () -> ignore @@ Poly_c.get p (-i - 1)) ;
         must_fail (fun () -> ignore @@ Poly_c.get p (Poly_c.length p + i))))
 
 let test_one () =
@@ -89,7 +93,7 @@ let test_add_inplace () =
   let p2 = Poly_c.generate_biased_random_polynomial (Random.int 100) in
   let expected_res = Poly.add (p_of_c p1) (p_of_c p2) in
   let res = Poly_c.(allocate (max (length p1) (length p2))) in
-  Poly_c.add_inplace res p1 p2;
+  Poly_c.add_inplace res p1 p2 ;
   assert (Poly.equal (p_of_c res) expected_res)
 
 let test_sub () =
@@ -104,7 +108,7 @@ let test_sub_inplace () =
   let p2 = Poly_c.generate_biased_random_polynomial (Random.int 100) in
   let expected_res = Poly.sub (p_of_c p1) (p_of_c p2) in
   let res = Poly_c.(allocate (max (length p1) (length p2))) in
-  Poly_c.sub_inplace res p1 p2;
+  Poly_c.sub_inplace res p1 p2 ;
   assert (Poly.equal (p_of_c res) expected_res)
 
 let test_mul () =
@@ -112,7 +116,7 @@ let test_mul () =
   let p2 = Poly_c.generate_biased_random_polynomial (Random.int 100) in
   let res = Poly_c.mul p1 p2 in
   let expected_res = Poly.polynomial_multiplication (p_of_c p1) (p_of_c p2) in
-  assert (Poly.equal (p_of_c res) expected_res);
+  assert (Poly.equal (p_of_c res) expected_res) ;
   let dres = Poly_c.degree res in
   let d1 = Poly_c.degree p1 in
   let d2 = Poly_c.degree p2 in
@@ -127,7 +131,7 @@ let test_opposite () =
 let test_opposite_inplace () =
   let p = Poly_c.generate_biased_random_polynomial (Random.int 100) in
   let expected_res = Poly.opposite (p_of_c p) in
-  Poly_c.opposite_inplace p;
+  Poly_c.opposite_inplace p ;
   assert (Poly.equal (p_of_c p) expected_res)
 
 let test_mul_by_scalar () =
@@ -141,7 +145,7 @@ let test_mul_by_scalar_inplace () =
   let p = Poly_c.generate_biased_random_polynomial 100 in
   let s = Fr.random () in
   let expected_res = Poly.mult_by_scalar s (p_of_c p) in
-  Poly_c.mul_by_scalar_inplace p s p;
+  Poly_c.mul_by_scalar_inplace p s p ;
   assert (Poly.equal (p_of_c p) expected_res)
 
 let test_is_zero () =
@@ -162,7 +166,7 @@ let test_evaluate () =
 let test_division_xn_plus_const poly n const =
   let poly_caml = p_of_c poly in
   let poly_xn_plus_const_caml =
-    Poly.of_coefficients [ (Fr.one, n); (const, 0) ]
+    Poly.of_coefficients [(Fr.one, n); (const, 0)]
   in
   let res_q, res_r = Poly_c.division_xn poly n const in
   let res_q_caml = p_of_c res_q in
@@ -170,14 +174,14 @@ let test_division_xn_plus_const poly n const =
   let expected_quotient, expected_reminder =
     Poly.euclidian_division_opt poly_caml poly_xn_plus_const_caml |> Option.get
   in
-  assert (Poly.equal res_q_caml expected_quotient);
+  assert (Poly.equal res_q_caml expected_quotient) ;
   assert (Poly.equal res_r_caml expected_reminder)
 
 (* exact division by (X^n + c) *)
 let test_division_exact_xn_plus_const poly_non_divisible n const =
   let poly_non_divisible_caml = p_of_c poly_non_divisible in
   let poly_xn_plus_const_caml =
-    Poly.of_coefficients [ (Fr.one, n); (const, 0) ]
+    Poly.of_coefficients [(Fr.one, n); (const, 0)]
   in
   let poly_divisible_caml =
     Poly.(poly_non_divisible_caml * poly_xn_plus_const_caml)
@@ -192,13 +196,11 @@ let test_division_exact_xn_plus_const poly_non_divisible n const =
     Poly.euclidian_division_opt poly_divisible_caml poly_xn_plus_const_caml
     |> Option.get
   in
-  let poly_xn_plus_const =
-    Poly_c.(of_coefficients [ (Fr.one, n); (const, 0) ])
-  in
-  assert (Poly.equal res_q_caml expected_quotient);
-  assert (Poly.equal res_r_caml expected_reminder);
-  assert (Poly.equal Poly.zero expected_reminder);
-  assert (Poly_c.(mul_xn res_q n const = poly_divisible));
+  let poly_xn_plus_const = Poly_c.(of_coefficients [(Fr.one, n); (const, 0)]) in
+  assert (Poly.equal res_q_caml expected_quotient) ;
+  assert (Poly.equal res_r_caml expected_reminder) ;
+  assert (Poly.equal Poly.zero expected_reminder) ;
+  assert (Poly_c.(mul_xn res_q n const = poly_divisible)) ;
   assert (Poly_c.(mul res_q poly_xn_plus_const = poly_divisible))
 
 (* division by (X - z) *)
@@ -212,7 +214,7 @@ let test_division_x_z () =
   in
   let z = Fr.random () in
   let minus_z = Fr.negate z in
-  test_division_exact_xn_plus_const poly_non_divisible 1 minus_z;
+  test_division_exact_xn_plus_const poly_non_divisible 1 minus_z ;
   test_division_xn_plus_const poly_non_divisible 1 minus_z
 
 (* division by (X^n - 1), degree a random poly >= 2 * n *)
@@ -226,7 +228,7 @@ let test_division_xn_minus_one () =
     generate ()
   in
   let minus_one = Fr.(negate one) in
-  test_division_exact_xn_plus_const poly_non_divisible n minus_one;
+  test_division_exact_xn_plus_const poly_non_divisible n minus_one ;
   test_division_xn_plus_const poly_non_divisible n minus_one
 
 (* division by (X^n - 1), degree a random poly = 2 * n *)
@@ -234,13 +236,14 @@ let test_division_xn_minus_one_limit_case () =
   (* We test the limit case in which the size of the polynomial is equal to 2*n
      ie. the degree is equal to 2*n. *)
   let n = 16 in
-  let poly_non_divisible = Poly_c.of_coefficients [ (Fr.random (), n - 1) ] in
+  let poly_non_divisible = Poly_c.of_coefficients [(Fr.random (), n - 1)] in
   let poly_non_divisible =
-    Poly_c.add poly_non_divisible
+    Poly_c.add
+      poly_non_divisible
       (Poly_c.generate_biased_random_polynomial (n - 2))
   in
   let minus_one = Fr.(negate one) in
-  test_division_exact_xn_plus_const poly_non_divisible n minus_one;
+  test_division_exact_xn_plus_const poly_non_divisible n minus_one ;
   test_division_xn_plus_const poly_non_divisible n minus_one
 
 (* division by (X^n - 1), degree a random poly >= n and < 2 * n *)
@@ -255,7 +258,7 @@ let test_division_xn_minus_one_lt_2n () =
     generate ()
   in
   let minus_one = Fr.(negate one) in
-  test_division_exact_xn_plus_const poly_non_divisible n minus_one;
+  test_division_exact_xn_plus_const poly_non_divisible n minus_one ;
   test_division_xn_plus_const poly_non_divisible n minus_one
 
 (* division by (X^n + 1), degree a random poly >= 2 * n *)
@@ -268,7 +271,7 @@ let test_division_xn_plus_one () =
     in
     generate ()
   in
-  test_division_exact_xn_plus_const poly_non_divisible n Fr.one;
+  test_division_exact_xn_plus_const poly_non_divisible n Fr.one ;
   test_division_xn_plus_const poly_non_divisible n Fr.one
 
 (* division by (X^n + 1), degree a random poly >= n and < 2 * n *)
@@ -282,7 +285,7 @@ let test_division_xn_plus_one_lt_2n () =
     in
     generate ()
   in
-  test_division_exact_xn_plus_const poly_non_divisible n Fr.one;
+  test_division_exact_xn_plus_const poly_non_divisible n Fr.one ;
   test_division_xn_plus_const poly_non_divisible n Fr.one
 
 (* division by (X^n + c), degree a random poly >= 2 * n *)
@@ -296,7 +299,7 @@ let test_division_xn_plus_c () =
     generate ()
   in
   let c = Fr.random () in
-  test_division_exact_xn_plus_const poly_non_divisible n c;
+  test_division_exact_xn_plus_const poly_non_divisible n c ;
   test_division_xn_plus_const poly_non_divisible n c
 
 (* division by (X^n + c), degree a random poly >= n and < 2 * n *)
@@ -311,7 +314,7 @@ let test_division_xn_plus_c_lt_2n () =
     generate ()
   in
   let c = Fr.random () in
-  test_division_exact_xn_plus_const poly_non_divisible n c;
+  test_division_exact_xn_plus_const poly_non_divisible n c ;
   test_division_xn_plus_const poly_non_divisible n c
 
 let test_linear () =
@@ -327,7 +330,9 @@ let test_linear () =
     List.fold_left2
       (fun acc coeff poly ->
         Poly.add acc @@ Poly.mult_by_scalar coeff (p_of_c poly))
-      Poly.zero coeffs polys
+      Poly.zero
+      coeffs
+      polys
   in
   assert (Poly.equal (p_of_c res) expected_res)
 
@@ -346,9 +351,11 @@ let test_linear_with_powers () =
     List.fold_left2
       (fun acc coeff poly ->
         Poly.add acc @@ Poly.mult_by_scalar coeff (p_of_c poly))
-      Poly.zero coeffs polys
+      Poly.zero
+      coeffs
+      polys
   in
-  assert (Poly.equal (p_of_c res1) expected_res);
+  assert (Poly.equal (p_of_c res1) expected_res) ;
   assert (Poly.equal (p_of_c res2) expected_res)
 
 let test_linear_with_powers_equal_length () =
@@ -371,30 +378,32 @@ let test_linear_with_powers_equal_length () =
     List.fold_left2
       (fun acc coeff poly ->
         Poly.add acc @@ Poly.mult_by_scalar coeff (p_of_c poly))
-      Poly.zero coeffs polys
+      Poly.zero
+      coeffs
+      polys
   in
   assert (Poly.equal (p_of_c res) expected_res)
 
 let test_of_sparse_coefficients () =
   let test_vectors =
     [
-      [| (Fr.random (), 0) |];
+      [|(Fr.random (), 0)|];
       (* FIXME: repr for zero polynomial *)
       (* [|(Fr.(copy zero), 0)|] *)
-      [| (Fr.random (), 0); (Fr.(copy one), 1) |];
+      [|(Fr.random (), 0); (Fr.(copy one), 1)|];
       Array.init (1 + Random.int 100) (fun i -> (Fr.random (), i));
       (* with zero coefficients somewhere *)
-      [| (Fr.random (), 1) |];
+      [|(Fr.random (), 1)|];
       (let n = 1 + Random.int 100 in
        Array.init n (fun i -> (Fr.random (), (i * 100) + Random.int 100)));
       (* Not in order *)
-      [| (Fr.random (), 1); (Fr.random (), 0) |];
+      [|(Fr.random (), 1); (Fr.random (), 0)|];
       (* random polynomial where we shuffle randomly the coefficients *)
       (let n = 1 + Random.int 100 in
        let p =
          Array.init n (fun i -> (Fr.random (), (i * 100) + Random.int 100))
        in
-       Array.fast_sort (fun _ _ -> if Random.bool () then 1 else -1) p;
+       Array.fast_sort (fun _ _ -> if Random.bool () then 1 else -1) p ;
        p);
     ]
   in
@@ -402,12 +411,16 @@ let test_of_sparse_coefficients () =
     (fun coefficients ->
       let polynomial_c = Poly_c.of_coefficients (Array.to_list coefficients) in
       let polynomial = Poly_c.to_sparse_coefficients polynomial_c in
-      Array.fast_sort (fun (_, i1) (_, i2) -> Int.compare i1 i2) coefficients;
+      Array.fast_sort (fun (_, i1) (_, i2) -> Int.compare i1 i2) coefficients ;
       List.iter2
         (fun (x1, i1) (x2, i2) ->
           if not (Fr.eq x1 x2 && i1 = i2) then
-            Alcotest.failf "Expected output (%s, %d), computed (%s, %d)"
-              (Fr.to_string x1) i1 (Fr.to_string x2) i2)
+            Alcotest.failf
+              "Expected output (%s, %d), computed (%s, %d)"
+              (Fr.to_string x1)
+              i1
+              (Fr.to_string x2)
+              i2)
         (Array.to_list coefficients)
         polynomial)
     test_vectors
@@ -421,20 +434,30 @@ let test_vectors_fft_aux =
       in
       let expected_fft_results = Array.map Fr.of_string expected_fft_results in
       let polynomial =
-        Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_unsafe.of_coefficients
+        Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_unsafe
+        .of_coefficients
           points
       in
       let domain = Domain.build_power_of_two ~primitive_root log in
       let evaluation =
-        Tezos_bls12_381_polynomial_internal.Evaluations.evaluation_fft domain polynomial
+        Tezos_bls12_381_polynomial_internal.Evaluations.evaluation_fft
+          domain
+          polynomial
       in
       assert (
-        Array.for_all2 Fr.eq expected_fft_results
-          (Tezos_bls12_381_polynomial_internal.Evaluations.to_array evaluation));
+        Array.for_all2
+          Fr.eq
+          expected_fft_results
+          (Tezos_bls12_381_polynomial_internal.Evaluations.to_array evaluation)) ;
       let ifft_results : Tezos_bls12_381_polynomial_internal.Polynomial.t =
-        Tezos_bls12_381_polynomial_internal.Evaluations.interpolation_fft domain evaluation
+        Tezos_bls12_381_polynomial_internal.Evaluations.interpolation_fft
+          domain
+          evaluation
       in
-      assert (Tezos_bls12_381_polynomial_internal.Polynomial.equal polynomial ifft_results))
+      assert (
+        Tezos_bls12_381_polynomial_internal.Polynomial.equal
+          polynomial
+          ifft_results))
 
 let test_vectors_fft () =
   (* Generated using {{: https://github.com/dannywillems/ocaml-polynomial} https://github.com/dannywillems/ocaml-polynomial},
@@ -675,14 +698,16 @@ let test_fft_evaluate_common length inner =
 
 let test_fft_evaluate () =
   let module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations in
-  test_fft_evaluate_common 16
+  test_fft_evaluate_common
+    16
     (fun ~length:_ ~primitive_root:_ ~domain ~polynomial ->
       Evaluations.(evaluation_fft domain polynomial |> to_array))
 
 let test_fft_pfa_evaluate () =
   let module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations in
   let module Domain = Tezos_bls12_381_polynomial_internal.Domain in
-  test_fft_evaluate_common (128 * 11)
+  test_fft_evaluate_common
+    (128 * 11)
     (fun ~length:_ ~primitive_root ~domain:_ ~polynomial ->
       let primroot1 = Fr.pow primitive_root (Z.of_int 11) in
       let primroot2 = Fr.pow primitive_root (Z.of_int 128) in
@@ -733,7 +758,8 @@ let test_ifft_random () =
 let test_fft_pfa_interpolate () =
   let module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations in
   let module Domain = Tezos_bls12_381_polynomial_internal.Domain in
-  test_fft_interpolate_common (4 * 3)
+  test_fft_interpolate_common
+    (4 * 3)
     (fun ~length:_ ~primitive_root ~polynomial ->
       let primroot1 = Fr.pow primitive_root (Z.of_int 3) in
       let primroot2 = Fr.pow primitive_root (Z.of_int 4) in
@@ -747,7 +773,8 @@ let test_dft_interpolate () =
   let module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations in
   let module Domain = Tezos_bls12_381_polynomial_internal.Domain in
   let module Poly = Tezos_bls12_381_polynomial_internal.Polynomial in
-  test_fft_interpolate_common (11 * 19)
+  test_fft_interpolate_common
+    (11 * 19)
     (fun ~length ~primitive_root ~polynomial ->
       let domain = Domain.build ~primitive_root length in
       Evaluations.(dft domain polynomial |> idft_inplace domain))
@@ -762,15 +789,21 @@ let test_of_carray_does_not_allocate_a_full_new_carray () =
   let array = Array.init n (fun _ -> Fr.random ()) in
   let carray = Tezos_bls12_381_polynomial_internal.Fr_carray.of_array array in
   let polynomial =
-    Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_unsafe.of_carray carray
+    Tezos_bls12_381_polynomial_internal.Polynomial.Polynomial_unsafe.of_carray
+      carray
   in
   let two = Fr.of_string "2" in
-  Tezos_bls12_381_polynomial_internal.Polynomial.mul_by_scalar_inplace polynomial two
-    polynomial;
+  Tezos_bls12_381_polynomial_internal.Polynomial.mul_by_scalar_inplace
+    polynomial
+    two
+    polynomial ;
   let poly_values =
-    Tezos_bls12_381_polynomial_internal.Polynomial.to_dense_coefficients polynomial
+    Tezos_bls12_381_polynomial_internal.Polynomial.to_dense_coefficients
+      polynomial
   in
-  let carray_values = Tezos_bls12_381_polynomial_internal.Fr_carray.to_array carray in
+  let carray_values =
+    Tezos_bls12_381_polynomial_internal.Fr_carray.to_array carray
+  in
   assert (Array.for_all2 Fr.eq poly_values carray_values)
 
 let tests =

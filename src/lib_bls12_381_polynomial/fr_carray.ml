@@ -29,6 +29,7 @@ module Elt = struct
   type t = Scalar.t
 
   let size = Bls12_381.Fr.size_in_bytes
+
   let allocate () = Bls12_381.Fr.(copy zero)
 end
 
@@ -44,7 +45,8 @@ let primitive_root_of_unity n =
   if not (Z.divisible multiplicative_group_order n) then
     raise
       (Invalid_argument
-         (Format.sprintf "There do not exist %s-th roots of unity"
+         (Format.sprintf
+            "There do not exist %s-th roots of unity"
             (Z.to_string n)))
   else
     let exponent = Z.divexact multiplicative_group_order n in
@@ -58,12 +60,13 @@ let build_array init next len =
   let xi = ref init in
   Array.init len (fun _ ->
       let i = !xi in
-      xi := next !xi;
+      xi := next !xi ;
       i)
 
 (* TODO return carray instead of array ? *)
 (* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
 let powers d x = build_array Scalar.one Scalar.(mul x) d
+
 let build_domain n = powers n (primitive_root_of_unity n)
 
 let build_domain_power_of_two ~log =

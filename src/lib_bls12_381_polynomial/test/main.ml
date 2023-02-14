@@ -32,7 +32,7 @@ let () =
   let seed =
     match Sys.getenv_opt "RANDOM_SEED" with
     | None ->
-        Random.self_init ();
+        Random.self_init () ;
         Random.int 1073741823
     | Some v -> (
         try int_of_string v
@@ -43,9 +43,11 @@ let () =
                 RANDOM_SEED' in your terminal?"
                v))
   in
-  Printf.printf "Random seed: %d\n" seed;
-  Random.init seed;
-  Alcotest.run ~verbose:false "PlonK"
+  Printf.printf "Random seed: %d\n" seed ;
+  Random.init seed ;
+  Alcotest.run
+    ~verbose:false
+    "PlonK"
     [
       ("Domains", Test_domains.tests);
       ("Coefficients", Test_coefficients.tests);

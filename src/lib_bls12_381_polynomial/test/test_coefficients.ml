@@ -33,17 +33,19 @@ let rec repeat n f =
     let f () = () in
     f
   else (
-    f ();
+    f () ;
     repeat (n - 1) f)
 
 module Scalar = Bls12_381.Fr
+
 module Domain = Tezos_bls12_381_polynomial_internal.Domain.Domain_unsafe
+
 module Poly = Tezos_bls12_381_polynomial_internal.Polynomial
 module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations
 
 let raises_invalid_arg f =
   try
-    ignore @@ f ();
+    ignore @@ f () ;
     false
   with
   | Invalid_argument _ -> true
@@ -51,43 +53,43 @@ let raises_invalid_arg f =
 
 let test_equal () =
   let make a = Poly.of_dense (Array.map Scalar.of_int a) in
-  let p1 = make [| 0; 1; 0; 0 |] in
-  let p2 = make [| 0; 1; 0 |] in
-  let p3 = make [| 0; 1 |] in
-  assert (Poly.(equal p1 p2));
-  assert (Poly.(equal p2 p3));
-  assert (Poly.(equal zero (make [| 0 |])));
-  assert (Poly.(equal zero (make [| 0; 0 |])))
+  let p1 = make [|0; 1; 0; 0|] in
+  let p2 = make [|0; 1; 0|] in
+  let p3 = make [|0; 1|] in
+  assert (Poly.(equal p1 p2)) ;
+  assert (Poly.(equal p2 p3)) ;
+  assert (Poly.(equal zero (make [|0|]))) ;
+  assert (Poly.(equal zero (make [|0; 0|])))
 
 let test_copy () =
   let module C = Poly.Polynomial_impl in
   let make a = C.of_dense (Array.map Scalar.of_string a) in
-  let p = make [| "0"; "1"; "2"; "0" |] in
-  assert (C.equal (C.copy p) p);
-  assert (C.equal (C.copy ~offset:1 p) (make [| "1"; "2"; "0" |]));
-  assert (C.equal (C.copy ~offset:1 ~len:2 p) (make [| "1"; "2" |]));
-  assert (C.equal (C.copy ~len:2 p) (make [| "0"; "1" |]));
-  assert (raises_invalid_arg (fun () -> C.copy ~len:5 p));
-  assert (raises_invalid_arg (fun () -> C.copy ~offset:(-2) p));
-  assert (raises_invalid_arg (fun () -> C.copy ~offset:(C.length p) p));
+  let p = make [|"0"; "1"; "2"; "0"|] in
+  assert (C.equal (C.copy p) p) ;
+  assert (C.equal (C.copy ~offset:1 p) (make [|"1"; "2"; "0"|])) ;
+  assert (C.equal (C.copy ~offset:1 ~len:2 p) (make [|"1"; "2"|])) ;
+  assert (C.equal (C.copy ~len:2 p) (make [|"0"; "1"|])) ;
+  assert (raises_invalid_arg (fun () -> C.copy ~len:5 p)) ;
+  assert (raises_invalid_arg (fun () -> C.copy ~offset:(-2) p)) ;
+  assert (raises_invalid_arg (fun () -> C.copy ~offset:(C.length p) p)) ;
   assert (
     raises_invalid_arg (fun () -> C.copy ~offset:(C.length p - 1) ~len:2 p))
 
 let test_split_poly () =
   let make a = Poly.of_dense (Array.map Scalar.of_string a) in
-  let p = make [| "0"; "1"; "2"; "3"; "4"; "0" |] in
+  let p = make [|"0"; "1"; "2"; "3"; "4"; "0"|] in
   let res = Poly.split ~nb_chunks:3 2 p in
-  assert (Poly.equal (List.nth res 0) (make [| "0"; "1" |]));
-  assert (Poly.equal (List.nth res 1) (make [| "2"; "3" |]));
-  assert (Poly.equal (List.nth res 2) (make [| "4" |]));
+  assert (Poly.equal (List.nth res 0) (make [|"0"; "1"|])) ;
+  assert (Poly.equal (List.nth res 1) (make [|"2"; "3"|])) ;
+  assert (Poly.equal (List.nth res 2) (make [|"4"|])) ;
   let res = Poly.split ~nb_chunks:2 2 p in
-  assert (Poly.equal (List.nth res 0) (make [| "0"; "1" |]));
-  assert (Poly.equal (List.nth res 1) (make [| "2"; "3"; "4" |]))
+  assert (Poly.equal (List.nth res 0) (make [|"0"; "1"|])) ;
+  assert (Poly.equal (List.nth res 1) (make [|"2"; "3"; "4"|]))
 
 let test_shift () =
   let p = Poly.generate_biased_random_polynomial 10 in
   let shift = 5 in
-  let res = Poly.(of_coefficients [ (Scalar.one, shift) ] * p) in
+  let res = Poly.(of_coefficients [(Scalar.one, shift)] * p) in
   let p_a = Poly.to_dense_coefficients p in
   let res_a = Poly.to_dense_coefficients res in
   Array.iteri
@@ -103,7 +105,7 @@ let test_split_poly2 () =
     List.fold_left
       (fun (poly, i) poly_part ->
         ( Poly.(
-            poly + (of_coefficients [ (Scalar.one, Int.mul 10 i) ] * poly_part)),
+            poly + (of_coefficients [(Scalar.one, Int.mul 10 i)] * poly_part)),
           i - 1 ))
       (Poly.zero, List.length res - 1)
       (List.rev res)
@@ -119,8 +121,8 @@ let test_degree_int_test_vectors () =
   let vectors =
     [
       (Poly.zero, -1);
-      (Poly.of_coefficients [ (Scalar.one, 0) ], 0);
-      (Poly.of_coefficients [ (Scalar.one, 10) ], 10);
+      (Poly.of_coefficients [(Scalar.one, 0)], 0);
+      (Poly.of_coefficients [(Scalar.one, 10)], 10);
     ]
   in
   List.iter
@@ -147,8 +149,7 @@ let test_eval_random_point_constant_polynomial () =
 
 let test_eval_x_to_random_point () =
   let p = Scalar.random () in
-  assert (
-    Scalar.eq (Poly.evaluate (Poly.of_coefficients [ (Scalar.one, 1) ]) p) p)
+  assert (Scalar.eq (Poly.evaluate (Poly.of_coefficients [(Scalar.one, 1)]) p) p)
 
 let test_of_coeff_to_dense_vectors () =
   let rec generate_non_null () =
@@ -159,26 +160,26 @@ let test_of_coeff_to_dense_vectors () =
   let z = Scalar.zero in
   let vectors =
     [
-      (Poly.zero, [ z ]);
-      (Poly.constant x, [ x ]);
-      (Poly.of_coefficients [ (z, 4); (x, 2) ], [ z; z; x ]);
-      (Poly.of_coefficients [ (x, 1) ], [ z; x ]);
-      (Poly.of_coefficients [ (x, 3); (x, 1) ], [ z; x; z; x ]);
-      (Poly.of_coefficients [ (x, 4); (x, 1) ], [ z; x; z; z; x ]);
-      ( Poly.of_coefficients [ (x, 17); (x, 14); (x, 3); (x, 1); (x, 0) ],
-        [ x; x; z; x; z; z; z; z; z; z; z; z; z; z; x; z; z; x ] );
+      (Poly.zero, [z]);
+      (Poly.constant x, [x]);
+      (Poly.of_coefficients [(z, 4); (x, 2)], [z; z; x]);
+      (Poly.of_coefficients [(x, 1)], [z; x]);
+      (Poly.of_coefficients [(x, 3); (x, 1)], [z; x; z; x]);
+      (Poly.of_coefficients [(x, 4); (x, 1)], [z; x; z; z; x]);
+      ( Poly.of_coefficients [(x, 17); (x, 14); (x, 3); (x, 1); (x, 0)],
+        [x; x; z; x; z; z; z; z; z; z; z; z; z; z; x; z; z; x] );
     ]
   in
   List.iter
     (fun (v, expected) ->
       let array = Poly.to_dense_coefficients v |> Array.to_list in
-      assert (List.for_all2 Scalar.eq expected array);
+      assert (List.for_all2 Scalar.eq expected array) ;
       assert (Poly.equal v (Poly.of_dense (Array.of_list expected))))
     vectors
 
 let test_multiply_by_zero_is_zero () =
   let r = Poly.generate_biased_random_polynomial (Random.int 1000) in
-  assert (Poly.equal (Poly.mul r Poly.zero) Poly.zero);
+  assert (Poly.equal (Poly.mul r Poly.zero) Poly.zero) ;
   assert (Poly.equal (Poly.mul Poly.zero r) Poly.zero)
 
 let test_communitativity () =
@@ -194,15 +195,15 @@ let test_distributivity () =
   assert (
     Poly.equal
       (Poly.mul (Poly.mul_by_scalar a p) (Poly.mul_by_scalar b q))
-      (Poly.mul (Poly.mul_by_scalar a q) (Poly.mul_by_scalar b p)));
+      (Poly.mul (Poly.mul_by_scalar a q) (Poly.mul_by_scalar b p))) ;
   assert (
     Poly.equal
       (Poly.mul (Poly.mul_by_scalar Scalar.(a * b) p) q)
-      (Poly.mul (Poly.mul_by_scalar Scalar.(a * b) q) p));
+      (Poly.mul (Poly.mul_by_scalar Scalar.(a * b) q) p)) ;
   assert (
     Poly.equal
       (Poly.mul p (Poly.mul_by_scalar Scalar.(a * b) q))
-      (Poly.mul q (Poly.mul_by_scalar Scalar.(a * b) p)));
+      (Poly.mul q (Poly.mul_by_scalar Scalar.(a * b) p))) ;
   assert (
     Poly.equal
       (Poly.mul (Poly.mul_by_scalar a p) (Poly.mul_by_scalar b q))
@@ -258,11 +259,11 @@ let test_multiply_constant_by_scalar_zero_is_zero () =
   assert (Poly.is_zero (Poly.mul_by_scalar Scalar.zero p1))
 
 let test_multiply_degree_one_by_scalar_zero_is_zero () =
-  let p1 = Poly.of_coefficients [ (Scalar.of_string "1", 1) ] in
+  let p1 = Poly.of_coefficients [(Scalar.of_string "1", 1)] in
   assert (Poly.is_zero (Poly.mul_by_scalar Scalar.zero p1))
 
 let test_property_of_twice_opposite () =
-  let p1 = Poly.of_coefficients [ (Scalar.of_string "10", 1) ] in
+  let p1 = Poly.of_coefficients [(Scalar.of_string "10", 1)] in
   assert (Poly.equal (Poly.opposite (Poly.opposite p1)) p1)
 
 let test_property_opposite_of_constant () =
@@ -286,33 +287,56 @@ let tests =
       test_case "degree of zero is infinity" `Quick test_degree_zero_is_infinity;
       test_case "degree of constant is one" `Quick test_degree_zero_is_infinity;
       test_case "degree int test vectors" `Quick test_degree_int_test_vectors;
-      test_case "evaluation at any point of the zero polynomial" `Quick
+      test_case
+        "evaluation at any point of the zero polynomial"
+        `Quick
         (repeat 100 test_eval_random_point_zero_polynomial);
-      test_case "evaluation at any point of a random constant polynomial" `Quick
+      test_case
+        "evaluation at any point of a random constant polynomial"
+        `Quick
         (repeat 100 test_eval_random_point_constant_polynomial);
-      test_case "evaluation at zero of a random constant polynomial" `Quick
+      test_case
+        "evaluation at zero of a random constant polynomial"
+        `Quick
         (repeat 100 test_eval_at_zero_point_of_random_constant_polynomial);
-      test_case "evaluation at zero of the zero polynomial" `Quick
+      test_case
+        "evaluation at zero of the zero polynomial"
+        `Quick
         (repeat 100 test_eval_at_zero_of_zero_polynomial);
-      test_case "evaluation at any point of the polynomial X" `Quick
+      test_case
+        "evaluation at any point of the polynomial X"
+        `Quick
         (repeat 100 test_eval_x_to_random_point);
-      test_case "of_coeff_to_dense_vectors" `Quick
+      test_case
+        "of_coeff_to_dense_vectors"
+        `Quick
         test_of_coeff_to_dense_vectors;
-      test_case "test properties nullifier 0 * P = P * 0 = 0" `Quick
+      test_case
+        "test properties nullifier 0 * P = P * 0 = 0"
+        `Quick
         (repeat 10 test_multiply_by_zero_is_zero);
-      test_case "test properties commutativity p * q = p * q" `Quick
+      test_case
+        "test properties commutativity p * q = p * q"
+        `Quick
         (repeat 10 test_communitativity);
       test_case
         "test properties distributivity and communtativity a p * b q = (a * b) \
          (p * q) = (b p) * (a q) = p * (a * b) q"
         `Quick
         (repeat 10 test_distributivity);
-      test_case "test interpolation with only roots" `Quick
+      test_case
+        "test interpolation with only roots"
+        `Quick
         (repeat 10 (test_interpolation_fft_with_only_roots ~power:32));
-      test_case "test evaluation with zero polynomial" `Quick
+      test_case
+        "test evaluation with zero polynomial"
+        `Quick
         (test_evaluation_fft_zero ~power:1024);
-      test_case "test evaluation with smaller polynomial" `Quick
-        (repeat 10
+      test_case
+        "test evaluation with smaller polynomial"
+        `Quick
+        (repeat
+           10
            (test_evaluation_fft_random_values_with_smaller_polynomial
               ~power:1024));
       (*       test_case *)
@@ -323,14 +347,24 @@ let tests =
       (*            (test_evaluation_fft_random_values_with_larger_polynomial *)
       (*               ~generator *)
       (*               ~power)); *)
-      test_case "test multiply constant by scalar zero is zero" `Quick
+      test_case
+        "test multiply constant by scalar zero is zero"
+        `Quick
         test_multiply_constant_by_scalar_zero_is_zero;
-      test_case "test multiply degree one by scalar zero is zero" `Quick
+      test_case
+        "test multiply degree one by scalar zero is zero"
+        `Quick
         test_multiply_degree_one_by_scalar_zero_is_zero;
-      test_case "test property opposite twice" `Quick
+      test_case
+        "test property opposite twice"
+        `Quick
         test_property_of_twice_opposite;
-      test_case "test property opposite of constant" `Quick
+      test_case
+        "test property opposite of constant"
+        `Quick
         test_property_opposite_of_constant;
-      test_case "test property opposite of zero" `Quick
+      test_case
+        "test property opposite of zero"
+        `Quick
         test_property_opposite_of_zero;
     ]
