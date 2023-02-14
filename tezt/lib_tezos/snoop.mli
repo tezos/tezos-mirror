@@ -156,3 +156,6 @@ val write_config :
 *)
 val generate_code_using_solution :
   solution:string -> ?fixed_point:string -> t -> string Lwt.t
+
+(** Execute octez-snoop check definitions of [files] *)
+val check_definitions : files:string list -> t -> unit Lwt.t

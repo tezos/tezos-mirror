@@ -56,7 +56,7 @@ let create ?(path = Constant.tezos_snoop) ?(color = Log.Color.FG.blue) () =
   {path; name = "snoop"; color}
 
 let spawn_command snoop command =
-  Process.spawn ~name:snoop.name ~color:snoop.color snoop.path @@ command
+  Process.spawn ~name:snoop.name ~color:snoop.color snoop.path command
 
 (* Benchmark command *)
 
@@ -412,3 +412,14 @@ let generate_code_using_solution ~solution ?fixed_point snoop =
   let process = spawn_command snoop command in
   let* output = Process.check_and_read_stdout process in
   Lwt.return output
+
+let check_definitions ~files snoop =
+  let open Process in
+  let command ~files = ["check"; "definitions"; "of"] @ files in
+  let spawn ~files snoop = spawn_command snoop (command ~files) in
+  let process = spawn ~files snoop in
+  Lwt.catch
+    (fun () -> check process)
+    (fun exn ->
+      Log.error "Cost function definitions have some issues" ;
+      raise exn)
