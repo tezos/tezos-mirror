@@ -333,22 +333,6 @@ let tezos_rust_lib =
 let tezos_rust_lib_sapling =
   opam_only ~can_vendor:false "tezos-rust-libs" V.(at_least "1.1")
 
-let tezt_lib =
-  external_lib
-    ~js_compatible:false
-    "tezt"
-    V.(at_least "3.0.0")
-    ~main_module:"Tezt"
-
-let tezt_core_lib =
-  external_sublib
-    tezt_lib
-    ~js_compatible:true
-    "tezt.core"
-    ~main_module:"Tezt_core"
-
-let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
-
 let tls = external_lib "tls" V.(at_least "0.13.0")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
@@ -387,6 +371,38 @@ let () =
     ]
 
 (* INTERNAL LIBS *)
+
+let tezt_lib =
+  external_lib
+    ~js_compatible:false
+    "tezt"
+    V.(at_least "3.0.0")
+    ~main_module:"Tezt"
+
+let tezt_core_lib =
+  external_sublib
+    tezt_lib
+    ~js_compatible:true
+    "tezt.core"
+    ~main_module:"Tezt_core"
+
+let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
+
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
+    ?synopsis ?opam_with_test l =
+  tezt_without_tezt_lib_dependency
+    ~opam
+    ~path
+    ?synopsis
+    ?js_compatible
+    ?modes
+    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ~exe_deps:[tezt_lib]
+    ~js_deps:[tezt_js_lib]
+    ?dep_globs
+    ?dep_files
+    ?opam_with_test
+    l
 
 let octez_test_helpers =
   public_lib
@@ -3069,19 +3085,6 @@ let octez_shell_benchmarks =
         octez_micheline;
       ]
     ~linkall:true
-
-let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
-  tezt_without_tezt_lib_dependency
-    ~opam
-    ~path
-    ?synopsis
-    ?js_compatible
-    ?modes
-    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
-    ~exe_deps:[tezt_lib]
-    ~js_deps:[tezt_js_lib]
-    ?dep_globs
-    l
 
 let tezt_performance_regression =
   public_lib

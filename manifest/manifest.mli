@@ -920,7 +920,9 @@ val tezt :
   ?exe_deps:target list ->
   ?js_deps:target list ->
   ?dep_globs:string list ->
+  ?dep_files:string list ->
   ?synopsis:string ->
+  ?opam_with_test:with_test ->
   string list ->
   unit
 

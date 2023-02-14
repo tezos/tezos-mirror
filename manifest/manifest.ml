@@ -1782,16 +1782,19 @@ type tezt_target = {
   exe_deps : target list;
   js_deps : target list;
   dep_globs : string list;
+  dep_files : string list;
   modules : string list;
   js_compatible : bool option;
   modes : Dune.mode list option;
   synopsis : string option;
+  opam_with_test : with_test option;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
-    ?(js_deps = []) ?(dep_globs = []) ?synopsis modules =
+    ?(js_deps = []) ?(dep_globs = []) ?(dep_files = []) ?synopsis
+    ?opam_with_test modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1802,10 +1805,12 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       exe_deps;
       js_deps;
       dep_globs;
+      dep_files;
       modules;
       js_compatible;
       modes;
       synopsis;
+      opam_with_test;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
@@ -1819,10 +1824,12 @@ let register_tezt_targets ~make_tezt_exe =
         exe_deps;
         js_deps;
         dep_globs;
+        dep_files;
         modules;
         js_compatible;
         modes;
         synopsis;
+        opam_with_test;
       } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
@@ -1852,7 +1859,9 @@ let register_tezt_targets ~make_tezt_exe =
           ?modes
           ~deps:(lib :: deps)
           ~dep_globs
+          ~dep_files
           ~modules:[exe_name]
+          ?opam_with_test
           ~dune:
             Dune.
               [
@@ -3040,7 +3049,9 @@ let check_circular_opam_deps () =
   in
   while not (Queue.is_empty to_visit) do
     let elt = Queue.take to_visit in
-    let elt_path = Hashtbl.find shortest_path elt.kind in
+    let elt_path =
+      Option.value ~default:[] (Hashtbl.find_opt shortest_path elt.kind)
+    in
     list_iter (deps_of elt) (fun (dep : Target.internal) ->
         if not (Hashtbl.mem shortest_path dep.kind) then (
           let path = dep :: elt_path in
