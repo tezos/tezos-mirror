@@ -88,6 +88,7 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
       (List.map fst consensus_list)
   in
   Baking_actions.inject_preendorsements state ~preendorsements:consensus_list
+  >>=? fun (_ignored_state : state) -> return_unit
 
 let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in

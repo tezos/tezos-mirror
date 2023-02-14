@@ -41,8 +41,6 @@ val is_acceptable_proposal_for_current_level :
 val make_consensus_list :
   state -> proposal -> (consensus_key_and_delegate * consensus_content) list
 
-val make_preendorse_action : state -> proposal -> action
-
 val may_update_proposal :
   is_proposal_applied:bool -> state -> proposal -> state Lwt.t
 
