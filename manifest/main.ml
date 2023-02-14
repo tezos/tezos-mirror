@@ -6292,13 +6292,15 @@ let _octez_scoru_wasm_debugger =
       ]
 
 let _evm_proxy =
-  private_exe
-    "evm_proxy"
+  public_exe
+    (sf "octez-evm-proxy-server")
+    ~internal_name:(sf "evm_proxy")
     ~path:("src" // "bin_evm_proxy")
+    ~opam:"octez-evm-proxy"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
-       rollup."
-    ~opam:""
+       rollup"
+    ~release_status:Experimental
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";

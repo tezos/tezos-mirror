@@ -14,6 +14,7 @@
 (package (name octez-codec))
 (package (name octez-dac-node))
 (package (name octez-dal-node))
+(package (name octez-evm-proxy))
 (package (name octez-node))
 (package (name octez-node-config))
 (package (name octez-protocol-compiler))
