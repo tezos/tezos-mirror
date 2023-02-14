@@ -556,7 +556,11 @@ let check_limits =
     let* () = fail_2 c.max_connections "max-connections" in
     let* () = fail_2 c.max_incoming_connections "max-incoming-connections" in
     let* () = fail_2 c.read_buffer_size "read-buffer-size" in
-    let* () = fail_1 c.swap_linger "swap-linger" in
+    let* () =
+      match c.swap_linger with
+      | Some swap_linger -> fail_1 swap_linger "swap-linger"
+      | None -> return_unit
+    in
     let* () =
       match c.binary_chunks_size with
       | None -> return_unit

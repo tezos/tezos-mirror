@@ -46,7 +46,7 @@ type t = {
   peer_greylist_size : int;
   ip_greylist_size_in_kilobytes : int;
   ip_greylist_cleanup_delay : Time.System.Span.t;
-  swap_linger : Time.System.Span.t;
+  swap_linger : Time.System.Span.t option;
   binary_chunks_size : int option;
 }
 
@@ -77,7 +77,7 @@ let default =
     ip_greylist_size_in_kilobytes =
       2 * 1024 (* two megabytes has shown good properties in simulation *);
     ip_greylist_cleanup_delay = greylist_timeout;
-    swap_linger = Time.System.Span.of_seconds_exn 30.;
+    swap_linger = Some (Time.System.Span.of_seconds_exn 30.);
     binary_chunks_size = None;
   }
 
@@ -244,7 +244,10 @@ let encoding : t Data_encoding.t =
                 "max-upload-speed"
                 ~description:"Max upload speeds in KiB/s."
                 int31)
-             (dft "swap-linger" Time.System.Span.encoding default.swap_linger))
+             (dft
+                "swap-linger"
+                (option Time.System.Span.encoding)
+                default.swap_linger))
           (obj8
              (opt "binary-chunks-size" uint8)
              (dft
