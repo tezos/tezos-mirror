@@ -4722,7 +4722,7 @@ module Protocol = Protocol
     in
     let _client_tests =
       only_if N.(number >= 011) @@ fun () ->
-      tests
+      tezt
         [
           "test_michelson_v1_macros";
           "test_client_proto_contracts";
@@ -4741,7 +4741,7 @@ module Protocol = Protocol
             main |> open_;
             octez_base_test_helpers |> open_;
             octez_test_helpers |> open_;
-            alcotest_lwt;
+            alcotezt;
             qcheck_alcotest;
           ]
     in

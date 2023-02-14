@@ -65,4 +65,7 @@ let tests =
       (binary_roundtrip Client_proto_context.batch_transfer_operation_encoding);
   ]
 
-let () = Alcotest.run "Client proto context" [("Encodings", qcheck_wrap tests)]
+let () =
+  Alcotest.run
+    "Client proto context"
+    [(Protocol.name ^ ": Encodings", qcheck_wrap tests)]

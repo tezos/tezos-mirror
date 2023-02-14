@@ -51,7 +51,6 @@ let assert_expands
   match errors with
   | [] ->
       Assert.equal
-        ~print
         (Michelson_v1_primitives.strings_of_prims expansion)
         (Micheline.strip_locations expanded) ;
       ok ()
@@ -699,7 +698,6 @@ let assert_unexpansion original ex =
   match errors with
   | [] ->
       Assert.equal
-        ~print
         unparse.Michelson_v1_parser.unexpanded
         (Micheline.strip_locations ex) ;
       ok ()
@@ -1339,7 +1337,6 @@ let wrap (n, f) =
 
 let () =
   Alcotest_lwt.run
-    ~argv:[|""|]
     "tezos-lib-client"
-    [("micheline v1 macros", List.map wrap tests)]
+    [(Protocol.name ^ ": micheline v1 macros", List.map wrap tests)]
   |> Lwt_main.run
