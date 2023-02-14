@@ -34,7 +34,7 @@ depends: [
   "irmin" { >= "3.6.0" & < "3.7.0" }
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
-  "tezos-injector-alpha"
+  "octez-injector"
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
   "tezos-crypto-dal"

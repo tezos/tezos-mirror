@@ -197,6 +197,8 @@ let logs = external_lib "logs" V.True
 
 let logs_fmt = external_sublib logs "logs.fmt"
 
+let logs_lwt = external_sublib logs "logs.lwt"
+
 let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.6.0")
 
 let lwt_canceler =
@@ -3439,6 +3441,26 @@ let octez_node_config =
         octez_validation |> open_;
       ]
 
+let octez_injector =
+  public_lib
+    "octez-injector"
+    ~path:"src/lib_injector"
+    ~synopsis:"Octez: library for building injectors"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives"
+        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
+        |> open_;
+        logs_lwt;
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_crypto;
+        octez_micheline |> open_;
+        octez_client_base |> open_;
+        octez_workers |> open_;
+        octez_shell;
+      ]
+
 let octez_scoru_wasm_helpers =
   public_lib
     "tezos-scoru-wasm-helpers"
@@ -5036,7 +5058,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let injector =
-      only_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       public_lib
         (sf "tezos-injector-%s" name_dash)
         ~path:(path // "lib_injector")
@@ -5074,7 +5096,7 @@ module Protocol = Protocol
             plugin |> if_some |> open_;
             parameters |> if_some |> open_;
             octez_rpc;
-            injector |> if_some |> open_;
+            octez_injector |> open_;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
@@ -5115,7 +5137,7 @@ module Protocol = Protocol
             irmin;
             aches;
             aches_lwt;
-            injector |> if_some |> open_;
+            octez_injector |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;

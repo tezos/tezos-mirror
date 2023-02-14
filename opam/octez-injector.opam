@@ -10,21 +10,18 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "ppx_expect"
   "tezos-base"
+  "logs"
   "tezos-stdlib-unix"
   "tezos-crypto"
-  "tezos-protocol-alpha"
   "tezos-micheline"
-  "tezos-client-alpha"
   "tezos-client-base"
   "tezos-workers"
   "tezos-shell"
-  "tezos-layer2-utils-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific library building injectors"
+synopsis: "Octez: library for building injectors"

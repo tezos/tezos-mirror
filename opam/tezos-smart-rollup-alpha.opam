@@ -15,7 +15,7 @@ depends: [
   "tezos-protocol-alpha"
   "tezos-protocol-plugin-alpha"
   "tezos-rpc"
-  "tezos-injector-alpha"
+  "octez-injector"
 ]
 build: [
   ["rm" "-r" "vendors"]
