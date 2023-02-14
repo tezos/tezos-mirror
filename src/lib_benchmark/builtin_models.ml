@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,59 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Benchmark parameters. *)
-type 'config parameters = {bench_number : int; config : 'config}
+(* The model for the timer *)
 
-(* The module type of benchmarks *)
-module type S = sig
-  (** Name of the benchmark *)
-  val name : Namespace.t
+let ns = Namespace.make Namespace.root "builtin"
 
-  (** Description of the benchmark *)
-  val info : string
+let fv s = Free_variable.of_namespace (ns s)
 
-  (** Tags of the benchmark *)
-  val tags : string list
+(* The timer variable is hidden in the interface, so that it is not used directly.
+   This is to ensure that it is not used twice, since it is already added at the registration *)
+let timer_variable = fv "Timer_latency"
 
-  (** Configuration of the benchmark (eg sampling parameters, paths, etc) *)
-  type config
-
-  (** Default configuration of the benchmark *)
-  val default_config : config
-
-  (** Configuration encoding *)
-  val config_encoding : config Data_encoding.t
-
-  (** Benchmark workload *)
-  type workload
-
-  (** Workload encoding *)
-  val workload_encoding : workload Data_encoding.t
-
-  (** Optional conversion to vector, for report generation purposes *)
-  val workload_to_vector : workload -> Sparse_vec.String.t
-
-  (** Cost models, with a given local name (string) for reference *)
-  val models : (string * workload Model.t) list
-
-  (** Benchmark generator *)
-  include Generator.S with type config := config and type workload := workload
-end
-
-type t = (module S)
-
-type ('cfg, 'workload) poly =
-  (module S with type config = 'cfg and type workload = 'workload)
-
-type packed = Ex : ('cfg, 'workload) poly -> packed
-
-(** Get the name of a benchmark *)
-let name ((module B) : t) = B.name
-
-(** Get the description of a benchmark *)
-let info ((module B) : t) = B.info
-
-(** Get the tags of a benchmark *)
-let tags ((module B) : t) = B.tags
-
-let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)
+let timer_model =
+  Model.make
+    ~conv:(fun () -> ())
+    ~model:(Model.unknown_const1 ~name:(ns "timer_model") ~const:timer_variable)

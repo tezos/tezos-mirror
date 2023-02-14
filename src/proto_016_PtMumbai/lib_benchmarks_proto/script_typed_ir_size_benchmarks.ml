@@ -57,7 +57,11 @@ module Size_benchmarks_shared_config = struct
     let coeff_variable = fv (Format.asprintf "%s_size_coeff" name) in
     Model.make
       ~conv:(function {size} -> (size, ()))
-      ~model:(Model.affine ~intercept:intercept_variable ~coeff:coeff_variable)
+      ~model:
+        (Model.affine
+           ~name:(ns name)
+           ~intercept:intercept_variable
+           ~coeff:coeff_variable)
 end
 
 module Value_size_benchmark : sig
@@ -268,6 +272,7 @@ module Node_size_benchmark : Benchmark.S = struct
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
@@ -279,7 +284,7 @@ module Node_size_benchmark : Benchmark.S = struct
   let () =
     Registration_helpers.register_for_codegen
       (Namespace.basename name)
-      (Model.For_codegen size_based_model)
+      size_based_model
 
   let models = [(model_name, size_based_model)]
 

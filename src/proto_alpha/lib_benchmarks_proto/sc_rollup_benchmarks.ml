@@ -420,9 +420,7 @@ module Sc_rollup_verify_output_proof_benchmark = struct
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
       ~model:
-        (Model.affine
-           ~intercept:(Free_variable.of_string "const")
-           ~coeff:(Free_variable.of_string "proof_length"))
+        (Model.affine ~name ~intercept:(fv "const") ~coeff:(fv "proof_length"))
 
   let models = [("verify_output_proof", verify_output_proof_model)]
 
@@ -486,11 +484,6 @@ module Sc_rollup_verify_output_proof_benchmark = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen verify_output_proof_model)
 end
 
 (** This benchmark estimates the cost of verifying an output proof for the
@@ -569,9 +562,7 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
       ~model:
-        (Model.affine
-           ~intercept:(Free_variable.of_string "const")
-           ~coeff:(Free_variable.of_string "proof_length"))
+        (Model.affine ~name ~intercept:(fv "const") ~coeff:(fv "proof_length"))
 
   let models = [("deserialize_output_proof", verify_output_proof_model)]
 
@@ -642,11 +633,6 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen verify_output_proof_model)
 end
 
 let () =

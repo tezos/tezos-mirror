@@ -1,13 +1,5 @@
 Missing config file prints
   $ ./main_snoop.exe benchmark proto/alpha/interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
-  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Benchmarking with the following options:
   { options = { seed=self-init;
                 bench #=1;
@@ -34,14 +26,6 @@ Missing config file prints
 
 Generate empty config
   $ ./main_snoop.exe config generate empty in empty.json; jq . empty.json
-  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   {
     "namespace": ".",
     "config": null,
@@ -50,14 +34,6 @@ Generate empty config
 
 Generate default config
   $ ./main_snoop.exe config generate default in dft.json for proto/alpha/interpreter/N_IBlake2b; jq . dft.json
-  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   {
     "namespace": ".",
     "config": null,
@@ -176,14 +152,6 @@ Generate default config
 
 Modify empty config
   $ ./main_snoop.exe config edit dft.json for proto/alpha/interpreter -j '{"a":123}'; jq . dft.json
-  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   {
     "namespace": ".",
     "config": null,
@@ -304,14 +272,6 @@ Modify empty config
 
 Check config edition
   $ ./main_snoop.exe config check dft.json for proto/alpha/interpreter/N_IBlake2b
-  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Looking for custom configuration for benchmark proto/alpha/interpreter/N_IBlake2b
   Config file successfully parsed
   Loaded configuration from dft.json for benchmark proto/alpha/interpreter/N_IBlake2b
@@ -328,14 +288,6 @@ Check config edition
 
 Test merge
   $ ./main_snoop.exe config merge dft.json in empty.json; jq . empty.json
-  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   {
     "namespace": ".",
     "config": null,

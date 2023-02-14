@@ -29,8 +29,10 @@ let fv s = Free_variable.of_namespace (ns s)
 
 (* We use the same Bloom filter configuration as used in P2p_acl *)
 
-let const_time_model name =
-  Model.make ~conv:(fun () -> ()) ~model:(Model.unknown_const1 ~const:(fv name))
+let const_time_model ~const_name ~name =
+  Model.make
+    ~conv:(fun () -> ())
+    ~model:(Model.unknown_const1 ~name ~const:(fv const_name))
 
 let make_bench name info model generator make_bench :
     Tezos_benchmark.Benchmark.t =
@@ -57,7 +59,7 @@ let make_bench name info model generator make_bench :
       let generator () = generator rng_state in
       List.repeat bench_num (make_bench generator)
 
-    let models = [("bloomer", model)]
+    let models = [("bloomer", model ~name)]
   end in
   (module Bench)
 
@@ -73,7 +75,7 @@ let () =
   @@ make_bench
        "bloomer_mem"
        "Benchmarking Bloomer.mem"
-       (const_time_model "bloomer_mem_const")
+       (const_time_model ~const_name:"bloomer_mem_const")
        (fun _rng_state ->
          let bloomer = make_bloomer () in
          let string = "test" in
@@ -89,7 +91,7 @@ let () =
   @@ make_bench
        "bloomer_add"
        "Benchmarking Bloomer.add"
-       (const_time_model "bloomer_add_const")
+       (const_time_model ~const_name:"bloomer_add_const")
        (fun _rng_state -> make_bloomer ())
        (fun generator () ->
          let bloomer = generator () in

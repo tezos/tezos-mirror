@@ -26,6 +26,8 @@
 open Protocol
 module Size = Gas_input_size
 
+let ns = Namespace.of_string
+
 module Apply_diff_bench : Benchmark.S = struct
   include Interpreter_benchmarks.Default_config
   include Interpreter_benchmarks.Default_boilerplate
@@ -72,6 +74,7 @@ module Apply_diff_bench : Benchmark.S = struct
       ~conv:(fun {nb_input; nb_output; _} -> (nb_input, (nb_output, ())))
       ~model:
         (Model.bilinear_affine
+           ~name:(ns name)
            ~intercept:(Free_variable.of_string "apply_diff_const")
            ~coeff1:(Free_variable.of_string "apply_diff_inputs")
            ~coeff2:(Free_variable.of_string "apply_diff_outputs"))

@@ -64,7 +64,7 @@ module Next : Benchmark.S = struct
 
   let next_model =
     let conv x = (x, ()) in
-    Model.make ~conv ~model:(Model.logn ~coeff:(fv "len_coeff"))
+    Model.make ~conv ~model:(Model.logn ~name ~coeff:(fv "len_coeff"))
 
   let models = [("skip_list_next", next_model)]
 
@@ -86,11 +86,6 @@ module Next : Benchmark.S = struct
     let prev_cell_ptr = () in
     let closure () = ignore (next ~prev_cell ~prev_cell_ptr ()) in
     Generator.Plain {workload; closure}
-
-  let () =
-    Registration.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen next_model)
 end
 
 (** Benchmark for the [Sc_rollup_inbox_repr.hash_skip_list_cell]
@@ -142,6 +137,7 @@ module Hash_cell = struct
       ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:(Free_variable.of_string "cost_hash_skip_list_cell")
            ~coeff:(Free_variable.of_string "cost_hash_skip_list_cell_coef"))
 
@@ -175,11 +171,6 @@ module Hash_cell = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen hash_skip_list_cell_model)
 end
 
 let () = Registration_helpers.register (module Next)

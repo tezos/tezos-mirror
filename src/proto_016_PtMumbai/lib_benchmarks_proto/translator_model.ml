@@ -58,7 +58,7 @@ let gas_based_model t_kind code_or_data =
   Model.make
     ~conv:(function
       | Translator_workload.Typechecker_workload {consumed; _} -> (consumed, ()))
-    ~model:(gas_full t_kind code_or_data)
+    ~model:(gas_full ~name:(ns "gas") t_kind code_or_data)
 
 let size_based_model t_kind code_or_data =
   Model.make
@@ -67,4 +67,4 @@ let size_based_model t_kind code_or_data =
           match micheline_size with
           | {traversal; int_bytes; string_bytes} ->
               (traversal, (int_bytes, (string_bytes, ())))))
-    ~model:(size_full t_kind code_or_data)
+    ~model:(size_full ~name:(ns "size") t_kind code_or_data)

@@ -34,7 +34,7 @@ let gas_full t_kind code_or_data =
   in
   let intercept = Free_variable.of_string (Format.asprintf "%s_const" name) in
   let coeff = Free_variable.of_string (Format.asprintf "%s_coeff" name) in
-  Model.affine ~intercept ~coeff
+  Model.affine ~name:(Namespace.of_string name) ~intercept ~coeff
 
 let size_full t_kind code_or_data =
   let name =
@@ -50,7 +50,7 @@ let size_full t_kind code_or_data =
   let coeff3 =
     Free_variable.of_string (Format.asprintf "%s_string_bytes" name)
   in
-  Model.trilinear ~coeff1 ~coeff2 ~coeff3
+  Model.trilinear ~name:(Namespace.of_string name) ~coeff1 ~coeff2 ~coeff3
 
 let gas_based_model t_kind code_or_data =
   Model.make

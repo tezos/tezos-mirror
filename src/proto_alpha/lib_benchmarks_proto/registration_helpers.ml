@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ns = Namespace.make Namespace.root "proto"
-
-let ns = Namespace.make ns Protocol.name
+let ns = Namespace.(make (make root "proto") Protocol.name)
 
 let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark.S = struct
@@ -34,6 +32,3 @@ let register ((module Bench) : Benchmark.t) =
     let tags = Protocol.name :: tags
   end in
   Registration.register (module B)
-
-let register_for_codegen name model =
-  Registration.register_for_codegen (name ^ "__" ^ Protocol.name) model

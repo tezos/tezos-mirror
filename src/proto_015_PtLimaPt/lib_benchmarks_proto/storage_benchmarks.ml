@@ -34,6 +34,8 @@ open Tezos_benchmark
 open Storage_functors
 open Protocol
 
+let ns = Namespace.of_string
+
 (** Creates a dummy raw-context value. *)
 let default_raw_context () =
   let initial_accounts =
@@ -137,7 +139,7 @@ module Table =
 module List_key_values_benchmark_boilerplate = struct
   type config = {max_size : int}
 
-  let name = Namespace.of_string "List_key_values"
+  let name = "List_key_values"
 
   let info = "List key values"
 
@@ -167,11 +169,13 @@ module List_key_values_benchmark_boilerplate = struct
         Model.make
           ~conv:(fun {size} -> (size, ()))
           ~model:
-            (Model.affine_split_const
-               ~intercept1:Builtin_benchmarks.timer_variable
-               ~intercept2:(Free_variable.of_string "list_key_values_intercept")
+            (Model.affine
+               ~name:(ns name)
+               ~intercept:(Free_variable.of_string "list_key_values_intercept")
                ~coeff:(Free_variable.of_string "list_key_values_step")) );
     ]
+
+  let name = ns name
 end
 
 module List_key_values_benchmark = struct

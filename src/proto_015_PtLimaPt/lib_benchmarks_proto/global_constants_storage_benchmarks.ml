@@ -39,6 +39,8 @@ open Tezos_benchmark
 open Tezos_micheline
 open Protocol
 
+let ns = Namespace.of_string
+
 let assert_ok_lwt x =
   match Lwt_main.run x with
   | Ok x -> x
@@ -314,7 +316,8 @@ module Set_add : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(logn ~coeff:(Free_variable.of_string "size"))) );
+            ~model:
+              (logn ~name:(ns name) ~coeff:(Free_variable.of_string "size"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -332,13 +335,7 @@ module Set_add : Benchmark.S = struct
   let name = Namespace.of_string name
 end
 
-let () =
-  Registration_helpers.register (module Set_add) ;
-  Registration_helpers.register_for_codegen
-    "Set_add"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc ~equal:String.equal "Set_add" Set_add.models))
+let () = Registration_helpers.register (module Set_add)
 
 (** Cost model and benchmarks for set elements from the
     OCaml stdlib.
@@ -374,7 +371,9 @@ module Set_elements : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(linear ~coeff:(Free_variable.of_string "size"))) );
+            ~model:
+              (linear ~name:(ns name) ~coeff:(Free_variable.of_string "size")))
+      );
     ]
 
   module Int_set = Set.Make (Int)
@@ -392,13 +391,7 @@ module Set_elements : Benchmark.S = struct
   let name = Namespace.of_string name
 end
 
-let () =
-  Registration_helpers.register (module Set_elements) ;
-  Registration_helpers.register_for_codegen
-    "Set_elements"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc ~equal:String.equal "Set_elements" Set_elements.models))
+let () = Registration_helpers.register (module Set_elements)
 
 (** Cost model and benchmarks for [Script_expr_hash.of_b58_check_opt].
     Under the hood this function uses the [Blake2b] functor, which uses
@@ -444,6 +437,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
             ~conv:(fun Micheline_sampler.{nodes; _} -> (nodes, ()))
             ~model:
               (Model.affine
+                 ~name:(ns name)
                  ~intercept:(Free_variable.of_string "b58_check_cost")
                  ~coeff:(Free_variable.of_string "size"))) );
     ]
@@ -470,16 +464,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
   let name = Namespace.of_string name
 end
 
-let () =
-  Registration_helpers.register (module Script_expr_hash_of_b58check_opt) ;
-  Registration_helpers.register_for_codegen
-    "Script_expr_hash_of_b58check_opt"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc
-            ~equal:String.equal
-            "Script_expr_hash_of_b58check_opt"
-            Script_expr_hash_of_b58check_opt.models))
+let () = Registration_helpers.register (module Script_expr_hash_of_b58check_opt)
 
 module Global_constants_storage_expr_to_address_in_context : Benchmark.S =
 struct
@@ -512,7 +497,9 @@ struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(linear ~coeff:(Free_variable.of_string "size"))) );
+            ~model:
+              (linear ~name:(ns name) ~coeff:(Free_variable.of_string "size")))
+      );
     ]
 
   let create_benchmark rng_state _config () =
@@ -535,15 +522,7 @@ end
 
 let () =
   Registration_helpers.register
-    (module Global_constants_storage_expr_to_address_in_context) ;
-  Registration_helpers.register_for_codegen
-    "Global_constants_storage_expr_to_address_in_context"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc
-            ~equal:String.equal
-            "Global_constants_storage_expr_to_address_in_context"
-            Global_constants_storage_expr_to_address_in_context.models))
+    (module Global_constants_storage_expr_to_address_in_context)
 
 (** [Global_constants_storage.expand] traverses a Micheline node,
     searching for constants and replacing them with their values
@@ -607,8 +586,9 @@ module Global_constants_storage_expand_models = struct
             make
               ~conv:(fun size -> (size, ()))
               ~model:
-                (linear ~coeff:(Free_variable.of_string "number of constants")))
-        );
+                (linear
+                   ~name:(ns name)
+                   ~coeff:(Free_variable.of_string "number of constants"))) );
       ]
 
     (* To test Branch 2 as nearly as possible, we generate a Micheline Seq
@@ -645,15 +625,7 @@ module Global_constants_storage_expand_models = struct
 
   let () =
     Registration_helpers.register
-      (module Global_constants_storage_expand_constant_branch) ;
-    Registration_helpers.register_for_codegen
-      "Global_constants_storage_expand_constant_branch"
-      (Model.For_codegen
-         (WithExceptions.Option.get ~loc:__LOC__
-         @@ List.assoc
-              ~equal:String.equal
-              "Global_constants_storage_expand_constant_branch"
-              Global_constants_storage_expand_constant_branch.models))
+      (module Global_constants_storage_expand_constant_branch)
 
   module Global_constants_storage_expand_no_constant_branch : Benchmark.S =
   struct
@@ -699,6 +671,7 @@ module Global_constants_storage_expand_models = struct
               ~conv:(fun size -> (size, ()))
               ~model:
                 (nlogn
+                   ~name:(ns name)
                    ~intercept:(Free_variable.of_string "cst")
                    ~coeff:(Free_variable.of_string "number of nodes"))) );
       ]
@@ -727,13 +700,5 @@ module Global_constants_storage_expand_models = struct
 
   let () =
     Registration_helpers.register
-      (module Global_constants_storage_expand_no_constant_branch) ;
-    Registration_helpers.register_for_codegen
-      "Global_constants_storage_expand_no_constant_branch"
-      (Model.For_codegen
-         (WithExceptions.Option.get ~loc:__LOC__
-         @@ List.assoc
-              ~equal:String.equal
-              "Global_constants_storage_expand_no_constant_branch"
-              Global_constants_storage_expand_no_constant_branch.models))
+      (module Global_constants_storage_expand_no_constant_branch)
 end

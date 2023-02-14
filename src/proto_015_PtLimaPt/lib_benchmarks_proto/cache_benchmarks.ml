@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.of_string
+
 (** {2 [Alpha_context.Cache]-related benchmarks} *)
 
 let assert_ok_lwt x =
@@ -142,6 +144,8 @@ module Cache_update_benchmark : Benchmark.S = struct
       let module M = struct
         type arg_type = int * unit
 
+        let name = ns name
+
         module Def (X : Costlang.S) = struct
           open X
 
@@ -189,7 +193,7 @@ module Cache_update_benchmark : Benchmark.S = struct
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
 
-  let name = Namespace.of_string name
+  let name = ns name
 end
 
 let () = Registration_helpers.register (module Cache_update_benchmark)

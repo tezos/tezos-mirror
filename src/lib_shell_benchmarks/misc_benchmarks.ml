@@ -32,10 +32,7 @@ let lwt_variable = fv "lwt_main_run"
 let lwt_model =
   Model.make
     ~conv:(fun () -> ())
-    ~model:
-      (Model.unknown_const2
-         ~const1:Builtin_benchmarks.timer_variable
-         ~const2:lwt_variable)
+    ~model:(Model.unknown_const1 ~name:(ns "lwt_model") ~const:lwt_variable)
 
 module Lwt_main_run_bench : Benchmark.S = struct
   type config = unit

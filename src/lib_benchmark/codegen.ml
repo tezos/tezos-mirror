@@ -215,7 +215,7 @@ let save_solution (s : solution) (fn : string) =
 
 (* ------------------------------------------------------------------------- *)
 
-let codegen (Model.For_codegen model) (sol : solution)
+let codegen (Model.Model model) (sol : solution)
     (transform : Costlang.transform) (name : string) =
   let subst fv =
     match Free_variable.Map.find fv sol.map with
@@ -232,36 +232,28 @@ let codegen (Model.For_codegen model) (sol : solution)
       end)
       (Impl)
   in
-  match model with
-  | Model.Preapplied _ -> None
-  | Model.Packaged {conv = _; model} ->
-      let name =
-        (* This renaming is a short-term workaround
-           until we have proper namespaces for model registration. *)
-        Option.value (String.remove_suffix ~suffix:"__alpha" name) ~default:name
-      in
-      let module M = (val model) in
-      let comments =
-        let module Sub =
-          Costlang.Subst
-            (struct
-              let subst = subst
-            end)
-            (Costlang.Pp)
-        in
-        let module M = M.Def (Sub) in
-        let expr = Sub.prj M.model in
-        ["model " ^ name; expr]
-      in
-      let module M = M.Def (Subst_impl) in
-      let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
-      Some (comments, generate_let_binding name expr)
+  let module M = (val model) in
+  let comments =
+    let module Sub =
+      Costlang.Subst
+        (struct
+          let subst = subst
+        end)
+        (Costlang.Pp)
+    in
+    let module M = M.Def (Sub) in
+    let expr = Sub.prj M.model in
+    ["model " ^ name; expr]
+  in
+  let module M = M.Def (Subst_impl) in
+  let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
+  Some (comments, generate_let_binding name expr)
 
 let codegen_module models sol transform =
   let items =
     List.filter_map
-      (fun (name, model) ->
-        let name = Printf.sprintf "cost_%s" name in
+      (fun (name, (model, _)) ->
+        let name = Format.asprintf "cost_%a" Namespace.pp name in
         codegen model sol transform name)
       models
   in

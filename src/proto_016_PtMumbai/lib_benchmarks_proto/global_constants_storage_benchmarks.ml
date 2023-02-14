@@ -316,8 +316,9 @@ module Set_add : Benchmark.S = struct
     [
       ( "Set_add",
         Model.(
-          make ~conv:(fun size -> (size, ())) ~model:(logn ~coeff:(fv "size")))
-      );
+          make
+            ~conv:(fun size -> (size, ()))
+            ~model:(logn ~name ~coeff:(fv "size"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -335,11 +336,7 @@ end
 
 let () =
   Registration_helpers.register (module Set_add) ;
-  Registration_helpers.register_for_codegen
-    "Set_add"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc ~equal:String.equal "Set_add" Set_add.models))
+  Registration_helpers.register_for_codegen "Set_add" ()
 
 (** Cost model and benchmarks for set elements from the
     OCaml stdlib.
@@ -373,8 +370,9 @@ module Set_elements : Benchmark.S = struct
     [
       ( "Set_elements",
         Model.(
-          make ~conv:(fun size -> (size, ())) ~model:(linear ~coeff:(fv "size")))
-      );
+          make
+            ~conv:(fun size -> (size, ()))
+            ~model:(linear ~name ~coeff:(fv "size"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -392,11 +390,7 @@ end
 
 let () =
   Registration_helpers.register (module Set_elements) ;
-  Registration_helpers.register_for_codegen
-    "Set_elements"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc ~equal:String.equal "Set_elements" Set_elements.models))
+  Registration_helpers.register_for_codegen "Set_elements" ()
 
 (** Cost model and benchmarks for [Script_expr_hash.of_b58_check_opt].
     Under the hood this function uses the [Blake2b] functor, which uses
@@ -441,8 +435,10 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
           make
             ~conv:(fun Micheline_sampler.{nodes; _} -> (nodes, ()))
             ~model:
-              (Model.affine ~intercept:(fv "b58_check_cost") ~coeff:(fv "size")))
-      );
+              (Model.affine
+                 ~name
+                 ~intercept:(fv "b58_check_cost")
+                 ~coeff:(fv "size"))) );
     ]
 
   (* To create realistic benchmarks, we generate a random Micheline expression,
@@ -469,12 +465,7 @@ let () =
   Registration_helpers.register (module Script_expr_hash_of_b58check_opt) ;
   Registration_helpers.register_for_codegen
     "Script_expr_hash_of_b58check_opt"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc
-            ~equal:String.equal
-            "Script_expr_hash_of_b58check_opt"
-            Script_expr_hash_of_b58check_opt.models))
+    ()
 
 module Global_constants_storage_expr_to_address_in_context : Benchmark.S =
 struct
@@ -505,8 +496,9 @@ struct
     [
       ( "Global_constants_storage_expr_to_address_in_context",
         Model.(
-          make ~conv:(fun size -> (size, ())) ~model:(linear ~coeff:(fv "size")))
-      );
+          make
+            ~conv:(fun size -> (size, ()))
+            ~model:(linear ~name ~coeff:(fv "size"))) );
     ]
 
   let create_benchmark rng_state _config () =
@@ -530,12 +522,7 @@ let () =
     (module Global_constants_storage_expr_to_address_in_context) ;
   Registration_helpers.register_for_codegen
     "Global_constants_storage_expr_to_address_in_context"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc
-            ~equal:String.equal
-            "Global_constants_storage_expr_to_address_in_context"
-            Global_constants_storage_expr_to_address_in_context.models))
+    ()
 
 (** [Global_constants_storage.expand] traverses a Micheline node,
     searching for constants and replacing them with their values
@@ -598,7 +585,7 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:(linear ~coeff:(fv "number of constants"))) );
+              ~model:(linear ~name ~coeff:(fv "number of constants"))) );
       ]
 
     (* To test Branch 2 as nearly as possible, we generate a Micheline Seq
@@ -636,12 +623,7 @@ module Global_constants_storage_expand_models = struct
       (module Global_constants_storage_expand_constant_branch) ;
     Registration_helpers.register_for_codegen
       "Global_constants_storage_expand_constant_branch"
-      (Model.For_codegen
-         (WithExceptions.Option.get ~loc:__LOC__
-         @@ List.assoc
-              ~equal:String.equal
-              "Global_constants_storage_expand_constant_branch"
-              Global_constants_storage_expand_constant_branch.models))
+      ()
 
   module Global_constants_storage_expand_no_constant_branch : Benchmark.S =
   struct
@@ -685,8 +667,11 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:(nlogn ~intercept:(fv "cst") ~coeff:(fv "number of nodes")))
-        );
+              ~model:
+                (nlogn
+                   ~name
+                   ~intercept:(fv "cst")
+                   ~coeff:(fv "number of nodes"))) );
       ]
 
     (** We benchmark this by generating a random Micheline expression without constants
@@ -714,10 +699,5 @@ module Global_constants_storage_expand_models = struct
       (module Global_constants_storage_expand_no_constant_branch) ;
     Registration_helpers.register_for_codegen
       "Global_constants_storage_expand_no_constant_branch"
-      (Model.For_codegen
-         (WithExceptions.Option.get ~loc:__LOC__
-         @@ List.assoc
-              ~equal:String.equal
-              "Global_constants_storage_expand_no_constant_branch"
-              Global_constants_storage_expand_no_constant_branch.models))
+      ()
 end

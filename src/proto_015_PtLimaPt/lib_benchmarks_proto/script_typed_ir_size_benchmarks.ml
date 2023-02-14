@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.of_string
+
 (** {2 [Script_typed_ir_size]-related benchmarks} *)
 
 (** Benchmarking {!Script_typed_ir_size.value_size}. *)
@@ -57,7 +59,11 @@ module Size_benchmarks_shared_config = struct
     in
     Model.make
       ~conv:(function {size} -> (size, ()))
-      ~model:(Model.affine ~intercept:intercept_variable ~coeff:coeff_variable)
+      ~model:
+        (Model.affine
+           ~name:(ns name)
+           ~intercept:intercept_variable
+           ~coeff:coeff_variable)
 end
 
 module Value_size_benchmark : sig
@@ -274,16 +280,12 @@ module Node_size_benchmark : Benchmark.S = struct
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
       ~model:
         (Model.affine
+           ~name:(ns name)
            ~intercept:
              (Free_variable.of_string (Format.asprintf "%s_const" name))
            ~coeff:
              (Free_variable.of_string
                 (Format.asprintf "%s_ns_per_node_coeff" name)))
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen size_based_model)
 
   let models = [(model_name, size_based_model)]
 

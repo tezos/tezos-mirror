@@ -26,6 +26,8 @@
 open Protocol
 module Size = Gas_input_size
 
+let ns = Namespace.of_string
+
 (** {2 [Script_ir_translator] benchmarks} *)
 
 module Config = struct
@@ -564,20 +566,13 @@ module Ty_eq : Benchmark.S = struct
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
       ~model:
-        (Model.affine_split_const
-           ~intercept1:Builtin_benchmarks.timer_variable
-           ~intercept2:intercept_var
-           ~coeff:coeff_var)
+        (Model.affine ~name:(ns name) ~intercept:intercept_var ~coeff:coeff_var)
 
   let codegen_model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:(Model.affine ~intercept:intercept_var ~coeff:coeff_var)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen codegen_model)
+      ~model:
+        (Model.affine ~name:(ns name) ~intercept:intercept_var ~coeff:coeff_var)
 
   let models =
     [("size_translator_model", size_model); ("codegen", codegen_model)]
@@ -748,6 +743,7 @@ module Parse_type_benchmark : Benchmark.S = struct
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name:(ns name)
            ~intercept:
              (Free_variable.of_string (Format.asprintf "%s_const" name))
            ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
@@ -798,6 +794,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name:(ns name)
            ~intercept:
              (Free_variable.of_string (Format.asprintf "%s_const" name))
            ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
@@ -806,11 +803,6 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen size_model)
 
   let name = Namespace.of_string name
 end

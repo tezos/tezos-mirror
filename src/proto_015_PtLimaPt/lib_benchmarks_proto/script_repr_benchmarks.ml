@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.of_string
+
 (** {2 [Script_repr] benchmarks} *)
 
 module Script_repr_shared_config = struct
@@ -81,16 +83,12 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
       ~model:
         (Model.affine
+           ~name:(ns name)
            ~intercept:
              (Free_variable.of_string (Format.asprintf "%s_const" name))
            ~coeff:
              (Free_variable.of_string
                 (Format.asprintf "%s_ns_per_node_coeff" name)))
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen size_based_model)
 
   let models = [("size_translator_model", size_based_model)]
 
@@ -123,12 +121,7 @@ module Script_repr_strip_annotations : Benchmark.S = struct
     Model.(
       make
         ~conv:(fun {micheline_nodes} -> (micheline_nodes, ()))
-        ~model:(linear ~coeff:(Free_variable.of_string "nodes")))
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen strip_annotations_model)
+        ~model:(linear ~name:(ns name) ~coeff:(Free_variable.of_string "nodes")))
 
   let models = [("strip_annotations_model", strip_annotations_model)]
 

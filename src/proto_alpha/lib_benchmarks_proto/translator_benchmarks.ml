@@ -559,24 +559,9 @@ module Ty_eq : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:
-        (Model.affine_split_const
-           ~intercept1:Builtin_benchmarks.timer_variable
-           ~intercept2:intercept_var
-           ~coeff:coeff_var)
+      ~model:(Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
 
-  let codegen_model =
-    Model.make
-      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:(Model.affine ~intercept:intercept_var ~coeff:coeff_var)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen codegen_model)
-
-  let models =
-    [("size_translator_model", size_model); ("codegen", codegen_model)]
+  let models = [("size_translator_model", size_model)]
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     Lwt_main.run
@@ -742,6 +727,7 @@ module Parse_type_benchmark : Benchmark.S = struct
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
@@ -790,6 +776,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
@@ -798,11 +785,6 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen size_model)
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)

@@ -521,7 +521,7 @@ module Infer_cmd = struct
       ~desc:"Name of the model for which to infer parameter"
       (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
-           Lwt.return_ok (Registration.all_model_names ()))
+           Lwt.return_ok (Registration.all_local_model_names ()))
          (fun _ str -> Lwt.return_ok str))
 
   let regression_param =
@@ -592,6 +592,7 @@ module Codegen_cmd = struct
       | None -> No_transform
       | Some json_file -> load_fixed_point_parameters json_file
     in
+    let model_name = Namespace.of_string model_name in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
     Lwt.return_ok ()
@@ -612,7 +613,7 @@ module Codegen_cmd = struct
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (name, _) -> name)
+               (fun (name, _) -> Namespace.to_string name)
                (Registration.all_registered_models ())
            in
            Lwt.return_ok res)
@@ -772,30 +773,20 @@ module List_cmd = struct
          ())
 
   let base_handler_bench bench_list show_tags =
-    if show_tags then
-      List.iter
-        (fun (module Bench : Benchmark.S) ->
-          Format.fprintf
-            Format.std_formatter
-            "%a: %s\n\tTags: %a\n"
-            Namespace.pp
-            Bench.name
-            Bench.info
-            (Format.pp_print_list
-               ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
-               Format.pp_print_string)
-            Bench.tags)
-        bench_list
-    else
-      List.iter
-        (fun (module Bench : Benchmark.S) ->
-          Format.fprintf
-            Format.std_formatter
-            "%a: %s\n"
-            Namespace.pp
-            Bench.name
-            Bench.info)
-        bench_list ;
+    Format.printf
+      "%a@."
+      (Format.pp_print_list (fun fmt (module Bench : Benchmark.S) ->
+           Format.fprintf fmt "%a: %s" Namespace.pp Bench.name Bench.info ;
+           if show_tags then
+             Format.fprintf
+               fmt
+               "@.\tTags: %a"
+               (Format.pp_print_list
+                  ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+                  Format.pp_print_string)
+               Bench.tags
+           else ()))
+      bench_list ;
     Lwt_result_syntax.return_unit
 
   let handler_all_bench show_tags () =
@@ -845,18 +836,38 @@ module List_cmd = struct
   let params_all_param = Tezos_clic.fixed ["list"; "all"; "parameters"]
 
   let handler_all_param () () =
-    List.iter
-      (fun (param, models) ->
-        Format.fprintf
-          Format.std_formatter
-          "%a\n\tModels: %a\n"
-          Namespace.pp
-          param
-          (Format.pp_print_list
-             ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
-             Format.pp_print_string)
-          models)
+    Format.printf
+      "%a@."
+      (Format.pp_print_list (fun fmt (param, models) ->
+           Format.fprintf
+             fmt
+             "%a@.\tModels: %a"
+             Namespace.pp
+             param
+             (Format.pp_print_list
+                ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
+                Namespace.pp)
+             models))
       (Registration.all_registered_parameters ()) ;
+    Lwt_result_syntax.return_unit
+
+  let params_all_models = Tezos_clic.fixed ["list"; "all"; "models"]
+
+  let print_model : type a. a Model.model -> string =
+   fun model ->
+    let module M = (val model) in
+    let module M = M.Def (Costlang.Pp) in
+    M.model
+
+  let handler_all_models () () =
+    Format.printf
+      "%a@."
+      (Format.pp_print_list (fun fmt (name, (model, _)) ->
+           let printed =
+             match model with Model.Model model -> print_model model
+           in
+           Format.fprintf fmt "%a@.\t%s" Namespace.pp name printed))
+      (Registration.all_registered_models ()) ;
     Lwt_result_syntax.return_unit
 
   let group =
@@ -918,6 +929,14 @@ module List_cmd = struct
       params_all_param
       handler_all_param
 
+  let command_all_models =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all models"
+      Tezos_clic.no_options
+      params_all_models
+      handler_all_models
+
   let commands =
     [
       command_all_bench;
@@ -927,6 +946,7 @@ module List_cmd = struct
       command_bench_tags_exact;
       command_bench_match;
       command_all_param;
+      command_all_models;
     ]
 end
 

@@ -26,6 +26,8 @@
 open Protocol
 open Alpha_context
 
+let ns = Namespace.of_string
+
 module Ticket_type_shared = struct
   type config = {max_size : int}
 
@@ -83,9 +85,9 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
     Model.make
       ~conv:(fun () -> ())
       ~model:
-        (Model.unknown_const2
-           ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(Free_variable.of_string "compare_ticket_hash"))
+        (Model.unknown_const1
+           ~name:(ns name)
+           ~const:(Free_variable.of_string "compare_ticket_hash"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -103,11 +105,6 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen compare_model)
 
   let name = Namespace.of_string name
 end
@@ -144,9 +141,9 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
     Model.make
       ~conv:(fun () -> ())
       ~model:
-        (Model.unknown_const2
-           ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(Free_variable.of_string "compare_contract"))
+        (Model.unknown_const1
+           ~name:(ns name)
+           ~const:(Free_variable.of_string "compare_contract"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -163,11 +160,6 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen compare_model)
 
   let name = Namespace.of_string name
 end
@@ -233,6 +225,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
       ~conv:(function {nodes} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name:(ns name)
            ~intercept:
              (Free_variable.of_string (Format.asprintf "%s_const" name))
            ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
@@ -241,11 +234,6 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen size_model)
 
   let name = Namespace.of_string name
 end
@@ -312,6 +300,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
       ~conv:(function {nodes} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name:(ns name)
            ~intercept:
              (Free_variable.of_string (Format.asprintf "%s_const" name))
            ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
@@ -320,11 +309,6 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen size_model)
 
   let name = Namespace.of_string name
 end

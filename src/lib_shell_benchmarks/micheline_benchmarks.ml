@@ -159,7 +159,7 @@ module Micheline_strip_locations : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
-            ~model:(linear ~coeff:(fv "nodes"))) );
+            ~model:(linear ~name ~coeff:(fv "nodes"))) );
     ]
 
   let create_benchmark rng_state () =

@@ -86,10 +86,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
   let compare_model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:
-        (Model.unknown_const2
-           ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(fv "compare_ticket_hash"))
+      ~model:(Model.unknown_const1 ~name ~const:(fv "compare_ticket_hash"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -107,11 +104,6 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen compare_model)
 end
 
 let () = Registration_helpers.register (module Compare_ticket_hash_benchmark)
@@ -145,10 +137,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
   let compare_model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:
-        (Model.unknown_const2
-           ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(fv "compare_contract"))
+      ~model:(Model.unknown_const1 ~name ~const:(fv "compare_contract"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -165,11 +154,6 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen compare_model)
 end
 
 let () = Registration_helpers.register (module Compare_key_contract_benchmark)
@@ -233,6 +217,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
       ~conv:(function {nodes} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
@@ -241,11 +226,6 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen size_model)
 end
 
 let () = Registration_helpers.register (module Has_tickets_type_benchmark)
@@ -305,6 +285,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
       ~conv:(function {nodes} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
@@ -313,11 +294,6 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
-
-  let () =
-    Registration_helpers.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen size_model)
 end
 
 let () = Registration_helpers.register (module Collect_tickets_benchmark)
