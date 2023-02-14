@@ -10,7 +10,7 @@
   tezos-error-monad
   data-encoding
   tezos-crypto
-  tezos-bls12-381-polynomial
+  tezos-bls12-381-polynomial-internal
   lwt.unix)
  (flags
   (:standard)

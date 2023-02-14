@@ -49,6 +49,7 @@
 (package (name tezos-benchmarks-proto-015-PtLimaPt))
 (package (name tezos-benchmarks-proto-016-PtMumbai))
 (package (name tezos-benchmarks-proto-alpha))
+(package (name tezos-bls12-381-polynomial-internal))
 (package (name tezos-clic))
 (package (name tezos-client-000-Ps9mPmXa))
 (package (name tezos-client-001-PtCJ7pwo))

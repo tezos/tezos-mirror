@@ -411,6 +411,13 @@ opam:tezos-base-test-helpers:
 
 # Ignoring unreleased package tezos-benchmarks-proto-alpha.
 
+opam:tezos-bls12-381-polynomial-internal:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezos-bls12-381-polynomial-internal
+
 opam:tezos-clic:
   extends:
     - .opam_template
