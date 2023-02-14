@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-#include "polynomial.h"
+#include "bls12_381_polynomial_internal_polynomial.h"
 #include <caml/fail.h>
 
 // IMPROVEME: can be improve it with lookups?

@@ -22,7 +22,7 @@
 
 #include "caml_bls12_381_stubs.h"
 #include "ocaml_integers.h"
-#include "polynomial.h"
+#include "bls12_381_polynomial_internal_polynomial.h"
 #include <caml/alloc.h>
 #include <caml/bigarray.h>
 #include <caml/fail.h>
