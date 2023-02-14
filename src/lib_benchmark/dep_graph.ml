@@ -26,7 +26,6 @@
 
 module Fv_map = Free_variable.Map
 module Fv_set = Free_variable.Set
-module Fv_set_set = Set.Make (Free_variable.Set)
 
 module Directed_graph = Graph.Imperative.Digraph.Concrete (struct
   type t = string
@@ -261,28 +260,10 @@ let add_names (state : string Solver.state) (filename : string)
   Format.eprintf "for %s, adding names %a@." filename pp_print_set names ;
   Solver.add_node state names filename
 
-exception
-  Variable_solved_by_several_datasets of {
-    free_var : Free_variable.t;
-    filename : string;
-    other_file : string;
-  }
-
 exception Missing_file_for_free_variable of {free_var : Free_variable.t}
 
 let () =
   Printexc.register_printer (function
-      | Variable_solved_by_several_datasets {free_var; filename; other_file} ->
-          let error =
-            Format.asprintf
-              "Variable %a has conflicting constraints from datasets %s and %s.\n\
-               Try to remove one?\n"
-              Free_variable.pp
-              free_var
-              filename
-              other_file
-          in
-          Some error
       | Missing_file_for_free_variable {free_var} ->
           let error =
             Format.asprintf

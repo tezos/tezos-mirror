@@ -40,13 +40,6 @@
     one possible solution, we use a simple heuristic to pick one.
 *)
 
-exception
-  Variable_solved_by_several_datasets of {
-    free_var : Free_variable.t;
-    filename : string;
-    other_file : string;
-  }
-
 exception Missing_file_for_free_variable of {free_var : Free_variable.t}
 
 (** Definition of the dependency graph *)
