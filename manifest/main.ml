@@ -894,9 +894,9 @@ let octez_bls12_381_polynomial_internal =
         flags = [];
         names =
           [
-            "caml_polynomial_stubs";
-            "caml_srs_stubs";
-            "polynomial";
+            "caml_bls12_381_polynomial_internal_polynomial_stubs";
+            "caml_bls12_381_polynomial_internal_srs_stubs";
+            "bls12_381_polynomial_internal_polynomial";
           ];
       }
 
