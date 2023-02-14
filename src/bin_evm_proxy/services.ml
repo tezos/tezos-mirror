@@ -132,7 +132,7 @@ module Mock = struct
   let call = hash_f "0x"
 end
 
-let dispatch dir =
+let dispatch (module Rollup_node_rpc : Rollup_node.S) dir =
   Directory.register0 dir dispatch_service (fun () (input, id) ->
       let open Lwt_result_syntax in
       let* output =
@@ -168,4 +168,5 @@ let dispatch dir =
       in
       return (output, id))
 
-let directory = Directory.empty |> version |> dispatch
+let directory rollup_node_rpc =
+  Directory.empty |> version |> dispatch rollup_node_rpc

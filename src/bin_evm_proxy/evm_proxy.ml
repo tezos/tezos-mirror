@@ -23,15 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type config = {rpc_addr : string; rpc_port : int; debug : bool}
+type config = {
+  rpc_addr : string;
+  rpc_port : int;
+  debug : bool;
+  rollup_node_endpoint : Uri.t;
+}
 
-let default_config = {rpc_addr = "127.0.0.1"; rpc_port = 8545; debug = true}
+let default_config =
+  {
+    rpc_addr = "127.0.0.1";
+    rpc_port = 8545;
+    debug = true;
+    rollup_node_endpoint = Uri.of_string "http://localhost:8731";
+  }
 
-let make_config ?rpc_addr ?rpc_port ?debug () =
+let make_config ?rpc_addr ?rpc_port ?debug ?rollup_node_endpoint () =
   {
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
     debug = Option.value ~default:default_config.debug debug;
+    rollup_node_endpoint =
+      Option.value
+        ~default:default_config.rollup_node_endpoint
+        rollup_node_endpoint;
   }
 
 let install_finalizer server =
@@ -53,14 +68,18 @@ let callback_log server conn req body =
     req
     (Cohttp_lwt.Body.of_string body_str)
 
-let start {rpc_addr; rpc_port; debug} =
-  let open Lwt_syntax in
+let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
+  let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
-  let directory = Services.directory in
+  let module Rollup_node_rpc = Rollup_node.Make (struct
+    let base = rollup_node_endpoint
+  end) in
+  let* () = Rollup_node_rpc.assert_connected in
+  let directory = Services.directory (module Rollup_node_rpc : Rollup_node.S) in
   let server =
     RPC_server.init_server
       ~acl
@@ -69,7 +88,7 @@ let start {rpc_addr; rpc_port; debug} =
   in
   Lwt.catch
     (fun () ->
-      let* () =
+      let*! () =
         RPC_server.launch
           ~host
           server
@@ -85,6 +104,8 @@ module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
+
+  let uri = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s))
 end
 
 let rpc_addr_arg =
@@ -101,17 +122,26 @@ let rpc_port_arg =
     ~doc:"The EVM proxy server rpc port."
     Params.int
 
+let rollup_node_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"rollup-node-endpoint"
+    ~placeholder:"ADDR:PORT"
+    ~doc:
+      "The smart rollup node endpoint address the proxy server will \
+       communicate with."
+    Params.uri
+
 let main_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args2 rpc_addr_arg rpc_port_arg)
+    (args3 rpc_addr_arg rpc_port_arg rollup_node_endpoint_arg)
     (prefixes ["run"] @@ stop)
-    (fun (rpc_addr, rpc_port) () ->
+    (fun (rpc_addr, rpc_port, rollup_node_endpoint) () ->
       Format.printf "Starting server\n%!" ;
-      let config = make_config ?rpc_addr ?rpc_port () in
-      let*! server = start config in
+      let config = make_config ?rpc_addr ?rpc_port ?rollup_node_endpoint () in
+      let* server = start config in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in
