@@ -4324,26 +4324,6 @@ let test_recover_bond_of_stakers =
   in
   unit
 
-(** {2 EVM Proxy server tests. } *)
-
-let evm_kernel () = read_kernel ~base:"./" "evm_mockup_kernel"
-
-let test_originate_evm_kernel =
-  Protocol.register_test ~__FILE__ ~tags:["evm"] ~title:"Originate EVM kernel"
-  @@ fun protocol ->
-  let* _tezos_node, tezos_client = setup_l1 protocol in
-  let* _sc_rollup =
-    originate_sc_rollup
-      ~kind:"wasm_2_0_0"
-      ~boot_sector:(evm_kernel ())
-      ~parameters_ty:"string"
-      ~src:Constant.bootstrap1.alias
-      tezos_client
-  in
-  unit
-
-let _register_evm_proxy_server ~protocols = test_originate_evm_kernel protocols
-
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -4563,6 +4543,3 @@ let register ~protocols =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
            re-enable Mumbai when DAC is separated from Dal node. *)
   test_tx_kernel_e2e [Alpha]
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4847
-         re-enable when kernel can be installed via the kernel's installer. *)
-(* register_evm_proxy_server ~protocols *)
