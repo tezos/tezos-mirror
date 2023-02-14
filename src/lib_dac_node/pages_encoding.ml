@@ -529,7 +529,7 @@ module Merkle_tree = struct
         match retrieved_hashes with
         | [] -> return @@ Bytes.concat Bytes.empty retrieved_content
         | hash :: hashes -> (
-            let* serialized_page = S.load dac_plugin page_store ~hash in
+            let* serialized_page = S.load dac_plugin page_store hash in
             let*? page = deserialize_page dac_plugin serialized_page in
             match page with
             | Hashes page_hashes ->

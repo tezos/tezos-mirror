@@ -115,7 +115,7 @@ let handle_verify_external_message_signature dac_plugin public_keys_opt
         witnesses
 
 let handle_retrieve_preimage dac_plugin page_store hash =
-  Page_store.Filesystem.load dac_plugin page_store ~hash
+  Page_store.Filesystem.load dac_plugin page_store hash
 
 let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
     hash_streamer directory =
