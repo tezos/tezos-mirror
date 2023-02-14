@@ -12,5 +12,8 @@
  (preprocess (pps ppx_repr))
  (foreign_stubs
   (language c)
-  (names caml_polynomial_stubs caml_srs_stubs polynomial))
+  (names
+   caml_bls12_381_polynomial_internal_polynomial_stubs
+   caml_bls12_381_polynomial_internal_srs_stubs
+   bls12_381_polynomial_internal_polynomial))
  (c_library_flags (-Wall -Wextra :standard)))
