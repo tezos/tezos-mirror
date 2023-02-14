@@ -1477,3 +1477,7 @@ let tests =
     tztest "scenario m7" `Quick test_scenario_m7;
     tztest "scenario m8" `Quick test_scenario_m8;
   ]
+
+let () =
+  Alcotest_lwt.run "lib_delegate" [(Protocol.name ^ ": scenario", tests)]
+  |> Lwt_main.run
