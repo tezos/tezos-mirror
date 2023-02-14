@@ -166,7 +166,7 @@ let test_one_connection =
 let rec wait_pred ~pred ~arg =
   let* () = Lwt.pause () in
   let* cond = pred arg in
-  if not cond then wait_pred ~pred ~arg else Lwt.return_unit
+  if not cond then wait_pred ~pred ~arg else unit
 
 (* [get_nb_connections ~client] returns the number of active connections of the
    node  to [client]. *)
@@ -369,7 +369,7 @@ module Maintenance = struct
          %d)"
         nb_active_connections
         max_target ;
-    Lwt.return_unit
+    unit
 
   let tests () =
     test_disabled () ;
@@ -450,7 +450,7 @@ module Known_Points_GC = struct
          What we actually get is a set of size 1.
       *)
     in
-    Lwt.return node
+    return node
 
   let included ~sub ~super ~fail =
     List.iter
@@ -497,7 +497,7 @@ module Known_Points_GC = struct
       ~super:registered_points
       ~fail:(fun (addr, port) ->
         Test.fail "point %s:%d should not be known" addr port) ;
-    Lwt.return_unit
+    unit
 
   let test_non_trusted_removal () =
     Test.register
@@ -543,7 +543,7 @@ module Known_Points_GC = struct
       ~super:registered_points
       ~fail:(fun (addr, port) ->
         Test.fail "point %s:%d should not be known" addr port) ;
-    Lwt.return_unit
+    unit
 
   let tests () =
     test_trusted_preservation () ;
@@ -581,7 +581,7 @@ module Connect_handler = struct
                       ( "chain_name",
                         JSON.annotate ~origin:__LOC__ (`String name) ))))
         chain_name ;
-      Lwt.return node
+      return node
     in
     let run_node node = Node.run ~event_level:`Debug node [] in
     let wait_for_nack node port =
