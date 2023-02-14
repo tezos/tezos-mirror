@@ -47,6 +47,11 @@ type full_evm_setup = {
 let hex_encode (input : string) : string =
   match Hex.of_string input with `Hex s -> s
 
+let evm_proxy_server_version proxy_server =
+  let endpoint = Evm_proxy_server.endpoint proxy_server in
+  let get_version_url = endpoint ^ "/version" in
+  RPC.Curl.get get_version_url
+
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
@@ -105,6 +110,41 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       rollup_operator_key;
     }
 
+let test_evm_proxy_server_connection =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"]
+    ~title:"EVM proxy server connection"
+  @@ fun protocol ->
+  let* tezos_node, tezos_client = setup_l1 protocol in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~kind:"wasm_2_0_0"
+      ~parameters_ty:"string"
+      ~src:Constant.bootstrap1.alias
+      tezos_client
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~protocol
+      Observer
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~default_operator:Constant.bootstrap1.alias
+  in
+  let evm_proxy = Evm_proxy_server.create sc_rollup_node in
+  (* Tries to start the EVM proxy server without a listening rollup node. *)
+  let process = Evm_proxy_server.spawn_run evm_proxy in
+  let* () = Process.check ~expect_failure:true process in
+  (* Starts the rollup node. *)
+  let* _filename = Sc_rollup_node.config_init sc_rollup_node sc_rollup in
+  let* _ = Sc_rollup_node.run sc_rollup_node [] in
+  (* Starts the EVM proxy server and asks its version. *)
+  let* () = Evm_proxy_server.run evm_proxy in
+  let*? process = evm_proxy_server_version evm_proxy in
+  let* () = Process.check process in
+  unit
+
 let test_originate_evm_kernel =
   Protocol.register_test
     ~__FILE__
@@ -144,6 +184,8 @@ let test_originate_evm_kernel =
       ~error_msg:"Expected %L to be initialized by the EVM kernel.") ;
   unit
 
-let register_evm_proxy_server ~protocols = test_originate_evm_kernel protocols
+let register_evm_proxy_server ~protocols =
+  test_originate_evm_kernel protocols ;
+  test_evm_proxy_server_connection protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
