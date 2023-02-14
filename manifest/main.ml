@@ -480,7 +480,7 @@ let octez_stdlib =
     ~foreign_stubs:{language = C; flags = []; names = ["tzBytes_c"]}
 
 let _octez_stdlib_tests =
-  tests
+  tezt
     [
       "test_bits";
       "test_tzList";
@@ -490,6 +490,7 @@ let _octez_stdlib_tests =
       "test_functionalArray";
       "test_hash_queue";
       "test_tzBytes";
+      "test_arrays";
     ]
     ~path:"src/lib_stdlib/test"
     ~opam:"tezos-stdlib"
@@ -497,7 +498,7 @@ let _octez_stdlib_tests =
     ~deps:
       [
         octez_stdlib |> open_;
-        alcotest;
+        alcotezt;
         bigstring;
         octez_test_helpers |> open_;
         qcheck_alcotest;
