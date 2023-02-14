@@ -25,13 +25,13 @@
 
 module Fr = Bls12_381.Fr
 module G1 = Bls12_381.G1
-module Poly = Bls12_381_polynomial__Polynomial
+module Poly = Tezos_bls12_381_polynomial_internal.Polynomial
 
 module Srs :
-  Bls12_381_polynomial__Srs.S_unsafe
+  Tezos_bls12_381_polynomial_internal.Srs.S_unsafe
     with type elt = Bls12_381.G1.t
      and type polynomial = Poly.t =
-  Bls12_381_polynomial__Srs.Make (Bls12_381_polynomial__Srs.Elt_g1)
+  Tezos_bls12_381_polynomial_internal.Srs.Make (Tezos_bls12_381_polynomial_internal.Srs.Elt_g1)
 
 let test_get () =
   let srs = Srs.generate_insecure 1 Fr.one in

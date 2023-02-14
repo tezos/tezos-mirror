@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 module Fr = Bls12_381.Fr
-module Domain = Bls12_381_polynomial.Domain
-module Poly_c = Bls12_381_polynomial.Polynomial
-module Eval = Bls12_381_polynomial.Evaluations
+module Domain = Tezos_bls12_381_polynomial_internal.Domain
+module Poly_c = Tezos_bls12_381_polynomial_internal.Polynomial
+module Eval = Tezos_bls12_381_polynomial_internal.Evaluations
 
-let powers = Bls12_381_polynomial__Fr_carray.powers
+let powers = Tezos_bls12_381_polynomial_internal.Fr_carray.powers
 
 (* computes p(g·x) *)
 let make_composition_gx g p_c =

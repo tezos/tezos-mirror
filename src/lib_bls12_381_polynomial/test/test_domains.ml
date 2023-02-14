@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 module Fr = Bls12_381.Fr
-module Fr_generation = Bls12_381_polynomial__Fr_carray
-module Domain = Bls12_381_polynomial__Domain.Domain_unsafe
+module Fr_generation = Tezos_bls12_381_polynomial_internal.Fr_carray
+module Domain = Tezos_bls12_381_polynomial_internal.Domain.Domain_unsafe
 
 let factors_naive n =
   let rec factors_aux n factor result =
