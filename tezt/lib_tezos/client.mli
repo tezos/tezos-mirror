@@ -2373,6 +2373,7 @@ val spawn_command :
   ?protocol_hash:string ->
   ?config_file:string ->
   ?no_base_dir_warnings:bool ->
+  ?block:string ->
   t ->
   string list ->
   Process.t
@@ -2859,3 +2860,11 @@ val spawn_expand_macros :
   t ->
   string ->
   Process.t
+
+(** Run [tezos-client get timestamp]. *)
+val get_timestamp :
+  ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> string Lwt.t
+
+(** Same as [get_timestamp], but do not wait for the process to exit. *)
+val spawn_get_timestamp :
+  ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> Process.t

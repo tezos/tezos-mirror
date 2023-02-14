@@ -123,6 +123,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Contract_hash_with_origination.register ~protocols ;
   Contract_liquidity_baking.register ~protocols ;
   Contract_non_regressions.register protocols ;
+  Contract_onchain_opcodes.register ~protocols ;
   Contract_opcodes.register ~protocols ;
   Contract_typecheck_contract.register ~protocols ;
   Contract_typecheck_regression.register ~protocols ;
