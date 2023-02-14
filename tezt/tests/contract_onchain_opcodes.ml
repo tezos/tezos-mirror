@@ -439,6 +439,419 @@ let test_big_map_origination protocol client =
   in
   unit
 
+module Tickets = struct
+  let ticket_forgery_attempt_error =
+    Process.check_error ~msg:(rex "Unexpected forged value")
+
+  let make_runnable process = {value = process; run = Process.check}
+
+  let runnable_script_failwith {value = process; run = _} =
+    process |> script_failwith
+
+  let test_ticket_user_forge protocol client =
+    let* contract =
+      originate client protocol ["opcodes"; "ticket_store-2"] ~storage:"None"
+    in
+    let* () = transfer client ~contract ~arg:"None" in
+    let* () =
+      spawn_transfer client ~contract ~arg:"Some 1"
+      |> ticket_forgery_attempt_error
+    in
+    let* () =
+      spawn_originate
+        client
+        protocol
+        ["opcodes"; "ticket_bad"]
+        ~storage:{|"ticket_bad"|}
+      |> ticket_forgery_attempt_error
+    in
+    unit
+
+  let test_ticket_user_big_forge protocol client =
+    (* This test attempts to forge a ticket by copying a big_map containing a ticket. *)
+    let script_name = ["opcodes"; "ticket_big_store"] in
+    (* Originate a contract with an empty big map of tickets. *)
+    let* contract = originate client protocol script_name ~storage:"{}" in
+    (* Ask the contract to mint a ticket and store it in its big map. *)
+    let* () = transfer client ~contract ~arg:"42" in
+    (* Get the id of the big map. *)
+    let* storage = get_storage client ~contract in
+    let* () =
+      (* Try to use the big map id as initial storage in an origination. *)
+      spawn_originate client protocol script_name ~storage
+      |> ticket_forgery_attempt_error
+    in
+    let* () =
+      (* Same but instead of using the big map id directly we pair it with an empty
+         big map diff (this exercises another code path).*)
+      spawn_originate
+        client
+        protocol
+        script_name
+        ~storage:(sf "Pair %s {}" storage)
+      |> ticket_forgery_attempt_error
+    in
+    unit
+
+  let test_ticket_read protocol client =
+    (* Test that tickets can be transferred between contracts.
+       The ticketer_read contract mints a ticket and sends it
+       to the reader contract which reads it and stores the
+       ticketer. *)
+    let* ticketer_read =
+      originate client protocol ["opcodes"; "ticketer"] ~storage:"42"
+    in
+    let* reader =
+      originate
+        client
+        protocol
+        ["opcodes"; "ticket_read"]
+        ~storage:(quote ticketer_read)
+    in
+    let* () = transfer client ~contract:ticketer_read ~arg:(quote reader) in
+    let* () =
+      check_storage ~__LOC__ client ~contract:reader (quote ticketer_read)
+    in
+    unit
+
+  let test_bad_ticket protocol client =
+    (* Calling the reader contract from an implicit account is forbidden
+       as a forgery attempt. *)
+    let* ticketer_bad =
+      originate client protocol ["opcodes"; "ticketer"] ~storage:"42"
+    in
+    let* reader_bad =
+      originate
+        client
+        protocol
+        ["opcodes"; "ticket_read"]
+        ~storage:(quote ticketer_bad)
+    in
+    spawn_transfer client ~contract:reader_bad ~arg:"1"
+    |> ticket_forgery_attempt_error
+
+  let test_utxo protocol client =
+    (* The utxor contract mints a 5-ticket, splits it into a 2-ticket and a 3-ticket
+       and send them to the two reader contracts which read the received tickets,
+       check their payload and amounts, and store the ticketer address. *)
+    let* utxor = originate client protocol ["opcodes"; "utxor"] ~storage:"42" in
+    let* reader_a =
+      originate client protocol ["opcodes"; "utxo_read"] ~storage:(quote utxor)
+    in
+    let* reader_b =
+      originate client protocol ["opcodes"; "utxo_read"] ~storage:(quote utxor)
+    in
+    transfer
+      client
+      ~contract:utxor
+      ~arg:(sf "Pair %s %s" (quote reader_a) (quote reader_b))
+
+  let test_ticket_split protocol client =
+    (* ticketer_2 mints a ticket described in the second and third parameters and sends it
+       to the first parameter. *)
+    let* ticketer_2 = originate client protocol ["opcodes"; "ticketer-2"] in
+    (* ticket_split splits input ticket into a 1-ticket and a 2-ticket and checks
+       that the resulting tickets have the expected amounts. *)
+    let* ticket_split = originate client protocol ["opcodes"; "ticket_split"] in
+    let build_arg target_addr param utxo_amount =
+      sf "Pair (Pair %s %d) %d" (quote target_addr) param utxo_amount
+    in
+    let* () =
+      transfer client ~contract:ticketer_2 ~arg:(build_arg ticket_split 42 3)
+    in
+    (* Incorrect Split Amount, ticket_split expects a 3-ticket. *)
+    spawn_transfer
+      client
+      ~contract:ticketer_2
+      ~arg:(build_arg ticket_split 42 4)
+    |> script_failwith
+
+  let test_ticket_join protocol client =
+    let* ticketer_a = originate client protocol ["opcodes"; "ticketer-2"] in
+    let* ticket_join =
+      originate client protocol ~storage:"None" ["opcodes"; "ticket_join"]
+    in
+    let build_arg target_addr param utxo_amount =
+      sf "Pair (Pair %s %d) %d" (quote target_addr) param utxo_amount
+    in
+    let* () =
+      (* first call from the ticketer to ticket_join replaces its None initial storage *)
+      transfer client ~contract:ticketer_a ~arg:(build_arg ticket_join 1 42)
+    in
+    let* () =
+      (* second call from ticketer to ticket_join joins the ticket of the first call
+         with the ticket of the second call. *)
+      transfer client ~contract:ticketer_a ~arg:(build_arg ticket_join 1 144)
+    in
+    (* Wrong ticketer *)
+    let* () =
+      let* ticketer_b = originate client protocol ["opcodes"; "ticketer-2"] in
+      spawn_transfer
+        client
+        ~contract:ticketer_b
+        ~arg:(build_arg ticket_join 1 23)
+      |> script_failwith
+    in
+    (* Wrong contents *)
+    spawn_transfer
+      client
+      ~contract:ticketer_a
+      ~arg:(build_arg ticket_join 23 21)
+    |> script_failwith
+
+  let test_ticket_fungible protocol client =
+    (* Test the origination of builder and wallet contracts for fungible
+       tokens implemented using tickets. *)
+    let script_failwith = runnable_script_failwith in
+    let manager_address = Constant.bootstrap1.public_key_hash in
+    let originate_builder () =
+      (* Create a fungible token contract managed by bootstrap1. *)
+      originate
+        client
+        protocol
+        ["mini_scenarios"; "ticket_builder_fungible"]
+        ~storage:(quote manager_address)
+    in
+    let originate_wallet () =
+      (* Create a fungible token wallet managed by bootstrap1. *)
+      originate
+        client
+        protocol
+        ["mini_scenarios"; "ticket_wallet_fungible"]
+        ~storage:(sf "Pair %s {}" (quote manager_address))
+    in
+    (* Create 3 token contracts "A", "B", and "C". *)
+    let* builder_a = originate_builder () in
+    let* builder_b = originate_builder () in
+    let* builder_c = originate_builder () in
+    let* alice = originate_wallet () in
+    let* bob = originate_wallet () in
+    let mint ~builder ~wallet amount =
+      (* Mint fungible tokens. *)
+      transfer
+        ~giver:manager_address
+        ~contract:builder
+        ~entrypoint:"mint"
+        ~arg:(sf {|Pair "%s%%receive" %d|} wallet amount)
+        client
+    in
+    let burn ~builder ~wallet amount =
+      (* Burn fungible tokens. *)
+      make_runnable
+      @@ spawn_transfer
+           ~giver:manager_address
+           ~contract:wallet
+           ~entrypoint:"send"
+           ~arg:(sf {|Pair "%s%%burn" %d "%s"|} builder amount builder)
+           client
+    in
+    let transfer_fungible_tokens ~builder ~src ~dst amount =
+      (* Transfer fungible tokens. *)
+      make_runnable
+      @@ spawn_transfer
+           ~giver:manager_address
+           ~contract:src
+           ~entrypoint:"send"
+           ~arg:(sf {|Pair "%s%%receive" %d "%s"|} dst amount builder)
+           client
+    in
+    Log.info "100A --> Alice" ;
+    let* () = mint ~builder:builder_a ~wallet:alice 100 in
+    Log.info "100B --> Alice" ;
+    let* () = mint ~builder:builder_b ~wallet:alice 100 in
+    Log.info "Fail: Alice --1C--> Bob" ;
+    let* () =
+      transfer_fungible_tokens ~builder:builder_c ~src:alice ~dst:bob 1
+      |> script_failwith
+    in
+    Log.info "Fail: Alice --0C--> Bob" ;
+    let* () =
+      transfer_fungible_tokens ~builder:builder_c ~src:alice ~dst:bob 0
+      |> script_failwith
+    in
+    Log.info "Fail: Alice --150A--> Bob" ;
+    let* () =
+      transfer_fungible_tokens ~builder:builder_a ~src:alice ~dst:bob 150
+      |> script_failwith
+    in
+    Log.info "Fail: Bob --50A--> Alice" ;
+    let* () =
+      transfer_fungible_tokens ~builder:builder_a ~src:bob ~dst:alice 50
+      |> script_failwith
+    in
+    Log.info "Alice --50A--> Bob" ;
+    let*! () =
+      transfer_fungible_tokens ~builder:builder_a ~src:alice ~dst:bob 50
+    in
+    Log.info "Alice --50A--> Bob" ;
+    let*! () =
+      transfer_fungible_tokens ~builder:builder_a ~src:alice ~dst:bob 50
+    in
+    Log.info "Fail: Alice --0A--> Bob" ;
+    (* This fails because we are not allowed to keep a ticket with zero amount in
+       big maps. In the last transfer, Alice's wallet contract has depleted all A-tokens.
+       Therefore, this contract call fails on A-token look-up. *)
+    let* () =
+      transfer_fungible_tokens ~builder:builder_a ~src:alice ~dst:bob 0
+      |> script_failwith
+    in
+    Log.info "Fail: Alice --1A--> Bob" ;
+    (* Similarly, this contract call fails because there is no big map entry for
+       A-tokens in Alice's wallet contract. *)
+    let* () =
+      transfer_fungible_tokens ~builder:builder_a ~src:alice ~dst:bob 1
+      |> script_failwith
+    in
+    Log.info "Bob --100A--> Bob" ;
+    let*! () =
+      transfer_fungible_tokens ~builder:builder_a ~src:bob ~dst:bob 100
+    in
+    Log.info "Fail: Bob --150A--> Bob" ;
+    let* () =
+      transfer_fungible_tokens ~builder:builder_a ~src:bob ~dst:bob 150
+      |> script_failwith
+    in
+    Log.info "Bob --100A-->" ;
+    let*! () = burn ~builder:builder_a ~wallet:bob 100 in
+    Log.info "Fail: Bob --0A-->" ;
+    (* The last `burn` call depletes all A-tokens in Bob's wallet. Since no
+       ticket of amount zero is allowed in big map, this call fails because
+       there is no A-token entry in Bob's wallet contract. *)
+    let* () = burn ~builder:builder_a ~wallet:bob 0 |> script_failwith in
+    Log.info "Fail: Bob --1A-->" ;
+    let* () = burn ~builder:builder_a ~wallet:bob 1 |> script_failwith in
+    unit
+
+  let test_ticket_non_fungible protocol client =
+    (* Test the origination of builder and wallet contracts for non-fungible tokens implemented
+       using tickets. *)
+    let manager_address = Constant.bootstrap1.public_key_hash in
+    let script_failwith = runnable_script_failwith in
+    let originate_builder () =
+      (* Create a non-fungible token contract managed by bootstrap1. *)
+      originate
+        client
+        protocol
+        ["mini_scenarios"; "ticket_builder_non_fungible"]
+        ~storage:(sf {|Pair "%s" 0|} manager_address)
+    in
+    let originate_wallet () =
+      (* Create a non-fungible token wallet managed by bootstrap1. *)
+      originate
+        client
+        protocol
+        ["mini_scenarios"; "ticket_wallet_non_fungible"]
+        ~storage:(sf "Pair %s {}" (quote manager_address))
+    in
+    (* Create 3 token contracts "A", "B", and "C". *)
+    let* builder_a = originate_builder () in
+    let* builder_b = originate_builder () in
+    let* builder_c = originate_builder () in
+    let* alice = originate_wallet () in
+    let* bob = originate_wallet () in
+    let mint ~builder ~wallet token_id =
+      (* Mint a non-fungible token and assert that it has the
+         expected id. *)
+      let* () =
+        check_storage
+          ~__LOC__
+          client
+          ~contract:builder
+          (sf {|Pair "%s" %d|} manager_address token_id)
+      in
+      transfer
+        ~giver:manager_address
+        ~contract:builder
+        ~entrypoint:"mint_destination"
+        ~arg:(sf {|"%s%%receive"|} wallet)
+        client
+    in
+    let burn ~builder ~wallet token_id =
+      (* Burn a non-fungible token. *)
+      make_runnable
+      @@ spawn_transfer
+           ~giver:manager_address
+           ~contract:wallet
+           ~entrypoint:"send"
+           ~arg:(sf {|Pair "%s%%burn" "%s" %d|} builder builder token_id)
+           client
+    in
+    let transfer_nft ~builder ~src ~dst token_id =
+      (* Transfer a non-fungible token. *)
+      make_runnable
+      @@ spawn_transfer
+           ~giver:manager_address
+           ~contract:src
+           ~entrypoint:"send"
+           ~arg:(sf {|Pair "%s%%receive" "%s" %d|} dst builder token_id)
+           client
+    in
+    Log.info "A0 --> Alice" ;
+    let* () = mint ~builder:builder_a ~wallet:alice 0 in
+    Log.info "A1 --> Alice" ;
+    let* () = mint ~builder:builder_a ~wallet:alice 1 in
+    Log.info "B0 --> Alice" ;
+    let* () = mint ~builder:builder_b ~wallet:alice 0 in
+    Log.info "Fail: Alice --C0--> Bob " ;
+    let* () =
+      transfer_nft ~builder:builder_c ~src:alice ~dst:bob 1 |> script_failwith
+    in
+    Log.info "Fail: Alice --A2--> Bob" ;
+    let* () =
+      transfer_nft ~builder:builder_a ~src:alice ~dst:bob 2 |> script_failwith
+    in
+    Log.info "Fail: Bob --A0--> Alice" ;
+    let* () =
+      transfer_nft ~builder:builder_a ~src:bob ~dst:alice 0 |> script_failwith
+    in
+    Log.info "Fail: Bob --A1--> Bob" ;
+    let* () =
+      transfer_nft ~builder:builder_a ~src:bob ~dst:bob 1 |> script_failwith
+    in
+    Log.info "Alice --A1--> Bob" ;
+    let*! () = transfer_nft ~builder:builder_a ~src:alice ~dst:bob 1 in
+    Log.info "Alice --A0--> Bob" ;
+    let*! () = transfer_nft ~builder:builder_a ~src:alice ~dst:bob 0 in
+    Log.info "Fail: Alice --A1--> Bob" ;
+    let* () =
+      transfer_nft ~builder:builder_a ~src:alice ~dst:bob 1 |> script_failwith
+    in
+    Log.info "Bob --A0--> Bob" ;
+    let*! () = transfer_nft ~builder:builder_a ~src:bob ~dst:bob 0 in
+    Log.info "Bob --A0-->" ;
+    let*! () = burn ~builder:builder_a ~wallet:bob 0 in
+    Log.info "Bob --A1-->" ;
+    let*! () = burn ~builder:builder_a ~wallet:bob 1 in
+    Log.info "Fail: Bob --B0-->" ;
+    let* () = burn ~builder:builder_b ~wallet:bob 0 |> script_failwith in
+    Log.info "Alice --B0-->" ;
+    let*! () = burn ~builder:builder_b ~wallet:alice 0 in
+    unit
+
+  let register ~protocols =
+    List.iter
+      (fun (title, body) ->
+        Protocol.register_test
+          ~__FILE__
+          ~title:("Contract onchain opcodes: " ^ title)
+          ~tags:["contract"; "onchain"; "opcodes"]
+          (fun protocol ->
+            let* client = Client.init_mockup ~protocol () in
+            body protocol client)
+          protocols)
+      [
+        ("ticket_user_forge", test_ticket_user_forge);
+        ("ticket_user_big_forge", test_ticket_user_big_forge);
+        ("ticket_read", test_ticket_read);
+        ("bad_ticket", test_bad_ticket);
+        ("ticket_utxo", test_utxo);
+        ("ticket_split", test_ticket_split);
+        ("ticket_join", test_ticket_join);
+        ("ticket_fungible", test_ticket_fungible);
+        ("ticket_non_fungible", test_ticket_non_fungible);
+      ]
+end
+
 let register ~protocols =
   List.iter
     (fun (title, body) ->
@@ -469,4 +882,5 @@ let register ~protocols =
         test_trace_origination ["opcodes"; "compare_big_type2"] );
       ("test_level", test_level);
       ("test_big_map_origination", test_big_map_origination);
-    ]
+    ] ;
+  Tickets.register ~protocols
