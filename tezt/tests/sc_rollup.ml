@@ -4447,7 +4447,7 @@ let test_originate_evm_kernel =
   in
   unit
 
-let register_evm_proxy_server ~protocols = test_originate_evm_kernel protocols
+let _register_evm_proxy_server ~protocols = test_originate_evm_kernel protocols
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -4667,5 +4667,7 @@ let register ~protocols =
   register ~kind:"arith" ~protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
            re-enable Mumbai when DAC is separated from Dal node. *)
-  test_tx_kernel_e2e [Alpha] ;
-  register_evm_proxy_server ~protocols
+  test_tx_kernel_e2e [Alpha]
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4847
+         re-enable when kernel can be installed via the kernel's installer. *)
+(* register_evm_proxy_server ~protocols *)
