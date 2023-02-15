@@ -625,7 +625,7 @@ module Inner = struct
     let eval =
       Evaluations.evaluation_fft t.domain_k p |> Evaluations.to_array
     in
-    let slot = Bytes.init t.slot_size (fun _ -> '0') in
+    let slot = Bytes.make t.slot_size '0' in
     let offset = ref 0 in
     (* Reverse permutation from [polynomial_from_slot]. *)
     for page = 0 to t.pages_per_slot - 1 do
