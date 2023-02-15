@@ -1187,10 +1187,6 @@ let prepare_manager_operation ~fee ~gas_limit ~storage_limit operation =
   Annotated_manager_operation.Manager_info
     {source = None; fee; gas_limit; storage_limit; counter = None; operation}
 
-(* [gas_limit] must correspond to
-   [Michelson_v1_gas.Cost_of.manager_operation] *)
-let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
-
 let reveal_error_message =
   "Requested operation requires to perform a public key revelation beforehand.\n\
    This cannot be done automatically when a custom fee or storage limit is \
@@ -1441,7 +1437,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       let reveal =
         prepare_manager_operation
           ~fee:Limit.unknown
-          ~gas_limit:(Limit.known cost_of_manager_operation)
+          ~gas_limit:Limit.unknown
           ~storage_limit:Limit.unknown
           (Reveal src_pk)
       in
