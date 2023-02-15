@@ -32,6 +32,16 @@ module Block_cache =
   Aches_lwt.Lache.Make_result
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
+module Int_cache =
+  Aches_lwt.Lache.Make_result
+    (Aches.Rache.Transfer
+       (Aches.Rache.LRU)
+       (struct
+         include Int
+
+         let hash x = x
+       end))
+
 (* This is the Tenderbake finality for blocks. *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2815
    Centralize this and maybe make it configurable. *)
@@ -200,6 +210,11 @@ struct
     included_in_blocks : Included_in_blocks.t;
   }
 
+  type protocols = Tezos_shell_services.Chain_services.Blocks.protocols = {
+    current_protocol : Protocol_hash.t;
+    next_protocol : Protocol_hash.t;
+  }
+
   (** The internal state of each injector worker.  *)
   type state = {
     cctxt : Client_context.full;
@@ -227,6 +242,11 @@ struct
     mutable last_seen_head : (Block_hash.t * int32) option;
         (** Last L1 head that the injector has seen (used to compute
             reorganizations). *)
+    mutable protocols : protocols;
+        (** The protocols of the head of the L1 chain. This information is used
+            to know with which protocol one should perform the
+            simulation/injection. NOTE: this value is updated before
+            [last_seen_head]. *)
   }
 
   module Event = struct
@@ -259,8 +279,8 @@ struct
     in
     state.last_seen_head <- Some head
 
-  let init_injector cctxt l1_ctxt ~data_dir state ~retention_period ~signer
-      strategy tags =
+  let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
+      ~retention_period ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -349,6 +369,7 @@ struct
         state;
         retention_period;
         last_seen_head;
+        protocols = head_protocols;
       }
 
   (** We consider an operation to already exist in the injector if either:
@@ -981,6 +1002,7 @@ struct
     type parameters = {
       cctxt : Client_context.full;
       l1_ctxt : Layer_1.t;
+      head_protocols : protocols;
       data_dir : string;
       state : Parameters.state;
       retention_period : int;
@@ -1034,11 +1056,21 @@ struct
 
     let on_launch _w signer
         Types.
-          {cctxt; l1_ctxt; data_dir; state; retention_period; strategy; tags} =
+          {
+            cctxt;
+            l1_ctxt;
+            head_protocols;
+            data_dir;
+            state;
+            retention_period;
+            strategy;
+            tags;
+          } =
       trace (Step_failed "initialization")
       @@ init_injector
            cctxt
            l1_ctxt
+           ~head_protocols
            ~data_dir
            state
            ~retention_period
@@ -1129,31 +1161,75 @@ struct
         return_unit)
       workers
 
-  let rec monitor_l1_chain l1_ctxt =
-    let open Lwt_syntax in
-    let* res =
+  let protocols_of_head cctxt =
+    Tezos_shell_services.Shell_services.Blocks.protocols
+      cctxt
+      ~chain:cctxt#chain
+      ~block:(`Head 0)
+      ()
+
+  let update_protocol ~next_protocol =
+    let workers = Worker.list table in
+    List.iter
+      (fun (_signer, w) ->
+        let state = Worker.state w in
+        let protocols =
+          {current_protocol = state.protocols.next_protocol; next_protocol}
+        in
+        state.protocols <- protocols)
+      workers
+
+  (** Retrieve next protocol of a block with a small cache from protocol levels
+      to protocol hashes. *)
+  let next_protocol_of_block =
+    let proto_levels_cache = Int_cache.create 7 in
+    fun (cctxt : Client_context.full)
+        (block_hash, (block_header : Block_header.t)) ->
+      let open Lwt_result_syntax in
+      let proto_level = block_header.shell.proto_level in
+      Int_cache.bind_or_put
+        proto_levels_cache
+        proto_level
+        (fun _proto_level ->
+          let+ protos =
+            Tezos_shell_services.Shell_services.Blocks.protocols
+              cctxt
+              ~chain:cctxt#chain
+              ~block:(`Hash (block_hash, 0))
+              ()
+          in
+          protos.next_protocol)
+        Lwt.return
+
+  let rec monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
+    let open Lwt_result_syntax in
+    let*! res =
       Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
       let head = (head_hash, header.shell.level) in
+      let* next_protocol =
+        next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)
+      in
+      update_protocol ~next_protocol ;
       (* Notify all workers of a new Tezos head *)
-      let* () = notify_new_tezos_head head in
-      return_ok ()
+      let*! () = notify_new_tezos_head head in
+      return_unit
     in
     (* Ignore errors *)
-    let* () =
+    let*! () =
       match res with
       | Error error -> Internal_event.Simple.emit Event.monitoring_error error
-      | Ok () -> return_unit
+      | Ok () -> Lwt.return_unit
     in
-    monitor_l1_chain l1_ctxt
+    monitor_l1_chain cctxt l1_ctxt
 
-  let rec async_monitor_l1_chain l1_ctxt =
+  let rec async_monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
     Lwt.dont_wait
-      (fun () -> monitor_l1_chain l1_ctxt)
+      (fun () -> monitor_l1_chain cctxt l1_ctxt)
       (fun exn ->
         Format.eprintf
           "Warning: Error in async monitoring (%s), restarting"
           (Printexc.to_string exn) ;
-        async_monitor_l1_chain l1_ctxt)
+        async_monitor_l1_chain cctxt l1_ctxt)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
@@ -1185,6 +1261,7 @@ struct
         signers
     in
     let* l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
+    let* head_protocols = protocols_of_head cctxt in
     let* () =
       Signature.Public_key_hash.Map.iter_es
         (fun signer (strategy, tags) ->
@@ -1195,6 +1272,7 @@ struct
               {
                 cctxt = (cctxt :> Client_context.full);
                 l1_ctxt;
+                head_protocols;
                 data_dir;
                 state;
                 retention_period;
@@ -1206,7 +1284,7 @@ struct
           ignore worker)
         signers_map
     in
-    async_monitor_l1_chain l1_ctxt ;
+    async_monitor_l1_chain cctxt l1_ctxt ;
     return_unit
 
   let worker_of_signer signer_pkh =
