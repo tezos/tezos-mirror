@@ -442,7 +442,7 @@ let test_durable_find_value () =
   assert (Option.is_none r) ;
   Lwt.return_ok ()
 
-let test_durable_count_subtrees () =
+let test_durable_count_subtrees_and_list () =
   let open Lwt_syntax in
   let* tree =
     make_durable
@@ -451,17 +451,41 @@ let test_durable_count_subtrees () =
         ("/hello/world", "a very long value");
         ("/hello/you", "a very long value");
         ("/hello/you/too", "a very long value");
+        ("/long/path/to/something", "hello, it's me");
       ]
   in
   let assert_subtree_count t count under =
     let dbl = Durable.of_storage_exn t in
     let+ n = Durable.count_subtrees dbl @@ Durable.key_of_string_exn under in
-    assert (n = count)
+    Assert.Int.equal
+      ~loc:__LOC__
+      ~msg:(Format.sprintf "Subtrees count for path %s" under)
+      n
+      count
+  in
+  let assert_list t expected under =
+    let dbl = Durable.of_storage_exn t in
+    let+ subtrees = Durable.list dbl @@ Durable.key_of_string_exn under in
+    Assert.equal_list
+      ~loc:__LOC__
+      ~msg:(Format.sprintf "Lists for path %s unequal" under)
+      expected
+      subtrees
   in
   let* () = assert_subtree_count tree 3 "/hello" in
   let* () = assert_subtree_count tree 2 "/hello/you" in
   let* () = assert_subtree_count tree 1 "/hello/you/too" in
   let* () = assert_subtree_count tree 0 "/bye" in
+  let* () = assert_list tree [""; "hello"; "long"] "" in
+  let* () = assert_list tree [""; "world"; "you"] "/hello" in
+  let* () = assert_list tree [""; "too"] "/hello/you" in
+  let* () = assert_list tree [""] "/hello/you/too" in
+  let* () = assert_list tree [] "/hello/you/too/unexisting" in
+  let* () = assert_list tree ["path"] "/long" in
+  let* () = assert_list tree ["to"] "/long/path" in
+  let* () = assert_list tree ["something"] "/long/path/to" in
+  let* () = assert_list tree [""] "/long/path/to/something" in
+  let* () = assert_list tree [] "/long/path/to/something/unexisting" in
   Lwt.return_ok ()
 
 (* Test checking that [store_copy from_key to_key] copies the subtree at
@@ -1014,7 +1038,10 @@ let tests =
     tztest "store_write" `Quick test_store_write;
     tztest "store_value_size" `Quick test_store_value_size;
     tztest "Durable: find value" `Quick test_durable_find_value;
-    tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
+    tztest
+      "Durable: count subtrees and list"
+      `Quick
+      test_durable_count_subtrees_and_list;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
     tztest "Durable: readonly keys" `Quick test_readonly_key;
   ]
