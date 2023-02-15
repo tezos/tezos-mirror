@@ -211,6 +211,26 @@ module Test = struct
     | Error (`Invalid_shard_length _) -> assert true
     | _ -> assert false
 
+  (* Check that for any slot,
+     [polynomial_to_slot (polynomial_from_slot slot) = slot]. *)
+  let test_polynomial_slot_conversions =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test polynomial-slot conversions"
+      ~print
+      params_gen
+      (fun ({slot_size; _} as params : Cryptobox.parameters) ->
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold:slot_size in
+        init params ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t = Cryptobox.make params in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let slot_res = Cryptobox.(polynomial_to_slot t p) in
+         Ok (Bytes.equal slot_res slot))
+        |> function
+        | Ok check -> check
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
+        | Error _ -> false)
+
   (* Tests that a page is included in a slot. *)
   let test_page_proofs =
     QCheck2.Test.make
@@ -388,5 +408,6 @@ let () =
             Test.test_page_proofs;
             Test.test_shard_proofs;
             Test.test_commitment_proof;
+            Test.test_polynomial_slot_conversions;
           ] );
     ]
