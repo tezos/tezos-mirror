@@ -318,6 +318,7 @@ type transaction_receipt = {
   type_ : hash;
   status : quantity;
   root : hash;
+  contractAddress : address option;
 }
 
 let transaction_receipt_encoding =
@@ -338,6 +339,7 @@ let transaction_receipt_encoding =
            type_;
            status;
            root;
+           contractAddress;
          } ->
       ( ( transactionHash,
           transactionIndex,
@@ -349,7 +351,7 @@ let transaction_receipt_encoding =
           effectiveGasPrice,
           gasUsed,
           logs ),
-        (logsBloom, type_, status, root) ))
+        (logsBloom, type_, status, root, contractAddress) ))
     (fun ( ( transactionHash,
              transactionIndex,
              blockHash,
@@ -360,7 +362,7 @@ let transaction_receipt_encoding =
              effectiveGasPrice,
              gasUsed,
              logs ),
-           (logsBloom, type_, status, root) ) ->
+           (logsBloom, type_, status, root, contractAddress) ) ->
       {
         transactionHash;
         transactionIndex;
@@ -376,6 +378,7 @@ let transaction_receipt_encoding =
         type_;
         status;
         root;
+        contractAddress;
       })
     (merge_objs
        (obj10
@@ -389,11 +392,12 @@ let transaction_receipt_encoding =
           (req "effectiveGasPrice" quantity_encoding)
           (req "gasUsed" quantity_encoding)
           (req "logs" (list transaction_log_encoding)))
-       (obj4
+       (obj5
           (req "logsBloom" hash_encoding)
           (req "type" hash_encoding)
           (req "status" quantity_encoding)
-          (req "root" hash_encoding)))
+          (req "root" hash_encoding)
+          (req "contractAddress" (option address_encoding))))
 
 type transaction = {
   from : address;

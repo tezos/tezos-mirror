@@ -266,6 +266,20 @@ module Get_block_by_number = MethodMaker (struct
   let method_ = "eth_getBlockByNumber"
 end)
 
+module Get_block_by_hash = MethodMaker (struct
+  open Ethereum_types
+
+  type input = hash * bool
+
+  type output = block
+
+  let input_encoding = Data_encoding.tup2 hash_encoding Data_encoding.bool
+
+  let output_encoding = block_encoding
+
+  let method_ = "eth_getBlockByHash"
+end)
+
 module Get_code = MethodMaker (struct
   open Ethereum_types
 
@@ -386,6 +400,7 @@ let methods : (module METHOD) list =
     (module Get_balance);
     (module Block_number);
     (module Get_block_by_number);
+    (module Get_block_by_hash);
     (module Get_code);
     (module Gas_price);
     (module Get_transaction_count);
