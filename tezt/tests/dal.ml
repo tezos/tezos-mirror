@@ -2181,8 +2181,9 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
    - We finally check that there is a "value" variable in the PVM whose payload
    is the sum of levels as returned by [slot_producer].
 *)
-let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
-    _sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
+let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1) protocol
+    parameters dal_node sc_rollup_node _sc_rollup_address l1_node l1_client
+    _pvm_name ~number_of_dal_slots =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
@@ -2225,6 +2226,7 @@ let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
      size [slot_size] with index [tracked_slots]. *)
   let* expected_value =
     slot_producer
+      ~beforehand_slot_injection
       ~slot_index:tracked_slot_index
       ~from:start_dal_slots_level
       ~into:end_dal_slots_level
@@ -2236,7 +2238,9 @@ let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
 
   (* Wait until the last published slot is included and attested. *)
   let* _lvl =
-    Node.wait_for_level l1_node (end_dal_slots_level + attestation_lag + 1)
+    Node.wait_for_level
+      l1_node
+      (end_dal_slots_level + attestation_lag + beforehand_slot_injection)
   in
 
   Log.info
@@ -2266,6 +2270,7 @@ type e2e_test = {
   attestation_lag : int;
   block_delay : int;
   number_of_dal_slots : int;
+  beforehand_slot_injection : int;
 }
 
 let e2e_tests =
@@ -2275,6 +2280,7 @@ let e2e_tests =
       attestation_lag = 1;
       block_delay = 6;
       number_of_dal_slots = 2;
+      beforehand_slot_injection = 1;
     }
   in
   let test2 =
@@ -2283,6 +2289,7 @@ let e2e_tests =
       attestation_lag = 2;
       block_delay = 4;
       number_of_dal_slots = 2;
+      beforehand_slot_injection = 1;
     }
   in
   let mainnet1 =
@@ -2291,6 +2298,7 @@ let e2e_tests =
       attestation_lag = 1;
       block_delay = 15;
       number_of_dal_slots = 1;
+      beforehand_slot_injection = 1;
     }
   in
   [test1; test2; mainnet1]
@@ -2310,7 +2318,13 @@ let register_end_to_end_tests ~protocols =
      tests in the future. *)
   List.iter
     (fun test ->
-      let {constants; attestation_lag; block_delay; number_of_dal_slots} =
+      let {
+        constants;
+        attestation_lag;
+        block_delay;
+        number_of_dal_slots;
+        beforehand_slot_injection;
+      } =
         test
       in
       let network = constants_to_string constants in
@@ -2341,7 +2355,7 @@ let register_end_to_end_tests ~protocols =
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
         title
-        (e2e_test_script ~number_of_dal_slots)
+        (e2e_test_script ~number_of_dal_slots ~beforehand_slot_injection)
         protocols)
     e2e_tests
 
