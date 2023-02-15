@@ -173,6 +173,14 @@ let handle_new_subscription_to_hash_streamer =
     ~level:Notice
     ()
 
+let subscribed_to_root_hashes_stream =
+  declare_0
+    ~section
+    ~name:"subscribed_to_root_hashes_stream"
+    ~msg:"Subscribed to root hashes stream"
+    ~level:Notice
+    ()
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
