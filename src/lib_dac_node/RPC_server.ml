@@ -63,7 +63,7 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
   let open Pages_encoding in
   let* root_hash =
     match pagination_scheme with
-    | Merkle_tree_V0 ->
+    | Pagination_scheme.Merkle_tree_V0 ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4897
            Once new "PUT /preimage" endpoint is implemented, pushing
            a new root hash to the data streamer should be moved there.
@@ -77,7 +77,7 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
           Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
         in
         return root_hash
-    | Hash_chain_V0 ->
+    | Pagination_scheme.Hash_chain_V0 ->
         Hash_chain.V0.serialize_payload
           dac_plugin
           ~for_each_page:(fun (hash, content) ->

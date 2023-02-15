@@ -40,13 +40,6 @@ type error +=
   | Cannot_combine_pages_data_of_different_type
   | Hashes_page_repr_expected_single_element
 
-type pagination_scheme = Merkle_tree_V0 | Hash_chain_V0
-
-let pagination_scheme_encoding =
-  Data_encoding.string_enum
-    [("Merkle_tree_V0", Merkle_tree_V0); ("Hash_chain_V0", Hash_chain_V0)]
-
-(* Encoding scheme configuration. *)
 module type CONFIG = sig
   val max_page_size : int
 end
