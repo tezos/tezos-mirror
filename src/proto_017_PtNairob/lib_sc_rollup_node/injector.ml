@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -151,6 +152,10 @@ end
 
 module Proto_client = struct
   open Protocol_client_context
+
+  type operation = Parameters.Operation.t
+
+  type state = Parameters.state
 
   type unsigned_operation =
     Tezos_base.Operation.shell_header * packed_contents_list
@@ -460,4 +465,6 @@ module Proto_client = struct
           (Time.System.now ())
 end
 
-include Injector_functor.Make (Parameters) (Proto_client)
+include Injector_functor.Make (Parameters)
+
+let () = register_proto_client Protocol.hash (module Proto_client)
