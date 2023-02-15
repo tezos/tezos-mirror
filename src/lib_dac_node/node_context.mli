@@ -24,9 +24,15 @@
 (*****************************************************************************)
 type dac_plugin_module = (module Dac_plugin.T)
 
-(** A [ready_ctx] value contains globally needed informations for a running dac
-    node. It is available when the DAC plugin has been loaded. *)
-type ready_ctxt = {dac_plugin : dac_plugin_module}
+(** A [ready_ctx] value contains globally needed information for a running dac
+    node. It is available when the DAC plugin has been loaded. Additionally,
+    it also contains an instance of [Dac_plugin.hash Data_streamer.t] - a
+    component for streaming root hashes, produced during the serialization of
+    dac payload. *)
+type ready_ctxt = {
+  dac_plugin : dac_plugin_module;
+  hash_streamer : Dac_plugin.hash Data_streamer.t;
+}
 
 (** The status of the dac node. *)
 type status = Ready of ready_ctxt | Starting

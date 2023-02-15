@@ -27,7 +27,13 @@ exception Status_already_ready
 
 type dac_plugin_module = (module Dac_plugin.T)
 
-type ready_ctxt = {dac_plugin : dac_plugin_module}
+type ready_ctxt = {
+  dac_plugin : dac_plugin_module;
+  hash_streamer : Dac_plugin.hash Data_streamer.t;
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
+         This could be problematic in case coordinator and member/observer
+         use two different plugins that bind different underlying hashes. *)
+}
 
 type status = Ready of ready_ctxt | Starting
 
@@ -46,7 +52,7 @@ let set_ready ctxt dac_plugin =
          Currently, Dac only supports coordinator functionalities but we might
          want to filter this capability out depending on the profile.
       *)
-      ctxt.status <- Ready {dac_plugin}
+      ctxt.status <- Ready {dac_plugin; hash_streamer = Data_streamer.init ()}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready
@@ -80,5 +86,5 @@ let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 let get_dac_plugin ctxt =
   let open Result_syntax in
   match ctxt.status with
-  | Ready {dac_plugin} -> Ok dac_plugin
+  | Ready {dac_plugin; hash_streamer = _} -> Ok dac_plugin
   | Starting -> tzfail Node_not_ready
