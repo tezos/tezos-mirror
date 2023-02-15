@@ -225,16 +225,6 @@ type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** Abstraction over store  *)
 
-let trace_lwt_with x =
-  Format.kasprintf
-    (fun s p -> trace (Exn (Failure s)) @@ protect @@ fun () -> p >>= return)
-    x
-
-let trace_lwt_result_with x =
-  Format.kasprintf
-    (fun s p -> trace (Exn (Failure s)) @@ protect @@ fun () -> p)
-    x
-
 module Lwt_result_option_syntax = struct
   let ( let** ) a f =
     let open Lwt_result_syntax in
@@ -319,7 +309,7 @@ let find_l2_block {store; _} block_hash =
 
 let get_l2_block_by_level node_ctxt level =
   let open Lwt_result_syntax in
-  trace_lwt_result_with "Could not retrieve L2 block at level %ld" level
+  Error.trace_lwt_result_with "Could not retrieve L2 block at level %ld" level
   @@ let* block_hash = hash_of_level node_ctxt level in
      get_l2_block node_ctxt block_hash
 
@@ -389,7 +379,7 @@ let tick_search ~big_step_blocks node_ctxt head tick =
 let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
   let open Lwt_result_syntax in
   let open Lwt_result_option_syntax in
-  trace_lwt_result_with
+  Error.trace_lwt_result_with
     "Could not retrieve block with tick %a"
     Sc_rollup.Tick.pp
     tick
@@ -578,7 +568,7 @@ let get_full_l2_block node_ctxt block_hash =
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
-  trace_lwt_with
+  Error.trace_lwt_with
     "Could not retrieve slot header for slot index %a published in block %a"
     Dal.Slot_index.pp
     slot_index
