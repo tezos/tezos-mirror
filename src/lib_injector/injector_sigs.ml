@@ -320,4 +320,14 @@ module type S = sig
 
   (** The status of an operation in the injector.  *)
   val operation_status : Inj_operation.Hash.t -> status option
+
+  (** Register a protocol client for a specific protocol to be used by the
+      injector. This function {b must} be called for all protocols that the
+      injector is meant support. *)
+  val register_proto_client :
+    Protocol_hash.t ->
+    (module PROTOCOL_CLIENT
+       with type operation = operation
+        and type state = state) ->
+    unit
 end

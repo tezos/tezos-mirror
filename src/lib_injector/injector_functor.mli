@@ -26,11 +26,7 @@
 
 open Injector_sigs
 
-module Make
-    (P : PARAMETERS)
-    (_ : PROTOCOL_CLIENT
-           with type state := P.state
-            and type operation := P.Operation.t) :
+module Make (P : PARAMETERS) :
   S
     with type state := P.state
      and type tag := P.Tag.t
