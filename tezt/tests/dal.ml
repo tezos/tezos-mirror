@@ -2239,15 +2239,25 @@ let create_additional_nodes ~protocol ~extra_nodes_operators rollup_address
    - We finally check that there is a "value" variable in the PVM whose payload
    is the sum of levels as returned by [slot_producer].
 *)
-let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1) protocol
-    parameters dal_node sc_rollup_node _sc_rollup_address l1_node l1_client
-    _pvm_name ~number_of_dal_slots =
+let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
+    ?(extra_nodes_operators = []) protocol parameters dal_node sc_rollup_node
+    sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
+  (* Generate new DAL and rollup nodes if requested. *)
+  let* additional_nodes =
+    create_additional_nodes
+      ~protocol
+      ~extra_nodes_operators
+      sc_rollup_address
+      l1_node
+      l1_client
+      dal_node
+  in
   Log.info
     "[e2e.configure_pvm] configure PVM with DAL parameters via inbox message@." ;
   let Rollup.Dal.Parameters.{attestation_lag; cryptobox; _} = parameters in
@@ -2316,9 +2326,20 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1) protocol
     unit
   in
   Log.info
-    "[e2e.final_check] check that the sum stored in the PVM is %d@."
+    "[e2e.final_check_1] check that the sum stored in the PVM is %d@."
     expected_value ;
-  check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+  let* () =
+    check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+  in
+
+  (* Check the statuses of the additional nodes/PVMs, if any. *)
+  Log.info
+    "[e2e.final_check_2] Check %d extra nodes@."
+    (List.length additional_nodes) ;
+  Lwt_list.iter_p
+    (fun (_dal_node, _rollup_node, rollup_client) ->
+      check_saved_value_in_pvm ~name:"value" ~expected_value rollup_client)
+    additional_nodes
 
 (** Register end-to-end DAL Tests. *)
 
