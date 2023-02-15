@@ -2175,7 +2175,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
     which case the corresponding rollup node is launched in observer mode, or
     [Some account], in which case the [account] is used as the default
     operator of the SORU node. *)
-let create_additional_nodes ~protocol ~extra_nodes_operators rollup_address
+let create_additional_nodes ~protocol ~extra_node_operators rollup_address
     l1_node l1_client dal_node =
   (* The mutable variable [connect_dal_node_to] below is used to diversify a bit
      the topology of the DAL nodes network as follows:
@@ -2218,7 +2218,7 @@ let create_additional_nodes ~protocol ~extra_nodes_operators rollup_address
       let* () = Sc_rollup_node.run sc_rollup_node [] in
       let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
       return (fresh_dal_node, sc_rollup_node, sc_rollup_client))
-    extra_nodes_operators
+    extra_node_operators
 
 (* This function allows to run an end-to-end test involving L1, DAL and rollup
    nodes. For that it:
@@ -2240,7 +2240,7 @@ let create_additional_nodes ~protocol ~extra_nodes_operators rollup_address
    is the sum of levels as returned by [slot_producer].
 *)
 let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
-    ?(extra_nodes_operators = []) protocol parameters dal_node sc_rollup_node
+    ?(extra_node_operators = []) protocol parameters dal_node sc_rollup_node
     sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
@@ -2252,7 +2252,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let* additional_nodes =
     create_additional_nodes
       ~protocol
-      ~extra_nodes_operators
+      ~extra_node_operators
       sc_rollup_address
       l1_node
       l1_client
@@ -2365,7 +2365,7 @@ let e2e_tests =
       block_delay = 6;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
-      num_extra_nodes = 0;
+      num_extra_nodes = 2;
     }
   in
   let test2 =
@@ -2375,7 +2375,7 @@ let e2e_tests =
       block_delay = 2;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
-      num_extra_nodes = 0;
+      num_extra_nodes = 2;
     }
   in
   let mainnet1 =
@@ -2385,7 +2385,7 @@ let e2e_tests =
       block_delay = 15;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
-      num_extra_nodes = 0;
+      num_extra_nodes = 1;
     }
   in
   let mainnet2 =
@@ -2448,7 +2448,7 @@ let register_end_to_end_tests ~protocols =
         Ptime.Span.of_int_s (expected_bake_for_occurrences * block_delay)
       in
       (* Preparing the list of node operators for extra nodes. *)
-      let extra_nodes_operators =
+      let extra_node_operators =
         (* So launch the extra SORU nodes in observer mode. So we don't actually
            need to provide public key hashes. *)
         List.init num_extra_nodes (fun _index -> None)
@@ -2463,7 +2463,7 @@ let register_end_to_end_tests ~protocols =
         (e2e_test_script
            ~number_of_dal_slots
            ~beforehand_slot_injection
-           ~extra_nodes_operators)
+           ~extra_node_operators)
         protocols)
     e2e_tests
 
