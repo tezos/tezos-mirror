@@ -1991,16 +1991,6 @@ module Manager = struct
         && storage_limit >= Z.zero)
       Fees.Storage_limit_too_high
 
-  let assert_tx_rollup_feature_enabled vi =
-    let open Result_syntax in
-    let* sunset =
-      Raw_level.of_int32 (Constants.tx_rollup_sunset_level vi.ctxt)
-    in
-    error_unless
-      (Constants.tx_rollup_enable vi.ctxt
-      && Raw_level.(vi.current_level.level < sunset))
-      Tx_rollup_feature_disabled
-
   let assert_sc_rollup_feature_enabled vi =
     error_unless (Constants.sc_rollup_enable vi.ctxt) Sc_rollup_feature_disabled
 
@@ -2029,85 +2019,6 @@ module Manager = struct
           lazy_expr is not actually decoded here; its deserialization
           cost is estimated from the size of its bytes. *)
     Script.consume_decoding_gas remaining_gas lexpr
-
-  let validate_tx_rollup_submit_batch vi remaining_gas content =
-    let open Result_syntax in
-    let* () = assert_tx_rollup_feature_enabled vi in
-    let _message, message_size = Tx_rollup_message.make_batch content in
-    let* cost = Tx_rollup_gas.hash_cost message_size in
-    let size_limit = Constants.tx_rollup_hard_size_limit_per_message vi.ctxt in
-    let* (_ : Gas.Arith.fp) = Gas.consume_from remaining_gas cost in
-    error_unless
-      Compare.Int.(message_size <= size_limit)
-      Tx_rollup_errors.Message_size_exceeds_limit
-
-  let validate_tx_rollup_dispatch_tickets vi remaining_gas operation =
-    let open Result_syntax in
-    let* () = assert_tx_rollup_feature_enabled vi in
-    let (Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _}) =
-      operation
-    in
-    let Constants.Parametric.
-          {max_messages_per_inbox; max_withdrawals_per_batch; _} =
-      Constants.tx_rollup vi.ctxt
-    in
-    let* () =
-      Tx_rollup_errors.check_path_depth
-        `Commitment
-        (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-        ~count_limit:max_messages_per_inbox
-    in
-    let* () =
-      error_when
-        Compare.List_length_with.(tickets_info = 0)
-        Tx_rollup_errors.No_withdrawals_to_dispatch
-    in
-    let* () =
-      error_when
-        Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
-        Tx_rollup_errors.Too_many_withdrawals
-    in
-    let* (_ : Gas.Arith.fp) =
-      record_trace
-        Gas_quota_exceeded_init_deserialize
-        (List.fold_left_e
-           (fun remaining_gas Tx_rollup_reveal.{contents; ty; _} ->
-             let* remaining_gas =
-               Script.consume_decoding_gas remaining_gas contents
-             in
-             Script.consume_decoding_gas remaining_gas ty)
-           remaining_gas
-           tickets_info)
-    in
-    return_unit
-
-  let validate_tx_rollup_rejection vi operation =
-    let open Result_syntax in
-    let* () = assert_tx_rollup_feature_enabled vi in
-    let (Tx_rollup_rejection
-          {message_path; message_result_path; previous_message_result_path; _})
-        =
-      operation
-    in
-    let Constants.Parametric.{max_messages_per_inbox; _} =
-      Constants.tx_rollup vi.ctxt
-    in
-    let* () =
-      Tx_rollup_errors.check_path_depth
-        `Inbox
-        (Tx_rollup_inbox.Merkle.path_depth message_path)
-        ~count_limit:max_messages_per_inbox
-    in
-    let* () =
-      Tx_rollup_errors.check_path_depth
-        `Commitment
-        (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-        ~count_limit:max_messages_per_inbox
-    in
-    Tx_rollup_errors.check_path_depth
-      `Commitment
-      (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
-      ~count_limit:max_messages_per_inbox
 
   let may_trace_gas_limit_too_high info =
     match info.mode with
@@ -2179,19 +2090,10 @@ module Manager = struct
       | Update_consensus_key pk -> Delegate.Consensus_key.check_not_tz4 pk
       | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
           return_unit
-      | Tx_rollup_origination -> assert_tx_rollup_feature_enabled vi
-      | Tx_rollup_submit_batch {content; _} ->
-          validate_tx_rollup_submit_batch vi remaining_gas content
-      | Tx_rollup_commit _ | Tx_rollup_return_bond _
-      | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
-          assert_tx_rollup_feature_enabled vi
       | Transfer_ticket {contents; ty; _} ->
           let* remaining_gas = consume_decoding_gas remaining_gas contents in
           let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
           return_unit
-      | Tx_rollup_dispatch_tickets _ ->
-          validate_tx_rollup_dispatch_tickets vi remaining_gas operation
-      | Tx_rollup_rejection _ -> validate_tx_rollup_rejection vi operation
       | Sc_rollup_originate {kind; _} ->
           let* () = assert_sc_rollup_feature_enabled vi in
           assert_pvm_kind_enabled vi kind

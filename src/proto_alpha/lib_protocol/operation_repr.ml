@@ -84,22 +84,6 @@ module Kind = struct
 
   type register_global_constant = Register_global_constant_kind
 
-  type tx_rollup_origination = Tx_rollup_origination_kind
-
-  type tx_rollup_submit_batch = Tx_rollup_submit_batch_kind
-
-  type tx_rollup_commit = Tx_rollup_commit_kind
-
-  type tx_rollup_return_bond = Tx_rollup_return_bond_kind
-
-  type tx_rollup_finalize_commitment = Tx_rollup_finalize_commitment_kind
-
-  type tx_rollup_remove_commitment = Tx_rollup_remove_commitment_kind
-
-  type tx_rollup_rejection = Tx_rollup_rejection_kind
-
-  type tx_rollup_dispatch_tickets = Tx_rollup_dispatch_tickets_kind
-
   type transfer_ticket = Transfer_ticket_kind
 
   type dal_publish_slot_header = Dal_publish_slot_header_kind
@@ -137,17 +121,6 @@ module Kind = struct
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
-    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
-    | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
-    | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
-    | Tx_rollup_return_bond_manager_kind : tx_rollup_return_bond manager
-    | Tx_rollup_finalize_commitment_manager_kind
-        : tx_rollup_finalize_commitment manager
-    | Tx_rollup_remove_commitment_manager_kind
-        : tx_rollup_remove_commitment manager
-    | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
-    | Tx_rollup_dispatch_tickets_manager_kind
-        : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
     | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
@@ -367,52 +340,6 @@ and _ manager_operation =
   | Update_consensus_key :
       Signature.Public_key.t
       -> Kind.update_consensus_key manager_operation
-  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
-  | Tx_rollup_submit_batch : {
-      tx_rollup : Tx_rollup_repr.t;
-      content : string;
-      burn_limit : Tez_repr.t option;
-    }
-      -> Kind.tx_rollup_submit_batch manager_operation
-  | Tx_rollup_commit : {
-      tx_rollup : Tx_rollup_repr.t;
-      commitment : Tx_rollup_commitment_repr.Full.t;
-    }
-      -> Kind.tx_rollup_commit manager_operation
-  | Tx_rollup_return_bond : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_return_bond manager_operation
-  | Tx_rollup_finalize_commitment : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_finalize_commitment manager_operation
-  | Tx_rollup_remove_commitment : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_remove_commitment manager_operation
-  | Tx_rollup_rejection : {
-      tx_rollup : Tx_rollup_repr.t;
-      level : Tx_rollup_level_repr.t;
-      message : Tx_rollup_message_repr.t;
-      message_position : int;
-      message_path : Tx_rollup_inbox_repr.Merkle.path;
-      message_result_hash : Tx_rollup_message_result_hash_repr.t;
-      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      previous_message_result : Tx_rollup_message_result_repr.t;
-      previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      proof : Tx_rollup_l2_proof.serialized;
-    }
-      -> Kind.tx_rollup_rejection manager_operation
-  | Tx_rollup_dispatch_tickets : {
-      tx_rollup : Tx_rollup_repr.t;
-      level : Tx_rollup_level_repr.t;
-      context_hash : Context_hash.t;
-      message_index : int;
-      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      tickets_info : Tx_rollup_reveal_repr.t list;
-    }
-      -> Kind.tx_rollup_dispatch_tickets manager_operation
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;
       ty : Script_repr.lazy_expr;
@@ -496,16 +423,6 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
-  | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
-  | Tx_rollup_submit_batch _ -> Kind.Tx_rollup_submit_batch_manager_kind
-  | Tx_rollup_commit _ -> Kind.Tx_rollup_commit_manager_kind
-  | Tx_rollup_return_bond _ -> Kind.Tx_rollup_return_bond_manager_kind
-  | Tx_rollup_finalize_commitment _ ->
-      Kind.Tx_rollup_finalize_commitment_manager_kind
-  | Tx_rollup_remove_commitment _ ->
-      Kind.Tx_rollup_remove_commitment_manager_kind
-  | Tx_rollup_rejection _ -> Kind.Tx_rollup_rejection_manager_kind
-  | Tx_rollup_dispatch_tickets _ -> Kind.Tx_rollup_dispatch_tickets_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
   | Dal_publish_slot_header _ -> Kind.Dal_publish_slot_header_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
@@ -596,6 +513,20 @@ let tx_rollup_operation_rejection_tag = tx_rollup_operation_tag_offset + 6
 let tx_rollup_operation_dispatch_tickets_tag =
   tx_rollup_operation_tag_offset + 7
 
+(** The following operation tags cannot be used again, it is checked
+    at compilation time. *)
+let tx_rollup_forbidden_operation_tags =
+  [
+    tx_rollup_operation_origination_tag;
+    tx_rollup_operation_submit_batch_tag;
+    tx_rollup_operation_commit_tag;
+    tx_rollup_operation_return_bond_tag;
+    tx_rollup_operation_finalize_commitment_tag;
+    tx_rollup_operation_remove_commitment_tag;
+    tx_rollup_operation_rejection_tag;
+    tx_rollup_operation_dispatch_tickets_tag;
+  ]
+
 let transfer_ticket_tag = tx_rollup_operation_tag_offset + 8
 
 let sc_rollup_operation_tag_offset = 200
@@ -631,8 +562,14 @@ let zk_rollup_operation_update_tag = zk_rollup_operation_tag_offset + 2
 module Encoding = struct
   open Data_encoding
 
-  (** These tags are reserved for future extensions: [fd] - [ff]. *)
-  let reserved_tag t = Compare.Int.(t >= 0xfd)
+  (** These tags can not be used yet for operations. *)
+  let reserved_tag t =
+    (* These tags are reserved for future extensions: [fd] - [ff]. *)
+    Compare.Int.(t >= 0xfd)
+    || (* These tags were used by old operations.
+          The operations have been removed in protocol proposal N, it can
+          be unblocked in the future (e.g. proposal O, P etc.). *)
+    List.exists (Compare.Int.equal t) tx_rollup_forbidden_operation_tags
 
   let signature_prefix_tag = 0xff
 
@@ -799,239 +736,6 @@ module Encoding = struct
             | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
           proj = (function Update_consensus_key consensus_pk -> consensus_pk);
           inj = (fun consensus_pk -> Update_consensus_key consensus_pk);
-        }
-
-    let tx_rollup_origination_case =
-      MCase
-        {
-          tag = tx_rollup_operation_origination_tag;
-          name = "tx_rollup_origination";
-          encoding = obj1 (req "tx_rollup_origination" Data_encoding.unit);
-          select =
-            (function
-            | Manager (Tx_rollup_origination as op) -> Some op | _ -> None);
-          proj = (function Tx_rollup_origination -> ());
-          inj = (fun () -> Tx_rollup_origination);
-        }
-
-    let tx_rollup_submit_batch_case =
-      MCase
-        {
-          tag = tx_rollup_operation_submit_batch_tag;
-          name = "tx_rollup_submit_batch";
-          encoding =
-            obj3
-              (req "rollup" Tx_rollup_repr.encoding)
-              (req "content" (string Hex))
-              (opt "burn_limit" Tez_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_submit_batch _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
-                (tx_rollup, content, burn_limit));
-          inj =
-            (fun (tx_rollup, content, burn_limit) ->
-              Tx_rollup_submit_batch {tx_rollup; content; burn_limit});
-        }
-
-    let tx_rollup_commit_case =
-      MCase
-        {
-          tag = tx_rollup_operation_commit_tag;
-          name = "tx_rollup_commit";
-          encoding =
-            obj2
-              (req "rollup" Tx_rollup_repr.encoding)
-              (req "commitment" Tx_rollup_commitment_repr.Full.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_commit _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_commit {tx_rollup; commitment} -> (tx_rollup, commitment));
-          inj =
-            (fun (tx_rollup, commitment) ->
-              Tx_rollup_commit {tx_rollup; commitment});
-        }
-
-    let tx_rollup_return_bond_case =
-      MCase
-        {
-          tag = tx_rollup_operation_return_bond_tag;
-          name = "tx_rollup_return_bond";
-          encoding = obj1 (req "rollup" Tx_rollup_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_return_bond _ as op) -> Some op | _ -> None);
-          proj = (function Tx_rollup_return_bond {tx_rollup} -> tx_rollup);
-          inj = (fun tx_rollup -> Tx_rollup_return_bond {tx_rollup});
-        }
-
-    let tx_rollup_finalize_commitment_case =
-      MCase
-        {
-          tag = tx_rollup_operation_finalize_commitment_tag;
-          name = "tx_rollup_finalize_commitment";
-          encoding = obj1 (req "rollup" Tx_rollup_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_finalize_commitment _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function Tx_rollup_finalize_commitment {tx_rollup} -> tx_rollup);
-          inj = (fun tx_rollup -> Tx_rollup_finalize_commitment {tx_rollup});
-        }
-
-    let tx_rollup_remove_commitment_case =
-      MCase
-        {
-          tag = tx_rollup_operation_remove_commitment_tag;
-          name = "tx_rollup_remove_commitment";
-          encoding = obj1 (req "rollup" Tx_rollup_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_remove_commitment _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function Tx_rollup_remove_commitment {tx_rollup} -> tx_rollup);
-          inj = (fun tx_rollup -> Tx_rollup_remove_commitment {tx_rollup});
-        }
-
-    let tx_rollup_rejection_case =
-      MCase
-        {
-          tag = tx_rollup_operation_rejection_tag;
-          name = "tx_rollup_rejection";
-          encoding =
-            obj10
-              (req "rollup" Tx_rollup_repr.encoding)
-              (req "level" Tx_rollup_level_repr.encoding)
-              (req "message" Tx_rollup_message_repr.encoding)
-              (req "message_position" n)
-              (req "message_path" Tx_rollup_inbox_repr.Merkle.path_encoding)
-              (req
-                 "message_result_hash"
-                 Tx_rollup_message_result_hash_repr.encoding)
-              (req
-                 "message_result_path"
-                 Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req
-                 "previous_message_result"
-                 Tx_rollup_message_result_repr.encoding)
-              (req
-                 "previous_message_result_path"
-                 Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req "proof" Tx_rollup_l2_proof.serialized_encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_rejection _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_rejection
-                {
-                  tx_rollup;
-                  level;
-                  message;
-                  message_position;
-                  message_path;
-                  message_result_hash;
-                  message_result_path;
-                  previous_message_result;
-                  previous_message_result_path;
-                  proof;
-                } ->
-                ( tx_rollup,
-                  level,
-                  message,
-                  Z.of_int message_position,
-                  message_path,
-                  message_result_hash,
-                  message_result_path,
-                  previous_message_result,
-                  previous_message_result_path,
-                  proof ));
-          inj =
-            (fun ( tx_rollup,
-                   level,
-                   message,
-                   message_position,
-                   message_path,
-                   message_result_hash,
-                   message_result_path,
-                   previous_message_result,
-                   previous_message_result_path,
-                   proof ) ->
-              Tx_rollup_rejection
-                {
-                  tx_rollup;
-                  level;
-                  message;
-                  message_position = Z.to_int message_position;
-                  message_path;
-                  message_result_hash;
-                  message_result_path;
-                  previous_message_result;
-                  previous_message_result_path;
-                  proof;
-                });
-        }
-
-    let tx_rollup_dispatch_tickets_case =
-      MCase
-        {
-          tag = tx_rollup_operation_dispatch_tickets_tag;
-          name = "tx_rollup_dispatch_tickets";
-          encoding =
-            obj6
-              (req "tx_rollup" Tx_rollup_repr.encoding)
-              (req "level" Tx_rollup_level_repr.encoding)
-              (req "context_hash" Context_hash.encoding)
-              (req "message_index" int31)
-              (req
-                 "message_result_path"
-                 Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req
-                 "tickets_info"
-                 (Data_encoding.list Tx_rollup_reveal_repr.encoding));
-          select =
-            (function
-            | Manager (Tx_rollup_dispatch_tickets _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_dispatch_tickets
-                {
-                  tx_rollup;
-                  level;
-                  context_hash;
-                  message_index;
-                  message_result_path;
-                  tickets_info;
-                } ->
-                ( tx_rollup,
-                  level,
-                  context_hash,
-                  message_index,
-                  message_result_path,
-                  tickets_info ));
-          inj =
-            (fun ( tx_rollup,
-                   level,
-                   context_hash,
-                   message_index,
-                   message_result_path,
-                   tickets_info ) ->
-              Tx_rollup_dispatch_tickets
-                {
-                  tx_rollup;
-                  level;
-                  context_hash;
-                  message_index;
-                  message_result_path;
-                  tickets_info;
-                });
         }
 
     let transfer_ticket_case =
@@ -1667,46 +1371,6 @@ module Encoding = struct
   let update_consensus_key_case =
     make_manager_case 114 Manager_operations.update_consensus_key_case
 
-  let tx_rollup_origination_case =
-    make_manager_case
-      tx_rollup_operation_tag_offset
-      Manager_operations.tx_rollup_origination_case
-
-  let tx_rollup_submit_batch_case =
-    make_manager_case
-      tx_rollup_operation_submit_batch_tag
-      Manager_operations.tx_rollup_submit_batch_case
-
-  let tx_rollup_commit_case =
-    make_manager_case
-      tx_rollup_operation_commit_tag
-      Manager_operations.tx_rollup_commit_case
-
-  let tx_rollup_return_bond_case =
-    make_manager_case
-      tx_rollup_operation_return_bond_tag
-      Manager_operations.tx_rollup_return_bond_case
-
-  let tx_rollup_finalize_commitment_case =
-    make_manager_case
-      tx_rollup_operation_finalize_commitment_tag
-      Manager_operations.tx_rollup_finalize_commitment_case
-
-  let tx_rollup_remove_commitment_case =
-    make_manager_case
-      tx_rollup_operation_remove_commitment_tag
-      Manager_operations.tx_rollup_remove_commitment_case
-
-  let tx_rollup_rejection_case =
-    make_manager_case
-      tx_rollup_operation_rejection_tag
-      Manager_operations.tx_rollup_rejection_case
-
-  let tx_rollup_dispatch_tickets_case =
-    make_manager_case
-      tx_rollup_operation_dispatch_tickets_tag
-      Manager_operations.tx_rollup_dispatch_tickets_case
-
   let transfer_ticket_case =
     make_manager_case
       transfer_ticket_tag
@@ -1797,14 +1461,6 @@ module Encoding = struct
       PCase drain_delegate_case;
       PCase failing_noop_case;
       PCase register_global_constant_case;
-      PCase tx_rollup_origination_case;
-      PCase tx_rollup_submit_batch_case;
-      PCase tx_rollup_commit_case;
-      PCase tx_rollup_return_bond_case;
-      PCase tx_rollup_finalize_commitment_case;
-      PCase tx_rollup_remove_commitment_case;
-      PCase tx_rollup_rejection_case;
-      PCase tx_rollup_dispatch_tickets_case;
       PCase transfer_ticket_case;
       PCase dal_publish_slot_header_case;
       PCase sc_rollup_originate_case;
@@ -2190,22 +1846,6 @@ let equal_manager_operation_kind :
   | Increase_paid_storage _, _ -> None
   | Update_consensus_key _, Update_consensus_key _ -> Some Eq
   | Update_consensus_key _, _ -> None
-  | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
-  | Tx_rollup_origination, _ -> None
-  | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq
-  | Tx_rollup_submit_batch _, _ -> None
-  | Tx_rollup_commit _, Tx_rollup_commit _ -> Some Eq
-  | Tx_rollup_commit _, _ -> None
-  | Tx_rollup_return_bond _, Tx_rollup_return_bond _ -> Some Eq
-  | Tx_rollup_return_bond _, _ -> None
-  | Tx_rollup_finalize_commitment _, Tx_rollup_finalize_commitment _ -> Some Eq
-  | Tx_rollup_finalize_commitment _, _ -> None
-  | Tx_rollup_remove_commitment _, Tx_rollup_remove_commitment _ -> Some Eq
-  | Tx_rollup_remove_commitment _, _ -> None
-  | Tx_rollup_rejection _, Tx_rollup_rejection _ -> Some Eq
-  | Tx_rollup_rejection _, _ -> None
-  | Tx_rollup_dispatch_tickets _, Tx_rollup_dispatch_tickets _ -> Some Eq
-  | Tx_rollup_dispatch_tickets _, _ -> None
   | Transfer_ticket _, Transfer_ticket _ -> Some Eq
   | Transfer_ticket _, _ -> None
   | Dal_publish_slot_header _, Dal_publish_slot_header _ -> Some Eq

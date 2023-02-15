@@ -173,51 +173,6 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.update_consensus_key successful_manager_operation_result
-  | Tx_rollup_origination_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      originated_tx_rollup : Tx_rollup.t;
-    }
-      -> Kind.tx_rollup_origination successful_manager_operation_result
-  | Tx_rollup_submit_batch_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
-      -> Kind.tx_rollup_submit_batch successful_manager_operation_result
-  | Tx_rollup_commit_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.tx_rollup_commit successful_manager_operation_result
-  | Tx_rollup_return_bond_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.tx_rollup_return_bond successful_manager_operation_result
-  | Tx_rollup_finalize_commitment_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      level : Tx_rollup_level.t;
-    }
-      -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
-  | Tx_rollup_remove_commitment_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      level : Tx_rollup_level.t;
-    }
-      -> Kind.tx_rollup_remove_commitment successful_manager_operation_result
-  | Tx_rollup_rejection_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.tx_rollup_rejection successful_manager_operation_result
-  | Tx_rollup_dispatch_tickets_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
-      -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
   | Transfer_ticket_result : {
       balance_updates : Receipt.balance_updates;
       ticket_receipt : Ticket_receipt.t;

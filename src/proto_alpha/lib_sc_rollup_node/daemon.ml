@@ -233,10 +233,7 @@ module Make (PVM : Pvm.S) = struct
       | Dal_publish_slot_header _ -> true
       | Reveal _ | Transaction _ | Origination _ | Delegation _
       | Update_consensus_key _ | Register_global_constant _
-      | Set_deposits_limit _ | Increase_paid_storage _ | Tx_rollup_origination
-      | Tx_rollup_submit_batch _ | Tx_rollup_commit _ | Tx_rollup_return_bond _
-      | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
-      | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
+      | Set_deposits_limit _ | Increase_paid_storage _ | Transfer_ticket _
       | Sc_rollup_originate _ | Zk_rollup_origination _ | Zk_rollup_publish _
       | Zk_rollup_update _ ->
           false
