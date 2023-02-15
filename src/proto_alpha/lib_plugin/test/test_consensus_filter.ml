@@ -435,7 +435,7 @@ let () =
   Alcotest.run
     "Filter"
     [
-      ( "pre_filter",
+      ( Protocol.name ^ ": pre_filter",
         qcheck_wrap
           [
             test_acceptable_past_level;
