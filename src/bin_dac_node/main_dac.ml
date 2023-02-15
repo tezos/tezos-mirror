@@ -88,7 +88,13 @@ let config_init_command =
           data_dir;
           rpc_address;
           rpc_port;
-          mode = Legacy {threshold = 0; dac_members_addresses = []};
+          mode =
+            Legacy
+              {
+                threshold = 0;
+                dac_members_addresses = [];
+                dac_cctxt_config = None;
+              };
           reveal_data_dir = default_reveal_data_dir;
         }
       in

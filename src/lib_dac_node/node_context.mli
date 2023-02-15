@@ -41,10 +41,13 @@ type status = Ready of ready_ctxt | Starting
     fields are available through accessors. *)
 type t
 
-(** [init config cctx] creates a [t] with a status set to [Starting]
-    using the given dac node configuration [config],
-    and tezos node client context [cctx]. *)
-val init : Configuration.t -> Client_context.full -> t
+(** [init config cctxt dac_node_cctxt] creates a [t] with a status set to
+    [Starting] using the given dac node configuration [config],
+    tezos node client context [cctxt], and optional client context of
+    another dac node [dac_node_cctxt], which can be used for writting
+    tests with two dac nodes running the legacy mode. *)
+val init :
+  Configuration.t -> Client_context.full -> Dac_node_client.cctxt option -> t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready

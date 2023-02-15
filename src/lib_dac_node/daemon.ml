@@ -140,10 +140,11 @@ let run ~data_dir cctxt =
     Configuration.load ~data_dir
   in
   let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
-  let* addresses, threshold =
+  let* addresses, threshold, coordinator_config_opt =
     match mode with
-    | Configuration.Legacy {dac_members_addresses; threshold} ->
-        return (dac_members_addresses, threshold)
+    | Configuration.Legacy {dac_members_addresses; threshold; dac_cctxt_config}
+      ->
+        return (dac_members_addresses, threshold, dac_cctxt_config)
     | Configuration.Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
     | Configuration.Dac_member _ -> tzfail @@ Mode_not_supported "dac_member"
     | Configuration.Observer _ -> tzfail @@ Mode_not_supported "observer"
@@ -159,7 +160,13 @@ let run ~data_dir cctxt =
            | Some (_pkh, pk_opt, sk_uri) -> (pk_opt, Some sk_uri))
     |> List.split
   in
-  let ctxt = Node_context.init config cctxt in
+  let coordinator_cctxt_opt =
+    Option.map
+      (fun Configuration.{host; port} ->
+        Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
+      coordinator_config_opt
+  in
+  let ctxt = Node_context.init config cctxt coordinator_cctxt_opt in
   let* rpc_server =
     RPC_server.(
       start_legacy

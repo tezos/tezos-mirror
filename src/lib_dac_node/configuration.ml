@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type host_and_port = {host : string; port : int}
+
 type coordinator = {
   threshold : int;
   dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
@@ -40,6 +42,7 @@ type observer = {coordinator_rpc_address : string; coordinator_rpc_port : int}
 type legacy = {
   threshold : int;
   dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+  dac_cctxt_config : host_and_port option;
 }
 
 type mode =
@@ -76,6 +79,13 @@ let default_reveal_data_dir =
   Filename.concat
     (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
     "wasm_2_0_0"
+
+let host_and_port_encoding =
+  let open Data_encoding in
+  conv
+    (fun {host; port} -> (host, port))
+    (fun (host, port) -> {host; port})
+    (obj2 (req "rpc-host" string) (req "rpc-port" uint16))
 
 let coordinator_encoding =
   Data_encoding.(
@@ -120,17 +130,18 @@ let observer_encoding =
 let legacy_encoding =
   Data_encoding.(
     conv_with_guard
-      (fun {threshold; dac_members_addresses} ->
-        (threshold, dac_members_addresses, true))
-      (fun (threshold, dac_members_addresses, legacy) ->
-        if legacy then Ok {threshold; dac_members_addresses}
+      (fun {threshold; dac_members_addresses; dac_cctxt_config} ->
+        (threshold, dac_members_addresses, dac_cctxt_config, true))
+      (fun (threshold, dac_members_addresses, dac_cctxt_config, legacy) ->
+        if legacy then Ok {threshold; dac_members_addresses; dac_cctxt_config}
         else Error "legacy flag should be set to true")
-      (obj3
+      (obj4
          (dft "threshold" uint8 default_dac_threshold)
          (dft
             "dac_members"
             (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
             default_dac_addresses)
+         (opt "dac_cctxt_config" host_and_port_encoding)
          (req "legacy" bool)))
 
 let mode_config_encoding =

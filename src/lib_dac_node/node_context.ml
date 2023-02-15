@@ -41,9 +41,20 @@ type t = {
   mutable status : status;
   config : Configuration.t;
   tezos_node_cctxt : Client_context.full;
+  coordinator_opt : Dac_node_client.cctxt option;
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4896
+         [coordinator_opt] is meant to be used for running integration tests
+         in the multiple dac node setup, where all nodes are in the [legacy]
+         mode. In this setup we normally try to mimic the role of coordinator
+         with one node, whereas the others want to interact with it.
+         This is done via [Dac_node_client.cctxt].
+
+         Eventually, once the legacy mode is removed we should revisit the
+         need for this fieeld.*)
 }
 
-let init config cctxt = {status = Starting; config; tezos_node_cctxt = cctxt}
+let init config cctxt coordinator_opt =
+  {status = Starting; config; tezos_node_cctxt = cctxt; coordinator_opt}
 
 let set_ready ctxt dac_plugin =
   match ctxt.status with
