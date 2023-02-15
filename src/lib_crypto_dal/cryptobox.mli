@@ -167,13 +167,25 @@ val encoded_share_size : t -> int
 
 (** [polynomial_from_shards t shards] computes the original polynomial
     from [shards]. The proportion of shards needed is [1] over
-    [parameters.redundancy_factor] the total number of shards.
+    [redundancy_factor] the total number of shards declared in [t].
 
-    Returns [Error (`Not_enough_shards msg)] if there aren't at least
-    [parameters.number_of_shards / parameters.redundancy_factor] shards, or
-    [Error (`Shard_index_out_of_range msg)] if one shard index is not within the
-    range [0, parameters.number_of_shards - 1], or [Error (`Invalid_shard_length msg)]
-    if one shard is not of the expected length. *)
+    Requires:
+    - [Seq.length shards >= number_of_shards / redundancy_factor]
+    (where [number_of_shards] and [redundancy_factor] are found in [t])
+.
+
+    Ensures:
+    - For any [p], let shards = shards_from_polynomial p,
+    for any subset S of shards of k / shard length elements,
+    [polynomial_from_shards S = p].
+    Here, k and shard length are parameters declared in [t].
+
+    Fails with:
+    - [Error (`Not_enough_shards msg)] if there aren't at least
+    [number_of_shards / redundancy_factor] shards (where these two parameters are found in [t])
+    - [Error (`Shard_index_out_of_range msg)] if one shard index is not within the
+    range [0, number_of_shards - 1] (where [number_of_shards] is declared in [t]).
+    - [Error (`Invalid_shard_length msg)] if one shard is not of the expected length. *)
 val polynomial_from_shards :
   t ->
   shard Seq.t ->
@@ -184,7 +196,13 @@ val polynomial_from_shards :
   result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
-     encoding the original [polynomial]. *)
+    encoding the original [polynomial].
+
+    Ensures:
+    - For any [p], let shards = shards_from_polynomial p,
+    for any subset S of shards of k / shard length elements,
+    [polynomial_from_shards S = p].
+    Here, k and shard length are parameters declared in [t]. *)
 val shards_from_polynomial : t -> polynomial -> shard Seq.t
 
 (** A proof that a shard belongs to some commitment. *)
