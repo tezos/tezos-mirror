@@ -651,16 +651,24 @@ module Inner = struct
   let encode t p =
     Evaluations.to_array (Evaluations.evaluation_fft t.domain_n p)
 
-  (* The shards are arranged in cosets to evaluate in batch with Kate
-     amortized. *)
+  (* The shards are arranged in cosets to produce batches of KZG proofs
+     for the shards efficiently.
+
+     The domain of evaluation <w> is split into cosets:
+     <w> = Disjoint union_{i in ⟦0, t.number_of_shards-1⟧} W_i,
+
+     where W_0 = {w^{t.number_of_shards * j}}_{j in ⟦0, t.shard_length-1⟧}
+     and W_i = w^i W_0 (|W_0|=t.shard_length). *)
   let shards_from_polynomial t p =
     let codeword = encode t p in
-    let len_shard = t.n / t.number_of_shards in
     let rec loop index seq =
       if index = t.number_of_shards then seq
       else
-        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
-        for j = 0 to len_shard - 1 do
+        (* For each shard index [index], a [share] consists of the
+           elements from [codeword] of indices w^index W_0.
+           A shard consists of its [index] and associated [share]. *)
+        let share = Array.init t.shard_length (fun _ -> Scalar.(copy zero)) in
+        for j = 0 to t.shard_length - 1 do
           share.(j) <- codeword.((t.number_of_shards * j) + index)
         done ;
         loop (index + 1) (Seq.cons {index; share} seq)
