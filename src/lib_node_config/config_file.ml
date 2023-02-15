@@ -374,6 +374,12 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
           (fun x -> x);
       ])
 
+let lwt_log_sink_default_cfg =
+  {
+    Lwt_log_sink_unix.default_cfg with
+    template = "$(date).$(milliseconds): $(message)";
+  }
+
 let make_default_internal_events ~data_dir =
   (* By default the node has two logs output:
      - on stdout using Lwt_log using the configured verbosity
@@ -462,7 +468,7 @@ let default_config =
     data_dir = default_data_dir;
     p2p = default_p2p;
     rpc = default_rpc;
-    log = Lwt_log_sink_unix.default_cfg;
+    log = lwt_log_sink_default_cfg;
     internal_events = Internal_event_config.empty;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
@@ -747,7 +753,7 @@ let encoding =
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
           Lwt_log_sink_unix.cfg_encoding
-          Lwt_log_sink_unix.default_cfg)
+          lwt_log_sink_default_cfg)
        (dft
           "internal-events"
           ~description:"Configuration of the structured logging framework"

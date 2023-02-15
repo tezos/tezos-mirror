@@ -59,6 +59,8 @@ Node
 - Added a default node configuration that enables disk logs as a
   file-descriptor-sink in the data directory of the node with a 7 days rotation.
 
+- **Breaking Change**: Removed section in stdout logs lines
+
 Client
 ------
 
