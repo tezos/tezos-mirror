@@ -51,6 +51,7 @@ type t = {
   rpc_listen_addrs : string list;
   private_mode : bool;
   disable_p2p_maintenance : bool;
+  disable_p2p_swap : bool;
   disable_mempool : bool;
   disable_mempool_precheck : bool;
   enable_testchain : bool;
@@ -182,9 +183,9 @@ let load_net_config =
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
     advertised_net_port discovery_addr peers no_bootstrap_peers
-    bootstrap_threshold private_mode disable_p2p_maintenance disable_mempool
-    disable_mempool_precheck enable_testchain expected_pow rpc_listen_addrs
-    rpc_tls cors_origins cors_headers log_output history_mode
+    bootstrap_threshold private_mode disable_p2p_maintenance disable_p2p_swap
+    disable_mempool disable_mempool_precheck enable_testchain expected_pow
+    rpc_listen_addrs rpc_tls cors_origins cors_headers log_output history_mode
     synchronisation_threshold latency disable_config_validation allow_all_rpc
     media_type metrics_addr operation_metadata_size_limit =
   let actual_data_dir =
@@ -216,6 +217,7 @@ let wrap data_dir config_file network connections max_download_speed
     rpc_listen_addrs;
     private_mode;
     disable_p2p_maintenance;
+    disable_p2p_swap;
     disable_mempool;
     disable_mempool_precheck;
     enable_testchain;
@@ -588,6 +590,14 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["disable-p2p-maintenance"])
 
+  let disable_p2p_swap =
+    let doc =
+      "Disable p2p connection swaps. This option should be used for testing \
+       purposes only. The node will neither try to initiate a swap of \
+       connections with one of its neighbor nor answer to a swap request."
+    in
+    Arg.(value & flag & info ~docs ~doc ["disable-p2p-swap"])
+
   let disable_mempool =
     let doc =
       "If set to [true], the node will not participate in the propagation of \
@@ -710,11 +720,12 @@ module Term = struct
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size $ listen_addr $ advertised_net_port $ discovery_addr
     $ peers $ no_bootstrap_peers $ bootstrap_threshold $ private_mode
-    $ disable_p2p_maintenance $ disable_mempool $ disable_mempool_precheck
-    $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
-    $ cors_origins $ cors_headers $ log_output $ history_mode
-    $ synchronisation_threshold $ latency $ disable_config_validation
-    $ allow_all_rpc $ media_type $ metrics_addr $ operation_metadata_size_limit
+    $ disable_p2p_maintenance $ disable_p2p_swap $ disable_mempool
+    $ disable_mempool_precheck $ enable_testchain $ expected_pow
+    $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers $ log_output
+    $ history_mode $ synchronisation_threshold $ latency
+    $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
+    $ operation_metadata_size_limit
 end
 
 let read_config_file args =
@@ -841,6 +852,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     private_mode;
     discovery_addr;
     disable_p2p_maintenance;
+    disable_p2p_swap;
     disable_mempool;
     disable_mempool_precheck;
     enable_testchain;
@@ -1003,6 +1015,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?operation_metadata_size_limit
     ~private_mode
     ~disable_p2p_maintenance
+    ~disable_p2p_swap
     ~disable_mempool
     ~disable_mempool_precheck
     ~enable_testchain
