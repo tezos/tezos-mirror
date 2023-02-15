@@ -15,17 +15,11 @@ test-protocol-compiles:
 
 .PHONY: test-pytest
 test-pytest:
-ifndef CI_NODE_INDEX
-	$(error CI_NODE_INDEX is undefined)
-endif
-ifndef CI_NODE_TOTAL
-	$(error CI_NODE_TOTAL is undefined)
-endif
 ifndef TESTS
 	$(error TESTS is undefined)
 endif
 	cd ${CI_PROJECT_DIR}/tests_python && \
-		poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800 ${TESTS} && \
+		poetry run pytest --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/report.xml" --timeout 1800 ${TESTS} && \
 		./../scripts/ci/merge_coverage.sh
 
 .PHONY: test-pytest-check-regression-files
