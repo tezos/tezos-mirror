@@ -136,7 +136,26 @@ let register_retrieve_preimage dac_plugin page_store =
     (RPC_services.retrieve_preimage dac_plugin)
     (fun hash () () -> handle_retrieve_preimage dac_plugin page_store hash)
 
-let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris =
+let register_monitor_root_hashes dac_plugin hash_streamer dir =
+  (* Handler for subscribing to the streaming of root hashes via
+     GET monitor/root_hashes RPC call. *)
+  let handle_monitor_root_hashes =
+    let open Lwt_syntax in
+    let* handle = Data_streamer.handle_subscribe hash_streamer in
+    match handle with
+    | Ok (stream, stopper) ->
+        let shutdown () = Lwt_watcher.shutdown stopper in
+        let next () = Lwt_stream.get stream in
+        Tezos_rpc.Answer.return_stream {next; shutdown}
+    | Error error -> Tezos_rpc.Answer.fail error
+  in
+  Tezos_rpc.Directory.gen_register
+    dir
+    (Monitor_services.S.root_hashes dac_plugin)
+    (fun () () () -> handle_monitor_root_hashes)
+
+let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
+    hash_streamer =
   let page_store = Page_store.Filesystem.init reveal_data_dir in
   Tezos_rpc.Directory.empty
   |> register_serialize_dac_store_preimage
@@ -146,6 +165,7 @@ let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris =
        page_store
   |> register_verify_external_message_signature dac_plugin dac_public_keys_opt
   |> register_retrieve_preimage dac_plugin page_store
+  |> register_monitor_root_hashes dac_plugin hash_streamer
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
    Move this to RPC_server.Legacy once all operating modes are supported. *)
@@ -158,7 +178,7 @@ let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
       Tezos_rpc.Path.open_root
       (fun () ->
         match Node_context.get_status ctxt with
-        | Ready {dac_plugin = (module Dac_plugin); _} ->
+        | Ready {dac_plugin = (module Dac_plugin); hash_streamer} ->
             let _threshold = threshold in
             Lwt.return
               (register
@@ -166,7 +186,8 @@ let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
                  reveal_data_dir
                  cctxt
                  dac_pks_opt
-                 dac_sk_uris)
+                 dac_sk_uris
+                 hash_streamer)
         | Starting -> Lwt.return Tezos_rpc.Directory.empty)
   in
   let rpc_address = P2p_addr.of_string_exn rpc_address in
