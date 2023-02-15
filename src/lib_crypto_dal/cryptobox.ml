@@ -619,7 +619,7 @@ module Inner = struct
 
   (* [polynomial_to_slot] is the left-inverse function of
      [polynomial_from_slot]. *)
-  let polynomial_to_bytes t p =
+  let polynomial_to_slot t p =
     (* The last operation of [polynomial_from_slot] is the interpolation,
        so we undo it with an evaluation on the same domain [t.domain_k]. *)
     let eval =

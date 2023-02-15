@@ -149,7 +149,7 @@ let get_slot cryptobox store slot_header =
   let share_size = Cryptobox.encoded_share_size cryptobox in
   let* shards = Shard_store.read_shards ~share_size store slot_header in
   let*? polynomial = polynomial_from_shards cryptobox shards in
-  let slot = Cryptobox.polynomial_to_bytes cryptobox polynomial in
+  let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 

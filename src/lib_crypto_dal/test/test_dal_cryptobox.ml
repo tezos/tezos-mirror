@@ -99,7 +99,7 @@ module Test = struct
          in
          let* decoded_slot = Cryptobox.polynomial_from_shards t c in
          let decoded_msg =
-           Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
+           Bytes.sub (Cryptobox.polynomial_to_slot t decoded_slot) 0 msg_size
          in
          return decoded_msg)
         |> function
