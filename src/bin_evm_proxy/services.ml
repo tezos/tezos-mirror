@@ -69,7 +69,7 @@ module Mock = struct
 
   let balance = qty_f @@ Conv.to_wei 1000
 
-  let code = hash_f @@ String.make 100 'a'
+  let code = hash_f "0x"
 
   (* Gas limit must be at least 21000 *)
   let gas_price = qty_f @@ Z.of_int 21000
