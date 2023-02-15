@@ -66,6 +66,6 @@ val get_status : t -> status
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Client_context.full
 
-(** [get_dac_hash_encoding ctxt] returns the [Dac_hash.t] encoding derived from 
-    [Dac_plugin.Protocol_reveal_hash.encoding] *)
-val get_dac_hash_encoding : t -> Dac_plugin.Dac_hash.t Data_encoding.t tzresult
+(** [get_dac_plugin ctxt] returns the [Dac_plugin.t] used in the node context. 
+    Fails with [Node_not_ready] when [Node_context.status] is not [Ready]. *)
+val get_dac_plugin : t -> Dac_plugin.t tzresult

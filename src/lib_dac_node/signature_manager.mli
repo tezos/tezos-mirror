@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,54 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc_http
-open Tezos_rpc_http_server
+(* Module for managing the verification of aggregate signatures *)
+type error +=
+  | Cannot_convert_root_page_hash_to_bytes of string
+  | Cannot_compute_aggregate_signature of string
+  | Public_key_for_witness_not_available of int * string
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
-   Move this to RPC_server.Legacy once all operating modes are supported. *)
-let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
-    dac_pks_opt dac_sk_uris =
-  let open Lwt_syntax in
-  let dir =
-    Tezos_rpc.Directory.register_dynamic_directory
-      Tezos_rpc.Directory.empty
-      Tezos_rpc.Path.open_root
-      (fun () ->
-        match Node_context.get_status ctxt with
-        | Ready {dac_plugin = (module Dac_plugin); _} ->
-            Lwt.return
-              (Dac_plugin.RPC.rpc_services
-                 ~reveal_data_dir
-                 cctxt
-                 dac_pks_opt
-                 dac_sk_uris
-                 threshold)
-        | Starting -> Lwt.return Tezos_rpc.Directory.empty)
-  in
-  let rpc_address = P2p_addr.of_string_exn rpc_address in
-  let host = Ipaddr.V6.to_string rpc_address in
-  let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.default rpc_address in
-  let server =
-    RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
-  in
-  Lwt.catch
-    (fun () ->
-      let* () =
-        RPC_server.launch
-          ~host
-          server
-          ~callback:(RPC_server.resto_callback server)
-          node
-      in
-      return_ok server)
-    fail_with_exn
+(* [sign_root_hash dac_pliugin cctx dac_sk_uris_opt root_hash] is legacy function that
+   returns an aggregate signature over [root_hash] and a bitmap of witnesses where
+   empty elements of [dac_sk_uris_opt] are 0 and non-empty elements are 1. *)
+val sign_root_hash :
+  Dac_plugin.t ->
+  #Client_context.wallet ->
+  Client_keys.aggregate_sk_uri option trace ->
+  Dac_plugin.hash ->
+  (Tezos_crypto.Aggregate_signature.signature * Z.t, tztrace) result Lwt.t
 
-let shutdown = RPC_server.shutdown
-
-let install_finalizer rpc_server =
-  let open Lwt_syntax in
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let* () = shutdown rpc_server in
-  let* () = Event.(emit shutdown_node exit_status) in
-  Tezos_base_unix.Internal_event_unix.close ()
+(** [verify dac_plugin public_keys_opt root_hash aggregate_signature witnesses] verifies
+    the [aggergate_signature] signed by the witnessed dac members. The witnessed 
+    dac members is given by applying the [witnesses] bitmap against [public_keys_opt]
+ *)
+val verify :
+  Dac_plugin.t ->
+  public_keys_opt:Tezos_crypto.Aggregate_signature.public_key option trace ->
+  Dac_plugin.hash ->
+  Tezos_crypto.Aggregate_signature.signature ->
+  Z.t ->
+  (bool, tztrace) result Lwt.t

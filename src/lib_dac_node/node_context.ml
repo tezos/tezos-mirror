@@ -77,8 +77,8 @@ let get_status ctxt = ctxt.status
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
-let get_dac_hash_encoding ctxt =
+let get_dac_plugin ctxt =
   let open Result_syntax in
   match ctxt.status with
-  | Ready {dac_plugin = (module Dac_plugin)} -> Ok Dac_plugin.Dac_hash.encoding
+  | Ready {dac_plugin} -> Ok dac_plugin
   | Starting -> tzfail Node_not_ready

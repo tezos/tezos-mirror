@@ -3295,6 +3295,7 @@ let octez_dac_node_lib =
         octez_protocol_updater |> open_;
         octez_client_base_unix |> open_;
         octez_stdlib_unix |> open_;
+        octez_rpc_http_server;
       ]
 
 let _octez_dac_node_lib_tests =
@@ -5186,7 +5187,6 @@ module Protocol = Protocol
             octez_dac_node_lib |> open_;
             client |> if_some |> open_;
             embedded |> open_;
-            layer2_utils |> if_some |> open_;
             main |> open_;
           ]
         ~inline_tests:ppx_expect

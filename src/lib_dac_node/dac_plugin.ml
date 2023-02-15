@@ -23,33 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Dac_hash = struct
-  type t = bytes
+type hash = bytes
 
-  let to_bytes = Fun.id
-end
+let hash_to_bytes = Fun.id
+
+type supported_hashes = Blake2B
 
 module type T = sig
-  module Dac_hash : sig
-    val encoding : Dac_hash.t Data_encoding.t
-  end
+  val encoding : hash Data_encoding.t
+
+  val hash_string :
+    scheme:supported_hashes -> ?key:string -> string list -> hash
+
+  val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> hash
+
+  val scheme_of_hash : hash -> supported_hashes
+
+  val of_hex : string -> hash option
+
+  val to_hex : hash -> string
+
+  val size : scheme:supported_hashes -> int
+
+  val hash_rpc_arg : hash Tezos_rpc.Arg.arg
 
   module Proto : Registered_protocol.T
-
-  module RPC : sig
-    val rpc_services :
-      reveal_data_dir:string ->
-      #Client_context.wallet ->
-      Tezos_crypto.Aggregate_signature.public_key option list ->
-      Client_keys.aggregate_sk_uri option list ->
-      int ->
-      unit Tezos_rpc.Directory.directory
-  end
 end
 
-let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
+type t = (module T)
 
-let register (make_plugin : (bytes -> Dac_hash.t) -> (module T)) : unit =
+let table : t Protocol_hash.Table.t = Protocol_hash.Table.create 5
+
+let register (make_plugin : (bytes -> hash) -> t) : unit =
   let dac_plugin = make_plugin Fun.id in
   let module Plugin = (val dac_plugin) in
   assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;

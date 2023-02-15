@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
+(* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,14 +34,26 @@
 (** DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4021
     Add tests to check actual (sequences of) bytes in serialized pages. *)
 
-open Protocol
-
 let lift f = Lwt.map Environment.wrap_tzresult f
 
 (* Tests are run against a mock storage backend where a Hash-indexed/Bytes-valued Map
    is used to simulate adding and retrieving files to a directory.
 *)
-module Hashes_map = Sc_rollup_reveal_hash.Map
+
+(** TODO: https://gitlab.com/tezos/tezos/-/issues/4855
+    Move tests to libdac_node/test
+*)
+let dac_plugin = Stdlib.Option.get (Dac_plugin.get Protocol.hash)
+
+module Hashes_map = Map.Make (struct
+  type t = Dac_plugin.hash
+
+  let compare h1 h2 =
+    let (module Dac_plugin) = dac_plugin in
+    let s1 = Dac_plugin.to_hex h1 in
+    let s2 = Dac_plugin.to_hex h2 in
+    String.compare s1 s2
+end)
 
 type hashes_map = bytes Hashes_map.t
 
@@ -185,21 +197,19 @@ e color cui tu fai cotanto mesti».
 Allor si mosse, e io li tenni dietro.|}
 
 module Hashes_map_backend = struct
-  open Environment.Error_monad
-
   type t = bytes Hashes_map.t ref
 
   type configuration = unit
 
-  type hash = Sc_rollup_reveal_hash.t
+  type hash = Dac_plugin.hash
 
   let init () = ref Hashes_map.empty
 
   type error +=
-    | Page_already_saved of Sc_rollup_reveal_hash.t
-    | Page_is_missing of Sc_rollup_reveal_hash.t
+    | Page_already_saved of Dac_plugin.hash
+    | Page_is_missing of Dac_plugin.hash
 
-  let save t ~hash ~content =
+  let save (_plugin : Dac_plugin.t) t ~hash ~content =
     let open Lwt_result_syntax in
     match Hashes_map.find hash !t with
     | None ->
@@ -209,7 +219,7 @@ module Hashes_map_backend = struct
         if Bytes.equal old_bytes content then return_unit
         else tzfail @@ Page_already_saved hash
 
-  let load t ~hash =
+  let load (_plugin : Dac_plugin.t) t ~hash =
     let open Lwt_result_syntax in
     let bytes = Hashes_map.find hash !t in
     match bytes with
@@ -219,35 +229,31 @@ module Hashes_map_backend = struct
   let number_of_pages t = List.length @@ Hashes_map.bindings !t
 end
 
-let assert_equal_bytes ~loc msg =
-  Assert.equal ~loc Bytes.equal msg String.pp_bytes_hex
+let assert_equal_bytes ~loc msg a b =
+  Assert.equal ~loc Bytes.equal msg String.pp_bytes_hex a b
 
 let assert_fails_with ~loc k expected_err =
   let open Lwt_result_syntax in
   let*! res = k in
-  let res = Environment.wrap_tzresult res in
-  Assert.error ~loc res (( = ) (Environment.wrap_tzerror expected_err))
+  Assert.error ~loc res (( = ) expected_err)
 
 module Merkle_tree = struct
-  open Dac_pages_encoding.Merkle_tree
+  open Pages_encoding.Merkle_tree
 
-  module Make_V0_for_test
-      (C : Dac_pages_encoding.CONFIG)
-      (S : Page_store.S with type hash := Sc_rollup_reveal_hash.t) =
-    Internal_for_tests.Make
-      (Internal_for_tests.Make_buffered
-         (struct
-           include Sc_rollup_reveal_hash
+  module Make_V0_for_test (C : Pages_encoding.CONFIG) (S : Page_store.S) =
+  struct
+    module Buffered =
+      Internal_for_tests.Make_buffered
+        (S)
+        (struct
+          let content_version = 0
 
-           let scheme = Sc_rollup_reveal_hash.Blake2B
-         end)
-         (S)
-         (struct
-           let content_version = 0
+          let hashes_version = 0
+        end)
+        (C)
 
-           let hashes_version = 0
-         end)
-         (C))
+    include Internal_for_tests.Make (Buffered)
+  end
 
   module V0 = struct
     let test_serialization_fails_with ~loc ~max_page_size ~payload ~error =
@@ -258,7 +264,9 @@ module Merkle_tree = struct
           end)
           (Hashes_map_backend) in
       let page_store = Hashes_map_backend.init () in
-      let serialize_payload = serialize_payload ~page_store payload in
+      let serialize_payload =
+        serialize_payload dac_plugin ~page_store payload
+      in
       assert_fails_with ~loc serialize_payload error
 
     let test_serialization_roundtrip ?expect_num_of_pages ~loc ~max_page_size
@@ -271,8 +279,10 @@ module Merkle_tree = struct
           (Hashes_map_backend) in
       let page_store = Hashes_map_backend.init () in
       let open Lwt_result_syntax in
-      let* hash = lift @@ serialize_payload ~page_store payload in
-      let* retrieved_payload = lift @@ deserialize_payload hash ~page_store in
+      let* hash = serialize_payload dac_plugin ~page_store payload in
+      let* retrieved_payload =
+        deserialize_payload dac_plugin ~page_store hash
+      in
       let* () =
         match expect_num_of_pages with
         | Some expected ->
@@ -302,7 +312,7 @@ module Merkle_tree = struct
         ~loc:__LOC__
         ~max_page_size:50
         ~payload
-        ~error:Dac_pages_encoding.Merkle_tree_branching_factor_not_high_enough
+        ~error:Pages_encoding.Merkle_tree_branching_factor_not_high_enough
 
     let serialize_empty_payload_fails () =
       (* Limit the number of hashes stored per page to 2. Because hashes
@@ -314,7 +324,7 @@ module Merkle_tree = struct
         ~loc:__LOC__
         ~max_page_size:80
         ~payload:Bytes.empty
-        ~error:Dac_pages_encoding.Payload_cannot_be_empty
+        ~error:Pages_encoding.Payload_cannot_be_empty
 
     let one_page_roundtrip () =
       (* Limit the number of hashes stored per page to 2. Because hashes
@@ -453,16 +463,16 @@ module Hash_chain = struct
     String.sub str (min (String.length str) n) (max 0 (String.length str - n))
 
   module V0 = struct
-    module Pagination_scheme = Dac_pages_encoding.Hash_chain.V0
+    module Pagination_scheme = Pages_encoding.Hash_chain.V0
 
     let deserialize_page page :
-        [`Node of Sc_rollup_reveal_hash.t * string | `Leaf of string] =
+        [`Node of Dac_plugin.hash * string | `Leaf of string] =
       if String.length page > 3996 then
         let content = String.sub page 0 3996 in
+        let (module Plugin) = dac_plugin in
         let hash =
           Stdlib.Option.get
-          @@ Sc_rollup_reveal_hash.of_hex
-               (take_after page (3996 + String.length " hash:"))
+          @@ Plugin.of_hex (take_after page (3996 + String.length " hash:"))
         in
         `Node (hash, content)
       else `Leaf page
@@ -482,51 +492,47 @@ module Hash_chain = struct
     let test_make_chain_hash_one_page () =
       let open Lwt_result_syntax in
       let payload = Bytes.of_string "simple payload" in
-      let*? pages = Pagination_scheme.make_hash_chain payload in
+      let*? pages = Pagination_scheme.make_hash_chain dac_plugin payload in
       let* () = Assert.equal_int ~loc:__LOC__ 1 (List.length pages) in
       let actual_hash, content = Stdlib.List.hd pages in
       let* () =
         assert_equal_bytes ~loc:__LOC__ "Contents not equal" payload content
       in
+      let (module Plugin) = dac_plugin in
       let expected_hash =
-        Pagination_scheme.to_hex @@ Pagination_scheme.hash content
+        Plugin.to_hex @@ Plugin.hash_bytes ~scheme:Blake2B [content]
       in
-      Assert.equal_string
-        ~loc:__LOC__
-        expected_hash
-        (Pagination_scheme.to_hex actual_hash)
+      Assert.equal_string ~loc:__LOC__ expected_hash (Plugin.to_hex actual_hash)
 
     let test_make_chain_hash_long () =
       let open Lwt_result_syntax in
       let payload = Bytes.of_string long_payload in
-      let*? pages = Pagination_scheme.make_hash_chain payload in
+      let*? pages = Pagination_scheme.make_hash_chain dac_plugin payload in
       let* () = Assert.equal_int ~loc:__LOC__ 2 (List.length pages) in
       let head_succ =
         Stdlib.List.hd pages |> snd |> fun byt ->
         take_after (String.of_bytes byt) (3996 + String.length " hash:")
       in
+      let (module Plugin) = dac_plugin in
       let next_hash, content = Stdlib.List.nth pages 1 in
       let* () =
-        Assert.equal_string
-          ~loc:__LOC__
-          (Pagination_scheme.to_hex next_hash)
-          head_succ
+        Assert.equal_string ~loc:__LOC__ (Plugin.to_hex next_hash) head_succ
       in
       Assert.equal_string
         ~loc:__LOC__
-        (Pagination_scheme.to_hex next_hash)
-        (Pagination_scheme.to_hex @@ Pagination_scheme.hash content)
+        (Plugin.to_hex next_hash)
+        (Plugin.to_hex @@ Plugin.hash_bytes ~scheme:Blake2B [content])
 
     let test_serialize () =
       let open Lwt_result_syntax in
       let payload = Bytes.of_string long_payload in
       let page_store = Hashes_map_backend.init () in
       let* root_hash =
-        lwt_map_error Environment.wrap_tztrace
-        @@ Pagination_scheme.serialize_payload
-             ~for_each_page:(fun (hash, content) ->
-               Hashes_map_backend.save page_store ~hash ~content)
-             payload
+        Pagination_scheme.serialize_payload
+          dac_plugin
+          ~for_each_page:(fun (hash, content) ->
+            Hashes_map_backend.save dac_plugin page_store ~hash ~content)
+          payload
       in
       let* () =
         Assert.equal_int
@@ -534,12 +540,10 @@ module Hash_chain = struct
           (Hashes_map_backend.number_of_pages page_store)
           2
       in
-      let* content =
-        lwt_map_error Environment.wrap_tztrace
-        @@ retrieve_content
-             ~get_page:(Hashes_map_backend.load page_store)
-             root_hash
+      let get_page ~hash =
+        Hashes_map_backend.load dac_plugin page_store ~hash
       in
+      let* content = retrieve_content ~get_page root_hash in
       Assert.equal_string ~loc:__LOC__ long_payload content
 
     let test_serialize_empty_payload_fails () =
@@ -548,13 +552,14 @@ module Hash_chain = struct
       let result =
         Pagination_scheme.serialize_payload
           ~for_each_page:(fun (hash, content) ->
-            Hashes_map_backend.save page_store ~hash ~content)
+            Hashes_map_backend.save dac_plugin page_store ~hash ~content)
+          dac_plugin
           payload
       in
       assert_fails_with
         ~loc:__LOC__
         result
-        Dac_pages_encoding.Payload_cannot_be_empty
+        Pages_encoding.Payload_cannot_be_empty
   end
 end
 
