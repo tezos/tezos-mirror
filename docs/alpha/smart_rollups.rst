@@ -663,27 +663,21 @@ to the rollup.
 
 ::
 
-      {
-        parameter (bytes %%default);
-        storage (unit);
-
+        parameter bytes;
+        storage unit;
         code
           {
-            CAR;
+            UNPAIR;
             PUSH address "${SOR_ADDR}";
             CONTRACT bytes;
-            IF_NONE { PUSH string "Invalid address"; FAILWITH; }
-                    {
-                      PUSH mutez 0;
-                      DIG 2;
-                      TRANSFER_TOKENS;
-                      NIL operation;
-                      SWAP;
-                      CONS;
-                      PUSH unit Unit;
-                      SWAP;
-                      PAIR;
-                    }
+            IF_NONE { PUSH string "Invalid address"; FAILWITH } {};
+            PUSH mutez 0;
+            DIG 2;
+            TRANSFER_TOKENS;
+            NIL operation;
+            SWAP;
+            CONS;
+            PAIR;
           }
 
 .. _populating_the_reveal_channel_alpha:
