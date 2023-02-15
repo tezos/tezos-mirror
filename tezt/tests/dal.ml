@@ -2163,6 +2163,63 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
   Log.info "[e2e.slot_producer] will terminate" ;
   return !sum
 
+(** Given a list of SORU node operators, this function allows to create and run new
+    DAL and SORU nodes, where:
+    - Each fresh rollup node is configured with a fresh DAL node and a key
+    operator;
+    - Each fresh DAL node is either connected to the original DAL node if the
+    associated operator has an even index in the list of node operators, or to
+    the previously generated DAL node otherwise.
+
+    Each element of the [extra_nodes_operators] list can actually be [None], in
+    which case the corresponding rollup node is launched in observer mode, or
+    [Some account], in which case the [account] is used as the default
+    operator of the SORU node. *)
+let create_additional_nodes ~protocol ~extra_nodes_operators rollup_address
+    l1_node l1_client dal_node =
+  (* The mutable variable [connect_dal_node_to] below is used to diversify a bit
+     the topology of the DAL nodes network as follows:
+
+     [node with odd idx] -- [node with even idx] -- init_node
+
+     So, we initialize its value to [dal_node]. *)
+  let connect_dal_node_to = ref dal_node in
+  Lwt_list.mapi_s
+    (fun index key_opt ->
+      (* We create a new DAL node and initialize it. *)
+      let fresh_dal_node = Dal_node.create ~node:l1_node ~client:l1_client () in
+      let* _config_file = Dal_node.init_config fresh_dal_node in
+
+      (* We connect the fresh DAL node to another node, start it and update the
+         value of [connect_dal_node_to] to generate the topology above: *)
+      update_neighbors fresh_dal_node [!connect_dal_node_to] ;
+      let* () = Dal_node.run fresh_dal_node in
+      connect_dal_node_to :=
+        if index mod 2 = 0 then fresh_dal_node else dal_node ;
+
+      (* We create a new SORU node, connected to the new DAL node, and
+         initialize it. *)
+      let rollup_mode =
+        Sc_rollup_node.(if Option.is_none key_opt then Observer else Operator)
+      in
+      let sc_rollup_node =
+        Sc_rollup_node.create
+          ~protocol
+          ~dal_node:fresh_dal_node
+          rollup_mode
+          l1_node
+          ~base_dir:(Client.base_dir l1_client)
+          ?default_operator:key_opt
+      in
+      let* _config_file =
+        Sc_rollup_node.config_init sc_rollup_node rollup_address
+      in
+      (* We start the rollup node and create a client for it. *)
+      let* () = Sc_rollup_node.run sc_rollup_node [] in
+      let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+      return (fresh_dal_node, sc_rollup_node, sc_rollup_client))
+    extra_nodes_operators
+
 (* This function allows to run an end-to-end test involving L1, DAL and rollup
    nodes. For that it:
 
