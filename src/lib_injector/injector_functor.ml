@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -203,6 +204,7 @@ struct
   type state = {
     cctxt : Client_context.full;
         (** The client context which is used to perform the injections. *)
+    l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
     signer : signer;  (** The signer for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
@@ -257,8 +259,8 @@ struct
     in
     state.last_seen_head <- Some head
 
-  let init_injector cctxt ~data_dir state ~retention_period ~signer strategy
-      tags =
+  let init_injector cctxt l1_ctxt ~data_dir state ~retention_period ~signer
+      strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -336,6 +338,7 @@ struct
     return
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
+        l1_ctxt;
         signer;
         tags;
         strategy;
@@ -890,15 +893,22 @@ struct
         else return_unit)
       state.included.included_in_blocks
 
-  (** [on_new_tezos_head state head reorg] is called when there is a new Tezos
-    head (with a potential reorganization [reorg]). It first reverts any blocks
-    that are in the alternative branch of the reorganization and then registers
-    the effect of the new branch (the newly included operation and confirmed
-    operations).  *)
-  let on_new_tezos_head state ((head_hash, head_level) as head)
-      (reorg : (Block_hash.t * int32) Reorg.t) =
+  (** [on_new_tezos_head state head] is called when there is a new Tezos
+      head. It first reverts any blocks that are in the alternative branch of
+      the reorganization and then registers the effect of the new branch (the
+      newly included operation and confirmed operations).  *)
+  let on_new_tezos_head state ((head_hash, head_level) as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
+    let* reorg =
+      match state.last_seen_head with
+      | None -> return {Reorg.no_reorg with new_chain = [head]}
+      | Some last_head ->
+          Layer_1.get_tezos_reorg_for_new_head
+            state.l1_ctxt
+            (`Head last_head)
+            head
+    in
     let* () =
       List.iter_es
         (fun (removed_block, _) ->
@@ -929,6 +939,7 @@ struct
 
     type parameters = {
       cctxt : Client_context.full;
+      l1_ctxt : Layer_1.t;
       data_dir : string;
       state : Parameters.state;
       retention_period : int;
@@ -962,17 +973,19 @@ struct
           (* The execution of the request handler is protected to avoid stopping the
              worker in case of an exception. *)
           protect @@ fun () -> add_pending_operation state op
-      | Request.New_tezos_head (head, reorg) ->
-          protect @@ fun () -> on_new_tezos_head state head reorg
+      | Request.New_tezos_head head ->
+          protect @@ fun () -> on_new_tezos_head state head
       | Request.Inject -> protect @@ fun () -> on_inject state
 
     type launch_error = error trace
 
     let on_launch _w signer
-        Types.{cctxt; data_dir; state; retention_period; strategy; tags} =
+        Types.
+          {cctxt; l1_ctxt; data_dir; state; retention_period; strategy; tags} =
       trace (Step_failed "initialization")
       @@ init_injector
            cctxt
+           l1_ctxt
            ~data_dir
            state
            ~retention_period
@@ -1011,10 +1024,88 @@ struct
       Lwt.return_unit
   end
 
+  let has_tag_in ~tags state =
+    match tags with
+    | None ->
+        (* Not filtering on tags *)
+        true
+    | Some tags -> not (Tags.disjoint state.tags tags)
+
+  let delay_strategy state header f =
+    let open Lwt_syntax in
+    match state.strategy with
+    | `Each_block -> f ()
+    | `Delay_block delay_factor ->
+        let time_until_next_block =
+          Proto_client.time_until_next_block state.state header
+          |> Ptime.Span.to_float_s
+        in
+        let delay = time_until_next_block *. delay_factor in
+        if delay <= 0. then f ()
+        else
+          let promise =
+            let* () = Event.(emit1 inject_wait) state delay in
+            let* () = Lwt_unix.sleep delay in
+            f ()
+          in
+          ignore promise ;
+          return_unit
+
+  let inject ?tags ?header () =
+    let workers = Worker.list table in
+    let tags = Option.map Tags.of_list tags in
+    List.iter_p
+      (fun (_signer, w) ->
+        let open Lwt_syntax in
+        let worker_state = Worker.state w in
+        if has_tag_in ~tags worker_state then
+          delay_strategy worker_state header @@ fun () ->
+          let* _pushed = Worker.Queue.push_request w Request.Inject in
+          return_unit
+        else Lwt.return_unit)
+      workers
+
+  let notify_new_tezos_head h =
+    let open Lwt_syntax in
+    let workers = Worker.list table in
+    List.iter_p
+      (fun (_signer, w) ->
+        let* (_pushed : bool) =
+          Worker.Queue.push_request w (Request.New_tezos_head h)
+        in
+        return_unit)
+      workers
+
+  let rec monitor_l1_chain l1_ctxt =
+    let open Lwt_syntax in
+    let* res =
+      Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
+      let head = (head_hash, header.shell.level) in
+      (* Notify all workers of a new Tezos head *)
+      let* () = notify_new_tezos_head head in
+      return_ok ()
+    in
+    (* Ignore errors *)
+    let* () =
+      match res with
+      | Error error -> Internal_event.Simple.emit Event.monitoring_error error
+      | Ok () -> return_unit
+    in
+    monitor_l1_chain l1_ctxt
+
+  let rec async_monitor_l1_chain l1_ctxt =
+    Lwt.dont_wait
+      (fun () -> monitor_l1_chain l1_ctxt)
+      (fun exn ->
+        Format.eprintf
+          "Warning: Error in async monitoring (%s), restarting"
+          (Printexc.to_string exn) ;
+        async_monitor_l1_chain l1_ctxt)
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      state ~signers =
+      ?(reconnection_delay = 2.0) state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     let signers_map =
@@ -1040,24 +1131,30 @@ struct
         Signature.Public_key_hash.Map.empty
         signers
     in
-    Signature.Public_key_hash.Map.iter_es
-      (fun signer (strategy, tags) ->
-        let+ worker =
-          Worker.launch
-            table
-            signer
-            {
-              cctxt = (cctxt :> Client_context.full);
-              data_dir;
-              state;
-              retention_period;
-              strategy;
-              tags;
-            }
-            (module Handlers)
-        in
-        ignore worker)
-      signers_map
+    let* l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
+    let* () =
+      Signature.Public_key_hash.Map.iter_es
+        (fun signer (strategy, tags) ->
+          let+ worker =
+            Worker.launch
+              table
+              signer
+              {
+                cctxt = (cctxt :> Client_context.full);
+                l1_ctxt;
+                data_dir;
+                state;
+                retention_period;
+                strategy;
+                tags;
+              }
+              (module Handlers)
+          in
+          ignore worker)
+        signers_map
+    in
+    async_monitor_l1_chain l1_ctxt ;
+    return_unit
 
   let worker_of_signer signer_pkh =
     match Worker.find_opt table signer_pkh with
@@ -1090,60 +1187,9 @@ struct
     in
     return operation.hash
 
-  let new_tezos_head h reorg =
-    let open Lwt_syntax in
-    let workers = Worker.list table in
-    List.iter_p
-      (fun (_signer, w) ->
-        let* (_pushed : bool) =
-          Worker.Queue.push_request w (Request.New_tezos_head (h, reorg))
-        in
-        return_unit)
-      workers
-
-  let has_tag_in ~tags state =
-    match tags with
-    | None ->
-        (* Not filtering on tags *)
-        true
-    | Some tags -> not (Tags.disjoint state.tags tags)
-
-  let delay_stategy state header f =
-    let open Lwt_syntax in
-    match state.strategy with
-    | `Each_block -> f ()
-    | `Delay_block delay_factor ->
-        let time_until_next_block =
-          Proto_client.time_until_next_block state.state header
-          |> Ptime.Span.to_float_s
-        in
-        let delay = time_until_next_block *. delay_factor in
-        if delay <= 0. then f ()
-        else
-          let promise =
-            let* () = Event.(emit1 inject_wait) state delay in
-            let* () = Lwt_unix.sleep delay in
-            f ()
-          in
-          ignore promise ;
-          return_unit
-
-  let inject ?tags ?header () =
-    let workers = Worker.list table in
-    let tags = Option.map Tags.of_list tags in
-    List.iter_p
-      (fun (_signer, w) ->
-        let open Lwt_syntax in
-        let worker_state = Worker.state w in
-        if has_tag_in ~tags worker_state then
-          delay_stategy worker_state header @@ fun () ->
-          let* _pushed = Worker.Queue.push_request w Request.Inject in
-          return_unit
-        else Lwt.return_unit)
-      workers
-
   let shutdown () =
     let workers = Worker.list table in
+    (* Don't shutdown L1 monitoring otherwise worker shutdown hangs *)
     List.iter_p (fun (_signer, w) -> Worker.shutdown w) workers
 
   let op_status_in_worker state l1_hash =

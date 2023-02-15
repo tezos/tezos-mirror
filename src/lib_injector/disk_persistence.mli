@@ -41,7 +41,7 @@ val maybe_read_value :
   'a Data_encoding.t ->
   'a option Lwt.t
 
-(** [write_value filenam encoding v] write the value [v] to the file [filenmae]
+(** [write_value filename encoding v] write the value [v] to the file [filename]
     in binary form following the [encoding]. *)
 val write_value :
   string -> 'a Data_encoding.t -> 'a -> (unit, error trace) result Lwt.t
