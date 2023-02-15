@@ -25,6 +25,7 @@
   src_lib_lwt_result_stdlib_test_tezt_lib
   src_lib_lazy_containers_test_tezt_lib
   src_lib_error_monad_test_tezt_lib
+  src_lib_clic_test_tezt_lib
   src_lib_benchmark_test_tezt_lib
   src_lib_base_test_tezt_lib)
  (link_flags
