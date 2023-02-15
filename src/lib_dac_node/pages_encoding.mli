@@ -159,6 +159,8 @@ module Merkle_tree : sig
   *)
   module V0 : Dac_codec with type page_store = Page_store.Filesystem.t
 
+  module V0_remote : Dac_codec with type page_store = Page_store.Remote.t
+
   (**/**)
 
   module Internal_for_tests : sig

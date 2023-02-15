@@ -566,21 +566,24 @@ module Merkle_tree = struct
     let deserialize_payload = B.deserialize_payload
   end
 
+  module V0_metadata = struct
+    (* Cntents_version_tag used in contents pages is 0. *)
+    let content_version = 0
+
+    (* Hashes_version_tag used in hashes pages is 1. *)
+    let hashes_version = 0
+  end
+
+  module V0_page_size = struct
+    let max_page_size = 4096
+  end
+
   module V0_Buffered =
-    Make_buffered
-      (Page_store.Filesystem)
-      (struct
-        (* Cntents_version_tag used in content pages is 0. *)
-        let content_version = 0
-
-        (* Hashes_version_tag used in hashes pages is 1. *)
-        let hashes_version = 0
-      end)
-      (struct
-        let max_page_size = 4096
-      end)
-
+    Make_buffered (Page_store.Filesystem) (V0_metadata) (V0_page_size)
   module V0 = Make (V0_Buffered)
+  module V0_buffered_remote =
+    Make_buffered (Page_store.Remote) (V0_metadata) (V0_page_size)
+  module V0_remote = Make (V0_buffered_remote)
 
   module Internal_for_tests = struct
     module Make_buffered = Make_buffered
