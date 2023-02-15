@@ -585,23 +585,23 @@ module Inner = struct
            elements of the cosets (w^j W). Indeed, the coefficients
            of the elements of w^j W are
            {i * t.pages_per_slot + j}_{i=0, ..., t.page_length-1}. *)
-        for elt = 0 to t.page_length - 1 do
+        for elt = 0 to t.page_length - 2 do
           (* [!offset >= t.slot_size] because we don't want to read past
              the buffer [slot] bounds. *)
           if !offset >= t.slot_size then ()
-          else if elt = t.page_length - 1 then (
-            let dst = Bytes.create t.remaining_bytes in
-            Bytes.blit slot !offset dst 0 t.remaining_bytes ;
-            offset := !offset + t.remaining_bytes ;
-            (* Apply the permutation *)
-            res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst)
           else
             let dst = Bytes.create scalar_bytes_amount in
             Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
             offset := !offset + scalar_bytes_amount ;
             (* Apply the permutation *)
             res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst
-        done
+        done ;
+        let dst = Bytes.create t.remaining_bytes in
+        Bytes.blit slot !offset dst 0 t.remaining_bytes ;
+        offset := !offset + t.remaining_bytes ;
+        (* Apply the permutation *)
+        res.(((t.page_length - 1) * t.pages_per_slot) + page) <-
+          Scalar.of_bytes_exn dst
       done ;
       Ok res
 
@@ -629,16 +629,16 @@ module Inner = struct
     let offset = ref 0 in
     (* Reverse permutation from [polynomial_from_slot]. *)
     for page = 0 to t.pages_per_slot - 1 do
-      for elt = 0 to t.page_length - 1 do
+      for elt = 0 to t.page_length - 2 do
         let idx = (elt * t.pages_per_slot) + page in
         let coeff = Scalar.to_bytes (Array.get eval idx) in
-        if elt = t.page_length - 1 then (
-          Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
-          offset := !offset + t.remaining_bytes)
-        else (
-          Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
-          offset := !offset + scalar_bytes_amount)
-      done
+        Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
+        offset := !offset + scalar_bytes_amount
+      done ;
+      let idx = ((t.page_length - 1) * t.pages_per_slot) + page in
+      let coeff = Scalar.to_bytes (Array.get eval idx) in
+      Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
+      offset := !offset + t.remaining_bytes
     done ;
     slot
 
