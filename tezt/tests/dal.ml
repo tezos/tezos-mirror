@@ -2117,7 +2117,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
   in
   let publish_and_store_slot_promises = ref [] in
   (* This is the account used to sign injected slot headers on L1. *)
-  let source = Constant.bootstrap3 in
+  let source = Constant.bootstrap2 in
   let* counter = Operation.get_next_counter ~source l1_client in
   let counter = ref counter in
   let task current_level =
@@ -2350,6 +2350,7 @@ type e2e_test = {
   block_delay : int;
   number_of_dal_slots : int;
   beforehand_slot_injection : int;
+  num_extra_nodes : int;
 }
 
 let e2e_tests =
@@ -2364,6 +2365,7 @@ let e2e_tests =
       block_delay = 6;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
+      num_extra_nodes = 0;
     }
   in
   let test2 =
@@ -2373,6 +2375,7 @@ let e2e_tests =
       block_delay = 2;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
+      num_extra_nodes = 0;
     }
   in
   let mainnet1 =
@@ -2382,6 +2385,7 @@ let e2e_tests =
       block_delay = 15;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
+      num_extra_nodes = 0;
     }
   in
   let mainnet2 =
@@ -2391,6 +2395,7 @@ let e2e_tests =
       block_delay = 5;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 10;
+      num_extra_nodes = 0;
     }
   in
   [test1; test2; mainnet1; mainnet2]
@@ -2416,6 +2421,7 @@ let register_end_to_end_tests ~protocols =
         block_delay;
         number_of_dal_slots;
         beforehand_slot_injection;
+        num_extra_nodes;
       } =
         test
       in
@@ -2441,6 +2447,12 @@ let register_end_to_end_tests ~protocols =
         let expected_bake_for_occurrences = 2 in
         Ptime.Span.of_int_s (expected_bake_for_occurrences * block_delay)
       in
+      (* Preparing the list of node operators for extra nodes. *)
+      let extra_nodes_operators =
+        (* So launch the extra SORU nodes in observer mode. So we don't actually
+           need to provide public key hashes. *)
+        List.init num_extra_nodes (fun _index -> None)
+      in
       scenario_with_all_nodes
         ~custom_constants:constants
         ~attestation_lag
@@ -2448,7 +2460,10 @@ let register_end_to_end_tests ~protocols =
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
         title
-        (e2e_test_script ~number_of_dal_slots ~beforehand_slot_injection)
+        (e2e_test_script
+           ~number_of_dal_slots
+           ~beforehand_slot_injection
+           ~extra_nodes_operators)
         protocols)
     e2e_tests
 
