@@ -17,7 +17,6 @@
   tezos-benchmark-016-PtMumbai
   tezos-016-PtMumbai-test-helpers
   tezos-error-monad
-  alcotest-lwt
   prbnmcn-stats)
  (link_flags
   (:standard)

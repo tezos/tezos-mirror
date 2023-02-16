@@ -22,7 +22,6 @@ depends: [
   "hashcons"
   "tezos-016-PtMumbai-test-helpers"
   "prbnmcn-stats" { = "0.0.4" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
