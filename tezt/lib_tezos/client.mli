@@ -362,7 +362,39 @@ val version : t -> unit Lwt.t
 (** Same as [version], but do not wait for the process to exit. *)
 val spawn_version : t -> Process.t
 
-(** Run [octez-client import secret key] for encrypted key *)
+(** Run [octez-client import secret keys from mnemonic]. *)
+val import_keys_from_mnemonic :
+  ?endpoint:endpoint ->
+  ?force:bool ->
+  ?passphrase:string ->
+  ?encryption_password:string ->
+  t ->
+  alias:string ->
+  mnemonic:string list ->
+  unit Lwt.t
+
+(** Same as [import_keys_from_mnemonic], but do not wait for the
+    process to exit. This function opens and returns an [output_channel]
+    and returns it along with the process.  *)
+val spawn_import_keys_from_mnemonic :
+  ?endpoint:endpoint ->
+  ?force:bool ->
+  ?encrypt:bool ->
+  t ->
+  alias:string ->
+  Process.t * Lwt_io.output_channel
+
+(** Run [octez-client import secret key] for an encrypted key. *)
+val import_encrypted_secret_key :
+  ?hooks:Process_hooks.t ->
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.key ->
+  password:string ->
+  unit Lwt.t
+
+(** Same as [import_encrypted_secret_key], but do not wait for the process to exit. *)
 val spawn_import_encrypted_secret_key :
   ?hooks:Process_hooks.t ->
   ?force:bool ->

@@ -513,6 +513,15 @@ let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
     (["import"; "secret"; "key"; key.alias; sk_uri]
     @ if force then ["--force"] else [])
 
+let import_encrypted_secret_key ?hooks ?force ?endpoint client
+    (key : Account.key) ~password =
+  let process, output_channel =
+    spawn_import_encrypted_secret_key ?hooks ?force ?endpoint client key
+  in
+  let* () = Lwt_io.write_line output_channel password in
+  let* () = Lwt_io.close output_channel in
+  Process.check process
+
 let spawn_import_secret_key ?endpoint client (key : Account.key) =
   let sk_uri =
     "unencrypted:"
@@ -535,6 +544,45 @@ let import_signer_key ?endpoint ?force client key signer_uri =
 
 let import_secret_key ?endpoint client key =
   spawn_import_secret_key ?endpoint client key |> Process.check
+
+let spawn_import_keys_from_mnemonic ?endpoint ?(force = false)
+    ?(encrypt = false) client ~alias =
+  spawn_command_with_stdin
+    ?endpoint
+    client
+    (["import"; "keys"; "from"; "mnemonic"; alias]
+    @ optional_switch "force" force
+    @ optional_switch "encrypt" encrypt)
+
+let import_keys_from_mnemonic ?endpoint ?force ?passphrase ?encryption_password
+    client ~alias ~mnemonic =
+  let stdin =
+    (* The client first asks for the mnemonic, then its passphrase.
+       If the [encryption_password] is set, then the [--encrypt] flag
+       will be passed to [import keys from mnemonic]. In this case, the
+       client will also ask for the encryption password twice.
+    *)
+    let lines =
+      [String.concat " " mnemonic; Option.value ~default:"" passphrase]
+      @
+      match encryption_password with
+      | Some password ->
+          [password; (* a second time for confirmation *) password]
+      | None -> []
+    in
+    String.concat "\n" lines ^ "\n"
+  in
+  let process, output_channel =
+    spawn_import_keys_from_mnemonic
+      ?endpoint
+      ?force
+      ~encrypt:(Option.is_some encryption_password)
+      client
+      ~alias
+  in
+  let* () = Lwt_io.write_line output_channel stdin in
+  let* () = Lwt_io.close output_channel in
+  Process.check process
 
 module Time = Tezos_base.Time.System
 

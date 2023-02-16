@@ -49,12 +49,12 @@ let test_client =
           "edesk1n2uGpPtVaeyhWkZzTEcaPRzkQHrqkw5pk8VkZvp3rM5KSc3mYNH5cJEuNcfB91B3G3JakKzfLQSmrgF4ht";
     }
   in
-  let process, output =
-    Client.spawn_import_encrypted_secret_key client encrypted_account
+  let* () =
+    Client.import_encrypted_secret_key
+      client
+      encrypted_account
+      ~password:"password"
   in
-  let* () = Lwt_io.write_line output "password" in
-  let* () = Lwt_io.close output in
-  let* () = Process.check process in
   let* () =
     Client.transfer
       ~burn_cap:Tez.one

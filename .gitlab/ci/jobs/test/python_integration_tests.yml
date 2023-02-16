@@ -7,9 +7,6 @@ include: .gitlab/ci/jobs/test/common.yml
 integration:pytest:
   extends:
     - .pytest_integration
-  # WARNING: if you increase the number of parallel jobs, you need to
-  # update test_coverage.yml with the new list of jobs.
-  parallel: 4
   variables:
     TESTS: "tests_alpha"
 
