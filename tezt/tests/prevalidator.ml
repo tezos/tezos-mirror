@@ -2204,7 +2204,7 @@ let wait_for_flush node =
     | Some s when s = "flush" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
+  let* _ = Node.wait_for node "request_completed_info.v0" filter in
   return ()
 
 let operation_json ~fee ~gas_limit ~source ~destination ~counter =
