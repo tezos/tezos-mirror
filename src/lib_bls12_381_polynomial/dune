@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_bls12_381_polynomial_internal)
+ (public_name tezos-bls12-381-polynomial-internal)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381
+  ppx_repr
+  bigstringaf)
+ (preprocess (pps ppx_repr))
+ (foreign_stubs
+  (language c)
+  (names
+   caml_bls12_381_polynomial_internal_polynomial_stubs
+   caml_bls12_381_polynomial_internal_srs_stubs
+   bls12_381_polynomial_internal_polynomial))
+ (c_library_flags (-Wall -Wextra :standard)))

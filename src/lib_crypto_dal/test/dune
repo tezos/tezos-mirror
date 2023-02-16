@@ -10,7 +10,7 @@
   data-encoding
   alcotest
   qcheck-alcotest
-  tezos-bls12-381-polynomial
+  tezos-bls12-381-polynomial-internal
   tezos-test-helpers)
  (flags
   (:standard)
