@@ -56,15 +56,14 @@ module type S = sig
 
   (** [eval_block_inbox ~fuel node_ctxt (inbox, messages) state] evaluates the
       [messages] for the [inbox] in the given [state] of the PVM and returns the
-      evaluation results containing the new state, the number of messages, the
+      evaluation result containing the new state, the number of messages, the
       inbox level and the remaining fuel. *)
   val eval_block_inbox :
     fuel:fuel ->
     _ Node_context.t ->
     Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
     PVM.state ->
-    (PVM.state * int * Raw_level.t * fuel) Node_context.delayed_write tzresult
-    Lwt.t
+    eval_result Node_context.delayed_write tzresult Lwt.t
 
   (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
       inbox_level messages] evaluates the [messages] for inbox level
@@ -407,14 +406,14 @@ module Make (PVM : Pvm.S) = struct
       (feed_messages [@tailcall]) (state, fuel) message_counter_offset messages
 
     let eval_block_inbox ~fuel node_ctxt (inbox, messages) (state : PVM.state) :
-        (PVM.state * int * Raw_level.t * fuel) Node_context.delayed_write
-        tzresult
-        Lwt.t =
+        eval_result Node_context.delayed_write tzresult Lwt.t =
+      let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
       (* Obtain inbox and its messages for this block. *)
       let inbox_level = Inbox.inbox_level inbox in
+      let*! initial_tick = PVM.get_tick state in
       (* Evaluate all the messages for this level. *)
-      let>* state, fuel, num_messages, _remaining_messages =
+      let>* state, remaining_fuel, num_messages, remaining_messages =
         eval_messages
           ~reveal_map:None
           ~fuel
@@ -424,7 +423,21 @@ module Make (PVM : Pvm.S) = struct
           inbox_level
           messages
       in
-      return (state, num_messages, inbox_level, fuel)
+      let*! final_tick = PVM.get_tick state in
+      let*! state_hash = PVM.state_hash state in
+      let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
+      let eval_state =
+        {
+          state;
+          state_hash;
+          tick = final_tick;
+          inbox_level;
+          message_counter_offset = num_messages;
+          remaining_fuel;
+          remaining_messages;
+        }
+      in
+      return {state = eval_state; num_ticks; num_messages}
 
     let eval_messages ?reveal_map node_ctxt
         {

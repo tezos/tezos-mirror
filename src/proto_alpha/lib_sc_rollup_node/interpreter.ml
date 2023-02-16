@@ -144,25 +144,24 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         inbox_messages
         predecessor_state
     in
-    let* state, num_messages, inbox_level, _fuel =
+    let* {
+           state = {state; state_hash; inbox_level; tick; _};
+           num_messages;
+           num_ticks;
+         } =
       Delayed_write_monad.apply node_ctxt eval_result
     in
     let*! ctxt = PVM.State.set ctxt state in
     let*! initial_tick = PVM.get_tick predecessor_state in
-    let*! last_tick = PVM.get_tick state in
-    let num_ticks =
-      Sc_rollup.Tick.distance initial_tick last_tick |> Z.to_int64
-    in
     (* Produce events. *)
-    let*! state_hash = PVM.state_hash state in
     let*! () =
       Interpreter_event.transitioned_pvm
         inbox_level
         state_hash
-        last_tick
+        tick
         num_messages
     in
-    return (ctxt, num_messages, num_ticks, initial_tick)
+    return (ctxt, num_messages, Z.to_int64 num_ticks, initial_tick)
 
   (** [process_head node_ctxt ctxt ~predecessor head] runs the PVM for the given
       head. *)
