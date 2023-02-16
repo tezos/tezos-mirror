@@ -91,3 +91,85 @@ let print_durable ?(depth = 10) tree =
         (String.concat "/" key)
         Hex.pp
         (Hex.of_bytes value))
+
+type printable_value_kind = [`I32 | `I64 | `Hex | `String]
+
+let integer_value_kind_of_string = function
+  | "int32" | "i32" -> Some `I32
+  | "int64" | "i64" -> Some `I64
+  | _ -> None
+
+let value_kind_length = function `I32 -> 4 | `I64 -> 8
+
+let printable_value_kind_of_string = function
+  | "hex" -> Some `Hex
+  | "string" -> Some `String
+  | k -> integer_value_kind_of_string k
+
+module type NUMERICAL = sig
+  type t
+
+  val zero : t
+
+  val name : string
+
+  (* Number of bytes to contain the value *)
+  val bytes_length : int
+
+  val of_int : int -> t
+
+  val shift_left : t -> int -> t
+
+  val shift_right_logical : t -> int -> t
+
+  val logor : t -> t -> t
+end
+
+module Int32 = struct
+  include Int32
+
+  let name = "int32"
+
+  let bytes_length = 4
+end
+
+module Int64 = struct
+  include Int64
+
+  let name = "int64"
+
+  let bytes_length = 8
+end
+
+(* [integer_from_small_endian (module Num) bytes] reads each [char] of bytes and
+   returns the corresponding integer according to its representation in
+   [Num].
+*)
+let integer_from_small_endian (type t) (module N : NUMERICAL with type t = t)
+    bytes : (t, string) result =
+  if N.bytes_length <> String.length bytes then
+    Error
+      (Format.sprintf "%s values must be %d bytes long" N.name N.bytes_length)
+  else
+    Ok
+      (String.fold_left
+         (fun value byte ->
+           let v = Char.code byte |> N.of_int in
+           N.(
+             logor
+               (shift_right_logical value 8)
+               (shift_left v ((bytes_length - 1) * 8))))
+         N.zero
+         bytes)
+
+let print_wasm_encoded_value kind value =
+  let open Result_syntax in
+  match kind with
+  | `I32 ->
+      let+ i = integer_from_small_endian (module Int32) value in
+      Int32.to_string i
+  | `I64 ->
+      let+ i = integer_from_small_endian (module Int64) value in
+      Int64.to_string i
+  | `Hex -> return (Format.asprintf "%a" Hex.pp (Hex.of_string value))
+  | `String -> return value

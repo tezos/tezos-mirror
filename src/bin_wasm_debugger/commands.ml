@@ -41,8 +41,8 @@ type commands =
   | Show_outbox of int32
   | Show_status
   | Show_durable_storage
-  | Show_key of string
-  | Show_memory of int32 * int
+  | Show_key of string * printable_value_kind
+  | Show_memory of int32 * int * printable_value_kind
   | Step of eval_step
   | Load_inputs
   | Reveal_preimage of string option
@@ -57,6 +57,24 @@ let parse_eval_step = function
   | "inbox" -> Some Inbox
   | _ -> None
 
+let parse_memory_commands full_command = function
+  | ["at"; address; "for"; length; "bytes"] -> (
+      match (Int32.of_string_opt address, int_of_string_opt length) with
+      | Some address, Some length -> Show_memory (address, length, `Hex)
+      | _, _ -> Unknown full_command)
+  | ["at"; address; "for"; length; "bytes"; "as"; "string"] -> (
+      match (Int32.of_string_opt address, int_of_string_opt length) with
+      | Some address, Some length -> Show_memory (address, length, `String)
+      | _, _ -> Unknown full_command)
+  | ["at"; address; "as"; kind] -> (
+      match
+        (Int32.of_string_opt address, integer_value_kind_of_string kind)
+      with
+      | Some address, Some kind ->
+          Show_memory (address, value_kind_length kind, kind)
+      | _, _ -> Unknown full_command)
+  | _ -> Unknown full_command
+
 let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
   let rec go = function
@@ -70,11 +88,12 @@ let parse_commands s =
         | None -> Unknown s)
     | ["show"; "status"] -> Show_status
     | ["show"; "durable"; "storage"] -> Show_durable_storage
-    | ["show"; "key"; key] -> Show_key key
-    | ["show"; "memory"; "at"; address; "for"; length; "bytes"] -> (
-        match (Int32.of_string_opt address, int_of_string_opt length) with
-        | Some address, Some length -> Show_memory (address, length)
-        | _, _ -> Unknown s)
+    | ["show"; "key"; key] -> Show_key (key, `Hex)
+    | ["show"; "key"; key; "as"; kind] -> (
+        match printable_value_kind_of_string kind with
+        | Some kind -> Show_key (key, kind)
+        | None -> Unknown s)
+    | "show" :: "memory" :: rest -> parse_memory_commands s rest
     | ["step"; step] -> (
         match parse_eval_step step with Some s -> Step s | None -> Unknown s)
     | ["load"; "inputs"] -> Load_inputs
@@ -359,9 +378,20 @@ let show_outbox tree level =
 (* [show_durable] prints the durable storage from the tree. *)
 let show_durable tree = Repl_helpers.print_durable ~depth:10 tree
 
+let show_value kind value =
+  let printable = Repl_helpers.print_wasm_encoded_value kind value in
+  match printable with
+  | Ok s -> s
+  | Error err ->
+      Format.asprintf
+        "Error: %s. Defaulting to hexadecimal value\n%a"
+        err
+        Hex.pp
+        (Hex.of_string value)
+
 (* [show_key_gen tree key] looks for the given [key] in the durable storage and
    print its value in hexadecimal format. *)
-let show_key_gen tree key =
+let show_key_gen tree key kind =
   let open Lwt_syntax in
   let* value = Repl_helpers.find_key_in_durable tree key in
   match value with
@@ -370,16 +400,16 @@ let show_key_gen tree key =
       return_unit
   | Some v ->
       let+ str_value = Tezos_lazy_containers.Chunked_byte_vector.to_string v in
-      Format.printf "%a\n%!" Hex.pp (Hex.of_string str_value)
+      Format.printf "%s\n%!" @@ show_value kind str_value
 
 (* [show_key tree key] looks for the given [key] in the durable storage and
    print its value in hexadecimal format. Prints errors in case the key is
    invalid or not existing. *)
-let show_key tree key =
+let show_key tree key kind =
   Lwt.catch
     (fun () ->
       let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-      show_key_gen tree key)
+      show_key_gen tree key kind)
     (function
       | Tezos_scoru_wasm.Durable.Invalid_key _ ->
           Lwt_io.printf "Invalid key\n%!"
@@ -409,7 +439,7 @@ let load_memory tree =
 
 (* [show_memory tree address length] loads the [length] bytes at address
    [address] in the memory, and prints it in its hexadecimal representation. *)
-let show_memory tree address length =
+let show_memory tree address length kind =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
@@ -417,8 +447,7 @@ let show_memory tree address length =
       let* value =
         Tezos_webassembly_interpreter.Memory.load_bytes memory address length
       in
-      Lwt_io.printf "%s\n%!"
-      @@ Format.asprintf "%a" Hex.pp (Hex.of_string value))
+      Lwt_io.printf "%s\n%!" @@ show_value kind value)
     (function
       | Cannot_inspect_memory state ->
           Lwt_io.printf
@@ -493,11 +522,11 @@ let handle_command c config tree inboxes level =
     | Show_durable_storage ->
         let*! () = show_durable tree in
         return ()
-    | Show_key key ->
-        let*! () = show_key tree key in
+    | Show_key (key, kind) ->
+        let*! () = show_key tree key kind in
         return ()
-    | Show_memory (address, length) ->
-        let*! () = show_memory tree address length in
+    | Show_memory (address, length, kind) ->
+        let*! () = show_memory tree address length kind in
         return ()
     | Reveal_preimage bytes ->
         let*! tree = reveal_preimage config bytes tree in
