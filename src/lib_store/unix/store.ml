@@ -3056,17 +3056,17 @@ module Unsafe = struct
             (fun (_ : exn) -> Lwt.return_true)
         in
         let*! () =
-          if not is_locked then Lwt.return_unit
-          else
-            Animation.three_dots
-              ~progress_display_mode:Auto
-              ~msg:
-                "The storage is locked by a context prunning. Waiting for it \
-                 to finish before exporting the snapshot"
-            @@ fun () ->
-            Lwt.finalize
-              (fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
-              (fun () -> Lwt_unix.close fd)
+          Lwt.finalize
+            (fun () ->
+              if not is_locked then Lwt.return_unit
+              else
+                Animation.three_dots
+                  ~progress_display_mode:Auto
+                  ~msg:
+                    "The storage is locked by a context prunning. Waiting for \
+                     it to finish before exporting the snapshot"
+                @@ fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
+            (fun () -> Lwt_unix.close fd)
         in
         let* store =
           load_store
