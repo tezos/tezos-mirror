@@ -409,22 +409,6 @@ let _alcotezt =
     ~deps:[tezt_core_lib]
   |> open_
 
-let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
-    ?synopsis ?opam_with_test l =
-  tezt_without_tezt_lib_dependency
-    ~opam
-    ~path
-    ?synopsis
-    ?js_compatible
-    ?modes
-    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
-    ~exe_deps:[tezt_lib]
-    ~js_deps:[tezt_js_lib]
-    ?dep_globs
-    ?dep_files
-    ?opam_with_test
-    l
-
 let octez_test_helpers =
   public_lib
     "tezos-test-helpers"
@@ -1549,6 +1533,107 @@ let octez_p2p =
         prometheus;
       ]
 
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
+  tezt_without_tezt_lib_dependency
+    ~opam
+    ~path
+    ?synopsis
+    ?js_compatible
+    ?modes
+    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ~exe_deps:[tezt_lib]
+    ~js_deps:[tezt_js_lib]
+    ?dep_globs
+    l
+
+let tezt_performance_regression =
+  public_lib
+    "tezt-performance-regression"
+    ~path:"tezt/lib_performance_regression"
+    ~synopsis:"Performance regression test framework based on Tezt"
+    ~bisect_ppx:false
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
+
+let tezt_tezos =
+  public_lib
+    "tezt-tezos"
+    ~path:"tezt/lib_tezos"
+    ~synopsis:"Tezos test framework based on Tezt"
+    ~bisect_ppx:false
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_performance_regression |> open_;
+        uri;
+        hex;
+        octez_crypto_dal;
+        octez_base;
+        octez_base_unix;
+        cohttp_lwt_unix;
+      ]
+    ~cram:true
+
+let _tezt_self_tests =
+  public_exe
+    "tezt-self-tests"
+    ~internal_name:"main"
+    ~path:"tezt/self_tests"
+    ~synopsis:"Tests for the Tezos test framework based on Tezt"
+    ~bisect_ppx:false
+    ~static:false
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
+    ~cram:true
+    ~dune:
+      Dune.
+        [
+          [
+            S "cram";
+            [S "package"; S "tezt-self-tests"];
+            [S "deps"; S "tezt.sh"; S "main.exe"];
+          ];
+        ]
+
+let _tezt_self_tests_catch_sigterm =
+  private_exe
+    "main"
+    ~path:"tezt/self_tests/bin_catch_sigterm"
+    ~opam:"tezt-self-tests"
+    ~deps:[unix]
+
+let octez_p2p_test_common =
+  private_lib
+    "tezos_p2p_test_common"
+    ~path:"src/lib_p2p/test/common"
+    ~opam:"tezos-p2p"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix |> open_;
+        octez_stdlib_unix |> open_;
+        octez_stdlib |> open_;
+        octez_p2p |> open_;
+        octez_p2p_services |> open_;
+      ]
+
+let _octez_p2p_tezt =
+  tezt
+    ["test_p2p_socket"]
+    ~path:"src/lib_p2p/tezt"
+    ~opam:"tezos-p2p"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_stdlib |> open_;
+        octez_p2p |> open_;
+        octez_p2p_services |> open_;
+        octez_test_helpers |> open_;
+        octez_base_test_helpers |> open_;
+        octez_event_logging_test_helpers |> open_;
+        octez_p2p_test_common |> open_;
+      ]
+
 let _octez_p2p_tests =
   tests
     [
@@ -1578,6 +1663,7 @@ let _octez_p2p_tests =
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         octez_event_logging_test_helpers |> open_;
+        octez_p2p_test_common |> open_;
         octez_p2p_services |> open_;
         alcotest_lwt;
         astring;
@@ -3146,60 +3232,6 @@ let octez_shell_benchmarks =
         octez_micheline;
       ]
     ~linkall:true
-
-let tezt_performance_regression =
-  public_lib
-    "tezt-performance-regression"
-    ~path:"tezt/lib_performance_regression"
-    ~synopsis:"Performance regression test framework based on Tezt"
-    ~bisect_ppx:false
-    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
-
-let tezt_tezos =
-  public_lib
-    "tezt-tezos"
-    ~path:"tezt/lib_tezos"
-    ~synopsis:"Tezos test framework based on Tezt"
-    ~bisect_ppx:false
-    ~deps:
-      [
-        tezt_lib |> open_ |> open_ ~m:"Base";
-        tezt_performance_regression |> open_;
-        uri;
-        hex;
-        octez_crypto_dal;
-        octez_base;
-        octez_base_unix;
-        cohttp_lwt_unix;
-      ]
-    ~cram:true
-
-let _tezt_self_tests =
-  public_exe
-    "tezt-self-tests"
-    ~internal_name:"main"
-    ~path:"tezt/self_tests"
-    ~synopsis:"Tests for the Tezos test framework based on Tezt"
-    ~bisect_ppx:false
-    ~static:false
-    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
-    ~cram:true
-    ~dune:
-      Dune.
-        [
-          [
-            S "cram";
-            [S "package"; S "tezt-self-tests"];
-            [S "deps"; S "tezt.sh"; S "main.exe"];
-          ];
-        ]
-
-let _tezt_self_tests_catch_sigterm =
-  private_exe
-    "main"
-    ~path:"tezt/self_tests/bin_catch_sigterm"
-    ~opam:"tezt-self-tests"
-    ~deps:[unix]
 
 let octez_openapi =
   public_lib

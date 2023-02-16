@@ -256,14 +256,11 @@ module Low_level = struct
   let run _dir = run_nodes client server
 end
 
-(** Spawns a client and a server. The client connects to the server
-    using identity [id2], this identity is checked on server-side. The
-    server sends a Nack message with no rejection motive. The client
-    asserts that its connection has been rejected by Nack.
+(** Spawns a client and a server. A client trying to connect to a
+    server receives and Ack message but replies with a Nack. The
+    connection is hence rejected by the client.
 *)
-module Nack = struct
-  let encoding = Data_encoding.bytes
-
+module Nacked = struct
   let is_rejected = function
     | Error (Tezos_p2p_services.P2p_errors.Rejected_by_nack _ :: _) -> true
     | Ok _ -> false
@@ -271,40 +268,13 @@ module Nack = struct
         log_notice "Error: %a" pp_print_trace err ;
         false
 
-  let server ch sched socket =
-    let open Lwt_result_syntax in
-    let* info, auth_fd = accept sched socket in
-    let* () = tzassert info.incoming __POS__ in
-    let*! id2 in
-    let* () =
-      tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
-    in
-    let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
-    sync ch
-
-  let client ch sched addr port =
-    let open Lwt_result_syntax in
-    let*! id2 in
-    let* auth_fd = connect sched addr port id2 in
-    let*! conn = P2p_socket.accept ~canceler auth_fd encoding in
-    let* () = tzassert (is_rejected conn) __POS__ in
-    sync ch
-
-  let run _dir = run_nodes client server
-end
-
-(** Spawns a client and a server. A client trying to connect to a
-    server receives and Ack message but replies with a Nack. The
-    connection is hence rejected by the client.
-*)
-module Nacked = struct
   let encoding = Data_encoding.bytes
 
   let server ch sched socket =
     let open Lwt_result_syntax in
     let* _info, auth_fd = accept sched socket in
     let*! conn = P2p_socket.accept ~canceler auth_fd encoding in
-    let* () = tzassert (Nack.is_rejected conn) __POS__ in
+    let* () = tzassert (is_rejected conn) __POS__ in
     sync ch
 
   let client ch sched addr port =
@@ -613,7 +583,6 @@ let main () =
            [
              wrap "low-level" Low_level.run;
              wrap "pow" Pow_check.run;
-             wrap "nack" Nack.run;
              wrap "nacked" Nacked.run;
              wrap "simple-message" Simple_message.run;
              wrap "chunked-message" Chunked_message.run;
