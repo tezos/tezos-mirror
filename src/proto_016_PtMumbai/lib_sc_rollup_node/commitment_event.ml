@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Publisher_worker_types
 
 module Simple = struct
   include Internal_event.Simple
@@ -120,6 +121,34 @@ module Simple = struct
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
+
+  module Publisher = struct
+    let section = section @ ["publisher"]
+
+    let request_failed =
+      declare_3
+        ~section
+        ~name:"request_failed"
+        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~level:Warning
+        ("view", Request.encoding)
+        ~pp1:Request.pp
+        ("worker_status", Worker_types.request_status_encoding)
+        ~pp2:Worker_types.pp_status
+        ("errors", Error_monad.trace_encoding)
+        ~pp3:Error_monad.pp_print_trace
+
+    let request_completed =
+      declare_2
+        ~section
+        ~name:"request_completed"
+        ~msg:"{view} {worker_status}"
+        ~level:Debug
+        ("view", Request.encoding)
+        ("worker_status", Worker_types.request_status_encoding)
+        ~pp1:Request.pp
+        ~pp2:Worker_types.pp_status
+  end
 end
 
 let starting = Simple.(emit starting)
@@ -158,3 +187,11 @@ let publish_commitment head level =
 
 let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
   Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))
+
+module Publisher = struct
+  let request_failed view worker_status errors =
+    Simple.(emit Publisher.request_failed (view, worker_status, errors))
+
+  let request_completed view worker_status =
+    Simple.(emit Publisher.request_completed (view, worker_status))
+end
