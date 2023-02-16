@@ -5604,7 +5604,7 @@ let _octez_shell_tests =
       "test_shell";
       "test_synchronisation_heuristic_fuzzy";
       "test_shell_operation";
-      "test_prevalidation_t";
+      "test_prevalidation";
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";

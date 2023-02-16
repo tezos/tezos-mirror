@@ -366,20 +366,19 @@ module Make_s
       remove_from_advertisement old_hash shell.advertisement ;
     match Classification.remove old_hash shell.classification with
     | Some (op, _class) ->
-        [(op, (replacement_classification :> Classification.classification))]
+        Some (op, (replacement_classification :> Classification.classification))
     | None ->
         (* This case should not happen. *)
         shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
-        []
+        None
 
   (* Determine the classification of a given operation in the current
-     filter/validation states, i.e. whether it could be included in a
+     validation state, i.e. whether it could be included in a
      block on top of the current head, and if not, why. If yes, the
      operation is accumulated in the given [mempool].
 
      The function returns a tuple
-     [(filter_state, validation_state, mempool, to_handle)], where:
-     - [filter_state] is the (possibly) updated filter_state,
+     [(validation_state, mempool, to_handle)], where:
      - [validation_state] is the (possibly) updated validation_state,
      - [mempool] is the (possibly) updated mempool,
      - [to_handle] contains the given operation and its classification, and all
@@ -392,17 +391,14 @@ module Make_s
       * (protocol_operation operation * Classification.classification) trace)
       Lwt.t =
     let open Lwt_syntax in
-    let* v_state, op, classification, replacement =
+    let* v_state, op, classification, replacements =
       Prevalidation_t.add_operation validation_state filter_config op
     in
     let to_replace =
-      match replacement with
-      | None -> []
-      | Some (old_oph, replacement_classification) ->
-          reclassify_replaced_manager_op
-            old_oph
-            shell
-            replacement_classification
+      List.filter_map
+        (fun (replaced_oph, new_classification) ->
+          reclassify_replaced_manager_op replaced_oph shell new_classification)
+        replacements
     in
     let to_handle = (op, classification) :: to_replace in
     let mempool =

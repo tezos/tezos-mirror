@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation_t.exe
+    Invocation:   dune exec src/lib_shell/test/test_prevalidation.exe
     Subject:      Unit tests for {!Prevalidation.T}
 *)
 
@@ -486,7 +486,7 @@ let test_add_operation ctxt =
     let*! ( state,
             (_op : Mock_protocol.operation Shell_operation.operation),
             classification,
-            replacement ) =
+            replacements ) =
       P.add_operation state filter_outcome op
     in
     (* Check the classification. *)
@@ -511,13 +511,13 @@ let test_add_operation ctxt =
     | Proto_added, F_no_replace ->
         assert (Operation_hash.Map.mem op.hash valid_ops) ;
         assert (Operation_hash.Set.mem op.hash filter_state) ;
-        assert (Option.is_none replacement)
+        assert (List.is_empty replacements)
     | Proto_added, F_replace | Proto_replaced, F_no_replace -> (
         assert (Operation_hash.Map.mem op.hash valid_ops) ;
         assert (Operation_hash.Set.mem op.hash filter_state) ;
-        match replacement with
-        | None -> assert false
-        | Some (removed, _) ->
+        match replacements with
+        | [] | _ :: _ :: _ -> assert false
+        | [(removed, _)] ->
             assert (Operation_hash.Map.mem removed valid_ops_before) ;
             assert (Operation_hash.Set.mem removed filter_state_before) ;
             assert (not (Operation_hash.Map.mem removed valid_ops)) ;
@@ -527,7 +527,7 @@ let test_add_operation ctxt =
     | _ ->
         assert (not (Operation_hash.Map.mem op.hash valid_ops)) ;
         assert (not (Operation_hash.Set.mem op.hash filter_state)) ;
-        assert (Option.is_none replacement)) ;
+        assert (List.is_empty replacements)) ;
     Lwt.return state
   in
   let timestamp : Time.Protocol.t = now () in
@@ -659,10 +659,10 @@ let () =
     "mempool-prevalidation"
     [
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test create '0' *)
+         dune exec src/lib_shell/test/test_prevalidation.exe -- test create '0' *)
       ("create", [register_test "[create] succeeds" test_create]);
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test add_operation '0' *)
+         dune exec src/lib_shell/test/test_prevalidation.exe -- test add_operation '0' *)
       ( "add_operation",
         [
           register_test
@@ -670,7 +670,7 @@ let () =
             test_add_operation;
         ] );
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test remove_operation '0' *)
+         dune exec src/lib_shell/test/test_prevalidation.exe -- test remove_operation '0' *)
       ( "remove_operation",
         [register_test "Test remove_operation" test_remove_operation] );
     ]

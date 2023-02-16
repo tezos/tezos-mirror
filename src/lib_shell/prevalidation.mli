@@ -89,26 +89,26 @@ module type T = sig
     | Prevalidator_classification.error_classification ]
     Lwt.t
 
-  (** If an old operation has been replaced by a newly added
-      operation, then this type contains its hash and its new
-      classification. If there is no replaced operation, this is [None]. *)
-  type replacement =
-    (Operation_hash.t * Prevalidator_classification.error_classification) option
+  (** Contain the hash and new classification of any operations that
+      had to be removed to make room for the newly validated
+      operation. *)
+  type replacements =
+    (Operation_hash.t * Prevalidator_classification.error_classification) list
 
   (** Result of {!add_operation}.
 
       Contain the updated (or unchanged) state {!t},
       the operation (in which [count_successful_prechecks]
       has been incremented if appropriate), its classification,
-      and the potential {!replacement}.
+      and the potential {!replacements}.
 
-      Invariant: [replacement] can only be [Some _] when the
+      Invariant: [replacements] can only be non-empty when the
       classification is [`Prechecked]. *)
   type add_result =
     t
     * protocol_operation Shell_operation.operation
     * Prevalidator_classification.classification
-    * replacement
+    * replacements
 
   (** Call the protocol [Mempool.add_operation] function, providing it
       with the [conflict_handler] from the plugin.
