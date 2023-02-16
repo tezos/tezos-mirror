@@ -78,9 +78,14 @@ module Next : Benchmark.S = struct
   let create_benchmarks ~rng_state ~bench_num ({max_items} : config) =
     List.repeat bench_num @@ fun () ->
     let workload =
-      Base_samplers.sample_in_interval
-        rng_state
-        ~range:{min = 0; max = max_items}
+      (* Since the model we want to infer is logarithmic in
+         the length, we sample the logarithm of the length
+         (and not the length itself) uniformly in an interval. *)
+      let logmax = log (float_of_int max_items) in
+      let loglen =
+        Base_samplers.sample_float_in_interval ~min:0. ~max:logmax rng_state
+      in
+      int_of_float (exp loglen)
     in
     let prev_cell = create_skip_list_of_len workload in
     let prev_cell_ptr = () in
@@ -144,11 +149,14 @@ module Hash_cell = struct
   let models = [("skip_list_hash", hash_skip_list_cell_model)]
 
   let benchmark rng_state conf () =
-    let skip_list_len =
-      Base_samplers.sample_in_interval
-        ~range:{min = 1; max = conf.max_index}
-        rng_state
+    (* Since the model we want to infer is logarithmic in
+       the length, we sample the logarithm of the length
+       (and not the length itself) uniformly in an interval. *)
+    let skip_list_loglen =
+      let logmax = log (float_of_int conf.max_index) in
+      Base_samplers.sample_float_in_interval ~min:0. ~max:logmax rng_state
     in
+    let skip_list_len = int_of_float (exp skip_list_loglen) in
     let random_hash () =
       Hash.hash_string
         [Base_samplers.string ~size:{min = 32; max = 32} rng_state]
