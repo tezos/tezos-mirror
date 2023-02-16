@@ -54,11 +54,6 @@ module type S = sig
     Context.rw ->
     Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t option tzresult Lwt.t
 
-  (** [publish_commitments node_ctxt] publishes the commitments that were not
-      yet published up to the finalized head and which are after the last
-      cemented commitment. *)
-  val publish_commitments : _ Node_context.t -> unit tzresult Lwt.t
-
   (** [publish_single_commitment node_ctxt commitment] publishes a single
       [commitment] if it is missing. This function is meant to be used by the {e
       accuser} mode to sparingly publish commitments when it detects a
@@ -68,13 +63,21 @@ module type S = sig
     Protocol.Alpha_context.Sc_rollup.Commitment.t ->
     unit tzresult Lwt.t
 
-  (** [cement_commitments node_ctxt] cements the commitments that can be
+  (** Worker for publishing and cementing commitments. *)
+  module Publisher : sig
+    val init : _ Node_context.t -> unit tzresult Lwt.t
+
+    (** [publish_commitments node_ctxt] publishes the commitments that were not
+      yet published up to the finalized head and which are after the last
+      cemented commitment. *)
+    val publish_commitments : unit -> unit tzresult Lwt.t
+
+    (** [cement_commitments node_ctxt] cements the commitments that can be
       cemented, i.e. the commitments that are after the current last cemented
       commitment and which have [sc_rollup_challenge_period] levels on top of
       them since they were originally published.  *)
-  val cement_commitments : _ Node_context.t -> unit tzresult Lwt.t
+    val cement_commitments : unit -> unit tzresult Lwt.t
 
-  (** [start ()] only emits the event that the commitment manager
-      for the rollup node has started. *)
-  val start : unit -> unit Lwt.t
+    val shutdown : unit -> unit Lwt.t
+  end
 end
