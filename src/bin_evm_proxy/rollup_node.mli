@@ -26,8 +26,11 @@
 (** List of services supported to communicate with a rollup node. *)
 module type S = sig
   (** [assert_connected] sends a random RPC to the rollup node to check
-      if the rollup node answers *)
+      if the rollup node answers. *)
   val assert_connected : unit tzresult Lwt.t
+
+  (** [balance address] returns the [address]'s balance. *)
+  val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup
