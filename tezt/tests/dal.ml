@@ -1238,7 +1238,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   let cryptobox = Rollup.Dal.make parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
-    | Ok p -> Cryptobox.polynomial_to_bytes cryptobox p |> Bytes.to_string
+    | Ok p -> Cryptobox.polynomial_to_slot cryptobox p |> Bytes.to_string
     | Error _ -> Test.fail "Fail to build polynomial from shards"
   in
   Check.(reformed_slot = slot_content)
