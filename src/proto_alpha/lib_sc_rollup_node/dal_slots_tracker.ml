@@ -99,7 +99,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           ~default:Dal.Attestation.empty
           metadata.protocol_data.dal_attestation
       in
-      let*! published_slots_indexes =
+      let* published_slots_indexes =
         Node_context.get_slot_indexes
           node_ctxt
           ~published_in_block_hash:published_block_hash
@@ -154,8 +154,8 @@ let download_and_save_slots
   (* The contents of each slot index are written to a different location on
      disk, therefore calls to store contents for different slot indexes can
      be parallelized. *)
-  let*! () =
-    List.iter_p
+  let* () =
+    List.iter_ep
       (fun s_slot ->
         Node_context.save_slot_status
           node_context
@@ -166,7 +166,7 @@ let download_and_save_slots
   in
   List.iter_ep
     (fun s_slot ->
-      let*! () =
+      let* () =
         Node_context.save_slot_status
           node_context
           current_block_hash
@@ -230,7 +230,7 @@ module Confirmed_slots_history = struct
       Layer1.{hash = block_hash; level = block_level} ~entry_kind ~find ~default
       =
     let open Lwt_result_syntax in
-    let*! confirmed_slots_history_opt = find node_ctxt block_hash in
+    let* confirmed_slots_history_opt = find node_ctxt block_hash in
     let block_level = Raw_level.of_int32_exn block_level in
     let should_process_dal_slots =
       should_process_dal_slots node_ctxt block_level
@@ -318,13 +318,13 @@ module Confirmed_slots_history = struct
        bounded cache in case we need it for refutation game. *)
     (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3856
        Attempt to improve this process. *)
-    let*! () =
+    let* () =
       Node_context.save_confirmed_slots_history
         node_ctxt
         head_hash
         slots_history
     in
-    let*! () =
+    let* () =
       Node_context.save_confirmed_slots_histories
         node_ctxt
         head_hash

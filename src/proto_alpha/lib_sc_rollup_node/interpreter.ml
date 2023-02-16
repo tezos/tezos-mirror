@@ -142,7 +142,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         inbox_messages
         predecessor_state
     in
-    let*! state, num_messages, inbox_level, _fuel =
+    let* state, num_messages, inbox_level, _fuel =
       Delayed_write_monad.apply node_ctxt eval_result
     in
     let*! ctxt = PVM.State.set ctxt state in

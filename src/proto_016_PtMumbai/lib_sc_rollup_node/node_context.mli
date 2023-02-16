@@ -338,17 +338,24 @@ val get_slot_header :
     for all the slots that were published in the provided block hash on Layer
     1. *)
 val get_all_slot_headers :
-  _ t -> published_in_block_hash:Block_hash.t -> Dal.Slot.Header.t list Lwt.t
+  _ t ->
+  published_in_block_hash:Block_hash.t ->
+  Dal.Slot.Header.t list tzresult Lwt.t
 
 (** [get_slot_indexes t ~published_in_block_hash] returns the slot indexes whose
     headers were published in the provided block hash on Layer 1. *)
 val get_slot_indexes :
-  _ t -> published_in_block_hash:Block_hash.t -> Dal.Slot_index.t list Lwt.t
+  _ t ->
+  published_in_block_hash:Block_hash.t ->
+  Dal.Slot_index.t list tzresult Lwt.t
 
 (** [save_slot_header t ~published_in_block_hash header] saves the [header] as
     being published for its index in the provided block hash on Layer 1. *)
 val save_slot_header :
-  rw -> published_in_block_hash:Block_hash.t -> Dal.Slot.Header.t -> unit Lwt.t
+  rw ->
+  published_in_block_hash:Block_hash.t ->
+  Dal.Slot.Header.t ->
+  unit tzresult Lwt.t
 
 (** [processed_slot t ~confirmed_in_block_hash index] returns [None] if the slot
     pages was never processed nor downloaded, [Some `Unconfirmed] if the slot
@@ -358,7 +365,7 @@ val processed_slot :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
   Dal.Slot_index.t ->
-  [`Unconfirmed | `Confirmed] option Lwt.t
+  [`Unconfirmed | `Confirmed] option tzresult Lwt.t
 
 (** [list_slot_pages t ~confirmed_in_block_hash] lists all slots and their pages
     that were confirmed and stored by the rollup node for
@@ -366,7 +373,7 @@ val processed_slot :
 val list_slot_pages :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
-  ((Dal.Slot_index.t * int) * bytes) list Lwt.t
+  ((Dal.Slot_index.t * int) * bytes) list tzresult Lwt.t
 
 (** [find_slot_page t ~confirmed_in_block_hash slot_index page_index] retrieves
     a pages (with index [page_index]) for a slot [slot_index] that was confirmed
@@ -377,30 +384,31 @@ val find_slot_page :
   confirmed_in_block_hash:Block_hash.t ->
   slot_index:Dal.Slot_index.t ->
   page_index:int ->
-  bytes option Lwt.t
+  bytes option tzresult Lwt.t
 
 (** [save_unconfirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
 *)
-val save_unconfirmed_slot : rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
+val save_unconfirmed_slot :
+  rw -> Block_hash.t -> Dal.Slot_index.t -> unit tzresult Lwt.t
 
 (** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
     The contents of the slot are set to [pages] in [node_ctxt.store]. *)
 val save_confirmed_slot :
-  rw -> Block_hash.t -> Dal.Slot_index.t -> bytes list -> unit Lwt.t
+  rw -> Block_hash.t -> Dal.Slot_index.t -> bytes list -> unit tzresult Lwt.t
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)
 
 val find_confirmed_slots_history :
-  _ t -> Block_hash.t -> Dal.Slots_history.t option Lwt.t
+  _ t -> Block_hash.t -> Dal.Slots_history.t option tzresult Lwt.t
 
 val save_confirmed_slots_history :
-  rw -> Block_hash.t -> Dal.Slots_history.t -> unit Lwt.t
+  rw -> Block_hash.t -> Dal.Slots_history.t -> unit tzresult Lwt.t
 
 val find_confirmed_slots_histories :
-  _ t -> Block_hash.t -> Dal.Slots_history.History_cache.t option Lwt.t
+  _ t -> Block_hash.t -> Dal.Slots_history.History_cache.t option tzresult Lwt.t
 
 val save_confirmed_slots_histories :
-  rw -> Block_hash.t -> Dal.Slots_history.History_cache.t -> unit Lwt.t
+  rw -> Block_hash.t -> Dal.Slots_history.History_cache.t -> unit tzresult Lwt.t

@@ -568,7 +568,7 @@ let get_full_l2_block node_ctxt block_hash =
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
-  Error.trace_lwt_with
+  Error.trace_lwt_result_with
     "Could not retrieve slot header for slot index %a published in block %a"
     Dal.Slot_index.pp
     slot_index
@@ -625,9 +625,9 @@ let save_unconfirmed_slot {store; _} current_block_hash slot_index =
 let save_confirmed_slot {store; _} current_block_hash slot_index pages =
   (* Adding multiple entries with the same primary key amounts to updating the
      contents of an in-memory map, hence pages must be added sequentially. *)
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let* () =
-    List.iteri_s
+    List.iteri_es
       (fun page_number page ->
         Store.Dal_slot_pages.add
           store.irmin_store

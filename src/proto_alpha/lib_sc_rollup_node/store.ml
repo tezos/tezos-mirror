@@ -413,7 +413,7 @@ let close
   and+ () = Commitments.close commitments
   and+ () = Commitments_published_at_level.close commitments_published_at_level
   and+ () = Levels_to_hashes.close levels_to_hashes
-  and+ () = Irmin_store.close irmin_store |> Lwt_result.ok in
+  and+ () = Irmin_store.close irmin_store in
   ()
 
 let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
@@ -437,9 +437,7 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
   let* levels_to_hashes =
     Levels_to_hashes.load mode ~path:(path "levels_to_hashes")
   in
-  let+ irmin_store =
-    Irmin_store.load mode (path "irmin_store") |> Lwt_result.ok
-  in
+  let+ irmin_store = Irmin_store.load mode (path "irmin_store") in
   {
     l2_blocks;
     messages;

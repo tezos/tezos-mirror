@@ -336,17 +336,24 @@ val get_slot_header :
     for all the slots that were published in the provided block hash on Layer
     1. *)
 val get_all_slot_headers :
-  _ t -> published_in_block_hash:Block_hash.t -> Dal.Slot.Header.t list Lwt.t
+  _ t ->
+  published_in_block_hash:Block_hash.t ->
+  Dal.Slot.Header.t list tzresult Lwt.t
 
 (** [get_slot_indexes t ~published_in_block_hash] returns the slot indexes whose
     headers were published in the provided block hash on Layer 1. *)
 val get_slot_indexes :
-  _ t -> published_in_block_hash:Block_hash.t -> Dal.Slot_index.t list Lwt.t
+  _ t ->
+  published_in_block_hash:Block_hash.t ->
+  Dal.Slot_index.t list tzresult Lwt.t
 
 (** [save_slot_header t ~published_in_block_hash header] saves the [header] as
     being published for its index in the provided block hash on Layer 1. *)
 val save_slot_header :
-  rw -> published_in_block_hash:Block_hash.t -> Dal.Slot.Header.t -> unit Lwt.t
+  rw ->
+  published_in_block_hash:Block_hash.t ->
+  Dal.Slot.Header.t ->
+  unit tzresult Lwt.t
 
 (** [find_slot_status t ~confirmed_in_block_hash index] returns [None] if the
     slot's block is not processed yet, [Some `Unconfirmed] if the slot was not
@@ -356,7 +363,7 @@ val find_slot_status :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
   Dal.Slot_index.t ->
-  [`Unconfirmed | `Confirmed] option Lwt.t
+  [`Unconfirmed | `Confirmed] option tzresult Lwt.t
 
 (** [list_slots_statuses t ~confirmed_in_block_hash] lists the list of
     slots indices with their respective statuses that are saved for the given
@@ -364,7 +371,7 @@ val find_slot_status :
 val list_slots_statuses :
   _ t ->
   confirmed_in_block_hash:Block_hash.t ->
-  (Dal.Slot_index.t * [`Confirmed | `Unconfirmed]) list Lwt.t
+  (Dal.Slot_index.t * [`Confirmed | `Unconfirmed]) list tzresult Lwt.t
 
 (** [save_slot_status node_ctxt hash slot_index status] saves in
     [node_ctxt.store] that [slot_index] has status [status] in the
@@ -375,19 +382,19 @@ val save_slot_status :
   Block_hash.t ->
   Dal.Slot_index.t ->
   [`Confirmed | `Unconfirmed] ->
-  unit Lwt.t
+  unit tzresult Lwt.t
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)
 
 val find_confirmed_slots_history :
-  _ t -> Block_hash.t -> Dal.Slots_history.t option Lwt.t
+  _ t -> Block_hash.t -> Dal.Slots_history.t option tzresult Lwt.t
 
 val save_confirmed_slots_history :
-  rw -> Block_hash.t -> Dal.Slots_history.t -> unit Lwt.t
+  rw -> Block_hash.t -> Dal.Slots_history.t -> unit tzresult Lwt.t
 
 val find_confirmed_slots_histories :
-  _ t -> Block_hash.t -> Dal.Slots_history.History_cache.t option Lwt.t
+  _ t -> Block_hash.t -> Dal.Slots_history.History_cache.t option tzresult Lwt.t
 
 val save_confirmed_slots_histories :
-  rw -> Block_hash.t -> Dal.Slots_history.History_cache.t -> unit Lwt.t
+  rw -> Block_hash.t -> Dal.Slots_history.History_cache.t -> unit tzresult Lwt.t
