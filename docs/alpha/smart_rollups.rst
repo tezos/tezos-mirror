@@ -1408,11 +1408,21 @@ kernel wrote data at key ``/store/key``:
   > show key /store/key
   `<hexadecimal value of the key>`
 
-Since the representation of values is decided by the kernel, the debugger can only
-return its raw value. It is possible however to inspect the memory by stopping
-the PVM before its snapshot internal state, with ``step result``, and
-inspect the memory at pointer ``n`` and length ``l``, and finaly evaluate until the
-next ``kernel_run``:
+Since the representation of values is decided by the kernel, the debugger can
+only return its raw value. Please note that the command ``show keys <path>``
+will return the keys under the given path. This can help navigate in the durable
+storage.
+
+.. code::
+
+   > show keys /store
+   /key
+   /another_key
+   ...
+
+It is also possible to inspect the memory by stopping the PVM before its
+snapshot internal state, with ``step result``, and inspect the memory at pointer
+``n`` and length ``l``, and finally evaluate until the next ``kernel_run``:
 
 .. code::
 
