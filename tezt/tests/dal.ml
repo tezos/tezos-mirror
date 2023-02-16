@@ -2115,10 +2115,10 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
         let current_level = index + from in
         task current_level)
   in
-  let promises = ref [] in
-  let* counter =
-    Operation.get_next_counter ~source:Constant.bootstrap3 l1_client
-  in
+  let publish_and_store_slot_promises = ref [] in
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap3 in
+  let* counter = Operation.get_next_counter ~source l1_client in
   let counter = ref counter in
   let task current_level =
     let* level = Node.wait_for_level l1_node current_level in
@@ -2143,12 +2143,13 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
         l1_node
         l1_client
         dal_node
-        Constant.bootstrap3
+        source
         slot_index
         (sf " %d " payload)
     in
     incr counter ;
-    promises := promise :: !promises ;
+    publish_and_store_slot_promises :=
+      promise :: !publish_and_store_slot_promises ;
     unit
   in
   let* () = loop ~from ~into ~task in
@@ -2156,7 +2157,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
     List.map (fun p ->
         let* _p = p in
         unit)
-    @@ List.rev !promises
+    @@ List.rev !publish_and_store_slot_promises
   in
   let* () = Lwt.join l in
   Log.info "[e2e.slot_producer] will terminate" ;
@@ -2274,6 +2275,10 @@ type e2e_test = {
 }
 
 let e2e_tests =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4858
+
+     Move tests that take time to long tests, in particular those with mainnet
+     parameters. *)
   let test1 =
     {
       constants = Protocol.Constants_test;
@@ -2287,9 +2292,9 @@ let e2e_tests =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 2;
-      block_delay = 4;
-      number_of_dal_slots = 2;
-      beforehand_slot_injection = 1;
+      block_delay = 2;
+      number_of_dal_slots = 5;
+      beforehand_slot_injection = 5;
     }
   in
   let mainnet1 =
@@ -2301,7 +2306,16 @@ let e2e_tests =
       beforehand_slot_injection = 1;
     }
   in
-  [test1; test2; mainnet1]
+  let mainnet2 =
+    {
+      constants = Protocol.Constants_mainnet;
+      attestation_lag = 3;
+      block_delay = 5;
+      number_of_dal_slots = 5;
+      beforehand_slot_injection = 10;
+    }
+  in
+  [test1; test2; mainnet1; mainnet2]
 
 let constants_to_string = function
   | Protocol.Constants_mainnet -> "mainnet"
@@ -2330,10 +2344,11 @@ let register_end_to_end_tests ~protocols =
       let network = constants_to_string constants in
       let title =
         sf
-          "e2e_%s_lag-%d_latency-%d_slots-%d"
+          "%s_lag-%d_time-%d_preinject-%d_slots-%d"
           network
           attestation_lag
           block_delay
+          beforehand_slot_injection
           number_of_dal_slots
       in
       let activation_timestamp =
