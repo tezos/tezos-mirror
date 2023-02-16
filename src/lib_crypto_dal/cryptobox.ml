@@ -294,7 +294,7 @@ module Inner = struct
     domain_2k : Domains.t;
     domain_n : Domains.t;
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
-    shard_size : int;
+    shard_length : int;
     (* Length of a shard in terms of scalar elements. *)
     pages_per_slot : int;
     (* Number of slot pages. *)
@@ -324,7 +324,7 @@ module Inner = struct
   let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
 
   let ensure_validity ~slot_size ~page_size ~n ~k ~redundancy_factor
-      ~number_of_shards ~shard_size ~srs_g1_length ~srs_g2_length =
+      ~number_of_shards ~shard_length ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
     if not (is_power_of_two slot_size) then
       (* According to the specification the length of a slot are in MiB *)
@@ -385,10 +385,10 @@ module Inner = struct
              number_of_shards))
     else if n mod number_of_shards <> 0 then
       fail (`Fail (Format.asprintf "The number of shards must divide %d" n))
-    else if 2 * shard_size >= k then
-      (* Since shard_size = n / number_of_shards, we obtain
+    else if 2 * shard_length >= k then
+      (* Since shard_length = n / number_of_shards, we obtain
          (all quantities are positive integers):
-         2 * shard_size < k
+         2 * shard_length < k
          => 2 (n / number_of_shards) < k
          => 2 * n / k < number_of_shards
          => 2 * redundancy_factor < number_of_shards
@@ -457,7 +457,7 @@ module Inner = struct
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
-    let shard_size = n / number_of_shards in
+    let shard_length = n / number_of_shards in
     let* raw =
       match !initialisation_parameters with
       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
@@ -471,7 +471,7 @@ module Inner = struct
         ~k
         ~redundancy_factor
         ~number_of_shards
-        ~shard_size
+        ~shard_length
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
@@ -500,7 +500,7 @@ module Inner = struct
         domain_k = make_domain k;
         domain_2k = make_domain (2 * k);
         domain_n = make_domain n;
-        shard_size;
+        shard_length;
         pages_per_slot = pages_per_slot parameters;
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
@@ -707,27 +707,27 @@ module Inner = struct
     let shards =
       (* We always consider the first k codeword vector components,
          the ShardSet allows collecting distinct indices.
-         [Seq.take] doesn't raise any exceptions as t.k / t.shard_size
+         [Seq.take] doesn't raise any exceptions as t.k / t.shard_length
          is (strictly) positive.
 
-         [t.k / t.shard_size] is strictly less than [t.number_of_shards].
+         [t.k / t.shard_length] is strictly less than [t.number_of_shards].
 
-         Indeed, [t.shard_size = t.n / t.number_of_shards] where
+         Indeed, [t.shard_length = t.n / t.number_of_shards] where
          [t.n = t.k * t.redundancy_factor] and [t.redundancy_factor > 1].
          Thus,
-         [t.k / t.shard_size = t.number_of_shards / t.redundancy_factor < t.number_of_shards].
+         [t.k / t.shard_length = t.number_of_shards / t.redundancy_factor < t.number_of_shards].
 
          Here, all variables are positive integers, and [t.redundancy_factor]
          divides [t.number_of_shards], [t.number_of_shards] divides [t.n]. *)
-      Seq.take (t.k / t.shard_size) shards |> ShardSet.of_seq
+      Seq.take (t.k / t.shard_length) shards |> ShardSet.of_seq
     in
-    (* There should be [t.k / t.shard_size] distinct shard indices. *)
-    if t.k / t.shard_size > ShardSet.cardinal shards then
+    (* There should be [t.k / t.shard_length] distinct shard indices. *)
+    if t.k / t.shard_length > ShardSet.cardinal shards then
       Error
         (`Not_enough_shards
           (Printf.sprintf
-             "there must be at least %d shards to decode."
-             (t.k / t.shard_size)))
+             "there must be at least %d shards to decode"
+             (t.k / t.shard_length)))
     else if
       ShardSet.exists
         (fun {index; _} -> index >= t.number_of_shards || index < 0)
@@ -742,14 +742,14 @@ module Inner = struct
              (t.number_of_shards - 1)))
     else if
       ShardSet.exists
-        (fun {share; _} -> Array.length share <> t.shard_size)
+        (fun {share; _} -> Array.length share <> t.shard_length)
         shards
     then
       Error
         (`Invalid_shard_length
           (Printf.sprintf
              "At least one shard of invalid length: expected length %d."
-             t.shard_size))
+             t.shard_length))
     else
       (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - x_i).
 
@@ -767,21 +767,21 @@ module Inner = struct
 
       (* The codewords are split into chunks called shards.
 
-         For this purpose, let [shard_length=t.n/t.number_of_shards]
+         For this purpose, let [t.shard_length=t.n/t.number_of_shards]
          be the length of a shard, and w a primitive n-th root
          of unity.
 
          The domain of evaluation <w> is then split into cosets:
          <w> = Disjoint union_{i in ⟦0, t.number_of_shards-1⟧} W_i,
 
-         where W_0 = {w^{t.number_of_shards * j}}_{j in ⟦0, shard_length-1⟧}
-         and W_i = w^i W_0.
+         where W_0 = {w^{t.number_of_shards * j}}_{j in ⟦0, t.shard_length-1⟧}
+         and W_i = w^i W_0 (|W_0|=t.shard_length).
 
          For a set of [t.k / shard_length] shard indices
          Z subseteq {0, t.number_of_shards-1}, we reorganize the product
          A(x)=prod_{i=0}^{k-1} (x-x_i) into
 
-         A(x) = prod_{i in Z, |Z|=t.k/shard_length} Z_i
+         A(x) = prod_{i in Z, |Z|=t.k/t.shard_length} Z_i
          where Z_i = prod_{w' in W_i} (x - w').
 
          We notice that Z_0(x)=x^{|W_0|}-1 (as its roots
@@ -797,15 +797,15 @@ module Inner = struct
          Thus A(x) = prod_{i in Z, |Z|=k/l} x^{|W_0|}-w^{i*|W_0|}.
 
          More formally: every element of W_i is of the form
-         w^i w^{t.number_of_shards j} for j in ⟦0, shard_length-1⟧. Thus
+         w^i w^{t.number_of_shards j} for j in ⟦0, t.shard_length-1⟧. Thus
 
          Z_i(w^i w^{s j}) = (w^i w^{s j})^{|W_0|}-w^{i*|W_0|}
                           = (w^i)^{|W_0|} (w^{s j})^{|W_0|} - w^{i*|W_0|}
                           = w^{i * |W_0|} * 1 - w^{i*|W_0|}=0.
 
          So every element of W_i is a root of Z_i(x).
-         Moreover, Z_i(x) is a degree |W_0|=shard_length polynomial
-         so has at most [shard_length] roots:
+         Moreover, Z_i(x) is a degree |W_0|=t.shard_length polynomial
+         so has at most [t.shard_length] roots:
          Z_i(x)'s only roots are W_i
 
          [mul acc i] computes the polynomial acc * Z_i. *)
@@ -814,8 +814,8 @@ module Inner = struct
            [Polynomials.degree acc + t.shard_length]. *)
         Polynomials.mul_xn
           acc
-          t.shard_size
-          (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)))
+          t.shard_length
+          (Scalar.negate (Domains.get t.domain_n (i * t.shard_length)))
       in
       (* [partition_products seq] builds two polynomials whose
          product is A(x) from the input shards [seq]. *)
