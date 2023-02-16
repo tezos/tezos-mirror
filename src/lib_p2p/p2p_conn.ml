@@ -46,9 +46,6 @@ type ('msg, 'peer, 'conn) t = {
 let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   let open Lwt_syntax in
   let open P2p_answerer in
-  let request_info =
-    P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
-  in
   let* () = Lwt.pause () in
   let* r = protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) in
   match r with
@@ -56,6 +53,15 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       let* () = Events.(emit bootstrap_received) t.peer_id in
       if t.disable_peer_discovery then worker_loop t callback
       else
+        (* Since [request_info] may be modified in another Lwt thread, it is
+           required that getting the [last_sent_swat_request] and invoquing the
+           callback be atomic to avoid race conditions.
+           e.g. there must not exist a Lwt cooperation point between this
+           affectation and the invocation of the callback.
+           The same statement is also true in the next cases. *)
+        let request_info =
+          P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+        in
         let* r = callback.bootstrap request_info in
         match r with
         | Ok () -> worker_loop t callback
@@ -64,18 +70,31 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       let* () = Events.(emit advertise_received) (t.peer_id, points) in
       let* () =
         if t.disable_peer_discovery then return_unit
-        else callback.advertise request_info points
+        else
+          let request_info =
+            P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+          in
+          callback.advertise request_info points
       in
       worker_loop t callback
   | Ok (_, Swap_request (point, peer)) ->
       let* () = Events.(emit swap_request_received) (t.peer_id, point, peer) in
+      let request_info =
+        P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+      in
       let* () = callback.swap_request request_info point peer in
       worker_loop t callback
   | Ok (_, Swap_ack (point, peer)) ->
       let* () = Events.(emit swap_ack_received) (t.peer_id, point, peer) in
+      let request_info =
+        P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+      in
       let* () = callback.swap_ack request_info point peer in
       worker_loop t callback
   | Ok (size, Message msg) ->
+      let request_info =
+        P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+      in
       let* () = callback.message request_info size msg in
       worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->

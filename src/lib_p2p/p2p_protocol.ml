@@ -141,10 +141,12 @@ module Default_answerer = struct
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
     Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
+    (* Checks that a swap request has been sent to this connection. *)
     match request.last_sent_swap_request with
     | None -> Lwt.return_unit (* ignore *)
     | Some (_time, proposed_peer_id) -> (
-        match P2p_pool.Connection.find_by_peer_id pool proposed_peer_id with
+        (* Ignore the swap if the new point is already connected *)
+        match P2p_pool.Connection.find_by_point pool new_point with
         | None ->
             swap config pool source_peer_id ~connect proposed_peer_id new_point
         | Some _ -> Lwt.return_unit)
@@ -165,30 +167,52 @@ module Default_answerer = struct
            config.latest_successful_swap
            config.latest_accepted_swap)
     in
-    let new_point_info = P2p_pool.register_point pool new_point in
+    (* We don't need to register the point here.
+       Registering the point is the responsibility of the
+       [P2p_connect_handler]. Registering the point will
+       eventually be done in [P2p_connect_handler.connect].
+
+       Moreover, registering the point here could lead to
+       chaotic interactions with the maintainance. *)
+    let new_point_info = P2p_pool.Points.info pool new_point in
     if
       Ptime.Span.compare span_since_last_swap swap_linger < 0
-      || not (P2p_point_state.is_disconnected new_point_info)
+      || not
+           (Option.fold
+              ~none:true
+              ~some:(fun new_point_info ->
+                P2p_point_state.is_disconnected new_point_info)
+              new_point_info)
     then (
       log (Swap_request_ignored {source = source_peer_id}) ;
       Prometheus.Counter.inc_one P2p_metrics.Swap.ignored ;
       Events.(emit swap_request_ignored) source_peer_id)
     else
-      match P2p_pool.Connection.random_addr pool ~no_private:true with
-      | None -> Events.(emit no_swap_candidate) source_peer_id
-      | Some (proposed_point, proposed_peer_id) -> (
-          match conn.write_swap_ack proposed_point proposed_peer_id with
-          | Ok true ->
-              log (Swap_ack_sent {source = source_peer_id}) ;
-              Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
-              swap
-                config
-                pool
-                source_peer_id
-                ~connect
-                proposed_peer_id
-                new_point
-          | Ok false | Error _ -> Lwt.return_unit)
+      match P2p_pool.Connection.find_by_peer_id pool source_peer_id with
+      | None ->
+          (* The connection has been lost so ignore the request *)
+          Lwt.return_unit
+      | Some source_conn -> (
+          match
+            P2p_pool.Connection.random_addr
+              pool
+              ~different_than:source_conn
+              ~no_private:true
+          with
+          | None -> Events.(emit no_swap_candidate) source_peer_id
+          | Some (proposed_point, proposed_peer_id) -> (
+              match conn.write_swap_ack proposed_point proposed_peer_id with
+              | Ok true ->
+                  log (Swap_ack_sent {source = source_peer_id}) ;
+                  Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
+                  swap
+                    config
+                    pool
+                    source_peer_id
+                    ~connect
+                    proposed_peer_id
+                    new_point
+              | Ok false | Error _ -> Lwt.return_unit))
 
   let create config conn =
     P2p_answerer.
