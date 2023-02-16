@@ -199,10 +199,10 @@ let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
 
 (** Wait for the rollup node to detect a conflict *)
 let wait_for_conflict_detected sc_node =
-  Sc_rollup_node.wait_for
-    sc_node
-    "sc_rollup_node_conflict_detected.v0"
-    (fun _ -> Some ())
+  Sc_rollup_node.wait_for sc_node "sc_rollup_node_conflict_detected.v0"
+  @@ fun json ->
+  let our_hash = JSON.(json |-> "our_commitment_hash" |> as_string) in
+  Some (our_hash, json)
 
 (* Configuration of a rollup node
    ------------------------------
@@ -499,6 +499,14 @@ let wait_for_injecting_event ?(tags = []) ?count node =
       if List.for_all (fun t -> List.mem t event_tags) tags then
         Some event_count
       else None
+
+(* Wait for the [sc_rollup_node_publish_commitment] event from the rollup node. *)
+let wait_for_publish_commitment node =
+  Sc_rollup_node.wait_for node "sc_rollup_node_publish_commitment.v0"
+  @@ fun json ->
+  let hash = JSON.(json |-> "hash" |> as_string) in
+  let level = JSON.(json |-> "level" |> as_int) in
+  Some (hash, level)
 
 let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
     ~sc_rollup ~src client =
@@ -2589,10 +2597,21 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
 
   let game_started = ref false in
   let conflict_detected = ref false in
+  let detected_conflicts = ref [] in
+  let published_commitments = ref [] in
   let _ =
-    let* () = wait_for_conflict_detected sc_rollup_node in
+    let* conflict = wait_for_conflict_detected sc_rollup_node in
     conflict_detected := true ;
+    detected_conflicts := conflict :: !detected_conflicts ;
     unit
+  in
+  let _ =
+    let rec gather_commitments () =
+      let* c = wait_for_publish_commitment sc_rollup_node in
+      published_commitments := c :: !published_commitments ;
+      gather_commitments ()
+    in
+    gather_commitments ()
   in
 
   let loser_sc_rollup_nodes =
@@ -2671,6 +2690,18 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
 
   if not !conflict_detected then
     Test.fail "Honest node did not detect the conflict" ;
+
+  if mode = Accuser then (
+    assert (!detected_conflicts <> []) ;
+    List.iter
+      (fun (commitment_hash, level) ->
+        if not (List.mem_assoc commitment_hash !detected_conflicts) then
+          Test.fail
+            "Accuser published the commitment %s at level %d which never \
+             appeared in a conflict"
+            commitment_hash
+            level)
+      !published_commitments) ;
 
   let* honest_deposit_json =
     RPC.Client.call client
