@@ -73,6 +73,9 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
           Merkle_tree.V0.serialize_payload dac_plugin ~page_store data
         in
         let* () = Data_streamer.publish hash_streamer root_hash in
+        let*! () =
+          Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
+        in
         return root_hash
     | Hash_chain_V0 ->
         Hash_chain.V0.serialize_payload

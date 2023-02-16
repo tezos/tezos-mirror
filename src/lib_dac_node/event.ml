@@ -189,6 +189,14 @@ let new_root_hash_received =
     ~level:Notice
     ("root_hash", Data_encoding.string)
 
+let new_hash_pushed_to_data_streamer =
+  declare_1
+    ~section
+    ~name:"root_hash_pushed_to_the_data_streamer"
+    ~msg:"New root hash pushed to the data streamer: {root_hash}"
+    ~level:Notice
+    ("root_hash", Data_encoding.string)
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -203,3 +211,6 @@ let emit_protocol_plugin_not_resolved current_protocol next_protocol =
 
 let emit_new_root_hash_received ((module P) : Dac_plugin.t) hash =
   emit new_root_hash_received (P.to_hex hash)
+
+let emit_root_hash_pushed_to_data_streamer ((module P) : Dac_plugin.t) hash =
+  emit new_hash_pushed_to_data_streamer (P.to_hex hash)
