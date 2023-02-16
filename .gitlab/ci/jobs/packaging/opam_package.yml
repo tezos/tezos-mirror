@@ -256,6 +256,8 @@ opam:octez-codec:
 
 # Ignoring unreleased package octez-dal-node.
 
+# Ignoring unreleased package octez-evm-proxy.
+
 opam:octez-node:
   extends:
     - .opam_template
