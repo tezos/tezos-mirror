@@ -41,6 +41,7 @@ type commands =
   | Show_outbox of int32
   | Show_status
   | Show_durable_storage
+  | Show_subkeys of string
   | Show_key of string * printable_value_kind
   | Show_memory of int32 * int * printable_value_kind
   | Step of eval_step
@@ -88,6 +89,7 @@ let parse_commands s =
         | None -> Unknown s)
     | ["show"; "status"] -> Show_status
     | ["show"; "durable"; "storage"] -> Show_durable_storage
+    | ["show"; "subkeys"; path] -> Show_subkeys path
     | ["show"; "key"; key] -> Show_key (key, `Hex)
     | ["show"; "key"; key; "as"; kind] -> (
         match printable_value_kind_of_string kind with
@@ -378,6 +380,21 @@ let show_outbox tree level =
 (* [show_durable] prints the durable storage from the tree. *)
 let show_durable tree = Repl_helpers.print_durable ~depth:10 tree
 
+(* [show_subkeys tree path] prints the direct subkeys under the given path. *)
+let show_subkeys tree path =
+  let invalid_path () =
+    Lwt.return @@ Format.printf "Invalid path, it must start with '/'\n%!"
+  in
+  match String.index_opt path '/' with
+  | Some i when i <> 0 -> invalid_path ()
+  | None -> invalid_path ()
+  | Some _ ->
+      Repl_helpers.print_durable
+        ~depth:1
+        ~path:(String.split_no_empty '/' path)
+        ~show_values:false
+        tree
+
 let show_value kind value =
   let printable = Repl_helpers.print_wasm_encoded_value kind value in
   match printable with
@@ -521,6 +538,9 @@ let handle_command c config tree inboxes level =
         return ()
     | Show_durable_storage ->
         let*! () = show_durable tree in
+        return ()
+    | Show_subkeys path ->
+        let*! () = show_subkeys tree path in
         return ()
     | Show_key (key, kind) ->
         let*! () = show_key tree key kind in
