@@ -28,7 +28,7 @@ black = "22.3.0"
 
 # tests_python/ python testing and execution framework dependencies
 pytest = "6.2.5"
-pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", branch="fc5bd9b2" }
+pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", rev="fc5bd9b2" }
 pytest-timeout = "1.4.2"
 # tests_python/tests_*/test_openapi.py dependencies
 requests = "2.26.0"
@@ -39,6 +39,8 @@ openapi-spec-validator = "0.2.9"
 # docs/ dependencies
 sphinx = "4.2.0"
 sphinx-rtd-theme = "0.5.2"
+types-pygments = "2.14.0.1"
+types-docutils = "0.19.1.2"
 
 # scripts/b58_prefix dependencies
 base58 = "2.1.0"
