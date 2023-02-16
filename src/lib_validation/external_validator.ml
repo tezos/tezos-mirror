@@ -48,7 +48,7 @@ module Events = struct
   let dynload_protocol =
     declare_1
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"dynload_protocol"
       ~msg:"dynamic loading of protocol {protocol}"
       ~pp1:Protocol_hash.pp
@@ -57,7 +57,7 @@ module Events = struct
   let validation_request =
     declare_1
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"validation_request"
       ~msg:"validating block {block}"
       ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
@@ -66,7 +66,7 @@ module Events = struct
   let precheck_request =
     declare_1
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"precheck_request"
       ~msg:"prechecking block {hash}"
       ~pp1:Block_hash.pp
@@ -75,7 +75,7 @@ module Events = struct
   let commit_genesis_request =
     declare_1
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"commit_genesis_request"
       ~msg:"committing genesis block {genesis}"
       ~pp1:Block_hash.pp
@@ -84,7 +84,7 @@ module Events = struct
   let initialization_request =
     declare_0
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"initialization_request"
       ~msg:"initializing validator's environment"
       ()
@@ -92,7 +92,7 @@ module Events = struct
   let fork_test_chain_request =
     declare_1
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"fork_testchain_request"
       ~msg:"forking test chain at block {block}"
       ~pp1:Block_header.pp
@@ -101,7 +101,7 @@ module Events = struct
   let context_gc_request =
     declare_1
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"context_gc_request"
       ~msg:"garbage collecting context below {context_hash}"
       ~pp1:Context_hash.pp
@@ -110,7 +110,7 @@ module Events = struct
   let context_split_request =
     declare_0
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"context_split_request"
       ~msg:"spliting context"
       ()
@@ -118,7 +118,7 @@ module Events = struct
   let termination_request =
     declare_0
       ~section
-      ~level:Debug
+      ~level:Info
       ~name:"termination_request"
       ~msg:"validator terminated"
       ()
