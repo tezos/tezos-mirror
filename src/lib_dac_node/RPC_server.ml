@@ -58,13 +58,22 @@ let add_service registerer service handler directory =
   registerer directory service handler
 
 let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
-    (data, pagination_scheme) =
+    hash_streamer (data, pagination_scheme) =
   let open Lwt_result_syntax in
   let open Pages_encoding in
   let* root_hash =
     match pagination_scheme with
     | Merkle_tree_V0 ->
-        Merkle_tree.V0.serialize_payload dac_plugin ~page_store data
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4897
+           Once new "PUT /preimage" endpoint is implemented, pushing
+           a new root hash to the data streamer should be moved there.
+           Tezt for testing streaming of root hashes should also use
+           the new endpoint. *)
+        let* root_hash =
+          Merkle_tree.V0.serialize_payload dac_plugin ~page_store data
+        in
+        let* () = Data_streamer.publish hash_streamer root_hash in
+        return root_hash
     | Hash_chain_V0 ->
         Hash_chain.V0.serialize_payload
           dac_plugin
@@ -106,7 +115,7 @@ let handle_retrieve_preimage dac_plugin page_store hash =
   Page_store.Filesystem.load dac_plugin page_store ~hash
 
 let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
-    directory =
+    hash_streamer directory =
   directory
   |> add_service
        Tezos_rpc.Directory.register0
@@ -117,6 +126,7 @@ let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
            cctxt
            dac_sk_uris
            page_store
+           hash_streamer
            input)
 
 let register_verify_external_message_signature ctx public_keys_opt directory =
@@ -164,6 +174,7 @@ let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
        cctxt
        dac_sk_uris
        page_store
+       hash_streamer
   |> register_verify_external_message_signature dac_plugin dac_public_keys_opt
   |> register_retrieve_preimage dac_plugin page_store
   |> register_monitor_root_hashes dac_plugin hash_streamer

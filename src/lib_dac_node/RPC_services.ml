@@ -58,7 +58,7 @@ let external_message_query =
   |> seal
 
 let dac_store_preimage ctx =
-  Tezos_rpc.Service.put_service
+  Tezos_rpc.Service.post_service
     ~description:"Split DAC reveal data"
     ~query:Tezos_rpc.Query.empty
     ~input:store_preimage_request_encoding
