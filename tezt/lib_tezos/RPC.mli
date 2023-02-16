@@ -72,8 +72,8 @@ val get_config : JSON.t t
 
 (** RPC: [GET /network/connections]
 
-    Returns the list of [(address, port)] pairs. *)
-val get_network_connections : (string * int) list t
+    Returns the list of [(address, port, peer_id)] tuple. *)
+val get_network_connections : (string * int * string) list t
 
 (** RPC: [GET /network/connections/<peer_id>]
 

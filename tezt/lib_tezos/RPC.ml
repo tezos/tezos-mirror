@@ -55,9 +55,11 @@ let get_config = make GET ["config"] Fun.id
 let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
-    let id_point = JSON.(json |-> "id_point") in
-    ( JSON.(id_point |-> "addr" |> as_string),
-      JSON.(id_point |-> "port" |> as_int) )
+    let open JSON in
+    let id_point = json |-> "id_point" in
+    ( id_point |-> "addr" |> as_string,
+      id_point |-> "port" |> as_int,
+      json |-> "peer_id" |> as_string )
   in
   List.map decode_connection (JSON.as_list json)
 
