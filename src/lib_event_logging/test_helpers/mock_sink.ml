@@ -120,7 +120,7 @@ let handle (type a) (_ : t) m ?section ev =
       level = M.level;
       section;
       name = M.name;
-      message = Format.asprintf "%a" (M.pp ~short:false) ev;
+      message = Format.asprintf "%a" (M.pp ~all_fields:true ~block:true) ev;
       json = Data_encoding.Json.construct M.encoding ev;
     }
   in

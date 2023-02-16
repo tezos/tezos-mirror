@@ -132,7 +132,7 @@ module Block_seen_event = struct
       in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ~short:_ ppf {hash; _} =
+    let pp ~all_fields:_ ~block:_ ppf {hash; _} =
       Format.fprintf ppf "Saw block %a" Block_hash.pp_short hash
 
     let doc = "Block observed while monitoring a blockchain."
