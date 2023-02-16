@@ -235,6 +235,7 @@ let propose_at_next_level ~minimal_timestamp state =
         round = minimal_round;
         delegate;
         kind;
+        force_apply = state.global_state.config.force_apply;
       }
     in
     let state_recorder ~new_state =
@@ -476,6 +477,7 @@ let baking_minimal_timestamp state =
       round = minimal_round;
       delegate;
       kind;
+      force_apply = state.global_state.config.force_apply;
     }
   in
   let state_recorder ~new_state =

@@ -119,6 +119,7 @@ type block_to_bake = {
   round : Round.t;
   delegate : Baking_state.consensus_key_and_delegate;
   kind : block_kind;
+  force_apply : bool;
 }
 
 type action =
@@ -214,7 +215,13 @@ let sign_block_header state proposer unsigned_block_header =
       return {Block_header.shell; protocol_data = {contents; signature}}
 
 let inject_block ~state_recorder state block_to_bake ~updated_state =
-  let {predecessor; round; delegate = (consensus_key, _) as delegate; kind} =
+  let {
+    predecessor;
+    round;
+    delegate = (consensus_key, _) as delegate;
+    kind;
+    force_apply;
+  } =
     block_to_bake
   in
   Events.(
@@ -311,7 +318,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     ~payload_round
     ~liquidity_baking_toggle_vote
     ~user_activated_upgrades
-    ~force_apply:state.global_state.config.force_apply
+    ~force_apply
     state.global_state.config.fees
     simulation_mode
     simulation_kind
