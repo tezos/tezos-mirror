@@ -70,8 +70,43 @@ module Test = struct
     |> List.mem true
 
   (* Tests that with a fraction 1/redundancy_factor of the shards
-     the decoding succeeds. *)
+     the decoding succeeds. Checks equality of polynomials. *)
   let test_erasure_code =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test erasure code"
+      ~print
+      params_gen
+      (fun
+        ({redundancy_factor; number_of_shards; slot_size; _} as params :
+          Cryptobox.parameters)
+      ->
+        let msg_size = slot_size / 16 in
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        init params ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t = Cryptobox.make params in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let enc_shards = Cryptobox.shards_from_polynomial t p in
+         let c_indices =
+           random_indices
+             (number_of_shards - 1)
+             (number_of_shards / redundancy_factor)
+         in
+         let c =
+           Seq.filter
+             (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
+             enc_shards
+         in
+         let* decoded_p = Cryptobox.polynomial_from_shards t c in
+         return (Cryptobox.Internal_for_tests.polynomials_equal decoded_p p))
+        |> function
+        | Ok check -> check
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
+        | Error _ -> false)
+
+  (* Tests that with a fraction 1/redundancy_factor of the shards
+     the decoding succeeds. Checks equality of slots. *)
+  let test_erasure_code_with_slot_conversion =
     QCheck2.Test.make
       ~name:"DAL cryptobox: test erasure code"
       ~print
@@ -405,6 +440,7 @@ let () =
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
           [
             Test.test_erasure_code;
+            Test.test_erasure_code_with_slot_conversion;
             Test.test_page_proofs;
             Test.test_shard_proofs;
             Test.test_commitment_proof;

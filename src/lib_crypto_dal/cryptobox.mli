@@ -258,6 +258,10 @@ module Internal_for_tests : sig
 
   (* Returns a default valid sequence of shards for the given parameters. *)
   val make_dummy_shards : t -> shard Seq.t
+
+  (* [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
+     represent the same polynomial. *)
+  val polynomials_equal : polynomial -> polynomial -> bool
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4380

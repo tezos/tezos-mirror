@@ -1272,6 +1272,8 @@ module Internal_for_tests = struct
         loop (index + 1) (Seq.cons {index; share} seq)
     in
     loop 0 Seq.empty
+
+  let polynomials_equal = Polynomials.equal
 end
 
 module Config = struct
