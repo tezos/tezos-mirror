@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use debug::debug_msg;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
+use debug::debug_msg;
 use kernel::kernel_entry;
 
 use crate::account::Account;

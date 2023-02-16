@@ -6,8 +6,6 @@ use host::path::PathError;
 use host::runtime::RuntimeError;
 use std::str::Utf8Error;
 
-use num_bigint::ParseBigIntError;
-
 pub enum Error {
     Path(PathError),
     Runtime(RuntimeError),
@@ -28,12 +26,6 @@ impl From<RuntimeError> for Error {
 
 impl From<Utf8Error> for Error {
     fn from(_: Utf8Error) -> Self {
-        Self::Generic
-    }
-}
-
-impl From<ParseBigIntError> for Error {
-    fn from(_: ParseBigIntError) -> Self {
         Self::Generic
     }
 }

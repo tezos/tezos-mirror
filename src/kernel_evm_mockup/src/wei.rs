@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use num_bigint::BigUint;
+use primitive_types::U256;
 
-pub type Wei = BigUint;
+pub type Wei = U256;
 
 pub const ETH_AS_WEI: u64 = 1_000_000_000_000_000_000;
 

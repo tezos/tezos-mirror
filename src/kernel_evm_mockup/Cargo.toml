@@ -17,4 +17,4 @@ host = { git = "https://gitlab.com/tezos/kernel", branch = "main"  }
 debug = { git = "https://gitlab.com/tezos/kernel", branch = "main" }
 mock_runtime = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
 
-num-bigint = "0.3"
+primitive-types = { version = "0.11.1", default-features = false }
