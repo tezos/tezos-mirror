@@ -1,0 +1,1088 @@
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_big_map_value.tz on storage '(Pair { Elt "hello" "hi" } None)' and input '"hello"' --trace-stack
+storage
+  (Pair 4 (Some "hi"))
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["hello"] to "hi"
+trace
+  - location: 12 (just consumed gas: 12.614)
+    [ (Pair "hello" { Elt "hello" "hi" } None) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair "hello" { Elt "hello" "hi" } None)
+      (Pair "hello" { Elt "hello" "hi" } None) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair "hello" { Elt "hello" "hi" } None) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair "hello" { Elt "hello" "hi" } None) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair { Elt "hello" "hi" } None) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" } ]
+  - location: 19 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hello"
+      { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
+  - location: 20 (just consumed gas: 0.756)
+    [ (Some "hi")
+      { Elt "hello" "hi" } ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" }
+      (Some "hi") ]
+  - location: 22 (just consumed gas: 0.010)
+    [ (Pair { Elt "hello" "hi" } (Some "hi")) ]
+  - location: 23 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "hello" "hi" } (Some "hi")) ]
+  - location: 25 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "hello" "hi" } (Some "hi")) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_big_map_value.tz on storage '(Pair { Elt "hello" "hi" } None)' and input '""' --trace-stack
+storage
+  (Pair 4 None)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["hello"] to "hi"
+trace
+  - location: 12 (just consumed gas: 12.564)
+    [ (Pair "" { Elt "hello" "hi" } None) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair "" { Elt "hello" "hi" } None)
+      (Pair "" { Elt "hello" "hi" } None) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ ""
+      (Pair "" { Elt "hello" "hi" } None) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair "" { Elt "hello" "hi" } None) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair { Elt "hello" "hi" } None) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" } ]
+  - location: 19 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ ""
+      { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
+  - location: 20 (just consumed gas: 0.700)
+    [ None
+      { Elt "hello" "hi" } ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" }
+      None ]
+  - location: 22 (just consumed gas: 0.010)
+    [ (Pair { Elt "hello" "hi" } None) ]
+  - location: 23 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "hello" "hi" } None) ]
+  - location: 25 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "hello" "hi" } None) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_big_map_value.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } None)' and input '"1"' --trace-stack
+storage
+  (Pair 4 (Some "one"))
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Set map(4)["1"] to "one"
+trace
+  - location: 12 (just consumed gas: 13.526)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)
+      (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "1"
+      (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 19 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "1"
+      { Elt "1" "one" ; Elt "2" "two" }
+      { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 20 (just consumed gas: 0.712)
+    [ (Some "one")
+      { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      (Some "one") ]
+  - location: 22 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } (Some "one")) ]
+  - location: 23 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "one" ; Elt "2" "two" } (Some "one")) ]
+  - location: 25 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } (Some "one")) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/update_big_map.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)' and input '{}' --trace-stack
+storage
+  (Pair 4 Unit)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Set map(4)["1"] to "one"
+trace
+  - location: 15 (just consumed gas: 12.065)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 16 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 16 (just consumed gas: 0.025)
+    [ {}
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/update_big_map.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)' and input '{ Elt "1" (Some "two") }' --trace-stack
+storage
+  (Pair 4 Unit)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Set map(4)["1"] to "two"
+trace
+  - location: 15 (just consumed gas: 12.515)
+    [ (Pair { Elt "1" (Some "two") } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { Elt "1" (Some "two") }
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 16 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 16 (just consumed gas: 0.025)
+    [ { Elt "1" (Some "two") }
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0)
+    [ (Pair "1" (Some "two"))
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 21 (just consumed gas: 0.010)
+    [ "1"
+      (Some "two")
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 22 (just consumed gas: 0.727)
+    [ { Elt "1" "two" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0.015)
+    [ { Elt "1" "two" ; Elt "2" "two" }
+      Unit ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "two" ; Elt "2" "two" } Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "two" ; Elt "2" "two" } Unit) ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "two" ; Elt "2" "two" } Unit) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/update_big_map.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)' and input '{ Elt "3" (Some "three") }' --trace-stack
+storage
+  (Pair 4 Unit)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Set map(4)["3"] to "three"
+  Set map(4)["1"] to "one"
+trace
+  - location: 15 (just consumed gas: 12.535)
+    [ (Pair { Elt "3" (Some "three") } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { Elt "3" (Some "three") }
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 16 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 16 (just consumed gas: 0.025)
+    [ { Elt "3" (Some "three") }
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0)
+    [ (Pair "3" (Some "three"))
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 21 (just consumed gas: 0.010)
+    [ "3"
+      (Some "three")
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 22 (just consumed gas: 0.727)
+    [ { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" }
+      Unit ]
+  - location: 19 (just consumed gas: 0.015)
+    [ { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" }
+      Unit ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit) ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/update_big_map.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)' and input '{ Elt "3" None }' --trace-stack
+storage
+  (Pair 4 Unit)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Unset map(4)["3"]
+  Set map(4)["1"] to "one"
+trace
+  - location: 15 (just consumed gas: 12.371)
+    [ (Pair { Elt "3" None } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { Elt "3" None }
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 16 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 16 (just consumed gas: 0.025)
+    [ { Elt "3" None }
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0)
+    [ (Pair "3" None)
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 21 (just consumed gas: 0.010)
+    [ "3"
+      None
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 22 (just consumed gas: 0.727)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0.015)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/update_big_map.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)' and input '{ Elt "2" None }' --trace-stack
+storage
+  (Pair 4 Unit)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Unset map(4)["2"]
+  Set map(4)["1"] to "one"
+trace
+  - location: 15 (just consumed gas: 12.371)
+    [ (Pair { Elt "2" None } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { Elt "2" None }
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 16 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 16 (just consumed gas: 0.025)
+    [ { Elt "2" None }
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0)
+    [ (Pair "2" None)
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 21 (just consumed gas: 0.010)
+    [ "2"
+      None
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 22 (just consumed gas: 0.727)
+    [ { Elt "1" "one" }
+      Unit ]
+  - location: 19 (just consumed gas: 0.015)
+    [ { Elt "1" "one" }
+      Unit ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" } Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "one" } Unit) ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "one" } Unit) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/update_big_map.tz on storage '(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)' and input '{ Elt "1" (Some "two") }' --trace-stack
+storage
+  (Pair 4 Unit)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Set map(4)["1"] to "two"
+trace
+  - location: 15 (just consumed gas: 12.515)
+    [ (Pair { Elt "1" (Some "two") } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { Elt "1" (Some "two") }
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 16 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 16 (just consumed gas: 0.025)
+    [ { Elt "1" (Some "two") }
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0)
+    [ (Pair "1" (Some "two"))
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 21 (just consumed gas: 0.010)
+    [ "1"
+      (Some "two")
+      { Elt "1" "one" ; Elt "2" "two" }
+      Unit ]
+  - location: 22 (just consumed gas: 0.727)
+    [ { Elt "1" "two" ; Elt "2" "two" }
+      Unit ]
+  - location: 19 (just consumed gas: 0.015)
+    [ { Elt "1" "two" ; Elt "2" "two" }
+      Unit ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "two" ; Elt "2" "two" } Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      (Pair { Elt "1" "two" ; Elt "2" "two" } Unit) ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "1" "two" ; Elt "2" "two" } Unit) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair None {})' and input '"hello"' --trace-stack
+storage
+  (Pair None 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Unset map(4)["hello"]
+trace
+  - location: 13 (just consumed gas: 8.479)
+    [ (Pair "hello" None {}) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair None {}) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair None {}) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ None
+      {} ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hello"
+      None
+      {} ]
+  - location: 17 (just consumed gas: 0.787)
+    [ None
+      {} ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair None {}) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair None {}) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} None {}) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair (Some 4) {})' and input '"hello"' --trace-stack
+storage
+  (Pair None 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["hello"] to 4
+trace
+  - location: 13 (just consumed gas: 8.579)
+    [ (Pair "hello" (Some 4) {}) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair (Some 4) {}) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair (Some 4) {}) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Some 4)
+      {} ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hello"
+      (Some 4)
+      {} ]
+  - location: 17 (just consumed gas: 0.787)
+    [ None
+      { Elt "hello" 4 } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair None { Elt "hello" 4 }) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair None { Elt "hello" 4 }) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} None { Elt "hello" 4 }) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair None { Elt "hello" 4 })' and input '"hello"' --trace-stack
+storage
+  (Pair (Some 4) 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Unset map(4)["hello"]
+trace
+  - location: 13 (just consumed gas: 9.509)
+    [ (Pair "hello" None { Elt "hello" 4 }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair None { Elt "hello" 4 }) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair None { Elt "hello" 4 }) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ None
+      { Elt "hello" 4 } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hello"
+      None
+      { Elt "hello" 4 } ]
+  - location: 17 (just consumed gas: 0.792)
+    [ (Some 4)
+      {} ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair (Some 4) {}) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Some 4) {}) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} (Some 4) {}) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair (Some 5) { Elt "hello" 4 })' and input '"hello"' --trace-stack
+storage
+  (Pair (Some 4) 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["hello"] to 5
+trace
+  - location: 13 (just consumed gas: 9.609)
+    [ (Pair "hello" (Some 5) { Elt "hello" 4 }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hello"
+      (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 17 (just consumed gas: 0.792)
+    [ (Some 4)
+      { Elt "hello" 5 } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair (Some 4) { Elt "hello" 5 }) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Some 4) { Elt "hello" 5 }) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} (Some 4) { Elt "hello" 5 }) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair (Some 5) { Elt "hello" 4 })' and input '"hi"' --trace-stack
+storage
+  (Pair None 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["hello"] to 4
+  Set map(4)["hi"] to 5
+trace
+  - location: 13 (just consumed gas: 9.579)
+    [ (Pair "hi" (Some 5) { Elt "hello" 4 }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hi"
+      (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hi"
+      (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 17 (just consumed gas: 0.759)
+    [ None
+      { Elt "hello" 4 ; Elt "hi" 5 } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair None { Elt "1" 1 ; Elt "2" 2 })' and input '"1"' --trace-stack
+storage
+  (Pair (Some 1) 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["2"] to 2
+  Unset map(4)["1"]
+trace
+  - location: 13 (just consumed gas: 10.367)
+    [ (Pair "1" None { Elt "1" 1 ; Elt "2" 2 }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "1"
+      (Pair None { Elt "1" 1 ; Elt "2" 2 }) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair None { Elt "1" 1 ; Elt "2" 2 }) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ None
+      { Elt "1" 1 ; Elt "2" 2 } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "1"
+      None
+      { Elt "1" 1 ; Elt "2" 2 } ]
+  - location: 17 (just consumed gas: 0.751)
+    [ (Some 1)
+      { Elt "2" 2 } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair (Some 1) { Elt "2" 2 }) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Some 1) { Elt "2" 2 }) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} (Some 1) { Elt "2" 2 }) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/get_and_update_big_map.tz on storage '(Pair None { Elt "1" 1 ; Elt "2" 2 })' and input '"1"' --trace-stack
+storage
+  (Pair (Some 1) 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["2"] to 2
+  Unset map(4)["1"]
+trace
+  - location: 13 (just consumed gas: 10.367)
+    [ (Pair "1" None { Elt "1" 1 ; Elt "2" 2 }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "1"
+      (Pair None { Elt "1" 1 ; Elt "2" 2 }) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair None { Elt "1" 1 ; Elt "2" 2 }) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ None
+      { Elt "1" 1 ; Elt "2" 2 } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "1"
+      None
+      { Elt "1" 1 ; Elt "2" 2 } ]
+  - location: 17 (just consumed gas: 0.751)
+    [ (Some 1)
+      { Elt "2" 2 } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair (Some 1) { Elt "2" 2 }) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Some 1) { Elt "2" 2 }) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} (Some 1) { Elt "2" 2 }) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/big_map_magic.tz on storage '(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))' and input '(Left Unit)' --trace-stack
+storage
+  (Left (Pair 4 5))
+emitted operations
+  
+big_map diff
+  New map(5) of type (big_map string string)
+  Set map(5)["1"] to "one"
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+trace
+  - location: 43 (just consumed gas: 62.128)
+    [ (Pair (Left Unit) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Left Unit)
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0)
+    [ Unit
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 46 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 48 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" } { Elt "2" "two" }) ]
+  - location: 48 (just consumed gas: 0.015)
+    [ (Pair { Elt "1" "one" } { Elt "2" "two" }) ]
+  - location: 54 (just consumed gas: 0.010)
+    [ { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 55 (just consumed gas: 0.010)
+    [ { Elt "2" "two" }
+      { Elt "1" "one" } ]
+  - location: 56 (just consumed gas: 0.010)
+    [ (Pair { Elt "2" "two" } { Elt "1" "one" }) ]
+  - location: 57 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "2" "two" } { Elt "1" "one" })) ]
+  - location: 44 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "2" "two" } { Elt "1" "one" })) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ {}
+      (Left (Pair { Elt "2" "two" } { Elt "1" "one" })) ]
+  - location: 153 (just consumed gas: 0.010)
+    [ (Pair {} (Left (Pair { Elt "2" "two" } { Elt "1" "one" }))) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/big_map_magic.tz on storage '(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))' and input '(Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))' --trace-stack
+storage
+  (Left (Pair 4 5))
+emitted operations
+  
+big_map diff
+  New map(5) of type (big_map string string)
+  Set map(5)["4"] to "four"
+  New map(4) of type (big_map string string)
+  Set map(4)["3"] to "three"
+trace
+  - location: 43 (just consumed gas: 65.416)
+    [ (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
+            (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0)
+    [ (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" })))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 60 (just consumed gas: 0)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 62 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))
+      (Left (Pair { Elt "3" "three" } { Elt "4" "four" })) ]
+  - location: 63 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" })) ]
+  - location: 60 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" })) ]
+  - location: 44 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" })) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ {}
+      (Left (Pair { Elt "3" "three" } { Elt "4" "four" })) ]
+  - location: 153 (just consumed gas: 0.010)
+    [ (Pair {} (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/big_map_magic.tz on storage '(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))' and input '(Right (Left (Right Unit)))' --trace-stack
+storage
+  (Right Unit)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 43 (just consumed gas: 62.768)
+    [ (Pair (Right (Left (Right Unit))) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Right (Left (Right Unit)))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0)
+    [ (Left (Right Unit))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 60 (just consumed gas: 0)
+    [ (Right Unit)
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 62 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))
+      (Right Unit) ]
+  - location: 63 (just consumed gas: 0.010)
+    [ (Right Unit) ]
+  - location: 60 (just consumed gas: 0.015)
+    [ (Right Unit) ]
+  - location: 44 (just consumed gas: 0.015)
+    [ (Right Unit) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ {}
+      (Right Unit) ]
+  - location: 153 (just consumed gas: 0.010)
+    [ (Pair {} (Right Unit)) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/big_map_magic.tz on storage '(Right Unit)' and input '(Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }) )))' --trace-stack
+storage
+  (Left (Pair 4 5))
+emitted operations
+  
+big_map diff
+  New map(5) of type (big_map string string)
+  Set map(5)["gaz"] to "baz"
+  New map(4) of type (big_map string string)
+  Set map(4)["foo"] to "bar"
+trace
+  - location: 43 (just consumed gas: 60.906)
+    [ (Pair (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))) (Right Unit)) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))))
+      (Right Unit) ]
+  - location: 44 (just consumed gas: 0)
+    [ (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))
+      (Right Unit) ]
+  - location: 60 (just consumed gas: 0)
+    [ (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))
+      (Right Unit) ]
+  - location: 65 (just consumed gas: 0)
+    [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })
+      (Right Unit) ]
+  - location: 67 (just consumed gas: 0)
+    [ (Right Unit) ]
+  - location: 70 (just consumed gas: 0)
+    [ Unit ]
+  - location: 70 (just consumed gas: 0.015)
+    [ Unit ]
+  - location: 76 (just consumed gas: 0.010)
+    [  ]
+  - location: 67 (just consumed gas: 0.025)
+    [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }) ]
+  - location: 77 (just consumed gas: 0.010)
+    [ { Pair "foo" "bar" }
+      { Pair "gaz" "baz" } ]
+  - location: 78 (just consumed gas: 0)
+    [ { Pair "gaz" "baz" } ]
+  - location: 80 (just consumed gas: 0.300)
+    [ {}
+      { Pair "gaz" "baz" } ]
+  - location: 78 (just consumed gas: 0.025)
+    [ { Pair "foo" "bar" }
+      {}
+      { Pair "gaz" "baz" } ]
+  - location: 83 (just consumed gas: 0)
+    [ (Pair "foo" "bar")
+      {}
+      { Pair "gaz" "baz" } ]
+  - location: 85 (just consumed gas: 0.010)
+    [ "foo"
+      "bar"
+      {}
+      { Pair "gaz" "baz" } ]
+  - location: 86 (just consumed gas: 0)
+    [ "bar"
+      {}
+      { Pair "gaz" "baz" } ]
+  - location: 88 (just consumed gas: 0.010)
+    [ (Some "bar")
+      {}
+      { Pair "gaz" "baz" } ]
+  - location: 86 (just consumed gas: 0.025)
+    [ "foo"
+      (Some "bar")
+      {}
+      { Pair "gaz" "baz" } ]
+  - location: 89 (just consumed gas: 0.744)
+    [ { Elt "foo" "bar" }
+      { Pair "gaz" "baz" } ]
+  - location: 83 (just consumed gas: 0.015)
+    [ { Elt "foo" "bar" }
+      { Pair "gaz" "baz" } ]
+  - location: 90 (just consumed gas: 0.010)
+    [ { Pair "gaz" "baz" }
+      { Elt "foo" "bar" } ]
+  - location: 91 (just consumed gas: 0)
+    [ { Elt "foo" "bar" } ]
+  - location: 93 (just consumed gas: 0.300)
+    [ {}
+      { Elt "foo" "bar" } ]
+  - location: 91 (just consumed gas: 0.025)
+    [ { Pair "gaz" "baz" }
+      {}
+      { Elt "foo" "bar" } ]
+  - location: 96 (just consumed gas: 0)
+    [ (Pair "gaz" "baz")
+      {}
+      { Elt "foo" "bar" } ]
+  - location: 98 (just consumed gas: 0.010)
+    [ "gaz"
+      "baz"
+      {}
+      { Elt "foo" "bar" } ]
+  - location: 99 (just consumed gas: 0)
+    [ "baz"
+      {}
+      { Elt "foo" "bar" } ]
+  - location: 101 (just consumed gas: 0.010)
+    [ (Some "baz")
+      {}
+      { Elt "foo" "bar" } ]
+  - location: 99 (just consumed gas: 0.025)
+    [ "gaz"
+      (Some "baz")
+      {}
+      { Elt "foo" "bar" } ]
+  - location: 102 (just consumed gas: 0.744)
+    [ { Elt "gaz" "baz" }
+      { Elt "foo" "bar" } ]
+  - location: 96 (just consumed gas: 0.015)
+    [ { Elt "gaz" "baz" }
+      { Elt "foo" "bar" } ]
+  - location: 103 (just consumed gas: 0.010)
+    [ { Elt "foo" "bar" }
+      { Elt "gaz" "baz" } ]
+  - location: 104 (just consumed gas: 0.010)
+    [ (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }) ]
+  - location: 105 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
+  - location: 65 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
+  - location: 60 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
+  - location: 44 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ {}
+      (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
+  - location: 153 (just consumed gas: 0.010)
+    [ (Pair {} (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/big_map_magic.tz on storage '(Left (Pair { Elt "1" "one" } { Elt "2" "two" }) )' and input '(Right (Right (Right (Left { Pair "3" "three" }))))' --trace-stack
+storage
+  (Left (Pair 4 5))
+emitted operations
+  
+big_map diff
+  New map(5) of type (big_map string string)
+  Set map(5)["2"] to "two"
+  New map(4) of type (big_map string string)
+  Set map(4)["3"] to "three"
+  Set map(4)["1"] to "one"
+trace
+  - location: 43 (just consumed gas: 63.036)
+    [ (Pair (Right (Right (Right (Left { Pair "3" "three" }))))
+            (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Right (Right (Right (Left { Pair "3" "three" }))))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0)
+    [ (Right (Right (Left { Pair "3" "three" })))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 60 (just consumed gas: 0)
+    [ (Right (Left { Pair "3" "three" }))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 65 (just consumed gas: 0)
+    [ (Left { Pair "3" "three" })
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 108 (just consumed gas: 0)
+    [ { Pair "3" "three" }
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 110 (just consumed gas: 0)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 113 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" } { Elt "2" "two" }) ]
+  - location: 113 (just consumed gas: 0.015)
+    [ (Pair { Elt "1" "one" } { Elt "2" "two" }) ]
+  - location: 119 (just consumed gas: 0.010)
+    [ { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 110 (just consumed gas: 0.025)
+    [ { Pair "3" "three" }
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 120 (just consumed gas: 0)
+    [ (Pair "3" "three")
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 122 (just consumed gas: 0.010)
+    [ "3"
+      "three"
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 123 (just consumed gas: 0)
+    [ "three"
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 125 (just consumed gas: 0.010)
+    [ (Some "three")
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 123 (just consumed gas: 0.025)
+    [ "3"
+      (Some "three")
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 126 (just consumed gas: 0.724)
+    [ { Elt "1" "one" ; Elt "3" "three" }
+      { Elt "2" "two" } ]
+  - location: 120 (just consumed gas: 0.015)
+    [ { Elt "1" "one" ; Elt "3" "three" }
+      { Elt "2" "two" } ]
+  - location: 127 (just consumed gas: 0.010)
+    [ (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" }) ]
+  - location: 128 (just consumed gas: 0.010)
+    [ (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" })) ]
+  - location: 108 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" })) ]
+  - location: 65 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" })) ]
+  - location: 60 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0.015)
+    [ (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" })) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ {}
+      (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" })) ]
+  - location: 153 (just consumed gas: 0.010)
+    [ (Pair {} (Left (Pair { Elt "1" "one" ; Elt "3" "three" } { Elt "2" "two" }))) ]
+
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/big_map_magic.tz on storage '(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))' and input '(Right (Right (Right (Right { "1" }))))' --trace-stack
+storage
+  (Left (Pair 4 5))
+emitted operations
+  
+big_map diff
+  New map(5) of type (big_map string string)
+  Set map(5)["2"] to "two"
+  New map(4) of type (big_map string string)
+  Unset map(4)["1"]
+trace
+  - location: 43 (just consumed gas: 62.772)
+    [ (Pair (Right (Right (Right (Right { "1" }))))
+            (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Right (Right (Right (Right { "1" }))))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0)
+    [ (Right (Right (Right { "1" })))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 60 (just consumed gas: 0)
+    [ (Right (Right { "1" }))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 65 (just consumed gas: 0)
+    [ (Right { "1" })
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 108 (just consumed gas: 0)
+    [ { "1" }
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 131 (just consumed gas: 0)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 134 (just consumed gas: 0)
+    [ (Pair { Elt "1" "one" } { Elt "2" "two" }) ]
+  - location: 134 (just consumed gas: 0.015)
+    [ (Pair { Elt "1" "one" } { Elt "2" "two" }) ]
+  - location: 140 (just consumed gas: 0.010)
+    [ { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 131 (just consumed gas: 0.025)
+    [ { "1" }
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 141 (just consumed gas: 0)
+    [ "1"
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 143 (just consumed gas: 0)
+    [ { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 145 (just consumed gas: 0.010)
+    [ None
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 143 (just consumed gas: 0.025)
+    [ "1"
+      None
+      { Elt "1" "one" }
+      { Elt "2" "two" } ]
+  - location: 147 (just consumed gas: 0.724)
+    [ {}
+      { Elt "2" "two" } ]
+  - location: 141 (just consumed gas: 0.015)
+    [ {}
+      { Elt "2" "two" } ]
+  - location: 148 (just consumed gas: 0.010)
+    [ (Pair {} { Elt "2" "two" }) ]
+  - location: 149 (just consumed gas: 0.010)
+    [ (Left (Pair {} { Elt "2" "two" })) ]
+  - location: 108 (just consumed gas: 0.015)
+    [ (Left (Pair {} { Elt "2" "two" })) ]
+  - location: 65 (just consumed gas: 0.015)
+    [ (Left (Pair {} { Elt "2" "two" })) ]
+  - location: 60 (just consumed gas: 0.015)
+    [ (Left (Pair {} { Elt "2" "two" })) ]
+  - location: 44 (just consumed gas: 0.015)
+    [ (Left (Pair {} { Elt "2" "two" })) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ {}
+      (Left (Pair {} { Elt "2" "two" })) ]
+  - location: 153 (just consumed gas: 0.010)
+    [ (Pair {} (Left (Pair {} { Elt "2" "two" }))) ]
+

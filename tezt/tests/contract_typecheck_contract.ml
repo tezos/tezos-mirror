@@ -102,7 +102,7 @@ let check_contract_ok client address entrypoint typ =
       ~data:address_opt
       ~typ:(sf {|contract (%s)|} typ)
   in
-  let* (_storage : string) =
+  let* (_run_script_result : Client.run_script_result) =
     Client.run_script
       client
       ~prg:
@@ -154,7 +154,7 @@ let check_contract_ko client address entrypoint typ expected_error =
       ~typ:(sf "contract (%s)" typ)
     |> Process.check_error ~msg:(rex expected_error)
   in
-  let* (_storage : string) =
+  let* (_run_script_result : Client.run_script_result) =
     Client.run_script
       client
       ~prg:

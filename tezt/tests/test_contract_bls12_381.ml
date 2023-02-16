@@ -35,11 +35,11 @@ let random_iterations = 10
 let hooks = Tezos_regression.hooks
 
 let check_contract protocol client ~contract ~input ~expected_storage =
-  let* actual_storage =
+  let* {storage; _} =
     Client.run_script_at ~hooks ~storage:"None" ~input client contract protocol
   in
   Check.(
-    (actual_storage = Format.asprintf "(Some %s)" expected_storage)
+    (storage = Format.asprintf "(Some %s)" expected_storage)
       ~__LOC__
       string
       ~error_msg:"Expected results %R, got %L") ;

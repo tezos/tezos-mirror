@@ -1584,7 +1584,7 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
   |> Process.check
 
 let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ~prg
+    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ?now ~prg
     ~storage ~input client =
   spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
   @@ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
@@ -1595,9 +1595,11 @@ let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
   @ optional_arg "gas" (fun gas -> string_of_int gas) gas
   @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
+  @ optional_arg "now" Fun.id now
 
 let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
-    ?payer ?prefix ~storage ~input client script_name protocol =
+    ?payer ?prefix ?now ?trace_stack ?level ~storage ~input client script_name
+    protocol =
   let prg =
     Michelson_script.find ?prefix script_name protocol |> Michelson_script.path
   in
@@ -1608,6 +1610,9 @@ let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
     ?self_address
     ?source
     ?payer
+    ?now
+    ?trace_stack
+    ?level
     ~prg
     ~storage
     ~input
@@ -1648,9 +1653,11 @@ let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
         initial_amount)
   |> Process.check
 
+type run_script_result = {storage : string; big_map_diff : string list}
+
 let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?trace_stack ?level ~prg ~storage ~input
-    client =
+    ?self_address ?source ?payer ?gas ?trace_stack ?level ?now ~prg ~storage
+    ~input client =
   let* client_output =
     spawn_run_script
       ?hooks
@@ -1663,30 +1670,68 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
       ?gas
       ?trace_stack
       ?level
+      ?now
       ~prg
       ~storage
       ~input
       client
     |> Process.check_and_read_stdout
   in
-  (* Extract the final storage, which is between the 'storage' and
-     'emitted operations' line in [client_output] *)
+  (* Extract the final storage and the big_map diff
+     from [client_output].
+
+     The [client_ouput] has the following format:
+     storage
+       <final storage>
+     emitted operations
+       <operations>
+     big_map diff
+       <big_map diff>
+     trace
+       <trace>
+
+     But the trace is only present if `--trace-stack`
+     was given. *)
   let client_output_lines = String.split_on_char '\n' client_output in
   let _header, tail =
     span (fun line -> not (String.equal "storage" line)) client_output_lines
   in
-  let storage, _tail =
+  let storage, tail =
     span (fun line -> not (String.equal "emitted operations" line)) tail
   in
-  match storage with
-  | "storage" :: storage -> return @@ String.trim (String.concat "\n" storage)
-  | _ ->
-      Test.fail
-        "Cannot extract new storage from client_output: %s"
-        client_output
+  let storage =
+    match storage with
+    | "storage" :: storage -> String.trim (String.concat "\n" storage)
+    | _ ->
+        Test.fail
+          "Cannot extract new storage from client_output: %s"
+          client_output
+  in
+  let _emitted_operations, tail =
+    span (fun line -> not (String.equal "big_map diff" line)) tail
+  in
+  let big_map_diff =
+    let diff =
+      match trace_stack with
+      | Some true ->
+          let big_map_diff, _tail =
+            span (fun line -> not (String.equal "trace" line)) tail
+          in
+          big_map_diff
+      | _ -> tail
+    in
+    match diff with
+    | ["big_map diff"; s] when String.(equal (trim s) "") -> []
+    | "big_map diff" :: diff -> List.map String.trim diff
+    | _ ->
+        Test.fail
+          "Cannot extract big_map diff from client_output: %s"
+          client_output
+  in
+  return {storage; big_map_diff}
 
 let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
-    ?prefix ~storage ~input client name protocol =
+    ?prefix ?now ?trace_stack ?level ~storage ~input client name protocol =
   let prg =
     Michelson_script.find name ?prefix protocol |> Michelson_script.path
   in
@@ -1697,6 +1742,9 @@ let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
     ?self_address
     ?source
     ?payer
+    ?now
+    ?trace_stack
+    ?level
     ~storage
     ~input
     ~prg
@@ -1768,14 +1816,22 @@ let hash_scripts ?hooks ?display_names ?for_script scripts client =
     | "" -> []
     | output -> String.split_on_char '\n' output)
 
+type hash_data_result = {
+  packed : string;
+  script_expr_hash : string;
+  raw_script_expr_hash : string;
+  ledger_blake2b_hash : string;
+  raw_sha256_hash : string;
+  raw_sha512_hash : string;
+}
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd
 
-let hash_data ?expect_failure ?hooks ~data ~typ client =
+let hash_data ?hooks ~data ~typ client =
   let* output =
-    spawn_hash_data ?hooks ~data ~typ client
-    |> Process.check_and_read_stdout ?expect_failure
+    spawn_hash_data ?hooks ~data ~typ client |> Process.check_and_read_stdout
   in
   let parse_line line =
     match line =~** rex "(.*): (.*)" with
@@ -1792,7 +1848,27 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
      We don't want to produce a warning about an empty line. *)
   let lines = String.split_on_char '\n' output |> List.filter (( <> ) "") in
   let key_value_list = List.map parse_line lines |> List.filter_map Fun.id in
-  Lwt.return key_value_list
+  let get hash_typ =
+    match List.assoc_opt hash_typ key_value_list with
+    | None ->
+        Test.fail
+          "Unparsable output line of `hash data %s of type %s`. Could not find \
+           hash type %s in output: %s"
+          data
+          typ
+          hash_typ
+          output
+    | Some hash -> hash
+  in
+  Lwt.return
+    {
+      packed = get "Raw packed data";
+      script_expr_hash = get "Script-expression-ID-Hash";
+      raw_script_expr_hash = get "Raw Script-expression-ID-Hash";
+      ledger_blake2b_hash = get "Ledger Blake2b hash";
+      raw_sha256_hash = get "Raw Sha256 hash";
+      raw_sha512_hash = get "Raw Sha512 hash";
+    }
 
 let normalize_mode_to_string = function
   | Readable -> "Readable"

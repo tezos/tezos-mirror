@@ -38,7 +38,7 @@ let test_bad_annot client protocol () =
      'a's at the end of the annotation) by the 0xff byte which is
      not a valid UTF8-encoding of a string *)
   let input = "0x05020000000e034f03420416000000042566ffff" in
-  let* storage =
+  let* {storage; _} =
     Client.run_script_at
       ~storage:"None"
       ~input

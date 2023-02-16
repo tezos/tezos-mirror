@@ -298,7 +298,7 @@ module StateMonad = struct
            ~typ:(Test_michelson.to_string typ)
            c
     in
-    let packed_data = List.assoc "Raw packed data" hash_data_output in
+    let packed_data = hash_data_output.packed in
     let* signer = alias (`User user) in
     lift @@ Client.sign_bytes ~signer ~data:packed_data c
 

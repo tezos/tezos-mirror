@@ -159,13 +159,10 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let* indices_exprs =
     let compute_index_expr index =
-      let* key_value_list =
+      let* {script_expr_hash; _} =
         Client.hash_data ~data:index ~typ:"string" mockup_client
       in
-      let key = "Script-expression-ID-Hash" in
-      match List.assoc_opt key key_value_list with
-      | None -> Test.fail "%s MUST be there" key
-      | Some res -> Lwt.return res
+      return script_expr_hash
     in
     let get_index_expr index =
       match String_map.find_opt index Proxy_server_test_data.key_to_expr with
