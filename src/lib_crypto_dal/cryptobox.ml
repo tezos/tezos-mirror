@@ -649,7 +649,7 @@ module Inner = struct
      This can be achieved with an n-points discrete Fourier transform
      supported by the [Scalar] field in time O(n log n). *)
   let encode t p =
-    Evaluations.evaluation_fft t.domain_n p |> Evaluations.to_array
+    Evaluations.to_array (Evaluations.evaluation_fft t.domain_n p)
 
   (* The shards are arranged in cosets to evaluate in batch with Kate
      amortized. *)
@@ -867,15 +867,14 @@ module Inner = struct
 
          where N(x) ≔ sum_{i=0}^{k-1} n_i / x_i x^i. *)
       let compute_n t eval_a' shards =
-        let w = Domains.get t.domain_n 1 in
         let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
         ShardSet.iter
           (fun {index; share} ->
             for j = 0 to Array.length share - 1 do
               let c_i = share.(j) in
-              let z_i = (t.number_of_shards * j) + index in
-              let x_i = Scalar.pow w (Z.of_int z_i) in
-              let tmp = Evaluations.get eval_a' z_i in
+              let i = (t.number_of_shards * j) + index in
+              let x_i = Domains.get t.domain_n i in
+              let tmp = Evaluations.get eval_a' i in
               Scalar.mul_inplace tmp tmp x_i ;
               (* The call below never fails, so we don't
                  catch exceptions.
@@ -885,7 +884,7 @@ module Inner = struct
                  (thus invertible). See point 1. *)
               Scalar.inverse_exn_inplace tmp tmp ;
               Scalar.mul_inplace tmp tmp c_i ;
-              n_poly.(z_i) <- tmp
+              n_poly.(i) <- tmp
             done)
           shards ;
         n_poly
