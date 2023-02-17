@@ -41,7 +41,7 @@ tezt:
     - "build_kernels"
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
-  parallel: 30
+  parallel: 40
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
