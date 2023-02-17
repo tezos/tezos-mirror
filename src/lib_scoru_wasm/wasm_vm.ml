@@ -26,6 +26,10 @@
 module Wasm = Tezos_webassembly_interpreter
 open Wasm_pvm_state.Internal_state
 
+let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
+  function
+  | Proto_alpha -> V1
+
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
 
@@ -616,8 +620,9 @@ let set_input_step input_info message pvm_state =
   let open Wasm_pvm_state in
   let {inbox_level; message_counter} = input_info in
   let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
+  let return ?(durable = pvm_state.durable) x = Lwt.return (durable, x) in
   let return_stuck state_name =
-    Lwt.return
+    return
       (Stuck
          (Wasm_pvm_errors.invalid_state
          @@ Format.sprintf "No input required during %s" state_name))
@@ -625,19 +630,30 @@ let set_input_step input_info message pvm_state =
   let next_tick_state () =
     match pvm_state.tick_state with
     | Collect -> (
-        let+ () =
+        let* () =
           Wasm.Input_buffer.(
             enqueue
               pvm_state.buffers.input
               {raw_level; message_counter; payload = String.to_bytes message})
         in
         match Pvm_input_kind.from_raw_input message with
-        | Internal End_of_level -> Padding
+        | Internal End_of_level -> return Padding
+        | Internal (Protocol_migration proto) ->
+            let* durable =
+              Durable.set_value_exn
+                ~edit_readonly:true
+                pvm_state.durable
+                Constants.version_key
+                (Data_encoding.Binary.to_string_exn
+                   Wasm_pvm_state.version_encoding
+                   (version_for_protocol proto))
+            in
+            return ~durable Collect
         | Internal Start_of_level ->
             update_output_buffer pvm_state raw_level ;
-            Collect
-        | _ -> Collect)
-    | Stuck _ -> Lwt.return pvm_state.tick_state
+            return Collect
+        | _ -> return Collect)
+    | Stuck _ -> return pvm_state.tick_state
     | Snapshot -> return_stuck "start"
     | Decode _ -> return_stuck "decoding"
     | Link _ -> return_stuck "link"
@@ -645,10 +661,15 @@ let set_input_step input_info message pvm_state =
     | Eval _ -> return_stuck "evaluation"
     | Padding -> return_stuck "padding"
   in
-  let+ tick_state = Lwt.catch next_tick_state (exn_to_stuck pvm_state) in
+  let+ durable, tick_state =
+    Lwt.catch next_tick_state (fun exn ->
+        let+ tick_state = exn_to_stuck pvm_state exn in
+        (pvm_state.durable, tick_state))
+  in
   (* Increase the current tick counter and update last input *)
   {
     pvm_state with
+    durable;
     tick_state;
     current_tick = Z.succ pvm_state.current_tick;
     last_input_info = Some input_info;
@@ -677,4 +698,6 @@ module Internal_for_tests = struct
   let compute_step_many_with_hooks ?reveal_builtins ?write_debug
       ?after_fast_exec:_ =
     compute_step_many ?reveal_builtins ?write_debug
+
+  let get_wasm_version = get_wasm_version
 end

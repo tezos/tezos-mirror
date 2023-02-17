@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Nomadic Labs  <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,32 +25,44 @@
 
 (** Testing
     -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
+    Component:    Lib_scoru_wasm protocol migration internal message
+    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
+                    -- test "Protocol migration"
+    Subject:      Protocol migration tests for the tezos-scoru-wasm library
 *)
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-      ("WASM VM", Test_wasm_vm.tests);
-      ("Module Initialisation", Test_init.tests);
-      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
-      ("Hash correspondence", Test_hash_consistency.tests);
-      ("Reveal", Test_reveal.tests);
-      ("Debug", Test_debug.tests);
-      ("Host functions ticks", Test_host_functions_ticks.tests);
-      ("Durable snapshot", Test_durable_shapshot.tests);
-      ("Protocol migration", Test_protocol_migration.tests);
-    ]
-  |> Lwt_main.run
+open Tztest
+open Wasm_utils
+
+let noop_module =
+  {|
+  (module
+    (memory 1)
+    (export "mem"(memory 0))
+    (func (export "kernel_run")
+      nop))
+|}
+
+let test_protocol_migration_message () =
+  let open Lwt_syntax in
+  let* tree = initial_tree ~version:V0 noop_module in
+  let* tree = eval_until_input_requested tree in
+  let* version = Wasm.Internal_for_tests.get_wasm_version tree in
+  assert (version = V0) ;
+  let* tree = set_empty_inbox_step 0l tree in
+  let* tree = eval_until_input_requested tree in
+  let* version = Wasm.Internal_for_tests.get_wasm_version tree in
+  assert (version = V0) ;
+  let* tree = set_empty_inbox_step ~migrate_to:Proto_alpha 0l tree in
+  let* tree = eval_until_input_requested tree in
+  let* version = Wasm.Internal_for_tests.get_wasm_version tree in
+  assert (version = V1) ;
+  Lwt_result_syntax.return_unit
+
+let tests =
+  [
+    tztest
+      "protocol migration message handling by the WASM PVM"
+      `Quick
+      test_protocol_migration_message;
+  ]

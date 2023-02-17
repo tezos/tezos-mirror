@@ -412,6 +412,11 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
       pvm.buffers.input
 
+    let get_wasm_version tree =
+      let open Lwt.Syntax in
+      let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+      Wasm_vm.Internal_for_tests.get_wasm_version pvm
+
     let compute_step_many_with_hooks ?reveal_builtins ?write_debug
         ?after_fast_exec ?stop_at_snapshot ~max_steps tree =
       let open Lwt.Syntax in

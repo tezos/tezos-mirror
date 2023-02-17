@@ -305,6 +305,38 @@ let test_output () =
       fail_unless valid (Exn (Failure "An output proof is not valid."))
   | Error _ -> failwith "Error during proof generation"
 
+(* When snapshoting a new protocol, to fix this test, the following
+   action should be done.
+
+     - In [src/lib_scoru_wasm/constants.ml], add a new variable before
+       [proto_alpha_name] using the name of the new protocol, and whose
+       value is [Raw_context.version_value].
+     - Update [src/lib_scoru_wasm/pvm_input_kind.ml] to add a new case
+       to the type [protocol], and update the functions
+       [protocol_from_raw] and [Internal_for_tests.proto_to_binary]
+       accordingly (by copy/pasting the [Proto_alpha] case and doing
+       the necessary renaming.
+     - Update [src/lib_scoru_wasm/wasm_vm.ml], more precisely the
+       [version_for_protocol] function, to take into account the new
+       protocol. The expected result is the same as for
+       [Proto_alpha]. *)
+let test_protocol_names () =
+  let open Alpha_context.Sc_rollup.Inbox_message in
+  let protocol_migration_message_str =
+    Data_encoding.Binary.to_string_exn
+      encoding
+      (Internal protocol_migration_internal_message)
+  in
+  let kind =
+    Tezos_scoru_wasm.Pvm_input_kind.from_raw_input
+      protocol_migration_message_str
+  in
+  assert (kind = Internal (Protocol_migration Proto_alpha)) ;
+  assert (
+    protocol_migration_internal_message
+    = Protocol_migration Tezos_scoru_wasm.Constants.proto_alpha_name) ;
+  Lwt_result_syntax.return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -314,4 +346,5 @@ let tests =
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
     Tztest.tztest "test output proofs" `Quick test_output;
+    Tztest.tztest "test protocol names consistency" `Quick test_protocol_names;
   ]
