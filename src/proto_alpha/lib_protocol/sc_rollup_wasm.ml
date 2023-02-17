@@ -81,7 +81,7 @@ let () =
     (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
-  let current_version = Wasm_2_0_0.v0
+  let current_version = Wasm_2_0_0.v1
 
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
@@ -121,7 +121,7 @@ module V2_0_0 = struct
   *)
   let reference_initial_state_hash =
     Sc_rollup_repr.State_hash.of_b58check_exn
-      "srs11XQCynQfGtuUr4c47rAoazGeTfC33R5FmimBKbnMrWwntHURX1"
+      "srs129wuRkckJpSyDhsqSvzE3qSVnvJZ7nD93r3b6oiBtPxa9LMBHu"
 
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig

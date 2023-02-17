@@ -54,14 +54,14 @@ let default_outbox_validity_period = 10l
 
 let default_outbox_message_limit = Z.of_int32 100l
 
-let initial_tree ?(ticks_per_snapshot = default_max_tick)
+let initial_tree ~version ?(ticks_per_snapshot = default_max_tick)
     ?(max_reboots = Constants.maximum_reboots_per_input) ?(from_binary = false)
     ?(outbox_validity_period = default_outbox_validity_period)
     ?(outbox_message_limit = default_outbox_message_limit) code =
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 ticks_per_snapshot in
   let* tree = empty_tree () in
-  let* tree = Wasm.initial_state V0 tree in
+  let* tree = Wasm.initial_state version tree in
   let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
   let* tree =
     Wasm.install_boot_sector

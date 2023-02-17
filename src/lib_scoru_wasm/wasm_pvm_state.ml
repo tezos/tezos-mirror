@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = V0
+type version = V0 | V1
 
 let version_encoding =
   (* This encoding is directly used by the protocol. As a consequence,
@@ -35,8 +35,11 @@ let version_encoding =
      bytes. *)
   Data_encoding.(
     conv_with_guard
-      (function V0 -> "2.0.0")
-      (function "2.0.0" -> Ok V0 | _ -> Error "not a valid version")
+      (function V0 -> "2.0.0" | V1 -> "2.0.0-r1")
+      (function
+        | "2.0.0" -> Ok V0
+        | "2.0.0-r1" -> Ok V1
+        | _ -> Error "not a valid version")
       Variable.string)
 
 (** Represents the location of an input message. *)

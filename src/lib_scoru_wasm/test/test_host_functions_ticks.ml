@@ -32,9 +32,9 @@
                   tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_scoru_wasm
 open Wasm_utils
+open Tztest_helper
 
 (* This function return a function to modifiy `write_debug` in the registry, and
    a function to revert the change. Due to how the registry works right now (a
@@ -69,7 +69,7 @@ let register_new_write_debug added_ticks =
   in
   (register alternative_write_debug, register current_write_debug)
 
-let test_tickified_host_function () =
+let test_tickified_host_function ~version () =
   let open Lwt_syntax in
   let run_until_result () =
     let module_ =
@@ -94,7 +94,7 @@ let test_tickified_host_function () =
  )
 |}
     in
-    let* tree = initial_tree ~from_binary:false module_ in
+    let* tree = initial_tree ~version ~from_binary:false module_ in
     (* Feeding it with one input *)
     let* tree = set_empty_inbox_step 0l tree in
     (* running until waiting for input *)
@@ -110,4 +110,6 @@ let test_tickified_host_function () =
   return_ok_unit
 
 let tests =
-  [tztest "Test tickified host function" `Quick test_tickified_host_function]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [("Test tickified host function", `Quick, test_tickified_host_function)]
