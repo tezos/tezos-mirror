@@ -29,37 +29,40 @@ type key = string list
 
 let key_to_str key_list = String.concat "/" ("" :: key_list)
 
+let key_len key_list =
+  List.fold_left (fun acc seg -> String.length seg + acc + 1) 0 ("" :: key_list)
+
 (* GADT type, each constructor's type represents a type parameters
    which are taken as input of corresponding operation *)
-type _ t =
+type _ operation_kind =
   (* key *)
-  | Find_value : key t
+  | Find_value : key operation_kind
   (* edit_readonly, key, value *)
-  | Find_value_exn : key t
+  | Find_value_exn : key operation_kind
   (* edit_readonly, key, value *)
-  | Set_value_exn : (bool * key * string) t
+  | Set_value_exn : (bool * key * string) operation_kind
   (* edit_readonly, key_from, key_to *)
-  | Copy_tree_exn : (bool * key * key) t
+  | Copy_tree_exn : (bool * key * key) operation_kind
   (* key_from, key_to *)
-  | Move_tree_exn : (key * key) t
+  | Move_tree_exn : (key * key) operation_kind
   (* edit_readonly, key *)
-  | Delete : (bool * key) t
+  | Delete : (bool * key) operation_kind
   (* key *)
-  | List : key t
+  | List : key operation_kind
   (* key *)
-  | Count_subtrees : key t
+  | Count_subtrees : key operation_kind
   (* key, idx*)
-  | Substree_name_at : (key * int) t
+  | Substree_name_at : (key * int) operation_kind
   (* key *)
-  | Hash : key t
+  | Hash : key operation_kind
   (* key *)
-  | Hash_exn : key t
+  | Hash_exn : key operation_kind
   (* edit_readonly, key, offset, value *)
-  | Write_value_exn : (bool * key * int64 * string) t
+  | Write_value_exn : (bool * key * int64 * string) operation_kind
   (* key, offset, len *)
-  | Read_value_exn : (key * int64 * int64) t
+  | Read_value_exn : (key * int64 * int64) operation_kind
 
-let pp (type a) fmt (x : a t) =
+let pp_operation_kind (type a) fmt (x : a operation_kind) =
   match x with
   | Find_value -> Format.fprintf fmt "find_value"
   | Find_value_exn -> Format.fprintf fmt "find_value_exn"
@@ -75,130 +78,143 @@ let pp (type a) fmt (x : a t) =
   | Write_value_exn -> Format.fprintf fmt "write_value_exn"
   | Read_value_exn -> Format.fprintf fmt "read_value_exn"
 
-type some_op = Some_op : 'a t -> some_op
+(* Existentially quantified operation_kind *)
+type operation_tag = Operation_tag : 'a operation_kind -> operation_tag
 
-let pp_some_op fmt (x : some_op) = match x with Some_op op -> pp fmt op
+let pp_operation_tag fmt (x : operation_tag) =
+  match x with Operation_tag op -> pp_operation_kind fmt op
 
-type some_input = Some_input : 'a t * 'a -> some_input
+(* Operation kind + operation arguments *)
+type t = Operation : 'a operation_kind * 'a -> t
 
-let pp_some_input fmt (x : some_input) =
+let pp fmt (x : t) =
   match x with
-  | Some_input (Find_value, key) ->
-      Format.fprintf fmt "%a(%s)" pp Find_value @@ key_to_str key
-  | Some_input (Find_value_exn, key) ->
-      Format.fprintf fmt "%a(%s)" pp Find_value_exn @@ key_to_str key
-  | Some_input (Set_value_exn, (edit_readonly, key, _value)) ->
+  | Operation (Find_value, key) ->
+      Format.fprintf fmt "%a(%s)" pp_operation_kind Find_value @@ key_to_str key
+  | Operation (Find_value_exn, key) ->
+      Format.fprintf fmt "%a(%s)" pp_operation_kind Find_value_exn
+      @@ key_to_str key
+  | Operation (Set_value_exn, (edit_readonly, key, _value)) ->
       Format.fprintf
         fmt
         "%a(edit_readonly: %a, key: %s, value: %s)"
-        pp
+        pp_operation_kind
         Set_value_exn
         Fmt.bool
         edit_readonly
         (key_to_str key)
         "<value>"
-  | Some_input (Copy_tree_exn, (edit_readonly, from, to_)) ->
+  | Operation (Copy_tree_exn, (edit_readonly, from, to_)) ->
       Format.fprintf
         fmt
         "%a(edit_readonly: %a, from: %s, to: %s)"
-        pp
+        pp_operation_kind
         Copy_tree_exn
         Fmt.bool
         edit_readonly
         (key_to_str from)
         (key_to_str to_)
-  | Some_input (Move_tree_exn, (from, to_)) ->
+  | Operation (Move_tree_exn, (from, to_)) ->
       Format.fprintf
         fmt
         "%a(from: %s, to: %s)"
-        pp
+        pp_operation_kind
         Move_tree_exn
         (key_to_str from)
         (key_to_str to_)
-  | Some_input (Delete, (edit_readonly, key)) ->
+  | Operation (Delete, (edit_readonly, key)) ->
       Format.fprintf
         fmt
         "%a(edit_readonly: %a, key: %s)"
-        pp
+        pp_operation_kind
         Delete
         Fmt.bool
         edit_readonly
         (key_to_str key)
-  | Some_input (List, key) ->
-      Format.fprintf fmt "%a(%s)" pp List @@ key_to_str key
-  | Some_input (Count_subtrees, key) ->
-      Format.fprintf fmt "%a(%s)" pp Count_subtrees @@ key_to_str key
-  | Some_input (Substree_name_at, (key, idx)) ->
+  | Operation (List, key) ->
+      Format.fprintf fmt "%a(%s)" pp_operation_kind List @@ key_to_str key
+  | Operation (Count_subtrees, key) ->
+      Format.fprintf fmt "%a(%s)" pp_operation_kind Count_subtrees
+      @@ key_to_str key
+  | Operation (Substree_name_at, (key, idx)) ->
       Format.fprintf
         fmt
         "%a(key: %s, index: %d)"
-        pp
+        pp_operation_kind
         Substree_name_at
         (key_to_str key)
         idx
-  | Some_input (Hash, key) ->
-      Format.fprintf fmt "%a(%s)" pp Hash (key_to_str key)
-  | Some_input (Hash_exn, key) ->
-      Format.fprintf fmt "%a(%s)" pp Hash_exn (key_to_str key)
-  | Some_input (Write_value_exn, (edit_readonly, key, offset, _value)) ->
+  | Operation (Hash, key) ->
+      Format.fprintf fmt "%a(%s)" pp_operation_kind Hash (key_to_str key)
+  | Operation (Hash_exn, key) ->
+      Format.fprintf fmt "%a(%s)" pp_operation_kind Hash_exn (key_to_str key)
+  | Operation (Write_value_exn, (edit_readonly, key, offset, _value)) ->
       Format.fprintf
         fmt
         "%a(edit_readonly: %a, key: %s, offset: %Ld, value: %s)"
-        pp
+        pp_operation_kind
         Write_value_exn
         Fmt.bool
         edit_readonly
         (key_to_str key)
         offset
         "<value>"
-  | Some_input (Read_value_exn, (key, offset, len)) ->
+  | Operation (Read_value_exn, (key, offset, len)) ->
       Format.fprintf
         fmt
         "%a(key: %s, offset: %Ld, len: %Ld)"
-        pp
+        pp_operation_kind
         Read_value_exn
         (key_to_str key)
         offset
         len
 
 module Map = Map.Make (struct
-  type t = some_op
+  type t = operation_tag
 
   let compare = Stdlib.compare
 end)
 
 module Set = Set.Make (struct
-  type t = some_op
+  type t = operation_tag
 
   let compare = Stdlib.compare
 end)
 
-let write_operations : some_op list =
-  [Some_op Write_value_exn; Some_op Set_value_exn]
+let write_operation_tags : operation_tag list =
+  [Operation_tag Write_value_exn; Operation_tag Set_value_exn]
 
-let read_operations : some_op list =
-  [Some_op Find_value; Some_op Read_value_exn; Some_op Find_value_exn]
-
-let structure_inspection_operations : some_op list =
+let read_operation_tags : operation_tag list =
   [
-    Some_op Hash;
-    Some_op List;
-    Some_op Count_subtrees;
-    Some_op Substree_name_at;
-    Some_op Hash_exn;
+    Operation_tag Find_value;
+    Operation_tag Read_value_exn;
+    Operation_tag Find_value_exn;
   ]
 
-let structure_modification_operations : some_op list =
-  [Some_op Delete; Some_op Copy_tree_exn; Some_op Move_tree_exn]
+let structure_inspection_operation_tags : operation_tag list =
+  [
+    Operation_tag Hash;
+    Operation_tag List;
+    Operation_tag Count_subtrees;
+    Operation_tag Substree_name_at;
+    Operation_tag Hash_exn;
+  ]
 
-let all_operations : some_op list =
+let structure_modification_operation_tags : operation_tag list =
+  [
+    Operation_tag Delete;
+    Operation_tag Copy_tree_exn;
+    Operation_tag Move_tree_exn;
+  ]
+
+let all_operation_tags : operation_tag list =
   let all =
     List.concat
       [
-        write_operations;
-        read_operations;
-        structure_modification_operations;
-        structure_inspection_operations;
+        write_operation_tags;
+        read_operation_tags;
+        structure_modification_operation_tags;
+        structure_inspection_operation_tags;
       ]
   in
   Assert.Int.equal

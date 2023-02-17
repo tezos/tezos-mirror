@@ -35,7 +35,6 @@ open Tztest
 open QCheck2
 open Encodings_util
 open Durable_snapshot_util
-open Durable_operations_generator
 open Probability_utils
 
 let tztest_qcheck2 ?(number_of_runs = 1) ~name (generator, verifier) =
@@ -78,18 +77,14 @@ let tztest_qcheck2 ?(number_of_runs = 1) ~name (generator, verifier) =
   Alcotest_lwt.test_case name speed (fun _sw () -> Lwt.return @@ run ())
 
 module Runners = struct
-  module Generator = Operations_generator
-  module Runner = Make_durable_operations_runner (Verifiable_current_durable)
-
   (* rounds - number of operations to be generated in a stress-test *)
   let gen_stress ~(rounds : int) ~(initial_tree_size : int)
-      ~(operations_distribution : operations_distribution) :
-      testcase Gen.t * (testcase -> Verifiable_current_durable.t Lwt.t) =
-    ( Generator.gen_testcase
+      ~operations_distribution =
+    ( Durable_program_generator.gen_testcase
         ~initial_size:initial_tree_size
         ~operations_number:rounds
         operations_distribution,
-      Runner.run_testcase )
+      Durable_program_runner.Verifiable_program_runner.run_testcase )
 
   let run_scenario (scenario : Verifiable_current_durable.t -> 'a Lwt.t) :
       'a Lwt.t =
@@ -171,7 +166,7 @@ let stress_test_desceding ~init_size ~rounds =
        ~rounds
        ~operations_distribution:
          (Distributions.descending_distribution_l
-            Durable_operation.all_operations)
+            Durable_operation_generator.all_operations)
 
 let stress_test_uniform ~init_size ~rounds =
   tztest_qcheck2
@@ -184,7 +179,8 @@ let stress_test_uniform ~init_size ~rounds =
        ~initial_tree_size:init_size
        ~rounds
        ~operations_distribution:
-         (Distributions.uniform_distribution_l Durable_operation.all_operations)
+         (Distributions.uniform_distribution_l
+            Durable_operation_generator.all_operations)
 
 let stress_strcture_ops ~init_size ~rounds =
   tztest_qcheck2
@@ -199,12 +195,11 @@ let stress_strcture_ops ~init_size ~rounds =
        ~rounds
        ~operations_distribution:
          (Distributions.uniform_distribution_l
-            Durable_operation.(
-              List.concat
-                [
-                  structure_modification_operations;
-                  structure_inspection_operations;
-                ]))
+         @@ List.concat
+              [
+                Durable_operation_generator.structure_modification_operations;
+                Durable_operation_generator.structure_inspection_operations;
+              ])
 
 let stress_each_op () =
   let initial_tree_size = 1000 in
@@ -217,18 +212,18 @@ let stress_each_op () =
          ~operations_distribution:distr
   in
   List.mapi
-    (fun i op ->
+    (fun i op_tag ->
       let name =
         Format.asprintf
           "Stress-test operation %a. Initial size: %d, %d operations"
-          Durable_operation.pp_some_op
-          op
+          Durable_operation.pp_operation_tag
+          op_tag
           initial_tree_size
           rounds
       in
       test_case ~name
-      @@ Distributions.one_of_n i Durable_operation.all_operations)
-    Durable_operation.all_operations
+      @@ Distributions.one_of_n i Durable_operation_generator.all_operations)
+    Durable_operation.all_operation_tags
 
 let tests : unit Alcotest_lwt.test_case trace =
   List.append

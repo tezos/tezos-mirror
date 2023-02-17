@@ -35,6 +35,9 @@ type 'a t = {
 }
 
 let empty =
+  {value = None; children = Children.empty; keys_count = 0; nodes_count = 1}
+
+let nonexisting =
   {value = None; children = Children.empty; keys_count = 0; nodes_count = 0}
 
 let replace_value t new_v =
@@ -43,16 +46,20 @@ let replace_value t new_v =
   | Some _ -> {t with value = Some new_v}
 
 let replace_child t step new_c =
-  let old_c = Option.value ~default:empty @@ Children.find step t.children in
+  let old_c =
+    Option.value ~default:nonexisting @@ Children.find step t.children
+  in
   {
     t with
-    children = Children.update step (Fun.const @@ Option.some new_c) t.children;
+    children = Children.add step new_c t.children;
     keys_count = t.keys_count - old_c.keys_count + new_c.keys_count;
     nodes_count = t.nodes_count - old_c.nodes_count + new_c.nodes_count;
   }
 
 let remove_child t step =
-  let old_c = Option.value ~default:empty @@ Children.find step t.children in
+  let old_c =
+    Option.value ~default:nonexisting @@ Children.find step t.children
+  in
   {
     t with
     children = Children.remove step t.children;
