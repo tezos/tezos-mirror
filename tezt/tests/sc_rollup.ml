@@ -212,6 +212,13 @@ let wait_for_timeout_detected sc_node =
   let other = JSON.(json |-> "other" |> as_string) in
   Some other
 
+(** Wait for the rollup node to compute a dissection *)
+let wait_for_computed_dissection sc_node =
+  Sc_rollup_node.wait_for sc_node "sc_rollup_node_computed_dissection.v0"
+  @@ fun json ->
+  let opponent = JSON.(json |-> "opponent" |> as_string) in
+  Some (opponent, json)
+
 (* Configuration of a rollup node
    ------------------------------
 
@@ -2588,6 +2595,19 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
    -------------------------
 *)
 
+let remove_state_from_dissection dissection =
+  JSON.update
+    "dissection"
+    (fun d ->
+      let d =
+        JSON.as_list d
+        |> List.map (fun s ->
+               JSON.filter_object s (fun key _ -> not (key = "state"))
+               |> JSON.unannotate)
+      in
+      JSON.annotate ~origin:"trimmed_dissection" (`A d))
+    dissection
+
 (*
 
    To check the refutation game logic, we evaluate a scenario with one
@@ -2609,6 +2629,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       stop_loser_at,
       reset_honest_on ) =
   test_full_scenario
+    ~regression:true
+    ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
     ~mode
@@ -2632,9 +2654,10 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let detected_conflicts = ref [] in
   let published_commitments = ref [] in
   let detected_timeouts = Hashtbl.create 5 in
+  let dissections = Hashtbl.create 17 in
 
-  let rec run_honest_node sc_rollup_node =
-    let _ =
+  let run_honest_node sc_rollup_node =
+    let gather_conflicts_promise =
       let rec gather_conflicts () =
         let* conflict = wait_for_conflict_detected sc_rollup_node in
         conflict_detected := true ;
@@ -2643,7 +2666,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_conflicts ()
     in
-    let _ =
+    let gather_commitments_promise =
       let rec gather_commitments () =
         let* c = wait_for_publish_commitment sc_rollup_node in
         published_commitments := c :: !published_commitments ;
@@ -2651,7 +2674,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_commitments ()
     in
-    let _ =
+    let gather_timeouts_promise =
       let rec gather_timeouts () =
         let* other = wait_for_timeout_detected sc_rollup_node in
         Hashtbl.replace
@@ -2663,25 +2686,39 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_timeouts ()
     in
-    let _ =
-      (* Reset node when detecting certain events *)
-      Lwt_list.iter_p
-        (fun (event, delay) ->
-          let* () =
-            Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
-          in
-          let current_level = Node.get_level node in
-          let* _ =
-            Sc_rollup_node.wait_for_level
-              ~timeout:3.0
-              sc_rollup_node
-              (current_level + delay)
-          in
-          let* () = Sc_rollup_node.terminate sc_rollup_node in
-          run_honest_node sc_rollup_node)
-        reset_honest_on
+    let gather_dissections_promise =
+      let rec gather_dissections () =
+        let* opponent, dissection =
+          wait_for_computed_dissection sc_rollup_node
+        in
+        let dissection =
+          match kind with
+          | "arith" -> dissection
+          | _ (* wasm *) ->
+              (* Remove state hashes from WASM dissections as they depend on
+                 timestamps *)
+              remove_state_from_dissection dissection
+        in
+        (* Use buckets of table to store multiple dissections for same
+           opponent. *)
+        Hashtbl.add dissections opponent dissection ;
+        gather_dissections ()
+      in
+      gather_dissections ()
     in
-    Sc_rollup_node.run sc_rollup_node []
+    let* () =
+      Sc_rollup_node.run
+        ~event_sections_levels:[("sc_rollup_node.refutation_game", `Debug)]
+        sc_rollup_node
+        []
+    in
+    return
+      [
+        gather_conflicts_promise;
+        gather_commitments_promise;
+        gather_timeouts_promise;
+        gather_dissections_promise;
+      ]
   in
 
   let loser_sc_rollup_nodes =
@@ -2704,11 +2741,31 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
           sc_rollup_address)
     @@ List.combine loser_modes loser_sc_rollup_nodes
   in
-  let* () = run_honest_node sc_rollup_node
+  let* gather_promises = run_honest_node sc_rollup_node
   and* () =
     Lwt_list.iter_p
       (fun loser_sc_rollup_node -> Sc_rollup_node.run loser_sc_rollup_node [])
       loser_sc_rollup_nodes
+  in
+
+  let restart_promise =
+    (* Reset node when detecting certain events *)
+    Lwt_list.iter_p
+      (fun (event, delay) ->
+        let* () =
+          Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
+        in
+        let current_level = Node.get_level node in
+        let* _ =
+          Sc_rollup_node.wait_for_level
+            ~timeout:3.0
+            sc_rollup_node
+            (current_level + delay)
+        in
+        let* () = Sc_rollup_node.terminate sc_rollup_node in
+        let* _ = run_honest_node sc_rollup_node in
+        unit)
+      reset_honest_on
   in
 
   let stop_losers level =
@@ -2810,6 +2867,13 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
   let*! _value = Sc_rollup_client.state_hash sc_client1 in
+  List.iter Lwt.cancel (restart_promise :: gather_promises) ;
+  (* Capture dissections *)
+  Hashtbl.to_seq_values dissections
+  |> List.of_seq |> List.rev
+  |> List.iter (fun dissection ->
+         Regression.capture "\n" ;
+         Regression.capture @@ JSON.encode dissection) ;
   unit
 
 let rec swap i l =
