@@ -250,6 +250,15 @@ module Forge = struct
     Bytes.create Constants.proof_of_work_nonce_size
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
+    (* We initialize the [proto_level] at 1 in order to be able to
+       mimick a transition block in the baker. The baker distinguishes
+       the first block of a protocol by comparing a block and its
+       predecessor's proto level. If there is a difference, it must
+       mean that the block is a transition one. If we start at 0, we
+       cannot "hack" a transition block by decrementing the genesis
+       predecessor's protocol level because protocol levels are
+       encoded as uint8. *)
+    let proto_level = 1 in
     Tezos_base.Block_header.
       {
         level;
@@ -257,7 +266,7 @@ module Forge = struct
         timestamp;
         fitness;
         operations_hash;
-        proto_level = 0;
+        proto_level;
         validation_passes = 0;
         context = Context_hash.zero;
       }

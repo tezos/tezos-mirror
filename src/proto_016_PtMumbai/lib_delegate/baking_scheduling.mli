@@ -29,7 +29,10 @@ open Protocol.Alpha_context
 type loop_state
 
 val create_loop_state :
-  proposal Lwt_stream.t -> Operation_worker.t -> loop_state
+  ?get_valid_blocks_stream:proposal Lwt_stream.t Lwt.t ->
+  heads_stream:proposal Lwt_stream.t ->
+  Operation_worker.t ->
+  loop_state
 
 val sleep_until : Time.Protocol.t -> unit Lwt.t option
 

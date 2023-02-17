@@ -52,6 +52,7 @@ val begin_construction :
   timestamp:Time.Protocol.t ->
   protocol_data:block_header_data ->
   force_apply:bool ->
+  pred_resulting_context_hash:Context_hash.t ->
   Abstract_context_index.t ->
   Baking_state.block_info ->
   Chain_id.t ->

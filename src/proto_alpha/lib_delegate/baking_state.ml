@@ -103,16 +103,12 @@ type prequorum = {
 type block_info = {
   hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
 }
 
 type cache = {
@@ -168,68 +164,48 @@ let block_info_encoding =
     (fun {
            hash;
            shell;
-           resulting_context_hash;
            payload_hash;
            payload_round;
            round;
-           protocol;
-           next_protocol;
            prequorum;
            quorum;
            payload;
-           live_blocks;
          } ->
-      ( ( hash,
-          shell,
-          resulting_context_hash,
-          payload_hash,
-          payload_round,
-          round,
-          protocol,
-          next_protocol,
-          prequorum,
-          List.map Operation.pack quorum ),
-        (payload, live_blocks) ))
-    (fun ( ( hash,
-             shell,
-             resulting_context_hash,
-             payload_hash,
-             payload_round,
-             round,
-             protocol,
-             next_protocol,
-             prequorum,
-             quorum ),
-           (payload, live_blocks) ) ->
+      ( hash,
+        shell,
+        payload_hash,
+        payload_round,
+        round,
+        prequorum,
+        List.map Operation.pack quorum,
+        payload ))
+    (fun ( hash,
+           shell,
+           payload_hash,
+           payload_round,
+           round,
+           prequorum,
+           quorum,
+           payload ) ->
       {
         hash;
         shell;
-        resulting_context_hash;
         payload_hash;
         payload_round;
         round;
-        protocol;
-        next_protocol;
         prequorum;
         quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
         payload;
-        live_blocks;
       })
-    (merge_objs
-       (obj10
-          (req "hash" Block_hash.encoding)
-          (req "shell" Block_header.shell_header_encoding)
-          (req "resulting_context_hash" Context_hash.encoding)
-          (req "payload_hash" Block_payload_hash.encoding)
-          (req "payload_round" Round.encoding)
-          (req "round" Round.encoding)
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding)
-          (req "prequorum" (option prequorum_encoding))
-          (req "quorum" (list (dynamic_size Operation.encoding))))
-       (obj2
-          (req "payload" Operation_pool.payload_encoding)
-          (req "live_blocks" Block_hash.Set.encoding)))
+    (obj8
+       (req "hash" Block_hash.encoding)
+       (req "shell" Block_header.shell_header_encoding)
+       (req "payload_hash" Block_payload_hash.encoding)
+       (req "payload_round" Round.encoding)
+       (req "round" Round.encoding)
+       (req "prequorum" (option prequorum_encoding))
+       (req "quorum" (list (dynamic_size Operation.encoding)))
+       (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult
@@ -267,6 +243,9 @@ let proposal_encoding =
        (req "block" block_info_encoding)
        (req "predecessor" block_info_encoding))
 
+let is_first_block_in_protocol {block; predecessor; _} =
+  Compare.Int.(block.shell.proto_level <> predecessor.shell.proto_level)
+
 type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
 
 let locked_round_encoding =
@@ -301,6 +280,10 @@ type elected_block = {
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
+  is_latest_proposal_applied : bool;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+  injected_preendorsements : packed_operation list option;
   (* Last proposal received where we injected an endorsement (thus we
      have seen 2f+1 preendorsements) *)
   locked_round : locked_round option;
@@ -313,7 +296,11 @@ type level_state = {
   next_level_proposed_round : Round.t option;
 }
 
-type phase = Idle | Awaiting_preendorsements | Awaiting_endorsements
+type phase =
+  | Idle
+  | Awaiting_preendorsements
+  | Awaiting_application
+  | Awaiting_endorsements
 
 let phase_encoding =
   let open Data_encoding in
@@ -333,8 +320,14 @@ let phase_encoding =
         (function Awaiting_preendorsements -> Some () | _ -> None)
         (fun () -> Awaiting_preendorsements);
       case
-        ~title:"Awaiting_endorsements"
+        ~title:"Awaiting_application"
         (Tag 2)
+        unit
+        (function Awaiting_application -> Some () | _ -> None)
+        (fun () -> Awaiting_application);
+      case
+        ~title:"Awaiting_endorsements"
+        (Tag 3)
         unit
         (function Awaiting_endorsements -> Some () | _ -> None)
         (fun () -> Awaiting_endorsements);
@@ -377,18 +370,13 @@ let timeout_kind_encoding =
         (fun at_round -> Time_to_bake_next_level {at_round});
     ]
 
-type voting_power = int
-
 type event =
-  | New_proposal of proposal
+  | New_valid_proposal of proposal
+  | New_head_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.preendorsement operation list
+      Operation_worker.candidate * Kind.preendorsement operation list
   | Quorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.endorsement operation list
+      Operation_worker.candidate * Kind.endorsement operation list
   | Timeout of timeout_kind
 
 let event_encoding =
@@ -397,40 +385,43 @@ let event_encoding =
     [
       case
         (Tag 0)
-        ~title:"New_proposal"
+        ~title:"New_valid_proposal"
         proposal_encoding
-        (function New_proposal p -> Some p | _ -> None)
-        (fun p -> New_proposal p);
+        (function New_valid_proposal p -> Some p | _ -> None)
+        (fun p -> New_valid_proposal p);
       case
         (Tag 1)
-        ~title:"Prequorum_reached"
-        (tup3
-           Operation_worker.candidate_encoding
-           Data_encoding.int31
-           (Data_encoding.list (dynamic_size Operation.encoding)))
-        (function
-          | Prequorum_reached (candidate, voting_power, ops) ->
-              Some (candidate, voting_power, List.map Operation.pack ops)
-          | _ -> None)
-        (fun (candidate, voting_power, ops) ->
-          Prequorum_reached
-            (candidate, voting_power, Operation_pool.filter_preendorsements ops));
+        ~title:"New_head_proposal"
+        proposal_encoding
+        (function New_head_proposal p -> Some p | _ -> None)
+        (fun p -> New_head_proposal p);
       case
         (Tag 2)
-        ~title:"Quorum_reached"
-        (tup3
+        ~title:"Prequorum_reached"
+        (tup2
            Operation_worker.candidate_encoding
-           Data_encoding.int31
            (Data_encoding.list (dynamic_size Operation.encoding)))
         (function
-          | Quorum_reached (candidate, voting_power, ops) ->
-              Some (candidate, voting_power, List.map Operation.pack ops)
+          | Prequorum_reached (candidate, ops) ->
+              Some (candidate, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, voting_power, ops) ->
-          Quorum_reached
-            (candidate, voting_power, Operation_pool.filter_endorsements ops));
+        (fun (candidate, ops) ->
+          Prequorum_reached
+            (candidate, Operation_pool.filter_preendorsements ops));
       case
         (Tag 3)
+        ~title:"Quorum_reached"
+        (tup2
+           Operation_worker.candidate_encoding
+           (Data_encoding.list (dynamic_size Operation.encoding)))
+        (function
+          | Quorum_reached (candidate, ops) ->
+              Some (candidate, List.map Operation.pack ops)
+          | _ -> None)
+        (fun (candidate, ops) ->
+          Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
+      case
+        (Tag 4)
         ~title:"Timeout"
         timeout_kind_encoding
         (function Timeout tk -> Some tk | _ -> None)
@@ -731,18 +722,15 @@ let pp_block_info fmt
       shell;
       payload_hash;
       round;
-      protocol;
-      next_protocol;
       prequorum;
       quorum;
       payload;
-      _;
+      payload_round;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d endorsements@ \
-     payload: %a@]"
+     prequorum: %a@ quorum: %d endorsements@ payload: %a@ payload round: %a@]"
     Block_hash.pp
     hash
     Block_payload_hash.pp_short
@@ -750,15 +738,13 @@ let pp_block_info fmt
     shell.level
     Round.pp
     round
-    Protocol_hash.pp_short
-    protocol
-    Protocol_hash.pp_short
-    next_protocol
     (pp_option pp_prequorum)
     prequorum
     (List.length quorum)
     Operation_pool.pp_payload
     payload
+    Round.pp
+    payload_round
 
 let pp_proposal fmt {block; _} = pp_block_info fmt block
 
@@ -818,6 +804,9 @@ let pp_level_state fmt
     {
       current_level;
       latest_proposal;
+      is_latest_proposal_applied;
+      delayed_prequorum;
+      injected_preendorsements;
       locked_round;
       endorsable_payload;
       elected_block;
@@ -827,11 +816,15 @@ let pp_level_state fmt
     } =
   Format.fprintf
     fmt
-    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal:@ %a@]@ locked \
-     round: %a@ endorsable payload: %a@ elected block: %a@ @[<v 2>own delegate \
+    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b, \
+     delayed prequorum:%b, injected preendorsements: %d):@ %a@]@ locked round: \
+     %a@ endorsable payload: %a@ elected block: %a@ @[<v 2>own delegate \
      slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ next level \
      proposed round: %a@]"
     current_level
+    is_latest_proposal_applied
+    (Option.is_some delayed_prequorum)
+    (match injected_preendorsements with None -> 0 | Some l -> List.length l)
     pp_proposal
     latest_proposal
     (pp_option pp_locked_round)
@@ -850,6 +843,7 @@ let pp_level_state fmt
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"
   | Awaiting_preendorsements -> Format.fprintf fmt "awaiting preendorsements"
+  | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_endorsements -> Format.fprintf fmt "awaiting endorsements"
 
 let pp_round_state fmt {current_round; current_phase} =
@@ -879,29 +873,32 @@ let pp_timeout_kind fmt = function
       Format.fprintf fmt "time to bake next level at round %a" Round.pp at_round
 
 let pp_event fmt = function
-  | New_proposal proposal ->
+  | New_valid_proposal proposal ->
       Format.fprintf
         fmt
-        "new proposal received: %a"
+        "new valid proposal received: %a"
         pp_block_info
         proposal.block
-  | Prequorum_reached (candidate, voting_power, preendos) ->
+  | New_head_proposal proposal ->
       Format.fprintf
         fmt
-        "pre-quorum reached with %d preendorsements (power: %d) for %a at \
-         round %a"
+        "new head proposal received: %a"
+        pp_block_info
+        proposal.block
+  | Prequorum_reached (candidate, preendos) ->
+      Format.fprintf
+        fmt
+        "prequorum reached with %d preendorsements for %a at round %a"
         (List.length preendos)
-        voting_power
         Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
-  | Quorum_reached (candidate, voting_power, endos) ->
+  | Quorum_reached (candidate, endos) ->
       Format.fprintf
         fmt
-        "quorum reached with %d endorsements (power: %d) for %a at round %a"
+        "quorum reached with %d endorsements for %a at round %a"
         (List.length endos)
-        voting_power
         Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp

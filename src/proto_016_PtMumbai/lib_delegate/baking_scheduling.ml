@@ -28,33 +28,52 @@ module Events = Baking_events.Scheduling
 open Baking_state
 
 type loop_state = {
-  block_stream : Baking_state.proposal Lwt_stream.t;
+  heads_stream : Baking_state.proposal Lwt_stream.t;
+  get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
-  future_block_stream : proposal Lwt_stream.t;
-  push_future_block : proposal -> unit;
-  mutable last_get_head_event : [`New_proposal of proposal option] Lwt.t option;
+  future_block_stream :
+    [`New_future_head of proposal | `New_future_valid_proposal of proposal]
+    Lwt_stream.t;
+  push_future_block :
+    [`New_future_head of proposal | `New_future_valid_proposal of proposal] ->
+    unit;
+  mutable last_get_head_event :
+    [`New_head_proposal of proposal option] Lwt.t option;
+  mutable last_get_valid_block_event :
+    [`New_valid_proposal of proposal option] Lwt.t option;
   mutable last_future_block_event :
-    [`New_future_block of Baking_state.proposal] Lwt.t option;
+    [`New_future_head of proposal | `New_future_valid_proposal of proposal]
+    Lwt.t
+    option;
   mutable last_get_qc_event :
     [`QC_reached of Operation_worker.event option] Lwt.t option;
 }
 
 type events =
-  [ `New_future_block of proposal
-  | `New_proposal of proposal option
+  [ `New_future_head of proposal
+  | `New_future_valid_proposal of proposal
+  | `New_valid_proposal of proposal option
+  | `New_head_proposal of proposal option
   | `QC_reached of Operation_worker.event option
   | `Termination
   | `Timeout of timeout_kind ]
   Lwt.t
 
-let create_loop_state block_stream operation_worker =
+let create_loop_state ?get_valid_blocks_stream ~heads_stream operation_worker =
   let future_block_stream, push_future_block = Lwt_stream.create () in
+  let get_valid_blocks_stream =
+    match get_valid_blocks_stream with
+    | None -> Lwt.return (Lwt_stream.create () |> fst)
+    | Some vbs_t -> vbs_t
+  in
   {
-    block_stream;
+    heads_stream;
+    get_valid_blocks_stream;
     qc_stream = Operation_worker.get_quorum_event_stream operation_worker;
     future_block_stream;
     push_future_block = (fun x -> push_future_block (Some x));
     last_get_head_event = None;
+    last_get_valid_block_event = None;
     last_future_block_event = None;
     last_get_qc_event = None;
   }
@@ -111,9 +130,21 @@ let rec wait_next_event ~timeout loop_state =
     match loop_state.last_get_head_event with
     | None ->
         let t =
-          Lwt_stream.get loop_state.block_stream >|= fun e -> `New_proposal e
+          Lwt_stream.get loop_state.heads_stream >|= fun e ->
+          `New_head_proposal e
         in
         loop_state.last_get_head_event <- Some t ;
+        t
+    | Some t -> t
+  in
+  let get_valid_block_event () =
+    match loop_state.last_get_valid_block_event with
+    | None ->
+        let t =
+          loop_state.get_valid_blocks_stream >>= fun valid_blocks_stream ->
+          Lwt_stream.get valid_blocks_stream >|= fun e -> `New_valid_proposal e
+        in
+        loop_state.last_get_valid_block_event <- Some t ;
         t
     | Some t -> t
   in
@@ -127,7 +158,7 @@ let rec wait_next_event ~timeout loop_state =
           | None ->
               (* unreachable, we never close the stream *)
               assert false
-          | Some proposal -> `New_future_block proposal
+          | Some future_proposal -> future_proposal
         in
         loop_state.last_future_block_event <- Some t ;
         t
@@ -149,6 +180,7 @@ let rec wait_next_event ~timeout loop_state =
     [
       terminated;
       (get_head_event () :> events);
+      (get_valid_block_event () :> events);
       (get_future_block_event () :> events);
       (get_qc_event () :> events);
       (timeout :> events);
@@ -158,7 +190,11 @@ let rec wait_next_event ~timeout loop_state =
   | `Termination ->
       (* Exit the loop *)
       return_none
-  | `New_proposal None ->
+  | `New_valid_proposal None ->
+      (* Node connection lost *)
+      loop_state.last_get_valid_block_event <- None ;
+      fail Baking_errors.Node_connection_lost
+  | `New_head_proposal None ->
       (* Node connection lost *)
       loop_state.last_get_head_event <- None ;
       fail Baking_errors.Node_connection_lost
@@ -166,7 +202,22 @@ let rec wait_next_event ~timeout loop_state =
       (* Not supposed to happen: exit the loop *)
       loop_state.last_get_qc_event <- None ;
       return_none
-  | `New_proposal (Some proposal) -> (
+  | `New_valid_proposal (Some proposal) -> (
+      loop_state.last_get_valid_block_event <- None ;
+      (* Is the block in the future? *)
+      match sleep_until proposal.block.shell.timestamp with
+      | Some waiter ->
+          (* If so, wait until its timestamp is reached before advertising it *)
+          Events.(emit proposal_in_the_future proposal.block.hash) >>= fun () ->
+          Lwt.dont_wait
+            (fun () ->
+              waiter >>= fun () ->
+              loop_state.push_future_block (`New_future_valid_proposal proposal) ;
+              Lwt.return_unit)
+            (fun _exn -> ()) ;
+          wait_next_event ~timeout loop_state
+      | None -> return_some (New_valid_proposal proposal))
+  | `New_head_proposal (Some proposal) -> (
       loop_state.last_get_head_event <- None ;
       (* Is the block in the future? *)
       match sleep_until proposal.block.shell.timestamp with
@@ -176,29 +227,30 @@ let rec wait_next_event ~timeout loop_state =
           Lwt.dont_wait
             (fun () ->
               waiter >>= fun () ->
-              loop_state.push_future_block proposal ;
+              loop_state.push_future_block (`New_future_head proposal) ;
               Lwt.return_unit)
             (fun _exn -> ()) ;
           wait_next_event ~timeout loop_state
-      | None -> return_some (New_proposal proposal))
-  | `New_future_block proposal ->
+      | None -> return_some (New_head_proposal proposal))
+  | `New_future_head proposal ->
       Events.(emit process_proposal_in_the_future proposal.block.hash)
       >>= fun () ->
       loop_state.last_future_block_event <- None ;
-      return_some (New_proposal proposal)
+      return_some (New_head_proposal proposal)
+  | `New_future_valid_proposal proposal ->
+      Events.(emit process_proposal_in_the_future proposal.block.hash)
+      >>= fun () ->
+      loop_state.last_future_block_event <- None ;
+      return_some (New_valid_proposal proposal)
   | `QC_reached
-      (Some
-        (Operation_worker.Prequorum_reached
-          (candidate, voting_power, preendorsement_qc))) ->
+      (Some (Operation_worker.Prequorum_reached (candidate, preendorsement_qc)))
+    ->
       loop_state.last_get_qc_event <- None ;
-      return_some
-        (Prequorum_reached (candidate, voting_power, preendorsement_qc))
+      return_some (Prequorum_reached (candidate, preendorsement_qc))
   | `QC_reached
-      (Some
-        (Operation_worker.Quorum_reached
-          (candidate, voting_power, endorsement_qc))) ->
+      (Some (Operation_worker.Quorum_reached (candidate, endorsement_qc))) ->
       loop_state.last_get_qc_event <- None ;
-      return_some (Quorum_reached (candidate, voting_power, endorsement_qc))
+      return_some (Quorum_reached (candidate, endorsement_qc))
   | `Timeout e -> return_some (Timeout e)
 
 (** From the current [state], the function returns an optional
@@ -211,8 +263,7 @@ let compute_next_round_time state =
     | None -> state.level_state.latest_proposal
     | Some {proposal; _} -> proposal
   in
-  if Protocol_hash.(proposal.predecessor.next_protocol <> Protocol.hash) then
-    None
+  if Baking_state.is_first_block_in_protocol proposal then None
   else
     match state.level_state.next_level_proposed_round with
     | Some _proposed_round ->
@@ -615,11 +666,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     ~chain
   >>=? fun next_level_delegate_slots ->
   let elected_block =
-    if
-      Protocol_hash.(
-        current_proposal.block.protocol <> Protocol.hash
-        && current_proposal.block.next_protocol = Protocol.hash)
-    then
+    if Baking_state.is_first_block_in_protocol current_proposal then
       (* If the last block is a protocol transition, we admit it as a
          final block *)
       Some {proposal = current_proposal; endorsement_qc = []}
@@ -629,6 +676,10 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     {
       current_level = current_proposal.block.shell.level;
       latest_proposal = current_proposal;
+      is_latest_proposal_applied =
+        true (* this proposal is expected to be the current head *);
+      delayed_prequorum = None;
+      injected_preendorsements = None;
       locked_round = None;
       endorsable_payload = None;
       elected_block;
@@ -657,7 +708,7 @@ let compute_bootstrap_event state =
       = state.round_state.current_round)
   then
     (* If so, then trigger the new proposal event to possibly preendorse *)
-    ok @@ Baking_state.New_proposal state.level_state.latest_proposal
+    ok @@ Baking_state.New_head_proposal state.level_state.latest_proposal
   else
     (* Otherwise, trigger the end of round to check whether we
        need to propose at this level or not *)
@@ -719,11 +770,13 @@ let perform_sanity_check cctxt ~chain_id =
 
 let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> return_unit) ~chain config delegates =
+  let open Lwt_result_syntax in
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   perform_sanity_check cctxt ~chain_id >>=? fun () ->
-  Node_rpc.monitor_proposals cctxt ~chain ()
-  >>=? fun (block_stream, _block_stream_stopper) ->
-  (Lwt_stream.get block_stream >>= function
+  let cache = Baking_cache.Block_cache.create 10 in
+  Node_rpc.monitor_heads cctxt ~cache ~chain ()
+  >>=? fun (heads_stream, _block_stream_stopper) ->
+  (Lwt_stream.get heads_stream >>= function
    | Some current_head -> return current_head
    | None -> failwith "head stream unexpectedly ended")
   >>=? fun current_proposal ->
@@ -742,7 +795,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ~current_proposal
     delegates
   >>=? fun initial_state ->
-  let cloned_block_stream = Lwt_stream.clone block_stream in
+  let cloned_block_stream = Lwt_stream.clone heads_stream in
   Baking_nonces.start_revelation_worker
     cctxt
     initial_state.global_state.config.nonce
@@ -756,9 +809,22 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
           Lwt_canceler.cancel revelation_worker_canceler >>= fun _ ->
           Lwt.return_unit))
     canceler ;
-
+  (* FIXME: currently, the client streamed RPC call will hold until at
+     least one element is present in the stream. This is fixed by:
+     https://gitlab.com/nomadic-labs/resto/-/merge_requests/50. Until
+     then, we await the promise completion of the RPC call later
+     on. *)
+  let get_valid_blocks_stream =
+    let*! vbs = Node_rpc.monitor_valid_proposals cctxt ~cache ~chain () in
+    match vbs with
+    | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
+    | Ok (vbs, _) -> Lwt.return vbs
+  in
   let loop_state =
-    create_loop_state block_stream initial_state.global_state.operation_worker
+    create_loop_state
+      ~get_valid_blocks_stream
+      ~heads_stream
+      initial_state.global_state.operation_worker
   in
   let on_error err =
     Events.(emit error_while_baking err) >>= fun () ->

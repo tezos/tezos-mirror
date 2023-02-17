@@ -44,10 +44,10 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     ~current_proposal
     delegates
 
-let get_current_proposal cctxt =
+let get_current_proposal cctxt ?cache () =
   let open Lwt_result_syntax in
   let* block_stream, _block_stream_stopper =
-    Node_rpc.monitor_proposals cctxt ~chain:cctxt#chain ()
+    Node_rpc.monitor_heads cctxt ?cache ~chain:cctxt#chain ()
   in
   Lwt_stream.peek block_stream >>= function
   | Some current_head -> return (block_stream, current_head)
@@ -59,7 +59,8 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
   let open State_transitions in
   let open Lwt_result_syntax in
-  let* _, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
   let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
@@ -87,11 +88,13 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
       (List.map fst consensus_list)
   in
   Baking_actions.inject_preendorsements state ~preendorsements:consensus_list
+  >>=? fun (_ignored_state : state) -> return_unit
 
 let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
   let open Lwt_result_syntax in
-  let* _, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
@@ -283,7 +286,8 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
     ?(minimal_timestamp = false) ?extra_operations ?context_path delegates =
   let open Lwt_result_syntax in
-  let* _block_stream, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
   let config =
     Baking_configuration.make
       ?minimal_fees
@@ -301,7 +305,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     | Some _ -> propose_at_next_level ~minimal_timestamp state
     | None -> (
         match endorsement_quorum state with
-        | Some (voting_power, endorsement_qc) ->
+        | Some (_voting_power, endorsement_qc) ->
             let state =
               {
                 state with
@@ -323,8 +327,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             let* state =
               State_transitions.step
                 state
-                (Baking_state.Quorum_reached
-                   (candidate, voting_power, endorsement_qc))
+                (Baking_state.Quorum_reached (candidate, endorsement_qc))
               >>= do_action
               (* this will register the elected block *)
             in
@@ -369,18 +372,18 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
-let bake_using_automaton config state block_stream =
+let bake_using_automaton config state heads_stream =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
   let loop_state =
     Baking_scheduling.create_loop_state
-      block_stream
+      ~heads_stream
       state.global_state.operation_worker
   in
   let stop_on_next_level_block = function
-    | New_proposal proposal ->
+    | New_head_proposal proposal ->
         Compare.Int32.(proposal.block.shell.level >= Int32.succ current_level)
     | _ -> false
   in
@@ -392,7 +395,7 @@ let bake_using_automaton config state block_stream =
     state
     initial_event
   >>=? function
-  | Some (New_proposal proposal) ->
+  | Some (New_head_proposal proposal) ->
       let*! () =
         cctxt#message
           "Block %a (%ld) injected"
@@ -521,7 +524,8 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?dal_node_endpoint
       ()
   in
-  let* block_stream, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* block_stream, current_proposal = get_current_proposal cctxt ~cache () in
   let* state =
     create_state
       cctxt

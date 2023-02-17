@@ -128,6 +128,7 @@ type action =
   | Inject_preendorsements of {
       preendorsements : (consensus_key_and_delegate * consensus_content) list;
     }
+  | Reinject_preendorsements of {preendorsements : packed_operation list}
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
     }
@@ -159,6 +160,7 @@ let pp_action fmt = function
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
   | Watch_proposal -> Format.fprintf fmt "watch proposal"
+  | Reinject_preendorsements _ -> Format.fprintf fmt "reinject preendorsements"
 
 let generate_seed_nonce_hash config delegate level =
   if level.Level.expected_commitment then
@@ -215,6 +217,7 @@ let sign_block_header state proposer unsigned_block_header =
       return {Block_header.shell; protocol_data = {contents; signature}}
 
 let inject_block ~state_recorder state block_to_bake ~updated_state =
+  let open Lwt_result_syntax in
   let {
     predecessor;
     round;
@@ -308,10 +311,24 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   in
   Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
   >>= fun () ->
+  let chain = `Hash state.global_state.chain_id in
+  let pred_block = `Hash (predecessor.hash, 0) in
+  let* pred_resulting_context_hash =
+    Shell_services.Blocks.resulting_context_hash
+      cctxt
+      ~chain
+      ~block:pred_block
+      ()
+  in
+  let* pred_live_blocks =
+    Chain_services.Blocks.live_blocks cctxt ~chain ~block:pred_block ()
+  in
   Block_forge.forge
     cctxt
     ~chain_id
     ~pred_info:predecessor
+    ~pred_live_blocks
+    ~pred_resulting_context_hash
     ~timestamp
     ~round
     ~seed_nonce_hash
@@ -415,22 +432,26 @@ let inject_preendorsements state ~preendorsements =
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
     (fun (delegate, operation) ->
-      let encoded_op =
-        Data_encoding.Binary.to_bytes_exn Operation.encoding operation
-      in
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_preendorsement (delegate, err))
           >>= fun () -> return_unit)
         (fun () ->
-          Shell_services.Injection.operation
-            cctxt
-            ~chain:(`Hash chain_id)
-            encoded_op
+          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
           Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
           return_unit))
     signed_operations
+  >>=? fun () ->
+  (* Hackish way of registering injected preendorsements *)
+  let endorsements = List.map snd signed_operations in
+  if endorsements = [] then return state
+  else
+    let new_level_state =
+      {state.level_state with injected_preendorsements = Some endorsements}
+    in
+    let new_state = {state with level_state = new_level_state} in
+    return new_state
 
 let sign_endorsements state endorsements =
   let cctxt = state.global_state.cctxt in
@@ -543,17 +564,16 @@ let inject_endorsements state ~endorsements =
   sign_endorsements state endorsements >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, signed_operation) ->
-      let encoded_op =
-        Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
-      in
-      Shell_services.Injection.operation
-        cctxt
-        ~chain:(`Hash chain_id)
-        encoded_op
-      >>=? fun oph ->
-      Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
-      return_unit)
+    (fun (delegate, operation) ->
+      protect
+        ~on_error:(fun err ->
+          Events.(emit failed_to_inject_endorsement (delegate, err))
+          >>= fun () -> return_unit)
+        (fun () ->
+          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
+          >>=? fun oph ->
+          Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
+          return_unit))
     signed_operations
 
 let inject_dal_attestations state attestations =
@@ -730,6 +750,16 @@ let update_to_level state level_update =
   compute_new_state ~current_round ~delegate_slots ~next_level_delegate_slots
   >>= return
 
+let reinject_preendorsements state preendorsements =
+  let cctxt = state.global_state.cctxt in
+  let chain = `Hash state.global_state.chain_id in
+  List.iter_p
+    (fun operation ->
+      Node_rpc.inject_operation cctxt ~chain operation >>= fun _res ->
+      (* Ignore errors for now *)
+      Lwt.return_unit)
+    preendorsements
+
 let synchronize_round state {new_round_proposal; handle_proposal} =
   Events.(emit synchronizing_round new_round_proposal.predecessor.hash)
   >>= fun () ->
@@ -762,8 +792,8 @@ let rec perform_action ~state_recorder state (action : action) =
   | Inject_block {block_to_bake; updated_state} ->
       inject_block state ~state_recorder block_to_bake ~updated_state
   | Inject_preendorsements {preendorsements} ->
-      inject_preendorsements state ~preendorsements >>=? fun () ->
-      perform_action ~state_recorder state Watch_proposal
+      inject_preendorsements state ~preendorsements >>=? fun new_state ->
+      perform_action ~state_recorder new_state Watch_proposal
   | Inject_endorsements {endorsements} ->
       state_recorder ~new_state:state >>=? fun () ->
       inject_endorsements state ~endorsements >>=? fun () ->
@@ -785,3 +815,5 @@ let rec perform_action ~state_recorder state (action : action) =
       (* We wait for preendorsements to trigger the
            [Prequorum_reached] event *)
       start_waiting_for_preendorsement_quorum state >>= fun () -> return state
+  | Reinject_preendorsements {preendorsements} ->
+      reinject_preendorsements state preendorsements >>= fun () -> return state

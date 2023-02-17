@@ -57,18 +57,12 @@ type prequorum = {
 type block_info = {
   hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
-      (** Set of live blocks for this block that is used to filter
-          old or too recent operations. *)
 }
 
 type cache = {
@@ -109,6 +103,15 @@ type proposal = {block : block_info; predecessor : block_info}
 
 val proposal_encoding : proposal Data_encoding.t
 
+(** Identify the first block of the protocol, ie. the block that
+    activates the current protocol.
+
+    This block should be baked by the baker of the previous protocol
+    (that's why this same block is also referred to as the last block
+    of the previous protocol). It is always considered final and
+    therefore is not endorsed.*)
+val is_first_block_in_protocol : proposal -> bool
+
 type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
 
 val locked_round_encoding : locked_round Data_encoding.t
@@ -125,6 +128,10 @@ type elected_block = {
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
+  is_latest_proposal_applied : bool;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+  injected_preendorsements : packed_operation list option;
   locked_round : locked_round option;
   endorsable_payload : endorsable_payload option;
   elected_block : elected_block option;
@@ -133,7 +140,11 @@ type level_state = {
   next_level_proposed_round : Round.t option;
 }
 
-type phase = Idle | Awaiting_preendorsements | Awaiting_endorsements
+type phase =
+  | Idle
+  | Awaiting_preendorsements
+  | Awaiting_application
+  | Awaiting_endorsements
 
 val phase_encoding : phase Data_encoding.t
 
@@ -155,18 +166,13 @@ type timeout_kind =
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 
-type voting_power = int
-
 type event =
-  | New_proposal of proposal
+  | New_valid_proposal of proposal
+  | New_head_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.preendorsement operation list
+      Operation_worker.candidate * Kind.preendorsement operation list
   | Quorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.endorsement operation list
+      Operation_worker.candidate * Kind.endorsement operation list
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t

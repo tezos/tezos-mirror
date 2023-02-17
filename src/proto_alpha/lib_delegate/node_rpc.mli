@@ -39,6 +39,16 @@ val inject_block :
   Tezos_base.Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 
+(** Inject an operation.
+
+    @return operation hash of the newly injected operation
+*)
+val inject_operation :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  packed_operation ->
+  Operation_hash.t tzresult Lwt.t
+
 (** Preapply a block using the node validation mechanism.*)
 val preapply_block :
   #Protocol_client_context.full ->
@@ -50,21 +60,19 @@ val preapply_block :
   (Tezos_base.Block_header.shell_header * error Preapply_result.t list) tzresult
   Lwt.t
 
-(** Fetch a proposal from the node.
-
-    @param cache is unset by default
-*)
-val proposal :
-  #Tezos_rpc.Context.simple ->
-  ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
-  chain:Shell_services.chain ->
-  Block_hash.t ->
-  Baking_state.proposal tzresult Lwt.t
-
-(** Monitor proposals from the node.*)
-val monitor_proposals :
+(** Monitor validated blocks/proposals from the node. *)
+val monitor_valid_proposals :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
+  ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
+  unit ->
+  (Baking_state.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
+
+(** Monitor heads from the node. *)
+val monitor_heads :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
   unit ->
   (Baking_state.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
 

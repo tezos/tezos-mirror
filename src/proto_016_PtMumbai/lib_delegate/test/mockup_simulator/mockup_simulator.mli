@@ -74,6 +74,15 @@ module type Hooks = sig
     tzresult
     Lwt.t
 
+  (** This is called when a new validated block is going to be sent as
+      the response to a "monitor validated blocks" RPC call. Returning
+      [None] here terminates the process for the baker. *)
+  val on_new_validated_block :
+    block_hash:Block_hash.t ->
+    block_header:Block_header.t ->
+    operations:Operation.t list list ->
+    (Block_hash.t * Block_header.t * Operation.t list list) option Lwt.t
+
   (** This is called when a new head is going to be sent as the response to
      a "monitor heads" RPC call. Returning [None] here terminates the
      process for the baker. *)
