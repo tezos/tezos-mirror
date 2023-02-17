@@ -690,7 +690,7 @@ end
 module Codegen_inferred_cmd = struct
   include Codegen_cmd
 
-  let codegen_infer_handler json solution () =
+  let codegen_inferred_handler json solution () =
     let codegen_options =
       match json with
       | None -> No_transform
@@ -716,7 +716,7 @@ module Codegen_inferred_cmd = struct
       ~desc:"Generate code for models inferred from the solution file"
       options
       params
-      codegen_infer_handler
+      codegen_inferred_handler
 end
 
 module Solution_print_cmd = struct

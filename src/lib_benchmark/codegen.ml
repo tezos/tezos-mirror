@@ -236,8 +236,10 @@ let save_solution (s : solution) (fn : string) =
 
 (* ------------------------------------------------------------------------- *)
 
+let function_name model_name = "cost_" ^ Namespace.basename model_name
+
 let codegen (Model.Model model) (sol : solution)
-    (transform : Costlang.transform) (name : string) =
+    (transform : Costlang.transform) model_name =
   let subst fv =
     match Free_variable.Map.find fv sol.map with
     | None ->
@@ -264,18 +266,17 @@ let codegen (Model.Model model) (sol : solution)
     in
     let module M = M.Def (Sub) in
     let expr = Sub.prj M.model in
-    ["model " ^ name; expr]
+    ["model " ^ Namespace.to_string model_name; expr]
   in
   let module M = M.Def (Subst_impl) in
   let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
-  Some (comments, generate_let_binding name expr)
+  let fun_name = function_name model_name in
+  Some (comments, generate_let_binding fun_name expr)
 
 let codegen_module models sol transform =
   let items =
     List.filter_map
-      (fun (name, {Registration.model; _}) ->
-        let name = Format.asprintf "cost_%a" Namespace.pp name in
-        codegen model sol transform name)
+      (fun (model_name, {Registration.model; _}) -> codegen model sol transform model_name)
       models
   in
   make_module items

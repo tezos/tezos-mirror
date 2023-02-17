@@ -407,9 +407,8 @@ let codegen_cmd solution model_name codegen_options =
             let module Transform = Fixed_point_transform.Apply (P) in
             ((module Transform) : Costlang.transform)
       in
-      let name = Format.asprintf "model_%a" Namespace.pp model_name in
       let code =
-        match Codegen.codegen model sol transform name with
+        match Codegen.codegen model sol transform model_name with
         | exception e ->
             Format.eprintf
               "Error in code generation for model %a, exiting@."
@@ -452,13 +451,12 @@ let fvs_of_codegen_model model =
   let module FV = Model.Def (Costlang.Free_variables) in
   FV.model
 
-let codegen_infer_cmd solution codegen_options =
+let codegen_inferred_cmd solution codegen_options =
   let solution = Codegen.load_solution solution in
 
   Format.eprintf "Inference model: %s@." solution.inference_model_name ;
 
   let ( let* ) = Option.bind in
-  let or_else m f = match m with Some x -> Some x | None -> f () in
 
   let found_codegen_models =
     let get_codegen_from_bench (bench_name, (module Bench : Benchmark.S)) =
@@ -467,15 +465,11 @@ let codegen_infer_cmd solution codegen_options =
         List.assoc_opt ~equal:( = ) solution.inference_model_name Bench.models
       in
       (* We assume a benchmark has up to one codegen model, *)
-      (* which has the same name as the benchmark and may be qualified with "__alpha" *)
-      let codegen_name = Namespace.basename bench_name in
-      let codegen_name_alpha = codegen_name ^ "__alpha" in
       let find_codegen name =
-        let* model = Registration.find_model (Namespace.of_string name) in
-        Some (Namespace.of_string name, model)
+        let* model = Registration.find_model name in
+        Some (name, model)
       in
-      or_else (find_codegen codegen_name) (fun () ->
-          find_codegen codegen_name_alpha)
+      find_codegen bench_name
     in
     List.filter_map get_codegen_from_bench (Registration.all_benchmarks ())
   in
@@ -544,5 +538,5 @@ let () =
       | Codegen_all {solution; matching; codegen_options} ->
           codegen_all_cmd solution matching codegen_options
       | Codegen_inferred {solution; codegen_options} ->
-          codegen_infer_cmd solution codegen_options
+          codegen_inferred_cmd solution codegen_options
       | Solution_print solutions -> solution_print_cmd solutions)
