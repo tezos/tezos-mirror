@@ -11,6 +11,8 @@
     GIT_VERSION: "dev"
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci  build-full-unreleased
+    - chmod +w ${CI_PROJECT_DIR}/octez-*
+    - strip -s ${CI_PROJECT_DIR}/octez-*
   cache:
     key: "$CI_COMMIT_REF_SLUG"
     paths:
