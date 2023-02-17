@@ -299,7 +299,7 @@ let make_arguments node =
        Some (base_dir node);
      ]
 
-let do_runlike_command node arguments =
+let do_runlike_command ?event_level ?event_sections_levels node arguments =
   if node.status <> Not_running then
     Test.fail "Smart contract rollup node %s is already running" node.name ;
   let on_terminate _status =
@@ -309,18 +309,22 @@ let do_runlike_command node arguments =
   let arguments = make_arguments node @ arguments in
   run
     ?runner:node.persistent_state.runner
+    ?event_level
+    ?event_sections_levels
     node
     {ready = false; level = Unknown}
     arguments
     ~on_terminate
 
-let run node arguments =
+let run ?event_level ?event_sections_levels node arguments =
   do_runlike_command
+    ?event_level
+    ?event_sections_levels
     node
     (["run"; "--data-dir"; node.persistent_state.data_dir] @ arguments)
 
-let run node arguments =
-  let* () = run node arguments in
+let run ?event_level ?event_sections_levels node arguments =
+  let* () = run ?event_level ?event_sections_levels node arguments in
   let* () = wait_for_ready node in
   return ()
 
