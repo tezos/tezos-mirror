@@ -5417,8 +5417,12 @@ module Protocol = Protocol
     in
     let _dac_tests =
       only_if (active && N.(number >= 017)) @@ fun () ->
-      test
-        "main"
+      tezt
+        [
+          "test_dac_pages_encoding";
+          "test_dac_plugin_registration";
+          "test_helpers";
+        ]
         ~path:(path // "lib_dac/test")
         ~with_macos_security_framework:true
         ~opam:(sf "tezos-dac-%s" name_dash)
@@ -5431,7 +5435,7 @@ module Protocol = Protocol
             octez_base_test_helpers |> open_;
             test_helpers |> if_some |> open_;
             octez_dac_node_lib |> open_;
-            alcotest_lwt;
+            alcotezt;
           ]
     in
     let benchmark_type_inference =

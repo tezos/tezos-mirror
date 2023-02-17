@@ -617,3 +617,13 @@ let tests =
       Hash_chain.V0.test_serialize;
     Merkle_tree.V0.PBT.serialization_roundtrip_pbt;
   ]
+
+let () =
+  Alcotest_lwt.run
+    "protocol > unit"
+    [
+      Test_helpers.Unit_test.spec
+        (Protocol.name ^ ": Dac_pages_encoding.ml")
+        tests;
+    ]
+  |> Lwt_main.run
