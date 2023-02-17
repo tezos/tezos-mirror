@@ -166,4 +166,6 @@ val read_value_exn : t -> key -> int64 -> int64 -> string Lwt.t
 
 module Internal_for_tests : sig
   val key_is_readonly : key -> bool
+
+  val key_to_list : key -> string list
 end

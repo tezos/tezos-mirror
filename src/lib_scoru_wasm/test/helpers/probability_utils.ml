@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 TriliTech  <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,38 +23,67 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+open Tezos_test_helpers
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5028
-         Beware: there is a weird test failure when
-         Durable snapshot test doesn't go first
-      *)
-      ("Durable snapshot", Test_durable_shapshot.tests);
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-      ("WASM VM", Test_wasm_vm.tests);
-      ("Module Initialisation", Test_init.tests);
-      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
-      ("Hash correspondence", Test_hash_consistency.tests);
-      ("Reveal", Test_reveal.tests);
-      ("Debug", Test_debug.tests);
-      ("Host functions ticks", Test_host_functions_ticks.tests);
-      ("Protocol migration", Test_protocol_migration.tests);
-    ]
-  |> Lwt_main.run
+(* Probability is in range between 0 and 1 *)
+module type Probability_sig = sig
+  type t
+
+  val of_percent : int -> t
+
+  val to_percent : t -> int
+
+  val ( < ) : t -> t -> bool
+
+  val ( + ) : t -> t -> t
+end
+
+module Probability : Probability_sig = struct
+  type t = int
+
+  let of_percent x =
+    Assert.Int.leq
+      ~loc:__LOC__
+      ~msg:"Probability should be greater or equal than 0.0"
+      0
+      x ;
+    Assert.Int.leq
+      ~loc:__LOC__
+      ~msg:"Probability should be less or equal than 1.0"
+      x
+      100 ;
+    x
+
+  let to_percent = Fun.id
+
+  let ( < ) x y = x < y
+
+  let ( + ) x y =
+    Assert.Int.leq
+      ~loc:__LOC__
+      ~msg:"Sum of probabilities should be less or equal than 1.0"
+      (x + y)
+      100 ;
+    x + y
+end
+
+module Distributions = struct
+  let uniform_distribution_l (a : 'a list) : (int * 'a) list =
+    List.map (fun x -> (1, x)) a
+
+  (* This one generates: n, n - 1, ... 1 weights.
+     So the first operation will occur n times more often than the last one. *)
+  let descending_distribution_l (a : 'a list) : (int * 'a) list =
+    let n = List.length a in
+    List.mapi (fun i x -> (n - i, x)) a
+
+  (* This one generates: 1, 2 ... n/2 - 1, n/2, n/2, n/2 - 1 ... 1*)
+  let centered_distribution_l (a : 'a list) : (int * 'a) list =
+    let n = List.length a in
+    let n2 = n - Int.div n 2 in
+    List.mapi (fun i x -> ((if i < n2 then i + 1 else n - i), x)) a
+
+  (* Generates 0, ... 1, ... 0, 0, where 1 is n-th position*)
+  let one_of_n n (a : 'a list) : (int * 'a) list =
+    List.mapi (fun i x -> if i = n then (1, x) else (0, x)) a
+end
