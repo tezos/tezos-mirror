@@ -30,8 +30,8 @@ depends: [
   "tezos-layer2-store"
   "tezos-tree-encoding"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "irmin-pack" { >= "3.5.1" & < "3.6.0" }
-  "irmin" { >= "3.5.1" & < "3.6.0" }
+  "irmin-pack" { >= "3.6.0" & < "3.7.0" }
+  "irmin" { >= "3.6.0" & < "3.7.0" }
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
   "tezos-injector-alpha"
