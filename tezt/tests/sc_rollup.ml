@@ -217,11 +217,12 @@ let wait_for_timeout_detected sc_node =
 
    A rollup node has a configuration file that must be initialized.
 *)
-let setup_rollup ~protocol ~kind ?(mode = Sc_rollup_node.Operator) ?boot_sector
-    ?(parameters_ty = "string") ?(operator = Constant.bootstrap1.alias)
-    tezos_node tezos_client =
+let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
+    ?boot_sector ?(parameters_ty = "string")
+    ?(operator = Constant.bootstrap1.alias) tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup
+      ?hooks
       ~kind
       ?boot_sector
       ~parameters_ty
@@ -247,7 +248,7 @@ let format_title_scenario kind {variant; tags = _; description} =
     description
     (match variant with Some variant -> " (" ^ variant ^ ")" | None -> "")
 
-let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
+let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
     ?challenge_window ?timeout ?(src = Constant.bootstrap1.alias)
     {variant; tags; description} scenario =
   let tags = kind :: tags in
@@ -260,10 +261,12 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
   let* tezos_node, tezos_client =
     setup_l1 ?commitment_period ?challenge_window ?timeout protocol
   in
-  let* sc_rollup = originate_sc_rollup ~kind ?boot_sector ~src tezos_client in
+  let* sc_rollup =
+    originate_sc_rollup ?hooks ~kind ?boot_sector ~src tezos_client
+  in
   scenario sc_rollup tezos_node tezos_client
 
-let test_full_scenario ?supports ?regression ~kind ?mode ?boot_sector
+let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
@@ -282,6 +285,7 @@ let test_full_scenario ?supports ?regression ~kind ?mode ?boot_sector
       ~protocol
       ~parameters_ty
       ~kind
+      ?hooks
       ?mode
       ?boot_sector
       tezos_node
@@ -374,6 +378,7 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
 let test_origination ~kind =
   test_l1_scenario
     ~regression:true
+    ~hooks
     {
       variant = None;
       tags = ["origination"];
@@ -531,11 +536,11 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
    the Tezos node. Then we can observe that the messages are included in the
    inbox.
 *)
-let send_message_client ?(src = Constant.bootstrap2.alias) client msg =
-  let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
+let send_message_client ?hooks ?(src = Constant.bootstrap2.alias) client msg =
+  let* () = Client.Sc_rollup.send_message ?hooks ~src ~msg client in
   Client.bake_for_and_wait client
 
-let send_messages_client ?src ?batch_size n client =
+let send_messages_client ?hooks ?src ?batch_size n client =
   let messages =
     List.map
       (fun i ->
@@ -546,7 +551,9 @@ let send_messages_client ?src ?batch_size n client =
         "text:" ^ Ezjsonm.to_string json)
       (range 1 n)
   in
-  Lwt_list.iter_s (fun msg -> send_message_client ?src client msg) messages
+  Lwt_list.iter_s
+    (fun msg -> send_message_client ?hooks ?src client msg)
+    messages
 
 let send_message_batcher_aux ?hooks client sc_node sc_client msgs =
   let batched =
@@ -606,10 +613,10 @@ let to_hex_messages_arg msgs =
   let json = Ezjsonm.list Ezjsonm.string msgs in
   "hex:" ^ Ezjsonm.to_string ~minify:true json
 
-let send_text_messages ?(format = `Raw) ?src client msgs =
+let send_text_messages ?(format = `Raw) ?hooks ?src client msgs =
   match format with
-  | `Raw -> send_message ?src client (to_text_messages_arg msgs)
-  | `Hex -> send_message ?src client (to_hex_messages_arg msgs)
+  | `Raw -> send_message ?hooks ?src client (to_text_messages_arg msgs)
+  | `Hex -> send_message ?hooks ?src client (to_hex_messages_arg msgs)
 
 let parse_inbox json =
   let go () =
@@ -997,6 +1004,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     ~internal ~kind =
   test_full_scenario
     ?regression
+    ~hooks
     {
       variant = Some (if internal then "internal" else "external");
       tags = ["pvm"];
@@ -1051,7 +1059,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       match forwarder with
       | None ->
           (* External message *)
-          send_message client (sf "[%S]" message)
+          send_message ~hooks client (sf "[%S]" message)
       | Some forwarder ->
           (* Internal message through forwarder *)
           let message = hex_encode message in
@@ -2278,6 +2286,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   *)
   test_l1_scenario
     ~regression:true
+    ~hooks
     ~boot_sector:boot_sector1
     ~kind
     {
@@ -2288,6 +2297,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   @@ fun sc_rollup1 _tezos_node tezos_client ->
   let* sc_rollup2 =
     originate_sc_rollup
+      ~hooks
       ~kind
       ~boot_sector:boot_sector2
       ~src:Constant.bootstrap2.alias
@@ -2788,7 +2798,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
-  let*! _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
+  let*! _value = Sc_rollup_client.state_hash sc_client1 in
   unit
 
 let rec swap i l =
@@ -3377,6 +3387,7 @@ let test_refutation_reward_and_punishment ~kind =
     ~timeout:timeout_period
     ~commitment_period
     ~regression:true
+    ~hooks
     {
       tags = ["refutation"; "reward"; "punishment"];
       variant = None;
@@ -3542,6 +3553,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
   test_full_scenario
     ?supports
     ?regression
+    ~hooks
     ?boot_sector
     ~parameters_ty:"bytes"
     ~kind
@@ -3667,7 +3679,8 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     let* payload = input_message sc_client target_address in
     let* () =
       match payload with
-      | `External payload -> send_text_messages ~format:`Hex client [payload]
+      | `External payload ->
+          send_text_messages ~hooks ~format:`Hex client [payload]
       | `Internal payload ->
           let payload = "0x" ^ payload in
           Client.transfer
@@ -3925,6 +3938,7 @@ let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind) =
   test_full_scenario
     ~regression:true
+    ~hooks
     ~kind
     ~boot_sector
     {
@@ -4187,6 +4201,7 @@ let test_messages_processed_by_commitment ~kind =
 let test_recover_bond_of_stakers =
   test_l1_scenario
     ~regression:true
+    ~hooks
     ~boot_sector:""
     ~kind:"arith"
     ~challenge_window:10
