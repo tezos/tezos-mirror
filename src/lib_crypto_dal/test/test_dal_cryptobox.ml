@@ -32,29 +32,65 @@ module Test = struct
     Bytes.blit msg 0 slot 0 padding_threshold ;
     (slot, msg)
 
+  type parameters = {
+    slot_size : int;
+    page_size : int;
+    redundancy_factor : int;
+    number_of_shards : int;
+    padding_threshold : int;
+  }
+
+  let get_cryptobox_parameters parameters : Cryptobox.parameters =
+    {
+      slot_size = parameters.slot_size;
+      page_size = parameters.page_size;
+      redundancy_factor = parameters.redundancy_factor;
+      number_of_shards = parameters.number_of_shards;
+    }
+
   let params_gen =
     let open QCheck2.Gen in
     let* redundancy_factor_log2 = int_range 1 4 in
     let* slot_size_log2 = int_range 0 11 in
     let* page_size_log2 = int_range 0 15 in
     let* number_of_shards_log2 = int_range 0 19 in
+    let* padding_threshold = int_range 0 (1 lsl slot_size_log2) in
     map
-      (fun (slot_size, page_size, redundancy_factor, number_of_shards) :
-           Cryptobox.parameters ->
-        {slot_size; page_size; redundancy_factor; number_of_shards})
-      (tup4
+      (fun ( slot_size,
+             page_size,
+             redundancy_factor,
+             number_of_shards,
+             padding_threshold ) : parameters ->
+        {
+          slot_size;
+          page_size;
+          redundancy_factor;
+          number_of_shards;
+          padding_threshold;
+        })
+      (tup5
          (return (1 lsl slot_size_log2))
          (return (1 lsl page_size_log2))
          (return (1 lsl redundancy_factor_log2))
-         (return (1 lsl number_of_shards_log2)))
+         (return (1 lsl number_of_shards_log2))
+         (return padding_threshold))
 
   let print =
     QCheck2.Print.(
       contramap
-        (fun ({slot_size; page_size; redundancy_factor; number_of_shards} :
-               Cryptobox.parameters) ->
-          (slot_size, page_size, redundancy_factor, number_of_shards))
-        (tup4 int int int int))
+        (fun {
+               slot_size;
+               page_size;
+               redundancy_factor;
+               number_of_shards;
+               padding_threshold;
+             } ->
+          ( slot_size,
+            page_size,
+            redundancy_factor,
+            number_of_shards,
+            padding_threshold ))
+        (tup5 int int int int int))
 
   let is_in_acceptable_errors error_string =
     List.map
@@ -70,18 +106,54 @@ module Test = struct
     |> List.mem true
 
   (* Tests that with a fraction 1/redundancy_factor of the shards
-     the decoding succeeds. *)
+     the decoding succeeds. Checks equality of polynomials. *)
   let test_erasure_code =
     QCheck2.Test.make
       ~name:"DAL cryptobox: test erasure code"
       ~print
       params_gen
       (fun
-        ({redundancy_factor; number_of_shards; slot_size; _} as params :
-          Cryptobox.parameters)
+        ({redundancy_factor; number_of_shards; slot_size; padding_threshold; _}
+        as params)
       ->
-        let msg_size = slot_size / 16 in
-        let slot, msg = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
+        init params ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t = Cryptobox.make params in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let enc_shards = Cryptobox.shards_from_polynomial t p in
+         let c_indices =
+           random_indices
+             (number_of_shards - 1)
+             (number_of_shards / redundancy_factor)
+         in
+         let c =
+           Seq.filter
+             (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
+             enc_shards
+         in
+         let* decoded_p = Cryptobox.polynomial_from_shards t c in
+         return (Cryptobox.Internal_for_tests.polynomials_equal decoded_p p))
+        |> function
+        | Ok check -> check
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
+        | Error _ -> false)
+
+  (* Tests that with a fraction 1/redundancy_factor of the shards
+     the decoding succeeds. Checks equality of slots. *)
+  let test_erasure_code_with_slot_conversion =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test erasure code"
+      ~print
+      params_gen
+      (fun
+        ({redundancy_factor; number_of_shards; slot_size; padding_threshold; _}
+        as params)
+      ->
+        let slot, msg = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
+
         init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
         (let* t = Cryptobox.make params in
@@ -99,7 +171,10 @@ module Test = struct
          in
          let* decoded_slot = Cryptobox.polynomial_from_shards t c in
          let decoded_msg =
-           Bytes.sub (Cryptobox.polynomial_to_slot t decoded_slot) 0 msg_size
+           Bytes.sub
+             (Cryptobox.polynomial_to_slot t decoded_slot)
+             0
+             padding_threshold
          in
          return decoded_msg)
         |> function
@@ -218,8 +293,9 @@ module Test = struct
       ~name:"DAL cryptobox: test polynomial-slot conversions"
       ~print
       params_gen
-      (fun ({slot_size; _} as params : Cryptobox.parameters) ->
-        let slot, _ = make_slot ~size:slot_size ~padding_threshold:slot_size in
+      (fun ({slot_size; padding_threshold; _} as params) ->
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
         init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
         (let* t = Cryptobox.make params in
@@ -237,10 +313,10 @@ module Test = struct
       ~name:"DAL cryptobox: test page proofs"
       ~print
       params_gen
-      (fun ({slot_size; page_size; _} as params : Cryptobox.parameters) ->
-        let msg_size = slot_size / 16 in
+      (fun ({slot_size; page_size; padding_threshold; _} as params) ->
         let number_of_pages = slot_size / page_size in
-        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
         init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
         (let* t = Cryptobox.make params in
@@ -264,10 +340,9 @@ module Test = struct
       ~name:"DAL cryptobox: test shard proofs"
       ~print
       params_gen
-      (fun ({number_of_shards; slot_size; _} as params : Cryptobox.parameters)
-      ->
-        let msg_size = slot_size / 16 in
-        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+      (fun ({number_of_shards; slot_size; padding_threshold; _} as params) ->
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
         init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
         (let* t = Cryptobox.make params in
@@ -299,9 +374,9 @@ module Test = struct
       ~name:"DAL cryptobox: test commitment proof"
       ~print
       params_gen
-      (fun ({slot_size; _} as params : Cryptobox.parameters) ->
-        let msg_size = slot_size / 16 in
-        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+      (fun ({slot_size; padding_threshold; _} as params) ->
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
         init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
         (let* t = Cryptobox.make params in
@@ -405,6 +480,7 @@ let () =
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
           [
             Test.test_erasure_code;
+            Test.test_erasure_code_with_slot_conversion;
             Test.test_page_proofs;
             Test.test_shard_proofs;
             Test.test_commitment_proof;

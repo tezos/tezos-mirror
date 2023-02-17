@@ -294,7 +294,7 @@ module Inner = struct
     domain_2k : Domains.t;
     domain_n : Domains.t;
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
-    shard_size : int;
+    shard_length : int;
     (* Length of a shard in terms of scalar elements. *)
     pages_per_slot : int;
     (* Number of slot pages. *)
@@ -324,7 +324,7 @@ module Inner = struct
   let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
 
   let ensure_validity ~slot_size ~page_size ~n ~k ~redundancy_factor
-      ~number_of_shards ~shard_size ~srs_g1_length ~srs_g2_length =
+      ~number_of_shards ~shard_length ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
     if not (is_power_of_two slot_size) then
       (* According to the specification the length of a slot are in MiB *)
@@ -385,10 +385,10 @@ module Inner = struct
              number_of_shards))
     else if n mod number_of_shards <> 0 then
       fail (`Fail (Format.asprintf "The number of shards must divide %d" n))
-    else if 2 * shard_size >= k then
-      (* Since shard_size = n / number_of_shards, we obtain
+    else if 2 * shard_length >= k then
+      (* Since shard_length = n / number_of_shards, we obtain
          (all quantities are positive integers):
-         2 * shard_size < k
+         2 * shard_length < k
          => 2 (n / number_of_shards) < k
          => 2 * n / k < number_of_shards
          => 2 * redundancy_factor < number_of_shards
@@ -457,7 +457,7 @@ module Inner = struct
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
-    let shard_size = n / number_of_shards in
+    let shard_length = n / number_of_shards in
     let* raw =
       match !initialisation_parameters with
       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
@@ -471,7 +471,7 @@ module Inner = struct
         ~k
         ~redundancy_factor
         ~number_of_shards
-        ~shard_size
+        ~shard_length
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
@@ -500,7 +500,7 @@ module Inner = struct
         domain_k = make_domain k;
         domain_2k = make_domain (2 * k);
         domain_n = make_domain n;
-        shard_size;
+        shard_length;
         pages_per_slot = pages_per_slot parameters;
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
@@ -642,19 +642,33 @@ module Inner = struct
     done ;
     slot
 
-  let encode t p =
-    Evaluations.evaluation_fft t.domain_n p |> Evaluations.to_array
+  (* Encoding a message P = (P_0, ... ,P_{k-1}) amounts to evaluate
+     its associated polynomial P(x)=sum_{i=0}^{k-1} P_i x^i at the
+     evaluation points [t.domain_n].
 
-  (* The shards are arranged in cosets to evaluate in batch with Kate
-     amortized. *)
+     This can be achieved with an n-points discrete Fourier transform
+     supported by the [Scalar] field in time O(n log n). *)
+  let encode t p =
+    Evaluations.to_array (Evaluations.evaluation_fft t.domain_n p)
+
+  (* The shards are arranged in cosets to produce batches of KZG proofs
+     for the shards efficiently.
+
+     The domain of evaluation <w> is split into cosets:
+     <w> = Disjoint union_{i in ⟦0, t.number_of_shards-1⟧} W_i,
+
+     where W_0 = {w^{t.number_of_shards * j}}_{j in ⟦0, t.shard_length-1⟧}
+     and W_i = w^i W_0 (|W_0|=t.shard_length). *)
   let shards_from_polynomial t p =
     let codeword = encode t p in
-    let len_shard = t.n / t.number_of_shards in
     let rec loop index seq =
       if index = t.number_of_shards then seq
       else
-        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
-        for j = 0 to len_shard - 1 do
+        (* For each shard index [index], a [share] consists of the
+           elements from [codeword] of indices w^index W_0.
+           A shard consists of its [index] and associated [share]. *)
+        let share = Array.init t.shard_length (fun _ -> Scalar.(copy zero)) in
+        for j = 0 to t.shard_length - 1 do
           share.(j) <- codeword.((t.number_of_shards * j) + index)
         done ;
         loop (index + 1) (Seq.cons {index; share} seq)
@@ -673,21 +687,55 @@ module Inner = struct
     let share_scalar_len = t.n / t.number_of_shards in
     (share_scalar_len * Scalar.size_in_bytes) + 4
 
+  (* Let w be a primitive [t.n]-th root of unity, where
+     [t.k] and [t.n = t.redundancy_factor * t.k] divide
+     [Scalar.order - 1]. Let F be a finite field, and in this
+     context we use the prime field [Scalar].
+     We can decode a codeword c from
+     RS(n, k, (w^i)_i) ≔ { (P(w^i))_{i in ⟦0, n-1⟧} | P in F[x] /\ deg P < k }
+     with at least k components of c. By decode we mean finding the
+     underlying message represented by the polynomial P such that
+     c=(P(w^i))_{i in ⟦0, n-1⟧} with at least k components of c.
+
+     Without loss of generality, let c̃ = (c_0, ..., c_{k-1})
+     be the received codeword with erasures, i.e., the first k components of
+     a codeword. We can retrieve the original message with any k
+     components of c thanks to the Lagrange interpolation polynomial P(x)
+     defined as follows, where the x_i=w^i are the evaluation points of c̃:
+
+     P(x) = sum_{i=0}^{k-1} c_i prod_{j=0, j != i}^{k-1} (x-x_j)/(x_i - x_j).
+
+     As detailed in https://arxiv.org/pdf/0907.1788v1.pdf, the idea is
+     to rewrite P(x) as a product of two polynomials A(x) and B(x) so
+     that the convolution theorem allows us to recover P(x) using FFTs
+     in O(n log n).
+
+     Asymptotic complexity is O(n log n). *)
   let polynomial_from_shards t shards =
     let shards =
       (* We always consider the first k codeword vector components,
          the ShardSet allows collecting distinct indices.
-         [Seq.take] doesn't raise any exceptions as t.k / t.shard_size
-         is (strictly) positive. *)
-      Seq.take (t.k / t.shard_size) shards |> ShardSet.of_seq
+         [Seq.take] doesn't raise any exceptions as t.k / t.shard_length
+         is (strictly) positive.
+
+         [t.k / t.shard_length] is strictly less than [t.number_of_shards].
+
+         Indeed, [t.shard_length = t.n / t.number_of_shards] where
+         [t.n = t.k * t.redundancy_factor] and [t.redundancy_factor > 1].
+         Thus,
+         [t.k / t.shard_length = t.number_of_shards / t.redundancy_factor < t.number_of_shards].
+
+         Here, all variables are positive integers, and [t.redundancy_factor]
+         divides [t.number_of_shards], [t.number_of_shards] divides [t.n]. *)
+      Seq.take (t.k / t.shard_length) shards |> ShardSet.of_seq
     in
-    (* There should be t.k / t.shard_size distinct shard indices. *)
-    if t.k / t.shard_size > ShardSet.cardinal shards then
+    (* There should be [t.k / t.shard_length] distinct shard indices. *)
+    if t.k / t.shard_length > ShardSet.cardinal shards then
       Error
         (`Not_enough_shards
           (Printf.sprintf
              "there must be at least %d shards to decode"
-             (t.k / t.shard_size)))
+             (t.k / t.shard_length)))
     else if
       ShardSet.exists
         (fun {index; _} -> index >= t.number_of_shards || index < 0)
@@ -696,80 +744,182 @@ module Inner = struct
       Error
         (`Shard_index_out_of_range
           (Printf.sprintf
-             "At least one shard index out of range: expected indexes within \
-              range [%d, %d]."
+             "At least one shard index out of range: expected indices within \
+              the range [%d, %d]."
              0
              (t.number_of_shards - 1)))
     else if
       ShardSet.exists
-        (fun {share; _} -> Array.length share <> t.shard_size)
+        (fun {share; _} -> Array.length share <> t.shard_length)
         shards
     then
       Error
         (`Invalid_shard_length
           (Printf.sprintf
-             "At least one shard of invalid length: expected length %d"
-             t.shard_size))
+             "At least one shard of invalid length: expected length %d."
+             t.shard_length))
     else
-      (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}). *)
+      (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - x_i).
+
+         Let A(x) ≔ prod_{i=0}^{k-1} (x-x_i) and
+         A_i(x) ≔ prod_{j=0, j != i}^{k-1} (x-x_j).
+
+         Let n_i ≔ c_i / A_i(x_i).
+
+         The interpolation polynomial becomes:
+         P(x) = A(x) sum_{i=0}^{k-1} c_i / ((x - x_i) A_i(x_i))
+              = A(x) sum_{i=0}^{k-1} n_i / (x - x_i).
+
+         Note that A_i(x_i) != 0 by definition, so it is invertible
+         in the [Scalar] field. *)
+
+      (* The codewords are split into chunks called shards.
+
+         For this purpose, let [t.shard_length=t.n/t.number_of_shards]
+         be the length of a shard, and w a primitive n-th root
+         of unity.
+
+         The domain of evaluation <w> is then split into cosets:
+         <w> = Disjoint union_{i in ⟦0, t.number_of_shards-1⟧} W_i,
+
+         where W_0 = {w^{t.number_of_shards * j}}_{j in ⟦0, t.shard_length-1⟧}
+         and W_i = w^i W_0 (|W_0|=t.shard_length).
+
+         For a set of [t.k / shard_length] shard indices
+         Z subseteq {0, t.number_of_shards-1}, we reorganize the product
+         A(x)=prod_{i=0}^{k-1} (x-x_i) into
+
+         A(x) = prod_{i in Z, |Z|=t.k/t.shard_length} Z_i
+         where Z_i = prod_{w' in W_i} (x - w').
+
+         We notice that Z_0(x)=x^{|W_0|}-1 (as its roots
+         are the elements of a group of order dividing |W_0|)
+         entails Z_i(x)=x^{|W_0|}-w^{i*|W_0|}
+         (multiplying all terms by a constant w^i in an
+         integral domain), which is a sparse polynomial.
+         This special form for Z_i(x) allows us to compute the product of
+         the Z_i(x)s more efficiently with the [mul_xn] function, which
+         multiplies an arbitrary polynomial P with a polynomial of the
+         form Z_i(x) in time linear in (degree P + degree Z_i(x)).
+
+         Thus A(x) = prod_{i in Z, |Z|=k/l} x^{|W_0|}-w^{i*|W_0|}.
+
+         More formally: every element of W_i is of the form
+         w^i w^{t.number_of_shards j} for j in ⟦0, t.shard_length-1⟧. Thus
+
+         Z_i(w^i w^{s j}) = (w^i w^{s j})^{|W_0|}-w^{i*|W_0|}
+                          = (w^i)^{|W_0|} (w^{s j})^{|W_0|} - w^{i*|W_0|}
+                          = w^{i * |W_0|} * 1 - w^{i*|W_0|}=0.
+
+         So every element of W_i is a root of Z_i(x).
+         Moreover, Z_i(x) is a degree |W_0|=t.shard_length polynomial
+         so has at most [t.shard_length] roots:
+         Z_i(x)'s only roots are W_i
+
+         [mul acc i] computes the polynomial acc * Z_i. *)
       let mul acc i =
-        (* The complexity of mul_xn is linear in [t.shard_size]. *)
+        (* The complexity of [mul_xn] is linear in
+           [Polynomials.degree acc + t.shard_length]. *)
         Polynomials.mul_xn
           acc
-          t.shard_size
-          (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)))
+          t.shard_length
+          (Scalar.negate (Domains.get t.domain_n (i * t.shard_length)))
       in
+      (* [partition_products seq] builds two polynomials whose
+         product is A(x) from the input shards [seq]. *)
       let partition_products seq =
         ShardSet.fold
           (fun {index; _} (l, r) -> (mul r index, l))
           seq
           (Polynomials.one, Polynomials.one)
       in
+      (* The computation of [p1], [p2] has asymptotic complexity
+         [O((t.k + t.shard_length) * (t.k / t.shard_length))
+         = O(t.k * t.number_of_shards / t.redundancy_factor)].
+         It is the most costly operation of this function. *)
       let p1, p2 = partition_products shards in
+      (* A(x) is the product of [p1] and [p2]. *)
       let a_poly = fft_mul t.domain_2k [p1; p2] in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
 
-      (* 3. Computing A'(w^i) = A_i(w^i). *)
+      (* 3. Computing A'(w^i) = A_i(w^i).
+
+         In order to compute A_i(x) more efficiently, we use the
+         fact that the formal derivative A'(x) of A(x) satisfies
+         for all i in ⟦0, k-1⟧: A'(x_i) = A_i(x_i).
+         So we can compute (A_i(x_i))_i by evaluating A'(x) at the
+         points (w^i)_i with an FFT.
+
+         Indeed:
+         A'(x) = (prod_{i=0}^{k-1} (x-x_i))'
+               = sum_{i=0}^{k-1} (x-x_i)' prod_{j=0, j != i}^{k-1} (x-x_j)
+               = sum_{j=0}^{k-1} A_j(x).
+
+         So A'(x_i) = sum_{j=0}^{k-1} A_j(x_i) = A_i(x_i) as the other
+         polynomials A_j(x) have x_i as root. *)
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
-      (* 4. Computing the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
+      (* 4. Computing N(x) ≔ sum_{i=0}^{k-1} n_i / x_i x^i
+         where n_i ≔ c_i/A_i(x_i)
+
+         Writing the fraction
+
+         1 / (x_i-x) = sum_{j=0}^infty x^j / (x_i^{j+1}) as a formal power
+         series, we obtain
+
+         P(x) / A(x) = sum_{i=0}^{k-1} n_i / (x-x_i) mod x^k
+                     = -sum_{i=0}^{k-1} [sum_{j=0}^{k-1} n_i / (x_i^{j+1}) x^j]
+                     = -sum_{i=0}^{k-1} N(w^{-i}) x^i
+
+         where N(x) ≔ sum_{i=0}^{k-1} n_i / x_i x^i. *)
       let compute_n t eval_a' shards =
-        let w = Domains.get t.domain_n 1 in
         let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
         ShardSet.iter
           (fun {index; share} ->
             for j = 0 to Array.length share - 1 do
               let c_i = share.(j) in
-              let z_i = (t.number_of_shards * j) + index in
-              let x_i = Scalar.pow w (Z.of_int z_i) in
-              let tmp = Evaluations.get eval_a' z_i in
+              let i = (t.number_of_shards * j) + index in
+              let x_i = Domains.get t.domain_n i in
+              let tmp = Evaluations.get eval_a' i in
               Scalar.mul_inplace tmp tmp x_i ;
-              (* The call below never fails by construction, so we don't
-                 catch exceptions. *)
+              (* The call below never fails, so we don't
+                 catch exceptions.
+
+                 Indeed, [tmp = A_i(x_i)] is a product of nonzero
+                 elements and so is itself nonzero
+                 (thus invertible). See point 1. *)
               Scalar.inverse_exn_inplace tmp tmp ;
               Scalar.mul_inplace tmp tmp c_i ;
-              n_poly.(z_i) <- tmp
+              n_poly.(i) <- tmp
             done)
           shards ;
         n_poly
       in
       let n_poly = compute_n t eval_a' shards in
 
-      (* 5. Computing B(x). *)
-      let b = Evaluations.interpolation_fft2 t.domain_n n_poly in
-      let b = Polynomials.copy ~len:t.k b in
-      Polynomials.mul_by_scalar_inplace b (Scalar.of_int t.n) b ;
+      (* 5. Computing B(x).
+         B(x) = P(x) / A(x) = -sum_{i=0}^{k-1} N(w^{-i}) x^i.
 
-      (* 6. Computing Lagrange interpolation polynomial P(x). *)
+         B(x) is thus given by the first k components
+         of -n * IFFT_n(N). *)
+      let b =
+        Polynomials.copy
+          ~len:t.k
+          (Evaluations.interpolation_fft2 t.domain_n n_poly)
+      in
+      Polynomials.mul_by_scalar_inplace b Scalar.(negate (of_int t.n)) b ;
+
+      (* 6. Computing Lagrange interpolation polynomial P(x).
+         The product is given by the convolution theorem:
+         P = A * B = IFFT_{2k}(FFT_{2k}(A) o FFT_{2k}(B))
+         where o is the pairwise product. *)
       let p = fft_mul t.domain_2k [a_poly; b] in
       let len =
         if Polynomials.is_zero p then 1 else min t.k (Polynomials.degree p + 1)
       in
-      let p = Polynomials.copy ~len p in
-      Polynomials.opposite_inplace p ;
-      Ok p
+      Ok (Polynomials.copy ~len p)
 
   let commit t p = Srs_g1.pippenger t.srs.raw.srs_g1 p
 
@@ -1122,6 +1272,8 @@ module Internal_for_tests = struct
         loop (index + 1) (Seq.cons {index; share} seq)
     in
     loop 0 Seq.empty
+
+  let polynomials_equal = Polynomials.equal
 end
 
 module Config = struct
