@@ -1,3 +1,7 @@
+v1.1
+
+* fix: The client do not wait for a first element of a stream to arrive.
+
 v1.0
 
 * refactoring: Invert control over resto server
