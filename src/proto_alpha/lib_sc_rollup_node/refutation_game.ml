@@ -303,8 +303,8 @@ module Make (Interpreter : Interpreter.S) :
     in
     if Result.is_ok res then return proof else assert false
 
-  let new_dissection ~default_number_of_sections node_ctxt last_level ok
-      our_view =
+  let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level
+      ok our_view =
     let open Lwt_result_syntax in
     let state_hash_from_tick tick =
       let* r = Interpreter.state_of_tick node_ctxt tick last_level in
@@ -319,21 +319,31 @@ module Make (Interpreter : Interpreter.S) :
     let our_stop_chunk =
       Sc_rollup.Dissection_chunk.{state_hash = start_hash; tick = start_tick}
     in
-    Game_helpers.make_dissection
-      ~state_hash_from_tick
-      ~start_chunk
-      ~our_stop_chunk
-    @@ PVM.new_dissection
-         ~start_chunk
-         ~our_stop_chunk
-         ~default_number_of_sections
+    let* dissection =
+      Game_helpers.make_dissection
+        ~state_hash_from_tick
+        ~start_chunk
+        ~our_stop_chunk
+      @@ PVM.new_dissection
+           ~start_chunk
+           ~our_stop_chunk
+           ~default_number_of_sections
+    in
+    let*! () =
+      Refutation_game_event.computed_dissection
+        ~opponent
+        ~start_tick:(snd ok)
+        ~end_tick:(snd our_view)
+        dissection
+    in
+    return dissection
 
   (** [generate_from_dissection ~default_number_of_sections node_ctxt game
       dissection] traverses the current [dissection] and returns a move which
       performs a new dissection of the execution trace or provides a refutation
       proof to serve as the next move of the [game]. *)
-  let generate_next_dissection ~default_number_of_sections node_ctxt game
-      dissection =
+  let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
+      game dissection =
     let open Lwt_result_syntax in
     let rec traverse ok = function
       | [] ->
@@ -368,6 +378,7 @@ module Make (Interpreter : Interpreter.S) :
         let choice = snd ok in
         let* dissection =
           new_dissection
+            ~opponent
             ~default_number_of_sections
             node_ctxt
             game.inbox_level
@@ -386,7 +397,7 @@ module Make (Interpreter : Interpreter.S) :
           Sc_rollup_node_errors
           .Unreliable_tezos_node_returning_inconsistent_game
 
-  let next_move node_ctxt game =
+  let next_move node_ctxt ~opponent game =
     let open Lwt_result_syntax in
     let final_move start_tick =
       let* start_state =
@@ -414,6 +425,7 @@ module Make (Interpreter : Interpreter.S) :
           generate_next_dissection
             ~default_number_of_sections
             node_ctxt
+            ~opponent
             game
             dissection
         in
@@ -425,7 +437,7 @@ module Make (Interpreter : Interpreter.S) :
 
   let play_next_move node_ctxt game self opponent =
     let open Lwt_result_syntax in
-    let* refutation = next_move node_ctxt game in
+    let* refutation = next_move node_ctxt ~opponent game in
     inject_next_move node_ctxt self ~refutation ~opponent
 
   let play_timeout (node_ctxt : _ Node_context.t) self stakers =
