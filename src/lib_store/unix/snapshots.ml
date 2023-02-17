@@ -3999,6 +3999,57 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
            got = validation_store.Block_validation.resulting_context_hash;
          })
 
+  let apply_context context_index ~imported_context_hash chain_id ~block_header
+      ~operations ~predecessor_header ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash ~user_activated_upgrades
+      ~user_activated_protocol_overrides ~operation_metadata_size_limit =
+    let open Lwt_result_syntax in
+    let* predecessor_context =
+      let*! o = Context.checkout context_index imported_context_hash in
+      match o with
+      | Some ch -> return ch
+      | None -> tzfail (Inconsistent_context imported_context_hash)
+    in
+    let predecessor_context =
+      Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
+    in
+    let apply_environment =
+      {
+        Block_validation.max_operations_ttl =
+          Int32.to_int predecessor_header.Block_header.shell.level;
+        chain_id;
+        predecessor_block_header = predecessor_header;
+        predecessor_context;
+        predecessor_resulting_context_hash = imported_context_hash;
+        predecessor_block_metadata_hash;
+        predecessor_ops_metadata_hash;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
+        operation_metadata_size_limit;
+      }
+    in
+    let* {result = block_validation_result; _} =
+      let*! r =
+        Block_validation.apply
+          apply_environment
+          block_header
+          operations
+          ~cache:`Lazy
+      in
+      match r with
+      | Ok block_validation_result -> return block_validation_result
+      | Error errs ->
+          Format.kasprintf
+            (fun errs ->
+              tzfail
+                (Target_block_validation_failed
+                   (Block_header.hash block_header, errs)))
+            "%a"
+            pp_print_trace
+            errs
+    in
+    return block_validation_result
+
   let restore_and_apply_context snapshot_importer protocol_levels
       ?user_expected_block ~dst_context_dir ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
@@ -4046,7 +4097,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             block_header.Block_header.shell.context
           else predecessor_header.Block_header.shell.context
     in
-    let* genesis_ctxt_hash, context_index =
+    let* genesis_ctxt_hash, block_validation_result =
       if legacy then
         let*! context_index =
           Context.init
@@ -4076,7 +4127,22 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~nb_context_elements:context_elements
             ~progress_display_mode
         in
-        return (genesis_ctxt_hash, context_index)
+        let* block_validation_result =
+          apply_context
+            context_index
+            ~imported_context_hash
+            chain_id
+            ~block_header
+            ~operations
+            ~predecessor_header
+            ~predecessor_block_metadata_hash
+            ~predecessor_ops_metadata_hash
+            ~user_activated_upgrades
+            ~user_activated_protocol_overrides
+            ~operation_metadata_size_limit
+        in
+        let*! () = Context.close context_index in
+        return (genesis_ctxt_hash, block_validation_result)
       else
         let* () =
           Animation.three_dots
@@ -4108,53 +4174,23 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               ~heads:(Some [Context_hash.to_b58check imported_context_hash])
           else Lwt.return_unit
         in
-        return (genesis_ctxt_hash, context_index)
+        let* block_validation_result =
+          apply_context
+            context_index
+            ~imported_context_hash
+            chain_id
+            ~block_header
+            ~operations
+            ~predecessor_header
+            ~predecessor_block_metadata_hash
+            ~predecessor_ops_metadata_hash
+            ~user_activated_upgrades
+            ~user_activated_protocol_overrides
+            ~operation_metadata_size_limit
+        in
+        let*! () = Context.close context_index in
+        return (genesis_ctxt_hash, block_validation_result)
     in
-    let* predecessor_context =
-      let*! o = Context.checkout context_index imported_context_hash in
-      match o with
-      | Some ch -> return ch
-      | None -> tzfail (Inconsistent_context imported_context_hash)
-    in
-    let predecessor_context =
-      Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
-    in
-    let apply_environment =
-      {
-        Block_validation.max_operations_ttl =
-          Int32.to_int predecessor_header.shell.level;
-        chain_id;
-        predecessor_block_header = predecessor_header;
-        predecessor_context;
-        predecessor_resulting_context_hash = imported_context_hash;
-        predecessor_block_metadata_hash;
-        predecessor_ops_metadata_hash;
-        user_activated_upgrades;
-        user_activated_protocol_overrides;
-        operation_metadata_size_limit;
-      }
-    in
-    let* {result = block_validation_result; _} =
-      let*! r =
-        Block_validation.apply
-          apply_environment
-          block_header
-          operations
-          ~cache:`Lazy
-      in
-      match r with
-      | Ok block_validation_result -> return block_validation_result
-      | Error errs ->
-          Format.kasprintf
-            (fun errs ->
-              tzfail
-                (Target_block_validation_failed
-                   (Block_header.hash block_header, errs)))
-            "%a"
-            pp_print_trace
-            errs
-    in
-    let*! () = Context.close context_index in
     let* () =
       check_context_hash_consistency
         ~expected_context_hash:resulting_context_hash
