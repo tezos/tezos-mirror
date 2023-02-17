@@ -119,16 +119,10 @@ struct
     block3b : Context_hash.t;
   }
 
-  type init_config = {indexing_strategy : [`Always | `Minimal]}
-
-  let wrap_context_init config f _ () =
+  let wrap_context_init f _ () =
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
         let root = base_dir // "context" in
-        let* idx =
-          match config with
-          | None -> Context.init root
-          | Some {indexing_strategy} -> Context.init ~indexing_strategy root
-        in
+        let* idx = Context.init root in
         let*!! genesis =
           Context.commit_genesis
             idx
@@ -649,10 +643,8 @@ struct
 
   (******************************************************************************)
 
-  let tests : (string * (t -> unit Lwt.t) * init_config option) list =
-    let test ?config name f =
-      (Printf.sprintf "%s:%s" Tag.tag name, f, config)
-    in
+  let tests : (string * (t -> unit Lwt.t)) list =
+    let test name f = (Printf.sprintf "%s:%s" Tag.tag name, f) in
     [
       test "is_empty" test_is_empty;
       test "simple" test_simple;
@@ -677,8 +669,7 @@ struct
 
   let tests =
     List.map
-      (fun (s, f, config) ->
-        Alcotest_lwt.test_case s `Quick (wrap_context_init config f))
+      (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_context_init f))
       tests
 end
 

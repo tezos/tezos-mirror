@@ -659,16 +659,12 @@ module type TEZOS_CONTEXT = sig
 
   (** Open or initialize a versioned store at a given path.
 
-      @param indexing_strategy determines whether newly-exported objects by
-      this store handle should also be added to the store's index. [`Minimal]
-      (the default) only adds objects to the index when they are {i commits},
-      whereas [`Always] indexes every object type. The indexing strategy used
-      for existing stores can be changed without issue (as only {i
-      newly}-exported objects are impacted). *)
+      The indexing_strategy, which determines whether newly-exported
+      objects by this store handle should also be added to the store's
+      index, is set to [`Minimal] by default. *)
   val init :
     ?patch_context:(context -> context tzresult Lwt.t) ->
     ?readonly:bool ->
-    ?indexing_strategy:[`Always | `Minimal] ->
     ?index_log_size:int ->
     string ->
     index Lwt.t

@@ -4048,7 +4048,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         let*! context_index =
           Context.init
             ~readonly:false
-            ~indexing_strategy:`Minimal
             ~index_log_size:default_index_log_size
             ?patch_context
             dst_context_dir
@@ -4086,7 +4085,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         let*! context_index =
           Context.init
             ~readonly:false
-            ~indexing_strategy:`Minimal
             ~index_log_size:default_index_log_size
             ?patch_context
             dst_context_dir
