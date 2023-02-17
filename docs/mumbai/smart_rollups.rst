@@ -297,13 +297,6 @@ Octez rollup client.
 Prerequisites
 ^^^^^^^^^^^^^
 
-.. warning::
-
-   At the time of writing this document, ``mumbainet`` has not been
-   started.  The easiest way to test smart rollups remains using
-   Dailynet, see :doc:`the Alpha’s smart rollups page
-   <../alpha/smart_rollups>`.
-
 An Octez rollup node needs an Octez node to run. We assume that
 a rollup node has been launched locally, typically by issuing:
 
