@@ -1001,54 +1001,13 @@ value that was previously stored in the ``big_map`` at the same key as
 Operations on optional values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``SOME``: Pack a value as an optional value.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : 'S   ->   option 'a : 'S
-
-    > SOME / v : S  =>  (Some v) : S
-
--  ``NONE 'a``: The absent optional value.
-
-::
-
-    :: 'S   ->   option 'a : 'S
-
-    > NONE / S  =>  None : S
-
--  ``IF_NONE bt bf``: Inspect an optional value.
-
-::
-
-    :: option 'a : 'A   ->   'B
-       iff   bt :: [ 'A -> 'B]
-             bf :: [ 'a : 'A -> 'B]
-
-    > IF_NONE bt bf / (None) : S  =>  bt / S
-    > IF_NONE bt bf / (Some a) : S  =>  bf / a : S
-
--  ``COMPARE``: Optional values comparison
-
-::
-
-    :: option 'a : option 'a : 'S   ->   int : 'S
-
-    > COMPARE / None : None : S  =>  0 : S
-    > COMPARE / None : (Some _) : S  =>  -1 : S
-    > COMPARE / (Some _) : None : S  =>  1 : S
-    > COMPARE / (Some a) : (Some b) : S  =>  COMPARE / a : b : S
-
-- ``MAP body``: Apply the body expression to the value inside the option if there is one.
-
-::
-
-   :: option 'a : 'S -> option 'b : 'S
-      iff    body :: [ 'a : 'S -> 'b : 'S ]
-
-   > MAP body / None : S => None : S
-   > MAP body / (Some a) : S => (Some b) : S'
-      where body / a : S => b : S'
+-  ``SOME``: Pack a value as an optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SOME>`__).
+-  ``NONE 'a``: The absent optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NONE>`__).
+-  ``IF_NONE bt bf``: Inspect an optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_NONE>`__).
+-  ``COMPARE``: Optional values comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
+- ``MAP body``: Apply the body expression to the value inside the option if there is one (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
 
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
