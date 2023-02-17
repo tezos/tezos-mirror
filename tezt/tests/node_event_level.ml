@@ -34,6 +34,7 @@
 
 let get_request_level = function
   | "debug" -> "request_completed_debug.v0"
+  | "info" -> "request_completed_info.v0"
   | "notice" -> "request_completed_notice.v0"
   | level -> Test.fail "Incorrect %s level for request_completed event" level
 
@@ -56,7 +57,7 @@ let get_request_level = function
      },
      "level": "notice"
 *)
-let wait_for_request_kind ?(level = "notice") (request_kind : string) node =
+let wait_for_request_kind ~level (request_kind : string) node =
   let filter json =
     match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
     | Some s when String.equal s request_kind -> Some ()
@@ -67,12 +68,12 @@ let wait_for_request_kind ?(level = "notice") (request_kind : string) node =
 (* Wait for the request signaling the injection of a new operation in
    the mempool. This event has level "notice".
 *)
-let wait_for_injection = wait_for_request_kind "inject"
+let wait_for_injection = wait_for_request_kind ~level:"notice" "inject"
 
 (* Wait for the request signaling a flush of the state of the mempool.
    This event has level "notice".
 *)
-let wait_for_flush = wait_for_request_kind "flush"
+let wait_for_flush = wait_for_request_kind ~level:"info" "flush"
 
 (* Wait for the request signaling the arrival of an operation in the mempool
    from a peer.
@@ -366,19 +367,18 @@ let test_event_levels =
       Constant.bootstrap1
       Constant.bootstrap2
   in
+  Log.info "NOTHING HAPPENS" ;
   Log.info "Injection event received from node 1." ;
   Log.info
-    "Step 5: Bake from node 3. Witness flush request (level notice) from all \
-     nodes, and set_head event (level info) from nodes 1 and 2." ;
+    "Step 5: Bake from node 3. Witness flush request (level notice) nodes, and \
+     set_head event (level info) from nodes 1 and 2." ;
   let wait1b = wait_for_flush node_1 in
   let wait2b = wait_for_flush node_2 in
-  let wait3b = wait_for_flush node_3 in
   let wait1c = wait_for_set_head node_1 in
   let wait2c = wait_for_set_head node_2 in
   let* () = Client.bake_for_and_wait client_3 in
   let* () = wait1b in
   let* () = wait2b in
-  let* () = wait3b in
   let* () = wait1c in
   let* () = wait2c in
   Log.info "Flush and set_head received." ;
@@ -398,6 +398,7 @@ let test_event_levels =
   let* () = wait1d in
   Log.info "Injection and arrival received for first transfer." ;
   let wait1e = wait_for_arrival node_1 in
+  Log.info "BEFORE TRANSFER" ;
   let* () =
     transfer_and_wait_for_injection
       node_3
@@ -406,6 +407,7 @@ let test_event_levels =
       Constant.bootstrap3
       Constant.bootstrap4
   in
+  Log.info "BEFORE ARRIVAL" ;
   let* () = wait1e in
   Log.info "Injection and arrival received for second transfer." ;
   unit

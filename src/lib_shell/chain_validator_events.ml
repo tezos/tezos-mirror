@@ -146,7 +146,7 @@ let disconnection =
     ~section
     ~name:"disconnection"
     ~msg:"disconnection of {peer_id}"
-    ~level:Notice
+    ~level:Info
     ~pp1:P2p_peer.Id.pp
     ("peer_id", P2p_peer.Id.encoding)
 

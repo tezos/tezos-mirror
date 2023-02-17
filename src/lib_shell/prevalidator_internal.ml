@@ -1403,8 +1403,10 @@ module Make
     let on_completion _w r _ st =
       Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
       match Request.view r with
-      | Request.View (Flush _) | View (Inject _) | View (Ban _) ->
+      | View (Inject _) | View (Ban _) ->
           Events.(emit request_completed_notice) (Request.view r, st)
+      | Request.View (Flush _) ->
+          Events.(emit request_completed_info) (Request.view r, st)
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
           Events.(emit request_completed_debug) (Request.view r, st)
 

@@ -595,7 +595,8 @@ let wait_for_identity node =
 let wait_for_request ~request node =
   let event_name =
     match request with
-    | `Flush | `Inject -> "request_completed_notice.v0"
+    | `Inject -> "request_completed_notice.v0"
+    | `Flush -> "request_completed_info.v0"
     | `Notify | `Arrived -> "request_completed_debug.v0"
   in
   let request_str =
