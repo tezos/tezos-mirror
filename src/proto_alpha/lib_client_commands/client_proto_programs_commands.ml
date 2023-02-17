@@ -687,6 +687,48 @@ let commands () =
             cctxt#error "ill-typed data expression");
     command
       ~group
+      ~desc:"Ask the node to normalize a typed Michelson stack."
+      (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
+      (prefixes ["normalize"; "stack"]
+      @@ param
+           ~name:"stack"
+           ~desc:
+             "the stack to normalize, in the following format: {Stack_elt \
+              <ty_1> <val_1>; ...; Stack_elt <ty_n> <val_n>}, where each \
+              <val_i> is a Michelson value of type <ty_i>. The topmost element \
+              of the stack is <val_1>."
+           micheline_parameter
+      @@ stop)
+      (fun (unparsing_mode, legacy) (stack, source) cctxt ->
+        let open Lwt_result_syntax in
+        let*? stack = Michelson_v1_stack.parse_stack ~source stack in
+        let*! r =
+          Plugin.RPC.Scripts.normalize_stack
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~legacy
+            ~stack
+            ~unparsing_mode
+        in
+        match r with
+        | Ok expr ->
+            let*! () =
+              cctxt#message "%a" Michelson_v1_printer.print_typed_stack expr
+            in
+            return_unit
+        | Error errs ->
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-typed stack");
+    command
+      ~group
       ~desc:"Ask the node to normalize a type."
       no_options
       (prefixes ["normalize"; "type"]

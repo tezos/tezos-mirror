@@ -52,6 +52,18 @@ let print_stack ppf = function
            print_expr_unwrapped)
         more
 
+let print_stack_elt out (ty, x) =
+  Format.fprintf out "Stack_elt %a %a" print_expr ty print_expr x
+
+let print_typed_stack out l =
+  Format.fprintf
+    out
+    "{%a}"
+    (Format.pp_print_list
+       ~pp_sep:(fun out () -> Format.fprintf out "; ")
+       print_stack_elt)
+    l
+
 let print_execution_trace ppf (trace : Script_typed_ir.execution_trace) =
   Format.pp_print_list
     (fun ppf (loc, gas, stack) ->

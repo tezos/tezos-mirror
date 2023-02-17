@@ -256,6 +256,18 @@ let binary_encoded_parameter ~name encoding =
   in
   file_or_text_parameter ~from_text ()
 
+let micheline_parameter =
+  Tezos_clic.parameter (fun _ source ->
+      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+      @@
+      let tokens, lexing_errors =
+        Tezos_micheline.Micheline_parser.tokenize source
+      in
+      let ast, parsing_errors =
+        Tezos_micheline.Micheline_parser.parse_expression tokens
+      in
+      ((ast, source), lexing_errors @ parsing_errors))
+
 let entrypoint_parameter =
   Tezos_clic.parameter (fun _ str ->
       Lwt.return @@ Environment.wrap_tzresult @@ Entrypoint.of_string_lax str)
