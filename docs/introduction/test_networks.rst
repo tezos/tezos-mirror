@@ -48,6 +48,21 @@ On Limanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
+Mumbainet
+=========
+
+- Built-in network alias: ``mumbainet`` (see :ref:`builtin_networks`)
+
+  * Available from version 16.0~rc2.
+
+Mumbainet is a test network which runs the Mumbai protocol.
+Mumbainet will run until Mumbai is refused through the amendment process
+or (accepted and then) replaced by another protocol on Mainnet.
+
+On Mumbainet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
+
 Future Networks
 ===============
 
