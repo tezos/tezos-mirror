@@ -5345,8 +5345,8 @@ module Protocol = Protocol
     in
     let _dal_tests =
       only_if (active && N.(number >= 016)) @@ fun () ->
-      test
-        "main"
+      tezt
+        ["test_dal_slot_frame_encoding"; "test_helpers"]
         ~path:(path // "lib_dal/test")
         ~opam:(sf "tezos-dal-%s" name_dash)
         ~with_macos_security_framework:true
@@ -5358,7 +5358,7 @@ module Protocol = Protocol
             main |> open_;
             octez_base_test_helpers |> open_;
             test_helpers |> if_some |> open_;
-            alcotest_lwt;
+            alcotezt;
           ]
     in
     let dac =

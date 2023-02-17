@@ -411,3 +411,13 @@ let tests =
       `Quick
       slot_frame_decoding_fails_if_wrong_version;
   ]
+
+let () =
+  Alcotest_lwt.run
+    "protocol > unit"
+    [
+      Test_helpers.Unit_test.spec
+        (Protocol.name ^ ": Slot_framing_protocol.ml")
+        tests;
+    ]
+  |> Lwt_main.run
