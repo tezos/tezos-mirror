@@ -394,3 +394,21 @@ let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
     else Lwt.return_unit
   in
   spawn_command snoop command |> Process.check
+
+let generate_code_using_solution ~solution ?fixed_point snoop =
+  let command =
+    [
+      "generate";
+      "code";
+      "using";
+      "solution";
+      solution;
+      "for";
+      "inferred";
+      "models";
+    ]
+    @ match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn]
+  in
+  let process = spawn_command snoop command in
+  let* output = Process.check_and_read_stdout process in
+  Lwt.return output
