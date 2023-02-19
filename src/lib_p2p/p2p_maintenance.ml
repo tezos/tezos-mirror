@@ -69,6 +69,7 @@ let broadcast_bootstrap_msg t =
       match P2p_peer_state.get peer_info with
       | Running {data = conn; _} ->
           if not (P2p_conn.private_node conn) then (
+            Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_sent ;
             ignore (P2p_conn.write_bootstrap conn) ;
             t.log (Bootstrap_sent {source = peer_id}))
       | _ -> ())
@@ -80,6 +81,7 @@ let send_swap_request t =
   | Some (proposed_point, proposed_peer_id, recipient) ->
       let recipient_peer_id = (P2p_conn.info recipient).peer_id in
       t.log (Swap_request_sent {source = recipient_peer_id}) ;
+      Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_sent ;
       ignore
         (P2p_conn.write_swap_request recipient proposed_point proposed_peer_id)
 
