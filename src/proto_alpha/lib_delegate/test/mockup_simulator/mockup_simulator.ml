@@ -759,9 +759,13 @@ let rec listener ~(user_hooks : (module Hooks)) ~state ~broadcast_pipe =
   let module User_hooks = (val user_hooks : Hooks) in
   Lwt_pipe.Unbounded.pop broadcast_pipe >>= function
   | Broadcast_op (operation_hash, packed_operation) ->
-      state.mempool <- (operation_hash, packed_operation) :: state.mempool ;
-      state.operations_stream_push (Some [(operation_hash, packed_operation)]) ;
-      User_hooks.check_mempool_after_processing ~mempool:state.mempool
+      (if
+       List.mem_assoc ~equal:Operation_hash.equal operation_hash state.mempool
+      then return_unit
+      else (
+        state.mempool <- (operation_hash, packed_operation) :: state.mempool ;
+        state.operations_stream_push (Some [(operation_hash, packed_operation)]) ;
+        User_hooks.check_mempool_after_processing ~mempool:state.mempool))
       >>=? fun () -> listener ~user_hooks ~state ~broadcast_pipe
   | Broadcast_block (block_hash, block_header, operations) ->
       get_block_level block_header >>=? fun level ->
