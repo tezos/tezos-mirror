@@ -126,6 +126,9 @@ let hash_of_string s =
     e.g. [0xFFFFFFF]. *)
 let hash_to_string (Hash h) = append_0x h
 
+(** [hash_to_bytes hash] transforms the [hash] to binary format. *)
+let hash_to_bytes (Hash h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
+
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 (** Ethereum block hash representation from RPCs. *)

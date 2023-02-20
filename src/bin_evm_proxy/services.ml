@@ -135,6 +135,22 @@ module Mock = struct
   let call = hash_f "0x"
 end
 
+(** [inject_raw_transaction rollup_node_rpc ~smart_rollup_address tx_raw]
+    crafts the hash of [tx_raw] and sends to the injector a message consisting
+    of:
+    - First 20 bytes: [smart_rollup_address].
+    - Following 32 bytes: crafted transaction hash.
+    - Remaining bytes: [tx_raw] in binary format.
+*)
+let inject_raw_transaction (module Rollup_node_rpc : Rollup_node.S)
+    ~smart_rollup_address tx_raw =
+  let open Lwt_result_syntax in
+  let tx_hash = Tx_hash.hash_to_string (Ethereum_types.hash_to_string tx_raw) in
+  let tx_raw = Ethereum_types.hash_to_bytes tx_raw in
+  let tx = smart_rollup_address ^ tx_hash ^ tx_raw in
+  let* () = Rollup_node_rpc.inject_raw_transaction tx in
+  return (Mock.hash_f Hex.(of_string tx_hash |> show))
+
 let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
     =
   Directory.register0 dir dispatch_service (fun () (input, id) ->
@@ -167,10 +183,21 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
         | Get_transaction_receipt.Input _ ->
             return
               (Get_transaction_receipt.Output (Ok (Mock.transaction_receipt ())))
-        | Send_raw_transaction.Input _ ->
-            incr Mock.block_height_counter ;
-            incr Mock.transaction_counter ;
-            return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
+        | Send_raw_transaction.Input (Some tx_raw) ->
+            let* tx_hash =
+              match rollup_node_config with
+              | Some (rollup_node_rpc, smart_rollup_address) ->
+                  inject_raw_transaction
+                    rollup_node_rpc
+                    ~smart_rollup_address
+                    tx_raw
+              | None ->
+                  incr Mock.block_height_counter ;
+                  incr Mock.transaction_counter ;
+
+                  return Mock.transaction_hash
+            in
+            return (Send_raw_transaction.Output (Ok tx_hash))
         | Send_transaction.Input _ ->
             return (Send_transaction.Output (Ok Mock.transaction_hash))
         | Eth_call.Input _ -> return (Eth_call.Output (Ok Mock.call))
