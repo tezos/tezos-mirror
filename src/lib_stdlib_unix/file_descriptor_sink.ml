@@ -380,14 +380,9 @@ end) : Internal_event.SINK with type t = t = struct
       in
       match format with
       | `Pp ->
-          let s =
-            String.map
-              (function '\n' -> ' ' | c -> c)
-              (Format.asprintf "%a" (M.pp ~short:false) event)
-          in
           (* See https://tools.ietf.org/html/rfc5424#section-6 *)
           Format.asprintf
-            "%a [%s.%s] %s\n"
+            "%a [%s.%s] %a\n"
             (Ptime.pp_rfc3339 ~frac_s:3 ())
             (match Ptime.of_float_s wrapped_event.time_stamp with
             | Some s -> s
@@ -395,7 +390,8 @@ end) : Internal_event.SINK with type t = t = struct
             (Internal_event.Section.to_string_list wrapped_event.section
             |> String.concat ".")
             M.name
-            s
+            (M.pp ~all_fields:true ~block:false)
+            event
       | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
       | `Netstring ->
           let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
