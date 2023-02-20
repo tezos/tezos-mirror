@@ -128,3 +128,8 @@ let endpoint (proxy_server : t) =
     "http://%s:%d"
     proxy_server.persistent_state.rpc_addr
     proxy_server.persistent_state.rpc_port
+
+let init ?runner ?rpc_addr ?rpc_port rollup_node =
+  let proxy_server = create ?runner ?rpc_addr ?rpc_port rollup_node in
+  let* () = run proxy_server in
+  return proxy_server
