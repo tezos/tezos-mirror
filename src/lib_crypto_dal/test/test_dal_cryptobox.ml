@@ -1,5 +1,5 @@
 module Test = struct
-  (* Samples k random integers within the range [0, bound]. *)
+  (* Samples k random integers within the range [0, bound[. *)
   let random_indices bound k =
     let indices = Array.init k (fun _ -> -1) in
     for i = 0 to k - 1 do
