@@ -31,6 +31,10 @@ let hash_to_hex hash = Hex.of_bytes hash
 
 type supported_hashes = Blake2B
 
+let bytes_to_hash = Fun.id
+
+let raw_encoding = Data_encoding.(conv hash_to_bytes bytes_to_hash (bytes' Hex))
+
 module type T = sig
   val encoding : hash Data_encoding.t
 

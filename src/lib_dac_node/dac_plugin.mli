@@ -36,6 +36,9 @@ val hash_to_bytes : hash -> bytes
 
 val hash_to_hex : hash -> Hex.t
 
+(** Protocol independent encoding of Dac_plugin.hash values. *)
+val raw_encoding : hash Data_encoding.t
+
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
     Fix static supported_hashes type *)
 type supported_hashes = Blake2B

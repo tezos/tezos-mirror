@@ -30,6 +30,10 @@
 type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
+  | Hash_of_page_is_invalid of {
+      expected : Dac_plugin.hash;
+      actual : Dac_plugin.hash;
+    }
 
 (** [S] is the module type defining the backend required for
     persisting DAC pages data onto the page storage. *)

@@ -27,6 +27,10 @@
 type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
+  | Hash_of_page_is_invalid of {
+      expected : Dac_plugin.hash;
+      actual : Dac_plugin.hash;
+    }
 
 let () =
   register_error_kind
@@ -59,7 +63,28 @@ let () =
     Data_encoding.(obj1 (req "hash" Data_encoding.string))
     (function
       | Cannot_read_page_from_page_storage hash -> Some hash | _ -> None)
-    (fun hash -> Cannot_read_page_from_page_storage hash)
+    (fun hash -> Cannot_read_page_from_page_storage hash) ;
+  register_error_kind
+    `Permanent
+    ~id:"hash_of_page_is_invalid"
+    ~title:"Hash of page contents i different from the expected hash"
+    ~description:"Hash of page content is different from the expected hash"
+    ~pp:(fun ppf (expected, actual) ->
+      Format.fprintf
+        ppf
+        "Hash of page content is %a, while %a was expected."
+        Format.pp_print_bytes
+        (Dac_plugin.hash_to_bytes expected)
+        Format.pp_print_bytes
+        (Dac_plugin.hash_to_bytes actual))
+    Data_encoding.(
+      obj2
+        (req "expected" Dac_plugin.raw_encoding)
+        (req "acual" Dac_plugin.raw_encoding))
+    (function
+      | Hash_of_page_is_invalid {expected; actual} -> Some (expected, actual)
+      | _ -> None)
+    (fun (expected, actual) -> Hash_of_page_is_invalid {expected; actual})
 
 module type S = sig
   type t
@@ -149,10 +174,18 @@ module Remote : S with type configuration = remote_configuration = struct
 
   let load plugin (cctxt, page_store) hash =
     let open Lwt_result_syntax in
+    let (module Plugin : Dac_plugin.T) = plugin in
     let* file_exists_locally = mem plugin (cctxt, page_store) hash in
     if file_exists_locally then Filesystem.load plugin page_store hash
     else
+      let hashing_scheme = Plugin.scheme_of_hash hash in
       let* content = Dac_node_client.get_preimage plugin cctxt hash in
-      let+ () = Filesystem.save plugin page_store ~hash ~content in
-      content
+      let fetched_hash = Plugin.hash_bytes ~scheme:hashing_scheme [content] in
+      (* TODO: expose Dac_hash.equal from protocol. *)
+      if not @@ Plugin.equal hash fetched_hash then
+        tzfail
+        @@ Hash_of_page_is_invalid {expected = hash; actual = fetched_hash}
+      else
+        let+ () = Filesystem.save plugin page_store ~hash ~content in
+        content
 end
