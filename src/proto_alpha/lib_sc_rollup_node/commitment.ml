@@ -244,6 +244,11 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let publish_operation =
       Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
     in
+    let*! () =
+      Commitment_event.publish_commitment
+        (Sc_rollup.Commitment.hash_uncarbonated commitment)
+        commitment.inbox_level
+    in
     let* _hash = Injector.add_pending_operation ~source publish_operation in
     return_unit
 
@@ -262,7 +267,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           let* commitments = missing_commitments node_ctxt in
           List.iter_es (publish_commitment node_ctxt ~source) commitments
 
-  let publish_single_commitment node_ctxt commitment_hash =
+  let publish_single_commitment node_ctxt (commitment : Sc_rollup.Commitment.t)
+      =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Publish in
     match operator with
@@ -270,9 +276,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         (* Configured to not publish commitments *)
         return_unit
     | Some source ->
-        let* commitment =
-          Node_context.get_commitment node_ctxt commitment_hash
-        in
         when_ (commitment.inbox_level > node_ctxt.lcc.level) @@ fun () ->
         publish_commitment node_ctxt ~source commitment
 

@@ -30,6 +30,55 @@ module Make (PVM : Pvm.S) = struct
   open Alpha_context
   open Apply_results
 
+  (** Returns [Some c] if [their_commitment] is refutable where [c] is our
+      commitment for the same inbox level. *)
+  let is_refutable_commitment node_ctxt
+      (their_commitment : Sc_rollup.Commitment.t) their_commitment_hash =
+    let open Lwt_result_syntax in
+    let* l2_block =
+      Node_context.get_l2_block_by_level
+        node_ctxt
+        (Raw_level.to_int32 their_commitment.inbox_level)
+    in
+    let* our_commitment_and_hash =
+      Option.filter_map_es
+        (fun hash ->
+          let+ commitment = Node_context.find_commitment node_ctxt hash in
+          Option.map (fun c -> (c, hash)) commitment)
+        l2_block.header.commitment_hash
+    in
+    match our_commitment_and_hash with
+    | Some (our_commitment, our_commitment_hash)
+      when Sc_rollup.Commitment.Hash.(
+             their_commitment_hash <> our_commitment_hash
+             && their_commitment.predecessor = our_commitment.predecessor) ->
+        return our_commitment_and_hash
+    | _ -> return_none
+
+  (** Publish a commitment when an accuser node sees a refutable commitment. *)
+  let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
+      their_commitment their_commitment_hash =
+    let open Lwt_result_syntax in
+    when_ (Node_context.is_accuser node_ctxt) @@ fun () ->
+    (* We are seeing a commitment from someone else. We check if we agree
+       with it, otherwise the accuser publishes our commitment in order to
+       play the refutation game. *)
+    let* refutable =
+      is_refutable_commitment node_ctxt their_commitment their_commitment_hash
+    in
+    match refutable with
+    | None -> return_unit
+    | Some (our_commitment, our_commitment_hash) ->
+        let*! () =
+          Refutation_game_event.potential_conflict_detected
+            ~our_commitment_hash
+            ~their_commitment_hash
+            ~level:their_commitment.inbox_level
+            ~other
+        in
+        assert (Sc_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
+        Components.Commitment.publish_single_commitment node_ctxt our_commitment
+
   (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
@@ -62,7 +111,7 @@ module Make (PVM : Pvm.S) = struct
             }
         in
         return_unit
-    | ( Sc_rollup_publish {commitment; rollup},
+    | ( Sc_rollup_publish {commitment = their_commitment; rollup},
         Sc_rollup_publish_result
           {published_at_level; staked_hash = their_commitment_hash; _} ) ->
         (* Commitment published by someone else *)
@@ -92,36 +141,14 @@ module Make (PVM : Pvm.S) = struct
               in
               return_unit
         in
-        if Node_context.is_accuser node_ctxt then
-          (* We are seeing a commitment from someone else. We check if we agree
-             with it, otherwise the accuser publishes our commitment in order to
-             play the refutation game. *)
-          let* l2_block =
-            Node_context.get_l2_block_by_level
-              node_ctxt
-              (Raw_level.to_int32 commitment.inbox_level)
-          in
-          let our_commitment_hash = l2_block.header.commitment_hash in
-          match our_commitment_hash with
-          | Some our_commitment_hash
-            when Sc_rollup.Commitment.Hash.(
-                   their_commitment_hash <> our_commitment_hash) ->
-              let*! () =
-                Refutation_game_event.potential_conflict_detected
-                  ~our_commitment_hash
-                  ~their_commitment_hash
-                  ~level:commitment.inbox_level
-                  ~other:source
-              in
-              assert (Sc_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/4628
-                 Make the accuser node only publish directly refutable
-                 commitments. *)
-              Components.Commitment.publish_single_commitment
-                node_ctxt
-                our_commitment_hash
-          | _ -> return_unit
-        else return_unit
+        (* An accuser node will publish its commitment if the other one is
+           refutable. *)
+        accuser_publish_commitment_when_refutable
+          node_ctxt
+          ~other:source
+          rollup
+          their_commitment
+          their_commitment_hash
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)

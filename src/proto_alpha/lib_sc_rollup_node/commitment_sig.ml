@@ -59,13 +59,13 @@ module type S = sig
       cemented commitment. *)
   val publish_commitments : _ Node_context.t -> unit tzresult Lwt.t
 
-  (** [publish_single_commitment node_ctxt commitment_hash] publishes a single
-      commitment, whose hash is [commitment_hash] if it is missing. This
-      function is meant to be used by the {e accuser} mode to sparingly publish
-      commitments when it detects a conflict. *)
+  (** [publish_single_commitment node_ctxt commitment] publishes a single
+      [commitment] if it is missing. This function is meant to be used by the {e
+      accuser} mode to sparingly publish commitments when it detects a
+      conflict. *)
   val publish_single_commitment :
     _ Node_context.t ->
-    Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t ->
+    Protocol.Alpha_context.Sc_rollup.Commitment.t ->
     unit tzresult Lwt.t
 
   (** [cement_commitments node_ctxt] cements the commitments that can be
