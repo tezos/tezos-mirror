@@ -21,6 +21,14 @@ Node
 
   Please refer to the :doc:`Snapshots entry<../user/snapshots>` for further detail.
 
+- Added the built-in network alias for Mumbainet (``--network mumbainet``).
+
+Docker Images
+-------------
+
+- Fixed ``entrypoint.sh`` which did not had the executable permission flag.
+
+- Updated Python version to 3.10.10.
 
 
 Version 16.0~rc1
