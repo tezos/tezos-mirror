@@ -9,6 +9,9 @@ include: .gitlab/ci/jobs/test/common.yml
 .tezt_template:
   variables:
     JUNIT: "tezt-junit.xml"
+    # if we do not set BISECT_FILE here, it will be empty, and include the 
+    # full CI_PROJECT_DIR in artifacts as per the template .tezt_template.
+    BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
   artifacts:
     reports:
       junit: $JUNIT

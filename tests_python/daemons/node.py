@@ -76,7 +76,6 @@ class Node:
         singleprocess: bool = False,
         env: Dict[str, str] = None,
     ):
-
         """Creates a new Popen instance for a octez-node, and manages context.
 
         args:
