@@ -219,7 +219,10 @@ module Hashes_map_backend = struct
         if Bytes.equal old_bytes content then return_unit
         else tzfail @@ Page_already_saved hash
 
-  let load (_plugin : Dac_plugin.t) t ~hash =
+  let mem (_plugin : Dac_plugin.t) t hash =
+    Lwt_result_syntax.return @@ Hashes_map.mem hash !t
+
+  let load (_plugin : Dac_plugin.t) t hash =
     let open Lwt_result_syntax in
     let bytes = Hashes_map.find hash !t in
     match bytes with
@@ -479,7 +482,7 @@ module Hash_chain = struct
 
     let rec retrieve_content ~get_page ?(result = "") hash =
       let open Lwt_result_syntax in
-      let* page = get_page ~hash in
+      let* page = get_page hash in
       let* res = return @@ deserialize_page (Bytes.to_string page) in
       match res with
       | `Node (succ_hash, content) ->
@@ -540,9 +543,7 @@ module Hash_chain = struct
           (Hashes_map_backend.number_of_pages page_store)
           2
       in
-      let get_page ~hash =
-        Hashes_map_backend.load dac_plugin page_store ~hash
-      in
+      let get_page hash = Hashes_map_backend.load dac_plugin page_store hash in
       let* content = retrieve_content ~get_page root_hash in
       Assert.equal_string ~loc:__LOC__ long_payload content
 
