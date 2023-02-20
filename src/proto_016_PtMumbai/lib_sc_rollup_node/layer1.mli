@@ -47,25 +47,6 @@ val iter_heads : t -> (head -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
 (** {2 Helpers } *)
 
-(** [get_predecessor_opt state head] returns the predecessor of block [head],
-    when [head] is not the genesis block. *)
-val get_predecessor_opt : t -> head -> head option tzresult Lwt.t
-
-(** [get_predecessor state head] returns the predecessor block of [head]. *)
-val get_predecessor : t -> head -> head tzresult Lwt.t
-
-(** [nth_predecessor l1_ctxt n head] return [block, history] where [block] is
-    the nth predecessor of [head] and [history] is the list of blocks between
-    [block] (excluded) and [head] (included) on the chain *)
-val nth_predecessor : t -> int -> head -> (head * head list) tzresult Lwt.t
-
-(** [get_tezos_reorg_for_new_head l1_ctxt old_head new_head] returns the
-    reorganization of L1 blocks between [old_head] and [new_head]. If [old_head]
-    is [`Level l], then it returns the reorganization between [new_head] and
-    level [l] on the same chain. *)
-val get_tezos_reorg_for_new_head :
-  t -> [`Head of head | `Level of int32] -> head -> head Reorg.t tzresult Lwt.t
-
 (** [fetch_tezos_shell_header cctxt hash] returns the block shell header of
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)
