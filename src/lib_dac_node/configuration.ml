@@ -134,7 +134,7 @@ let legacy_encoding =
         (threshold, dac_members_addresses, dac_cctxt_config, true))
       (fun (threshold, dac_members_addresses, dac_cctxt_config, legacy) ->
         if legacy then Ok {threshold; dac_members_addresses; dac_cctxt_config}
-        else Error "legacy flag should be set to true")
+        else Error "'legacy' flag should be set to true")
       (obj4
          (dft "threshold" uint8 default_dac_threshold)
          (dft
