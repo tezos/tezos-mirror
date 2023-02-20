@@ -114,6 +114,10 @@ let test_sunset () =
     op
   >>=? fun (_i : Incremental.t) -> return_unit
 
+let path =
+  project_root
+  // "src/proto_016_PtMumbai/lib_protocol/test/integration/operations"
+
 (** [parsing_tests] try originating contracts using the
     type [tx_rollup_l2_address], test that it only works
     when rollups are enabled.
@@ -163,10 +167,10 @@ let parsing_tests =
           (fun () -> test_origination ~tx_rollup_enable:false path "Unit");
       ])
     [
-      ("deposit", "contracts/tx_rollup_deposit.tz");
-      ("type", "contracts/tx_rollup_parse_type.tz");
-      ("comparable_type", "contracts/tx_rollup_parse_comparable_type.tz");
-      ("data", "contracts/tx_rollup_parse_data.tz");
+      ("deposit", path // "contracts/tx_rollup_deposit.tz");
+      ("type", path // "contracts/tx_rollup_parse_type.tz");
+      ("comparable_type", path // "contracts/tx_rollup_parse_comparable_type.tz");
+      ("data", path // "contracts/tx_rollup_parse_data.tz");
     ]
 
 let message_hash_testable : Tx_rollup_message_hash.t Alcotest.testable =
@@ -383,8 +387,9 @@ let raw_level level = assert_ok @@ Raw_level.of_int32 level
 (** Create a deposit on the layer1 side through the origination of a contract
     and return the associated deposit message to apply in the layer2. *)
 let make_deposit b tx_rollup l1_src addr =
+  let script = path // "contracts/tx_rollup_deposit.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit.tz"
+    script
     "Unit"
     l1_src
     b
@@ -1004,8 +1009,9 @@ let test_inbox_count_too_big () =
   let message_count = constant.parametric.tx_rollup.max_messages_per_inbox in
   let contents = "some contents" in
   originate b contract >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit.tz"
+    script
     "Unit"
     contract
     b
@@ -1124,8 +1130,9 @@ let test_additional_space_allocation_for_valid_deposit () =
   let tx_rollup_origination_size = 1 in
   context_init1 ~tx_rollup_origination_size () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit.tz"
+    script
     "Unit"
     account
     b
@@ -1155,8 +1162,9 @@ let test_additional_space_allocation_for_valid_deposit () =
 let test_valid_deposit_inexistant_rollup () =
   let _, _, pkh = gen_l2_account () in
   context_init1 () >>=? fun (b, account) ->
+  let script = path // "contracts/tx_rollup_deposit.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit.tz"
+    script
     "Unit"
     account
     b
@@ -1184,8 +1192,9 @@ let test_invalid_deposit_not_ticket () =
 
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit_incorrect_param.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit_incorrect_param.tz"
+    script
     "Unit"
     account
     b
@@ -1254,8 +1263,9 @@ let test_invalid_deposit_too_big_ticket () =
     constant.parametric.tx_rollup.max_ticket_payload_size
   in
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit_string.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit_string.tz"
+    script
     "Unit"
     account
     b
@@ -1305,8 +1315,9 @@ let test_invalid_deposit_too_big_ticket_type () =
     constant.parametric.tx_rollup.max_ticket_payload_size
   in
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit_pair_string.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit_pair_string.tz"
+    script
     "Unit"
     account
     b
@@ -1362,8 +1373,9 @@ let test_valid_deposit_big_ticket () =
     constant.parametric.tx_rollup.max_ticket_payload_size
   in
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit_string.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit_string.tz"
+    script
     "Unit"
     account
     b
@@ -1402,8 +1414,9 @@ let test_invalid_entrypoint () =
 
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit_incorrect_param.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit_incorrect_param.tz"
+    script
     "Unit"
     account
     b
@@ -1427,8 +1440,9 @@ let test_invalid_entrypoint () =
 let test_invalid_l2_address () =
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit.tz"
+    script
     "Unit"
     account
     b
@@ -1455,8 +1469,9 @@ let test_valid_deposit_invalid_amount () =
   let _, _, pkh = gen_l2_account () in
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
+  let script = path // "contracts/tx_rollup_deposit_one_mutez.tz" in
   Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit_one_mutez.tz"
+    script
     "Unit"
     account
     b
@@ -1739,13 +1754,7 @@ let tx_level level = assert_ok @@ Tx_rollup_level.of_int32 level
 let test_storage_burn_for_commitment () =
   let check_storage_delta ~__POS__ msg ~size_before ~size_after ~expected_delta
       =
-    Alcotest.(
-      check
-        ~pos:__POS__
-        zestable
-        msg
-        expected_delta
-        Z.(sub size_after size_before))
+    Alcotest.(check zestable msg expected_delta Z.(sub size_after size_before))
   in
   let tx_rollup_origination_size = 1 in
   context_init1 ~tx_rollup_origination_size () >>=? fun (b, contract) ->
@@ -1817,7 +1826,6 @@ let test_storage_burn_for_commitment_and_bond () =
       =
     Alcotest.(
       check
-        ~pos:__POS__
         zestable
         msg
         (Z.of_int expected_delta)
@@ -1876,7 +1884,6 @@ let test_storage_burn_for_commitment_and_bond () =
     ~expected_delta:commitment_remove_delta ;
   Alcotest.(
     check
-      ~pos:__POS__
       int
       "The delta of adding and removing a commitment is zero (modulo \
        preallocation)"
@@ -4062,7 +4069,6 @@ let test_state_message_storage_preallocation () =
      {!Tx_rollup_inbox_storage.prepare_inbox}. *)
   let inbox_preparation = Tx_rollup_inbox.size in
   Alcotest.check
-    ~pos:__POS__
     zestable
     "the storage occupied by the first message is the size of the inbox plus \
      the preallocation for commiting the message"
@@ -4077,7 +4083,6 @@ let test_state_message_storage_preallocation () =
     Tx_rollup_state.Internal_for_tests.get_occupied_storage state
   in
   Alcotest.check
-    ~pos:__POS__
     zestable
     "the storage occupied by the second message null thanks to the merklisation"
     Z.zero
