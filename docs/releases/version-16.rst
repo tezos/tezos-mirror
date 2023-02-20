@@ -1,4 +1,4 @@
-Version 16.0~rc1
+Version 16.0~rc2
 ================
 
 Version 16.0 contains a new version (V8) of the protocol environment,
@@ -25,18 +25,22 @@ the total disk usage will be slightly higher due to the automatic storage migrat
 This will result in an overhead of a few gigabytes (around 10GB) of disk usage during a 6 cycles period.
 To avoid this overhead, you can import a fresh snapshot.
 
+The second release candidate (16.0~rc2) fixes an issue where old contexts (v13 or older) would be corrupted at cycle switch.
+The docker images no longer cause a "permission denied" error on ``entrypoint.sh``, hence can now be used properly.
+This new release candidate also includes an improvement of the ``octez-smart-rollup-node`` that drastically reduces disk consumption.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v16.0-rc1
+  git checkout v16.0-rc2
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v16.0-rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``v16.0-rc2`` Docker images of Octez.
 
 If you are installing Octez using Opam, note that the minimal required
 OCaml version is now 4.14.1. This means that you might need to create a
@@ -46,4 +50,5 @@ new switch with ``opam switch create 4.14.1`` before you run ``opam install tezo
 Changelog
 ---------
 
+- `Version 16.0~rc2 <../CHANGES.html#version-16-0-rc2>`_
 - `Version 16.0~rc1 <../CHANGES.html#version-16-0-rc1>`_

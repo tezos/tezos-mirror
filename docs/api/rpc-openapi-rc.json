@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "16.0~rc1"
+    "version": "16.0~rc2"
   },
   "paths": {
     "/chains/{chain_id}": {
