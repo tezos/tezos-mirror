@@ -432,7 +432,7 @@ let buffers ?(input = Input_buffer.alloc ())
     ?(output = default_output_buffer ()) () =
   {input; output}
 
-let config host_funcs ?frame_arity inst vs es =
+let config ~stack_size_limit host_funcs ?frame_arity inst vs es =
   let frame = frame inst (Vector.empty ()) in
   let label_kont =
     label_kont
@@ -444,7 +444,7 @@ let config host_funcs ?frame_arity inst vs es =
   {
     step_kont = SK_Start (frame_stack, Vector.empty ());
     host_funcs;
-    stack_size_limit = 300;
+    stack_size_limit;
   }
 
 let plain e = Plain e.it @@ e.at
@@ -1630,9 +1630,10 @@ let reveal_step reveal module_reg payload =
 
 (* Functions & Constants *)
 
-let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
-    ?(output = default_output_buffer ()) ?(durable = Durable_storage.empty)
-    ?(init = false) host_funcs (func : func_inst) (vs : value list) :
+let invoke ?(stack_size_limit = 300) ~module_reg ~caller
+    ?(input = Input_buffer.alloc ()) ?(output = default_output_buffer ())
+    ?(durable = Durable_storage.empty) ?(init = false) host_funcs
+    (func : func_inst) (vs : value list) :
     (Durable_storage.t * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
@@ -1652,6 +1653,7 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
   let n = Vector.num_elements out in
   let c =
     config
+      ~stack_size_limit
       host_funcs
       ~frame_arity:n
       inst
@@ -1669,9 +1671,10 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
 
 type eval_const_kont = EC_Next of config | EC_Stop of value
 
-let eval_const_kont inst (const : const) =
+let eval_const_kont ~stack_size_limit inst (const : const) =
   let c =
     config
+      ~stack_size_limit
       (Host_funcs.empty ())
       inst
       (Vector.empty ())
@@ -1711,8 +1714,8 @@ let create_memory (mem : memory) : memory_inst =
 
 type create_global_kont = global_type * eval_const_kont
 
-let create_global_kont inst glob =
-  (glob.it.gtype, eval_const_kont inst glob.it.ginit)
+let create_global_kont ~stack_size_limit inst glob =
+  (glob.it.gtype, eval_const_kont ~stack_size_limit inst glob.it.ginit)
 
 let create_global_completed (gtype, kont) =
   match eval_const_completed kont with
@@ -1972,11 +1975,11 @@ let create_elem_completed : create_elem_kont -> elem_inst option =
  fun kont ->
   if tick_map_completed kont then Some (ref kont.map.destination) else None
 
-let create_elem_step ~module_reg buffers inst :
+let create_elem_step ~stack_size_limit ~module_reg buffers inst :
     create_elem_kont -> create_elem_kont Lwt.t =
  fun tick ->
   tick_map_step
-    (eval_const_kont inst)
+    (eval_const_kont ~stack_size_limit inst)
     (fun x ->
       match eval_const_completed x with
       | Some x -> Some (as_ref x)
@@ -2026,11 +2029,13 @@ let section_next_init_kont :
             {exports = NameMap.create (); exports_memory_0 = false} )
 
 let section_inner_kont :
-    type kont a b. module_key -> (kont, a, b) init_section -> a -> kont =
- fun self sec x ->
+    type kont a b.
+    stack_size_limit:int -> module_key -> (kont, a, b) init_section -> a -> kont
+    =
+ fun ~stack_size_limit self sec x ->
   match sec with
   | Func -> Either.Left x
-  | Global -> create_global_kont self x
+  | Global -> create_global_kont ~stack_size_limit self x
   | Table -> Left x
   | Memory -> Left x
 
@@ -2086,8 +2091,9 @@ type memory_export_rules = Exports_memory_0 | No_memory_export_rules
 
 exception Missing_memory_0_export
 
-let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
-    ~module_reg ~self buffers host_funcs (m : module_) = function
+let init_step ~stack_size_limit ~filter_exports
+    ?(check_module_exports = No_memory_export_rules) ~module_reg ~self buffers
+    host_funcs (m : module_) = function
   | IK_Start exts ->
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
@@ -2124,7 +2130,7 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
   | IK_Aggregate (inst0, sec, tick) ->
       let+ tick =
         tick_map_step
-          (section_inner_kont self sec)
+          (section_inner_kont ~stack_size_limit self sec)
           (section_inner_completed sec)
           (section_inner_step module_reg self buffers sec)
           tick
@@ -2169,7 +2175,7 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
         tick_map_step
           create_elem_kont
           create_elem_completed
-          (create_elem_step ~module_reg buffers self)
+          (create_elem_step ~stack_size_limit ~module_reg buffers self)
           tick
       in
       IK_Elems (inst0, tick)
@@ -2216,7 +2222,9 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
   | IK_Join_admin (inst0, tick) -> (
       match join_completed tick with
       | Some res ->
-          Lwt.return (IK_Eval (config host_funcs self (Vector.empty ()) res))
+          Lwt.return
+            (IK_Eval
+               (config ~stack_size_limit host_funcs self (Vector.empty ()) res))
       | None ->
           let+ tick = join_step tick in
           IK_Join_admin (inst0, tick))
@@ -2230,14 +2238,15 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
       IK_Eval config
   | IK_Stop -> raise (Init_step_error Init_step)
 
-let init ~module_reg ~self buffers host_funcs (m : module_) (exts : extern list)
-    : module_inst Lwt.t =
+let init ?(stack_size_limit = 300) ~module_reg ~self buffers host_funcs
+    (m : module_) (exts : extern list) : module_inst Lwt.t =
   let open Lwt.Syntax in
   let rec go = function
     | IK_Stop -> resolve_module_ref module_reg self
     | kont ->
         let* kont =
           init_step
+            ~stack_size_limit
             ~filter_exports:false
             ~module_reg
             ~self

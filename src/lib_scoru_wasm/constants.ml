@@ -64,3 +64,5 @@ let too_many_reboot_flag_key =
    kernel can do with a given inbox. *)
 let reboot_counter_key =
   Durable.key_of_string_exn "/readonly/kernel/env/reboot_counter"
+
+let stack_size_limit = 300
