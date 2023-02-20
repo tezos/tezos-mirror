@@ -142,7 +142,7 @@ module Test = struct
      the decoding succeeds. Checks equality of slots. *)
   let test_erasure_code_with_slot_conversion =
     QCheck2.Test.make
-      ~name:"DAL cryptobox: test erasure code"
+      ~name:"DAL cryptobox: test erasure code with slot conversion"
       ~print
       params_gen
       (fun
@@ -181,68 +181,65 @@ module Test = struct
             | `Shard_index_out_of_range _ | `Invalid_shard_length _ ) ->
             false)
 
-  let test_erasure_code_failure_not_enough_shards () =
-    let redundancy_factor = 2 in
-    let number_of_shards = 1 lsl 4 in
-    let slot_size = 1 lsl 10 in
-    let msg_size = slot_size / 16 in
-    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-    let params =
-      ({redundancy_factor; slot_size; page_size = 1 lsl 5; number_of_shards}
-        : Cryptobox.parameters)
-    in
-    init params ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (let* t = Cryptobox.make params in
-     let* p = Cryptobox.polynomial_from_slot t slot in
-     let enc_shards = Cryptobox.shards_from_polynomial t p in
-     let c_indices =
-       random_indices
-         number_of_shards
-         ((number_of_shards / redundancy_factor) - 1)
-     in
-     let c =
-       Seq.filter
-         (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
-         enc_shards
-     in
-     Cryptobox.polynomial_from_shards t c)
-    |> function
-    | Error (`Not_enough_shards _) -> assert true
-    | Ok _
-    | Error
-        ( `Fail _ | `Slot_wrong_size _ | `Shard_index_out_of_range _
-        | `Invalid_shard_length _ ) ->
-        assert false
+  let test_erasure_code_failure_not_enough_shards =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test erasure code not enough shards"
+      ~print
+      params_gen
+      (fun
+        ({redundancy_factor; number_of_shards; slot_size; padding_threshold; _}
+        as params)
+      ->
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
+        init params ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t = Cryptobox.make params in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let enc_shards = Cryptobox.shards_from_polynomial t p in
+         let c_indices =
+           random_indices
+             (number_of_shards - 1)
+             ((number_of_shards / redundancy_factor) - 1)
+         in
+         let c =
+           Seq.filter
+             (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
+             enc_shards
+         in
+         Cryptobox.polynomial_from_shards t c)
+        |> function
+        | Error (`Not_enough_shards _) -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
+        | _ -> false)
 
-  let test_erasure_code_failure_out_of_range () =
-    let redundancy_factor = 2 in
-    let number_of_shards = 1 lsl 4 in
-    let slot_size = 1 lsl 10 in
-    let msg_size = slot_size / 16 in
-    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-    let params =
-      ({redundancy_factor; slot_size; page_size = 1 lsl 5; number_of_shards}
-        : Cryptobox.parameters)
-    in
-    init params ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (let* t = Cryptobox.make params in
-     let* p = Cryptobox.polynomial_from_slot t slot in
-     let enc_shards = Cryptobox.shards_from_polynomial t p in
-     let c =
-       Seq.take (number_of_shards / redundancy_factor) enc_shards
-       |> Seq.map (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
-              {index = index + 1000; share})
-     in
-     Cryptobox.polynomial_from_shards t c)
-    |> function
-    | Error (`Shard_index_out_of_range _) -> assert true
-    | Ok _ -> assert false
-    | Error
-        ( `Fail _ | `Slot_wrong_size _ | `Not_enough_shards _
-        | `Invalid_shard_length _ ) ->
-        assert false
+  let test_erasure_code_failure_out_of_range =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test erasure code shard index out of range"
+      ~print
+      params_gen
+      (fun
+        ({redundancy_factor; number_of_shards; slot_size; padding_threshold; _}
+        as params)
+      ->
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold in
+        let params = get_cryptobox_parameters params in
+        init params ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t = Cryptobox.make params in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let enc_shards = Cryptobox.shards_from_polynomial t p in
+         let c =
+           Seq.take (number_of_shards / redundancy_factor) enc_shards
+           |> Seq.map
+                (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
+                  {index = index + 1000; share})
+         in
+         Cryptobox.polynomial_from_shards t c)
+        |> function
+        | Error (`Shard_index_out_of_range _) -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
+        | _ -> false)
 
   (* Checking the shards' length to avoid out-of-bounds array accesses.
      The function [polynomial_from_shards] returns an error if the shards
@@ -250,37 +247,36 @@ module Test = struct
      produced with a different set of parameters than the ones used by
      [polynomial_from_shards].
 
-     Here, the number of shards is 16 with the first set of parameters t1
-     versus 32 for the second set of paramaters t2. *)
-  let test_erasure_code_failure_invalid_shard_length () =
-    let redundancy_factor = 2 in
-    let slot_size = 1 lsl 10 in
-    let params =
-      ({
-         redundancy_factor;
-         slot_size;
-         page_size = 1 lsl 5;
-         number_of_shards = 1 lsl 4;
-       }
-        : Cryptobox.parameters)
-    in
-    init params ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (let* t1 = Cryptobox.make params in
-     let* t2 =
-       Cryptobox.make
-         {
-           redundancy_factor;
-           slot_size;
-           page_size = 1 lsl 5;
-           number_of_shards = 1 lsl 5;
-         }
-     in
-     let enc_shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
-     Cryptobox.polynomial_from_shards t2 enc_shards)
-    |> function
-    | Error (`Invalid_shard_length _) -> assert true
-    | _ -> assert false
+     Here, the number of shards for the second set of parameters t2 is
+     half of the number of shards for the first set of parameters t1. *)
+  let test_erasure_code_failure_invalid_shard_length =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test erasure code shard index out of range"
+      ~print
+      params_gen
+      (fun
+        ({redundancy_factor; number_of_shards; slot_size; page_size; _} as
+        params)
+      ->
+        let params = get_cryptobox_parameters params in
+        init params ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t1 = Cryptobox.make params in
+         let* t2 =
+           Cryptobox.make
+             {
+               redundancy_factor;
+               slot_size;
+               page_size = page_size / 2;
+               number_of_shards;
+             }
+         in
+         let enc_shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
+         Cryptobox.polynomial_from_shards t2 enc_shards)
+        |> function
+        | Error (`Invalid_shard_length _) -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
+        | _ -> false)
 
   (* Check that for any slot,
      [polynomial_to_slot (polynomial_from_slot slot) = slot]. *)
@@ -443,15 +439,7 @@ let test =
   List.map
     (fun (test_name, test_func) ->
       Alcotest.test_case test_name `Quick test_func)
-    [
-      ( "erasure code failure: not enough shards",
-        Test.test_erasure_code_failure_not_enough_shards );
-      ( "erasure code failure: shard indices out of range",
-        Test.test_erasure_code_failure_out_of_range );
-      ( "erasure code failure: invalid shard length",
-        Test.test_erasure_code_failure_invalid_shard_length )
-      (*("test_collision_page_size", Test.test_collision_page_size);*);
-    ]
+    [ (*("test_collision_page_size", Test.test_collision_page_size);*) ]
 
 let () =
   (* Seed for deterministic pseudo-randomness:
@@ -477,6 +465,9 @@ let () =
           [
             Test.test_erasure_code;
             Test.test_erasure_code_with_slot_conversion;
+            Test.test_erasure_code_failure_out_of_range;
+            Test.test_erasure_code_failure_not_enough_shards;
+            Test.test_erasure_code_failure_invalid_shard_length;
             Test.test_page_proofs;
             Test.test_shard_proofs;
             Test.test_commitment_proof;
