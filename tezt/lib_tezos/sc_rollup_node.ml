@@ -37,7 +37,7 @@ module Parameters = struct
     rpc_port : int;
     mode : mode;
     dal_node : Dal_node.t option;
-    node : Node.t;
+    mutable node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
     runner : Runner.t option;
@@ -323,3 +323,8 @@ let run node arguments =
   let* () = run node arguments in
   let* () = wait_for_ready node in
   return ()
+
+let change_node_and_restart sc_rollup_node node =
+  let* () = terminate sc_rollup_node in
+  sc_rollup_node.persistent_state.node <- node ;
+  run sc_rollup_node []

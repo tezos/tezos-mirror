@@ -1629,8 +1629,8 @@ let commitment_stored_robust_to_failures protocol sc_rollup_node
     (Some stored_commitment', "stored in second node") ;
   unit
 
-let commitments_reorgs ~kind _protocol sc_rollup_node sc_rollup_client sc_rollup
-    node client =
+let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
+    sc_rollup_client sc_rollup node client =
   (* No messages are published after origination, for
      `sc_rollup_commitment_period_in_blocks - 1` levels. Then a divergence
      occurs:  in the first branch one message is published for
@@ -1710,7 +1710,17 @@ let commitments_reorgs ~kind _protocol sc_rollup_node sc_rollup_client sc_rollup
   in
 
   let* () = divergence () in
-  let* () = trigger_reorg () in
+  let* client, node =
+    if switch_l1_node then (
+      (* Switch the L1 node of a rollup node so that reverted blocks are not *)
+      (* available in the new L1 node. *)
+      Log.info "Changing L1 node for rollup node" ;
+      let* () = Sc_rollup_node.change_node_and_restart sc_rollup_node node' in
+      return (client', node'))
+    else
+      let* () = trigger_reorg () in
+      return (client, node)
+  in
   (* After triggering a reorganisation the node should see that there is a more
      attractive head at level `init_level +
      sc_rollup_commitment_period_in_blocks + block_finality_time - 1`.
@@ -4340,7 +4350,12 @@ let register ~kind ~protocols =
     ~kind ;
   test_commitment_scenario
     ~variant:"handles_chain_reorgs"
-    (commitments_reorgs ~kind)
+    (commitments_reorgs ~kind ~switch_l1_node:false)
+    protocols
+    ~kind ;
+  test_commitment_scenario
+    ~variant:"handles_chain_reorgs_missing_blocks"
+    (commitments_reorgs ~kind ~switch_l1_node:true)
     protocols
     ~kind ;
   test_commitment_scenario
