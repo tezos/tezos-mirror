@@ -200,8 +200,7 @@ module Inner = struct
           Format.kasprintf Stdlib.failwith "Unexpected data (DAL commitment)"
       | Some commitment -> commitment
 
-    (* We divide by two because we use the compressed representation. *)
-    let commitment_size = Bls12_381.G1.size_in_bytes / 2
+    let commitment_size = Bls12_381.G1.compressed_size_in_bytes
 
     let to_string commitment = commitment_to_bytes commitment |> Bytes.to_string
 
@@ -264,8 +263,7 @@ module Inner = struct
             "Unexpected data (DAL commitment proof)"
       | Some proof -> proof
 
-    (* We divide by two because we use the compressed representation. *)
-    let size = Bls12_381.G1.size_in_bytes / 2
+    let size = Bls12_381.G1.compressed_size_in_bytes
 
     let raw_encoding =
       let open Data_encoding in
