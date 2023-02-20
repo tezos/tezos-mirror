@@ -181,6 +181,14 @@ let subscribed_to_root_hashes_stream =
     ~level:Notice
     ()
 
+let new_root_hash_received =
+  declare_1
+    ~section
+    ~name:"dac_node_new_root_hash_received"
+    ~msg:"Received new root hash via monitoring rpc {root_hash}"
+    ~level:Notice
+    ("root_hash", Data_encoding.string)
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -192,3 +200,6 @@ let emit_protocol_plugin_not_resolved current_protocol next_protocol =
     protocol_plugin_not_resolved
     ( proto_short_hash_string current_protocol,
       proto_short_hash_string next_protocol )
+
+let emit_new_root_hash_received ((module P) : Dac_plugin.t) hash =
+  emit new_root_hash_received (P.to_hex hash)

@@ -120,7 +120,10 @@ module Handler = struct
       to the dac node corresponding to [coordinator_cctxt]. *)
   let new_root_hash ctxt coordinator_cctxt =
     let open Lwt_result_syntax in
-    let handler _dac_plugin _stopper _root_hash = return_unit in
+    let handler dac_plugin _stopper root_hash =
+      let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
+      return_unit
+    in
     let*? dac_plugin = Node_context.get_dac_plugin ctxt in
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
