@@ -4712,7 +4712,6 @@ module Protocol = Protocol
         ~opam_only_deps:[octez_protocol_environment; parameters |> if_some]
         ~deps:
           [
-            alcotest_lwt;
             qcheck_alcotest;
             octez_test_helpers |> open_;
             octez_base |> open_ ~m:"TzPervasives"
