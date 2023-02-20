@@ -9,6 +9,7 @@ include: .gitlab/ci/jobs/test/common.yml
 .tezt_template:
   variables:
     JUNIT: "tezt-junit.xml"
+    BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
   artifacts:
     reports:
       junit: $JUNIT

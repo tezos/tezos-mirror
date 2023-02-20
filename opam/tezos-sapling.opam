@@ -18,7 +18,7 @@ depends: [
   "tezos-stdlib"
   "tezos-crypto"
   "tezos-error-monad"
-  "tezos-rust-libs" { = "1.3" }
+  "tezos-rust-libs" { = "1.4" }
   "tezos-lwt-result-stdlib"
   "tezos-base" {with-test}
   "tezos-stdlib-unix" {with-test}

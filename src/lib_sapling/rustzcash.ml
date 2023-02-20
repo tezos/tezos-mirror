@@ -394,7 +394,7 @@ let valid_position pos =
    Parameters of type Rust `usize` are converted to OCaml `int` because they
    are only file paths. NULL is a void pointer.
 *)
-let init_zksnark_params ~spend_path ~spend_hash ~output_path ~output_hash =
+let init_zksnark_params ~spend_path ~output_path =
   let spend_path = Bytes.of_string spend_path in
   let output_path = Bytes.of_string output_path in
   let spend_path_len = Bytes.length spend_path in
@@ -402,17 +402,12 @@ let init_zksnark_params ~spend_path ~spend_hash ~output_path ~output_hash =
   RS.init_zksnark_params
     (Ctypes.ocaml_bytes_start spend_path)
     (Unsigned.Size_t.of_int spend_path_len)
-    (Ctypes.ocaml_string_start spend_hash)
     (Ctypes.ocaml_bytes_start output_path)
     (Unsigned.Size_t.of_int output_path_len)
-    (Ctypes.ocaml_string_start output_hash)
     (* Getting a NULL pointer of type uchar. Causing the warning saying we
        convert a void * to unsigned char* *)
     Ctypes.(from_voidp uchar null)
     Unsigned.Size_t.zero
-    (* Any value can be passed. The Rust code does check if the path is a NULL
-       pointer (i.e. see previous comment) *)
-    (Ctypes.ocaml_string_start "Undefined")
 
 let nsk_to_nk nsk =
   let nk = Bytes.create 32 in
@@ -480,6 +475,7 @@ let compute_cm diversifier pk_d ~amount rcm =
     let cm = Bytes.create 32 in
     let res =
       RS.sapling_compute_cm
+        false
         (Ctypes.ocaml_bytes_start (of_diversifier diversifier))
         (Ctypes.ocaml_bytes_start (of_pkd pk_d))
         (Unsigned.UInt64.of_int64 amount)
@@ -493,6 +489,7 @@ let ka_agree (p : Bytes.t) (sk : Bytes.t) =
   let ka = Bytes.create 32 in
   let res =
     RS.sapling_ka_agree
+      false
       (Ctypes.ocaml_bytes_start p)
       (Ctypes.ocaml_bytes_start sk)
       (Ctypes.ocaml_bytes_start ka)
@@ -535,7 +532,7 @@ let proving_ctx_free ctx = RS.proving_ctx_free ctx
 
 type verification_ctx = unit Ctypes_static.ptr
 
-let verification_ctx_init () = RS.verification_ctx_init ()
+let verification_ctx_init () = RS.verification_ctx_init false
 
 let verification_ctx_free ctx = RS.verification_ctx_free ctx
 
@@ -654,10 +651,12 @@ let zip32_xsk_master seed =
 let zip32_xfvk_address xfvk j =
   let j_ret = Bytes.create 11 in
   let addr = Bytes.create 43 in
-  let bytes_xfvk = of_zip32_full_viewing_key xfvk in
+  let fvk = of_full_viewing_key xfvk.fvk in
+  let dk = xfvk.dk in
   let res =
     RS.zip32_xfvk_address
-      (Ctypes.ocaml_bytes_start bytes_xfvk)
+      (Ctypes.ocaml_bytes_start fvk)
+      (Ctypes.ocaml_bytes_start dk)
       (Ctypes.ocaml_bytes_start (of_diversifier_index j))
       (Ctypes.ocaml_bytes_start j_ret)
       (Ctypes.ocaml_bytes_start addr)
@@ -779,13 +778,7 @@ let find_params ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
 
 let init_params () =
   let {spend_path; output_path} = find_params () in
-  let spend_hash =
-    "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c\000"
-  in
-  let output_hash =
-    "657e3d38dbb5cb5e7dd2970e8b03d69b4787dd907285b5a7f0790dcc8072f60bf593b32cc2d1c030e00ff5ae64bf84c5c3beb84ddc841d48264b4a171744d028\000"
-  in
-  init_zksnark_params ~spend_path ~spend_hash ~output_path ~output_hash
+  init_zksnark_params ~spend_path ~output_path
 
 let init_params_lazy = Lazy.from_fun init_params
 
