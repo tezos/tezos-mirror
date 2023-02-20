@@ -189,6 +189,14 @@ let new_root_hash_received =
     ~level:Notice
     ("root_hash", Data_encoding.string)
 
+let received_root_hash_processed =
+  declare_1
+    ~section
+    ~name:"dac_node_received_root_hash_processed"
+    ~msg:"Finished processing previously received root hash {root_hash}"
+    ~level:Notice
+    ("root_hash", Data_encoding.string)
+
 let new_hash_pushed_to_data_streamer =
   declare_1
     ~section
@@ -214,3 +222,6 @@ let emit_new_root_hash_received ((module P) : Dac_plugin.t) hash =
 
 let emit_root_hash_pushed_to_data_streamer ((module P) : Dac_plugin.t) hash =
   emit new_hash_pushed_to_data_streamer (P.to_hex hash)
+
+let emit_received_root_hash_processed ((module P) : Dac_plugin.t) hash =
+  emit received_root_hash_processed (P.to_hex hash)
