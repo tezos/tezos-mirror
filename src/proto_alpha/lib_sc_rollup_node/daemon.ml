@@ -309,9 +309,10 @@ module Make (PVM : Pvm.S) = struct
       =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
+    let* predecessor = Node_context.get_predecessor node_ctxt head in
     let* () = Node_context.save_level node_ctxt head in
     let* inbox_hash, inbox, inbox_witness, messages, ctxt =
-      Inbox.process_head node_ctxt head
+      Inbox.process_head node_ctxt ~predecessor head
     in
     let* () =
       when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
@@ -322,14 +323,20 @@ module Make (PVM : Pvm.S) = struct
     (* Avoid triggering the pvm execution if this has been done before for
        this head. *)
     let* ctxt, _num_messages, num_ticks, initial_tick =
-      Components.Interpreter.process_head node_ctxt ctxt head (inbox, messages)
+      Components.Interpreter.process_head
+        node_ctxt
+        ctxt
+        ~predecessor
+        head
+        (inbox, messages)
     in
     let*! context_hash = Context.commit ctxt in
-    let* {Layer1.hash = predecessor; _} =
-      Node_context.get_predecessor node_ctxt head
-    in
     let* commitment_hash =
-      Components.Commitment.process_head node_ctxt ~predecessor head ctxt
+      Components.Commitment.process_head
+        node_ctxt
+        ~predecessor:predecessor.hash
+        head
+        ctxt
     in
     let level = Raw_level.of_int32_exn level in
     let* previous_commitment_hash =
@@ -337,7 +344,7 @@ module Make (PVM : Pvm.S) = struct
         (* Previous commitment for rollup genesis is itself. *)
         return node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash
       else
-        let+ pred = Node_context.get_l2_block node_ctxt predecessor in
+        let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
         Sc_rollup_block.most_recent_commitment pred.header
     in
     let header =
@@ -345,7 +352,7 @@ module Make (PVM : Pvm.S) = struct
         {
           block_hash = hash;
           level;
-          predecessor;
+          predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
           context = context_hash;
