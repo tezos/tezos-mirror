@@ -96,7 +96,7 @@ type tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.value
 
 type ('a, 'b) pair = 'a * 'b
 
-type ('a, 'b) union = L of 'a | R of 'b
+type ('a, 'b) or_ = L of 'a | R of 'b
 
 module Script_chain_id : sig
   (** [t] is made algebraic in order to distinguish it from the other type
@@ -304,8 +304,8 @@ type entrypoint_info = {name : Entrypoint.t; original_type_expr : Script.node}
     ['arg].
     [at_node] are entrypoint details at that node if it is not [None].
     [nested] are the entrypoints below the node in the tree.
-      It is always [Entrypoints_None] for non-union nodes.
-      But it is also ok to have [Entrypoints_None] for a union node, it just
+      It is always [Entrypoints_None] for non-or nodes.
+      But it is also ok to have [Entrypoints_None] for an or node, it just
       means that there are no entrypoints below that node in the tree.
 *)
 type 'arg entrypoints_node = {
@@ -314,11 +314,11 @@ type 'arg entrypoints_node = {
 }
 
 and 'arg nested_entrypoints =
-  | Entrypoints_Union : {
+  | Entrypoints_Or : {
       left : 'l entrypoints_node;
       right : 'r entrypoints_node;
     }
-      -> ('l, 'r) union nested_entrypoints
+      -> ('l, 'r) or_ nested_entrypoints
   | Entrypoints_None : _ nested_entrypoints
 
 (** [no_entrypoints] is [{at_node = None; nested = Entrypoints_None}] *)
@@ -488,14 +488,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
     }
       -> ('a option, 's, 'c, 't) kinstr
   (*
-     Unions
+     Ors
      ------
    *)
   | ICons_left :
-      Script.location * ('b, _) ty * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      Script.location * ('b, _) ty * (('a, 'b) or_, 'c * 's, 'r, 'f) kinstr
       -> ('a, 'c * 's, 'r, 'f) kinstr
   | ICons_right :
-      Script.location * ('a, _) ty * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      Script.location * ('a, _) ty * (('a, 'b) or_, 'c * 's, 'r, 'f) kinstr
       -> ('b, 'c * 's, 'r, 'f) kinstr
   | IIf_left : {
       loc : Script.location;
@@ -503,7 +503,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       branch_if_right : ('b, 's, 'c, 't) kinstr;
       k : ('c, 't, 'r, 'f) kinstr;
     }
-      -> (('a, 'b) union, 's, 'r, 'f) kinstr
+      -> (('a, 'b) or_, 's, 'r, 'f) kinstr
   (*
      Lists
      -----
@@ -810,9 +810,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop_left :
       Script.location
-      * ('a, 's, ('a, 'b) union, 's) kinstr
+      * ('a, 's, ('a, 'b) or_, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
-      -> (('a, 'b) union, 's, 'r, 'f) kinstr
+      -> (('a, 'b) or_, 's, 'r, 'f) kinstr
   | IDip :
       Script.location
       * ('b, 's, 'c, 't) kinstr
@@ -1132,7 +1132,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       Script.location * 'a comparable_ty * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      Script.location * ((bytes, bool) union, 's, 'r, 'f) kinstr
+      Script.location * ((bytes, bool) or_, 's, 'r, 'f) kinstr
       -> ( Script_timelock.chest_key,
            Script_timelock.chest * (n num * 's),
            'r,
@@ -1279,8 +1279,8 @@ and (_, _, _, _) continuation =
   (* This continuation is executed at each iteration of a loop with
      a condition encoded by a sum type. *)
   | KLoop_in_left :
-      ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
-      -> (('a, 'b) union, 's, 'r, 'f) continuation
+      ('a, 's, ('a, 'b) or_, 's) kinstr * ('b, 's, 'r, 'f) continuation
+      -> (('a, 'b) or_, 's, 'r, 'f) continuation
   (* This continuation is executed at each iteration of a traversal.
      (Used in List, Map and Set.) *)
   | KIter :
@@ -1442,12 +1442,12 @@ and ('ty, 'comparable) ty =
       * ('a, 'b) pair ty_metadata
       * ('ac, 'bc, 'rc) dand
       -> (('a, 'b) pair, 'rc) ty
-  | Union_t :
+  | Or_t :
       ('a, 'ac) ty
       * ('b, 'bc) ty
-      * ('a, 'b) union ty_metadata
+      * ('a, 'b) or_ ty_metadata
       * ('ac, 'bc, 'rc) dand
-      -> (('a, 'b) union, 'rc) ty
+      -> (('a, 'b) or_, 'rc) ty
   | Lambda_t :
       ('arg, _) ty * ('ret, _) ty * ('arg, 'ret) lambda ty_metadata
       -> (('arg, 'ret) lambda, no) ty
@@ -1756,16 +1756,16 @@ val comparable_pair_3_t :
   'c comparable_ty ->
   ('a, ('b, 'c) pair) pair comparable_ty tzresult
 
-val union_t :
-  Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) union ty_ex_c tzresult
+val or_t :
+  Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) or_ ty_ex_c tzresult
 
-val comparable_union_t :
+val comparable_or_t :
   Script.location ->
   'a comparable_ty ->
   'b comparable_ty ->
-  ('a, 'b) union comparable_ty tzresult
+  ('a, 'b) or_ comparable_ty tzresult
 
-val union_bytes_bool_t : (Bytes.t, bool) union comparable_ty
+val or_bytes_bool_t : (Bytes.t, bool) or_ comparable_ty
 
 val lambda_t :
   Script.location ->

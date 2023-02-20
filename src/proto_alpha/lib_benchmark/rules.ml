@@ -335,7 +335,7 @@ module Instruction = struct
       replacement
         ~fresh:[Plain alpha; Plain beta]
         ~fresh_stack:[gamma]
-        ~bef:(item (union (var alpha) (var beta)) (stack_var gamma))
+        ~bef:(item (or_ (var alpha) (var beta)) (stack_var gamma))
         ~aft:(item (var beta) (stack_var gamma))
         ~replacement:[Context_blind (fun () -> M.Instructions.(loop_left hole))]
         ();
@@ -350,7 +350,7 @@ module Instruction = struct
       replacement
         ~fresh:[Plain alpha; Plain beta]
         ~fresh_stack:[gamma; delta]
-        ~bef:(item (union (var alpha) (var beta)) (stack_var gamma))
+        ~bef:(item (or_ (var alpha) (var beta)) (stack_var gamma))
         ~aft:(stack_var delta)
         ~replacement:
           [Context_blind (fun () -> M.Instructions.(if_left hole hole))]
@@ -376,14 +376,14 @@ module Instruction = struct
         ~fresh:[Plain alpha; Plain beta]
         ~fresh_stack:[gamma]
         ~bef:(item (var alpha) (stack_var gamma))
-        ~aft:(item (union (var alpha) (var beta)) (stack_var gamma))
+        ~aft:(item (or_ (var alpha) (var beta)) (stack_var gamma))
         ~replacement:[Context_blind (fun () -> M.Instructions.left)]
         ();
       replacement
         ~fresh:[Plain alpha; Plain beta]
         ~fresh_stack:[gamma]
         ~bef:(item (var beta) (stack_var gamma))
-        ~aft:(item (union (var alpha) (var beta)) (stack_var gamma))
+        ~aft:(item (or_ (var alpha) (var beta)) (stack_var gamma))
         ~replacement:[Context_blind (fun () -> M.Instructions.right)]
         ();
       replacement
@@ -725,13 +725,13 @@ struct
     let replace_by_left =
       replacement
         ~fresh:[alpha; beta]
-        ~typ:Type.(union (var alpha) (var beta))
+        ~typ:Type.(or_ (var alpha) (var beta))
         ~replacement:Mikhailsky.Data.(left hole)
     in
     let replace_by_right =
       replacement
         ~fresh:[alpha; beta]
-        ~typ:Type.(union (var alpha) (var beta))
+        ~typ:Type.(or_ (var alpha) (var beta))
         ~replacement:Mikhailsky.Data.(right hole)
     in
     let replace_by_some =

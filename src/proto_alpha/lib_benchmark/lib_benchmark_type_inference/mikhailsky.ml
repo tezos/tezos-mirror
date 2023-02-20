@@ -89,7 +89,7 @@ let rec parse_ty :
   | Prim (_loc, T_or, [utl; utr], _annot) ->
       let lty = parse_ty ~allow_big_map ~allow_operation ~allow_contract utl in
       let rty = parse_ty ~allow_big_map ~allow_operation ~allow_contract utr in
-      Type.union lty rty
+      Type.or_ lty rty
   | Prim (_loc, T_set, [ut], _annot) ->
       let ut = parse_ty ~allow_big_map ~allow_operation ~allow_contract ut in
       Type.set ut
@@ -134,7 +134,7 @@ let rec map_var f (x : Type.Base.t) =
       let lty = map_var f lty in
       let rty = map_var f rty in
       prim T_pair [lty; rty] []
-  | Union_t (lty, rty) ->
+  | Or_t (lty, rty) ->
       let lty = map_var f lty in
       let rty = map_var f rty in
       prim T_or [lty; rty] []
@@ -279,7 +279,7 @@ module Instructions = struct
 
   let pair = prim I_PAIR [] []
 
-  (* unions *)
+  (* ors *)
 
   let left = prim I_LEFT [] []
 

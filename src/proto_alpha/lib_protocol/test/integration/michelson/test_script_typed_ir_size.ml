@@ -344,30 +344,30 @@ let check_value_size () =
           };
       ])
     (*
-        Union_t
+        Or_t
         =======
     *)
     @ (let module P = struct
-         type ('a, 'b) f = {apply : 'c. (('a, 'b) union, 'c) ty -> ex}
+         type ('a, 'b) f = {apply : 'c. (('a, 'b) or_, 'c) ty -> ex}
        end in
-      let on_union : type a b. (a, _) ty -> (b, _) ty -> (a, b) P.f -> ex =
+      let on_or : type a b. (a, _) ty -> (b, _) ty -> (a, b) P.f -> ex =
        fun ty1 ty2 f ->
-        let (Ty_ex_c ty) = is_ok @@ union_t dummy_loc ty1 ty2 in
+        let (Ty_ex_c ty) = is_ok @@ or_t dummy_loc ty1 ty2 in
         f.apply ty
       in
       let open Script_int in
       [
         (* "int + int" *)
-        on_union
+        on_or
           int_t
           int_t
           {apply = (fun ty -> ex "L 0 : int + int" ty (L (of_int 0)))};
-        on_union
+        on_or
           int_t
           int_t
           {apply = (fun ty -> ex "R 0 : int + int" ty (R (of_int 0)))};
         (* "string + string" *)
-        on_union
+        on_or
           string_t
           string_t
           {
@@ -376,7 +376,7 @@ let check_value_size () =
                 let foo = gen_string "foo" in
                 ex "L foo : string * string" ty (L foo));
           };
-        on_union
+        on_or
           string_t
           string_t
           {
@@ -386,7 +386,7 @@ let check_value_size () =
                 ex "R foo : string * string" ty (R foo));
           };
         (* "string + int" *)
-        on_union
+        on_or
           string_t
           int_t
           {
@@ -396,13 +396,13 @@ let check_value_size () =
                 ex "L foo : string * int" ty (L foo));
           };
         (* "int + int + int" *)
-        on_union
+        on_or
           int_t
           int_t
           {
             apply =
               (fun ty ->
-                on_union
+                on_or
                   int_t
                   ty
                   {
@@ -410,13 +410,13 @@ let check_value_size () =
                       (fun ty -> ex "L 0 : int + int + int" ty (L (of_int 0)));
                   });
           };
-        on_union
+        on_or
           int_t
           int_t
           {
             apply =
               (fun ty ->
-                on_union
+                on_or
                   int_t
                   ty
                   {
@@ -425,13 +425,13 @@ let check_value_size () =
                         ex "R (L 0) : int + int + int" ty (R (L (of_int 0))));
                   });
           };
-        on_union
+        on_or
           int_t
           int_t
           {
             apply =
               (fun ty ->
-                on_union
+                on_or
                   int_t
                   ty
                   {

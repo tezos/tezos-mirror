@@ -140,11 +140,11 @@ let rec validate_ty :
             no_entrypoints
             no_entrypoints
             k
-      | Union_t (ty1, ty2, _, _) ->
+      | Or_t (ty1, ty2, _, _) ->
           let entrypoints_l, entrypoints_r =
             match nested_entrypoints with
             | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-            | Entrypoints_Union {left; right} -> (left, right)
+            | Entrypoints_Or {left; right} -> (left, right)
           in
           (validate_two_tys [@ocaml.tailcall])
             ty1

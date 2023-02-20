@@ -44,7 +44,7 @@ module Base = struct
     | Key_t
     | Option_t of t
     | Pair_t of t * t
-    | Union_t of t * t
+    | Or_t of t * t
     | List_t of t
     | Set_t of t
     | Map_t of t * t
@@ -69,7 +69,7 @@ module Base = struct
           true
       | Option_t ty1, Option_t ty2 -> ty1.tag = ty2.tag
       | Pair_t (l1, r1), Pair_t (l2, r2) -> l1.tag = l2.tag && r1.tag = r2.tag
-      | Union_t (l1, r1), Union_t (l2, r2) -> l1.tag = l2.tag && r1.tag = r2.tag
+      | Or_t (l1, r1), Or_t (l2, r2) -> l1.tag = l2.tag && r1.tag = r2.tag
       | List_t ty1, List_t ty2 -> ty1.tag = ty2.tag
       | Set_t ty1, Set_t ty2 -> ty1.tag = ty2.tag
       | Map_t (kty1, vty1), Map_t (kty2, vty2) ->
@@ -101,7 +101,7 @@ module Base = struct
     | Option_t ty -> Format.fprintf fmtr "(option %a)" pp ty
     | List_t ty -> Format.fprintf fmtr "(list %a)" pp ty
     | Pair_t (lty, rty) -> Format.fprintf fmtr "(pair %a %a)" pp lty pp rty
-    | Union_t (lty, rty) -> Format.fprintf fmtr "(union %a %a)" pp lty pp rty
+    | Or_t (lty, rty) -> Format.fprintf fmtr "(or %a %a)" pp lty pp rty
     | Set_t ty -> Format.fprintf fmtr "(set %a)" pp ty
     | Map_t (kty, vty) -> Format.fprintf fmtr "(map %a %a)" pp kty pp vty
     | Lambda_t (dom, range) ->
@@ -114,7 +114,7 @@ module Base = struct
         acc
     | Var_t v -> v :: acc
     | Option_t ty | List_t ty | Set_t ty -> vars ty acc
-    | Pair_t (lty, rty) | Union_t (lty, rty) -> vars lty (vars rty acc)
+    | Pair_t (lty, rty) | Or_t (lty, rty) -> vars lty (vars rty acc)
     | Map_t (kty, vty) -> vars kty (vars vty acc)
     | Lambda_t (dom, range) -> vars dom (vars range acc)
 
@@ -182,7 +182,7 @@ let option ty = Base.Table.hashcons Base.table (Option_t ty)
 
 let pair lty rty = Base.Table.hashcons Base.table (Pair_t (lty, rty))
 
-let union lty rty = Base.Table.hashcons Base.table (Union_t (lty, rty))
+let or_ lty rty = Base.Table.hashcons Base.table (Or_t (lty, rty))
 
 let list ty = Base.Table.hashcons Base.table (List_t ty)
 

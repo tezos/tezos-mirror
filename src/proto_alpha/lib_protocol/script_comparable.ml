@@ -70,11 +70,11 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
           (Compare_comparable (tr, rx, ry, k))
           lx
           ly
-    | Union_t (tl, _, _, YesYes), L x, L y ->
+    | Or_t (tl, _, _, YesYes), L x, L y ->
         (compare_comparable [@tailcall]) tl k x y
-    | Union_t _, L _, R _ -> -1
-    | Union_t _, R _, L _ -> 1
-    | Union_t (_, tr, _, YesYes), R x, R y ->
+    | Or_t _, L _, R _ -> -1
+    | Or_t _, R _, L _ -> 1
+    | Or_t (_, tr, _, YesYes), R x, R y ->
         (compare_comparable [@tailcall]) tr k x y
     | Option_t _, None, None -> (apply [@tailcall]) 0 k
     | Option_t _, None, Some _ -> -1
