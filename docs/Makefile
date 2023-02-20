@@ -4,7 +4,7 @@
 SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
-TMPDOCDIR        = /tmp/octezdoc
+TMPDOCDIR     = /tmp/octezdoc
 BUILDDIR      = _build
 TOPBUILDDIR   = ../_build/default
 
