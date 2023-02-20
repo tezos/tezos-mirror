@@ -63,6 +63,14 @@ let has_upgrade_error_flag durable =
   let+ error = Durable.(find_value durable Constants.upgrade_error_flag_key) in
   Option.is_some error
 
+let get_wasm_version {durable; _} =
+  let open Lwt_syntax in
+  let* cbv = Durable.find_value_exn durable Constants.version_key in
+  let+ bytes = Tezos_lazy_containers.Chunked_byte_vector.to_bytes cbv in
+  Data_encoding.Binary.of_bytes_exn Wasm_pvm_state.version_encoding bytes
+
+let stack_size_limit = function Wasm_pvm_state.V0 -> 300 | V1 -> 2048
+
 let patch_flags_on_eval_successful durable =
   let open Lwt_syntax in
   (* We have an empty set of admin instructions, but need to wait until we can restart *)
@@ -424,19 +432,21 @@ let compute_step_with_host_functions ~stack_size_limit registry pvm_state =
   return pvm_state
 
 let compute_step pvm_state =
-  compute_step_with_host_functions
-    ~stack_size_limit:Constants.stack_size_limit
-    Host_funcs.all
-    pvm_state
+  let open Lwt_syntax in
+  let* version = get_wasm_version pvm_state in
+  let stack_size_limit = stack_size_limit version in
+  compute_step_with_host_functions ~stack_size_limit Host_funcs.all pvm_state
 
 let compute_step_with_debug ~write_debug pvm_state =
+  let open Lwt_syntax in
   let registry =
     match write_debug with
     | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
     | Noop -> Host_funcs.all
   in
+  let* wasm_version = get_wasm_version pvm_state in
   compute_step_with_host_functions
-    ~stack_size_limit:Constants.stack_size_limit
+    ~stack_size_limit:(stack_size_limit wasm_version)
     registry
     pvm_state
 
@@ -507,10 +517,11 @@ let reveal_step payload pvm_state =
   | Stuck _ | Padding -> return pvm_state.tick_state
 
 let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
-    ?(write_debug = Builtins.Noop) should_continue =
+    ?(write_debug = Builtins.Noop) should_continue pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
-  let stack_size_limit = Constants.stack_size_limit in
+  let* version = get_wasm_version pvm_state in
+  let stack_size_limit = stack_size_limit version in
   let host_function_registry =
     match write_debug with
     | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
@@ -572,7 +583,7 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
     in
     go (Int64.pred max_steps) pvm_state
   in
-  measure_executed_ticks one_or_more_steps
+  measure_executed_ticks one_or_more_steps pvm_state
 
 let should_compute ?reveal_builtins pvm_state =
   let input_request_val = input_request pvm_state in
