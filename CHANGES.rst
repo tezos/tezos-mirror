@@ -111,8 +111,6 @@ Codec
 Docker Images
 -------------
 
-- Change Python versions to 3.10.10.
-
 Smart Rollup node
 -----------------
 
