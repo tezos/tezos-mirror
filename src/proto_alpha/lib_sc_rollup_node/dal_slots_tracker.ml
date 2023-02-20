@@ -27,15 +27,15 @@ open Protocol
 open Alpha_context
 module Block_services = Block_services.Make (Protocol) (Protocol)
 
-let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
-    =
+let ancestor_hash ~number_of_levels
+    ({Node_context.genesis_info; _} as node_ctxt) head =
   let genesis_level = genesis_info.level in
   let rec go number_of_levels (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
     if level < Raw_level.to_int32 genesis_level then return_none
     else if number_of_levels = 0 then return_some hash
     else
-      let* pred_head = Layer1.get_predecessor_opt l1_ctxt head in
+      let* pred_head = Node_context.get_predecessor_opt node_ctxt head in
       match pred_head with
       | None -> return_none
       | Some pred_head -> go (number_of_levels - 1) pred_head
@@ -289,8 +289,8 @@ module Confirmed_slots_history = struct
         @@ Dal.Slots_history.History_cache.empty
              ~capacity:(Int64.of_int @@ (num_slots * 60000)))
 
-  let update (Node_context.{l1_ctxt; _} as node_ctxt)
-      Layer1.({hash = head_hash; _} as head) confirmation_info =
+  let update node_ctxt Layer1.({hash = head_hash; _} as head) confirmation_info
+      =
     let open Lwt_result_syntax in
     let* slots_to_save =
       confirmed_slots_with_headers node_ctxt confirmation_info
@@ -302,7 +302,7 @@ module Confirmed_slots_history = struct
           Slot_index.compare a b)
         slots_to_save
     in
-    let* pred = Layer1.get_predecessor l1_ctxt head in
+    let* pred = Node_context.get_predecessor node_ctxt head in
     let* slots_history = slots_history_of_hash node_ctxt pred in
     let* slots_cache = slots_history_cache_of_hash node_ctxt pred in
     let*? slots_history, slots_cache =

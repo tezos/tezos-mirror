@@ -147,7 +147,7 @@ let process_head (node_ctxt : _ Node_context.t)
           to chain reorganization.
 
     *)
-    let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
+    let* predecessor = Node_context.get_predecessor node_ctxt head in
     let* inbox = Node_context.inbox_of_head node_ctxt predecessor in
     let inbox_metrics = Metrics.Inbox.metrics in
     Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;

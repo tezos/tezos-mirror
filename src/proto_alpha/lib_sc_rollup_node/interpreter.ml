@@ -169,9 +169,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
     in
     if head.Layer1.level >= first_inbox_level then
-      let* predecessor =
-        Layer1.get_predecessor node_ctxt.Node_context.l1_ctxt head
-      in
+      let* predecessor = Node_context.get_predecessor node_ctxt head in
       transition_pvm node_ctxt ctxt predecessor head inbox_messages
     else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
     then

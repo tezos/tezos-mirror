@@ -66,21 +66,28 @@ val get_predecessor_opt :
 val get_predecessor :
   t -> Block_hash.t * int32 -> (Block_hash.t * int32) tzresult Lwt.t
 
-(** [nth_predecessor l1_ctxt n head] returns [block, history] where [block] is
-    the nth predecessor of [head] and [history] is the list of blocks between
-    [block] (excluded) and [head] (included) on the chain *)
+(** [nth_predecessor ~get_predecessor n head] returns [block, history] where
+    [block] is the nth predecessor of [head] and [history] is the list of blocks
+    between [block] (excluded) and [head] (included) on the chain. It uses the
+    function [get_predecessor] to retrieve the predecessor of one block. *)
 val nth_predecessor :
-  t ->
+  get_predecessor:('a -> 'a tzresult Lwt.t) ->
   int ->
-  Block_hash.t * int32 ->
-  ((Block_hash.t * int32) * (Block_hash.t * int32) list) tzresult Lwt.t
+  'a ->
+  ('a * 'a trace) tzresult Lwt.t
 
-(** [get_tezos_reorg_for_new_head l1_ctxt old_head new_head] returns the
-    reorganization of L1 blocks between [old_head] and [new_head]. If [old_head]
-    is [`Level l], then it returns the reorganization between [new_head] and
-    level [l] on the same chain. *)
+(** [get_tezos_reorg_for_new_head l1_ctxt ?get_old_predecessor old_head
+    new_head] returns the reorganization of L1 blocks between [old_head] and
+    [new_head]. If [old_head] is [`Level l], then it returns the reorganization
+    between [new_head] and level [l] on the same chain. [get_old_predecessor]
+    can be provided to use a different function (than by default
+    {!get_predecessor}) to retrieve the predecessors of the old head. This is
+    necessary when the old head is not in the L1 chain anymore and forgotten by
+    the L1 node. *)
 val get_tezos_reorg_for_new_head :
   t ->
+  ?get_old_predecessor:
+    (Block_hash.t * int32 -> (Block_hash.t * int32) tzresult Lwt.t) ->
   [`Head of Block_hash.t * int32 | `Level of int32] ->
   Block_hash.t * int32 ->
   (Block_hash.t * int32) Reorg.t tzresult Lwt.t

@@ -296,7 +296,7 @@ module Make (PVM : Pvm.S) = struct
     in
     unless (already_finalized || before_origination node_ctxt block)
     @@ fun () ->
-    let* predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt block in
+    let* predecessor = Node_context.get_predecessor_opt node_ctxt block in
     let* () =
       Option.iter_es (processed_finalized_block node_ctxt) predecessor
     in
@@ -326,7 +326,7 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! context_hash = Context.commit ctxt in
     let* {Layer1.hash = predecessor; _} =
-      Layer1.get_predecessor node_ctxt.l1_ctxt head
+      Node_context.get_predecessor node_ctxt head
     in
     let* commitment_hash =
       Components.Commitment.process_head node_ctxt ~predecessor head ctxt
@@ -357,10 +357,7 @@ module Make (PVM : Pvm.S) = struct
       Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
     in
     let* finalized_block, _ =
-      Layer1.nth_predecessor
-        node_ctxt.l1_ctxt
-        node_ctxt.block_finality_time
-        head
+      Node_context.nth_predecessor node_ctxt node_ctxt.block_finality_time head
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
     let* () = Node_context.save_l2_head node_ctxt l2_block in
@@ -394,7 +391,7 @@ module Make (PVM : Pvm.S) = struct
           `Level (Int32.pred origination_level)
     in
     let* reorg =
-      Layer1.get_tezos_reorg_for_new_head node_ctxt.l1_ctxt old_head head
+      Node_context.get_tezos_reorg_for_new_head node_ctxt old_head head
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
        Rollback state information on reorganization, i.e. for
