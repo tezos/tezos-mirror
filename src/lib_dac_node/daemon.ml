@@ -188,7 +188,6 @@ let run ~data_dir cctxt =
       start_legacy
         ~rpc_address
         ~rpc_port
-        ~reveal_data_dir
         ~threshold
         cctxt
         ctxt

@@ -168,9 +168,9 @@ let register_monitor_root_hashes dac_plugin hash_streamer dir =
     (Monitor_services.S.root_hashes dac_plugin)
     (fun () () () -> handle_monitor_root_hashes)
 
-let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
+let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
     hash_streamer =
-  let page_store = Page_store.Filesystem.init reveal_data_dir in
+  let page_store = Node_context.get_page_store node_context in
   Tezos_rpc.Directory.empty
   |> register_serialize_dac_store_preimage
        dac_plugin
@@ -184,8 +184,8 @@ let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
    Move this to RPC_server.Legacy once all operating modes are supported. *)
-let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
-    dac_pks_opt dac_sk_uris =
+let start_legacy ~rpc_address ~rpc_port ~threshold cctxt ctxt dac_pks_opt
+    dac_sk_uris =
   let open Lwt_syntax in
   let dir =
     Tezos_rpc.Directory.register_dynamic_directory
@@ -198,7 +198,7 @@ let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
             Lwt.return
               (register
                  (module Dac_plugin)
-                 reveal_data_dir
+                 ctxt
                  cctxt
                  dac_pks_opt
                  dac_sk_uris

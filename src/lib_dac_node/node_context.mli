@@ -75,6 +75,10 @@ val get_status : t -> status
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Client_context.full
 
-(** [get_dac_plugin ctxt] returns the [Dac_plugin.t] used in the node context. 
+(** [get_dac_plugin ctxt] returns the [Dac_plugin.t] used in the node context.
     Fails with [Node_not_ready] when [Node_context.status] is not [Ready]. *)
 val get_dac_plugin : t -> Dac_plugin.t tzresult
+
+(** [get_page_store ctxt] returns the filesystem backed page store used by
+    the Dac node to save and load pages. *)
+val get_page_store : t -> Page_store.Filesystem.t
