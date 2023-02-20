@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO https://gitlab.com/tezos/tezos/-/issues/4705
-   Dac node client context should be properly tested *)
-
 class type cctxt =
   object
     inherit Tezos_rpc.Context.generic
