@@ -64,7 +64,7 @@ let simple_test () =
   return_unit
 
 let timelock_path =
-  "../../../../../../michelson_test_scripts/ill_typed/timelock.tz"
+  project_root // "michelson_test_scripts/ill_typed/timelock.tz"
 
 let deprecated_chest_open () =
   let open Lwt_result_syntax in

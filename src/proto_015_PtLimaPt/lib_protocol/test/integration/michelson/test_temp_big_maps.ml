@@ -64,6 +64,8 @@ let call_the_contract b ~baker ~src contract param_left param_right =
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr
 
+let path = project_root // Filename.dirname __FILE__
+
 (** Originates the contract at contracts/temp_big_maps.tz and calls it with
     the pair [(param_left, param_right)].
     An action (originating, storing, passing, passing twice) is done on a big
@@ -72,12 +74,8 @@ let call_the_contract b ~baker ~src contract param_left param_right =
 *)
 let test_temp_big_maps_contract param_left param_right () =
   Contract_helpers.init () >>=? fun (b, baker, src, _src2) ->
-  Contract_helpers.originate_contract
-    "contracts/temp_big_maps.tz"
-    "{}"
-    src
-    b
-    baker
+  let script = path // "contracts/temp_big_maps.tz" in
+  Contract_helpers.originate_contract script "{}" src b baker
   >>=? fun (contract, b) ->
   check_no_dangling_temp_big_map b >>=? fun () ->
   call_the_contract b ~baker ~src contract param_left param_right >>=? fun b ->

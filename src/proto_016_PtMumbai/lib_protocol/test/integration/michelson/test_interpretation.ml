@@ -371,6 +371,8 @@ let test_store_and_reload path ~init_storage ~entrypoint_str_1 ~param_1
           (Expr.to_string real.storage))
     ~ko:fail_with_trace
 
+let path = project_root // Filename.dirname __FILE__
+
 let tests =
   [
     Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
@@ -392,20 +394,24 @@ let tests =
     Tztest.tztest
       "test lambda_rec instruction"
       `Quick
-      (test_contract_success "./contracts/rec_fact.tz" "0" "5" "120");
+      (test_contract_success (path // "contracts/rec_fact.tz") "0" "5" "120");
     Tztest.tztest
       "test lambda_rec instruction with apply"
       `Quick
-      (test_contract_success "./contracts/rec_fact_apply.tz" "0" "5" "120");
+      (test_contract_success
+         (path // "contracts/rec_fact_apply.tz")
+         "0"
+         "5"
+         "120");
     Tztest.tztest
       "test lambda_rec instruction with an infinite recursion"
       `Quick
-      (test_contract_fail "./contracts/omega.tz" "Unit" "Unit");
+      (test_contract_fail (path // "contracts/omega.tz") "Unit" "Unit");
     Tztest.tztest
       "test lambda_rec instruction storage"
       `Quick
       (test_store_and_reload
-         "./contracts/rec_fact_store.tz"
+         (path // "contracts/rec_fact_store.tz")
          ~init_storage:"Left 0"
          ~entrypoint_str_1:"gen"
          ~param_1:"Unit"
@@ -424,7 +430,7 @@ let tests =
       "test lambda_rec instruction storage"
       `Quick
       (test_store_and_reload
-         "./contracts/rec_fact_apply_store.tz"
+         (path // "contracts/rec_fact_apply_store.tz")
          ~init_storage:"Left 0"
          ~entrypoint_str_1:"gen"
          ~param_1:"Unit"

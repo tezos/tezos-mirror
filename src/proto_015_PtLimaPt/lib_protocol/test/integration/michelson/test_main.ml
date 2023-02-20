@@ -34,27 +34,30 @@ let () =
   Alcotest_lwt.run
     "protocol > integration > michelson"
     [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("ticket accounting", Test_ticket_accounting.tests);
-      ("ticket balance", Test_ticket_balance.tests);
-      ("ticket manager", Test_ticket_manager.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-      ("block time instructions", Test_block_time_instructions.tests);
-      ("annotations", Test_annotations.tests);
-      ("event logging", Test_contract_event.tests);
-      ("patched contracts", Test_patched_contracts.tests);
-      ("lambda normalization", Test_lambda_normalization.tests);
+      ( Protocol.name ^ ": global table of constants",
+        Test_global_constants_storage.tests );
+      (Protocol.name ^ ": interpretation", Test_interpretation.tests);
+      (Protocol.name ^ ": lazy storage diff", Test_lazy_storage_diff.tests);
+      (Protocol.name ^ ": sapling", Test_sapling.tests);
+      (Protocol.name ^ ": script typed ir size", Test_script_typed_ir_size.tests);
+      (Protocol.name ^ ": temp big maps", Test_temp_big_maps.tests);
+      (Protocol.name ^ ": ticket balance key", Test_ticket_balance_key.tests);
+      (Protocol.name ^ ": ticket scanner", Test_ticket_scanner.tests);
+      (Protocol.name ^ ": ticket storage", Test_ticket_storage.tests);
+      ( Protocol.name ^ ": ticket lazy storage diff",
+        Test_ticket_lazy_storage_diff.tests );
+      ( Protocol.name ^ ": ticket operations diff",
+        Test_ticket_operations_diff.tests );
+      (Protocol.name ^ ": ticket accounting", Test_ticket_accounting.tests);
+      (Protocol.name ^ ": ticket balance", Test_ticket_balance.tests);
+      (Protocol.name ^ ": ticket manager", Test_ticket_manager.tests);
+      (Protocol.name ^ ": timelock", Test_timelock.tests);
+      (Protocol.name ^ ": typechecking", Test_typechecking.tests);
+      (Protocol.name ^ ": script cache", Test_script_cache.tests);
+      ( Protocol.name ^ ": block time instructions",
+        Test_block_time_instructions.tests );
+      (Protocol.name ^ ": annotations", Test_annotations.tests);
+      (Protocol.name ^ ": event logging", Test_contract_event.tests);
+      (Protocol.name ^ ": patched contracts", Test_patched_contracts.tests);
     ]
   |> Lwt_main.run

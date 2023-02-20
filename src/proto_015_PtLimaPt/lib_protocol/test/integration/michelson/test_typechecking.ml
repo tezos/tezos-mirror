@@ -132,6 +132,10 @@ let test_context_with_nat_nat_big_map ?(sc_rollup_enable = false) () =
   @@ Contract.update_script_storage ctxt originated nat_ty_expr (Some diffs)
   >>=? fun ctxt -> return (ctxt, id)
 
+let path =
+  project_root
+  // "src/proto_015_PtLimaPt/lib_protocol/test/integration/michelson"
+
 let read_file filename =
   let ch = open_in filename in
   let s = really_input_string ch (in_channel_length ch) in
@@ -144,7 +148,7 @@ let test_typecheck_stack_overflow () =
   test_context () >>=? fun ctxt ->
   let storage = "Unit" in
   let parameter = "Unit" in
-  let script = read_file "./contracts/big_interpreter_stack.tz" in
+  let script = read_file (path // "contracts/big_interpreter_stack.tz") in
   Contract_helpers.run_script ctxt script ~storage ~parameter () >>= function
   | Ok _ -> Alcotest.fail "expected an error"
   | Error lst
@@ -770,7 +774,7 @@ let test_contract_not_packable () =
 
 (* This test function is used to checks forbidden operations in views. *)
 let test_forbidden_op_in_view op () =
-  let prefix = "./contracts/forbidden_op_in_view_" in
+  let prefix = path // "contracts/forbidden_op_in_view_" in
   let script = read_file (prefix ^ op ^ ".tz") in
   let contract_expr = Expr.from_string script in
   test_context () >>=? fun ctxt ->
@@ -981,13 +985,13 @@ let tests =
     Tztest.tztest
       "test lambda_rec instruction"
       `Quick
-      (test_contract_success "./contracts/rec_fact.tz");
+      (test_contract_success (path // "contracts/rec_fact.tz"));
     Tztest.tztest
       "test lambda_rec instruction with apply"
       `Quick
-      (test_contract_success "./contracts/rec_fact_apply.tz");
+      (test_contract_success (path // "contracts/rec_fact_apply.tz"));
     Tztest.tztest
       "test lambda_rec with type error"
       `Quick
-      (test_contract_failure "./contracts/fail_rec.tz");
+      (test_contract_failure (path // "contracts/fail_rec.tz"));
   ]

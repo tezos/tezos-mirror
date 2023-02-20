@@ -593,6 +593,8 @@ module Interpreter_tests = struct
     let string = "{ " ^ String.concat " ; " transactions ^ " }" in
     Alpha_context.Script.(lazy_expr (Expr.from_string string))
 
+  let path = project_root // Filename.dirname __FILE__
+
   (* In this test we use a contract which takes a list of transactions, applies
      all of them, and assert all of them are correct. It also enforces a 1-to-1
      conversion with mutez by asking an amount to shield and asking for a pkh to
@@ -605,7 +607,7 @@ module Interpreter_tests = struct
     init () >>=? fun (genesis, baker, src0, src1) ->
     let memo_size = 8 in
     originate_contract_hash
-      "contracts/sapling_contract.tz"
+      (path // "contracts/sapling_contract.tz")
       "{ }"
       src0
       genesis
@@ -775,7 +777,7 @@ module Interpreter_tests = struct
     >>=?
     fun (block, baker, src, _) ->
     originate_contract_hash
-      "contracts/sapling_contract.tz"
+      (path // "contracts/sapling_contract.tz")
       "{ }"
       src
       block
@@ -783,7 +785,7 @@ module Interpreter_tests = struct
     >>=? fun (_, _, _) ->
     (* Originating the next contract should fail *)
     originate_contract_hash
-      "contracts/sapling_push_sapling_state.tz"
+      (path // "contracts/sapling_push_sapling_state.tz")
       "{ }"
       src
       block
@@ -808,7 +810,7 @@ module Interpreter_tests = struct
        >>=? fun (_shielded_pool_contract_address, block, _anti_replay_shielded_pool)
                 -> *)
     originate_contract_hash
-      "contracts/sapling_use_existing_state.tz"
+      (path // "contracts/sapling_use_existing_state.tz")
       "{ }"
       src
       block
@@ -861,7 +863,12 @@ module Interpreter_tests = struct
   let test_transac_and_block () =
     init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
-    originate_contract_hash "contracts/sapling_contract.tz" "{ }" src b baker
+    originate_contract_hash
+      (path // "contracts/sapling_contract.tz")
+      "{ }"
+      src
+      b
+      baker
     >>=? fun (dst, block_start, anti_replay) ->
     let {sk; vk} = wallet_gen () in
     let hex_transac_1 = hex_shield ~memo_size {sk; vk} anti_replay in
@@ -1000,7 +1007,7 @@ module Interpreter_tests = struct
   let test_drop () =
     init () >>=? fun (b, baker, src, _) ->
     originate_contract_hash
-      "contracts/sapling_contract_drop.tz"
+      (path // "contracts/sapling_contract_drop.tz")
       "Unit"
       src
       b
@@ -1033,7 +1040,7 @@ module Interpreter_tests = struct
     init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
     originate_contract_hash
-      "contracts/sapling_contract_double.tz"
+      (path // "contracts/sapling_contract_double.tz")
       "(Pair { } { })"
       src
       b
@@ -1124,14 +1131,14 @@ module Interpreter_tests = struct
   let test_state_as_arg () =
     init () >>=? fun (b, baker, src, _) ->
     originate_contract_hash
-      "contracts/sapling_contract_state_as_arg.tz"
+      (path // "contracts/sapling_contract_state_as_arg.tz")
       "None"
       src
       b
       baker
     >>=? fun (dst, b, anti_replay) ->
     originate_contract_hash
-      "contracts/sapling_contract_send.tz"
+      (path // "contracts/sapling_contract_send.tz")
       "Unit"
       src
       b

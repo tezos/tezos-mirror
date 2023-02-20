@@ -87,6 +87,8 @@ let value_as_int :
     type a ac. (a, ac) Script_typed_ir.ty -> a -> Script_int.z Script_int.num =
  fun ty v -> match ty with Int_t -> v | _ -> Stdlib.failwith "value_as_int"
 
+let path = project_root // Filename.dirname __FILE__
+
 let add_some_contracts k src block baker =
   ( make_block block @@ fun ctxt ->
     find ctxt liquidity_baking_contract >>=? fun (ctxt, id, _, _) ->
@@ -94,7 +96,12 @@ let add_some_contracts k src block baker =
   >>=? fun (liquidity_baking_contract_id, block) ->
   List.fold_left_es
     (fun (rev_contracts, block) _ ->
-      originate_contract_hash "contracts/int-store.tz" "31" src block baker
+      originate_contract_hash
+        (path // "contracts/int-store.tz")
+        "31"
+        src
+        block
+        baker
       >>=? fun (addr, block) ->
       Block.bake block >>=? fun block ->
       make_block block @@ fun ctxt ->
@@ -141,7 +148,12 @@ let test_size_of_liquidity_baking_contract () =
 
 let test_size_of_int_store_contract () =
   init () >>=? fun (block, baker, src, _) ->
-  originate_contract_hash "contracts/int-store.tz" "31" src block baker
+  originate_contract_hash
+    (path // "contracts/int-store.tz")
+    "31"
+    src
+    block
+    baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
     Script_cache.find ctxt addr >|= Environment.wrap_tzresult
@@ -158,7 +170,12 @@ let test_size_of_int_store_contract () =
 *)
 let test_find_correctly_looks_up () =
   init () >>=? fun (block, baker, src, _) ->
-  originate_contract_hash "contracts/sapling_contract.tz" "{ }" src block baker
+  originate_contract_hash
+    (path // "contracts/sapling_contract.tz")
+    "{ }"
+    src
+    block
+    baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
     (*
@@ -197,7 +214,12 @@ let test_find_correctly_looks_up () =
 *)
 let test_update_modifies_cached_contract () =
   init () >>=? fun (block, baker, src, _) ->
-  originate_contract_hash "contracts/int-store.tz" "36" src block baker
+  originate_contract_hash
+    (path // "contracts/int-store.tz")
+    "36"
+    src
+    block
+    baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
     find ctxt addr >>=? fun (ctxt, identifier, script, Ex_script (Script ir)) ->
