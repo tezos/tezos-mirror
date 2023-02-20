@@ -124,9 +124,7 @@ module Test = struct
          let* p = Cryptobox.polynomial_from_slot t slot in
          let enc_shards = Cryptobox.shards_from_polynomial t p in
          let c_indices =
-           random_indices
-             (number_of_shards - 1)
-             (number_of_shards / redundancy_factor)
+           random_indices number_of_shards (number_of_shards / redundancy_factor)
          in
          let c =
            Seq.filter
@@ -160,9 +158,7 @@ module Test = struct
          let* p = Cryptobox.polynomial_from_slot t slot in
          let enc_shards = Cryptobox.shards_from_polynomial t p in
          let c_indices =
-           random_indices
-             (number_of_shards - 1)
-             (number_of_shards / redundancy_factor)
+           random_indices number_of_shards (number_of_shards / redundancy_factor)
          in
          let c =
            Seq.filter
@@ -202,7 +198,7 @@ module Test = struct
      let enc_shards = Cryptobox.shards_from_polynomial t p in
      let c_indices =
        random_indices
-         (number_of_shards - 1)
+         number_of_shards
          ((number_of_shards / redundancy_factor) - 1)
      in
      let c =
