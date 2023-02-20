@@ -31,6 +31,10 @@ module type S = sig
 
   (** [balance address] returns the [address]'s balance. *)
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+
+  (** [inject_raw_transaction tx] injects [tx] in the rollup node's
+      batcher queue. *)
+  val inject_raw_transaction : string -> unit tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

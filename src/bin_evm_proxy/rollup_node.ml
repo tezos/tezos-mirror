@@ -65,6 +65,21 @@ module RPC = struct
       (open_root / "global" / "block" / "head" / "durable" / "wasm_2_0_0"
      / "value")
 
+  let batcher_injection =
+    Tezos_rpc.Service.post_service
+      ~description:"Inject messages in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def "messages" ~description:"Messages to inject" (list string))
+      ~output:
+        Data_encoding.(
+          def
+            "message_hashes"
+            ~description:"Hashes of injected L2 messages"
+            (list string))
+      (open_root / "local" / "batcher" / "injection")
+
   let call_service ~base =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service
       Media_type.all_media_types
@@ -93,19 +108,32 @@ module RPC = struct
     | Some bytes ->
         Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
     | None -> Ethereum_types.Qty Z.zero
+
+  let inject_raw_transaction base tx =
+    let open Lwt_result_syntax in
+    let tx = Hex.of_string tx |> Hex.show in
+    (* The injection's service returns a notion of L2 message hash (defined
+       by the rollup node) used to track the message's injection in the batcher.
+       We do not wish to follow the message's inclusion, and thus, ignore
+       the resulted hash. *)
+    let* _answer = call_service ~base batcher_injection () () [tx] in
+    return_unit
 end
 
 module type S = sig
   val assert_connected : unit tzresult Lwt.t
 
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+
+  val inject_raw_transaction : string -> unit tzresult Lwt.t
 end
 
 module Make (Base : sig
   val base : Uri.t
-end) =
-struct
+end) : S = struct
   let assert_connected = RPC.is_connected Base.base
 
   let balance = RPC.balance Base.base
+
+  let inject_raw_transaction = RPC.inject_raw_transaction Base.base
 end
