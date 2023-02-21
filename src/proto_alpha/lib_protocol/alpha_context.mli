@@ -2557,7 +2557,6 @@ module Receipt : sig
     | Block_fees
     | Deposits of public_key_hash
     | Nonce_revelation_rewards
-    | Double_signing_evidence_rewards
     | Endorsing_rewards
     | Baking_rewards
     | Baking_bonuses
@@ -5290,7 +5289,6 @@ module Token : sig
     | `Bootstrap
     | `Initial_commitments
     | `Revelation_rewards
-    | `Double_signing_evidence_rewards
     | `Endorsing_rewards
     | `Baking_rewards
     | `Baking_bonuses

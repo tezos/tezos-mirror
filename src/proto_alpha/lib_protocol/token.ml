@@ -35,7 +35,6 @@ type infinite_source =
   | `Bootstrap
   | `Initial_commitments
   | `Revelation_rewards
-  | `Double_signing_evidence_rewards
   | `Endorsing_rewards
   | `Baking_rewards
   | `Baking_bonuses
@@ -141,7 +140,6 @@ let spend ctxt giver amount origin =
         | `Minted -> Minted
         | `Liquidity_baking_subsidies -> Liquidity_baking_subsidies
         | `Revelation_rewards -> Nonce_revelation_rewards
-        | `Double_signing_evidence_rewards -> Double_signing_evidence_rewards
         | `Endorsing_rewards -> Endorsing_rewards
         | `Baking_rewards -> Baking_rewards
         | `Baking_bonuses -> Baking_bonuses

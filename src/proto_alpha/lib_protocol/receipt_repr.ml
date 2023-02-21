@@ -29,7 +29,6 @@ type balance =
   | Block_fees
   | Deposits of Signature.Public_key_hash.t
   | Nonce_revelation_rewards
-  | Double_signing_evidence_rewards
   | Endorsing_rewards
   | Baking_rewards
   | Baking_bonuses
@@ -87,15 +86,8 @@ let balance_encoding =
               (req "category" (constant "nonce revelation rewards")))
            (function Nonce_revelation_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Nonce_revelation_rewards);
-         case
-           (Tag 6)
-           ~title:"Double_signing_evidence_rewards"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "double signing evidence rewards")))
-           (function
-             | Double_signing_evidence_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Double_signing_evidence_rewards);
+         (* 6 was for Double_signing_evidence_rewards that has been removed.
+            https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
          case
            (Tag 7)
            ~title:"Endorsing_rewards"
@@ -278,7 +270,8 @@ let compare_balance ba bb =
         | Block_fees -> 1
         | Deposits _ -> 2
         | Nonce_revelation_rewards -> 3
-        | Double_signing_evidence_rewards -> 4
+        (* 4 was for Double_signing_evidence_rewards that has been removed.
+           https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
         | Endorsing_rewards -> 5
         | Baking_rewards -> 6
         | Baking_bonuses -> 7

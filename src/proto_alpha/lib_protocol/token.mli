@@ -77,8 +77,6 @@ type infinite_source =
   | `Initial_commitments
     (** Funding of Genesis' prefunded accounts requiring an activation *)
   | `Revelation_rewards  (** Seed nonce revelation rewards *)
-  | `Double_signing_evidence_rewards
-    (** Double signing denunciation rewards (consensus slashing redistribution) *)
   | `Endorsing_rewards  (** Consensus endorsing rewards *)
   | `Baking_rewards  (** Consensus baking fixed rewards *)
   | `Baking_bonuses  (** Consensus baking variable bonus *)

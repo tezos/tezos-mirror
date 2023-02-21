@@ -427,12 +427,6 @@ let test_transferring_from_giver () =
   test_transferring_from_infinite_source ctxt `Revelation_rewards (fun am ->
       [(Nonce_revelation_rewards, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_infinite_source
-    ctxt
-    `Double_signing_evidence_rewards
-    (fun am ->
-      [(Double_signing_evidence_rewards, Debited am, Block_application)])
-  >>=? fun () ->
   test_transferring_from_infinite_source ctxt `Endorsing_rewards (fun am ->
       [(Endorsing_rewards, Debited am, Block_application)])
   >>=? fun () ->
