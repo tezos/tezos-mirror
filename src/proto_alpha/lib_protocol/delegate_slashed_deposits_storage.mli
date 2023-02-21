@@ -53,7 +53,7 @@ type punishing_amounts = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
     record in the context that the given delegate has now been slashed
     for double endorsing for the given level.
 
-    Returns the burned amount.
+    Returns the burned amount and the reward.
 
     Fails with [Unrequired_denunciation] if the given delegate has
     already been slashed for double endorsing for the given level.  *)
@@ -61,13 +61,14 @@ val punish_double_endorsing :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
-  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
+  (Raw_context.t * punishing_amounts * Receipt_repr.balance_updates) tzresult
+  Lwt.t
 
 (** Burn some frozen deposit for a delegate at a given level and
     record in the context that the given delegate has now been slashed
     for double baking for the given level.
 
-    Returns the burned amount.
+    Returns the burned amount and the reward.
 
     Fails with [Unrequired_denunciation] if the given delegate has
     already been slashed for double baking for the given level.  *)
@@ -75,7 +76,8 @@ val punish_double_baking :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
-  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
+  (Raw_context.t * punishing_amounts * Receipt_repr.balance_updates) tzresult
+  Lwt.t
 
 val clear_outdated_slashed_deposits :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
