@@ -497,4 +497,10 @@ let parallel_test =
       | Error err ->
           QCheck2.Test.fail_reportf "%a@." Error_monad.pp_print_trace err)
 
-let () = QCheck_base_runner.run_tests_main [sequential_test; parallel_test]
+let () =
+  Alcotest.run
+    "test-key-value-store-fuzzy"
+    [
+      ("sequential", [QCheck_alcotest.to_alcotest sequential_test]);
+      ("parallel", [QCheck_alcotest.to_alcotest parallel_test]);
+    ]

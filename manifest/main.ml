@@ -480,7 +480,7 @@ let octez_stdlib =
     ~foreign_stubs:{language = C; flags = []; names = ["tzBytes_c"]}
 
 let _octez_stdlib_tests =
-  tests
+  tezt
     [
       "test_bits";
       "test_tzList";
@@ -490,6 +490,7 @@ let _octez_stdlib_tests =
       "test_functionalArray";
       "test_hash_queue";
       "test_tzBytes";
+      "test_arrays";
     ]
     ~path:"src/lib_stdlib/test"
     ~opam:"tezos-stdlib"
@@ -497,7 +498,7 @@ let _octez_stdlib_tests =
     ~deps:
       [
         octez_stdlib |> open_;
-        alcotest;
+        alcotezt;
         bigstring;
         octez_test_helpers |> open_;
         qcheck_alcotest;
@@ -505,7 +506,7 @@ let _octez_stdlib_tests =
     ~js_compatible:true
 
 let _octez_stdlib_test_unix =
-  tests
+  tezt
     [
       "test_lwt_pipe";
       "test_circular_buffer";
@@ -517,8 +518,7 @@ let _octez_stdlib_test_unix =
     ~deps:
       [
         octez_stdlib |> open_;
-        alcotest;
-        alcotest_lwt;
+        alcotezt;
         lwt_log;
         bigstring;
         lwt_unix;
@@ -1037,8 +1037,8 @@ let octez_stdlib_unix =
       ]
 
 let _octez_stdlib_unix_test =
-  test
-    "test_key_value_store_fuzzy"
+  tezt
+    ["test_key_value_store_fuzzy"]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"tezos-stdlib-unix"
     ~deps:
@@ -1046,7 +1046,7 @@ let _octez_stdlib_unix_test =
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_stdlib_unix |> open_;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_clic =

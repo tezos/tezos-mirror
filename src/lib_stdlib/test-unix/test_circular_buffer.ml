@@ -359,7 +359,6 @@ let wrap n f =
 
 let () =
   Alcotest.run
-    ~argv:[|""|]
     "tezos-stdlib"
     (List.map
        (fun (run, descr) ->
