@@ -357,7 +357,7 @@ module Test = struct
         page_size = 2;
         redundancy_factor = 2;
         number_of_shards = 1 lsl 6;
-        slot = Bytes.make 1 '0';
+        slot = Bytes.make 1 '\000';
         padding_threshold = 0;
       } ;
     let open Tezos_error_monad.Error_monad.Result_syntax in
