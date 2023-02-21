@@ -876,13 +876,16 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
-    ?(metrics_addr = []) ?operation_metadata_size_limit ?(private_mode = false)
-    ?(disable_p2p_maintenance = false) ?(disable_mempool = false)
+    ?(metrics_addr = []) ?operation_metadata_size_limit
+    ?(private_mode = default_p2p.private_mode)
+    ?(disable_p2p_maintenance =
+      Option.is_none default_p2p.limits.maintenance_idle_time)
+    ?(disable_mempool = default_p2p.disable_mempool)
     ?(disable_mempool_precheck =
       Shell_limits.default_limits.prevalidator_limits.disable_precheck)
-    ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
-    ?latency cfg =
+    ?(enable_testchain = default_p2p.enable_testchain) ?(cors_origins = [])
+    ?(cors_headers = []) ?rpc_tls ?log_output ?synchronisation_threshold
+    ?history_mode ?network ?latency cfg =
   let open Lwt_result_syntax in
   let disable_config_validation =
     cfg.disable_config_validation || disable_config_validation
