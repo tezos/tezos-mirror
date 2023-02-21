@@ -239,6 +239,7 @@ exception Missing_memory_0_export
     @raise Invalid_argument if called with [IK_Stop]. There is no
     transition from the terminal state. *)
 val init_step :
+  stack_size_limit:int ->
   filter_exports:bool ->
   ?check_module_exports:memory_export_rules ->
   module_reg:module_reg ->
@@ -250,6 +251,7 @@ val init_step :
   init_kont Lwt.t
 
 val init :
+  ?stack_size_limit:int ->
   module_reg:module_reg ->
   self:module_key ->
   buffers ->
@@ -259,6 +261,7 @@ val init :
   module_inst Lwt.t (* raises Link, Trap *)
 
 val invoke :
+  ?stack_size_limit:int ->
   module_reg:module_reg ->
   caller:module_key ->
   ?input:Input_buffer.t ->
@@ -313,6 +316,7 @@ val reveal_step :
   config Lwt.t
 
 val config :
+  stack_size_limit:int ->
   Host_funcs.registry ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
