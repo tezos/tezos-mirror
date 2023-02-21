@@ -187,7 +187,7 @@ let with_dal_node tezos_node tezos_client f key =
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
+let scenario_with_layer1_node ?(tags = ["layer1"]) ?attestation_lag
     ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
     ?event_sections_levels ?node_arguments ?activation_timestamp
     ?minimal_block_delay ?delay_increment_per_round variant scenario =
@@ -212,9 +212,9 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
-    ?custom_constants ?minimal_block_delay ?delay_increment_per_round
-    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
+let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
+    ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
+    ?attestation_threshold ?commitment_period ?challenge_window
     ?(dal_enable = true) ?activation_timestamp variant scenario =
   let description = "Testing DAL node" in
   test
@@ -238,7 +238,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
-    ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
+    ?(tags = ["dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
     ?commitment_period ?challenge_window ?minimal_block_delay
     ?delay_increment_per_round ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
