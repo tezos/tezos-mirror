@@ -270,7 +270,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     Local_directory.register0 Sc_rollup_services.Local.last_published_commitment
     @@ fun node_ctxt () () ->
     let open Lwt_result_syntax in
-    match node_ctxt.lpc with
+    match Reference.get node_ctxt.lpc with
     | None -> return_none
     | Some commitment ->
         let hash =
@@ -357,7 +357,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
       =
     let open Alpha_context in
     let open Option_syntax in
-    let+ last_published_commitment = node_ctxt.lpc in
+    let+ last_published_commitment = Reference.get node_ctxt.lpc in
     let commitment_period =
       Int32.of_int
         node_ctxt.protocol_constants.parametric.sc_rollup
@@ -380,8 +380,9 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
       | Some {header = {level = finalized_level; _}; _} ->
           Compare.Int32.(inbox_level <= Raw_level.to_int32 finalized_level)
     in
+    let lcc = Reference.get node_ctxt.lcc in
     let cemented =
-      Compare.Int32.(inbox_level <= Raw_level.to_int32 node_ctxt.lcc.level)
+      Compare.Int32.(inbox_level <= Raw_level.to_int32 lcc.level)
     in
     Sc_rollup_services.{finalized; cemented}
 

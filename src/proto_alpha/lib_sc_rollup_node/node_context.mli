@@ -65,8 +65,8 @@ type 'a t = {
   store : 'a store;  (** The store for the persistent storage. *)
   context : 'a Context.index;
       (** The persistent context for the rollup node. *)
-  mutable lcc : lcc;  (** Last cemented commitment and its level. *)
-  mutable lpc : Sc_rollup.Commitment.t option;
+  lcc : ('a, lcc) Reference.t;  (** Last cemented commitment and its level. *)
+  lpc : ('a, Sc_rollup.Commitment.t option) Reference.t;
       (** The last published commitment, i.e. commitment that the operator is
           staked on. *)
 }
