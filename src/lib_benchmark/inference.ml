@@ -41,9 +41,13 @@ type problem =
     }
   | Degenerate of {predicted : matrix; measured : matrix}
 
-(* R2 score is uninformative when the input is constant. (e.g. constant model)
-   We use `None` for the R2 score of such models. *)
-type scores = {r2_score : float option; rmse_score : float}
+type scores = {
+  (* R2 score is uninformative when the input is constant. (e.g. constant model)
+     We use `None` for the R2 score of such models. *)
+  r2_score : float option;
+  rmse_score : float;
+  tvalues : (Free_variable.t * float) list;
+}
 
 let pp_scores ppf {r2_score; rmse_score} =
   Format.fprintf
@@ -314,6 +318,11 @@ let to_scipy m =
   let rows = Maths.row_dim m in
   Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
 
+(* Convert a vector overlay to a Python vector. *)
+let to_scipy_vector v =
+  let open Bigarray in
+  Array1.init Float64 C_layout (vec_dim v) (fun i -> Vector.get v i)
+
 let median_of_output output =
   (* Scipy's functions expect a column vector on output. *)
   Matrix.of_col
@@ -351,22 +360,60 @@ let rmse_score ~output ~prediction =
   let output = to_scipy output in
   Scikit.rmse_score ~output ~prediction
 
+let calculate_benchmark_scores ~input ~output =
+  let output =
+    let arrs =
+      Array.init (row_dim output) (fun r ->
+          let arr = Matrix.row output r |> vector_to_array in
+          Array.sort Float.compare arr ;
+          (* Eliminate the upper 10% to reduce influence of GC *)
+          let len = Array.length arr in
+          let q = len * 9 / 10 in
+          Array.init q (fun i -> arr.(i)))
+    in
+    Maths.matrix_of_array_array arrs
+  in
+
+  (* Duplicate input vector & Flatten output vector *)
+  (* Input: (dim_of_workload,nsamples) matrix =>
+            (dim_of_workload,bench_num * nsamples) matrix *)
+  let input =
+    let co = col_dim output in
+    let r = row_dim input in
+    let ci = col_dim input in
+    Matrix.make (Linalg.Tensor.Int.rank_two ci (co * r)) @@ fun (c, r) ->
+    Matrix.get input (c, r / co)
+  in
+  (* Output: (bench_num, nsamples) matrix =>
+             (bench_num * nsamples) vector *)
+  let output =
+    let c = col_dim output in
+    let shape = Linalg.Tensor.Int.rank_one (c * row_dim output) in
+    Vector.make shape (fun i -> Matrix.get output (i mod c, i / c))
+  in
+
+  let input = to_scipy input in
+  let output = to_scipy_vector output in
+  let params, tvalues = Scikit.benchmark_score ~input ~output in
+  (params |> of_scipy, tvalues |> of_scipy)
+
 let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
  fun problem ~is_constant_input solver ->
-  let calculate_scores ~output ~prediction =
+  let calculate_regression_scores ~output ~prediction =
     let r2_score =
       if is_constant_input then None else r2_score ~output ~prediction
     in
     let rmse_score = rmse_score ~output ~prediction in
-    {r2_score; rmse_score}
+    {r2_score; rmse_score; tvalues = []}
   in
   match problem with
   | Degenerate {predicted; measured} ->
       let prediction = to_scipy predicted |> Scikit_matrix.to_numpy in
       let output = median_of_output measured in
-      let scores = calculate_scores ~output ~prediction in
+      let scores = calculate_regression_scores ~output ~prediction in
       {mapping = []; weights = empty_matrix; scores}
   | Non_degenerate {input; output; nmap; _} ->
+      let params, tvalues = calculate_benchmark_scores ~input ~output in
       let output = median_of_output output in
       let weights =
         match solver with
@@ -375,7 +422,8 @@ let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
         | NNLS -> nnls ~input ~output
       in
       let prediction = predict_output ~input ~weights in
-      let scores = calculate_scores ~output ~prediction in
+
+      let regression_scores = calculate_regression_scores ~output ~prediction in
       let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
         let cols = Maths.col_dim weights in
@@ -396,4 +444,29 @@ let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
             nmap
             []
         in
-        {mapping; weights; scores}
+        let tvalues =
+          NMap.fold
+            (fun variable i acc ->
+              (let w_true = Matrix.get weights (0, i) in
+               let w_ols = Matrix.get params (0, i) in
+               if
+                 Float.(abs (w_true -. w_ols) /. min (abs w_true) (abs w_ols))
+                 > 2.0
+               then
+                 Format.eprintf
+                   "Warning: Estimation results for %s differ significantly; \
+                    %f from statmodels.OLS, and %f from scikit. Problem might \
+                    be underdetermined.@."
+                   (Free_variable.to_string variable)
+                   w_ols
+                   w_true) ;
+              let tvalue = Matrix.get tvalues (0, i) in
+              Format.eprintf
+                "tvalue-%s := %f@."
+                (Free_variable.to_string variable)
+                tvalue ;
+              (variable, tvalue) :: acc)
+            nmap
+            []
+        in
+        {mapping; weights; scores = {regression_scores with tvalues}}

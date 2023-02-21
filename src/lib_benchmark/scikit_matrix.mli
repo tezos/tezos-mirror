@@ -71,6 +71,11 @@ val of_genarray : gen -> t
 (** Converts to a numpy Python object. *)
 val to_numpy : t -> Pytypes.pyobject
 
+(** Converts a vector to a numpy Python object. *)
+val to_numpy_vector :
+  (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+  Pytypes.pyobject
+
 (** Converts from a numpy Python object. *)
 val of_numpy : Pytypes.pyobject -> t
 

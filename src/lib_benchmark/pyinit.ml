@@ -69,6 +69,16 @@ let sklearn_metrics () =
   handle_python_error "While initializing sklearn.metrics" @@ fun () ->
   Py.Import.import_module "sklearn.metrics"
 
+let statsmodels_api () =
+  pyinit () ;
+  handle_python_error "While initializing statsmodels.api" @@ fun () ->
+  Py.Import.import_module "statsmodels.api"
+
+let statsmodels_stats () =
+  pyinit () ;
+  handle_python_error "While initializing statsmodels.stats" @@ fun () ->
+  Py.Import.import_module "statsmodels.stats"
+
 let%expect_test "pyinit can be called twice without failing" =
   (* Paths are environment specific, do not leak into tests *)
   let discard_python_path str =
