@@ -30,6 +30,39 @@ type t = {active_sinks : Uri.t list}
 let lwt_log =
   {active_sinks = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()]}
 
+let make_section_prefix ~pattern level =
+  Format.sprintf "%s:%s" pattern (Internal_event.Level.to_string level)
+
+let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
+    ?fresh ?(section_prefixes = []) kind =
+  let scheme, path =
+    match kind with
+    | `Stdout -> ("file-descriptor-stdout", None)
+    | `Stderr -> ("file-descriptor-stderr", None)
+    | `Path path -> ("file-descriptor-path", Some path)
+  in
+  let add prop str v conf =
+    match v with Some c -> (prop, [str c]) :: conf | None -> conf
+  in
+  let make_section_prefixes sp =
+    List.map (fun (pattern, lvl) -> make_section_prefix ~pattern lvl) sp
+    |> List.map (fun p -> ("section-prefix", [p]))
+  in
+  let bool = Format.sprintf "%B" in
+  Uri.make
+    ?path
+    ~scheme
+    ~query:
+      (make_section_prefixes section_prefixes
+      |> add "format" Fun.id format
+      |> add "level-at-least" Internal_event.Level.to_string level
+      |> add "create-dirs" bool create_dirs
+      |> add "daily-logs" string_of_int daily_logs
+      |> add "fresh" bool fresh
+      |> add "chmod" string_of_int chmod
+      |> add "with_pid" bool with_pid)
+    ()
+
 let empty = {active_sinks = []}
 
 let is_empty {active_sinks} = active_sinks = []

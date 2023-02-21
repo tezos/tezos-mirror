@@ -108,25 +108,20 @@ let close () =
 
 open Filename.Infix
 
-let make_default_internal_events daily_logs_path =
+let make_default_internal_events daily_log_path =
   (* By default the node has two logs output:
      - on stdout using Lwt_log using the configured verbosity
      - on disk, with a 7 days rotation with an info verbosity level *)
-  Internal_event_config.make_custom
-    [
-      Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ();
-      Uri.make
-        ~scheme:"file-descriptor-path"
-        ~path:(daily_logs_path // "daily.log")
-        ~query:
-          [
-            ("create-dirs", ["true"]);
-            ("daily-logs", ["7"]);
-            ("section-prefix", [":info"]);
-            ("format", ["pp"]);
-          ]
-        ();
-    ]
+  let internal_logs =
+    Internal_event_config.make_config_uri
+      ~daily_logs:7
+      ~create_dirs:true
+      ~level:Info
+      ~format:"pp"
+      (`Path (daily_log_path // "daily.log"))
+  in
+  let user_logs = Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme () in
+  Internal_event_config.make_custom [user_logs; internal_logs]
 
 let make_with_defaults ?internal_events ?enable_default_daily_logs_at () =
   let internal_events =
