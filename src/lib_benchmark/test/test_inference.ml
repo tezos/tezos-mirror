@@ -118,3 +118,6 @@ let test () =
   30.0 < T.const && T.const < 36.0 && T.quadratic_term =~ 0.042
 
 let tests = [Test.tztest_assert "regression" `Quick @@ test]
+
+let () =
+  Alcotest_lwt.run "tezos-benchmark" [("inference", tests)] |> Lwt_main.run

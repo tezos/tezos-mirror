@@ -10,7 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "tezt" { with-test & >= "3.0.0" }
+  "octez-alcotezt" {with-test}
   "tezos-base" {with-test}
   "tezos-stdlib-unix" {with-test}
   "tezos-micheline" {with-test}
@@ -22,5 +23,6 @@ build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: tests for lib-benchmarks"
