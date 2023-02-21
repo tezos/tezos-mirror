@@ -96,9 +96,10 @@ let punish_double_baking ctxt delegate (level : Level_repr.t) =
   let slashing_for_one_block =
     Constants_storage.double_baking_punishment ctxt
   in
-  let amount_to_burn =
+  let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount slashing_for_one_block)
   in
+  let reward, amount_to_burn = Tez_repr.div2_sub punishing_amount in
   let* ctxt, balance_updates =
     Token.transfer
       ctxt
@@ -112,7 +113,7 @@ let punish_double_baking ctxt delegate (level : Level_repr.t) =
       (level.level, delegate)
       updated_slashed
   in
-  return (ctxt, amount_to_burn, balance_updates)
+  return (ctxt, reward, balance_updates)
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in
