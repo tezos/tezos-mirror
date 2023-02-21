@@ -3989,14 +3989,27 @@ end = struct
       in
       let _integration_validate =
         only_if N.(number >= 014) @@ fun () ->
-        test
-          "main"
+        tezt
+          [
+            "test_main";
+            "generator_descriptors";
+            "generators";
+            "manager_operation_helpers";
+            "test_1m_restriction";
+            "test_covalidity";
+            "test_manager_operation_validation";
+            "test_mempool";
+            "test_sanity";
+            "test_validation_batch";
+            "valid_operations_generators";
+            "validate_helpers";
+          ]
           ~path:(path // "lib_protocol/test/integration/validate")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true
           ~deps:
             [
-              alcotest_lwt;
+              alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;
