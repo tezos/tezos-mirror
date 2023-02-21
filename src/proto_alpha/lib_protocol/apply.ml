@@ -3075,3 +3075,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
       return (result, receipt)
 
 let value_of_key ctxt k = Cache.Admin.value_of_key ctxt k
+
+module Internal_for_benchmark = struct
+  let take_fees ctxt batch = ignore (take_fees ctxt batch)
+end
