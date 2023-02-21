@@ -23,11 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type rollup_node_endpoint = Mockup | Endpoint of Uri.t
+
 type config = {
   rpc_addr : string;
   rpc_port : int;
   debug : bool;
-  rollup_node_endpoint : Uri.t;
+  rollup_node_endpoint : rollup_node_endpoint;
 }
 
 let default_config =
@@ -35,10 +37,10 @@ let default_config =
     rpc_addr = "127.0.0.1";
     rpc_port = 8545;
     debug = true;
-    rollup_node_endpoint = Uri.of_string "http://localhost:8731";
+    rollup_node_endpoint = Mockup;
   }
 
-let make_config ?rpc_addr ?rpc_port ?debug ?rollup_node_endpoint () =
+let make_config ?rpc_addr ?rpc_port ?debug ~rollup_node_endpoint () =
   {
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
@@ -96,11 +98,17 @@ let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
   let host = Ipaddr.V6.to_string p2p_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
-  let module Rollup_node_rpc = Rollup_node.Make (struct
-    let base = rollup_node_endpoint
-  end) in
-  let* () = Rollup_node_rpc.assert_connected in
-  let directory = Services.directory (module Rollup_node_rpc : Rollup_node.S) in
+  let* rollup_node_rpc =
+    match rollup_node_endpoint with
+    | Endpoint endpoint ->
+        let module Rollup_node_rpc = Rollup_node.Make (struct
+          let base = endpoint
+        end) in
+        let* () = Rollup_node_rpc.assert_connected in
+        return_some (module Rollup_node_rpc : Rollup_node.S)
+    | Mockup -> return_none
+  in
+  let directory = Services.directory rollup_node_rpc in
   let server =
     RPC_server.init_server
       ~acl
@@ -129,7 +137,14 @@ module Params = struct
 
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
 
-  let uri = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s))
+  let rollup_node_endpoint =
+    Tezos_clic.parameter (fun _ s ->
+        let endpoint =
+          match s with
+          | "mockup" -> Mockup
+          | uri -> Endpoint (Uri.of_string uri)
+        in
+        Lwt.return_ok endpoint)
 end
 
 let rpc_addr_arg =
@@ -152,8 +167,8 @@ let rollup_node_endpoint_arg =
     ~placeholder:"ADDR:PORT"
     ~doc:
       "The smart rollup node endpoint address the proxy server will \
-       communicate with."
-    Params.uri
+       communicate with, or [mockup] if you want to use mock values."
+    Params.rollup_node_endpoint
 
 let main_command =
   let open Tezos_clic in
@@ -165,7 +180,7 @@ let main_command =
     (fun (rpc_addr, rpc_port, rollup_node_endpoint) () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
-      let config = make_config ?rpc_addr ?rpc_port ?rollup_node_endpoint () in
+      let config = make_config ?rpc_addr ?rpc_port ~rollup_node_endpoint () in
       let* server = start config in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
