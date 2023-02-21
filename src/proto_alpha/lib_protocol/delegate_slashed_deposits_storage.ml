@@ -49,7 +49,7 @@ let finish_punish ctxt delegate (level : Level_repr.t) updated_slashed
       (level.level, delegate)
       updated_slashed
   in
-  return (ctxt, {reward; amount_to_burn}, [])
+  return (ctxt, {reward; amount_to_burn})
 
 let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   let open Lwt_result_syntax in

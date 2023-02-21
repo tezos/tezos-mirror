@@ -2679,13 +2679,13 @@ module Delegate : sig
     context ->
     public_key_hash ->
     Level.t ->
-    (context * punishing_amounts * Receipt.balance_updates) tzresult Lwt.t
+    (context * punishing_amounts) tzresult Lwt.t
 
   val punish_double_baking :
     context ->
     public_key_hash ->
     Level.t ->
-    (context * punishing_amounts * Receipt.balance_updates) tzresult Lwt.t
+    (context * punishing_amounts) tzresult Lwt.t
 
   val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 

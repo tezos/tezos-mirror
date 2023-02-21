@@ -61,8 +61,7 @@ val punish_double_endorsing :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
-  (Raw_context.t * punishing_amounts * Receipt_repr.balance_updates) tzresult
-  Lwt.t
+  (Raw_context.t * punishing_amounts) tzresult Lwt.t
 
 (** Burn some frozen deposit for a delegate at a given level and
     record in the context that the given delegate has now been slashed
@@ -76,8 +75,7 @@ val punish_double_baking :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
-  (Raw_context.t * punishing_amounts * Receipt_repr.balance_updates) tzresult
-  Lwt.t
+  (Raw_context.t * punishing_amounts) tzresult Lwt.t
 
 val clear_outdated_slashed_deposits :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
