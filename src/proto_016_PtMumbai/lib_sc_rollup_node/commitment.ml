@@ -184,7 +184,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let missing_commitments (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
     let lpc_level =
-      match node_ctxt.lpc with
+      match Reference.get node_ctxt.lpc with
       | None -> node_ctxt.genesis_info.level
       | Some lpc -> lpc.inbox_level
     in
@@ -201,10 +201,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let* commitment =
         Node_context.find_commitment node_ctxt commitment_hash
       in
+      let lcc = Reference.get node_ctxt.lcc in
       match commitment with
       | None -> return acc
-      | Some commitment
-        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+      | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
           (* Commitment is before or at the LCC, we have reached the end. *)
           return acc
       | Some commitment when Raw_level.(commitment.inbox_level <= lpc_level) ->
@@ -271,12 +271,13 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Publish in
+    let lcc = Reference.get node_ctxt.lcc in
     match operator with
     | None ->
         (* Configured to not publish commitments *)
         return_unit
     | Some source ->
-        when_ (commitment.inbox_level > node_ctxt.lcc.level) @@ fun () ->
+        when_ (commitment.inbox_level > lcc.level) @@ fun () ->
         publish_commitment node_ctxt ~source commitment
 
   (* Commitments can only be cemented after [sc_rollup_challenge_window] has
@@ -306,8 +307,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       return
       @@ sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
     in
-    if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then
-      return_none
+    let lcc = Reference.get node_ctxt.lcc in
+    if Raw_level.(cementable_level_bound <= lcc.level) then return_none
     else
       let** cementable_bound_block =
         Node_context.find_l2_block_by_level
@@ -324,14 +325,14 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let open Lwt_result_option_list_syntax in
     let*& head = Node_context.last_processed_head_opt node_ctxt in
     let head_level = head.header.level in
+    let lcc = Reference.get node_ctxt.lcc in
     let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
       let* commitment =
         Node_context.find_commitment node_ctxt commitment_hash
       in
       match commitment with
       | None -> return acc
-      | Some commitment
-        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+      | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
           (* If we have moved backward passed or at the current LCC then we have
              reached the end. *)
           return acc

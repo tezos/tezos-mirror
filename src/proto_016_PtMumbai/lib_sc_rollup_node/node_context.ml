@@ -47,8 +47,8 @@ type 'a t = {
   loser_mode : Loser_mode.t;
   store : 'a store;
   context : 'a Context.index;
-  mutable lcc : lcc;
-  mutable lpc : Sc_rollup.Commitment.t option;
+  lcc : ('a, lcc) Reference.t;
+  lpc : ('a, Sc_rollup.Commitment.t option) Reference.t;
 }
 
 type rw = [`Read | `Write] t
@@ -163,8 +163,8 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
       mode = operating_mode;
       operators;
       genesis_info = l1_ctxt.Layer1.genesis_info;
-      lcc;
-      lpc;
+      lcc = Reference.new_ lcc;
+      lpc = Reference.new_ lpc;
       kind;
       injector_retention_period = 0;
       block_finality_time = 2;
@@ -219,6 +219,8 @@ let readonly (node_ctxt : _ t) =
     node_ctxt with
     store = Store.readonly node_ctxt.store;
     context = Context.readonly node_ctxt.context;
+    lcc = Reference.readonly node_ctxt.lcc;
+    lpc = Reference.readonly node_ctxt.lpc;
   }
 
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t

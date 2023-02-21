@@ -82,9 +82,10 @@ module Block_directory_helpers = struct
 
   let get_last_cemented (node_ctxt : _ Node_context.t) =
     protect @@ fun () ->
+    let lcc = Reference.get node_ctxt.lcc in
     Node_context.hash_of_level
       node_ctxt
-      (Alpha_context.Raw_level.to_int32 node_ctxt.lcc.level)
+      (Alpha_context.Raw_level.to_int32 lcc.level)
 
   let block_of_prefix node_ctxt block =
     match block with

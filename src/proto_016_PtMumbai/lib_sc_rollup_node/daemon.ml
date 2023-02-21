@@ -92,11 +92,11 @@ module Make (PVM : Pvm.S) = struct
       when Node_context.is_operator node_ctxt source ->
         (* Published commitment --------------------------------------------- *)
         let save_lpc =
-          match node_ctxt.lpc with
+          match Reference.get node_ctxt.lpc with
           | None -> true
           | Some lpc -> Raw_level.(commitment.inbox_level >= lpc.inbox_level)
         in
-        if save_lpc then node_ctxt.lpc <- Some commitment ;
+        if save_lpc then Reference.set node_ctxt.lpc (Some commitment) ;
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
@@ -171,9 +171,10 @@ module Make (PVM : Pvm.S) = struct
                  on_l1 = commitment;
                })
         in
+        let lcc = Reference.get node_ctxt.lcc in
         let*! () =
-          if Raw_level.(inbox_level > node_ctxt.lcc.level) then (
-            node_ctxt.lcc <- {commitment; level = inbox_level} ;
+          if Raw_level.(inbox_level > lcc.level) then (
+            Reference.set node_ctxt.lcc {commitment; level = inbox_level} ;
             Commitment_event.last_cemented_commitment_updated
               commitment
               inbox_level)
