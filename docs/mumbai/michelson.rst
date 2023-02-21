@@ -53,7 +53,7 @@ always succeed to receive tokens, and does nothing else.
 Another kind of addresses, prefixed by ``txr1``, are related to
 :doc:`transaction rollups <./transaction_rollups>`.
 
-Finally, addresses prefixed with ``scr1`` identify smart rollups.
+Finally, addresses prefixed with ``sr1`` identify :doc:`smart rollups <./smart_rollups>`.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1920,7 +1920,7 @@ Bytes can be converted to natural numbers and integers.
 
 - ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
   The ``bytes`` are allowed to have leading zeros.
-  
+
 ::
 
     :: bytes : 'S   ->   nat : 'S
@@ -1930,14 +1930,14 @@ Bytes can be converted to natural numbers and integers.
 
 - ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
   The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
-  
+
 ::
 
     :: bytes : 'S   ->   int : 'S
 
     > INT / s : S  =>  z : S
         iff s is a big-endian encoding of integer z
-  
+
 - ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
 
 ::

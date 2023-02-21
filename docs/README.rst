@@ -15,19 +15,14 @@ You can build the documentation locally or in the CI.
 Building the documentation in the CI
 ------------------------------------
 
-When reviewing a merge request in the Gitlab interface, you may build the documentation in the CI without installing anything locally. Proceed as follows:
+When reviewing a merge request (MR) in the Gitlab interface, you may build the documentation in the CI without checking out the source branch of the MR, and without installing Python locally. Proceed as follows:
 
-- if you want the light version of the documentation (RST pages only):
++ trigger the CI if needed in the home page of the MR, and make sure that job ``documentation:build_all`` under the CI stage ``build`` is being executed
++ once the whole CI is finished, check the built documentation in the exposed artifacts on the home page of the MR
 
-  + make sure the CI job ``documentation:build`` under the CI stage ``build`` is executed (you may have to trigger it manually)
-  + once finished, check the light built documentation in the exposed artifacts
+If you cannot wait for the whole CI to finish, the artifacts are not yet exposed on the home page of the MR; but click on the CI job ``documentation:build_all``, and in the job's page (once finished), click on ``Browse`` to retrieve only the doc artifacts.
 
-- if you want the full version of the documentation (including CLI manuals and Odoc APIs):
-
-  + trigger the CI job ``documentation:build_all`` under the CI stage ``manual``
-  + once finished, check the full built documentation in the exposed artifacts
-
-If the artifacts are not exposed on the main page of the MR, click on the CI jobs mentioned above, and in the job's page (once finished), click on ``Browse``, then visualize file ``docs/_build/index.html``.
+In both cases, visualize file ``docs/_build/index.html``.
 
 Building the documentation locally
 ----------------------------------

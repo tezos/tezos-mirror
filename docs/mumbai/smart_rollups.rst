@@ -514,7 +514,7 @@ Rollup node in a sandbox
 
 The node can also be tested locally with a sandbox environment. (See :doc:`sandbox documentation <../user/sandbox>`.)
 
-Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup'node-alpha run``.
+Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node-PtMumbai run``.
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
@@ -904,10 +904,7 @@ At its core, the WASM machine defined in the WASM standard is just a
 very evolved arithmetic machine. It needs to be enriched with
 so-called host functions in order to be used for greater purposes. The
 host functions provide an API to the WASM program to interact with an
-“outer world”.  In a browser for instance, this API typically allows the WASM
-program to interact with the `DOM
-<https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model>`_
-of the webpage.
+“outer world”.
 
 As for smart rollups, the host functions exposed to a WASM kernel
 allow it to interact with the components of persistent state:
