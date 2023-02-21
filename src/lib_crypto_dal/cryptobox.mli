@@ -25,6 +25,47 @@
 
 open Cryptobox_intf
 
+(** {0 Cryptography for the Data Availability Layer}
+
+    The data availability layer (DAL) reduces the storage strain on the
+    blockchain by only storing on-chain constant-size cryptographic
+    {!type:commitment}s to arbitrary data blobs called {!type:slot}s.
+    The slots themselves are stored off-chain and are made available by the DAL.
+
+    A slot is encoded with an MDS (Maximum Distance Separable) code. The
+    resulting encoded slot is partitioned into {!type:shard}s, allowing
+    retrieval of the slot with any subset of
+    [{!recfield:parameters.number_of_shards}/{!recfield:parameters.redundancy_factor}]
+    out of [{!recfield:parameters.number_of_shards}] shards. By doing so,
+    we can guarantee high data availability provided a certain fraction of
+    the DAL nodes is storing and supplying the data. This fraction can be
+    made as small as desired at the expense of a higher data redundancy
+    {!recfield:parameters.redundancy_factor}. MDS codes have no unnecessary
+    redundancy.
+
+    Compatibility between the commitment scheme and the MDS code is achieved
+    by using the KZG polynomial commitment scheme and Reed-Solomon
+    codes. Indeed, Reed-Solomon codes are evaluations of polynomials, and KZG
+    allows proving and verifying evaluations of polynomials.
+
+    The DAL nodes can verify in constant time that they downloaded the correct
+    shard using constant-sized
+    {{: https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf}KZG proofs}
+    {!type:shard_proof} (see function [verifyEval] in section 3.3) and the
+    slot commitment. This mitigates the barriers in terms of bandwidth and
+    storage to participate in the DAL network so that more actors can increase
+    its efficacy and security -- to prevent data availability attacks, for instance.
+
+    The L1 can also verify in constant time that it downloaded the correct
+    slot segment called {type:Verifier.page} it queried using KZG proofs
+    {!type:page_proof} and the slot commitment.
+
+    A challenge is to keep the proving time for the {!type:shard_proof}s
+    almost proportional to the length [n] of the slot encoded with the MDS
+    code: we've chosen and implemented a technique to produce the proofs in
+    time [O(n log n)]
+    (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}). *)
+
 (** Initial values to parametrize dal cryptographic primitives. It used to build
     a value of type [t] *)
 type parameters = {
