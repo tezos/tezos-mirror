@@ -164,3 +164,7 @@ val finalize_block :
     so that it can be put into the cache. *)
 val value_of_key :
   context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+
+module Internal_for_benchmark : sig
+  val take_fees : context -> 'a Kind.manager contents_list -> unit
+end
