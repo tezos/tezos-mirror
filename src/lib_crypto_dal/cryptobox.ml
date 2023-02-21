@@ -1161,7 +1161,33 @@ module Inner = struct
      4. The first n/l coefficients is the result of the multiplication by the
      Toeplitz vector (with a bit of zero padding starting from the m/l-th coefficient):
      let's call this vector h'. The n/l KZG proofs are given by
-     π=EC-FFT_{n/l}(h') following the observation ( * ). *)
+     π=EC-FFT_{n/l}(h') following the observation ( * ).
+
+
+     Complexity of multiple multi-reveals
+     ====================================
+
+     For the preprocessing part (step 1), we count l EC-FFTs on G_1, so the asymptotic complexity
+     of the step is O(l * (m/l) log (m/l))=O(m log(m/l)).
+
+     For the KZG proofs generation part (steps 2 to 4), we count l FFTs on the scalar field F,
+     two EC-FFTs on G_1, and l * 2m/l elliptic curve scalar multiplications in G_1:
+     the runtime complexity is O(l * T_{F}(m/l) + T_{G_1}(n/l) + m),
+     where T_{F} and T_{G_1} represent the runtime cost of the FFT and EC-FFT.
+     Both have the same complexity, even though the latter hides a bigger constant
+     (log of scalar size in bits, here log 256) due to the elliptic curve scalar multiplication.
+
+     Let's recall that l is in our application the length of a shard, n is the length of
+     the erasure code, α its redundancy factor and m ≈ k is the dimension of the erasure code.
+     Calling s the number of shards, we obtain l = n/s = α*k/s.
+     The runtime of the precomputation part can be rewritten as O(k * log (s/α)).
+     And the computation of the n/l KZG proofs becomes
+     O(k * log (s/α) + s * log s).
+     This explains why the algorithm is more efficient with bigger erasure code redundancies α,
+     especially the precomputation part as it performs EC-FFTs.
+
+     For our purposes the length of a shard s << k, so the bottleneck is the pointwise
+     scalar multiplication in G_1. *)
 
   (* Step 1, returns the pair made of the vectors s_j and the [domain] of length
      [2 * m / l = 2 * t.k / t.shard_size] used for the computation of the s_j. *)
