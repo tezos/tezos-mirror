@@ -61,9 +61,10 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
         (mul_exn frozen_deposits.initial_amount slashing_ratio.numerator)
         slashing_ratio.denominator)
   in
-  let amount_to_burn =
+  let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount punish_value)
   in
+  let reward, amount_to_burn = Tez_repr.div2_sub punishing_amount in
   let* ctxt, balance_updates =
     Token.transfer
       ctxt
@@ -77,7 +78,7 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
       (level.level, delegate)
       updated_slashed
   in
-  return (ctxt, amount_to_burn, balance_updates)
+  return (ctxt, reward, balance_updates)
 
 let punish_double_baking ctxt delegate (level : Level_repr.t) =
   let open Lwt_result_syntax in
