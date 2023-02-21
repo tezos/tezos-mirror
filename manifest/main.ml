@@ -389,11 +389,26 @@ let tezt_core_lib =
 
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
+    ?opam_with_test ?synopsis l =
+  tezt_without_tezt_lib_dependency
+    ~opam
+    ~path
+    ?synopsis
+    ?js_compatible
+    ?modes
+    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ~exe_deps:[tezt_lib]
+    ~js_deps:[tezt_js_lib]
+    ?dep_globs
+    ?opam_with_test
+    l
+
 (* The main module [Octez_alcotest] is [open_] so that one can replace
    the [alcotest] dependency with [alcotezt] and it just works.
    If we use [~internal_name:"alcotest"] here, it would also work,
    except in cases where the real Alcotest is also a dependency. *)
-let _alcotezt =
+let alcotezt =
   public_lib
     "octez-alcotezt"
     ~path:"tezt/lib_alcotezt"
@@ -607,12 +622,16 @@ let octez_lwt_result_stdlib_examples_traces =
     ~opam_with_test:Only_on_64_arch
 
 let _octez_lwt_result_stdlib_tests =
-  tests
+  tezt
     [
+      "support";
+      "traits_tiered";
       "test_hashtbl";
       "test_list_basic";
       "test_list_basic_lwt";
       "test_seq_basic";
+      "test_fuzzing_helpers";
+      "test_fuzzing_lib";
       "test_fuzzing_seq_tiered";
       "test_fuzzing_seq_against_stdlib";
       "test_fuzzing_list_against_stdlib";
@@ -627,7 +646,7 @@ let _octez_lwt_result_stdlib_tests =
         octez_lwt_result_stdlib |> open_;
         octez_lwt_result_stdlib_examples_traces;
         lwt_unix;
-        alcotest_lwt;
+        alcotezt;
         qcheck_alcotest;
         octez_test_helpers |> open_;
       ]
@@ -1532,19 +1551,6 @@ let octez_p2p =
         octez_version;
         prometheus;
       ]
-
-let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
-  tezt_without_tezt_lib_dependency
-    ~opam
-    ~path
-    ?synopsis
-    ?js_compatible
-    ?modes
-    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
-    ~exe_deps:[tezt_lib]
-    ~js_deps:[tezt_js_lib]
-    ?dep_globs
-    l
 
 let tezt_performance_regression =
   public_lib
