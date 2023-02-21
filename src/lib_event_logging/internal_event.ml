@@ -750,7 +750,7 @@ module Simple = struct
           else Format.fprintf fmt ",@ %s = %s" name value
     in
     if all_fields then List.iter print_field fields ;
-    if !first_field then Format.fprintf fmt ")" ;
+    if not !first_field then Format.fprintf fmt ")" ;
     if block then Format.fprintf fmt "@]"
 
   let with_version ~name encoding =
