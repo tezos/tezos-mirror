@@ -1,34 +1,55 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names test_registration test_splitted_error_encoding)
- (modes native js)
+(library
+ (name src_lib_error_monad_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-error-monad
   data-encoding
-  alcotest)
+  octez-alcotezt)
  (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_error_monad))
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_error_monad
+  -open Octez_alcotezt)
+ (modules test_registration test_splitted_error_encoding))
+
+(executable
+ (name main)
+ (modes native)
+ (libraries
+  src_lib_error_monad_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
- (alias runtest)
+ (alias runtezt)
  (package tezos-error-monad)
- (action (run %{dep:./test_registration.exe})))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-error-monad)
- (action (run %{dep:./test_splitted_error_encoding.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (modes js)
+ (libraries
+  src_lib_error_monad_test_tezt_lib
+  tezt.js)
+ (js_of_ocaml)
+ (modules main_js))
 
 (rule
- (alias runtest_js)
+ (alias runtezt_js)
  (package tezos-error-monad)
- (action (run node %{dep:./test_registration.bc.js})))
+ (action (run node %{dep:./main_js.bc.js})))
 
 (rule
- (alias runtest_js)
- (package tezos-error-monad)
- (action (run node %{dep:./test_splitted_error_encoding.bc.js})))
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

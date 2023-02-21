@@ -809,12 +809,12 @@ let _octez_hacl_tests_1 =
     ~js_compatible:true
 
 let _octez_error_monad_tests =
-  tests
+  tezt
     ["test_registration"; "test_splitted_error_encoding"]
     ~path:"src/lib_error_monad/test"
     ~opam:"tezos-error-monad"
     ~modes:[Native; JS]
-    ~deps:[octez_error_monad |> open_; data_encoding; alcotest]
+    ~deps:[octez_error_monad |> open_; data_encoding; alcotezt]
     ~js_compatible:true
 
 let octez_rpc =
