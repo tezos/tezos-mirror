@@ -178,7 +178,7 @@ module Term = struct
   let integrity_check_inodes config_file data_dir block =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Log_config.init_internal_events_with_defaults () in
       let actual_data_dir =
         Option.value ~default:Config_file.default_data_dir data_dir
       in
@@ -238,7 +238,7 @@ module Term = struct
   let find_head config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Log_config.init_internal_events_with_defaults () in
       let actual_data_dir =
         Option.value ~default:Config_file.default_data_dir data_dir
       in

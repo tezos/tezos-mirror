@@ -47,7 +47,7 @@ module Term = struct
   let process args sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Log_config.init_internal_events_with_defaults () in
       let* node_config = Shared_arg.read_and_patch_config_file args in
       let data_dir = node_config.data_dir in
       let ({genesis; _} : Config_file.blockchain_network) =

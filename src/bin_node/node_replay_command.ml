@@ -453,15 +453,10 @@ let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
     ~filename:(Data_version.lock_file config.data_dir)
   @@ fun () ->
   (* Main loop *)
-  let log_cfg =
-    match verbosity with
-    | None -> config.log
-    | Some default_level -> {config.log with default_level}
-  in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:log_cfg
-      ~configuration:config.internal_events
+    Log_config.init_internal_events_with_defaults
+      ?verbosity
+      ~log_cfg:config.log
       ()
   in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
