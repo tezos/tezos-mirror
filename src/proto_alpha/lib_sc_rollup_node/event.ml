@@ -113,6 +113,7 @@ module Simple = struct
       ~level:Info
       ~msg:"{log}"
       ("log", Data_encoding.string)
+      ~pp1:Format.pp_print_string
 
   let warn_dal_enabled_no_node =
     declare_0
