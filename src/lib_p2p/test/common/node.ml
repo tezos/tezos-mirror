@@ -181,6 +181,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         incoming_message_queue_size = None;
         outgoing_message_queue_size = None;
         binary_chunks_size = None;
+        disable_peer_discovery = false;
       }
   in
   let pool_config =

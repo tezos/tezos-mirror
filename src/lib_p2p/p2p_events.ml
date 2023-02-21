@@ -344,6 +344,14 @@ module P2p_conn = struct
 
   let section = ["p2p"; "conn"]
 
+  let peer_discovery_disabled =
+    declare_0
+      ~section
+      ~name:"peer_discovery_disabled"
+      ~msg:"request for new peers interrupted because peer discovery disabled"
+      ~level:Warning
+      ()
+
   let unexpected_error =
     declare_1
       ~section

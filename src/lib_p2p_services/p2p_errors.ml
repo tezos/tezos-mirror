@@ -248,6 +248,27 @@ let () =
       | _ -> None)
     (fun (value, min, max) -> Invalid_chunks_size {value; min; max})
 
+(***************************** p2p conn ***********************************)
+
+type error += Peer_discovery_disabled
+
+let () =
+  (* Peer discovery disabled *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_conn.peer_discovery_disabled"
+    ~title:"Peer discovery disabled"
+    ~description:
+      "The peer discovery is disabled, sending advertise messages is forbidden."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The peer discovery is disabled, sending advertise messages is \
+         forbidden.")
+    Data_encoding.empty
+    (function Peer_discovery_disabled -> Some () | _ -> None)
+    (fun () -> Peer_discovery_disabled)
+
 (***************************** p2p pool ***********************************)
 
 type error += Pending_connection

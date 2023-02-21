@@ -70,6 +70,7 @@ and p2p = {
   disable_mempool : bool;
   enable_testchain : bool;
   reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
+  disable_peer_discovery : bool;
 }
 
 and rpc = {

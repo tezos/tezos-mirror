@@ -42,6 +42,7 @@ type config = {
   proof_of_work_target : Tezos_crypto.Crypto_box.pow_target;
   listening_port : P2p_addr.port option;
   advertised_port : P2p_addr.port option;
+  disable_peer_discovery : bool;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) dependencies = {
@@ -172,6 +173,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       ~canceler
       ~greylister
       ~callback:(Lazy.force t.answerer)
+      ~disable_peer_discovery:t.config.disable_peer_discovery
       negotiated_version
   in
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
@@ -414,11 +416,13 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       let*! () =
         Events.(emit authenticate_status ("nack", point, info.peer_id))
       in
-      let*! point_list =
-        (* Never send more than 100 points, you would be greylisted *)
-        P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
+      let*! nack_point_list =
+        if t.config.disable_peer_discovery then Lwt.return []
+        else
+          (* Never send more than 100 points, you would be greylisted *)
+          P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
       in
-      let*! () = P2p_socket.nack auth_conn motive point_list in
+      let*! () = P2p_socket.nack auth_conn motive nack_point_list in
       let () =
         if not incoming then
           let timestamp = Time.System.now () in
@@ -501,11 +505,13 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                     Events.(emit connection_rejected_by_peers)
                       (point, info.peer_id, motive, points)
                   in
-                  P2p_pool.register_list_of_new_points
-                    ~medium:"Nack"
-                    ~source:info.peer_id
-                    t.pool
-                    points
+                  if t.config.disable_peer_discovery then Lwt.return_unit
+                  else
+                    P2p_pool.register_list_of_new_points
+                      ~medium:"Nack"
+                      ~source:info.peer_id
+                      t.pool
+                      points
               | _ -> Events.(emit connection_error) (point, err)
             in
             let*! () =
@@ -773,6 +779,7 @@ module Internal_for_tests = struct
     let proof_of_work_target = Tezos_crypto.Crypto_box.make_pow_target 0. in
     let listening_port = Some 9732 in
     let advertised_port = None in
+    let disable_peer_discovery = false in
     {
       incoming_app_message_queue_size;
       private_mode;
@@ -789,6 +796,7 @@ module Internal_for_tests = struct
       proof_of_work_target;
       listening_port;
       advertised_port;
+      disable_peer_discovery;
     }
 
   (** An encoding that typechecks for all types, but fails at runtime. This is a placeholder as most tests never go through

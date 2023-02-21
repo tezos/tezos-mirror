@@ -34,6 +34,19 @@
 
 type ('msg, 'peer, 'conn) t
 
+(* [create sock ~point_info ~peer_info msg_pipe canceler greylist callbacks
+   disable_peer_discovery version] creates a connection over [sock] with the
+   corresponding [point_info], [peer_info] and negotiated [version].
+
+   [msg_pipe] is the pipe where the received messages are read.
+   [canceler] is used to initiate or propagate the closure of the connection.
+   [greylist] is a callback to greylist the peer id of the connection.
+   [callback] is a record that contains the functions to call to handle each
+              kind of received messages.
+   If [disable_peer_discovery] is true, then the received [Advertise] and
+   [Bootstrap] messages are ignored. Requests to send a [Bootstrap] message are
+   ignored and requests to send an [Advertise] message fail.
+*)
 val create :
   conn:('msg P2p_message.t, 'conn) P2p_socket.t ->
   point_info:('msg, 'peer, 'conn) t P2p_point_state.Info.t option ->
@@ -42,6 +55,7 @@ val create :
   canceler:Lwt_canceler.t ->
   greylister:(unit -> unit) ->
   callback:'msg P2p_answerer.t ->
+  disable_peer_discovery:bool ->
   Network_version.t ->
   ('msg, 'peer, 'conn) t
 

@@ -107,6 +107,11 @@ type config = {
       (** If [true], peers discovered on the local network will be trusted. *)
   reconnection_config : Point_reconnection_config.t;
       (** The reconnection delat configuration. *)
+  disable_peer_discovery : bool;
+      (** If set to [true], the p2p layer will not participate to the peer
+          discovery mechanism. The p2p layer will not be able to find new peers
+          to connect with. For more details, refers to field
+          {disable_peer_discovery} of {!type:P2p_connect_handler.config}.  *)
 }
 
 (** Type of a P2P layer instance *)

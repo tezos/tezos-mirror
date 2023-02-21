@@ -400,6 +400,7 @@ and p2p = {
   disable_mempool : bool;
   enable_testchain : bool;
   reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
+  disable_peer_discovery : bool;
 }
 
 and rpc = {
@@ -425,6 +426,7 @@ let default_p2p =
     disable_mempool = false;
     enable_testchain = false;
     reconnection_config = Tezos_p2p_services.Point_reconnection_config.default;
+    disable_peer_discovery = false;
   }
 
 let default_rpc =
@@ -467,27 +469,30 @@ let p2p =
            disable_mempool;
            enable_testchain;
            reconnection_config;
+           disable_peer_discovery;
          } ->
-      ( expected_pow,
-        bootstrap_peers,
-        listen_addr,
-        advertised_net_port,
-        discovery_addr,
-        private_mode,
-        limits,
-        disable_mempool,
-        enable_testchain,
-        reconnection_config ))
-    (fun ( expected_pow,
-           bootstrap_peers,
-           listen_addr,
-           advertised_net_port,
-           discovery_addr,
-           private_mode,
-           limits,
-           disable_mempool,
-           enable_testchain,
-           reconnection_config ) ->
+      ( ( expected_pow,
+          bootstrap_peers,
+          listen_addr,
+          advertised_net_port,
+          discovery_addr ),
+        ( private_mode,
+          limits,
+          disable_mempool,
+          enable_testchain,
+          reconnection_config,
+          disable_peer_discovery ) ))
+    (fun ( ( expected_pow,
+             bootstrap_peers,
+             listen_addr,
+             advertised_net_port,
+             discovery_addr ),
+           ( private_mode,
+             limits,
+             disable_mempool,
+             enable_testchain,
+             reconnection_config,
+             disable_peer_discovery ) ) ->
       {
         expected_pow;
         bootstrap_peers;
@@ -499,83 +504,98 @@ let p2p =
         disable_mempool;
         enable_testchain;
         reconnection_config;
+        disable_peer_discovery;
       })
-    (obj10
-       (dft
-          "expected-proof-of-work"
-          ~description:
-            "Floating point number between 0 and 256 that represents a \
-             difficulty, 24 signifies for example that at least 24 leading \
-             zeroes are expected in the hash."
-          float
-          default_p2p.expected_pow)
-       (opt
-          "bootstrap-peers"
-          ~description:
-            "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. If \
-             the port is not specified, default port 9732 will be assumed."
-          (list string))
-       (opt
-          "listen-addr"
-          ~description:
-            "Host to listen to. If the port is not specified, the default port \
-             9732 will be assumed."
-          string)
-       (opt
-          "advertised-net-port"
-          ~description:
-            "Alternative port advertised to other peers to connect to. If the \
-             port is not specified, the port from listen-addr will be assumed."
-          uint16)
-       (dft
-          "discovery-addr"
-          ~description:
-            "Host for local peer discovery. If the port is not specified, the \
-             default port 10732 will be assumed."
-          (option string)
-          default_p2p.discovery_addr)
-       (dft
-          "private-mode"
-          ~description:
-            "Specify if the node is in private mode or not. A node in private \
-             mode rejects incoming connections from untrusted peers and only \
-             opens outgoing connections to peers listed in 'bootstrap-peers' \
-             or provided with '--peer' option. Moreover, these peers will keep \
-             the identity and the address of the private node secret."
-          bool
-          default_p2p.private_mode)
-       (dft
-          "limits"
-          ~description:"Network limits"
-          Tezos_p2p_services.P2p_limits.encoding
-          Tezos_p2p_services.P2p_limits.default)
-       (dft
-          "disable_mempool"
-          ~description:
-            "If set to [true], the node will not participate in the \
-             propagation of pending operations (mempool). Default value is \
-             [false]. It can be used to decrease the memory and computation \
-             footprints of the node."
-          bool
-          default_p2p.disable_mempool)
-       (dft
-          "enable_testchain"
-          ~description:
-            "DEPRECATED. If set to [true], the node will spawn a testchain \
-             during the protocol's testing voting period. Default value is \
-             [false]. It is disabled to decrease the node storage usage and \
-             computation by dropping the validation of the test network \
-             blocks."
-          bool
-          default_p2p.enable_testchain)
-       (let open Tezos_p2p_services.Point_reconnection_config in
-       dft
-         "greylisting_config"
-         ~description:
-           "The reconnection policy regulates the frequency with which the \
-            node tries to reconnect to an old known peer."
-         encoding
-         default))
+    (merge_objs
+       (obj5
+          (dft
+             "expected-proof-of-work"
+             ~description:
+               "Floating point number between 0 and 256 that represents a \
+                difficulty, 24 signifies for example that at least 24 leading \
+                zeroes are expected in the hash."
+             float
+             default_p2p.expected_pow)
+          (opt
+             "bootstrap-peers"
+             ~description:
+               "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. \
+                If the port is not specified, default port 9732 will be \
+                assumed."
+             (list string))
+          (opt
+             "listen-addr"
+             ~description:
+               "Host to listen to. If the port is not specified, the default \
+                port 9732 will be assumed."
+             string)
+          (opt
+             "advertised-net-port"
+             ~description:
+               "Alternative port advertised to other peers to connect to. If \
+                the port is not specified, the port from listen-addr will be \
+                assumed."
+             uint16)
+          (dft
+             "discovery-addr"
+             ~description:
+               "Host for local peer discovery. If the port is not specified, \
+                the default port 10732 will be assumed."
+             (option string)
+             default_p2p.discovery_addr))
+       (obj6
+          (dft
+             "private-mode"
+             ~description:
+               "Specify if the node is in private mode or not. A node in \
+                private mode rejects incoming connections from untrusted peers \
+                and only opens outgoing connections to peers listed in \
+                'bootstrap-peers' or provided with '--peer' option. Moreover, \
+                these peers will keep the identity and the address of the \
+                private node secret."
+             bool
+             default_p2p.private_mode)
+          (dft
+             "limits"
+             ~description:"Network limits"
+             Tezos_p2p_services.P2p_limits.encoding
+             Tezos_p2p_services.P2p_limits.default)
+          (dft
+             "disable_mempool"
+             ~description:
+               "If set to [true], the node will not participate in the \
+                propagation of pending operations (mempool). Default value is \
+                [false]. It can be used to decrease the memory and computation \
+                footprints of the node."
+             bool
+             default_p2p.disable_mempool)
+          (dft
+             "enable_testchain"
+             ~description:
+               "DEPRECATED. If set to [true], the node will spawn a testchain \
+                during the protocol's testing voting period. Default value is \
+                [false]. It is disabled to decrease the node storage usage and \
+                computation by dropping the validation of the test network \
+                blocks."
+             bool
+             default_p2p.enable_testchain)
+          (let open Tezos_p2p_services.Point_reconnection_config in
+          dft
+            "greylisting_config"
+            ~description:
+              "The reconnection policy regulates the frequency with which the \
+               node tries to reconnect to an old known peer."
+            encoding
+            default)
+          (dft
+             "disable_peer_discovery"
+             ~description:
+               "This field should be used for testing purpose only. If set to \
+                [true], the node will not participate to the peer discovery \
+                mechanism. The node will not be able to find new peers to \
+                connect with."
+             bool
+             default_p2p.disable_peer_discovery)))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -927,6 +947,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
       enable_testchain = cfg.p2p.enable_testchain || enable_testchain;
       reconnection_config = cfg.p2p.reconnection_config;
+      disable_peer_discovery = cfg.p2p.disable_peer_discovery;
     }
   and rpc : rpc =
     {

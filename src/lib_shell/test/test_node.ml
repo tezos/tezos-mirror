@@ -81,6 +81,7 @@ let default_p2p : P2p.config =
     proof_of_work_target = Tezos_crypto.Crypto_box.default_pow_target;
     trust_discovered_peers = false;
     reconnection_config = Point_reconnection_config.default;
+    disable_peer_discovery = false;
   }
 
 let default_p2p_limits =
