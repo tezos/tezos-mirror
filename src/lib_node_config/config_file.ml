@@ -567,7 +567,7 @@ let p2p =
              or provided with '--peer' option. Moreover, these peers will keep \
              the identity and the address of the private node secret."
           bool
-          false)
+          default_p2p.private_mode)
        (dft
           "limits"
           ~description:"Network limits"
@@ -581,7 +581,7 @@ let p2p =
              [false]. It can be used to decrease the memory and computation \
              footprints of the node."
           bool
-          false)
+          default_p2p.disable_mempool)
        (dft
           "enable_testchain"
           ~description:
@@ -591,7 +591,7 @@ let p2p =
              computation by dropping the validation of the test network \
              blocks."
           bool
-          false)
+          default_p2p.enable_testchain)
        (let open Tezos_p2p_services.Point_reconnection_config in
        dft
          "greylisting_config"
