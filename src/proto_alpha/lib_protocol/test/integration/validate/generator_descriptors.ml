@@ -618,7 +618,7 @@ let endorsement_descriptor =
   }
 
 (* TODO: #4917 remove direct dependency of the alpha_context. *)
-let dal_slot_availibility ctxt current_level delegate =
+let dal_attestation ctxt current_level delegate =
   let open Lwt_result_syntax in
   let level = Alpha_context.Level.from_raw ctxt current_level in
   let* committee = Dal_apply.compute_committee ctxt level in
@@ -656,7 +656,7 @@ let dal_attestation_descriptor =
           in
           let*? current_level = Context.get_level (B state.block) in
           let* op =
-            dal_slot_availibility ctxt current_level delegate
+            dal_attestation ctxt current_level delegate
             >|= Environment.wrap_tzresult
           in
           return
