@@ -43,20 +43,13 @@ let finish_punish ctxt delegate (level : Level_repr.t) updated_slashed
     punishing_amount =
   let open Lwt_result_syntax in
   let reward, amount_to_burn = Tez_repr.div2_sub punishing_amount in
-  let* ctxt, balance_updates =
-    Token.transfer
-      ctxt
-      (`Frozen_deposits delegate)
-      `Double_signing_punishments
-      amount_to_burn
-  in
   let*! ctxt =
     Storage.Slashed_deposits.add
       (ctxt, level.cycle)
       (level.level, delegate)
       updated_slashed
   in
-  return (ctxt, {reward; amount_to_burn}, balance_updates)
+  return (ctxt, {reward; amount_to_burn}, [])
 
 let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   let open Lwt_result_syntax in
