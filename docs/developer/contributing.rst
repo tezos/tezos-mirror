@@ -182,7 +182,7 @@ You can refer to the following table that summarizes how assignee and
 When all discussions are resolved, and the MR has got at least two
 approvals from Octez Merge Team members, the developer should squash
 any fix-up commits that were applied (remembering to edit the commit
-message appropriately). Then anyone can assign the MR to the `Nomadic
+message appropriately). Then the developer (or anyone else when not possible) can assign the MR to the `Nomadic
 Marge-bot <https://gitlab.com/nomadic-margebot>`__, which will
 automatically rebase the branch on top of master and finally merge it.
 
