@@ -244,17 +244,9 @@ let check_except_locked_round fitness ~level ~predecessor_round =
   in
   error_unless correct Wrong_fitness
 
-let check_locked_round fitness ~locked_round =
-  let {
-    level = _;
-    locked_round = expected_locked_round;
-    predecessor_round = _;
-    round = _;
-  } =
-    fitness
-  in
+let check_locked_round ~fitness_locked_round ~locked_round =
   let correct =
-    match (locked_round, expected_locked_round) with
+    match (locked_round, fitness_locked_round) with
     | None, None -> true
     | Some _, None | None, Some _ -> false
     | Some v, Some v' -> Round_repr.(v = v')

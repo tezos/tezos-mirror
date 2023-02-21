@@ -3221,7 +3221,8 @@ let check_endorsement_power vi bs =
     (Validate_errors.Block.Not_enough_endorsements {required; provided})
 
 let finalize_validate_block_header vi vs checkable_payload_hash
-    (block_header_contents : Block_header.contents) round fitness =
+    (block_header_contents : Block_header.contents) round ~fitness_locked_round
+    =
   let locked_round_evidence =
     Option.map
       (fun (preendorsement_round, preendorsement_count) ->
@@ -3231,7 +3232,7 @@ let finalize_validate_block_header vi vs checkable_payload_hash
   Block_header.finalize_validate_block_header
     ~block_header_contents
     ~round
-    ~fitness
+    ~fitness_locked_round
     ~checkable_payload_hash
     ~locked_round_evidence
     ~consensus_threshold:(Constants.consensus_threshold vi.ctxt)
@@ -3264,7 +3265,7 @@ let finalize_block {info; block_state; _} =
           (Block_header.Expected_payload_hash block_payload_hash)
           block_data_contents
           round
-          fitness
+          ~fitness_locked_round:(Fitness.locked_round fitness)
       in
       return_unit
   | Partial_validation _ ->
@@ -3275,8 +3276,7 @@ let finalize_block {info; block_state; _} =
         else ok_unit
       in
       return_unit
-  | Construction
-      {predecessor_round; predecessor_hash; round; block_data_contents; _} ->
+  | Construction {predecessor_hash; round; block_data_contents; _} ->
       let block_payload_hash =
         compute_payload_hash block_state block_data_contents ~predecessor_hash
       in
@@ -3300,18 +3300,6 @@ let finalize_block {info; block_state; _} =
           check_endorsement_power info block_state
         else ok_unit
       in
-      let* fitness =
-        let locked_round =
-          match locked_round_evidence with
-          | None -> None
-          | Some (preendorsement_round, _power) -> Some preendorsement_round
-        in
-        let level = (Level.current info.ctxt).level in
-        let*? fitness =
-          Fitness.create ~level ~round ~predecessor_round ~locked_round
-        in
-        return fitness
-      in
       let*? () =
         finalize_validate_block_header
           info
@@ -3319,7 +3307,7 @@ let finalize_block {info; block_state; _} =
           checkable_payload_hash
           block_data_contents
           round
-          fitness
+          ~fitness_locked_round:(Option.map fst locked_round_evidence)
       in
       return_unit
   | Mempool ->

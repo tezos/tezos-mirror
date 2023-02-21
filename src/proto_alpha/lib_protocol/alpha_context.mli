@@ -4387,7 +4387,7 @@ module Block_header : sig
   val finalize_validate_block_header :
     block_header_contents:contents ->
     round:Round.t ->
-    fitness:Fitness.t ->
+    fitness_locked_round:Round.t option ->
     checkable_payload_hash:checkable_payload_hash ->
     locked_round_evidence:locked_round_evidence option ->
     consensus_threshold:int ->

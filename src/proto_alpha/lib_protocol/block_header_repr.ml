@@ -470,7 +470,7 @@ let finalize_validate_block_header ~(block_header_contents : contents)
     ~(round : Round_repr.t)
     ~(* We have to check the round because in the construction case it was
         deduced from the time *)
-    (fitness : Fitness_repr.t)
+    (fitness_locked_round : Round_repr.t option)
     ~(checkable_payload_hash : checkable_payload_hash)
     ~(locked_round_evidence : locked_round_evidence option)
     ~(consensus_threshold : int) =
@@ -502,4 +502,5 @@ let finalize_validate_block_header ~(block_header_contents : contents)
         (Insufficient_locked_round_evidence
            {voting_power = preendorsement_count; consensus_threshold})
       >>? fun () -> ok (Some preendorsement_round))
-  >>? fun locked_round -> Fitness_repr.check_locked_round fitness ~locked_round
+  >>? fun locked_round ->
+  Fitness_repr.check_locked_round ~fitness_locked_round ~locked_round
