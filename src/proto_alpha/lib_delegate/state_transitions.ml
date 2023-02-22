@@ -631,7 +631,7 @@ let end_of_round state current_round =
           state.level_state.latest_proposal
         >>= fun action -> Lwt.return (new_state, action)
 
-let time_to_bake state at_round =
+let time_to_bake_at_next_level state at_round =
   (* It is now time to update the state level *)
   (* We need to keep track for which block we have 2f+1 *endorsements*, that is,
      which will become the new predecessor_block *)
@@ -809,7 +809,7 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | _, Timeout (Time_to_bake_next_level {at_round}) ->
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
-      time_to_bake state at_round
+      time_to_bake_at_next_level state at_round
   | Idle, New_head_proposal proposal ->
       Events.(
         emit

@@ -75,7 +75,7 @@ val propose_block_action :
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
 (** Propose (if possible) for the first time at a new level. *)
-val time_to_bake : state -> Round.t -> (state * action) Lwt.t
+val time_to_bake_at_next_level : state -> Round.t -> (state * action) Lwt.t
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
 
