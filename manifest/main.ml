@@ -2851,8 +2851,8 @@ let octez_signer_backends_unix =
       ]
 
 let _octez_signer_backends_unix_tests =
-  test
-    "test_crouching"
+  tezt
+    ["test_crouching"]
     ~path:"src/lib_signer_backends/unix/test"
     ~opam:"tezos-signer-backends"
     ~with_macos_security_framework:true
@@ -2863,7 +2863,7 @@ let _octez_signer_backends_unix_tests =
         octez_crypto;
         octez_client_base |> open_;
         octez_signer_backends_unix |> open_;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_client_commands =
