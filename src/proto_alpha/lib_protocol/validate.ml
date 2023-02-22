@@ -667,53 +667,6 @@ module Consensus = struct
       Tez.(frozen_deposits.current_amount > zero)
       (Zero_frozen_deposits delegate_pkh)
 
-  let check_level_equal kind expected_features
-      (consensus_content : consensus_content) =
-    let expected = expected_features.level in
-    let provided = consensus_content.level in
-    error_unless
-      (Raw_level.equal expected provided)
-      (if Raw_level.(expected > provided) then
-       Consensus_operation_for_old_level {kind; expected; provided}
-      else Consensus_operation_for_future_level {kind; expected; provided})
-
-  let check_round kind expected (consensus_content : consensus_content) =
-    let provided = consensus_content.round in
-    error_unless
-      (Round.equal expected provided)
-      (if Round.(expected > provided) then
-       Consensus_operation_for_old_round {kind; expected; provided}
-      else Consensus_operation_for_future_round {kind; expected; provided})
-
-  let check_round_equal kind (expected_features : expected_features)
-      (consensus_content : consensus_content) =
-    match expected_features.round with
-    | Some expected -> check_round kind expected consensus_content
-    | None -> ok_unit
-
-  let check_branch_equal kind expected_features (operation : 'a operation) =
-    let expected = expected_features.branch in
-    let provided = operation.shell.branch in
-    error_unless
-      (Block_hash.equal expected provided)
-      (Wrong_consensus_operation_branch {kind; expected; provided})
-
-  let check_payload_hash_equal kind (expected_features : expected_features)
-      (consensus_content : consensus_content) =
-    let expected = expected_features.payload_hash in
-    let provided = consensus_content.block_payload_hash in
-    error_unless
-      (Block_payload_hash.equal expected provided)
-      (Wrong_payload_hash_for_consensus_operation {kind; expected; provided})
-
-  let check_consensus_features kind (expected : expected_features)
-      (consensus_content : consensus_content) (operation : 'a operation) =
-    let open Result_syntax in
-    let* () = check_level_equal kind expected consensus_content in
-    let* () = check_round_equal kind expected consensus_content in
-    let* () = check_branch_equal kind expected operation in
-    check_payload_hash_equal kind expected consensus_content
-
   let get_delegate_details slot_map kind consensus_content =
     Result.of_option
       (Slot.Map.find consensus_content.slot slot_map)
@@ -930,18 +883,19 @@ module Consensus = struct
     {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
 
   (** Validate an endorsement pointing to the grandparent block. This
-      function will only be called in [Partial_construction] mode. *)
-  let check_grandparent_endorsement vi ~check_signature expected operation
-      (consensus_content : consensus_content) =
+      function will only be called in [Mempool] mode. *)
+  let check_grandparent_endorsement vi ~check_signature grandparent
+      (operation : _ operation) {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
-    let kind = Grandparent_endorsement in
-    let level = Level.from_raw vi.ctxt consensus_content.level in
     let* (_ctxt : t), consensus_key =
-      Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
+      Stake_distribution.slot_owner vi.ctxt (Level.from_raw vi.ctxt level) slot
     in
-    let*? () =
-      check_consensus_features kind expected consensus_content operation
-    in
+    let kind = Grandparent_endorsement in
+    (* This function is only called on endorsements whose level is the
+       grandparent's, so there is no need to check the level. *)
+    let*? () = check_round kind grandparent.round round in
+    let*? () = check_branch kind grandparent.hash operation.shell.branch in
+    let*? () = check_payload_hash kind grandparent.payload_hash bph in
     let*? () =
       if check_signature then
         Operation.check_signature
@@ -1112,19 +1066,15 @@ module Consensus = struct
     let (Single (Endorsement consensus_content)) =
       operation.protocol_data.contents
     in
-    match
-      consensus_info.all_expected_features
-        .expected_grandparent_endorsement_for_partial_construction
-    with
-    | Some expected_grandparent_endorsement
+    match vi.mode with
+    | Mempool (Some grandparent)
       when Raw_level.(
-             consensus_content.level = expected_grandparent_endorsement.level)
-      ->
+             succ consensus_content.level = consensus_info.predecessor_level) ->
         let* () =
           check_grandparent_endorsement
             vi
             ~check_signature
-            expected_grandparent_endorsement
+            grandparent
             operation
             (consensus_content : consensus_content)
         in
