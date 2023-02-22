@@ -1002,48 +1002,13 @@ Domain specific operations
 Operations on timestamps
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Timestamps can be obtained by the ``NOW`` operation, or retrieved from
-script parameters or globals.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
 -  ``ADD`` Increment / decrement a timestamp of the given number of
-   seconds.
-
-::
-
-    :: timestamp : int : 'S -> timestamp : 'S
-    :: int : timestamp : 'S -> timestamp : 'S
-
-    > ADD / seconds : nat (t) : S  =>  (seconds + t) : S
-    > ADD / nat (t) : seconds : S  =>  (t + seconds) : S
-
--  ``SUB`` Subtract a number of seconds from a timestamp.
-
-::
-
-    :: timestamp : int : 'S -> timestamp : 'S
-
-    > SUB / seconds : nat (t) : S  =>  (seconds - t) : S
-
--  ``SUB`` Subtract two timestamps.
-
-::
-
-    :: timestamp : timestamp : 'S -> int : 'S
-
-    > SUB / seconds(t1) : seconds(t2) : S  =>  (t1 - t2) : S
-
--  ``COMPARE``: Timestamp comparison.
-
-::
-
-    :: timestamp : timestamp : 'S   ->   int : 'S
-
-    > COMPARE / seconds(t1) : seconds(t2) : S  =>  -1 : S
-        iff t1 < t2
-    > COMPARE / seconds(t1) : seconds(t2) : S  =>  0 : S
-        iff t1 = t2
-    > COMPARE / seconds(t1) : seconds(t2) : S  =>  1 : S
-        iff t1 > t2
+   seconds (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``SUB`` Subtract a number of seconds from a timestamp (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
+-  ``SUB`` Subtract two timestamps (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
+-  ``COMPARE``: Timestamp comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 
 Operations on Mutez
