@@ -58,9 +58,9 @@ This sequence of operations was run:
       Consumed gas: 1002.567
 
 
-./octez-client --wait none send smart rollup message '["+ value"]' from bootstrap2
+./octez-client --wait none send smart rollup message '["++++ value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1002.537 units (will add 100 for safety)
+Estimated gas: 1002.552 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -71,17 +71,17 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.00035
+    Fee to the baker: ꜩ0.000353
     Expected counter: 2
     Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.00035
-      payload fees(the block proposer) ....... +ꜩ0.00035
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000353
+      payload fees(the block proposer) ....... +ꜩ0.000353
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1002.537
+      Consumed gas: 1002.552
 
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\011"
+"\000\000\0007"

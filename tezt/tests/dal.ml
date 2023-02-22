@@ -399,16 +399,17 @@ let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
   in
   iter 1
 
-let publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof node
-    client =
+let publish_slot ?counter ?force ~source ?level ?fee ?error ~index ~commitment
+    ~proof node client =
   let level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
   Operation.Manager.(
     inject
       ?error
+      ?force
       [
-        make ~source ?fee
+        make ~source ?fee ?counter
         @@ dal_publish_slot_header ~index ~level ~commitment ~proof;
       ]
       client)
@@ -940,8 +941,8 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?level ?(fee = 1_200) node client dal_node source
-    index content ~slot_size =
+let publish_and_store_slot ?counter ?force ?level ?(fee = 1_200) node client
+    dal_node source index content ~slot_size =
   let slot_level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
@@ -970,7 +971,19 @@ let publish_and_store_slot ?level ?(fee = 1_200) node client dal_node source
       Cryptobox.Commitment_proof.encoding
       (`String proof)
   in
-  let* _ = publish_slot ~source ~fee ~index ~commitment ~proof node client in
+  let* _ =
+    publish_slot
+      ~level:slot_level
+      ?counter
+      ?force
+      ~source
+      ~fee
+      ~index
+      ~commitment
+      ~proof
+      node
+      client
+  in
   return (index, slot_commitment)
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
@@ -2063,16 +2076,33 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
 (** End-to-end DAL Tests.  *)
 
 (* This function publishes the DAL slot whose index is [slot_index] for the
-   levels between [from] and [into] with a payload equal to the slot's
+   levels between [from + beforehand_slot_injection] and
+   [into + beforehand_slot_injection] with a payload equal to the slot's
    publish_level.
+
+   The parameter [beforehand_slot_injection] (whose value should be at least
+   one) allows, for a published level, to inject the slots an amount of blocks
+   ahead, In other terms, we have:
+
+   [published level = injection level + beforehand_slot_injection]
 
    The publication consists in sending the slot to a DAL node, computing its
    shards on the DAL node and associating it to a slot index and published
    level. On the L1 side, a manager operation publish_slot_header is also sent.
 
-   The function returns the sum of the payloads submitted via DAL. *)
-let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
-    =
+   Having the ability to inject some blocks ahead (thanks to
+   [beforehand_slot_injection]) allows some pipelining, as shards computation
+   may take an amount of time to complete.
+
+   The function returns the sum of the payloads submitted via DAL.
+*)
+let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
+    ~into dal_node l1_node l1_client =
+  Check.(
+    (beforehand_slot_injection >= 1)
+      int
+      ~error_msg:
+        "Value of beforehand_slot_injection should be at least 1 (got %L)") ;
   (* We add the successive slots' contents (that is, published_level-s) injected
      into DAL and L1, and store the result in [!sum]. The final value is then
      returned by this function. *)
@@ -2085,32 +2115,51 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
         let current_level = index + from in
         task current_level)
   in
+  let publish_and_store_slot_promises = ref [] in
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap3 in
+  let* counter = Operation.get_next_counter ~source l1_client in
+  let counter = ref counter in
   let task current_level =
     let* level = Node.wait_for_level l1_node current_level in
     (* We expected to advance level by level, otherwise, the test should fail. *)
     Check.(
       (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
-    let (publish_level as payload) = level + 1 in
+    let (publish_level as payload) = level + beforehand_slot_injection in
     sum := !sum + payload ;
     Log.info
-      "[e2e.slot_producer] publish slot %d for level %d with payload %d"
+      "[e2e.slot_producer] publish slot %d for level %d with payload %d at \
+       level %d"
       slot_index
       publish_level
-      payload ;
-    let* _index, _commitment =
+      payload
+      level ;
+    let promise =
       publish_and_store_slot
         ~slot_size
+        ~force:true
+        ~counter:!counter
         ~level:publish_level
         l1_node
         l1_client
         dal_node
-        Constant.bootstrap3
+        source
         slot_index
         (sf " %d " payload)
     in
+    incr counter ;
+    publish_and_store_slot_promises :=
+      promise :: !publish_and_store_slot_promises ;
     unit
   in
   let* () = loop ~from ~into ~task in
+  let l =
+    List.map (fun p ->
+        let* _p = p in
+        unit)
+    @@ List.rev !publish_and_store_slot_promises
+  in
+  let* () = Lwt.join l in
   Log.info "[e2e.slot_producer] will terminate" ;
   return !sum
 
@@ -2133,8 +2182,9 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
    - We finally check that there is a "value" variable in the PVM whose payload
    is the sum of levels as returned by [slot_producer].
 *)
-let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
-    _sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
+let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1) protocol
+    parameters dal_node sc_rollup_node _sc_rollup_address l1_node l1_client
+    _pvm_name ~number_of_dal_slots =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
@@ -2177,6 +2227,7 @@ let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
      size [slot_size] with index [tracked_slots]. *)
   let* expected_value =
     slot_producer
+      ~beforehand_slot_injection
       ~slot_index:tracked_slot_index
       ~from:start_dal_slots_level
       ~into:end_dal_slots_level
@@ -2188,7 +2239,9 @@ let e2e_test_script ?expand_test:_ protocol parameters dal_node sc_rollup_node
 
   (* Wait until the last published slot is included and attested. *)
   let* _lvl =
-    Node.wait_for_level l1_node (end_dal_slots_level + attestation_lag + 1)
+    Node.wait_for_level
+      l1_node
+      (end_dal_slots_level + attestation_lag + beforehand_slot_injection)
   in
 
   Log.info
@@ -2218,23 +2271,30 @@ type e2e_test = {
   attestation_lag : int;
   block_delay : int;
   number_of_dal_slots : int;
+  beforehand_slot_injection : int;
 }
 
 let e2e_tests =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4858
+
+     Move tests that take time to long tests, in particular those with mainnet
+     parameters. *)
   let test1 =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 1;
       block_delay = 6;
       number_of_dal_slots = 2;
+      beforehand_slot_injection = 1;
     }
   in
   let test2 =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 2;
-      block_delay = 4;
-      number_of_dal_slots = 2;
+      block_delay = 2;
+      number_of_dal_slots = 5;
+      beforehand_slot_injection = 5;
     }
   in
   let mainnet1 =
@@ -2243,9 +2303,19 @@ let e2e_tests =
       attestation_lag = 1;
       block_delay = 15;
       number_of_dal_slots = 1;
+      beforehand_slot_injection = 1;
     }
   in
-  [test1; test2; mainnet1]
+  let mainnet2 =
+    {
+      constants = Protocol.Constants_mainnet;
+      attestation_lag = 3;
+      block_delay = 5;
+      number_of_dal_slots = 5;
+      beforehand_slot_injection = 10;
+    }
+  in
+  [test1; test2; mainnet1; mainnet2]
 
 let constants_to_string = function
   | Protocol.Constants_mainnet -> "mainnet"
@@ -2262,16 +2332,23 @@ let register_end_to_end_tests ~protocols =
      tests in the future. *)
   List.iter
     (fun test ->
-      let {constants; attestation_lag; block_delay; number_of_dal_slots} =
+      let {
+        constants;
+        attestation_lag;
+        block_delay;
+        number_of_dal_slots;
+        beforehand_slot_injection;
+      } =
         test
       in
       let network = constants_to_string constants in
       let title =
         sf
-          "e2e_%s_lag-%d_latency-%d_slots-%d"
+          "%s_lag-%d_time-%d_preinject-%d_slots-%d"
           network
           attestation_lag
           block_delay
+          beforehand_slot_injection
           number_of_dal_slots
       in
       let activation_timestamp =
@@ -2293,7 +2370,7 @@ let register_end_to_end_tests ~protocols =
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
         title
-        (e2e_test_script ~number_of_dal_slots)
+        (e2e_test_script ~number_of_dal_slots ~beforehand_slot_injection)
         protocols)
     e2e_tests
 
