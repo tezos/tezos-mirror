@@ -617,9 +617,10 @@ let endorsement_descriptor =
         List.filter_map_es gen state.delegates);
   }
 
-let dal_slot_availibility ctxt delegate =
+(* TODO: #4917 remove direct dependency of the alpha_context. *)
+let dal_attestation ctxt current_level delegate =
   let open Lwt_result_syntax in
-  let level = Alpha_context.Level.current ctxt in
+  let level = Alpha_context.Level.from_raw ctxt current_level in
   let* committee = Dal_apply.compute_committee ctxt level in
   match
     Environment.Signature.Public_key_hash.Map.find
@@ -630,8 +631,9 @@ let dal_slot_availibility ctxt delegate =
   | Some _interval ->
       (* The content of the attestation does not matter for covalidity. *)
       let attestation = Dal.Attestation.empty in
-      let level = Raw_level.succ level.Level.level in
-      return_some (Dal_attestation {attestor = delegate; attestation; level})
+      let next_level = Raw_level.succ current_level in
+      return_some
+        (Dal_attestation {attestor = delegate; attestation; level = next_level})
 
 let dal_attestation_descriptor =
   let open Lwt_result_syntax in
@@ -652,8 +654,10 @@ let dal_attestation_descriptor =
             let+ incr = Incremental.begin_construction state.block in
             Incremental.alpha_ctxt incr
           in
+          let*? current_level = Context.get_level (B state.block) in
           let* op =
-            dal_slot_availibility ctxt delegate >|= Environment.wrap_tzresult
+            dal_attestation ctxt current_level delegate
+            >|= Environment.wrap_tzresult
           in
           return
             (op
