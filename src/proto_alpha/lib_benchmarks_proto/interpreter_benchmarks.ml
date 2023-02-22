@@ -177,9 +177,35 @@ let benchmark_from_kinstr_and_stack :
     Interpreter_workload.ir_sized_step list Generator.benchmark =
  fun ?amplification ctxt step_constants stack_kinstr ->
   let ctxt = Gas_helpers.set_limit ctxt in
+  let measure_allocation ~outdated_ctxt ~step_constants ~kinstr ~bef_top ~bef ()
+      =
+    let result =
+      Lwt_main.run
+      @@ Script_interpreter.Internals.step
+           (outdated_ctxt, step_constants)
+           (Local_gas_counter 9_999_999_999)
+           kinstr
+           bef_top
+           bef
+    in
+    let stack_top, stack =
+      match result with
+      | Ok (stack_top, stack, _, _) -> (stack_top, stack)
+      | Error _ -> assert false
+    in
+    let size_after =
+      Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
+    in
+    let size_before =
+      Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
+    in
+
+    size_after - size_before
+  in
+
   match stack_kinstr with
   | Ex_stack_and_kinstr {stack = bef_top, bef; stack_type; kinstr} ->
-      let workload, closure =
+      let workload, closure, measure_allocation =
         match amplification with
         | None ->
             let workload =
@@ -194,8 +220,8 @@ let benchmark_from_kinstr_and_stack :
               Local_gas_counter.local_gas_counter_and_outdated_context ctxt
             in
             let closure () =
+              (* Lwt_main.run *)
               ignore
-                (* Lwt_main.run *)
                 (Script_interpreter.Internals.step
                    (outdated_ctxt, step_constants)
                    (Local_gas_counter 9_999_999_999)
@@ -203,7 +229,15 @@ let benchmark_from_kinstr_and_stack :
                    bef_top
                    bef)
             in
-            (workload, closure)
+            let measure_allocation =
+              measure_allocation
+                ~outdated_ctxt
+                ~step_constants
+                ~kinstr
+                ~bef_top
+                ~bef
+            in
+            (workload, closure, measure_allocation)
         | Some amplification_factor ->
             assert (amplification_factor > 0) ;
             let workload =
@@ -232,9 +266,17 @@ let benchmark_from_kinstr_and_stack :
                      bef)
               done
             in
-            (workload, closure)
+            let measure_allocation =
+              measure_allocation
+                ~outdated_ctxt
+                ~step_constants
+                ~kinstr
+                ~bef_top
+                ~bef
+            in
+            (workload, closure, measure_allocation)
       in
-      Generator.Plain {workload; closure}
+      Generator.PlainWithAllocation {workload; closure; measure_allocation}
 
 let make_benchmark :
     ?amplification:int ->
