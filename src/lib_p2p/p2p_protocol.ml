@@ -135,14 +135,12 @@ module Default_answerer = struct
         | _ -> Events.(emit swap_failed) (new_point, err))
 
   let swap_ack config conn request new_point _peer =
-    let open Lwt_syntax in
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
     let connect = config.connect in
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
     Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
-    let* () = Events.(emit swap_ack_received) source_peer_id in
     match request.last_sent_swap_request with
     | None -> Lwt.return_unit (* ignore *)
     | Some (_time, proposed_peer_id) -> (
@@ -152,7 +150,6 @@ module Default_answerer = struct
         | Some _ -> Lwt.return_unit)
 
   let swap_request config conn _request new_point _peer =
-    let open Lwt_syntax in
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
     let swap_linger = config.swap_linger in
@@ -160,7 +157,6 @@ module Default_answerer = struct
     let log = config.log in
     log (Swap_request_received {source = source_peer_id}) ;
     Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
-    let* () = Events.(emit swap_request_received) source_peer_id in
     (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
       Ptime.diff

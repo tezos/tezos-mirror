@@ -53,6 +53,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   let* r = protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) in
   match r with
   | Ok (_, Bootstrap) -> (
+      let* () = Events.(emit bootstrap_received) t.peer_id in
       if t.disable_peer_discovery then worker_loop t callback
       else
         let* r = callback.bootstrap request_info in
@@ -60,15 +61,18 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
         | Ok () -> worker_loop t callback
         | Error _ -> Error_monad.cancel_with_exceptions t.canceler)
   | Ok (_, Advertise points) ->
+      let* () = Events.(emit advertise_received) (t.peer_id, points) in
       let* () =
         if t.disable_peer_discovery then return_unit
         else callback.advertise request_info points
       in
       worker_loop t callback
   | Ok (_, Swap_request (point, peer)) ->
+      let* () = Events.(emit swap_request_received) (t.peer_id, point, peer) in
       let* () = callback.swap_request request_info point peer in
       worker_loop t callback
   | Ok (_, Swap_ack (point, peer)) ->
+      let* () = Events.(emit swap_ack_received) (t.peer_id, point, peer) in
       let* () = callback.swap_ack request_info point peer in
       worker_loop t callback
   | Ok (size, Message msg) ->

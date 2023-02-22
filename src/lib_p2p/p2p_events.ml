@@ -117,22 +117,6 @@ module P2p_protocol = struct
       ~pp2:pp_print_top_error_of_trace
       ("trace", Error_monad.trace_encoding)
 
-  let swap_ack_received =
-    declare_1
-      ~section
-      ~name:"swap_ack_received"
-      ~msg:"swap ack received from {peer}"
-      ~level:Info
-      ("peer", P2p_peer.Id.encoding)
-
-  let swap_request_received =
-    declare_1
-      ~section
-      ~name:"swap_request_received"
-      ~msg:"swap request received from {peer}"
-      ~level:Info
-      ("peer", P2p_peer.Id.encoding)
-
   let swap_request_ignored =
     declare_1
       ~section
@@ -361,6 +345,26 @@ module P2p_conn = struct
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
+  let swap_ack_received =
+    declare_3
+      ~section
+      ~name:"swap_ack_received"
+      ~msg:"swap ack received from {emitter}"
+      ~level:Info
+      ("emitter", P2p_peer.Id.encoding)
+      ("proposed_point", P2p_point.Id.encoding)
+      ("proposed_peer", P2p_peer.Id.encoding)
+
+  let swap_request_received =
+    declare_3
+      ~section
+      ~name:"swap_request_received"
+      ~msg:"swap request received from {emitter}"
+      ~level:Info
+      ("emitter", P2p_peer.Id.encoding)
+      ("proposed_point", P2p_point.Id.encoding)
+      ("proposed_peer", P2p_peer.Id.encoding)
+
   let bytes_popped_from_queue =
     declare_2
       ~section
@@ -377,6 +381,23 @@ module P2p_conn = struct
       ~msg:"{peer} has been explicitly closed"
       ~level:Debug
       ("peer", P2p_peer.Id.encoding)
+
+  let bootstrap_received =
+    declare_1
+      ~section
+      ~name:"bootstrap_received"
+      ~msg:"bootstrap message received from {emitter}"
+      ~level:Debug
+      ("emitter", P2p_peer.Id.encoding)
+
+  let advertise_received =
+    declare_2
+      ~section
+      ~name:"advertise_received"
+      ~msg:"advertise message received from {emitter}"
+      ~level:Debug
+      ("emitter", P2p_peer.Id.encoding)
+      ("points", Data_encoding.list P2p_point.Id.encoding)
 end
 
 module P2p_fd = struct
