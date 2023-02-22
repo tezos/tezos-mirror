@@ -214,6 +214,22 @@ let wait_for_layer1_block_processing dac_node level =
   Dac_node.wait_for dac_node "dac_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
+let wait_for_root_hash_pushed_to_data_streamer dac_node root_hash =
+  Dac_node.wait_for
+    dac_node
+    "root_hash_pushed_to_the_data_streamer.v0"
+    (fun json -> if JSON.(json |> as_string) = root_hash then Some () else None)
+
+let wait_for_received_root_hash dac_node root_hash =
+  Dac_node.wait_for dac_node "dac_node_new_root_hash_received.v0" (fun json ->
+      if JSON.(json |> as_string) = root_hash then Some () else None)
+
+let wait_for_handle_new_subscription_to_hash_streamer dac_node =
+  Dac_node.wait_for
+    dac_node
+    "handle_new_subscription_to_hash_streamer.v0"
+    (fun _ -> Some ())
+
 type status = Applied | Failed of {error_id : string}
 
 let pp fmt = function
@@ -574,6 +590,129 @@ let test_dac_node_dac_threshold_not_reached =
   let* () = error_promise in
   Dac_node.terminate dac_node
 
+(** This modules encapsulates tests where we have two dac nodes running in
+    the legacy mode interacting with each other. As such one node normally tries
+    to mimic the coordinator and the other tries to mimic signer or observer.
+    Note that both nodes still run in the [legacy] mode, where as such there is
+    no notion of profiles. Once we have a fully working profiles, tests from this
+    module should be refactored. *)
+module Legacy = struct
+  let set_coordinator dac_node coordinator =
+    let coordinator =
+      `O
+        [
+          ("rpc-host", `String (Dac_node.rpc_host coordinator));
+          ("rpc-port", `Float (float_of_int (Dac_node.rpc_port coordinator)));
+        ]
+    in
+    let mode_updated =
+      Dac_node.Config_file.read dac_node
+      |> JSON.get "mode"
+      |> JSON.put
+           ( "dac_cctxt_config",
+             JSON.annotate ~origin:"dac_node_config" coordinator )
+    in
+    Dac_node.Config_file.update dac_node (JSON.put ("mode", mode_updated))
+
+  let test_streaming_of_root_hashes _protocol node client coordinator =
+    let coordinator_serializes_payload ~payload ~expected_rh =
+      let* actual_rh, _l1_operation =
+        RPC.call
+          coordinator
+          (Rollup.Dac.RPC.dac_store_preimage
+             ~payload
+             ~pagination_scheme:"Merkle_tree_V0")
+      in
+      return @@ check_valid_root_hash expected_rh actual_rh
+    in
+    (* 1. Create two new dac nodes; [observer_1] and [observer_2].
+       2. Initialize their default configuration.
+       3. Update their configuration so that their dac node client context
+          points to [coordinator]. *)
+    let observer_1 = Dac_node.create ~node ~client () in
+    let observer_2 = Dac_node.create ~node ~client () in
+    let* _ = Dac_node.init_config observer_1 in
+    let* _ = Dac_node.init_config observer_2 in
+    let () = set_coordinator observer_1 coordinator in
+    let () = set_coordinator observer_2 coordinator in
+    let payload_1 = "test_1" in
+    let expected_rh_1 =
+      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+    in
+    let payload_2 = "test_2" in
+    let expected_rh_2 =
+      "00f2f47f480fec0e4180930790e52a54b2dbd7676b5fa2a25dd93bf22969f22e33"
+    in
+    let push_promise_1 =
+      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh_1
+    in
+    let push_promise_2 =
+      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh_2
+    in
+    let observer_1_promise_1 =
+      wait_for_received_root_hash observer_1 expected_rh_1
+    in
+    let observer_1_promise_2 =
+      wait_for_received_root_hash observer_1 expected_rh_2
+    in
+    let observer_2_promise_1 =
+      wait_for_received_root_hash observer_2 expected_rh_1
+    in
+    let observer_2_promise_2 =
+      wait_for_received_root_hash observer_2 expected_rh_2
+    in
+
+    (* Test starts here *)
+
+    (* Start running [observer_1]. From now on we expect [observer_1] to monitor
+       streamed root hashes produced by [coordinator]. [coordinator] produces
+       and pushes them as a side effect of serializing dac payload. *)
+    let observer_1_is_subscribed =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator
+    in
+    let* () = Dac_node.run observer_1 in
+    let* () = observer_1_is_subscribed in
+    (* [coordinator] serializes [payload_1]. We expect it would push
+       [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
+    let* () =
+      coordinator_serializes_payload
+        ~payload:payload_1
+        ~expected_rh:expected_rh_1
+    in
+    (* Assert [coordinator] emitted event that [expected_rh_1] was pushed
+       to the data_streamer. *)
+    let* () = push_promise_1 in
+    (* Assert [observer_1] emitted event of received [expected_rh_1]. *)
+    let* () = observer_1_promise_1 in
+    (* Start running [observer_2]. We expect that from now on [observer_2]
+       will also monitor streamed root hashes from [coordinator]. *)
+    let observer_2_is_subscribed =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator
+    in
+    let* () = Dac_node.run observer_2 in
+    let* () = observer_2_is_subscribed in
+    (* [coordinator] serializes [payload_2]. We expect it would push
+       [expected_rh_2] to all attached subscribers,
+       i.e. to both [observer_1] and [observer_2] this time. *)
+    let* () =
+      coordinator_serializes_payload
+        ~payload:payload_2
+        ~expected_rh:expected_rh_2
+    in
+    (* Assert [coordinator] emitted event. *)
+    let* () = push_promise_2 in
+    (* Assert both [observer_1] and [observer_2] received [expected_rh_2]. *)
+    let* () = observer_1_promise_2 in
+    let* () = observer_2_promise_2 in
+    (* Since [observer_2] was not running when [expected_rh_1] was generated
+       and streamed by [coordinator], we expect it never received it.
+       We assert this, by making sure that the promise of [observer_2] about
+       waiting for the emitted event with payload [expected_rh_1] is still not
+       resolved after the promise [observer_2_promise_2] has been resolved. *)
+    assert (Lwt.is_sleeping observer_2_promise_1) ;
+    unit
+end
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   test_dac_node_startup protocols ;
@@ -602,4 +741,9 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_wrong_hash"
     test_reveals_fails_on_wrong_hash
+    protocols ;
+  scenario_with_layer1_and_dac_nodes
+    ~tags:["dac"; "dac_node"]
+    "dac_streaming_of_root_hashes_in_legacy_mode"
+    Legacy.test_streaming_of_root_hashes
     protocols

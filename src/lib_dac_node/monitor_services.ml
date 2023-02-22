@@ -23,27 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+module S = struct
+  let root_hashes ((module P) : Dac_plugin.t) =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Monitor a stream of root hashes that are produced by another dac node \
+         responsible for the serialization of the dac payload (coordinator).  "
+      ~query:Tezos_rpc.Query.empty
+      ~output:P.encoding
+      Tezos_rpc.Path.(open_root / "monitor" / "root_hashes")
+end
 
-class unix_cctxt ~rpc_config : cctxt =
-  object
-    inherit
-      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-        rpc_config
-        (Tezos_rpc_http.Media_type.Command_line.of_command_line
-           rpc_config.media_type)
-  end
-
-let make_unix_cctxt ~scheme ~host ~port =
-  let endpoint = Uri.make ~scheme ~host ~port () in
-  let rpc_config =
-    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
-  in
-  new unix_cctxt ~rpc_config
-
-let call (cctxt : #cctxt) = cctxt#call_service
-
-let streamed_call (cctxt : #cctxt) = cctxt#call_streamed_service
+let root_hashes dac_node_cctxt dac_plugin =
+  Tezos_rpc.Context.make_streamed_call
+    (S.root_hashes dac_plugin)
+    dac_node_cctxt
+    ()
+    ()
+    ()

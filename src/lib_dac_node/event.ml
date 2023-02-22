@@ -163,6 +163,40 @@ let dac_account_cannot_sign =
     ~level:Warning
     ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 
+let handle_new_subscription_to_hash_streamer =
+  declare_0
+    ~section
+    ~name:"handle_new_subscription_to_hash_streamer"
+    ~msg:
+      "Subscription of another dac node to the hash streamer handled \
+       successfully."
+    ~level:Notice
+    ()
+
+let subscribed_to_root_hashes_stream =
+  declare_0
+    ~section
+    ~name:"subscribed_to_root_hashes_stream"
+    ~msg:"Subscribed to root hashes stream"
+    ~level:Notice
+    ()
+
+let new_root_hash_received =
+  declare_1
+    ~section
+    ~name:"dac_node_new_root_hash_received"
+    ~msg:"Received new root hash via monitoring rpc {root_hash}"
+    ~level:Notice
+    ("root_hash", Data_encoding.string)
+
+let new_hash_pushed_to_data_streamer =
+  declare_1
+    ~section
+    ~name:"root_hash_pushed_to_the_data_streamer"
+    ~msg:"New root hash pushed to the data streamer: {root_hash}"
+    ~level:Notice
+    ("root_hash", Data_encoding.string)
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -174,3 +208,9 @@ let emit_protocol_plugin_not_resolved current_protocol next_protocol =
     protocol_plugin_not_resolved
     ( proto_short_hash_string current_protocol,
       proto_short_hash_string next_protocol )
+
+let emit_new_root_hash_received ((module P) : Dac_plugin.t) hash =
+  emit new_root_hash_received (P.to_hex hash)
+
+let emit_root_hash_pushed_to_data_streamer ((module P) : Dac_plugin.t) hash =
+  emit new_hash_pushed_to_data_streamer (P.to_hex hash)

@@ -113,6 +113,22 @@ module Handler = struct
     make_stream_daemon
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
+
+  (** This handler will be invoked only when a [coordinator_cctxt] is specified
+      in the DAC node configuration. The DAC node tries to subscribes to the
+      stream of root hashes via the streamed GET /monitor/root_hashes RPC call
+      to the dac node corresponding to [coordinator_cctxt]. *)
+  let new_root_hash ctxt coordinator_cctxt =
+    let open Lwt_result_syntax in
+    let handler dac_plugin _stopper root_hash =
+      let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
+      return_unit
+    in
+    let*? dac_plugin = Node_context.get_dac_plugin ctxt in
+    let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
+    make_stream_daemon
+      (handler dac_plugin)
+      (Monitor_services.root_hashes coordinator_cctxt dac_plugin)
 end
 
 let daemonize handlers =
@@ -140,10 +156,11 @@ let run ~data_dir cctxt =
     Configuration.load ~data_dir
   in
   let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
-  let* addresses, threshold =
+  let* addresses, threshold, coordinator_config_opt =
     match mode with
-    | Configuration.Legacy {dac_members_addresses; threshold} ->
-        return (dac_members_addresses, threshold)
+    | Configuration.Legacy {dac_members_addresses; threshold; dac_cctxt_config}
+      ->
+        return (dac_members_addresses, threshold, dac_cctxt_config)
     | Configuration.Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
     | Configuration.Dac_member _ -> tzfail @@ Mode_not_supported "dac_member"
     | Configuration.Observer _ -> tzfail @@ Mode_not_supported "observer"
@@ -159,7 +176,13 @@ let run ~data_dir cctxt =
            | Some (_pkh, pk_opt, sk_uri) -> (pk_opt, Some sk_uri))
     |> List.split
   in
-  let ctxt = Node_context.init config cctxt in
+  let coordinator_cctxt_opt =
+    Option.map
+      (fun Configuration.{host; port} ->
+        Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
+      coordinator_config_opt
+  in
+  let ctxt = Node_context.init config cctxt coordinator_cctxt_opt in
   let* rpc_server =
     RPC_server.(
       start_legacy
@@ -178,5 +201,13 @@ let run ~data_dir cctxt =
   in
   (* Start daemon to resolve current protocol plugin *)
   let* () = daemonize [Handler.resolve_plugin_and_set_ready ctxt cctxt] in
-  (* Start never-ending monitoring daemons *)
-  daemonize [Handler.new_head ctxt cctxt]
+  (* Start never-ending monitoring daemons. [coordinator_cctxt] is required to
+     monitor new root hashes in legacy mode. *)
+  match coordinator_cctxt_opt with
+  | None -> daemonize [Handler.new_head ctxt cctxt]
+  | Some coordinator_cctxt ->
+      daemonize
+        [
+          Handler.new_head ctxt cctxt;
+          Handler.new_root_hash ctxt coordinator_cctxt;
+        ]

@@ -901,7 +901,7 @@ module Dac = struct
              pagination_scheme)
       in
       let data : RPC_core.data = Data (JSON.unannotate preimage) in
-      make ~data PUT ["store_preimage"] @@ fun json ->
+      make ~data POST ["store_preimage"] @@ fun json ->
       JSON.
         ( json |-> "root_hash" |> as_string,
           json |-> "external_message" |> get_bytes_from_json_string_node )

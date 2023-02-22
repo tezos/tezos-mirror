@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [host_and_port] holds server configuration details of another dac node
+    required to instantiate [Dac_node_client.(#cctxt)]. *)
+type host_and_port = {host : string; port : int}
+
 (** Configuration type for coordinators. *)
 type coordinator = {
   threshold : int;
@@ -54,6 +58,10 @@ type legacy = {
       message valid. *)
   dac_members_addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
       (** The list of tz4 addresses denoting the dac members. *)
+  dac_cctxt_config : host_and_port option;
+      (**  When running integration tests with multiple dac nodes in the
+           [legacy] mode [dac_cctxt_config] is used to create
+           [Dac_node_client.cctxt] for the node that mimics coordinator. *)
 }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4707.

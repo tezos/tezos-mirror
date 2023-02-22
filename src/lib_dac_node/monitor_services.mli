@@ -23,27 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+module S : sig
+  (** Define RPC GET /monitor/root_hashes. *)
+  val root_hashes :
+    Dac_plugin.t ->
+    ([`GET], unit, unit, unit, unit, Dac_plugin.hash) Tezos_rpc.Service.service
+end
 
-class unix_cctxt ~rpc_config : cctxt =
-  object
-    inherit
-      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-        rpc_config
-        (Tezos_rpc_http.Media_type.Command_line.of_command_line
-           rpc_config.media_type)
-  end
-
-let make_unix_cctxt ~scheme ~host ~port =
-  let endpoint = Uri.make ~scheme ~host ~port () in
-  let rpc_config =
-    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
-  in
-  new unix_cctxt ~rpc_config
-
-let call (cctxt : #cctxt) = cctxt#call_service
-
-let streamed_call (cctxt : #cctxt) = cctxt#call_streamed_service
+(** [root_hashes streamed_cctxt dac_plugin] returns a stream of root hashes
+    and a stopper for it.
+    
+    Stream is produced by calling RPC GET /monitor/root_hashes.
+*)
+val root_hashes :
+  #Tezos_rpc.Context.streamed ->
+  Dac_plugin.t ->
+  (Dac_plugin.hash Lwt_stream.t * Tezos_rpc.Context.stopper)
+  Error_monad.tzresult
+  Lwt.t
