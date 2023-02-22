@@ -26,7 +26,6 @@
 type container =
   [ `Contract of Contract_repr.t
   | `Collected_commitments of Blinded_public_key_hash.t
-  | `Delegate_balance of Signature.Public_key_hash.t
   | `Frozen_deposits of Signature.Public_key_hash.t
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
@@ -65,10 +64,6 @@ let allocated ctxt stored =
   | `Collected_commitments bpkh ->
       Commitment_storage.exists ctxt bpkh >|= fun allocated ->
       ok (ctxt, allocated)
-  | `Delegate_balance delegate ->
-      let contract = Contract_repr.Implicit delegate in
-      Contract_storage.allocated ctxt contract >|= fun allocated ->
-      ok (ctxt, allocated)
   | `Frozen_deposits _ | `Block_fees -> return (ctxt, true)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.bond_allocated ctxt contract bond_id
@@ -80,10 +75,6 @@ let balance ctxt stored =
       (ctxt, balance)
   | `Collected_commitments bpkh ->
       Commitment_storage.committed_amount ctxt bpkh >|=? fun balance ->
-      (ctxt, balance)
-  | `Delegate_balance delegate ->
-      let contract = Contract_repr.Implicit delegate in
-      Storage.Contract.Spendable_balance.get ctxt contract >|=? fun balance ->
       (ctxt, balance)
   | `Frozen_deposits delegate ->
       let contract = Contract_repr.Implicit delegate in
@@ -120,13 +111,6 @@ let credit ctxt receiver amount origin =
             bpkh
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
-      | `Delegate_balance delegate ->
-          let contract = Contract_repr.Implicit delegate in
-          Contract_storage.increase_balance_only_call_from_token
-            ctxt
-            contract
-            amount
-          >|=? fun ctxt -> (ctxt, Contract contract)
       | `Frozen_deposits delegate ->
           Frozen_deposits_storage.credit_only_call_from_token
             ctxt
@@ -176,13 +160,6 @@ let spend ctxt giver amount origin =
             bpkh
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
-      | `Delegate_balance delegate ->
-          let contract = Contract_repr.Implicit delegate in
-          Contract_storage.decrease_balance_only_call_from_token
-            ctxt
-            contract
-            amount
-          >|=? fun ctxt -> (ctxt, Contract contract)
       | `Frozen_deposits delegate ->
           Frozen_deposits_storage.spend_only_call_from_token
             ctxt

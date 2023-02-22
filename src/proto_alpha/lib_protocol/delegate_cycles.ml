@@ -134,7 +134,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
           ~origin
           ctxt
           (`Frozen_deposits delegate)
-          (`Delegate_balance delegate)
+          (`Contract delegate_contract)
           to_reimburse
         >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
       else if Tez_repr.(current_amount < maximum_stake_to_be_deposited) then
@@ -153,7 +153,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
         Token.transfer
           ~origin
           ctxt
-          (`Delegate_balance delegate)
+          (`Contract delegate_contract)
           (`Frozen_deposits delegate)
           to_freeze
         >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
@@ -181,7 +181,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
           ~origin
           ctxt
           (`Frozen_deposits delegate)
-          (`Delegate_balance delegate)
+          (`Contract delegate_contract)
           frozen_deposits.current_amount
         >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
       else return (ctxt, balance_updates))
