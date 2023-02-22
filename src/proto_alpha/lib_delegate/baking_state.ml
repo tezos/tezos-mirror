@@ -108,6 +108,7 @@ type block_info = {
   round : Round.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
+  dal_attestations : Kind.dal_attestation operation list;
   payload : Operation_pool.payload;
 }
 
@@ -169,6 +170,7 @@ let block_info_encoding =
            round;
            prequorum;
            quorum;
+           dal_attestations;
            payload;
          } ->
       ( hash,
@@ -178,6 +180,7 @@ let block_info_encoding =
         round,
         prequorum,
         List.map Operation.pack quorum,
+        List.map Operation.pack dal_attestations,
         payload ))
     (fun ( hash,
            shell,
@@ -186,6 +189,7 @@ let block_info_encoding =
            round,
            prequorum,
            quorum,
+           dal_attestations,
            payload ) ->
       {
         hash;
@@ -195,9 +199,11 @@ let block_info_encoding =
         round;
         prequorum;
         quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
+        dal_attestations =
+          List.filter_map Operation_pool.unpack_dal_attestation dal_attestations;
         payload;
       })
-    (obj8
+    (obj9
        (req "hash" Block_hash.encoding)
        (req "shell" Block_header.shell_header_encoding)
        (req "payload_hash" Block_payload_hash.encoding)
@@ -205,6 +211,7 @@ let block_info_encoding =
        (req "round" Round.encoding)
        (req "prequorum" (option prequorum_encoding))
        (req "quorum" (list (dynamic_size Operation.encoding)))
+       (req "dal_attestations" (list (dynamic_size Operation.encoding)))
        (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
@@ -724,13 +731,15 @@ let pp_block_info fmt
       round;
       prequorum;
       quorum;
+      dal_attestations;
       payload;
       payload_round;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     prequorum: %a@ quorum: %d endorsements@ payload: %a@ payload round: %a@]"
+     prequorum: %a@ quorum: %d endorsements@ dal_attestations: %d@ payload: \
+     %a@ payload round: %a@]"
     Block_hash.pp
     hash
     Block_payload_hash.pp_short
@@ -741,6 +750,7 @@ let pp_block_info fmt
     (pp_option pp_prequorum)
     prequorum
     (List.length quorum)
+    (List.length dal_attestations)
     Operation_pool.pp_payload
     payload
     Round.pp

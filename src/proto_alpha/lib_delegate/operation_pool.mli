@@ -97,6 +97,9 @@ val unpack_preendorsement :
 
 val unpack_endorsement : packed_operation -> Kind.endorsement operation option
 
+val unpack_dal_attestation :
+  packed_operation -> Kind.dal_attestation operation option
+
 val filter_preendorsements :
   packed_operation list -> Kind.preendorsement operation list
 
@@ -112,6 +115,7 @@ val extract_operations_of_list_list :
   packed_operation list list ->
   (Kind.preendorsement operation list option
   * Kind.endorsement operation list
+  * Kind.dal_attestation operation list
   * payload)
   option
 

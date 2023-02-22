@@ -83,14 +83,20 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
   let* round =
     Environment.wrap_tzresult @@ Fitness.round_from_raw shell.fitness
   in
-  let payload_hash, payload_round, prequorum, quorum, payload =
+  let payload_hash, payload_round, prequorum, quorum, dal_attestations, payload
+      =
     if not in_protocol then
       (* The first block in the protocol is baked using the previous
          protocol, the encodings might change. The baker's logic is to
          consider final the first block of a new protocol and not
          endorse it. Therefore, we do not need to have the correct
          values here. *)
-      (dummy_payload_hash, Round.zero, None, [], Operation_pool.empty_payload)
+      ( dummy_payload_hash,
+        Round.zero,
+        None,
+        [],
+        [],
+        Operation_pool.empty_payload )
     else
       let payload_hash, payload_round =
         match
@@ -102,13 +108,13 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
             (payload_hash, payload_round)
         | None -> assert false
       in
-      let preendorsements, quorum, payload =
+      let preendorsements, quorum, dal_attestations, payload =
         WithExceptions.Option.get
           ~loc:__LOC__
           (Operation_pool.extract_operations_of_list_list operations)
       in
       let prequorum = Option.bind preendorsements extract_prequorum in
-      (payload_hash, payload_round, prequorum, quorum, payload)
+      (payload_hash, payload_round, prequorum, quorum, dal_attestations, payload)
   in
   return
     {
@@ -119,6 +125,7 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
       round;
       prequorum;
       quorum;
+      dal_attestations;
       payload;
     }
 

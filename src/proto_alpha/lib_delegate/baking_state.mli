@@ -62,6 +62,7 @@ type block_info = {
   round : Round.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
+  dal_attestations : Kind.dal_attestation operation list;
   payload : Operation_pool.payload;
 }
 

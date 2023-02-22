@@ -60,6 +60,7 @@ val round_proposer :
 
 val propose_fresh_block_action :
   endorsements:Kind.endorsement Operation.t list ->
+  dal_attestations:Kind.dal_attestation Operation.t list ->
   ?last_proposal:block_info ->
   predecessor:block_info ->
   state ->
