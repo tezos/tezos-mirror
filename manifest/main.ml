@@ -3469,13 +3469,8 @@ let octez_scoru_wasm_helpers =
         tree_encoding;
         octez_base_unix;
         octez_context_disk;
-        octez_base_test_helpers |> open_;
-        octez_test_helpers |> open_;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
-        qcheck_alcotest;
-        alcotest_lwt;
-        tezt_lib;
         octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
@@ -6384,7 +6379,6 @@ let _octez_scoru_wasm_debugger =
         octez_clic;
         tree_encoding;
         octez_base_unix;
-        octez_base_test_helpers |> open_;
         (* The debugger always rely on proto_alpha, as such the client is always
            available. *)
         Protocol.(client_exn alpha);
