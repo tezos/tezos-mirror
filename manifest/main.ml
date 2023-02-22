@@ -389,7 +389,7 @@ let tezt_core_lib =
 
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
-let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
     ?opam_with_test ?synopsis l =
   tezt_without_tezt_lib_dependency
     ~opam
@@ -401,6 +401,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ~exe_deps:[tezt_lib]
     ~js_deps:[tezt_js_lib]
     ?dep_globs
+    ?dep_files
     ?opam_with_test
     l
 
@@ -1184,9 +1185,11 @@ let octez_base_unix =
         uri;
       ]
 
-let lib_base_tests ?dep_files names =
-  tests
-    names
+let _octez_base_tests =
+  tezt
+    [
+      "test_bounded"; "test_time"; "test_protocol"; "test_p2p_addr"; "test_sized";
+    ]
     ~path:"src/lib_base/test"
     ~opam:"tezos-base"
     ~deps:
@@ -1194,21 +1197,18 @@ let lib_base_tests ?dep_files names =
         octez_base |> open_;
         octez_error_monad |> open_;
         data_encoding;
-        qcheck_alcotest;
         octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
       ]
-    ?dep_files
+    ~dep_files:
+      [
+        (* Note: those files are only actually needed by test_p2p_addr. *)
+        "points.ok";
+        "points.ko";
+      ]
     ~modes:[Native; JS]
     ~js_compatible:true
-    ~modules:names
-
-let _octez_base_tests_1 =
-  lib_base_tests ["test_bounded"; "test_time"; "test_protocol"]
-
-let _octez_base_tests_2 =
-  lib_base_tests ["test_p2p_addr"] ~dep_files:["points.ok"; "points.ko"]
-
-let _octez_base_tests_3 = lib_base_tests ["test_sized"]
 
 let _octez_base_unix_tests =
   test

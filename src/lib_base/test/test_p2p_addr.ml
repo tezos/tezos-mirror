@@ -117,7 +117,7 @@ let eq l r =
   eq_addr l.addr r.addr && l.port = r.port && eq_peer_id l.peer_id r.peer_id
 
 let process_points filename f =
-  let file = open_in filename in
+  let file = open_in (project_root // "src/lib_base/test" // filename) in
   try
     while true do
       f (input_line file)
