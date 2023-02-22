@@ -2012,25 +2012,33 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
   let* () = wait_block_processing in
   let* first_not_attested_published_level =
     if with_baker_daemon then (
-      Log.info
-        "Run the baker till at least level %d."
-        (max_level + parameters.attestation_lag) ;
-      let* () =
-        run_baker all_delegates (intermediary_level + parameters.attestation_lag)
+      let last_level_of_first_baker =
+        intermediary_level + parameters.attestation_lag
       in
+      let last_level_of_second_baker = max_level + parameters.attestation_lag in
+      Log.info
+        "Run the first baker for all delegates till at least level %d."
+        last_level_of_first_baker ;
+      let* () = run_baker all_delegates last_level_of_first_baker in
       (* (D) We tried to stop the baker as soon as it reaches
          [intermediary_level + attestation_lag], but it may have baked a few
          blocks more *)
+      let node_level = Node.get_level node in
       let first_not_attested_published_level =
-        Node.get_level node + 1 - parameters.attestation_lag
+        node_level + 1 - parameters.attestation_lag
       in
+      Log.info
+        "The first baker baked till level %d. Therefore \
+         first_not_attested_published_level is %d."
+        node_level
+        first_not_attested_published_level ;
+      Log.info
+        "Run the second baker for some (not all) delegates till at least level \
+         %d."
+        last_level_of_second_baker ;
       if first_not_attested_published_level >= max_level then
         Test.fail "test not checking for unattested slots; adjust parameters" ;
-      let* () =
-        run_baker
-          (List.tl all_delegates)
-          (max_level + parameters.attestation_lag)
-      in
+      let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
       return first_not_attested_published_level)
     else return intermediary_level
   in
