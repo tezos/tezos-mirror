@@ -163,6 +163,16 @@ let dac_account_cannot_sign =
     ~level:Warning
     ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 
+let handle_new_subscription_to_hash_streamer =
+  declare_0
+    ~section
+    ~name:"handle_new_subscription_to_hash_streamer"
+    ~msg:
+      "Subscription of another dac node to the hash streamer handled \
+       successfully."
+    ~level:Notice
+    ()
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 

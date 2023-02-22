@@ -144,6 +144,7 @@ let register_monitor_root_hashes dac_plugin hash_streamer dir =
     let* handle = Data_streamer.handle_subscribe hash_streamer in
     match handle with
     | Ok (stream, stopper) ->
+        let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
         let shutdown () = Lwt_watcher.shutdown stopper in
         let next () = Lwt_stream.get stream in
         Tezos_rpc.Answer.return_stream {next; shutdown}
