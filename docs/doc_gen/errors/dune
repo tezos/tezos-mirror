@@ -8,4 +8,5 @@
                    -open Data_encoding
                    -open Tezos_client_alpha
                    -safe-string
-                   -linkall)))
+                   -linkall
+                   (:include %{workspace_root}/macos-link-flags.sexp))))

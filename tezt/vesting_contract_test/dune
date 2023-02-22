@@ -6,4 +6,6 @@
             tezos-protocol-alpha
             tezt-tezos
             ptime)
- (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base -open Tezos_stdlib)))
+ (flags (:standard
+          (:include %{workspace_root}/macos-link-flags.sexp)
+          -open Tezt -open Tezt_tezos -open Tezt.Base -open Tezos_stdlib)))
