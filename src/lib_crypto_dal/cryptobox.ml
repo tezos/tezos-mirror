@@ -373,16 +373,21 @@ module Inner = struct
              "Slot size is expected to be less than '%d'. Got: %d"
              (1 lsl 36)
              slot_size))
-    else if number_of_shards >= n then
+    else if not (n mod number_of_shards == 0 && number_of_shards < n) then
+      (* The number of shards must divide n, so [number_of_shards <= n].
+         Moreover, the inequality is strict because if [number_of_shards = n],
+         the domains for the FFT contain only one element and we cannot build
+         FFT domains with only one element. Given that [n] is a power of two,
+         it follows that the maximum number of shards is [n/2]. *)
       fail
         (`Fail
           (Format.asprintf
-             "For the given parameters, the maximum number of shards is %d. \
-              Got: %d."
+             "The number of shards must divide, and not be equal to %d. For \
+              the given parameter, the maximum number of shards is %d. Got: \
+              %d."
+             n
              (n / 2)
              number_of_shards))
-    else if n mod number_of_shards <> 0 then
-      fail (`Fail (Format.asprintf "The number of shards must divide %d" n))
     else if 2 * shard_length >= k then
       (* Since shard_length = n / number_of_shards, we obtain
          (all quantities are positive integers):
