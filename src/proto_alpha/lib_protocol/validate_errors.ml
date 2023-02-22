@@ -112,11 +112,6 @@ module Consensus = struct
         expected : Round.t;
         provided : Round.t;
       }
-    | Wrong_consensus_operation_branch of {
-        kind : consensus_operation_kind;
-        expected : Block_hash.t;
-        provided : Block_hash.t;
-      }
     | Wrong_payload_hash_for_consensus_operation of {
         kind : consensus_operation_kind;
         expected : Block_payload_hash.t;
@@ -242,35 +237,6 @@ module Consensus = struct
         | _ -> None)
       (fun (kind, expected, provided) ->
         Consensus_operation_for_future_round {kind; expected; provided}) ;
-    register_error_kind
-      `Temporary
-      ~id:"validate.wrong_consensus_operation_branch"
-      ~title:"Wrong consensus operation branch"
-      ~description:
-        "Trying to include an endorsement or preendorsement which points to \
-         the wrong block. It should be the predecessor for preendorsements and \
-         the grandfather for endorsements."
-      ~pp:(fun ppf (kind, expected, provided) ->
-        Format.fprintf
-          ppf
-          "%a with wrong branch (expected: %a, provided: %a)."
-          consensus_operation_kind_pp
-          kind
-          Block_hash.pp
-          expected
-          Block_hash.pp
-          provided)
-      Data_encoding.(
-        obj3
-          (req "kind" consensus_operation_kind_encoding)
-          (req "expected" Block_hash.encoding)
-          (req "provided" Block_hash.encoding))
-      (function
-        | Wrong_consensus_operation_branch {kind; expected; provided} ->
-            Some (kind, expected, provided)
-        | _ -> None)
-      (fun (kind, expected, provided) ->
-        Wrong_consensus_operation_branch {kind; expected; provided}) ;
     register_error_kind
       (* Note: in Mempool mode this used to be
          Consensus_operation_on_competing_proposal (which was

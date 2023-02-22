@@ -64,11 +64,6 @@ module Consensus : sig
         expected : Round.t;
         provided : Round.t;
       }
-    | Wrong_consensus_operation_branch of {
-        kind : consensus_operation_kind;
-        expected : Block_hash.t;
-        provided : Block_hash.t;
-      }
     | Wrong_payload_hash_for_consensus_operation of {
         kind : consensus_operation_kind;
         expected : Block_payload_hash.t;

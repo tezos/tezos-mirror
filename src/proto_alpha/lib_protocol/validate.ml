@@ -507,11 +507,6 @@ module Consensus = struct
       error (Consensus_operation_for_old_round {kind; expected; provided})
     else error (Consensus_operation_for_future_round {kind; expected; provided})
 
-  let check_branch kind expected provided =
-    error_unless
-      (Block_hash.equal expected provided)
-      (Wrong_consensus_operation_branch {kind; expected; provided})
-
   let check_payload_hash kind expected provided =
     error_unless
       (Block_payload_hash.equal expected provided)
@@ -519,7 +514,7 @@ module Consensus = struct
 
   (** Check the preendorsement features for both [Application] and
       [Partial_validation] modes. *)
-  let check_preendorsement_content_preexisting_block vi block_info branch
+  let check_preendorsement_content_preexisting_block vi block_info
       {level; round; block_payload_hash; _} =
     let open Result_syntax in
     let* locked_round =
@@ -534,11 +529,10 @@ module Consensus = struct
     let* () = check_round_before_block ~block_round:block_info.round round in
     let* () = check_level kind vi.current_level.level level in
     let* () = check_round kind locked_round round in
-    let* () = check_branch kind block_info.predecessor_hash branch in
     let expected_payload_hash = block_info.header_contents.payload_hash in
     check_payload_hash kind expected_payload_hash block_payload_hash
 
-  let check_preendorsement_content_construction vi cons_info branch
+  let check_preendorsement_content_construction vi cons_info
       {level; round; block_payload_hash; _} =
     let open Result_syntax in
     let expected_payload_hash = cons_info.header_contents.payload_hash in
@@ -557,11 +551,10 @@ module Consensus = struct
        there is no preexisting fitness to provide the locked_round. We do
        however check that all preendorments have the same round in
        [check_construction_preendorsement_round_consistency] further below. *)
-    let* () = check_branch kind cons_info.predecessor_hash branch in
     check_payload_hash kind expected_payload_hash block_payload_hash
 
   let check_preendorsement_content_mempool vi (consensus_info : consensus_info)
-      branch {level; round; block_payload_hash; _} =
+      {level; round; block_payload_hash; _} =
     let open Result_syntax in
     let kind = Preendorsement in
     match Consensus.endorsement_branch vi.ctxt with
@@ -569,10 +562,9 @@ module Consensus = struct
         let expected = consensus_info.predecessor_level in
         let provided = level in
         error (Consensus_operation_for_future_level {kind; expected; provided})
-    | Some (expected_branch, expected_payload_hash) ->
+    | Some (_, expected_payload_hash) ->
         let* () = check_level kind consensus_info.predecessor_level level in
         let* () = check_round kind consensus_info.predecessor_round round in
-        let* () = check_branch kind expected_branch branch in
         check_payload_hash kind expected_payload_hash block_payload_hash
 
   let check_preendorsement vi ~check_signature
@@ -592,19 +584,16 @@ module Consensus = struct
           check_preendorsement_content_preexisting_block
             vi
             block_info
-            operation.shell.branch
             consensus_content
       | Construction construction_info ->
           check_preendorsement_content_construction
             vi
             construction_info
-            operation.shell.branch
             consensus_content
       | Mempool _ ->
           check_preendorsement_content_mempool
             vi
             consensus_info
-            operation.shell.branch
             consensus_content
     in
     let*? consensus_key, voting_power =
@@ -704,7 +693,6 @@ module Consensus = struct
     (* This function is only called on endorsements whose level is the
        grandparent's, so there is no need to check the level. *)
     let*? () = check_round kind grandparent.round round in
-    let*? () = check_branch kind grandparent.hash operation.shell.branch in
     let*? () = check_payload_hash kind grandparent.payload_hash bph in
     let*? () =
       if check_signature then
@@ -763,8 +751,7 @@ module Consensus = struct
       predecessor is the protocol activation block, which is always
       considered final and should not be endorsed. In that case, return
       an error depending on the mode. *)
-  let expected_branch_and_payload_hash vi (consensus_info : consensus_info)
-      op_level =
+  let expected_payload_hash vi (consensus_info : consensus_info) op_level =
     match Consensus.endorsement_branch vi.ctxt with
     | Some branch_and_payload_hash -> ok branch_and_payload_hash
     | None ->
@@ -802,13 +789,12 @@ module Consensus = struct
       operation.protocol_data.contents
     in
     let {level; round; block_payload_hash = bph; _} = consensus_content in
-    let*? expected_branch, expected_payload_hash =
-      expected_branch_and_payload_hash vi consensus_info level
+    let*? _expected_branch, expected_payload_hash =
+      expected_payload_hash vi consensus_info level
     in
     let kind = Endorsement in
     let*? () = check_level kind consensus_info.predecessor_level level in
     let*? () = check_round kind consensus_info.predecessor_round round in
-    let*? () = check_branch kind expected_branch operation.shell.branch in
     let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
       get_delegate_details

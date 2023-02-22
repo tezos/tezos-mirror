@@ -56,6 +56,13 @@ let inject_the_first_endorsement () =
 let test_simple_endorsement () =
   inject_the_first_endorsement () >>=? fun (_, _) -> return_unit
 
+(** Test that the endorsement's branch does not affect its
+    validity. *)
+let test_endorsement_with_arbitrary_branch () =
+  init_genesis () >>=? fun (_genesis, blk) ->
+  Op.endorsement ~pred_branch:Block_hash.zero blk >>=? fun operation ->
+  Block.bake ~operation blk >>=? fun _blk -> return_unit
+
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
 (****************************************************************)
@@ -120,18 +127,6 @@ let test_non_normalized_slot () =
             when kind = Validate_errors.Consensus.Endorsement ->
               true
           | _ -> false)
-
-(** Wrong endorsement predecessor : apply an endorsement with an
-    incorrect block predecessor. *)
-let test_wrong_endorsement_predecessor () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Op.endorsement ~pred_branch:(Context.branch (B b)) b >>=? fun operation ->
-  Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Wrong_consensus_operation_branch {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
 
 (** Invalid_endorsement_level: apply an endorsement with an incorrect
     level (i.e. the predecessor level). *)
@@ -519,6 +514,10 @@ let test_endorsement_grandparent_full_construction () =
 let tests =
   [
     Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
+    Tztest.tztest
+      "Endorsement with arbitrary branch"
+      `Quick
+      test_endorsement_with_arbitrary_branch;
     Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
     Tztest.tztest
       "Endorsement wrapped with non-normalized slot"
@@ -526,10 +525,6 @@ let tests =
       test_non_normalized_slot;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
-    Tztest.tztest
-      "Wrong endorsement predecessor"
-      `Quick
-      test_wrong_endorsement_predecessor;
     Tztest.tztest
       "Invalid endorsement level"
       `Quick

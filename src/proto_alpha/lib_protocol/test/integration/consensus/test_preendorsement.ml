@@ -46,6 +46,15 @@ let init_genesis ?policy () =
 (*                      Tests                                   *)
 (****************************************************************)
 
+(** Test that the preendorsement's branch does not affect its
+    validity. *)
+let test_preendorsement_with_arbitrary_branch () =
+  Context.init1 () >>=? fun (genesis, _contract) ->
+  Block.bake genesis >>=? fun blk ->
+  Op.preendorsement ~pred_branch:Block_hash.zero blk >>=? fun operation ->
+  Incremental.begin_construction ~mempool_mode:true blk >>=? fun inc ->
+  Incremental.validate_operation inc operation >>=? fun _inc -> return_unit
+
 (** Consensus operation for future level : apply a preendorsement with a level in the future *)
 let test_consensus_operation_preendorsement_for_future_level () =
   init_genesis () >>=? fun (_genesis, pred) ->
@@ -206,6 +215,10 @@ let tests =
   end) in
   AppMode.tests @ ConstrMode.tests
   @ [
+      Tztest.tztest
+        "Preendorsement with arbitrary branch"
+        `Quick
+        test_preendorsement_with_arbitrary_branch;
       Tztest.tztest
         "Preendorsement for future level"
         `Quick
