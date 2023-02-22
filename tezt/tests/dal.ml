@@ -1302,7 +1302,12 @@ let commitment_of_slot cryptobox slot =
       (Rollup.Dal.content_of_slot slot |> Bytes.of_string)
     |> Result.get_ok
   in
-  Cryptobox.commit cryptobox polynomial
+  match Cryptobox.commit cryptobox polynomial with
+  | Ok cm -> cm
+  | Error
+      (`Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected})
+    ->
+      Test.fail "Got %d, expecting a value strictly less than %d" given expected
 
 let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
     _client dal_node =
@@ -1386,19 +1391,19 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let slot = Rollup.Dal.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let commit =
+  let commitment =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
   let* () =
     let* response =
-      RPC.call_raw dal_node @@ Rollup.Dal.RPC.get_commitment_slot commit
+      RPC.call_raw dal_node @@ Rollup.Dal.RPC.get_commitment_slot commitment
     in
     return @@ RPC.check_string_response ~code:404 response
   in
   let* _commitment = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
   (* commit = _commitment already tested in /POST test. *)
   let* got_slot =
-    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot commit)
+    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot commitment)
   in
   Check.(Rollup.Dal.content_of_slot slot = Rollup.Dal.content_of_slot got_slot)
     Check.string

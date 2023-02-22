@@ -282,7 +282,7 @@ module Test = struct
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let cm = Cryptobox.commit t p in
+        let* cm = Cryptobox.commit t p in
         let number_of_pages = params.slot_size / params.page_size in
         let page_index = Random.int number_of_pages in
         let* pi = Cryptobox.prove_page t p page_index in
@@ -307,7 +307,7 @@ module Test = struct
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let cm = Cryptobox.commit t p in
+        let* cm = Cryptobox.commit t p in
         let enc_shards = Cryptobox.shards_from_polynomial t p in
         let shard_proofs = Cryptobox.prove_shards t p in
         let shard_index = Random.int params.number_of_shards in
@@ -340,10 +340,9 @@ module Test = struct
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let cm = Cryptobox.commit t p in
-        let pi = Cryptobox.prove_commitment t p in
-        let check = Cryptobox.verify_commitment t cm pi in
-        Ok check)
+        let* cm = Cryptobox.commit t p in
+        let* pi = Cryptobox.prove_commitment t p in
+        return (Cryptobox.verify_commitment t cm pi))
         |> function
         | Ok true -> true
         | _ -> false)
@@ -394,8 +393,8 @@ module Test = struct
      let* p1 = Cryptobox.polynomial_from_slot t1 slot1 in
      let* p2 = Cryptobox.polynomial_from_slot t2 slot2 in
 
-     let cm1 = Cryptobox.commit t1 p1 in
-     let cm2 = Cryptobox.commit t2 p2 in
+     let* cm1 = Cryptobox.commit t1 p1 in
+     let* cm2 = Cryptobox.commit t2 p2 in
      Ok (Cryptobox.Commitment.equal cm1 cm2))
     |> function
     | Ok check -> assert check

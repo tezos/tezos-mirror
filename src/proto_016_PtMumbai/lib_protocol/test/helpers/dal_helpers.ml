@@ -105,13 +105,38 @@ struct
     | Ok p -> return p
     | Error `Segment_index_out_of_range ->
         fail [Test_failure "compute_proof_segment: Segment_index_out_of_range"]
+    | Error
+        (`Invalid_degree_strictly_less_than_expected
+          Cryptobox.{given; expected}) ->
+        fail
+          [
+            Test_failure
+              (Format.sprintf
+                 "Got %d, expecting a value strictly less than %d"
+                 given
+                 expected);
+          ]
 
   let mk_slot ?(level = level_one) ?(index = S.Index.zero)
       ?(fill_function = fun _i -> 'x') () =
     let open Result_syntax in
     let slot_data = Bytes.init params.slot_size fill_function in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
-    let commitment = Cryptobox.commit cryptobox polynomial in
+    let* commitment =
+      match Cryptobox.commit cryptobox polynomial with
+      | Ok cm -> return cm
+      | Error
+          (`Invalid_degree_strictly_less_than_expected
+            Cryptobox.{given; expected}) ->
+          fail
+            [
+              Test_failure
+                (Format.sprintf
+                   "Got %d, expecting a value strictly less than %d"
+                   given
+                   expected);
+            ]
+    in
     return
       ( slot_data,
         polynomial,

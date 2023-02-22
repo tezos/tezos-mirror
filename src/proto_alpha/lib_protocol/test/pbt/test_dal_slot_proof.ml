@@ -79,7 +79,7 @@ struct
         (fun _i -> 'x')
     in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
-    let commitment = Cryptobox.commit ARG.cryptobox polynomial in
+    let* commitment = dal_commit ARG.cryptobox polynomial in
     let add_slot level sindex (cell, cache, slots_info) skip_slot =
       let index =
         Option.value_f

@@ -110,7 +110,14 @@ module Make (Interpreter : Interpreter.S) :
           (match e with
           | `Fail s -> "Fail " ^ s
           | `Segment_index_out_of_range -> "Segment_index_out_of_range"
-          | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s)
+          | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
+          | `Invalid_degree_strictly_less_than_expected
+              Cryptobox.{given; expected} ->
+              Format.sprintf
+                "Invalid_degree: got %d, expecting a value strictly less than \
+                 %d"
+                given
+                expected)
 
   (** When the PVM is waiting for a Dal page input, this function attempts to
       retrieve the page's content from the store, the data of its slot. Then it

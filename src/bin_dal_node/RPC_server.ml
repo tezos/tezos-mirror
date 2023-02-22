@@ -76,8 +76,13 @@ module Slots_handlers = struct
                 (* Storage consistency ensures we can always compute the
                    polynomial from the slot. *)
                 assert false
-            | Ok polynomial ->
-                return_some (Cryptobox.prove_commitment cryptobox polynomial)))
+            | Ok polynomial -> (
+                match Cryptobox.prove_commitment cryptobox polynomial with
+                (* [polynomial] was produced with the parameters from
+                   [cryptobox], thus we can always compute the proof from
+                   [polynomial]. *)
+                | Error _ -> assert false
+                | Ok proof -> return_some proof)))
 
   let put_commitment_shards ctxt commitment () with_proof =
     call_handler2 ctxt (fun store {cryptobox; _} ->

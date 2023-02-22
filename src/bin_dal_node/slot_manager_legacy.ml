@@ -34,6 +34,7 @@ type error +=
   | Slot_not_found
   | Illformed_pages
   | Invalid_shards_slot_header_association
+  | Invalid_degree_strictly_less_than_expected of {given : int; expected : int}
 
 let () =
   register_error_kind
@@ -107,7 +108,25 @@ let () =
       Format.fprintf ppf "Association between shards and slot header is invalid")
     Data_encoding.(unit)
     (function Invalid_shards_slot_header_association -> Some () | _ -> None)
-    (fun () -> Invalid_shards_slot_header_association)
+    (fun () -> Invalid_shards_slot_header_association) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_degree"
+    ~title:"Invalid degree"
+    ~description:"The degree of the polynomial is too high"
+    ~pp:(fun ppf (given, expected) ->
+      Format.fprintf
+        ppf
+        "Got %d, expecting a value strictly less than %d"
+        given
+        expected)
+    Data_encoding.(obj2 (req "given" int31) (req "expected" int31))
+    (function
+      | Invalid_degree_strictly_less_than_expected {given; expected} ->
+          Some (given, expected)
+      | _ -> None)
+    (fun (given, expected) ->
+      Invalid_degree_strictly_less_than_expected {given; expected})
 
 type slot = bytes
 
@@ -120,10 +139,18 @@ let polynomial_from_shards cryptobox shards =
       | `Invalid_shard_length msg ) ->
       Error [Merging_failed msg]
 
+let commit cryptobox polynomial =
+  match Cryptobox.commit cryptobox polynomial with
+  | Ok cm -> Ok cm
+  | Error
+      (`Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected})
+    ->
+      Error [Invalid_degree_strictly_less_than_expected {given; expected}]
+
 let save_shards store cryptobox commitment shards =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
-  let rebuilt_commitment = Cryptobox.commit cryptobox polynomial in
+  let*? rebuilt_commitment = commit cryptobox polynomial in
   let*? () =
     if Cryptobox.Commitment.equal commitment rebuilt_commitment then Ok ()
     else Result_syntax.fail [Invalid_shards_slot_header_association]

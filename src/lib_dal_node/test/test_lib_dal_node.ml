@@ -50,7 +50,19 @@ let shards_from_bytes dal b =
     | Ok v -> v
     | Error _ -> Stdlib.failwith "DAL ERROR: polynomial_from_slot failed"
   in
-  let commitment = Cryptobox.commit dal polynomial in
+  let commitment =
+    match Cryptobox.commit dal polynomial with
+    | Ok cm -> cm
+    | Error
+        (`Invalid_degree_strictly_less_than_expected
+          Cryptobox.{given; expected}) ->
+        Stdlib.failwith
+          (Format.sprintf
+             "DAL ERROR: commit failed with: got %d, expecting a value \
+              strictly less than %d"
+             given
+             expected)
+  in
   let shards = Cryptobox.shards_from_polynomial dal polynomial in
   (commitment, shards)
 

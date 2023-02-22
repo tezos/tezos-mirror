@@ -379,7 +379,11 @@ module Dal : sig
 
   module Commitment : sig
     val dummy_commitment :
-      ?on_error:(string -> Cryptobox.commitment * Cryptobox.commitment_proof) ->
+      ?on_error:
+        ([ `Invalid_degree_strictly_less_than_expected of
+           (int, int) Cryptobox.error_container
+         | `Slot_wrong_size of slot ] ->
+        Cryptobox.commitment * Cryptobox.commitment_proof) ->
       Cryptobox.t ->
       string ->
       Cryptobox.commitment * Cryptobox.commitment_proof

@@ -837,20 +837,30 @@ module Dal = struct
   module Commitment = struct
     let dummy_commitment
         ?(on_error =
-          fun str -> Test.fail "Rollup.Dal.dummy_commitment failed: %s" str)
-        cryptobox message =
+          function
+          | `Slot_wrong_size str ->
+              Test.fail "Rollup.Dal.dummy_commitment failed: %s" str
+          | `Invalid_degree_strictly_less_than_expected
+              Cryptobox.{given; expected} ->
+              Test.fail
+                "Rollup.Dal.dummy_commitment failed: got %d, expecting a value \
+                 strictly less than %d"
+                given
+                expected) cryptobox message =
       let parameters = Cryptobox.Verifier.parameters cryptobox in
       let padding_length = parameters.slot_size - String.length message in
       let padded_message =
         if padding_length > 0 then pad padding_length message else message
       in
       let slot = String.to_bytes padded_message in
-      match Cryptobox.polynomial_from_slot cryptobox slot with
-      | Ok r ->
-          let c = Cryptobox.commit cryptobox r in
-          let p = Cryptobox.prove_commitment cryptobox r in
-          (c, p)
-      | Error (`Slot_wrong_size str) -> on_error str
+      let open Tezos_error_monad.Error_monad.Result_syntax in
+      (let* p = Cryptobox.polynomial_from_slot cryptobox slot in
+       let* cm = Cryptobox.commit cryptobox p in
+       let* proof = Cryptobox.prove_commitment cryptobox p in
+       Ok (cm, proof))
+      |> function
+      | Ok res -> res
+      | Error e -> on_error e
 
     let to_string commitment = Cryptobox.Commitment.to_b58check commitment
   end

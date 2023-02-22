@@ -64,6 +64,12 @@ end) : sig
   (** Returns the slot's polynomial from the given slot's data. *)
   val dal_mk_polynomial_from_slot : bytes -> Cryptobox.polynomial tzresult
 
+  (* Commits to the given polynomial. *)
+  val dal_commit :
+    Cryptobox.t ->
+    Cryptobox.polynomial ->
+    (Cryptobox.commitment, error trace) result
+
   (** Using the given slot's polynomial, this function computes the page proof of
       the page whose ID is provided.  *)
   val dal_mk_prove_page :
