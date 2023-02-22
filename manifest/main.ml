@@ -2804,8 +2804,8 @@ let octez_signer_backends =
       ]
 
 let _octez_signer_backends_tests =
-  test
-    "test_encrypted"
+  tezt
+    ["test_encrypted"]
     ~path:"src/lib_signer_backends/test"
     ~opam:"tezos-signer-backends"
     ~with_macos_security_framework:true
@@ -2818,7 +2818,7 @@ let _octez_signer_backends_tests =
         octez_crypto;
         octez_client_base |> open_;
         octez_signer_backends |> open_;
-        alcotest_lwt;
+        alcotezt;
         uri;
       ]
 
