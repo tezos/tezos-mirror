@@ -714,37 +714,103 @@ module Consensus = struct
     let* () = check_branch_equal kind expected operation in
     check_payload_hash_equal kind expected consensus_content
 
-  let get_expected_preendorsements_features consensus_info consensus_content =
-    match consensus_info.all_expected_features.expected_preendorsement with
-    | Expected_preendorsement {expected_features; block_round} ->
-        ok (expected_features, block_round)
-    | No_locked_round_for_block_validation_preendorsement
-    | Fresh_proposal_for_construction_preendorsement ->
-        error Unexpected_preendorsement_in_block
-    | No_expected_branch_for_partial_construction_preendorsement
-        {expected_level} ->
-        error
-          (Consensus_operation_for_future_level
-             {
-               kind = Preendorsement;
-               expected = expected_level;
-               provided = consensus_content.Alpha_context.level;
-             })
-    | No_predecessor_info_cannot_validate_preendorsement ->
-        error Consensus_operation_not_allowed
-
-  let check_round_not_too_high ~block_round ~provided =
-    match block_round with
-    | None -> ok_unit
-    | Some block_round ->
-        error_unless
-          Round.(provided < block_round)
-          (Preendorsement_round_too_high {block_round; provided})
-
   let get_delegate_details slot_map kind consensus_content =
     Result.of_option
       (Slot.Map.find consensus_content.slot slot_map)
       ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
+
+  (** When validating a block (ie. in [Application],
+      [Partial_validation], and [Construction] modes), any
+      preendorsements must point to a round that is strictly before the
+      block's round. *)
+  let check_round_before_block ~block_round provided =
+    error_unless
+      Round.(provided < block_round)
+      (Preendorsement_round_too_high {block_round; provided})
+
+  let check_level kind expected provided =
+    (* We use [if] instead of [error_unless] to avoid computing the
+       error when it is not needed. *)
+    if Raw_level.equal expected provided then Result.return_unit
+    else if Raw_level.(expected > provided) then
+      error (Consensus_operation_for_old_level {kind; expected; provided})
+    else error (Consensus_operation_for_future_level {kind; expected; provided})
+
+  let check_round kind expected provided =
+    (* We use [if] instead of [error_unless] to avoid computing the
+       error when it is not needed. *)
+    if Round.equal expected provided then Result.return_unit
+    else if Round.(expected > provided) then
+      error (Consensus_operation_for_old_round {kind; expected; provided})
+    else error (Consensus_operation_for_future_round {kind; expected; provided})
+
+  let check_branch kind expected provided =
+    error_unless
+      (Block_hash.equal expected provided)
+      (Wrong_consensus_operation_branch {kind; expected; provided})
+
+  let check_payload_hash kind expected provided =
+    error_unless
+      (Block_payload_hash.equal expected provided)
+      (Wrong_payload_hash_for_consensus_operation {kind; expected; provided})
+
+  (** Check the preendorsement features for both [Application] and
+      [Partial_validation] modes. *)
+  let check_preendorsement_content_preexisting_block vi block_info branch
+      {level; round; block_payload_hash; _} =
+    let open Result_syntax in
+    let* locked_round =
+      match block_info.locked_round with
+      | Some locked_round -> return locked_round
+      | None ->
+          (* A preexisting block whose fitness has no locked round
+             should contain no preendorsements. *)
+          error Unexpected_preendorsement_in_block
+    in
+    let kind = Preendorsement in
+    let* () = check_round_before_block ~block_round:block_info.round round in
+    let* () = check_level kind vi.current_level.level level in
+    let* () = check_round kind locked_round round in
+    let* () = check_branch kind block_info.predecessor_hash branch in
+    let expected_payload_hash = block_info.header_contents.payload_hash in
+    check_payload_hash kind expected_payload_hash block_payload_hash
+
+  let check_preendorsement_content_construction vi cons_info branch
+      {level; round; block_payload_hash; _} =
+    let open Result_syntax in
+    let expected_payload_hash = cons_info.header_contents.payload_hash in
+    let* () =
+      (* When the proposal is fresh, a fake [payload_hash] of [zero]
+         has been provided. In this case, the block should not contain
+         any preendorsements. *)
+      error_when
+        Block_payload_hash.(expected_payload_hash = zero)
+        Unexpected_preendorsement_in_block
+    in
+    let kind = Preendorsement in
+    let* () = check_round_before_block ~block_round:cons_info.round round in
+    let* () = check_level kind vi.current_level.level level in
+    (* We cannot check the exact round here in construction mode, because
+       there is no preexisting fitness to provide the locked_round. We do
+       however check that all preendorments have the same round in
+       [check_construction_preendorsement_round_consistency] further below. *)
+    let* () = check_branch kind cons_info.predecessor_hash branch in
+    check_payload_hash kind expected_payload_hash block_payload_hash
+
+  let check_preendorsement_content_mempool vi (consensus_info : consensus_info)
+      branch {level; round; block_payload_hash; _} =
+    let open Result_syntax in
+    let kind = Preendorsement in
+    match Consensus.endorsement_branch vi.ctxt with
+    | None ->
+        let expected = consensus_info.predecessor_level in
+        let provided = level in
+        error (Consensus_operation_for_future_level {kind; expected; provided})
+    | Some (expected_branch, expected_payload_hash) ->
+        let* () = check_level kind consensus_info.predecessor_level level in
+        let* () = check_round kind consensus_info.predecessor_round round in
+        let* () = check_branch kind expected_branch branch in
+        check_payload_hash kind expected_payload_hash block_payload_hash
 
   let check_preendorsement vi ~check_signature
       (operation : Kind.preendorsement operation) =
@@ -757,24 +823,31 @@ module Consensus = struct
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
     in
-    let kind = Preendorsement in
-    let*? expected_features, block_round =
-      get_expected_preendorsements_features consensus_info consensus_content
-    in
     let*? () =
-      check_round_not_too_high ~block_round ~provided:consensus_content.round
-    in
-    let*? () =
-      check_consensus_features
-        kind
-        expected_features
-        consensus_content
-        operation
+      match vi.mode with
+      | Application block_info | Partial_validation block_info ->
+          check_preendorsement_content_preexisting_block
+            vi
+            block_info
+            operation.shell.branch
+            consensus_content
+      | Construction construction_info ->
+          check_preendorsement_content_construction
+            vi
+            construction_info
+            operation.shell.branch
+            consensus_content
+      | Mempool _ ->
+          check_preendorsement_content_mempool
+            vi
+            consensus_info
+            operation.shell.branch
+            consensus_content
     in
     let*? consensus_key, voting_power =
       get_delegate_details
         consensus_info.preendorsement_slot_map
-        kind
+        Preendorsement
         consensus_content
     in
     let* () =
@@ -833,7 +906,8 @@ module Consensus = struct
           | None -> Some (consensus_content.round, voting_power)
           | Some (_stored_round, evidences) ->
               (* [_stored_round] is always equal to [consensus_content.round].
-                 Indeed, this is ensured by {!check_round_equal} in
+                 Indeed, this is ensured by
+                 {!check_preendorsement_content_preexisting_block} in
                  application and partial validation modes, and by
                  {!check_construction_preendorsement_round_consistency} in
                  construction mode. *)
@@ -1154,43 +1228,30 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with dal_attestation_seen}}
 
-  let check_construction_preendorsement_round_consistency vi block_state kind
+  (** In Construction mode, check that the preendorsement has the same
+      round as any previously validated preendorsements.
+
+      This check is not needed in other modes because
+      {!check_preendorsement} already checks that all preendorsements
+      have the same expected round (the locked_round in Application and
+      Partial_validation modes when there is one (otherwise all
+      preendorsements are rejected so the point is moot), or the
+      predecessor_round in Mempool mode). *)
+  let check_construction_preendorsement_round_consistency vi block_state
       (consensus_content : consensus_content) =
     let open Result_syntax in
-    let* consensus_info =
-      Option.value_e
-        ~error:(trace_of_error Consensus_operation_not_allowed)
-        vi.consensus_info
-    in
-    let* expected_features, _block_round =
-      get_expected_preendorsements_features consensus_info consensus_content
-    in
-    match expected_features.round with
-    | Some _ ->
-        (* When [expected_features.round] has a value (ie. in
-           application and partial validation modes when the block
-           fitness has a [locked_round], and always in mempool mode),
-           [check_preendorsement] already checks that all
-           preendorsements have this expected round, so checking
-           anything here would be redundant. Also note that when the
-           fitness contains no [locked_round], this code is
-           unreachable because [get_expected_preendorsements_features]
-           returns an error. *)
-        return_unit
-    | None -> (
-        (* For preendorsements in block construction mode,
-           [expected_features.round] has been set to [None] because we
-           could not know yet whether there is a locked round. *)
+    match vi.mode with
+    | Construction _ -> (
         match block_state.locked_round_evidence with
         | None ->
-            (* This is the first validated preendorsement in
-               construction mode: there is nothing to check. *)
+            (* This is the first validated preendorsement:
+               there is nothing to check. *)
             return_unit
         | Some (expected, _power) ->
-            (* Other preendorsements have already been validated: we
-               check that the current operation has the same round as
-               them. *)
-            check_round kind expected consensus_content)
+            (* Other preendorsements have already been validated: we check
+               that the current operation has the same round as them. *)
+            check_round Preendorsement expected consensus_content.round)
+    | Application _ | Partial_validation _ | Mempool _ -> return_unit
 
   let validate_preendorsement ~check_signature info operation_state block_state
       oph (operation : Kind.preendorsement operation) =
@@ -1203,7 +1264,6 @@ module Consensus = struct
       check_construction_preendorsement_round_consistency
         info
         block_state
-        Preendorsement
         consensus_content
     in
     let*? () =
