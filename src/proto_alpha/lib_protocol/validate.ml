@@ -1461,17 +1461,32 @@ module Anonymous = struct
     | Single (Endorsement e1), Single (Endorsement e2) ->
         let op1_hash = Operation.hash op1 in
         let op2_hash = Operation.hash op2 in
+        let same_levels = Raw_level.(e1.level = e2.level) in
+        let same_rounds = Round.(e1.round = e2.round) in
+        let same_payload =
+          Block_payload_hash.(e1.block_payload_hash = e2.block_payload_hash)
+        in
+        let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
+        let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
+        let is_denunciation_consistent =
+          same_levels && same_rounds
+          (* Either the payloads or the branches must differ for the
+             double (pre)endorsement to be punishable. Indeed,
+             different payloads would endanger the consensus process,
+             while different branches could be used to spam mempools
+             with a lot of valid operations. On the other hand, if the
+             operations have identical levels, rounds, payloads, and
+             branches (and of course delegates), then only their
+             signatures are different, which is not considered the
+             delegate's fault and therefore is not punished. *)
+          && ((not same_payload) || not same_branches)
+          && (* we require an order on hashes to avoid the existence of
+                   equivalent evidences *)
+          ordered_hashes
+        in
         let*? () =
           error_unless
-            (Raw_level.(e1.level = e2.level)
-            && Round.(e1.round = e2.round)
-            && (not
-                  (Block_payload_hash.equal
-                     e1.block_payload_hash
-                     e2.block_payload_hash))
-            && (* we require an order on hashes to avoid the existence of
-                  equivalent evidences *)
-            Operation_hash.(op1_hash < op2_hash))
+            is_denunciation_consistent
             (Invalid_denunciation denunciation_kind)
         in
         (* Disambiguate: levels are equal *)
