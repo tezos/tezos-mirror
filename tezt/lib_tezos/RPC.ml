@@ -239,6 +239,9 @@ let get_network_version = make GET ["network"; "version"] Fun.id
 
 let get_network_versions = make GET ["network"; "versions"] Fun.id
 
+let put_network_points point =
+  make PUT ["network"; "points"; point] ~data:(Data (`O [])) Fun.id
+
 let get_version = make GET ["version"] Fun.id
 
 let post_injection_operation ?(async = false) data =

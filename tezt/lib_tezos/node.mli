@@ -191,6 +191,10 @@ val point_and_id : ?from:t -> t -> string Lwt.t
     In other words it is the address where [from] can contact [node]. *)
 val point : ?from:t -> t -> string * int
 
+(** Same as [point] but returns a string representation of the point
+    ["<ADDRESS>:<PORT>"]. *)
+val point_str : ?from:t -> t -> string
+
 (** See [Daemon.Make.name] *)
 val name : t -> string
 

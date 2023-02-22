@@ -228,6 +228,9 @@ val get_network_version : JSON.t t
 (** RPC: [GET /network/versions] *)
 val get_network_versions : JSON.t t
 
+(** RPC: [PUT /network/points/<point>] *)
+val put_network_points : string -> JSON.t t
+
 (** RPC: [GET /versions] *)
 val get_version : JSON.t t
 

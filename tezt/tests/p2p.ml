@@ -176,6 +176,9 @@ let get_nb_connections node =
 
 (* [wait_connections ~client n] waits until the node related to [client] has at
    least [n] active connections. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4919
+   Use Node.wait_for instead of spaming the node with RPCs
+*)
 let wait_connections node nb_conns_target =
   wait_pred
     ~pred:(fun () ->
@@ -1042,6 +1045,134 @@ module P2p_stat = struct
     unit
 end
 
+module Peer_discovery = struct
+  let connect node1 node2 =
+    let point = Node.point_str node2 in
+    RPC.(call node1 (put_network_points point))
+
+  let create_node ?name ~maintenance_idle_time () =
+    let patch_maintenance_idle_time =
+      JSON.update
+        "p2p"
+        (JSON.update
+           "limits"
+           (JSON.put
+              ( "maintenance-idle-time",
+                JSON.parse
+                  ~origin:__LOC__
+                  (Float.to_string maintenance_idle_time) )))
+    in
+    let node = Node.create ?name [] in
+    let* () = Node.identity_generate node in
+    let* () = Node.config_init node [] in
+    Node.Config_file.update node patch_maintenance_idle_time ;
+    return node
+
+  let run_node node =
+    let* () = Node.run ~event_sections_levels:[("p2p.conn", `Debug)] node [] in
+    Node.wait_for_ready node
+
+  (* Launches 3 nodes (named a, b, center), connects node a and node b to node center.
+
+     Waits node a be advertised of node b's point or node b be advertised of
+     node a's point.
+  *)
+  let peer_discovery_test_raw ~maintenance_idle_time () =
+    let create_node = create_node ~maintenance_idle_time in
+    let advertise_received node point =
+      let filter_advertise point json =
+        let points = JSON.(json |-> "points" |> as_list) in
+        if List.exists (fun x -> JSON.as_string x = point) points then Some ()
+        else None
+      in
+      let point = Node.point_str point in
+      Node.wait_for node "advertise_received.v0" (filter_advertise point)
+    in
+    let* node1 = create_node ~name:"node_a" () in
+    let* node2 = create_node ~name:"node_b" () in
+    let* center = create_node ~name:"node_center" () in
+    let advertise_received1 =
+      let* _ = advertise_received node1 node2 in
+      Log.info "adv a b" ;
+      unit
+    in
+    let advertise_received2 =
+      let* _ = advertise_received node2 node1 in
+      Log.info "adv b a" ;
+      unit
+    in
+    let* () = run_node center in
+    let* () = run_node node1 in
+    let* () = run_node node2 in
+    let* _ = connect center node1 in
+    let* _ = connect center node2 in
+    let* () = advertise_received1 and* () = advertise_received2 in
+    unit
+
+  (* Tests the peer discovery mechanism.
+     Same as [peer_discovery_test_raw]. *)
+  let peer_discovery_test () =
+    Test.register
+      ~__FILE__
+      ~title:"p2p-peer-discovery"
+      ~tags:["p2p"; "node"; "peer_discovery"]
+    @@ fun () ->
+    let maintenance_idle_time = 5. in
+    peer_discovery_test_raw ~maintenance_idle_time ()
+
+  (* Launches 3 nodes (named 1, 2, disabled_center), connects node 1 and node 2
+     to node disabled_center, then checks there is no advertise or bootstrap
+     message received by node 1 or 2.
+
+     To determine when the test succeed, waits twice the maintenance idle time
+     + [peer_discover_test_raw] execution time. *)
+  let peer_discovery_disable () =
+    Test.register
+      ~__FILE__
+      ~title:"p2p-peer-discovery-disable"
+      ~tags:["p2p"; "node"; "peer_discovery"]
+    @@ fun () ->
+    let maintenance_idle_time = 5. in
+    let create_node = create_node ~maintenance_idle_time in
+    let fail_on_bootstrap_received node =
+      Node.wait_for node "bootstrap_received.v0" (fun _ ->
+          Test.fail
+            "A bootstrap message has been received by a node that should be \
+             connected only to a node with disabled peer discovery")
+    in
+    let fail_on_advertise_received node =
+      Node.wait_for node "advertise_received.v0" (fun _ ->
+          Test.fail "An advertise message has been received")
+    in
+    let* node1 = create_node ~name:"node1" () in
+    let* node2 = create_node ~name:"node2" () in
+    let* center = create_node ~name:"disabled_center" () in
+    let patch_center_config =
+      JSON.update
+        "p2p"
+        (JSON.put
+           ( "disable_peer_discovery",
+             JSON.parse ~origin:__LOC__ (Bool.to_string true) ))
+    in
+    Node.Config_file.update center patch_center_config ;
+    let _ = fail_on_bootstrap_received node1 in
+    let _ = fail_on_bootstrap_received node2 in
+    let _ = fail_on_advertise_received node1 in
+    let _ = fail_on_advertise_received node2 in
+    let* () = run_node center in
+    let* () = run_node node1 in
+    let* () = run_node node2 in
+    let* _ = connect center node1 in
+    let* _ = connect center node2 in
+    (* Waits twice the maintenance idle time + [peer_discover_test_raw]
+       execution time *)
+    Lwt_unix.sleep (2. *. maintenance_idle_time)
+
+  let tests () =
+    peer_discovery_test () ;
+    peer_discovery_disable ()
+end
+
 let register_protocol_independent () =
   Maintenance.tests () ;
   ACL.tests () ;
@@ -1050,7 +1181,8 @@ let register_protocol_independent () =
   Connect_handler.tests () ;
   trusted_ring () ;
   expected_peer_id () ;
-  P2p_stat.register ()
+  P2p_stat.register () ;
+  Peer_discovery.tests ()
 
 let register ~(protocols : Protocol.t list) =
   check_peer_option protocols ;
