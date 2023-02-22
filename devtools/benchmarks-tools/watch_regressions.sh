@@ -32,13 +32,15 @@
 # the script does nothing. So it is safe to run this script quite often in a
 # Cron job.
 
-# If the bucket contains new results, they are compared to two reference points:
-# the first run (declared in the FIRST_DIR environment variable; defaulting to
-# the oldest run if the variable is empty or not set) and the previous run (as
-# read in the last_known_dir file).
+# If the bucket contains new results, then the script compares each CSV in the
+# directory of the last run with CSVs of the same name in all other directories.
+# Old directories can be filtered out by setting the FIRST_DIR environment
+# variable, which defaults to the oldest directory.
 
-# The script compares each CSV in the directory of the last run with CSVs of the
-# same name in the two reference directories.
+# The results of the last run are also compared to two reference points:
+# * a reference run (declared in the REF_DIR environment variable; defaulting to
+#   FIRST_DIR if the variable is empty or not set);
+# * and the previous run (as read in the last_known_dir file).
 
 # The comparison is done using the gas_parameter_diff OCaml script from the
 # Tezos codebase.
@@ -47,8 +49,8 @@
 # channel.
 
 # The results of all comparisons are 3 CSV tables:
-# - all.csv comparing all the runs
-# - first.csv comparing the first and last runs
+# - all.csv comparing all the runs since FIRST_DIR (included)
+# - reference.csv comparing the reference and last runs
 # - prev.csv comparing the previous and last runs.
 # These tables are also sent to the Slack channel
 
@@ -127,7 +129,7 @@ ALERT_FILE="$OCTEZ_DIR/alerts"
 
 rm -f "$ALERT_FILE"
 
-# The first directory serves as reference point.
+# All the directories before FIRST_DIR will be ignored.
 export FIRST_DIR
 if [ "$FIRST_DIR" = "" ]
 then
@@ -137,6 +139,29 @@ then
     # basename to remove the path.
     # xargs because basename expects one input, but head returns a list.
     FIRST_DIR="$(find "$INPUT_CSV_DIR/" -maxdepth 1 -mindepth 1 | sort | head -n 1 | xargs basename)"
+fi
+
+# The directories after FIRST_DIR.
+DIRS=""
+for d in "$INPUT_CSV_DIR"/*
+do
+    if [[ "$d" > "$FIRST_DIR" || "$d" == "$FIRST_DIR" ]]
+    then
+        if [ -z "$DIRS" ]
+        then
+            DIRS="$d"
+        else
+            DIRS="$DIRS $d"
+        fi
+    fi
+done
+
+# REF_DIR is some reference directory that we want the current run to be
+# compared to.
+export REF_DIR
+if [ "$REF_DIR" = "" ]
+then
+    REF_DIR="$FIRST_DIR"
 fi
 
 DUNE="/data/redbull/tezos/_opam/bin/dune"
@@ -157,21 +182,23 @@ for f in "$INPUT_CSV_DIR/$LAST_DIR"/*
 do
     b="$(basename "$f")"
 
-    # Comparing all runs
-    $DUNE exec --no-build gas_parameter_diff -- "$INPUT_CSV_DIR"/*/"$b" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+    files=$(for d in $DIRS; do echo "$INPUT_CSV_DIR/$d/$b"; done)
 
-    # Comparing with the first and previous runs.
-    for reference in first previous
+    # Comparing all runs from FIRST_DIR.
+    $DUNE exec --no-build gas_parameter_diff -- "$files" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+
+    # Comparing with the reference and previous runs.
+    for current in reference previous
     do
-        REFERENCE_DIR=""
-        if [ "$reference" = "first" ]
+        CURRENT_DIR=""
+        if [ "$current" = "reference" ]
         then
-            REFERENCE_DIR="$FIRST_DIR"
+            CURRENT_DIR="$REF_DIR"
         else
-            REFERENCE_DIR="$PREV_DIR"
+            CURRENT_DIR="$PREV_DIR"
         fi
 
-        $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$REFERENCE_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$reference"_"$b" 2> tmp
+        $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$CURRENT_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$current"_"$b" 2> tmp
         # The parameters with "score" in their name indicate how well the models
         # fits the benchmarks. We care about their values but not much about
         # their variations so we ignore them when looking for regressions. They
@@ -182,7 +209,7 @@ do
             {
                 echo
                 echo "--------------------------------"
-                echo "Warning while comparing $b between $LAST_DIR and the $reference version $REFERENCE_DIR"
+                echo "Warning while comparing $b between $LAST_DIR and the $current version $CURRENT_DIR"
                 cat tmp2
             } >> "$ALERT_FILE"
         fi
@@ -191,7 +218,7 @@ do
 done
 
 cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
-cat "$OUTPUT_CSV_DIR"/first_*.csv > "$OUTPUT_CSV_DIR"/first.csv
+cat "$OUTPUT_CSV_DIR"/reference_*.csv > "$OUTPUT_CSV_DIR"/reference.csv
 cat "$OUTPUT_CSV_DIR"/previous_*.csv > "$OUTPUT_CSV_DIR"/previous.csv
 
 if [ -s "$ALERT_FILE" ]
@@ -202,5 +229,5 @@ else
 fi
 
 slack_send_file "$OUTPUT_CSV_DIR/all.csv" "CSV comparing all runs"
-slack_send_file "$OUTPUT_CSV_DIR/first.csv" "CSV comparing first and last runs"
+slack_send_file "$OUTPUT_CSV_DIR/reference.csv" "CSV comparing reference and last runs"
 slack_send_file "$OUTPUT_CSV_DIR/previous.csv" "CSV comparing previous and last runs"
