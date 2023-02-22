@@ -1039,6 +1039,7 @@ module Target = struct
     license : string option;
     extra_authors : string list;
     ctypes : Ctypes.t option;
+    with_macos_security_framework : bool;
   }
 
   and preprocessor = PPS of t * string list | Staged_PPS of t list
@@ -1221,6 +1222,7 @@ module Target = struct
     ?cram:bool ->
     ?license:string ->
     ?extra_authors:string list ->
+    ?with_macos_security_framework:bool ->
     path:string ->
     'a ->
     t option
@@ -1270,7 +1272,7 @@ module Target = struct
       ?(release_status = Auto_opam) ?static ?synopsis ?description
       ?(time_measurement_ppx = false) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ~path names =
+      ?(with_macos_security_framework = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1586,6 +1588,7 @@ module Target = struct
         license;
         extra_authors;
         ctypes;
+        with_macos_security_framework;
       }
 
   let public_lib ?internal_name =
@@ -1780,12 +1783,14 @@ type tezt_target = {
   js_compatible : bool option;
   modes : Dune.mode list option;
   synopsis : string option;
+  with_macos_security_framework : bool;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
-    ?(js_deps = []) ?(dep_globs = []) ?synopsis modules =
+    ?(js_deps = []) ?(dep_globs = []) ?synopsis
+    ?(with_macos_security_framework = false) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1800,6 +1805,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       js_compatible;
       modes;
       synopsis;
+      with_macos_security_framework;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
@@ -1817,6 +1823,7 @@ let register_tezt_targets ~make_tezt_exe =
         js_compatible;
         modes;
         synopsis;
+        with_macos_security_framework;
       } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
@@ -1840,6 +1847,7 @@ let register_tezt_targets ~make_tezt_exe =
           exe_name
           ~alias:"runtezt"
           ~path
+          ~with_macos_security_framework
           ~opam
           ?synopsis
           ?js_compatible

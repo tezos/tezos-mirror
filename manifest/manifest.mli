@@ -733,7 +733,11 @@ type release_status = Unreleased | Experimental | Released | Auto_opam
 
     - [extra_authors]: list of authors in addition to the Tezos Dev Team.
 
-    - [path]: the path to the directory of the [dune] file that will define this target. *)
+    - [path]: the path to the directory of the [dune] file that will define this target.
+
+    - [with_macos_security_framework]: Default value is [false]. When set to
+      [true], the [-ccopt "-framework Security"]flag is added at link time for
+      macOS system. *)
 type 'a maker =
   ?all_modules_except:string list ->
   ?bisect_ppx:bool ->
@@ -776,6 +780,7 @@ type 'a maker =
   ?cram:bool ->
   ?license:string ->
   ?extra_authors:string list ->
+  ?with_macos_security_framework:bool ->
   path:string ->
   'a ->
   target
@@ -910,7 +915,11 @@ val tests :
 
     Additionally, the library [PACKAGE_tezt_lib] is also linked in [tezt/tests/main.exe]
     so that this executable can be used to run all tests with auto-balancing
-    and other Tezt features. *)
+    and other Tezt features.
+
+    The flag [with_macos_security_framework] has a default [false]. When set to
+    [true], the [-ccopt "-framework Security"]flag is added at link time for
+    macOS system. *)
 val tezt :
   opam:string ->
   path:string ->
@@ -921,6 +930,7 @@ val tezt :
   ?js_deps:target list ->
   ?dep_globs:string list ->
   ?synopsis:string ->
+  ?with_macos_security_framework:bool ->
   string list ->
   unit
 
