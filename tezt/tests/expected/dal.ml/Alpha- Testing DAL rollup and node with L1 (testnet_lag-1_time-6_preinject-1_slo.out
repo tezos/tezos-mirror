@@ -72,7 +72,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.00035
-    Expected counter: 2
+    Expected counter: 4
     Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
@@ -84,4 +84,10 @@ This sequence of operations was run:
 
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
+"\000\000\000\011"
+
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
+
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
+"\000\000\000\011"
 "\000\000\000\011"

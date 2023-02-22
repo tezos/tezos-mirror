@@ -2117,7 +2117,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
   in
   let publish_and_store_slot_promises = ref [] in
   (* This is the account used to sign injected slot headers on L1. *)
-  let source = Constant.bootstrap3 in
+  let source = Constant.bootstrap2 in
   let* counter = Operation.get_next_counter ~source l1_client in
   let counter = ref counter in
   let task current_level =
@@ -2163,6 +2163,63 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
   Log.info "[e2e.slot_producer] will terminate" ;
   return !sum
 
+(** Given a list of SORU node operators, this function allows to create and run new
+    DAL and SORU nodes, where:
+    - Each fresh rollup node is configured with a fresh DAL node and a key
+    operator;
+    - Each fresh DAL node is either connected to the original DAL node if the
+    associated operator has an even index in the list of node operators, or to
+    the previously generated DAL node otherwise.
+
+    Each element of the [extra_nodes_operators] list can actually be [None], in
+    which case the corresponding rollup node is launched in observer mode, or
+    [Some account], in which case the [account] is used as the default
+    operator of the SORU node. *)
+let create_additional_nodes ~protocol ~extra_node_operators rollup_address
+    l1_node l1_client dal_node =
+  (* The mutable variable [connect_dal_node_to] below is used to diversify a bit
+     the topology of the DAL nodes network as follows:
+
+     [node with odd idx] -- [node with even idx] -- init_node
+
+     So, we initialize its value to [dal_node]. *)
+  let connect_dal_node_to = ref dal_node in
+  Lwt_list.mapi_s
+    (fun index key_opt ->
+      (* We create a new DAL node and initialize it. *)
+      let fresh_dal_node = Dal_node.create ~node:l1_node ~client:l1_client () in
+      let* _config_file = Dal_node.init_config fresh_dal_node in
+
+      (* We connect the fresh DAL node to another node, start it and update the
+         value of [connect_dal_node_to] to generate the topology above: *)
+      update_neighbors fresh_dal_node [!connect_dal_node_to] ;
+      let* () = Dal_node.run fresh_dal_node in
+      connect_dal_node_to :=
+        if index mod 2 = 0 then fresh_dal_node else dal_node ;
+
+      (* We create a new SORU node, connected to the new DAL node, and
+         initialize it. *)
+      let rollup_mode =
+        Sc_rollup_node.(if Option.is_none key_opt then Observer else Operator)
+      in
+      let sc_rollup_node =
+        Sc_rollup_node.create
+          ~protocol
+          ~dal_node:fresh_dal_node
+          rollup_mode
+          l1_node
+          ~base_dir:(Client.base_dir l1_client)
+          ?default_operator:key_opt
+      in
+      let* _config_file =
+        Sc_rollup_node.config_init sc_rollup_node rollup_address
+      in
+      (* We start the rollup node and create a client for it. *)
+      let* () = Sc_rollup_node.run sc_rollup_node [] in
+      let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+      return (fresh_dal_node, sc_rollup_node, sc_rollup_client))
+    extra_node_operators
+
 (* This function allows to run an end-to-end test involving L1, DAL and rollup
    nodes. For that it:
 
@@ -2182,15 +2239,25 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
    - We finally check that there is a "value" variable in the PVM whose payload
    is the sum of levels as returned by [slot_producer].
 *)
-let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1) protocol
-    parameters dal_node sc_rollup_node _sc_rollup_address l1_node l1_client
-    _pvm_name ~number_of_dal_slots =
+let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
+    ?(extra_node_operators = []) protocol parameters dal_node sc_rollup_node
+    sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
+  (* Generate new DAL and rollup nodes if requested. *)
+  let* additional_nodes =
+    create_additional_nodes
+      ~protocol
+      ~extra_node_operators
+      sc_rollup_address
+      l1_node
+      l1_client
+      dal_node
+  in
   Log.info
     "[e2e.configure_pvm] configure PVM with DAL parameters via inbox message@." ;
   let Rollup.Dal.Parameters.{attestation_lag; cryptobox; _} = parameters in
@@ -2259,9 +2326,20 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1) protocol
     unit
   in
   Log.info
-    "[e2e.final_check] check that the sum stored in the PVM is %d@."
+    "[e2e.final_check_1] check that the sum stored in the PVM is %d@."
     expected_value ;
-  check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+  let* () =
+    check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+  in
+
+  (* Check the statuses of the additional nodes/PVMs, if any. *)
+  Log.info
+    "[e2e.final_check_2] Check %d extra nodes@."
+    (List.length additional_nodes) ;
+  Lwt_list.iter_p
+    (fun (_dal_node, _rollup_node, rollup_client) ->
+      check_saved_value_in_pvm ~name:"value" ~expected_value rollup_client)
+    additional_nodes
 
 (** Register end-to-end DAL Tests. *)
 
@@ -2272,6 +2350,7 @@ type e2e_test = {
   block_delay : int;
   number_of_dal_slots : int;
   beforehand_slot_injection : int;
+  num_extra_nodes : int;
 }
 
 let e2e_tests =
@@ -2286,6 +2365,7 @@ let e2e_tests =
       block_delay = 6;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
+      num_extra_nodes = 2;
     }
   in
   let test2 =
@@ -2295,6 +2375,7 @@ let e2e_tests =
       block_delay = 2;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
+      num_extra_nodes = 2;
     }
   in
   let mainnet1 =
@@ -2304,6 +2385,7 @@ let e2e_tests =
       block_delay = 15;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
+      num_extra_nodes = 1;
     }
   in
   let mainnet2 =
@@ -2313,6 +2395,7 @@ let e2e_tests =
       block_delay = 5;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 10;
+      num_extra_nodes = 0;
     }
   in
   [test1; test2; mainnet1; mainnet2]
@@ -2338,6 +2421,7 @@ let register_end_to_end_tests ~protocols =
         block_delay;
         number_of_dal_slots;
         beforehand_slot_injection;
+        num_extra_nodes;
       } =
         test
       in
@@ -2363,6 +2447,12 @@ let register_end_to_end_tests ~protocols =
         let expected_bake_for_occurrences = 2 in
         Ptime.Span.of_int_s (expected_bake_for_occurrences * block_delay)
       in
+      (* Preparing the list of node operators for extra nodes. *)
+      let extra_node_operators =
+        (* So launch the extra SORU nodes in observer mode. So we don't actually
+           need to provide public key hashes. *)
+        List.init num_extra_nodes (fun _index -> None)
+      in
       scenario_with_all_nodes
         ~custom_constants:constants
         ~attestation_lag
@@ -2370,7 +2460,10 @@ let register_end_to_end_tests ~protocols =
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
         title
-        (e2e_test_script ~number_of_dal_slots ~beforehand_slot_injection)
+        (e2e_test_script
+           ~number_of_dal_slots
+           ~beforehand_slot_injection
+           ~extra_node_operators)
         protocols)
     e2e_tests
 
