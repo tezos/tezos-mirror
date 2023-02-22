@@ -94,13 +94,18 @@ type all_expected_consensus_features = {
 }
 
 type consensus_info = {
+  predecessor_level : Raw_level.t;
+  predecessor_round : Round.t;
   all_expected_features : all_expected_consensus_features;
   preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
   endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
 }
 
-let init_consensus_info ctxt all_expected_features =
+let init_consensus_info ctxt ~predecessor_level ~predecessor_round
+    all_expected_features =
   {
+    predecessor_level;
+    predecessor_round;
     all_expected_features;
     preendorsement_slot_map = Consensus.allowed_preendorsements ctxt;
     endorsement_slot_map = Consensus.allowed_endorsements ctxt;
@@ -125,6 +130,10 @@ module Consensus_content_map = Map.Make (struct
 end)
 
 type consensus_state = {
+  (* The [predecessor_level] is needed here, despite being also in
+     {!consensus_info}, because it allows to identify grandparent
+     endorsements in [check_endorsement_conflict] where we only have
+     access to the [consensus_state]. *)
   predecessor_level : Raw_level.t;
   preendorsements_seen : Operation_hash.t Slot.Map.t;
   endorsements_seen : Operation_hash.t Slot.Map.t;
@@ -378,48 +387,60 @@ let manager_state_encoding =
 
 let empty_manager_state = {managers_seen = Signature.Public_key_hash.Map.empty}
 
-(** Mode-dependent information needed in final checks. *)
-type block_finalization_info = {
-  fitness : Fitness.t;
+(** Information needed to validate consensus operations and/or to
+    finalize the block in both modes that handle a preexisting block:
+    [Application] and [Partial_validation]. *)
+type block_info = {
+  round : Round.t;
+  locked_round : Round.t option;
+  predecessor_hash : Block_hash.t;
   block_producer : Consensus_key.pk;
   payload_producer : Consensus_key.pk;
+  header_contents : Block_header.contents;
+}
+
+(** Information needed to validate consensus operations and/or to
+    finalize the block in [Construction] mode. *)
+type construction_info = {
+  round : Round.t;
   predecessor_hash : Block_hash.t;
-  block_data_contents : Block_header.contents;
+  block_producer : Consensus_key.pk;
+  payload_producer : Consensus_key.pk;
+  header_contents : Block_header.contents;
+}
+
+(** Information needed to validate grandparent endorsements in
+    [Mempool] mode. *)
+type grandparent = {
+  round : Round.t;
+  hash : Block_hash.t;
+  payload_hash : Block_payload_hash.t;
 }
 
 (** Circumstances in which operations are validated, and corresponding
-    information.
-
-    - [Application] is used for the validation of a preexisting block,
-      often in preparation for its future application.
-
-    - [Partial_validation] is used to quickly but partially validate a
-      preexisting block, e.g. to quickly decide whether an alternate
-      branch seems viable. In this mode, the initial {!type:context} may
-      come from an ancestor block instead of the predecessor block. Only
-      consensus operations are validated in this mode.
-
-    - [Construction] is used for the construction of a new block.
-
-    - [Mempool] is used by the {!module:Mempool} and by the
-      [Partial_construction] mode in {!module:Main}, which may itself be
-      used by RPCs or by another mempool implementation. (The [Mempool]
-      mode is also used by the plugin.)
+    specific information.
 
     If you add a new mode, please make sure that it has a way to bound
-    the size of the map {!recfield:manager_state.managers_seen}. *)
+    the size of the maps in the {!operation_conflict_state}. *)
 type mode =
-  | Application of block_finalization_info
-  | Partial_validation of block_finalization_info
-  | Construction of {
-      predecessor_round : Round.t;
-      predecessor_hash : Block_hash.t;
-      round : Round.t;
-      block_data_contents : Block_header.contents;
-      block_producer : Consensus_key.pk;
-      payload_producer : Consensus_key.pk;
-    }
-  | Mempool
+  | Application of block_info
+      (** [Application] is used for the validation of a preexisting block,
+          often in preparation for its future application. *)
+  | Partial_validation of block_info
+      (** [Partial_validation] is used to quickly but partially validate a
+          preexisting block, e.g. to quickly decide whether an alternate
+          branch seems viable. In this mode, the initial {!type:context} may
+          come from an ancestor block instead of the predecessor block. Only
+          consensus operations are validated in this mode. *)
+  | Construction of construction_info
+      (** Used for the construction of a new block. *)
+  | Mempool of grandparent option
+      (** Used by the mempool ({!module:Mempool_validation}) and by the
+          [Partial_construction] mode in {!module:Main}, which may itself be
+          used by RPCs or by another mempool implementation.
+
+          If the option is [None], it means that there cannot be any
+          grandparent endorsements. *)
 
 (** {2 Definition and initialization of [info] and [state]} *)
 
@@ -470,14 +491,19 @@ type validation_state = {
 
 let ok_unit = Result_syntax.return_unit
 
-let init_info ctxt mode chain_id all_expected_consensus_characteristics =
+let init_info ctxt mode chain_id ~predecessor_level ~predecessor_round
+    all_expected_consensus_characteristics =
   {
     ctxt;
     mode;
     chain_id;
     current_level = Level.current ctxt;
     consensus_info =
-      init_consensus_info ctxt all_expected_consensus_characteristics;
+      init_consensus_info
+        ctxt
+        ~predecessor_level
+        ~predecessor_round
+        all_expected_consensus_characteristics;
     manager_info = init_manager_info ctxt;
   }
 
@@ -655,7 +681,7 @@ module Consensus = struct
        Consensus_operation_for_old_round {kind; expected; provided}
       else Consensus_operation_for_future_round {kind; expected; provided})
 
-  let check_round_equal kind expected_features
+  let check_round_equal kind (expected_features : expected_features)
       (consensus_content : consensus_content) =
     match expected_features.round with
     | Some expected -> check_round kind expected consensus_content
@@ -668,7 +694,7 @@ module Consensus = struct
       (Block_hash.equal expected provided)
       (Wrong_consensus_operation_branch {kind; expected; provided})
 
-  let check_payload_hash_equal kind expected_features
+  let check_payload_hash_equal kind (expected_features : expected_features)
       (consensus_content : consensus_content) =
     let expected = expected_features.payload_hash in
     let provided = consensus_content.block_payload_hash in
@@ -792,7 +818,7 @@ module Consensus = struct
       (consensus_content : consensus_content) voting_power =
     let locked_round_evidence =
       match mode with
-      | Mempool -> None
+      | Mempool _ -> (* The block_state is not relevant in this mode. *) None
       | Application _ | Partial_validation _ | Construction _ -> (
           match block_state.locked_round_evidence with
           | None -> Some (consensus_content.round, voting_power)
@@ -2336,7 +2362,7 @@ module Manager = struct
   let may_trace_gas_limit_too_high info =
     match info.mode with
     | Application _ | Partial_validation _ | Construction _ -> fun x -> x
-    | Mempool ->
+    | Mempool _ ->
         (* [Gas.check_limit] will only
            raise a "temporary" error, however when
            {!validate_operation} is called on a batch in isolation
@@ -2553,7 +2579,7 @@ module Manager = struct
           Gas.Arith.(sub block_state.remaining_block_gas operation_gas_used)
         in
         {block_state with remaining_block_gas}
-    | Mempool -> block_state
+    | Mempool _ -> block_state
 
   let remove_manager_operation (type kind) vs
       (operation : kind Kind.manager operation) =
@@ -2590,8 +2616,16 @@ module Manager = struct
 end
 
 let init_validation_state ctxt mode chain_id all_expected_consensus_features
-    ~predecessor_level =
-  let info = init_info ctxt mode chain_id all_expected_consensus_features in
+    ~predecessor_level ~predecessor_round =
+  let info =
+    init_info
+      ctxt
+      mode
+      chain_id
+      ~predecessor_level
+      ~predecessor_round
+      all_expected_consensus_features
+  in
   let operation_state = init_operation_conflict_state ~predecessor_level in
   let block_state = init_block_state info in
   {info; operation_state; block_state}
@@ -2638,18 +2672,18 @@ let begin_any_application ctxt chain_id ~predecessor_level
   in
   let payload_hash = block_header.protocol_data.contents.payload_hash in
   let predecessor_hash = block_header.shell.predecessor in
-  let block_finalization_info =
+  let block_info =
     {
-      fitness;
+      round;
+      locked_round = Fitness.locked_round fitness;
+      predecessor_hash;
       block_producer;
       payload_producer;
-      predecessor_hash;
-      block_data_contents = block_header.protocol_data.contents;
+      header_contents = block_header.protocol_data.contents;
     }
   in
   let mode =
-    if is_partial then Partial_validation block_finalization_info
-    else Application block_finalization_info
+    if is_partial then Partial_validation block_info else Application block_info
   in
   let all_expected_consensus_features =
     Consensus.expected_features_for_application
@@ -2660,14 +2694,16 @@ let begin_any_application ctxt chain_id ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
   in
-  let predecessor_level = predecessor_level.level in
-  return
-    (init_validation_state
-       ctxt
-       mode
-       chain_id
-       all_expected_consensus_features
-       ~predecessor_level)
+  let validation_state =
+    init_validation_state
+      ctxt
+      mode
+      chain_id
+      all_expected_consensus_features
+      ~predecessor_level:predecessor_level.level
+      ~predecessor_round
+  in
+  return validation_state
 
 let begin_partial_validation ctxt chain_id ~predecessor_level
     ~predecessor_timestamp block_header fitness =
@@ -2727,22 +2763,21 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
       ~predecessor_round
       ~predecessor_hash
   in
-  let predecessor_level = predecessor_level.level in
   let validation_state =
     init_validation_state
       ctxt
       (Construction
          {
-           predecessor_round;
-           predecessor_hash;
            round;
-           block_data_contents = header_contents;
+           predecessor_hash;
            block_producer;
            payload_producer;
+           header_contents;
          })
       chain_id
       all_expected_consensus_features
-      ~predecessor_level
+      ~predecessor_level:predecessor_level.level
+      ~predecessor_round
   in
   return validation_state
 
@@ -2755,14 +2790,20 @@ let begin_partial_construction ctxt chain_id ~predecessor_level
       ~predecessor_round
       ~grandparent_round
   in
-  let predecessor_level = predecessor_level.level in
+  let grandparent =
+    Option.map
+      (fun (hash, payload_hash) ->
+        {round = grandparent_round; hash; payload_hash})
+      (Alpha_context.Consensus.grand_parent_branch ctxt)
+  in
   let validation_state =
     init_validation_state
       ctxt
-      Mempool
+      (Mempool grandparent)
       chain_id
       all_expected_consensus_features
-      ~predecessor_level
+      ~predecessor_level:predecessor_level.level
+      ~predecessor_round
   in
   validation_state
 
@@ -2783,10 +2824,13 @@ let begin_no_predecessor_info ctxt chain_id =
   in
   init_validation_state
     ctxt
-    Mempool
+    (Mempool None)
     chain_id
     all_expected_consensus_features
     ~predecessor_level
+      (* Fake predecessor_round because all consensus
+         operations should be rejected anyway. *)
+    ~predecessor_round:Round.zero
 
 let check_operation ?(check_signature = true) info (type kind)
     (operation : kind operation) : unit tzresult Lwt.t =
@@ -3007,7 +3051,7 @@ let remove_operation operation_conflict_state (type kind)
 let check_validation_pass_consistency vi vs validation_pass =
   let open Lwt_result_syntax in
   match vi.mode with
-  | Mempool | Construction _ -> return vs
+  | Mempool _ | Construction _ -> return vs
   | Application _ | Partial_validation _ -> (
       match (vs.last_op_validation_pass, validation_pass) with
       | None, validation_pass ->
@@ -3052,10 +3096,10 @@ let validate_operation ?(check_signature = true)
   match (info.mode, validation_pass_opt) with
   | Partial_validation _, Some n
     when Compare.Int.(n <> Operation_repr.consensus_pass) ->
-      (* Do not validate non-consensus operation in [Partial_validation] mode *)
+      (* Do not validate non-consensus operations in
+         [Partial_validation] mode. *)
       return {info; operation_state; block_state}
-  | Partial_validation _, _ | Mempool, _ | Construction _, _ | Application _, _
-    -> (
+  | (Application _ | Partial_validation _ | Construction _ | Mempool _), _ -> (
       match operation.protocol_data.contents with
       | Single (Preendorsement _) ->
           Consensus.validate_preendorsement
@@ -3247,7 +3291,7 @@ let compute_payload_hash block_state
 let finalize_block {info; block_state; _} =
   let open Lwt_result_syntax in
   match info.mode with
-  | Application {fitness; predecessor_hash; block_data_contents; _} ->
+  | Application {round; locked_round; predecessor_hash; header_contents; _} ->
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
         if are_endorsements_required then
@@ -3255,17 +3299,16 @@ let finalize_block {info; block_state; _} =
         else ok_unit
       in
       let block_payload_hash =
-        compute_payload_hash block_state block_data_contents ~predecessor_hash
+        compute_payload_hash block_state header_contents ~predecessor_hash
       in
-      let round = Fitness.round fitness in
       let*? () =
         finalize_validate_block_header
           info
           block_state
           (Block_header.Expected_payload_hash block_payload_hash)
-          block_data_contents
+          header_contents
           round
-          ~fitness_locked_round:(Fitness.locked_round fitness)
+          ~fitness_locked_round:locked_round
       in
       return_unit
   | Partial_validation _ ->
@@ -3276,9 +3319,9 @@ let finalize_block {info; block_state; _} =
         else ok_unit
       in
       return_unit
-  | Construction {predecessor_hash; round; block_data_contents; _} ->
+  | Construction {round; predecessor_hash; header_contents; _} ->
       let block_payload_hash =
-        compute_payload_hash block_state block_data_contents ~predecessor_hash
+        compute_payload_hash block_state header_contents ~predecessor_hash
       in
       let locked_round_evidence = block_state.locked_round_evidence in
       let checkable_payload_hash =
@@ -3305,11 +3348,11 @@ let finalize_block {info; block_state; _} =
           info
           block_state
           checkable_payload_hash
-          block_data_contents
+          header_contents
           round
           ~fitness_locked_round:(Option.map fst locked_round_evidence)
       in
       return_unit
-  | Mempool ->
-      (* Nothing to do for the mempool mode*)
+  | Mempool _ ->
+      (* There is no block to finalize in mempool mode. *)
       return_unit
