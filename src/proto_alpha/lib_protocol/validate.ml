@@ -990,45 +990,62 @@ module Consensus = struct
       consensus_state = {vs.consensus_state with grandparent_endorsements_seen};
     }
 
-  let get_expected_endorsements_features consensus_info consensus_content =
-    match consensus_info.all_expected_features.expected_endorsement with
-    | Expected_endorsement {expected_features} -> ok expected_features
-    | No_expected_branch_for_block_endorsement ->
-        error Unexpected_endorsement_in_block
-    | No_expected_branch_for_partial_construction_endorsement {expected_level}
-      ->
-        error
-          (Consensus_operation_for_future_level
-             {
-               kind = Endorsement;
-               expected = expected_level;
-               provided = consensus_content.Alpha_context.level;
-             })
-    | No_predecessor_info_cannot_validate_endorsement ->
-        error Consensus_operation_not_allowed
-
   type endorsement_kind = Grandparent_endorsement | Normal_endorsement of int
+
+  (** Retrieve the expected branch and payload_hash for endorsements
+      from the context.
+
+      [Consensus.endorsement_branch] only returns [None] when the
+      predecessor is the protocol activation block, which is always
+      considered final and should not be endorsed. In that case, return
+      an error depending on the mode. *)
+  let expected_branch_and_payload_hash vi (consensus_info : consensus_info)
+      op_level =
+    match Consensus.endorsement_branch vi.ctxt with
+    | Some branch_and_payload_hash -> ok branch_and_payload_hash
+    | None ->
+        error
+          (match vi.mode with
+          | Application _ | Partial_validation _ | Construction _ ->
+              (* The block should not contain any endorsements. The
+                 validation of the endorsement fails, and so will the
+                 validation of the whole block. *)
+              Unexpected_endorsement_in_block
+          | Mempool _ ->
+              (* The block that will be built on top on the mempool head
+                 should contain no endorsements, and this is not a
+                 grandparent endorsement (otherwise
+                 [check_normal_endorsement] would not have been called). It
+                 is probably an early endorsement for the next level, hence
+                 the error (and even if this is not the case, hopefully the
+                 levels recorded in the error will provide a hint to what
+                 happened). *)
+              Consensus_operation_for_future_level
+                {
+                  kind = Endorsement;
+                  expected = consensus_info.predecessor_level;
+                  provided = op_level;
+                })
 
   (** Validate an endorsement pointing to the predecessor, aka a
       "normal" endorsement. Only this kind of endorsement may be found
-      during block validation or construction. *)
+      during block validation or construction (ie. [Application],
+      [Partial_validation], or [Construction] modes). *)
   let check_normal_endorsement vi consensus_info ~check_signature
       (operation : Kind.endorsement operation) =
     let open Lwt_result_syntax in
     let (Single (Endorsement consensus_content)) =
       operation.protocol_data.contents
     in
+    let {level; round; block_payload_hash = bph; _} = consensus_content in
+    let*? expected_branch, expected_payload_hash =
+      expected_branch_and_payload_hash vi consensus_info level
+    in
     let kind = Endorsement in
-    let*? expected_features =
-      get_expected_endorsements_features consensus_info consensus_content
-    in
-    let*? () =
-      check_consensus_features
-        kind
-        expected_features
-        consensus_content
-        operation
-    in
+    let*? () = check_level kind consensus_info.predecessor_level level in
+    let*? () = check_round kind consensus_info.predecessor_round round in
+    let*? () = check_branch kind expected_branch operation.shell.branch in
+    let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
       get_delegate_details
         consensus_info.endorsement_slot_map
