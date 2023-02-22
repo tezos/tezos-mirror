@@ -21,4 +21,5 @@
           -open Tezt_performance_regression
           -open Tezos_lwt_result_stdlib
           -open Tezos_event_logging
+          (:include %{workspace_root}/macos-link-flags.sexp)
          )))
