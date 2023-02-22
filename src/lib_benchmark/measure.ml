@@ -317,7 +317,7 @@ let packed_measurement_save_json measurement_packed output_path =
   Out_channel.with_open_text output_path (fun oc ->
       Printf.fprintf oc "%s\n" json) ;
   Format.eprintf
-    "Measure.packed_measurement_save_json: saved to %s\n"
+    "Measure.packed_measurement_save_json: saved to %s@."
     output_path
 
 let load : filename:string -> packed_measurement =
@@ -332,7 +332,7 @@ let load : filename:string -> packed_measurement =
   let str =
     Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
   in
-  Format.eprintf "Measure.load: loaded %s\n" filename ;
+  Format.eprintf "Measure.load: loaded %s@." filename ;
   match Data_encoding.Binary.of_string serialized_workload_encoding str with
   | Ok {bench_name; measurement_bytes} -> (
       let bench =

@@ -1064,7 +1064,9 @@ module GP_run = struct
   let write_script ~filename ~matrix_mode ~target ~(plot : GP_script.t) =
     match open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename with
     | exception _ ->
-        Format.eprintf "write_script: could not open file %s, exiting" filename ;
+        Format.eprintf
+          "write_script: could not open file %s, exiting@."
+          filename ;
         exit 1
     | oc ->
         let script = make_script ~matrix_mode ~target ~plot in
@@ -1091,7 +1093,7 @@ module GP_run = struct
             exit 0
         | _ ->
             Unix.unlink name ;
-            Format.eprintf "run_script: call to gnuplot failed, exiting" ;
+            Format.eprintf "run_script: call to gnuplot failed, exiting@." ;
             exit 1)
     | pid -> if not detach then ignore @@ Unix.waitpid [] pid else ()
 
@@ -1099,7 +1101,9 @@ module GP_run = struct
       ~matrix_mode ~target ~(plot : GP_script.t) () =
     match open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename with
     | exception _ ->
-        Format.eprintf "write_script: could not open file %s, exiting" filename ;
+        Format.eprintf
+          "write_script: could not open file %s, exiting@."
+          filename ;
         exit 1
     | oc -> (
         let script = make_script ~matrix_mode ~target ~plot in
@@ -1112,7 +1116,7 @@ module GP_run = struct
             | _ ->
                 Format.eprintf
                   "run_script: call to gnuplot failed, exiting (wrote script \
-                   to %s)"
+                   to %s)@."
                   filename ;
                 exit 1)
         | pid -> if not detach then ignore @@ Unix.waitpid [] pid else ())

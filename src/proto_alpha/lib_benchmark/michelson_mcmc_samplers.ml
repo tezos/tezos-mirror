@@ -66,7 +66,7 @@ let save ~filename ~terms =
     with
     | Error err ->
         Format.eprintf
-          "Michelson_mcmc_samplers.save: encoding failed (%a); exiting"
+          "Michelson_mcmc_samplers.save: encoding failed (%a); exiting@."
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
@@ -75,7 +75,8 @@ let save ~filename ~terms =
   try Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
   with exn ->
     Format.eprintf
-      "Michelson_mcmc_samplers.save: create_file failed (%s); exiting"
+      "Michelson_mcmc_samplers.save: create_file %s failed (%s); exiting@."
+      filename
       (Printexc.to_string exn) ;
     exit 1
 
@@ -85,7 +86,8 @@ let load ~filename =
     try Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
     with exn ->
       Format.eprintf
-        "Michelson_mcmc_samplers.load: read_file failed (%s); exiting"
+        "Michelson_mcmc_samplers.load: read_file %s failed (%s); exiting@."
+        filename
         (Printexc.to_string exn) ;
       exit 1
   in
@@ -94,7 +96,8 @@ let load ~filename =
   | Ok result -> result
   | Error err ->
       Format.eprintf
-        "Michelson_mcmc_samplers.load: decoding failed (%a); exiting"
+        "Michelson_mcmc_samplers.load: decoding %s failed (%a); exiting@."
+        filename
         Data_encoding.Binary.pp_read_error
         err ;
       exit 1
