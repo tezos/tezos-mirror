@@ -316,7 +316,10 @@ module Test = struct
             (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
             enc_shards
         with
-        | None -> (* The shard index is within the bounds. *) assert false
+        | None ->
+            (* The shard index was sampled within the bounds, so this case
+               (the queried index is out of bounds) doesn't happen. *)
+            assert false
         | Some shard ->
             Cryptobox.verify_shard t cm shard shard_proofs.(shard_index))
         |> function
