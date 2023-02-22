@@ -1256,27 +1256,58 @@ module Inner = struct
     in
     Bls12_381.G1.fft ~domain ~points
 
-  (* h = polynomial such that h(y*domain[i]) = zi. *)
-  let interpolation_h_poly y domain z_list =
-    Scalar.ifft_inplace ~domain:(Domains.inverse domain) ~points:z_list ;
-    let inv_y = Scalar.inverse_exn y in
-    Array.fold_left_map
-      (fun inv_yi h -> Scalar.(mul inv_yi inv_y, mul h inv_yi))
-      Scalar.(copy one)
-      z_list
-    |> snd |> Polynomials.of_dense
+  (* [interpolation_poly root domain evaluations] returns the unique
+     polynomial P of degree [< Domains.length domain] verifying
+     P(root * domain[i]) = evaluations[i].
 
-  (* Part 3.2 verifier : verifies that f(w*domain.(i)) = evaluations.(i). *)
-  let verify t cm_f srs_point domain (w, evaluations) proof =
+     Requires:
+     - [(Array.length evaluations = Domains.length domain)] *)
+  let interpolation_poly ~root ~domain ~evaluations =
+    assert (Array.length evaluations = Domains.length domain) ;
+    Scalar.ifft_inplace ~domain:(Domains.inverse domain) ~points:evaluations ;
+    (* Computes root_inverse = 1/root. *)
+    let root_inverse = Scalar.inverse_exn root in
+    (* Computes evaluations[i] = evaluations[i] * root_inverse^i. *)
+    Polynomials.of_dense
+      (snd
+         (Array.fold_left_map
+            (fun root_pow_inverse coefficient ->
+              ( Scalar.mul root_pow_inverse root_inverse,
+                Scalar.mul coefficient root_pow_inverse ))
+            Scalar.(copy one)
+            evaluations))
+
+  (* [verify t commitment srs_point domain root evaluations proof]
+     verifies that P(root * domain.(i)) = evaluations.(i),
+     where
+     - [P = commit t s] for some slot [s]
+     - [l := Array.length evaluations = Domains.length domain]
+     - [srs_point = Srs_g2.get t.srs.raw.srs_g2 l]
+     - [root = w^i] where [w] is a primitive [n]-th root of unity for [l] dividing [n]
+     - [domain = (1, z, z^2, ..., z^{l - 1})] where [z = w^{n/l}] is a primitive
+     [l]-th root of unity
+
+     Implements the "Multi-reveals" section above. *)
+  let verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof =
     let open Bls12_381 in
-    let h = interpolation_h_poly w domain evaluations in
-    let cm_h = commit t h in
-    let l = Domains.length domain in
-    let sl_min_yl =
-      G2.(add srs_point (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
+    (* Compute r_i(x). *)
+    let remainder = interpolation_poly ~root ~domain ~evaluations in
+    (* Compute [r_i(τ)]_1. *)
+    let commitment_remainder = commit t remainder in
+    (* Compute [w^{i * l}]. *)
+    let root_pow = Scalar.pow root (Z.of_int (Domains.length domain)) in
+    (* Compute [τ^l]_2 - [w^{i * l}]_2). *)
+    let commit_srs_point_minus_root_pow =
+      G2.(add srs_point (negate (mul (copy one) root_pow)))
     in
-    let diff_commits = G1.(add cm_h (negate cm_f)) in
-    Pairing.pairing_check [(diff_commits, G2.(copy one)); (proof, sl_min_yl)]
+    (* Compute [r_i(τ)]_1-c. *)
+    let diff_commits = G1.(add commitment_remainder (negate commitment)) in
+    (* Checks e(c-[r_i(τ)]_1, g_2) ?= e(π, [τ^l]_2 - [w^{i * l}]_2)
+       by checking
+       [0]_1 ?= -e(c-[r_i(τ)]_1, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2)
+              = e([r_i(τ)]_1-c, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2). *)
+    Pairing.pairing_check
+      [(diff_commits, G2.(copy one)); (proof, commit_srs_point_minus_root_pow)]
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
@@ -1311,7 +1342,7 @@ module Inner = struct
     Array.blit p 0 coefficients 0 p_length ;
     multiple_multi_reveals t ~preprocess ~coefficients
 
-  let verify_shard (t : t) cm {index = shard_index; share = shard_evaluations}
+  let verify_shard (t : t) commitment {index = shard_index; share = evaluations}
       proof =
     if shard_index < 0 || shard_index >= t.number_of_shards then
       Error
@@ -1323,34 +1354,31 @@ module Inner = struct
              0
              (t.number_of_shards - 1)))
     else
-      let d_n = Domains.build_power_of_two t.evaluations_log in
-      let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
-      if
-        verify
-          t
-          cm
-          t.srs.kate_amortized_srs_g2_shards
-          domain
-          (Domains.get d_n shard_index, shard_evaluations)
-          proof
-      then Ok ()
+      let root = Domains.get t.domain_n shard_index in
+      let domain = Domains.build t.shard_length in
+      let srs_point = t.srs.kate_amortized_srs_g2_shards in
+      if verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof then
+        Ok ()
       else Error `Invalid_shard
 
-  let _prove_single t p z =
-    let q, _ =
-      Polynomials.(
-        division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
+  let _prove_single t polynomial evaluation_point =
+    let quotient, _ =
+      let open Polynomials in
+      division_xn
+        (polynomial - constant (evaluate polynomial evaluation_point))
+        1
+        (Scalar.negate evaluation_point)
     in
-    commit t q
+    commit t quotient
 
-  let _verify_single t cm ~point ~evaluation proof =
-    let h_secret = Srs_g2.get t.srs.raw.srs_g2 1 in
+  let _verify_single t commitment ~point ~evaluation proof =
+    let commit_secret = Srs_g2.get t.srs.raw.srs_g2 1 in
     Bls12_381.(
       Pairing.pairing_check
         [
-          ( G1.(add cm (negate (mul (copy one) evaluation))),
+          ( G1.(add commitment (negate (mul (copy one) evaluation))),
             G2.(negate (copy one)) );
-          (proof, G2.(add h_secret (negate (mul (copy one) point))));
+          (proof, G2.(add commit_secret (negate (mul (copy one) point))));
         ])
 
   let prove_page t p page_index =
@@ -1366,7 +1394,7 @@ module Inner = struct
 
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
-  let verify_page t cm ~page_index page proof =
+  let verify_page t commitment ~page_index page proof =
     if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
@@ -1375,14 +1403,16 @@ module Inner = struct
       if expected_page_length <> got_page_length then
         Error `Page_length_mismatch
       else
-        let domain =
-          Domains.build_power_of_two Z.(log2up (of_int t.page_length))
-        in
-        let slot_page_evaluations =
-          Array.init
-            (1 lsl Z.(log2up (of_int t.page_length)))
-            (function
+        (* The [page_length] is not necessarily a power of two,
+           so we take the next power of two. *)
+        let length = 1 lsl Z.(log2up (of_int t.page_length)) in
+        let domain = Domains.build length in
+        let evaluations =
+          Array.init length (function
               | i when i < t.page_length - 1 ->
+                  (* Parse the [page] by chunks of [scalar_bytes_amount] bytes.
+                     These chunks are interpreted as [Scalar.t] elements and stored
+                     in [evaluations]. *)
                   let dst = Bytes.create scalar_bytes_amount in
                   Bytes.blit
                     page
@@ -1392,6 +1422,8 @@ module Inner = struct
                     scalar_bytes_amount ;
                   Scalar.of_bytes_exn dst
               | i when i = t.page_length - 1 ->
+                  (* Store the remaining bytes in the last nonzero coefficient
+                     of evaluations. *)
                   let dst = Bytes.create t.remaining_bytes in
                   Bytes.blit
                     page
@@ -1402,14 +1434,16 @@ module Inner = struct
                   Scalar.of_bytes_exn dst
               | _ -> Scalar.(copy zero))
         in
+        let root = Domains.get t.domain_k page_index in
         if
           verify
             t
-            cm
-            t.srs.kate_amortized_srs_g2_pages
-            domain
-            (Domains.get t.domain_k page_index, slot_page_evaluations)
-            proof
+            ~commitment
+            ~srs_point:t.srs.kate_amortized_srs_g2_pages
+            ~domain
+            ~root
+            ~evaluations
+            ~proof
         then Ok ()
         else Error `Invalid_page
 end
