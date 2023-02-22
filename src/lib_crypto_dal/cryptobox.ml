@@ -1272,6 +1272,31 @@ module Internal_for_tests = struct
     loop 0 Seq.empty
 
   let polynomials_equal = Polynomials.equal
+
+  let ensure_validity
+      {redundancy_factor; slot_size; page_size; number_of_shards} =
+    let k = slot_as_polynomial_length ~slot_size in
+    let n = redundancy_factor * k in
+    let shard_length = n / number_of_shards in
+    let open Result_syntax in
+    (let* raw =
+       match !initialisation_parameters with
+       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
+       | Some srs -> return srs
+     in
+     ensure_validity
+       ~slot_size
+       ~page_size
+       ~n
+       ~k
+       ~redundancy_factor
+       ~number_of_shards
+       ~shard_length
+       ~srs_g1_length:(Srs_g1.size raw.srs_g1)
+       ~srs_g2_length:(Srs_g2.size raw.srs_g2))
+    |> function
+    | Ok _ -> true
+    | _ -> false
 end
 
 module Config = struct

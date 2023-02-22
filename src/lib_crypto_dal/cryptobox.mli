@@ -262,6 +262,10 @@ module Internal_for_tests : sig
   (* [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
      represent the same polynomial. *)
   val polynomials_equal : polynomial -> polynomial -> bool
+
+  (* [ensure_validity parameters] returns true if the [parameters] are valid.
+     See implementation file for details. *)
+  val ensure_validity : parameters -> bool
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
