@@ -190,11 +190,11 @@ end
 module Network_id = MethodMaker (struct
   type input = unit
 
-  type output = Ethereum_types.quantity
+  type output = string
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Ethereum_types.quantity_encoding
+  let output_encoding = Data_encoding.string
 
   let method_ = "net_version"
 end)

@@ -61,7 +61,11 @@ module Mock = struct
   let qty_f = quantity_of_z
 
   (* Default chain_id for ethereum custom networks with Ganache. *)
-  let chain_id = qty_f (Z.of_int 1337)
+  let id = Z.of_int 1337
+
+  let chain_id = qty_f id
+
+  let net_version = Z.to_string id
 
   let block_height_counter = ref 0
 
@@ -138,7 +142,7 @@ let dispatch (_rollup_node_rpc : (module Rollup_node.S) option) dir =
       let* output =
         match input with
         | Accounts.Input _ -> return (Accounts.Output (Ok []))
-        | Network_id.Input _ -> return (Network_id.Output (Ok Mock.chain_id))
+        | Network_id.Input _ -> return (Network_id.Output (Ok Mock.net_version))
         | Chain_id.Input _ -> return (Chain_id.Output (Ok Mock.chain_id))
         | Get_balance.Input _ -> return (Get_balance.Output (Ok Mock.balance))
         | Block_number.Input _ ->
