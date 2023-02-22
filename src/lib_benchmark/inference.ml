@@ -256,7 +256,7 @@ let make_problem :
     problem =
  fun ~data ~model ~overrides ->
   let data =
-    List.map (fun {Measure.workload; measures} -> (workload, measures)) data
+    List.map (fun {Measure.workload; measures; _} -> (workload, measures)) data
   in
   match model with
   | Model.Abstract {conv; model} ->
