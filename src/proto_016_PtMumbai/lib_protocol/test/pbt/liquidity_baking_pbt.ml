@@ -321,6 +321,7 @@ let () =
   Alcotest.run
     "protocol > pbt > liquidity baking"
     [
-      ("Machines Cross-Validation", qcheck_wrap machine_validation_tests);
-      ("Economic Properties", qcheck_wrap economic_tests);
+      ( Protocol.name ^ ": Machines Cross-Validation",
+        qcheck_wrap machine_validation_tests );
+      (Protocol.name ^ ": Economic Properties", qcheck_wrap economic_tests);
     ]

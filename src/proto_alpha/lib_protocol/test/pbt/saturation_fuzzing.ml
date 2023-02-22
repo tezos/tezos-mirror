@@ -192,10 +192,10 @@ let () =
   Alcotest.run
     "protocol > pbt > saturation"
     [
-      ("add", qcheck_wrap tests_add);
-      ("mul", qcheck_wrap tests_mul);
-      ("sub", qcheck_wrap tests_sub);
-      ("add and sub", qcheck_wrap tests_add_sub);
-      ("sqrt", qcheck_wrap tests_sqrt);
-      ("<= and >=", qcheck_wrap tests_boundaries);
+      (Protocol.name ^ ": add", qcheck_wrap tests_add);
+      (Protocol.name ^ ": mul", qcheck_wrap tests_mul);
+      (Protocol.name ^ ": sub", qcheck_wrap tests_sub);
+      (Protocol.name ^ ": add and sub", qcheck_wrap tests_add_sub);
+      (Protocol.name ^ ": sqrt", qcheck_wrap tests_sqrt);
+      (Protocol.name ^ ": <= and >=", qcheck_wrap tests_boundaries);
     ]

@@ -98,4 +98,6 @@ let tests = [test_compare_is_strorder]
 let () =
   Alcotest.run
     "Compare operations"
-    [("Compare_operations", Qcheck2_helpers.qcheck_wrap tests)]
+    [
+      (Protocol.name ^ ": Compare_operations", Qcheck2_helpers.qcheck_wrap tests);
+    ]

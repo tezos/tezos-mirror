@@ -278,8 +278,8 @@ let () =
   Alcotest.run
     "Compact_encoding"
     [
-      ("quantity", qcheck_wrap [test_quantity ~count:100_000]);
-      ( "roundtrip",
+      (Protocol.name ^ ": quantity", qcheck_wrap [test_quantity ~count:100_000]);
+      ( Protocol.name ^ ": roundtrip",
         qcheck_wrap
           [
             test_roundtrip

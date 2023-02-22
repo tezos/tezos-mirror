@@ -233,7 +233,13 @@ struct
     ]
 
   let tests =
-    [(Format.sprintf "[%s] Dal slots refutation" Parameters.name, tests)]
+    [
+      ( Format.sprintf
+          "[%s: %s] Dal slots refutation"
+          Protocol.name
+          Parameters.name,
+        tests );
+    ]
 end
 
 let () =
@@ -245,4 +251,5 @@ let () =
 
     let dal_parameters = constants_test.dal
   end) in
-  Alcotest_lwt.run "Refutation_game" Test.tests |> Lwt_main.run
+  Alcotest_lwt.run (Protocol.name ^ ": Dal slots refutation game") Test.tests
+  |> Lwt_main.run

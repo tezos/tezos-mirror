@@ -141,4 +141,6 @@ let tests =
   ]
 
 let () =
-  Alcotest.run "protocol > pbt > gas" [("gas properties", qcheck_wrap tests)]
+  Alcotest.run
+    "protocol > pbt > gas"
+    [(Protocol.name ^ ": gas properties", qcheck_wrap tests)]
