@@ -633,6 +633,18 @@ let wait_for_connections node connections =
   let* () = wait_for_ready node in
   waiter
 
+let wait_for_disconnections node disconnections =
+  let counter = ref 0 in
+  let waiter, resolver = Lwt.task () in
+  on_event node (fun {name; _} ->
+      match name with
+      | "disconnection.v0" ->
+          incr counter ;
+          if !counter = disconnections then Lwt.wakeup resolver ()
+      | _ -> ()) ;
+  let* () = wait_for_ready node in
+  waiter
+
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
     ?rpc_port ?rpc_tls ?(allow_all_rpc = true) arguments =
