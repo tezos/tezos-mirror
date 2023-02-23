@@ -60,6 +60,7 @@ val round_proposer :
 
 val propose_fresh_block_action :
   endorsements:Kind.endorsement Operation.t list ->
+  dal_attestations:Kind.dal_attestation Operation.t list ->
   ?last_proposal:block_info ->
   predecessor:block_info ->
   state ->
@@ -75,7 +76,7 @@ val propose_block_action :
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
 (** Propose (if possible) for the first time at a new level. *)
-val time_to_bake : state -> Round.t -> (state * action) Lwt.t
+val time_to_bake_at_next_level : state -> Round.t -> (state * action) Lwt.t
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
 

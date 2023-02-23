@@ -429,10 +429,10 @@ let round_proposer state delegate_slots round =
     state.level_state.delegate_slots.all_slots_by_round.(round_mod)
     delegate_slots
 
-(** Inject a fresh block proposal containing the current operations of
-    the mempool in [state] and the additional [endorsements] for
-    [delegate] at round [round]. *)
-let propose_fresh_block_action ~endorsements ?last_proposal
+(** Inject a fresh block proposal containing the current operations of the
+    mempool in [state] and the additional [endorsements] and [dal_attestations]
+    for [delegate] at round [round]. *)
+let propose_fresh_block_action ~endorsements ~dal_attestations ?last_proposal
     ~(predecessor : block_info) state delegate round =
   (* TODO check if there is a trace where we could not have updated the level *)
   (* The block to bake embeds the operations gathered by the
@@ -480,11 +480,16 @@ let propose_fresh_block_action ~endorsements ?last_proposal
     let filtered_mempool =
       {current_mempool with consensus = relevant_consensus_operations}
     in
-    (* 3. Add the additional given [endorsements].
+    (* 3. Add the additional given [endorsements] and [dal_attestations].
          N.b. this is a set: there won't be duplicates *)
+    let pool =
+      Operation_pool.add_operations
+        filtered_mempool
+        (List.map Operation.pack endorsements)
+    in
     Operation_pool.add_operations
-      filtered_mempool
-      (List.map Operation.pack endorsements)
+      pool
+      (List.map Operation.pack dal_attestations)
   in
   let kind = Fresh operation_pool in
   Events.(emit proposing_fresh_block (delegate, round)) >>= fun () ->
@@ -514,9 +519,15 @@ let propose_block_action state delegate round (proposal : proposal) =
       (* Invariant: there is no locked round if there is no endorsable
          payload *)
       assert (state.level_state.locked_round = None) ;
-      let last_proposal_consensus_ops = proposal.block.quorum in
+      let endorsements_in_last_proposal = proposal.block.quorum in
+      (* Also insert the DAL attestations from the proposal, because the mempool
+         may not contain them anymore *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
+         The block may therefore contain multiple attestations for the same delegate. *)
+      let dal_attestations_in_last_proposal = proposal.block.dal_attestations in
       propose_fresh_block_action
-        ~endorsements:last_proposal_consensus_ops
+        ~endorsements:endorsements_in_last_proposal
+        ~dal_attestations:dal_attestations_in_last_proposal
         state
         ~last_proposal:proposal.block
         ~predecessor:proposal.predecessor
@@ -631,7 +642,7 @@ let end_of_round state current_round =
           state.level_state.latest_proposal
         >>= fun action -> Lwt.return (new_state, action)
 
-let time_to_bake state at_round =
+let time_to_bake_at_next_level state at_round =
   (* It is now time to update the state level *)
   (* We need to keep track for which block we have 2f+1 *endorsements*, that is,
      which will become the new predecessor_block *)
@@ -649,12 +660,18 @@ let time_to_bake state at_round =
       assert false
   | Some elected_block, Some (delegate, _) ->
       let endorsements = elected_block.endorsement_qc in
+      let dal_attestations =
+        (* Unlike endorsements, we don't watch and store DAL attestations for
+           each proposal, we'll retrieve them from the mempool *)
+        []
+      in
       let new_level_state =
         {state.level_state with next_level_proposed_round = Some at_round}
       in
       let new_state = {state with level_state = new_level_state} in
       propose_fresh_block_action
         ~endorsements
+        ~dal_attestations
         ~predecessor:elected_block.proposal.block
         new_state
         delegate
@@ -809,7 +826,7 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | _, Timeout (Time_to_bake_next_level {at_round}) ->
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
-      time_to_bake state at_round
+      time_to_bake_at_next_level state at_round
   | Idle, New_head_proposal proposal ->
       Events.(
         emit

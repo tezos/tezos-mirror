@@ -254,6 +254,13 @@ let unpack_endorsement packed_endorsement =
       Some ({shell; protocol_data = data} : Kind.endorsement Operation.t)
   | _ -> None
 
+let unpack_dal_attestation packed_dal_attestation =
+  let {shell; protocol_data = Operation_data data} = packed_dal_attestation in
+  match data with
+  | {contents = Single (Dal_attestation _); _} ->
+      Some ({shell; protocol_data = data} : Kind.dal_attestation Operation.t)
+  | _ -> None
+
 let filter_preendorsements ops =
   List.filter_map
     (function
@@ -311,21 +318,30 @@ let ordered_pool_of_payload ~consensus_operations
 
 let extract_operations_of_list_list = function
   | [consensus; votes_payload; anonymous_payload; managers_payload] ->
-      let preendorsements, endorsements =
+      let preendorsements, endorsements, dal_attestations =
         List.fold_left
           (fun ( (preendorsements : Kind.preendorsement Operation.t list),
-                 (endorsements : Kind.endorsement Operation.t list) )
+                 (endorsements : Kind.endorsement Operation.t list),
+                 (dal_attestations : Kind.dal_attestation Operation.t list) )
                packed_op ->
             let {shell; protocol_data = Operation_data data} = packed_op in
             match data with
             | {contents = Single (Preendorsement _); _} ->
-                ({shell; protocol_data = data} :: preendorsements, endorsements)
+                ( {shell; protocol_data = data} :: preendorsements,
+                  endorsements,
+                  dal_attestations )
             | {contents = Single (Endorsement _); _} ->
-                (preendorsements, {shell; protocol_data = data} :: endorsements)
+                ( preendorsements,
+                  {shell; protocol_data = data} :: endorsements,
+                  dal_attestations )
+            | {contents = Single (Dal_attestation _); _} ->
+                ( preendorsements,
+                  endorsements,
+                  {shell; protocol_data = data} :: dal_attestations )
             | _ ->
                 (* unreachable *)
-                (preendorsements, endorsements))
-          ([], [])
+                (preendorsements, endorsements, dal_attestations))
+          ([], [], [])
           consensus
         (* N.b. the order doesn't matter *)
       in
@@ -333,7 +349,7 @@ let extract_operations_of_list_list = function
         if preendorsements = [] then None else Some preendorsements
       in
       let payload = {votes_payload; anonymous_payload; managers_payload} in
-      Some (preendorsements, endorsements, payload)
+      Some (preendorsements, endorsements, dal_attestations, payload)
   | _ -> None
 
 let filter_pool p {consensus; votes; anonymous; managers} =

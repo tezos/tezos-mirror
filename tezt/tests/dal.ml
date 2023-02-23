@@ -187,7 +187,7 @@ let with_dal_node tezos_node tezos_client f key =
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
+let scenario_with_layer1_node ?(tags = ["layer1"]) ?attestation_lag
     ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
     ?event_sections_levels ?node_arguments ?activation_timestamp
     ?minimal_block_delay ?delay_increment_per_round variant scenario =
@@ -212,9 +212,9 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
-    ?custom_constants ?minimal_block_delay ?delay_increment_per_round
-    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
+let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
+    ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
+    ?attestation_threshold ?commitment_period ?challenge_window
     ?(dal_enable = true) ?activation_timestamp variant scenario =
   let description = "Testing DAL node" in
   test
@@ -238,7 +238,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
-    ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
+    ?(tags = ["dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
     ?commitment_period ?challenge_window ?minimal_block_delay
     ?delay_increment_per_round ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
@@ -2012,25 +2012,33 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
   let* () = wait_block_processing in
   let* first_not_attested_published_level =
     if with_baker_daemon then (
-      Log.info
-        "Run the baker till at least level %d."
-        (max_level + parameters.attestation_lag) ;
-      let* () =
-        run_baker all_delegates (intermediary_level + parameters.attestation_lag)
+      let last_level_of_first_baker =
+        intermediary_level + parameters.attestation_lag
       in
+      let last_level_of_second_baker = max_level + parameters.attestation_lag in
+      Log.info
+        "Run the first baker for all delegates till at least level %d."
+        last_level_of_first_baker ;
+      let* () = run_baker all_delegates last_level_of_first_baker in
       (* (D) We tried to stop the baker as soon as it reaches
          [intermediary_level + attestation_lag], but it may have baked a few
          blocks more *)
+      let node_level = Node.get_level node in
       let first_not_attested_published_level =
-        Node.get_level node + 1 - parameters.attestation_lag
+        node_level + 1 - parameters.attestation_lag
       in
+      Log.info
+        "The first baker baked till level %d. Therefore \
+         first_not_attested_published_level is %d."
+        node_level
+        first_not_attested_published_level ;
+      Log.info
+        "Run the second baker for some (not all) delegates till at least level \
+         %d."
+        last_level_of_second_baker ;
       if first_not_attested_published_level >= max_level then
         Test.fail "test not checking for unattested slots; adjust parameters" ;
-      let* () =
-        run_baker
-          (List.tl all_delegates)
-          (max_level + parameters.attestation_lag)
-      in
+      let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
       return first_not_attested_published_level)
     else return intermediary_level
   in
