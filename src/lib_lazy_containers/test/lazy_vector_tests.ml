@@ -136,19 +136,11 @@ let concat_works () =
   Lwt_main.run
   @@
   let map1 =
-    IntVector.create
-      ~produce_value:(fun x ->
-        Printf.printf "> map1: %i\n%!" x ;
-        Lwt.return @@ Int.succ x)
-      1
+    IntVector.create ~produce_value:(fun x -> Lwt.return @@ Int.succ x) 1
     |> IntVector.cons 10
   in
   let map2 =
-    IntVector.create
-      ~produce_value:(fun x ->
-        Printf.printf "> map2: %i\n%!" x ;
-        Lwt.return @@ Int.pred x)
-      1
+    IntVector.create ~produce_value:(fun x -> Lwt.return @@ Int.pred x) 1
     |> IntVector.cons 20
   in
   let* map = IntVector.concat map1 map2 in
@@ -254,3 +246,5 @@ let tests =
     ("concat works lazily", `Quick, concat_works);
     ("check size overflow", `Quick, check_overflow);
   ]
+
+let () = Alcotest.run "Lazy structs tests" [("Lazy_vector", tests)]

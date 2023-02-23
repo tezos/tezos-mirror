@@ -1254,19 +1254,18 @@ let lazy_containers =
     ~deps:[octez_lwt_result_stdlib; zarith]
 
 let _lazy_containers_tests =
-  test
-    "main"
+  tezt
+    ["chunked_byte_vector_tests"; "lazy_vector_tests"]
     ~path:"src/lib_lazy_containers/test"
     ~opam:"tezos-lazy-containers-tests"
     ~synopsis:"Various tests for the lazy containers library"
-    ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:
       [
         lazy_containers |> open_;
         qcheck_core;
         qcheck_alcotest;
-        alcotest;
         lwt_unix;
+        alcotezt;
       ]
 
 let tree_encoding =
