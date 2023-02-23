@@ -101,8 +101,8 @@ type consensus_info = {
   endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
 }
 
-let init_consensus_info ctxt ~predecessor_level ~predecessor_round
-    all_expected_features =
+let init_consensus_info ctxt all_expected_features
+    (predecessor_level, predecessor_round) =
   {
     predecessor_level;
     predecessor_round;
@@ -449,7 +449,11 @@ type info = {
   mode : mode;
   chain_id : Chain_id.t;  (** Needed for signature checks. *)
   current_level : Level.t;
-  consensus_info : consensus_info;
+  consensus_info : consensus_info option;
+      (** Needed to validate consensus operations. This can be [None] during
+          some RPC calls when some predecessor information is unavailable,
+          in which case the validation of all consensus operations will
+          systematically fail. *)
   manager_info : manager_info;
 }
 
@@ -491,19 +495,19 @@ type validation_state = {
 
 let ok_unit = Result_syntax.return_unit
 
-let init_info ctxt mode chain_id ~predecessor_level ~predecessor_round
+let init_info ctxt mode chain_id ~predecessor_level_and_round
     all_expected_consensus_characteristics =
+  let consensus_info =
+    Option.map
+      (init_consensus_info ctxt all_expected_consensus_characteristics)
+      predecessor_level_and_round
+  in
   {
     ctxt;
     mode;
     chain_id;
     current_level = Level.current ctxt;
-    consensus_info =
-      init_consensus_info
-        ctxt
-        ~predecessor_level
-        ~predecessor_round
-        all_expected_consensus_characteristics;
+    consensus_info;
     manager_info = init_manager_info ctxt;
   }
 
@@ -745,12 +749,17 @@ module Consensus = struct
   let check_preendorsement vi ~check_signature
       (operation : Kind.preendorsement operation) =
     let open Lwt_result_syntax in
+    let*? consensus_info =
+      Option.value_e
+        ~error:(trace_of_error Consensus_operation_not_allowed)
+        vi.consensus_info
+    in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
     in
     let kind = Preendorsement in
     let*? expected_features, block_round =
-      get_expected_preendorsements_features vi.consensus_info consensus_content
+      get_expected_preendorsements_features consensus_info consensus_content
     in
     let*? () =
       check_round_not_too_high ~block_round ~provided:consensus_content.round
@@ -764,7 +773,7 @@ module Consensus = struct
     in
     let*? consensus_key, voting_power =
       get_delegate_details
-        vi.consensus_info.preendorsement_slot_map
+        consensus_info.preendorsement_slot_map
         kind
         consensus_content
     in
@@ -929,7 +938,7 @@ module Consensus = struct
   (** Validate an endorsement pointing to the predecessor, aka a
       "normal" endorsement. Only this kind of endorsement may be found
       during block validation or construction. *)
-  let check_normal_endorsement vi ~check_signature
+  let check_normal_endorsement vi consensus_info ~check_signature
       (operation : Kind.endorsement operation) =
     let open Lwt_result_syntax in
     let (Single (Endorsement consensus_content)) =
@@ -937,7 +946,7 @@ module Consensus = struct
     in
     let kind = Endorsement in
     let*? expected_features =
-      get_expected_endorsements_features vi.consensus_info consensus_content
+      get_expected_endorsements_features consensus_info consensus_content
     in
     let*? () =
       check_consensus_features
@@ -948,7 +957,7 @@ module Consensus = struct
     in
     let*? consensus_key, voting_power =
       get_delegate_details
-        vi.consensus_info.endorsement_slot_map
+        consensus_info.endorsement_slot_map
         kind
         consensus_content
     in
@@ -1004,11 +1013,16 @@ module Consensus = struct
   let check_endorsement vi ~check_signature
       (operation : Kind.endorsement operation) =
     let open Lwt_result_syntax in
+    let*? consensus_info =
+      Option.value_e
+        ~error:(trace_of_error Consensus_operation_not_allowed)
+        vi.consensus_info
+    in
     let (Single (Endorsement consensus_content)) =
       operation.protocol_data.contents
     in
     match
-      vi.consensus_info.all_expected_features
+      consensus_info.all_expected_features
         .expected_grandparent_endorsement_for_partial_construction
     with
     | Some expected_grandparent_endorsement
@@ -1026,7 +1040,7 @@ module Consensus = struct
         return Grandparent_endorsement
     | _ ->
         let* voting_power =
-          check_normal_endorsement vi ~check_signature operation
+          check_normal_endorsement vi consensus_info ~check_signature operation
         in
         return (Normal_endorsement voting_power)
 
@@ -1143,8 +1157,13 @@ module Consensus = struct
   let check_construction_preendorsement_round_consistency vi block_state kind
       (consensus_content : consensus_content) =
     let open Result_syntax in
+    let* consensus_info =
+      Option.value_e
+        ~error:(trace_of_error Consensus_operation_not_allowed)
+        vi.consensus_info
+    in
     let* expected_features, _block_round =
-      get_expected_preendorsements_features vi.consensus_info consensus_content
+      get_expected_preendorsements_features consensus_info consensus_content
     in
     match expected_features.round with
     | Some _ ->
@@ -2616,15 +2635,22 @@ module Manager = struct
 end
 
 let init_validation_state ctxt mode chain_id all_expected_consensus_features
-    ~predecessor_level ~predecessor_round =
+    ~predecessor_level_and_round =
   let info =
     init_info
       ctxt
       mode
       chain_id
-      ~predecessor_level
-      ~predecessor_round
+      ~predecessor_level_and_round
       all_expected_consensus_features
+  in
+  let predecessor_level =
+    match predecessor_level_and_round with
+    | Some (predecessor_level, _) -> predecessor_level
+    | None ->
+        (* Fake predecessor level that will not be used since the
+           validation of all consensus operations will fail. *)
+        info.current_level.level
   in
   let operation_state = init_operation_conflict_state ~predecessor_level in
   let block_state = init_block_state info in
@@ -2700,8 +2726,8 @@ let begin_any_application ctxt chain_id ~predecessor_level
       mode
       chain_id
       all_expected_consensus_features
-      ~predecessor_level:predecessor_level.level
-      ~predecessor_round
+      ~predecessor_level_and_round:
+        (Some (predecessor_level.level, predecessor_round))
   in
   return validation_state
 
@@ -2776,8 +2802,8 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
          })
       chain_id
       all_expected_consensus_features
-      ~predecessor_level:predecessor_level.level
-      ~predecessor_round
+      ~predecessor_level_and_round:
+        (Some (predecessor_level.level, predecessor_round))
   in
   return validation_state
 
@@ -2802,8 +2828,8 @@ let begin_partial_construction ctxt chain_id ~predecessor_level
       (Mempool grandparent)
       chain_id
       all_expected_consensus_features
-      ~predecessor_level:predecessor_level.level
-      ~predecessor_round
+      ~predecessor_level_and_round:
+        (Some (predecessor_level.level, predecessor_round))
   in
   validation_state
 
@@ -2816,21 +2842,12 @@ let begin_no_predecessor_info ctxt chain_id =
       expected_grandparent_endorsement_for_partial_construction = None;
     }
   in
-  let current_level = Level.current ctxt in
-  let predecessor_level =
-    match Raw_level.pred current_level.level with
-    | None -> current_level.level
-    | Some level -> level
-  in
   init_validation_state
     ctxt
     (Mempool None)
     chain_id
     all_expected_consensus_features
-    ~predecessor_level
-      (* Fake predecessor_round because all consensus
-         operations should be rejected anyway. *)
-    ~predecessor_round:Round.zero
+    ~predecessor_level_and_round:None
 
 let check_operation ?(check_signature = true) info (type kind)
     (operation : kind operation) : unit tzresult Lwt.t =
