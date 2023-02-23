@@ -65,3 +65,7 @@ val originate_sc_rollup :
   ?boot_sector:string ->
   Client.t ->
   string Lwt.t
+
+(** [default_boot_sector_of k] returns a valid boot sector for a PVM of
+    kind [kind]. *)
+val default_boot_sector_of : kind:string -> string

@@ -3735,16 +3735,25 @@ let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
     ~message_kind
     ~kind
 
-let test_rpcs ~kind =
+let test_rpcs ~kind
+    ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind) =
   test_full_scenario
     ~regression:true
     ~kind
+    ~boot_sector
     {
       tags = ["rpc"; "api"];
       variant = None;
       description = "RPC API should work and be stable";
     }
   @@ fun protocol sc_rollup_node sc_client sc_rollup node client ->
+  let* _origination_proof =
+    RPC.Client.call ~hooks client
+    @@ RPC.post_chain_block_context_smart_rollups_all_origination_proof
+         ~kind
+         ~boot_sector
+         ()
+  in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   (* Smart rollup address endpoint test *)
   let*! sc_rollup_address =
