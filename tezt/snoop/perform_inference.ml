@@ -68,8 +68,8 @@ let main () =
       "size_has_tickets_model";
       "compare_tickets";
       "list_key_values";
-      "skip_list_next";
-      "skip_list_hash";
+      "skip_list/next/model";
+      "skip_list/hash_cell/model";
       "verify_output_proof";
       "deserialize_output_proof";
     ]
