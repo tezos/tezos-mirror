@@ -26,87 +26,17 @@
 open Validate_errors
 open Alpha_context
 
-(** Since the expected features of preendorsement and endorsement are
-    the same for all operations in the considered block, we compute
-    them once and for all at the begining of the block.
-
-    See [expected_features_for_application],
-    [expected_features_for_construction], and
-    [expected_features_for_partial_construction] in the [Consensus]
-    module below. *)
-type expected_features = {
-  level : Raw_level.t;
-  round : Round.t option;
-      (** This always contains a value, except for the case of
-          preendorsements during block construction. See
-          [Consensus.check_round_equal] below for its usage. *)
-  branch : Block_hash.t;
-  payload_hash : Block_payload_hash.t;
-}
-
-type expected_preendorsement =
-  | Expected_preendorsement of {
-      expected_features : expected_features;
-      block_round : Round.t option;
-          (** During block validation or construction, we must also check that
-              the preendorsement round is lower than the block round. In
-              mempool mode, this field is [None]. *)
-    }
-  | No_locked_round_for_block_validation_preendorsement
-      (** A preexisting block whose fitness indicates no locked round
-          should contain no preendorsements. *)
-  | Fresh_proposal_for_construction_preendorsement
-      (** A constructed block with a fresh proposal should contain no
-          preendorsements. *)
-  | No_expected_branch_for_partial_construction_preendorsement of {
-      expected_level : Raw_level.t;
-    }
-      (** See [No_expected_branch_for_partial_construction_endorsement] below. *)
-  | No_predecessor_info_cannot_validate_preendorsement
-      (** We do not have access to predecessor level, round, etc. so any
-          preendorsement validation will fail. *)
-
-type expected_endorsement =
-  | Expected_endorsement of {expected_features : expected_features}
-  | No_expected_branch_for_block_endorsement
-      (** The context contains no branch: this happens to the first block
-          that uses the Tenderbake consensus algorithm. This block contains
-          no endorsements. *)
-  | No_expected_branch_for_partial_construction_endorsement of {
-      expected_level : Raw_level.t;
-    }
-      (** Same as [No_expected_branch_for_block_endorsement]. This has a
-          separate constructor because the error raised is distinct: in
-          mempool mode, we simply assume that we have received a
-          preendorsement for a future block to which we have not switched
-          yet. *)
-  | No_predecessor_info_cannot_validate_endorsement
-      (** We do not have access to predecessor level, round, etc. so any
-          endorsement validation will fail. *)
-
-type all_expected_consensus_features = {
-  expected_preendorsement : expected_preendorsement;
-  expected_endorsement : expected_endorsement;
-  expected_grandparent_endorsement_for_partial_construction :
-    expected_features option;
-      (** This only has a value in Mempool mode and when the [ctxt] has a
-          [grandparent_branch]; it is [None] in all other cases. *)
-}
-
 type consensus_info = {
   predecessor_level : Raw_level.t;
   predecessor_round : Round.t;
-  all_expected_features : all_expected_consensus_features;
   preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
   endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
 }
 
-let init_consensus_info ctxt all_expected_features
-    (predecessor_level, predecessor_round) =
+let init_consensus_info ctxt (predecessor_level, predecessor_round) =
   {
     predecessor_level;
     predecessor_round;
-    all_expected_features;
     preendorsement_slot_map = Consensus.allowed_preendorsements ctxt;
     endorsement_slot_map = Consensus.allowed_endorsements ctxt;
   }
@@ -495,12 +425,9 @@ type validation_state = {
 
 let ok_unit = Result_syntax.return_unit
 
-let init_info ctxt mode chain_id ~predecessor_level_and_round
-    all_expected_consensus_characteristics =
+let init_info ctxt mode chain_id ~predecessor_level_and_round =
   let consensus_info =
-    Option.map
-      (init_consensus_info ctxt all_expected_consensus_characteristics)
-      predecessor_level_and_round
+    Option.map (init_consensus_info ctxt) predecessor_level_and_round
   in
   {
     ctxt;
@@ -541,123 +468,6 @@ let get_initial_ctxt {info; _} = info.ctxt
 (** Validation of consensus operations (validation pass [0]):
     preendorsement, endorsement, and dal_attestation. *)
 module Consensus = struct
-  let expected_endorsement_features ~predecessor_level ~predecessor_round branch
-      payload_hash =
-    {
-      level = predecessor_level.Level.level;
-      round = Some predecessor_round;
-      branch;
-      payload_hash;
-    }
-
-  (** Expected endorsement features for all modes in which a block is
-      considered: application, partial validation, and construction. *)
-  let expected_endorsement_for_block ctxt ~predecessor_level ~predecessor_round
-      : expected_endorsement =
-    match Consensus.endorsement_branch ctxt with
-    | None -> No_expected_branch_for_block_endorsement
-    | Some (branch, payload_hash) ->
-        let expected_features =
-          expected_endorsement_features
-            ~predecessor_level
-            ~predecessor_round
-            branch
-            payload_hash
-        in
-        Expected_endorsement {expected_features}
-
-  (** Retrieve the expected consensus features for both application and
-      partial validation modes. *)
-  let expected_features_for_application ctxt fitness payload_hash
-      ~predecessor_level ~predecessor_round ~predecessor_hash =
-    let expected_preendorsement =
-      match Fitness.locked_round fitness with
-      | None -> No_locked_round_for_block_validation_preendorsement
-      | Some locked_round ->
-          let expected_features =
-            {
-              level = (Level.current ctxt).level;
-              round = Some locked_round;
-              branch = predecessor_hash;
-              payload_hash;
-            }
-          in
-          let block_round = Some (Fitness.round fitness) in
-          Expected_preendorsement {expected_features; block_round}
-    in
-    let expected_endorsement =
-      expected_endorsement_for_block ctxt ~predecessor_level ~predecessor_round
-    in
-    {
-      expected_preendorsement;
-      expected_endorsement;
-      expected_grandparent_endorsement_for_partial_construction = None;
-    }
-
-  let expected_features_for_construction ctxt round payload_hash
-      ~predecessor_level ~predecessor_round ~predecessor_hash =
-    let expected_preendorsement =
-      if Block_payload_hash.(payload_hash = zero) then
-        (* When the proposal is fresh, a fake [payload_hash] of [zero]
-           has been provided. In this case, the block should not
-           contain any preendorsements. *)
-        Fresh_proposal_for_construction_preendorsement
-      else
-        let expected_features =
-          {
-            level = (Level.current ctxt).level;
-            round = None;
-            branch = predecessor_hash;
-            payload_hash;
-          }
-        in
-        Expected_preendorsement {expected_features; block_round = Some round}
-    in
-    let expected_endorsement =
-      expected_endorsement_for_block ctxt ~predecessor_level ~predecessor_round
-    in
-    {
-      expected_preendorsement;
-      expected_endorsement;
-      expected_grandparent_endorsement_for_partial_construction = None;
-    }
-
-  let expected_features_for_partial_construction ctxt ~predecessor_level
-      ~predecessor_round ~grandparent_round =
-    let expected_preendorsement, expected_endorsement =
-      match Consensus.endorsement_branch ctxt with
-      | None ->
-          let expected_level = predecessor_level.Level.level in
-          ( No_expected_branch_for_partial_construction_preendorsement
-              {expected_level},
-            No_expected_branch_for_partial_construction_endorsement
-              {expected_level} )
-      | Some (branch, payload_hash) ->
-          let expected_features =
-            expected_endorsement_features
-              ~predecessor_level
-              ~predecessor_round
-              branch
-              payload_hash
-          in
-          ( Expected_preendorsement {expected_features; block_round = None},
-            Expected_endorsement {expected_features} )
-    in
-    let expected_grandparent_endorsement_for_partial_construction =
-      match
-        ( Consensus.grand_parent_branch ctxt,
-          Raw_level.pred predecessor_level.level )
-      with
-      | None, _ | _, None -> None
-      | Some (branch, payload_hash), Some level ->
-          Some {level; round = Some grandparent_round; branch; payload_hash}
-    in
-    {
-      expected_preendorsement;
-      expected_endorsement;
-      expected_grandparent_endorsement_for_partial_construction;
-    }
-
   open Validate_errors.Consensus
 
   let check_frozen_deposits_are_positive ctxt delegate_pkh =
@@ -2661,16 +2471,8 @@ module Manager = struct
     return {info; operation_state; block_state}
 end
 
-let init_validation_state ctxt mode chain_id all_expected_consensus_features
-    ~predecessor_level_and_round =
-  let info =
-    init_info
-      ctxt
-      mode
-      chain_id
-      ~predecessor_level_and_round
-      all_expected_consensus_features
-  in
+let init_validation_state ctxt mode chain_id ~predecessor_level_and_round =
+  let info = init_info ctxt mode chain_id ~predecessor_level_and_round in
   let predecessor_level =
     match predecessor_level_and_round with
     | Some (predecessor_level, _) -> predecessor_level
@@ -2723,7 +2525,6 @@ let begin_any_application ctxt chain_id ~predecessor_level
       current_level
       ~round:block_header.protocol_data.contents.payload_round
   in
-  let payload_hash = block_header.protocol_data.contents.payload_hash in
   let predecessor_hash = block_header.shell.predecessor in
   let block_info =
     {
@@ -2738,23 +2539,13 @@ let begin_any_application ctxt chain_id ~predecessor_level
   let mode =
     if is_partial then Partial_validation block_info else Application block_info
   in
-  let all_expected_consensus_features =
-    Consensus.expected_features_for_application
-      ctxt
-      fitness
-      payload_hash
-      ~predecessor_level
-      ~predecessor_round
-      ~predecessor_hash
-  in
   let validation_state =
     init_validation_state
       ctxt
       mode
       chain_id
-      all_expected_consensus_features
       ~predecessor_level_and_round:
-        (Some (predecessor_level.level, predecessor_round))
+        (Some (predecessor_level.Level.level, predecessor_round))
   in
   return validation_state
 
@@ -2807,15 +2598,6 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
       current_level
       ~round:header_contents.payload_round
   in
-  let all_expected_consensus_features =
-    Consensus.expected_features_for_construction
-      ctxt
-      round
-      header_contents.payload_hash
-      ~predecessor_level
-      ~predecessor_round
-      ~predecessor_hash
-  in
   let validation_state =
     init_validation_state
       ctxt
@@ -2828,21 +2610,13 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
            header_contents;
          })
       chain_id
-      all_expected_consensus_features
       ~predecessor_level_and_round:
-        (Some (predecessor_level.level, predecessor_round))
+        (Some (predecessor_level.Level.level, predecessor_round))
   in
   return validation_state
 
 let begin_partial_construction ctxt chain_id ~predecessor_level
     ~predecessor_round ~grandparent_round =
-  let all_expected_consensus_features =
-    Consensus.expected_features_for_partial_construction
-      ctxt
-      ~predecessor_level
-      ~predecessor_round
-      ~grandparent_round
-  in
   let grandparent =
     Option.map
       (fun (hash, payload_hash) ->
@@ -2854,26 +2628,16 @@ let begin_partial_construction ctxt chain_id ~predecessor_level
       ctxt
       (Mempool grandparent)
       chain_id
-      all_expected_consensus_features
       ~predecessor_level_and_round:
-        (Some (predecessor_level.level, predecessor_round))
+        (Some (predecessor_level.Level.level, predecessor_round))
   in
   validation_state
 
 let begin_no_predecessor_info ctxt chain_id =
-  let all_expected_consensus_features =
-    {
-      expected_preendorsement =
-        No_predecessor_info_cannot_validate_preendorsement;
-      expected_endorsement = No_predecessor_info_cannot_validate_endorsement;
-      expected_grandparent_endorsement_for_partial_construction = None;
-    }
-  in
   init_validation_state
     ctxt
     (Mempool None)
     chain_id
-    all_expected_consensus_features
     ~predecessor_level_and_round:None
 
 let check_operation ?(check_signature = true) info (type kind)
