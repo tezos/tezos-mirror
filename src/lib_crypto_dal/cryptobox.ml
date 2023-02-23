@@ -324,111 +324,124 @@ module Inner = struct
   let ensure_validity ~slot_size ~page_size ~n ~k ~redundancy_factor
       ~number_of_shards ~shard_length ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
-    if not (is_power_of_two slot_size) then
-      (* According to the specification the length of a slot are in MiB *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "Slot size is expected to be a power of 2. Given: %d"
-             slot_size))
-    else if not (is_power_of_two page_size) then
-      (* According to the specification the lengths of a page are in MiB *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "Page size is expected to be a power of 2. Given: %d"
-             page_size))
-    else if not (is_power_of_two redundancy_factor && redundancy_factor >= 2)
-    then
-      (* The redundancy factor should be a power of 2 so that n is a power of 2
-          for proper FFT sizing. The variable [k] is assumed to be a power of 2
-          as the output of [slot_as_polynomial_length]. *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "Redundancy factor is expected to be a power of 2 and greater \
-              than 2. Given: %d"
-             redundancy_factor))
-    else if
-      (* At this point [n] is a power of 2, and [n > k]. *)
-      not (page_size >= 32 && page_size < slot_size)
-    then
-      (* The size of a page must be greater than 31 bytes (32 > 31 is the next
-         power of two), the size in bytes of a scalar element, and strictly less
-         than the slot size. *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "Page size is expected to be greater than '32' and strictly less \
-              than the slot_size '%d'. Got: %d"
-             slot_size
-             page_size))
-    else if not (Z.(log2 (of_int n)) <= 32) then
-      (* n must be at most 2^32, the cardinal of the biggest subgroup of 2^i
-         roots of unity in the multiplicative group of Fr, because the FFTs
-         operate on such groups. *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "Slot size is expected to be less than '%d'. Got: %d"
-             (1 lsl 36)
-             slot_size))
-    else if not (n mod number_of_shards == 0 && number_of_shards < n) then
-      (* The number of shards must divide n, so [number_of_shards <= n].
-         Moreover, the inequality is strict because if [number_of_shards = n],
-         the domains for the FFT contain only one element and we cannot build
-         FFT domains with only one element. Given that [n] is a power of two,
-         it follows that the maximum number of shards is [n/2]. *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "The number of shards must divide, and not be equal to %d. For \
-              the given parameter, the maximum number of shards is %d. Got: \
-              %d."
-             n
-             (n / 2)
-             number_of_shards))
-    else if 2 * shard_length >= k then
-      (* Since shard_length = n / number_of_shards, we obtain
-         (all quantities are positive integers):
-         2 * shard_length < k
-         => 2 (n / number_of_shards) < k
-         => 2 * n / k < number_of_shards
-         => 2 * redundancy_factor < number_of_shards
-         since number_of_shards is a power of 2 the minimum value for
-         number_of_shards is 4 * redundancy_factor *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "For the given parameters, the minimum number of shards is %d. \
-              Got %d."
-             (redundancy_factor * 4)
-             number_of_shards))
-    else if k > srs_g1_length then
-      (* the committed polynomials have degree t.k - 1 at most,
-         so t.k coefficients. *)
-      fail
-        (`Fail
-          (Format.asprintf
-             "SRS on G1 size is too small. Expected more than %d. Got %d"
-             k
-             srs_g1_length))
-    else if
-      let evaluations_per_proof_log =
-        evaluations_per_proof_log ~n ~number_of_shards
-      in
-      let srs_g2_expected_length =
-        max k (1 lsl evaluations_per_proof_log) + 1
-      in
-      srs_g2_expected_length > srs_g2_length
-    then
-      fail
-        (`Fail
-          (Format.asprintf
-             "SRS on G2 size is too small. Expected more than %d. Got %d"
-             k
-             srs_g2_length))
-    else return_unit
+    let assert_result condition error_message =
+      if not condition then fail (`Fail (error_message ())) else return_unit
+    in
+    let* () =
+      assert_result
+        (is_power_of_two slot_size)
+        (* According to the specification the length of a slot are in MiB *)
+        (fun () ->
+          Format.asprintf
+            "Slot size is expected to be a power of 2. Given: %d"
+            slot_size)
+    in
+    let* () =
+      assert_result
+        (is_power_of_two page_size)
+        (* According to the specification the lengths of a page are in MiB *)
+        (fun () ->
+          Format.asprintf
+            "Page size is expected to be a power of 2. Given: %d"
+            page_size)
+    in
+    let* () =
+      assert_result
+        (is_power_of_two redundancy_factor && redundancy_factor >= 2)
+        (* The redundancy factor should be a power of 2 so that n is a power of 2
+           for proper FFT sizing. The variable [k] is assumed to be a power of 2
+           as the output of [slot_as_polynomial_length]. *)
+          (fun () ->
+          Format.asprintf
+            "Redundancy factor is expected to be a power of 2 and greater than \
+             2. Given: %d"
+            redundancy_factor)
+    in
+
+    (* At this point [n] is a power of 2, and [n > k]. *)
+    let* () =
+      assert_result
+        (page_size >= 32 && page_size < slot_size)
+        (* The size of a page must be greater than 31 bytes (32 > 31 is the next
+           power of two), the size in bytes of a scalar element, and strictly less
+           than the slot size. *)
+          (fun () ->
+          Format.asprintf
+            "Page size is expected to be greater than '32' and strictly less \
+             than the slot_size '%d'. Got: %d"
+            slot_size
+            page_size)
+    in
+    let* () =
+      assert_result
+        (Z.(log2 (of_int n)) <= 32)
+        (* n must be at most 2^32, the cardinal of the biggest subgroup of 2^i
+           roots of unity in the multiplicative group of Fr, because the FFTs
+           operate on such groups. *)
+          (fun () ->
+          Format.asprintf
+            "Slot size is expected to be less than '%d'. Got: %d"
+            (1 lsl 36)
+            slot_size)
+    in
+    let* () =
+      assert_result
+        (n mod number_of_shards == 0 && number_of_shards < n)
+        (* The number of shards must divide n, so [number_of_shards <= n].
+           Moreover, the inequality is strict because if [number_of_shards = n],
+           the domains for the FFT contain only one element and we cannot build
+           FFT domains with only one element. Given that [n] is a power of two,
+           it follows that the maximum number of shards is [n/2]. *)
+          (fun () ->
+          Format.asprintf
+            "The number of shards must divide, and not be equal to %d. For the \
+             given parameter, the maximum number of shards is %d. Got: %d."
+            n
+            (n / 2)
+            number_of_shards)
+    in
+    let* () =
+      assert_result
+        (2 * shard_length < k)
+        (* Since shard_length = n / number_of_shards, we obtain
+           (all quantities are positive integers):
+           2 * shard_length < k
+           => 2 (n / number_of_shards) < k
+           => 2 * n / k < number_of_shards
+           => 2 * redundancy_factor < number_of_shards
+           since number_of_shards is a power of 2 the minimum value for
+           number_of_shards is 4 * redundancy_factor *)
+          (fun () ->
+          Format.asprintf
+            "For the given parameters, the minimum number of shards is %d. Got \
+             %d."
+            (redundancy_factor * 4)
+            number_of_shards)
+    in
+    let* () =
+      assert_result
+        (k <= srs_g1_length)
+        (* The committed polynomials have degree t.k - 1 at most,
+           so t.k coefficients. *)
+        (fun () ->
+          Format.asprintf
+            "SRS on G1 size is too small. Expected more than %d. Got %d"
+            k
+            srs_g1_length)
+    in
+    assert_result
+      (let evaluations_per_proof_log =
+         evaluations_per_proof_log ~n ~number_of_shards
+       in
+       let srs_g2_expected_length =
+         max k (1 lsl evaluations_per_proof_log) + 1
+       in
+       srs_g2_expected_length <= srs_g2_length)
+      (fun () ->
+        Format.asprintf
+          "SRS on G2 size is too small. Expected more than %d. Got %d"
+          k
+          srs_g2_length)
 
   type parameters = {
     redundancy_factor : int;
