@@ -12,7 +12,8 @@
   tezos-client-base
   tezos-client-base-unix
   tezos-client-alpha
-  tezos-smart-rollup-alpha)
+  tezos-smart-rollup-alpha
+  tezos-smart-rollup-layer2-alpha)
  (flags
   (:standard)
   -open Tezos_base
@@ -23,4 +24,5 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_alpha
-  -open Tezos_smart_rollup_alpha))
+  -open Tezos_smart_rollup_alpha
+  -open Tezos_smart_rollup_layer2_alpha))

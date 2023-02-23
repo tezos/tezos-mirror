@@ -26,6 +26,7 @@ depends: [
   "tezos-dal-node-lib"
   "tezos-shell-services"
   "tezos-smart-rollup-alpha"
+  "tezos-smart-rollup-layer2-alpha"
   "tezos-layer2-utils-alpha"
   "tezos-layer2-store"
   "tezos-tree-encoding"

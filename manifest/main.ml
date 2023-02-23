@@ -4587,6 +4587,18 @@ module Protocol = Protocol
             ])
         ~bisect_ppx:false
     in
+    let octez_sc_rollup =
+      only_if N.(number >= 016) @@ fun () ->
+      public_lib
+        (sf "tezos-smart-rollup-%s" name_dash)
+        ~path:(path // "lib_sc_rollup")
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library of helpers for \
+           `tezos-smart-rollup`"
+        ~deps:[octez_base |> open_ ~m:"TzPervasives"; main |> open_]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
     let plugin =
       only_if (N.(number >= 007) && not_overridden) @@ fun () ->
       public_lib
@@ -5076,11 +5088,11 @@ module Protocol = Protocol
         ~inline_tests:ppx_expect
         ~linkall:true
     in
-    let octez_sc_rollup =
+    let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
       public_lib
-        (sf "tezos-smart-rollup-%s" name_dash)
-        ~path:(path // "lib_sc_rollup")
+        (sf "tezos-smart-rollup-layer2-%s" name_dash)
+        ~path:(path // "lib_sc_rollup_layer2")
         ~synopsis:
           "Tezos/Protocol: protocol specific library for `tezos-smart-rollup`"
         ~deps:
@@ -5119,6 +5131,7 @@ module Protocol = Protocol
             octez_dal_node_lib |> open_;
             octez_shell_services |> open_;
             octez_sc_rollup |> if_some |> open_;
+            octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
             tree_encoding;
@@ -5152,6 +5165,7 @@ module Protocol = Protocol
             octez_client_base_unix |> open_;
             client |> if_some |> open_;
             octez_sc_rollup |> if_some |> open_;
+            octez_sc_rollup_layer2 |> if_some |> open_;
           ]
     in
     let _sc_rollup_client =
