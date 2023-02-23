@@ -32,6 +32,9 @@
  (libraries
   src_proto_015_PtLimaPt_lib_protocol_test_regression_tezt_lib
   tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
 (rule

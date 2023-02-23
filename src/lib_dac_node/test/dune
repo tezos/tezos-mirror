@@ -11,6 +11,9 @@
   tezos-base-test-helpers
   tezos_dac_node_lib
   alcotest-lwt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_stdlib

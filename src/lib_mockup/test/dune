@@ -31,6 +31,9 @@
  (libraries
   src_lib_mockup_test_tezt_lib
   tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
 (rule (alias runtezt) (package tezos-mockup) (action (run %{dep:./main.exe})))
