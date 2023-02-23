@@ -13,8 +13,6 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "tezos-protocol-016-PtMumbai"
-  "tezos-protocol-plugin-016-PtMumbai"
-  "tezos-rpc"
   "octez-injector"
 ]
 build: [

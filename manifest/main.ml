@@ -5087,9 +5087,6 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives";
             main |> open_;
-            plugin |> if_some |> open_;
-            parameters |> if_some |> open_;
-            octez_rpc;
             octez_injector |> open_;
           ]
         ~inline_tests:ppx_expect
