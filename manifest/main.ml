@@ -4437,6 +4437,7 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             main |> open_;
+            octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
           ]
         ~all_modules_except:["Plugin_registerer"]
         ~bisect_ppx:N.(number >= 008)
