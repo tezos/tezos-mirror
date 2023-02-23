@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -11,9 +12,9 @@ edition = '2021'
 crate-type = ["cdylib"]
 
 [dependencies]
-kernel = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4", default-features = false }
-host = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4"  }
-debug = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4" }
-mock_runtime = { git = "https://gitlab.com/tezos/kernel", rev= "826e47a4", default-features = false }
+kernel = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
+host = { git = "https://gitlab.com/tezos/kernel", branch = "main"  }
+debug = { git = "https://gitlab.com/tezos/kernel", branch = "main" }
+mock_runtime = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
 
 num-bigint = "0.3"
