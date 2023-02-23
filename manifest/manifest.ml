@@ -2013,16 +2013,17 @@ let generate_dune (internal : Target.internal) =
   in
   let link_flags =
     let linkall = internal.linkall && not is_lib in
-    let static =
+    let static_flags =
       if internal.static then
-        Some Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]
-      else None
+        [Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]]
+      else []
     in
-    match (linkall, static) with
-    | false, None -> None
-    | true, None -> Some [Dune.[S ":standard"; S "-linkall"]]
-    | false, Some static -> Some [[S ":standard"]; static]
-    | true, Some static -> Some [[S ":standard"; S "-linkall"]; static]
+    let includes_list = static_flags in
+    if linkall then Some (Dune.[S ":standard"; S "-linkall"] :: includes_list)
+    else
+      match includes_list with
+      | [] -> None
+      | _ -> Some (Dune.[S ":standard"] :: includes_list)
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
