@@ -1865,6 +1865,12 @@ let parse_toplevel :
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
           ({code_field = c; arg_type; views; storage_type = s}, ctxt))
 
+(* Normalize lambdas during parsing *)
+
+let normalized_lam ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
+  unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) Optimized code_field
+  >|=? fun (code_field, ctxt) -> (Lam (kdescr, code_field), ctxt)
+
 (* -- parse data of any type -- *)
 
 (*
@@ -2081,7 +2087,13 @@ let rec parse_data :
            ta
            tr
            script_instr
-      >|=? fun (kdescr, ctxt) -> (Lam (kdescr, script_instr), ctxt)
+      >>=? fun (kdescr, ctxt) ->
+      (normalized_lam [@ocaml.tailcall])
+        ~unparse_code_rec
+        ctxt
+        ~stack_depth
+        kdescr
+        script_instr
   | ( Lambda_t (ta, tr, _ty_name),
       Prim (loc, D_Lambda_rec, [(Seq (_loc, _) as script_instr)], []) ) ->
       traced
@@ -3414,6 +3426,8 @@ and parse_instr :
         ret
         code
       >>=? fun (kdescr, ctxt) ->
+      (* No need to normalize the unparsed component to Optimized mode here
+         because the script is already normalized in Optimized mode. *)
       let instr = {apply = (fun k -> ILambda (loc, Lam (kdescr, code), k))} in
       lambda_t loc arg ret >>?= fun ty ->
       let stack = Item_t (ty, stack) in
