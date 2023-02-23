@@ -1,0 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name octez-testnet-scenarios)
+ (package octez-testnet-scenarios)
+ (libraries
+  tezt
+  tezt-tezos)
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax))

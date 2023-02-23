@@ -3250,6 +3250,20 @@ let octez_shell_benchmarks =
       ]
     ~linkall:true
 
+let _tezt_testnet_scenarios =
+  public_exe
+    "octez-testnet-scenarios"
+    ~internal_name:"main"
+    ~path:"src/bin_testnet_scenarios"
+    ~synopsis:"Run scenarios on testnets"
+    ~bisect_ppx:false
+    ~static:false
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+      ]
+
 let octez_openapi =
   public_lib
     "tezos-openapi"

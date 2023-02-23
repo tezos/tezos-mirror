@@ -26,6 +26,7 @@
 (package (name octez-smart-rollup-node-alpha))
 (package (name octez-smart-rollup-wasm-debugger))
 (package (name octez-snoop))
+(package (name octez-testnet-scenarios))
 (package (name octez-tx-rollup-client-PtLimaPt))
 (package (name octez-tx-rollup-node-PtLimaPt))
 (package (name tezos-015-PtLimaPt-test-helpers))
