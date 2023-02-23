@@ -12,8 +12,6 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "tezos-protocol-alpha"
-  "tezos-protocol-plugin-alpha"
-  "tezos-rpc"
   "tezos-injector-alpha"
 ]
 build: [

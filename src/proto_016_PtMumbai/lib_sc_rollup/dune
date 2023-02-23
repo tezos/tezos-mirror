@@ -8,9 +8,6 @@
  (libraries
   tezos-base
   tezos-protocol-016-PtMumbai
-  tezos-protocol-plugin-016-PtMumbai
-  tezos-protocol-016-PtMumbai.parameters
-  tezos-rpc
   tezos-injector-016-PtMumbai)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -19,6 +16,4 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_016_PtMumbai
-  -open Tezos_protocol_plugin_016_PtMumbai
-  -open Tezos_protocol_016_PtMumbai_parameters
   -open Tezos_injector_016_PtMumbai))
