@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Protocol.Alpha_context
 
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
+module Arith_pvm_in_memory :
+  Sc_rollup.PVM.S
+    with type context = Context_helpers.In_memory.Tree.t
+     and type state = Context_helpers.In_memory.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t =
+  Sc_rollup.ArithPVM.Make (Context_helpers.In_memory)
 
-module EpoxyEntity = struct
-  include Zk_rollup.Address
-
-  let of_source s =
-    let open Lwt_result_syntax in
-    let* rollup =
-      match Zk_rollup.Address.of_b58check_opt s with
-      | None -> tzfail @@ error_of_fmt "bad epoxy notation"
-      | Some rollup -> return rollup
-    in
-    return rollup
-
-  let to_source rollup = return (Zk_rollup.Address.to_b58check rollup)
-
-  let name = "epoxy"
-end
-
-module EpoxyAlias = Client_aliases.Alias (EpoxyEntity)
+module Wasm_pvm_in_memory :
+  Sc_rollup.PVM.S
+    with type context = Context_helpers.In_memory.Tree.t
+     and type state = Context_helpers.In_memory.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t =
+  Sc_rollup.Wasm_2_0_0PVM.Make
+    (Environment.Wasm_2_0_0.Make)
+    (Context_helpers.In_memory)

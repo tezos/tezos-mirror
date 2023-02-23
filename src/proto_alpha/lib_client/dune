@@ -17,6 +17,7 @@
   tezos-protocol-plugin-alpha
   tezos-protocol-alpha.parameters
   tezos-rpc
+  tezos-smart-rollup-alpha
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -29,4 +30,5 @@
   -open Tezos_client_base
   -open Tezos_protocol_alpha
   -open Tezos_protocol_plugin_alpha
-  -open Tezos_protocol_alpha_parameters))
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_smart_rollup_alpha))

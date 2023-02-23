@@ -20,6 +20,7 @@ depends: [
   "tezos-signer-backends"
   "tezos-protocol-plugin-alpha"
   "tezos-rpc"
+  "tezos-smart-rollup-alpha"
   "uri" { >= "3.1.0" }
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}
