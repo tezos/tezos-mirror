@@ -19,4 +19,5 @@
                    -open Tezos_shell
                    -open Tezos_store
                    -open Tezos_protocol_updater
-                   -linkall)))
+                   -linkall
+                   (:include %{workspace_root}/macos-link-flags.sexp))))

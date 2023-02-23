@@ -22,7 +22,9 @@
   tezos-base
   tezos-protocol-011-PtHangz2.parameters)
  (link_flags
-  (:standard -linkall))
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

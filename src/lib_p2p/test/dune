@@ -27,7 +27,8 @@
   alcotest-lwt
   astring)
  (link_flags
-  (:standard -linkall))
+  (:standard)
+  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

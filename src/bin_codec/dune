@@ -56,8 +56,10 @@
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty)))
  (link_flags
-  (:standard -linkall)
-  (:include %{workspace_root}/static-link-flags.sexp))
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
   -open Data_encoding

@@ -13,3 +13,10 @@
  (target static-link-flags.sexp)
  (action (with-stdout-to %{target}
   (system "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev)' || echo '()'"))))
+
+; This file is included in the link_flags stanza of binaries and static libraries
+; for which we should include -ccopt "-framework Security" on macOS.
+(rule
+ (target macos-link-flags.sexp)
+ (action (with-stdout-to %{target}
+  (system "[ '%{system}' = 'macosx' ] && echo '(-ccopt \"-framework Security\")' || echo '()'"))))

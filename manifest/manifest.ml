@@ -1045,6 +1045,7 @@ module Target = struct
     license : string option;
     extra_authors : string list;
     ctypes : Ctypes.t option;
+    with_macos_security_framework : bool;
   }
 
   and preprocessor = PPS of t * string list | Staged_PPS of t list
@@ -1227,6 +1228,7 @@ module Target = struct
     ?cram:bool ->
     ?license:string ->
     ?extra_authors:string list ->
+    ?with_macos_security_framework:bool ->
     path:string ->
     'a ->
     t option
@@ -1276,7 +1278,8 @@ module Target = struct
       ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ~path names =
+      ?(extra_authors = []) ?(with_macos_security_framework = false) ~path names
+      =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1592,6 +1595,7 @@ module Target = struct
         license;
         extra_authors;
         ctypes;
+        with_macos_security_framework;
       }
 
   let public_lib ?internal_name =
@@ -1788,13 +1792,14 @@ type tezt_target = {
   modes : Dune.mode list option;
   synopsis : string option;
   opam_with_test : with_test option;
+  with_macos_security_framework : bool;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_files = []) ?synopsis
-    ?opam_with_test modules =
+    ?opam_with_test ?(with_macos_security_framework = false) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1811,6 +1816,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       modes;
       synopsis;
       opam_with_test;
+      with_macos_security_framework;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
@@ -1830,6 +1836,7 @@ let register_tezt_targets ~make_tezt_exe =
         modes;
         synopsis;
         opam_with_test;
+        with_macos_security_framework;
       } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
@@ -1853,6 +1860,7 @@ let register_tezt_targets ~make_tezt_exe =
           exe_name
           ~alias:"runtezt"
           ~path
+          ~with_macos_security_framework
           ~opam
           ?synopsis
           ?js_compatible
@@ -2005,16 +2013,20 @@ let generate_dune (internal : Target.internal) =
   in
   let link_flags =
     let linkall = internal.linkall && not is_lib in
-    let static =
+    let static_flags =
       if internal.static then
-        Some Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]
-      else None
+        [Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]]
+      else []
     in
-    match (linkall, static) with
-    | false, None -> None
-    | true, None -> Some [Dune.[S ":standard"; S "-linkall"]]
-    | false, Some static -> Some [[S ":standard"]; static]
-    | true, Some static -> Some [[S ":standard"; S "-linkall"]; static]
+    let macos_link_flags =
+      if internal.with_macos_security_framework then
+        [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
+      else []
+    in
+    let linkall_flags = if linkall then [Dune.[S "-linkall"]] else [] in
+    List.concat [static_flags; macos_link_flags; linkall_flags] |> function
+    | [] -> None
+    | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))

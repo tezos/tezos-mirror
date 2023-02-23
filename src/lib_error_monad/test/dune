@@ -25,6 +25,9 @@
  (libraries
   src_lib_error_monad_test_tezt_lib
   tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
 (rule
@@ -43,6 +46,9 @@
   src_lib_error_monad_test_tezt_lib
   tezt.js)
  (js_of_ocaml)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main_js))
 
 (rule
