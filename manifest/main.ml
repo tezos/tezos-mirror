@@ -4655,6 +4655,7 @@ module Protocol = Protocol
             octez_rpc;
             octez_client_commands |> if_ N.(number == 000) |> open_;
             octez_stdlib_unix |> if_ N.(number == 000);
+            octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
             uri |> if_ N.(number >= 001);
           ]
         ~bisect_ppx:N.(number >= 008)
