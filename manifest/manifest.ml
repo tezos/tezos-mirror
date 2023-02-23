@@ -2003,12 +2003,15 @@ let generate_dune (internal : Target.internal) =
         [Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]]
       else []
     in
-    let includes_list = static_flags in
-    if linkall then Some (Dune.[S ":standard"; S "-linkall"] :: includes_list)
-    else
-      match includes_list with
-      | [] -> None
-      | _ -> Some (Dune.[S ":standard"] :: includes_list)
+    let macos_link_flags =
+      if internal.with_macos_security_framework then
+        [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
+      else []
+    in
+    let linkall_flags = if linkall then [Dune.[S "-linkall"]] else [] in
+    List.concat [static_flags; macos_link_flags; linkall_flags] |> function
+    | [] -> None
+    | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
