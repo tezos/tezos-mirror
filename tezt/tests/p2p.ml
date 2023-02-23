@@ -382,6 +382,13 @@ end
 module Swap = struct
   module StringSet = Set.Make (String)
 
+  let run_node ?patch_config node =
+    let* () = Node.identity_generate node in
+    let* () = Node.config_init node [] in
+    Option.iter (Node.Config_file.update node) patch_config ;
+    let* () = Node.run node [] in
+    Node.wait_for_ready node
+
   (* Tests the swap mechanism.
      - Create the following topology:
        1b-1a-swaper-2a-2b
@@ -390,7 +397,11 @@ module Swap = struct
      - Check logs for swap request events
      - Check that the new topology is one of the following:
        1b-swaper-1a-2a-2b if swaper sent its request to 1a or
-       1b-1a-2a-swaper-2b if swaper sent its request to 2a. *)
+       1b-1a-2a-swaper-2b if swaper sent its request to 2a.
+
+     If [disable_swap = true], checks that disabled nodes does not answer to
+     swap request. Disable the swap for nodes 1a and 1b and check that swaper
+     does not receive a swap ack after it sends a swap request. *)
 
   (* NOTE: This test has previously been flaky because of some race conditions that
      where caused by inconsistencies regarding the way the maintenance was
@@ -403,25 +414,27 @@ module Swap = struct
      as a connection is added (before removing the replaced one), the number
      of connections was equal to [3]. The maintainance was then triggered
      unexpectedly. This should not occur anymore. *)
-  let test_swap_raw () =
-    let create_node name = Node.create ~name [Disable_p2p_maintenance] in
-    let run_node node =
-      let patch_config =
-        JSON.update
-          "p2p"
-          (JSON.put
-             ( "disable_peer_discovery",
-               JSON.parse ~origin:__LOC__ (Bool.to_string true) ))
-      in
-      let* () = Node.identity_generate node in
-      let* () = Node.config_init node [] in
-      Node.Config_file.update node patch_config ;
-      let* () = Node.run node [] in
-      Node.wait_for_ready node
+  let test_swap_raw ?(disable_swap = false) () =
+    let create_node name params =
+      Node.create ~name (Disable_p2p_maintenance :: params)
+    in
+    let run_node =
+      run_node
+        ~patch_config:
+          (JSON.update
+             "p2p"
+             (JSON.put
+                ( "disable_peer_discovery",
+                  JSON.parse ~origin:__LOC__ (Bool.to_string true) )))
     in
     let filter_get_peer json =
       let peer = JSON.(json |-> "proposed_peer" |> as_string) in
       Some peer
+    in
+    let filter_fail _ =
+      Test.fail
+        "Swap ack should not be send by node_1a or node_2a because it is \
+         disabled"
     in
     let wait_swap_request_received node =
       let* peer =
@@ -477,18 +490,22 @@ module Swap = struct
           conn_ids ;
       unit
     in
-    let node_1a = create_node "1a" in
-    let node_1b = create_node "1b" in
-    let node_2a = create_node "2a" in
-    let node_2b = create_node "2b" in
-    let swaper = Node.create ~name:"swaper" [Connections 2] in
+    let prefix, params =
+      if disable_swap then ("disable.", [Node.Disable_p2p_swap]) else ("", [])
+    in
+    let node_1a = create_node (prefix ^ "1a") params in
+    let node_1b = create_node (prefix ^ "1b") params in
+    let node_2a = create_node (prefix ^ "2a") params in
+    let node_2b = create_node (prefix ^ "2b") params in
+    let swaper = Node.create ~name:(prefix ^ "swaper") [Connections 2] in
     let nodes = [node_1a; node_1b; node_2a; node_2b; swaper] in
     let swap_request_received =
       Lwt.pick
         [wait_swap_request_received node_1a; wait_swap_request_received node_2a]
     in
+    let filter = if disable_swap then filter_fail else filter_get_peer in
     let swap_ack_received =
-      Node.wait_for swaper "swap_ack_received.v0" filter_get_peer
+      Node.wait_for swaper "swap_ack_received.v0" filter
     in
     let swap_succeeded =
       let* node =
@@ -541,7 +558,41 @@ module Swap = struct
     Test.register ~__FILE__ ~title:"p2p-swap" ~tags:["p2p"; "node"; "swap"]
     @@ fun () -> test_swap_raw ()
 
-  let tests () = test_swap ()
+  (* Checks that nodes with swap disabled neither respond to swap request nor
+     send swap request. *)
+  let test_swap_disable () =
+    Test.register
+      ~__FILE__
+      ~title:"p2p-swap-disable"
+      ~tags:["p2p"; "node"; "swap"]
+    @@ fun () ->
+    (* Test that nodes with swap disabled does not answer to swap requests. *)
+    let _ = test_swap_raw ~disable_swap:true () in
+    (* Test that nodes with swap disabled does not send swap requests.
+       Launch a node with swap disabled and 2 neighbors and checks that it does
+       not send swap request. *)
+    let* node1 = Node.init [Disable_p2p_maintenance] in
+    let* node2 = Node.init [Disable_p2p_maintenance] in
+    let center = Node.create [Disable_p2p_swap; Connections 2] in
+    Node.add_peer center node1 ;
+    Node.add_peer center node2 ;
+    let swap_request_received node =
+      Node.wait_for node "swap_request_received.v0" (fun _ ->
+          Test.fail "Node with swap disabled should not send swap request")
+    in
+    let _ = swap_request_received node1 in
+    let _ = swap_request_received node2 in
+    (* Test Succeed after 10 sec + normal test finished *)
+    let* () = Lwt_unix.sleep 10. in
+    (* Since we try to verify that something does not happen, we need to find
+       when we consider having waited enough time to consider the event will
+       not happen. The idea is to define this duration from the duration that
+       it takes to have the thing to happen in a normal situation. *)
+    test_swap_raw ()
+
+  let tests () =
+    test_swap () ;
+    test_swap_disable ()
 end
 
 let port_from_peers_file file_name =

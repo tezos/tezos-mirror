@@ -47,6 +47,7 @@ type argument =
   | Connections of int
   | Private_mode
   | Disable_p2p_maintenance
+  | Disable_p2p_swap
   | Peer of string
   | No_bootstrap_peers
   | Disable_operations_precheck
@@ -75,6 +76,7 @@ let make_argument = function
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
   | Disable_p2p_maintenance -> ["--disable-p2p-maintenance"]
+  | Disable_p2p_swap -> ["--disable-p2p-swap"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
   | Disable_operations_precheck -> ["--disable-mempool-precheck"]
@@ -102,6 +104,7 @@ let is_redundant = function
   | Connections _, Connections _
   | Private_mode, Private_mode
   | Disable_p2p_maintenance, Disable_p2p_maintenance
+  | Disable_p2p_swap, Disable_p2p_swap
   | No_bootstrap_peers, No_bootstrap_peers
   | Disable_operations_precheck, Disable_operations_precheck
   | Media_type _, Media_type _
@@ -120,6 +123,7 @@ let is_redundant = function
   | Connections _, _
   | Private_mode, _
   | Disable_p2p_maintenance, _
+  | Disable_p2p_swap, _
   | No_bootstrap_peers, _
   | Disable_operations_precheck, _
   | Media_type _, _
