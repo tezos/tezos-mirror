@@ -13,7 +13,6 @@ depends: [
   "tezos-base"
   "tezos-clic"
   "tezos-tree-encoding"
-  "tezos-base-test-helpers"
   "tezos-client-alpha"
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-helpers"

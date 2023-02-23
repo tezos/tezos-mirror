@@ -491,15 +491,28 @@ module Kernels = struct
   let unreachable_kernel = "unreachable"
 end
 
+let project_root =
+  match Sys.getenv_opt "DUNE_SOURCEROOT" with
+  | Some x -> x
+  | None -> (
+      match Sys.getenv_opt "PWD" with
+      | Some x -> x
+      | None ->
+          (* For some reason, under [dune runtest], [PWD] and
+             [getcwd] have different values. [getcwd] is in
+             [_build/default], and [PWD] is where [dune runtest] was
+             executed, which is closer to what we want. *)
+          Sys.getcwd ())
+
+let ( // ) = Filename.concat
+
 let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
-  let open Tezt.Base in
   let open Lwt_result_syntax in
-  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
-     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let kernel_file =
     project_root // Filename.dirname __FILE__ // "../test/wasm_kernels"
     // (kernel ^ ".wasm")
   in
+
   let* () =
     Lwt_io.with_file ~mode:Lwt_io.Input kernel_file (fun channel ->
         let*! kernel = Lwt_io.read channel in
@@ -508,9 +521,6 @@ let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
   return_unit
 
 let read_test_messages names =
-  let open Tezt.Base in
-  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
-     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let locate_file name =
     project_root // Filename.dirname __FILE__ // "../test/messages" // name
   in

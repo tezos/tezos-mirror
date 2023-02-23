@@ -11,7 +11,6 @@
   tezos-clic
   tezos-tree-encoding
   tezos-base.unix
-  tezos-base-test-helpers
   tezos-client-alpha
   tezos-scoru-wasm
   tezos-scoru-wasm-helpers
@@ -24,7 +23,6 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base_test_helpers
   -open Tezos_scoru_wasm_helpers
   -open Tezos_webassembly_interpreter
   -open Tezos_webassembly_interpreter_extra))
