@@ -17,6 +17,7 @@
   tezos-protocol-plugin-016-PtMumbai
   tezos-protocol-016-PtMumbai.parameters
   tezos-rpc
+  tezos-smart-rollup-016-PtMumbai
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -29,4 +30,5 @@
   -open Tezos_client_base
   -open Tezos_protocol_016_PtMumbai
   -open Tezos_protocol_plugin_016_PtMumbai
-  -open Tezos_protocol_016_PtMumbai_parameters))
+  -open Tezos_protocol_016_PtMumbai_parameters
+  -open Tezos_smart_rollup_016_PtMumbai))
