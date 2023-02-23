@@ -1421,8 +1421,8 @@ let octez_workers =
       ]
 
 let _octez_workers_tests =
-  tests
-    ["test_workers_unit"]
+  tezt
+    ["mocked_worker"; "test_workers_unit"]
     ~path:"src/lib_workers/test"
     ~opam:"tezos-workers"
     ~deps:
@@ -1434,7 +1434,7 @@ let _octez_workers_tests =
         octez_workers |> open_;
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_context_sigs =

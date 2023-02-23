@@ -1296,7 +1296,7 @@ opam:tezos-proxy:
 opam:tezos-proxy-server-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-proxy-server-config
 
@@ -1526,7 +1526,7 @@ opam:tezos-webassembly-interpreter-extra:
 opam:tezos-workers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-workers
 
