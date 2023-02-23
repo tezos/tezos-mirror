@@ -123,7 +123,7 @@ module Handler = struct
     let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
       let*! payload_result =
-        Pages_encoding.Merkle_tree.V0_remote.deserialize_payload
+        Pages_encoding.Merkle_tree.V0.Remote.deserialize_payload
           dac_plugin
           ~page_store:remote_store
           root_hash

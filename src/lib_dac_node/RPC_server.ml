@@ -70,7 +70,10 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
            Tezt for testing streaming of root hashes should also use
            the new endpoint. *)
         let* root_hash =
-          Merkle_tree.V0.serialize_payload dac_plugin ~page_store data
+          Merkle_tree.V0.Filesystem.serialize_payload
+            dac_plugin
+            ~page_store
+            data
         in
         let* () = Data_streamer.publish hash_streamer root_hash in
         let*! () =

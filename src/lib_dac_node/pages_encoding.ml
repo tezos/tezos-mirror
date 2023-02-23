@@ -578,12 +578,17 @@ module Merkle_tree = struct
     let max_page_size = 4096
   end
 
-  module V0_Buffered =
-    Make_buffered (Page_store.Filesystem) (V0_metadata) (V0_page_size)
-  module V0 = Make (V0_Buffered)
-  module V0_buffered_remote =
-    Make_buffered (Page_store.Remote) (V0_metadata) (V0_page_size)
-  module V0_remote = Make (V0_buffered_remote)
+  module V0_Buffered = struct
+    module Filesystem =
+      Make_buffered (Page_store.Filesystem) (V0_metadata) (V0_page_size)
+    module Remote =
+      Make_buffered (Page_store.Remote) (V0_metadata) (V0_page_size)
+  end
+
+  module V0 = struct
+    module Filesystem = Make (V0_Buffered.Filesystem)
+    module Remote = Make (V0_Buffered.Remote)
+  end
 
   module Internal_for_tests = struct
     module Make_buffered = Make_buffered

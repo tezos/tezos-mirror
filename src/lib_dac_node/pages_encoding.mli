@@ -153,13 +153,11 @@ end
     hashing schemes to be used.
  *)
 module Merkle_tree : sig
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4662
-     Remove `page_store = string` when Hash_chain is removed
-     Context https://gitlab.com/tezos/tezos/-/merge_requests/7465#note_1247831273
-  *)
-  module V0 : Dac_codec with type page_store = Page_store.Filesystem.t
+  module V0 : sig
+    module Filesystem : Dac_codec with type page_store = Page_store.Filesystem.t
 
-  module V0_remote : Dac_codec with type page_store = Page_store.Remote.t
+    module Remote : Dac_codec with type page_store = Page_store.Remote.t
+  end
 
   (**/**)
 
