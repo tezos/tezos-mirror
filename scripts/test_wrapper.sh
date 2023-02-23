@@ -21,14 +21,17 @@ echo "Running test \"dune build ${COVERAGE_OPTIONS:-} $*\" ..."
 
 START=$(date +%s.%N)
 
-EXITCODE=0
-# TODO: https://gitlab.com/tezos/tezos/-/issues/3018
-# Disable verbose once the log file bug in Alcotest is fixed.
-# If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
-# We need this to be word split for the arguments to be properly parsed by dune.
-# shellcheck disable=SC2086
-dune build --error-reporting=twice ${COVERAGE_OPTIONS:-} "$@" 2>&1 | tee "test_results/$name.log" \
-    || EXITCODE=$?
+exitcode_file=$(mktemp)
+{
+    echo "0" > "$exitcode_file" ;
+    # If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
+    # We need this to be word split for the arguments to be properly parsed by dune.
+    # shellcheck disable=SC2086
+    dune build --error-reporting=twice ${COVERAGE_OPTIONS:-} "$@" 2>&1 ||
+        echo "$?" > "$exitcode_file" ;
+} | tee "test_results/$name.log"
+EXITCODE=$(cat "$exitcode_file")
+rm "$exitcode_file"
 
 END=$(date +%s.%N)
 
@@ -42,13 +45,11 @@ ds=$(echo "$dt3-60*$dm" | bc)
 
 LC_NUMERIC=C printf "Total runtime: %02d:%02d:%02.4f\n" "$dh" "$dm" "$ds"
 
-if [ $EXITCODE -eq 0 ]; then
+if [ "$EXITCODE" -eq 0 ]; then
   echo "Ok";
   nb_fail=0
 else
-  echo "Error";
-  echo "Exited with exitcode $EXITCODE"
-  cat "test_results/$name.log"
+  echo "Error: exited with exitcode $EXITCODE. See full logs in test_results/$name.log"
   nb_fail=1
 fi
 
@@ -62,7 +63,7 @@ cat > "test_results/$name.xml" <<EOF
     <testcase classname="${name}" name="${name}" time="${dt}">
 EOF
 
-if [ ! $EXITCODE -eq 0 ]; then
+if [ ! "$EXITCODE" -eq 0 ]; then
     msg="Exited with exitcode $EXITCODE."
 
     # Add link to log artifact when running in CI
@@ -82,4 +83,4 @@ cat >> "test_results/$name.xml" <<EOF
 </testsuites>
 EOF
 
-exit $EXITCODE
+exit "$EXITCODE"
