@@ -62,11 +62,6 @@ module Consensus_conflict_map = Map.Make (struct
 end)
 
 type consensus_state = {
-  (* The [predecessor_level] is needed here, despite being also in
-     {!consensus_info}, because it allows to identify grandparent
-     endorsements in [check_endorsement_conflict] where we only have
-     access to the [consensus_state]. *)
-  predecessor_level : Raw_level.t;
   preendorsements_seen : Operation_hash.t Consensus_conflict_map.t;
   endorsements_seen : Operation_hash.t Consensus_conflict_map.t;
   dal_attestation_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
@@ -88,37 +83,19 @@ let consensus_state_encoding =
   let open Data_encoding in
   def "consensus_state"
   @@ conv
-       (fun {
-              predecessor_level;
-              preendorsements_seen;
-              endorsements_seen;
-              dal_attestation_seen;
-            } ->
-         ( predecessor_level,
-           preendorsements_seen,
-           endorsements_seen,
-           dal_attestation_seen ))
-       (fun ( predecessor_level,
-              preendorsements_seen,
-              endorsements_seen,
-              dal_attestation_seen ) ->
-         {
-           predecessor_level;
-           preendorsements_seen;
-           endorsements_seen;
-           dal_attestation_seen;
-         })
-       (obj4
-          (req "predecessor_level" Raw_level.encoding)
+       (fun {preendorsements_seen; endorsements_seen; dal_attestation_seen} ->
+         (preendorsements_seen, endorsements_seen, dal_attestation_seen))
+       (fun (preendorsements_seen, endorsements_seen, dal_attestation_seen) ->
+         {preendorsements_seen; endorsements_seen; dal_attestation_seen})
+       (obj3
           (req "preendorsements_seen" consensus_conflict_map_encoding)
           (req "endorsements_seen" consensus_conflict_map_encoding)
           (req
              "dal_attestation_seen"
              (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
 
-let init_consensus_state ~predecessor_level =
+let empty_consensus_state =
   {
-    predecessor_level;
     preendorsements_seen = Consensus_conflict_map.empty;
     endorsements_seen = Consensus_conflict_map.empty;
     dal_attestation_seen = Signature.Public_key_hash.Map.empty;
@@ -440,9 +417,9 @@ let empty_voting_state =
     ballots_seen = Signature.Public_key_hash.Map.empty;
   }
 
-let init_operation_conflict_state ~predecessor_level =
+let empty_operation_conflict_state =
   {
-    consensus_state = init_consensus_state ~predecessor_level;
+    consensus_state = empty_consensus_state;
     voting_state = empty_voting_state;
     anonymous_state = empty_anonymous_state;
     manager_state = empty_manager_state;
@@ -2408,15 +2385,7 @@ end
 
 let init_validation_state ctxt mode chain_id ~predecessor_level_and_round =
   let info = init_info ctxt mode chain_id ~predecessor_level_and_round in
-  let predecessor_level =
-    match predecessor_level_and_round with
-    | Some (predecessor_level, _) -> predecessor_level
-    | None ->
-        (* Fake predecessor level that will not be used since the
-           validation of all consensus operations will fail. *)
-        info.current_level.level
-  in
-  let operation_state = init_operation_conflict_state ~predecessor_level in
+  let operation_state = empty_operation_conflict_state in
   let block_state = init_block_state info in
   {info; operation_state; block_state}
 
