@@ -205,6 +205,17 @@ let new_hash_pushed_to_data_streamer =
     ~level:Notice
     ("root_hash", Data_encoding.string)
 
+let processing_root_hash_failed =
+  declare_2
+    ~section
+    ~name:"processing_root_hash_failed"
+    ~msg:
+      "Processing root hash {root_hash} resulted in the wollowing errors: \
+       {errors}"
+    ~level:Warning
+    ("root_hash", Data_encoding.string)
+    ("errors", Error_monad.trace_encoding)
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -225,3 +236,6 @@ let emit_root_hash_pushed_to_data_streamer ((module P) : Dac_plugin.t) hash =
 
 let emit_received_root_hash_processed ((module P) : Dac_plugin.t) hash =
   emit received_root_hash_processed (P.to_hex hash)
+
+let emit_processing_root_hash_failed ((module P) : Dac_plugin.t) hash errors =
+  emit processing_root_hash_failed (P.to_hex hash, errors)

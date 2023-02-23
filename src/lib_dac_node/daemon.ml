@@ -122,14 +122,25 @@ module Handler = struct
     let open Lwt_result_syntax in
     let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
-      let* _payload =
+      let*! payload_result =
         Pages_encoding.Merkle_tree.V0_remote.deserialize_payload
           dac_plugin
           ~page_store:remote_store
           root_hash
       in
-      let*! () = Event.emit_received_root_hash_processed dac_plugin root_hash in
-      return ()
+      match payload_result with
+      | Ok _ ->
+          let*! () =
+            Event.emit_received_root_hash_processed dac_plugin root_hash
+          in
+          return ()
+      | Error errs ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
+             Improve handling of errors. *)
+          let*! () =
+            Event.emit_processing_root_hash_failed dac_plugin root_hash errs
+          in
+          return ()
     in
     let*? dac_plugin = Node_context.get_dac_plugin ctxt in
     let remote_store =
