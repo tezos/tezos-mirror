@@ -27,6 +27,7 @@
   tezos_dal_node_lib
   tezos-shell-services
   tezos-smart-rollup-016-PtMumbai
+  tezos-smart-rollup-layer2-016-PtMumbai
   tezos-layer2-utils-016-PtMumbai
   tezos_layer2_store
   data-encoding
@@ -61,6 +62,7 @@
   -open Tezos_dal_node_lib
   -open Tezos_shell_services
   -open Tezos_smart_rollup_016_PtMumbai
+  -open Tezos_smart_rollup_layer2_016_PtMumbai
   -open Tezos_layer2_utils_016_PtMumbai
   -open Tezos_layer2_store
   -open Tezos_injector_016_PtMumbai

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Protocol.Alpha_context
 
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
+(**  [Arith_pvm_in_memory]: Arith PVM with an in memory context
+     {!Tezos_context_memory}. *)
+module Arith_pvm_in_memory :
+  Sc_rollup.PVM.S
+    with type context = Context_helpers.In_memory.Tree.t
+     and type state = Context_helpers.In_memory.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t
 
-module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
-
-module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
+(** [Wasm_pvm_in_memory] Wasm PVM with an in memory context
+    {!Tezos_context_memory}. *)
+module Wasm_pvm_in_memory :
+  Sc_rollup.PVM.S
+    with type context = Context_helpers.In_memory.Tree.t
+     and type state = Context_helpers.In_memory.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t

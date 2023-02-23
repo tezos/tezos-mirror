@@ -12,10 +12,11 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "tezos-protocol-016-PtMumbai"
+  "tezos-injector-016-PtMumbai"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific library of helpers for `tezos-smart-rollup`"
+synopsis: "Tezos/Protocol: protocol specific library for `tezos-smart-rollup`"

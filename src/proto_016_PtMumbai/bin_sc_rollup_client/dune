@@ -18,6 +18,7 @@
   tezos-rpc-http-client-unix
   tezos-protocol-016-PtMumbai
   tezos-smart-rollup-016-PtMumbai
+  tezos-smart-rollup-layer2-016-PtMumbai
   uri)
  (link_flags
   (:standard)
@@ -33,4 +34,5 @@
   -open Tezos_client_base_unix
   -open Tezos_rpc_http_client_unix
   -open Tezos_protocol_016_PtMumbai
-  -open Tezos_smart_rollup_016_PtMumbai))
+  -open Tezos_smart_rollup_016_PtMumbai
+  -open Tezos_smart_rollup_layer2_016_PtMumbai))
