@@ -484,7 +484,7 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess strict blocks args =
+let process verbosity singleprocess strict blocks data_dir config_file =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -492,10 +492,7 @@ let process verbosity singleprocess strict blocks args =
   let run =
     let open Lwt_result_syntax in
     let* data_dir, config =
-      Shared_arg.resolve_data_dir_and_config_file
-        ?data_dir:args.Shared_arg.data_dir
-        ?config_file:(Some args.config_file)
-        ()
+      Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
     in
     let* () = check_data_dir data_dir in
     run ?verbosity ~singleprocess ~strict config blocks
@@ -579,7 +576,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ verbosity $ singleprocess $ strict $ blocks
-       $ Shared_arg.Term.args))
+       $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file))
 end
 
 module Manpage = struct
