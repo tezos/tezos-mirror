@@ -27,8 +27,9 @@ open Protocol_client_context
 open Protocol
 open Alpha_context
 open Injector_common
+open Injector_sigs
 
-module Request = struct
+module Request (L1_operation : INJECTOR_OPERATION) = struct
   type ('a, 'b) t =
     | Add_pending : L1_operation.t -> (unit, error trace) t
     | New_tezos_head :
@@ -75,11 +76,7 @@ module Request = struct
   let pp ppf (View r) =
     match r with
     | Add_pending op ->
-        Format.fprintf
-          ppf
-          "request add %a to pending queue"
-          L1_operation.Hash.pp
-          op.hash
+        Format.fprintf ppf "request add %a to pending queue" L1_operation.pp op
     | New_tezos_head (b, r) ->
         Format.fprintf
           ppf
@@ -100,7 +97,7 @@ module Name = struct
 
   let encoding = Tezos_crypto.Signature.Public_key_hash.encoding
 
-  let base = ["tx_rollup_injector"]
+  let base = ["injector"]
 
   let pp = Tezos_crypto.Signature.Public_key_hash.pp_short
 

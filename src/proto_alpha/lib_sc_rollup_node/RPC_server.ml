@@ -384,7 +384,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let cemented =
       Compare.Int32.(inbox_level <= Raw_level.to_int32 lcc.level)
     in
-    Sc_rollup_services.{finalized; cemented}
+    (finalized, cemented)
 
   let () =
     Local_directory.register1 Sc_rollup_services.Local.batcher_message
@@ -403,18 +403,30 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
               | None -> return Sc_rollup_services.Unknown
               | Some (Pending op) ->
                   return (Sc_rollup_services.Pending_injection op)
-              | Some (Injected info) ->
-                  return (Sc_rollup_services.Injected info)
-              | Some (Included info) -> (
-                  let* inbox_info =
-                    inbox_info_of_level node_ctxt info.l1_level
+              | Some (Injected {op; oph; op_index}) ->
+                  return
+                    (Sc_rollup_services.Injected
+                       {op = op.operation; oph; op_index})
+              | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
+                  let* finalized, cemented =
+                    inbox_info_of_level node_ctxt l1_level
                   in
                   let commitment_level =
-                    commitment_level_of_inbox_level node_ctxt info.l1_level
+                    commitment_level_of_inbox_level node_ctxt l1_level
                   in
                   match commitment_level with
                   | None ->
-                      return (Sc_rollup_services.Included (info, inbox_info))
+                      return
+                        (Sc_rollup_services.Included
+                           {
+                             op = op.operation;
+                             oph;
+                             op_index;
+                             l1_block;
+                             l1_level;
+                             finalized;
+                             cemented;
+                           })
                   | Some commitment_level -> (
                       let* block =
                         Node_context.find_l2_block_by_level
@@ -425,7 +437,16 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                       | None ->
                           (* Commitment not computed yet for inbox *)
                           return
-                            (Sc_rollup_services.Included (info, inbox_info))
+                            (Sc_rollup_services.Included
+                               {
+                                 op = op.operation;
+                                 oph;
+                                 op_index;
+                                 l1_block;
+                                 l1_level;
+                                 finalized;
+                                 cemented;
+                               })
                       | Some block -> (
                           let commitment_hash =
                             WithExceptions.Option.get
@@ -442,7 +463,16 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                           | None | Some {published_at_level = None; _} ->
                               (* Commitment not published yet *)
                               return
-                                (Sc_rollup_services.Included (info, inbox_info))
+                                (Sc_rollup_services.Included
+                                   {
+                                     op = op.operation;
+                                     oph;
+                                     op_index;
+                                     l1_block;
+                                     l1_level;
+                                     finalized;
+                                     cemented;
+                                   })
                           | Some
                               {
                                 first_published_at_level;
@@ -454,18 +484,21 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                                   node_ctxt
                                   commitment_hash
                               in
-                              let commitment_info =
-                                Sc_rollup_services.
-                                  {
-                                    commitment;
-                                    commitment_hash;
-                                    first_published_at_level;
-                                    published_at_level;
-                                  }
-                              in
                               return
                                 (Sc_rollup_services.Committed
-                                   (info, inbox_info, commitment_info)))))))
+                                   {
+                                     op = op.operation;
+                                     oph;
+                                     op_index;
+                                     l1_block;
+                                     l1_level;
+                                     finalized;
+                                     cemented;
+                                     commitment;
+                                     commitment_hash;
+                                     first_published_at_level;
+                                     published_at_level;
+                                   }))))))
     in
 
     return status

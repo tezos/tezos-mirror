@@ -242,7 +242,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       (commitment : Sc_rollup.Commitment.t) =
     let open Lwt_result_syntax in
     let publish_operation =
-      Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
+      L1_operation.Publish {rollup = node_ctxt.rollup_address; commitment}
     in
     let*! () =
       Commitment_event.publish_commitment
@@ -376,7 +376,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment_hash =
     let open Lwt_result_syntax in
     let cement_operation =
-      Sc_rollup_cement
+      L1_operation.Cement
         {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
     in
     let* _hash = Injector.add_pending_operation ~source cement_operation in

@@ -27,3 +27,4 @@ include
   Injector_sigs.S
     with type state := Node_context.ro
      and type tag := Configuration.purpose
+     and type operation := L1_operation.t

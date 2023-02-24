@@ -62,8 +62,6 @@ type simulate_input = {
   reveal_pages : string list option;
 }
 
-type inbox_info = {finalized : bool; cemented : bool}
-
 type commitment_info = {
   commitment : Sc_rollup.Commitment.t;
   commitment_hash : Sc_rollup.Commitment.Hash.t;
@@ -75,9 +73,29 @@ type message_status =
   | Unknown
   | Pending_batch
   | Pending_injection of L1_operation.t
-  | Injected of Injector_sigs.injected_info
-  | Included of Injector_sigs.included_info * inbox_info
-  | Committed of Injector_sigs.included_info * inbox_info * commitment_info
+  | Injected of {op : L1_operation.t; oph : Operation_hash.t; op_index : int}
+  | Included of {
+      op : L1_operation.t;
+      oph : Operation_hash.t;
+      op_index : int;
+      l1_block : Block_hash.t;
+      l1_level : int32;
+      finalized : bool;
+      cemented : bool;
+    }
+  | Committed of {
+      op : L1_operation.t;
+      oph : Operation_hash.t;
+      op_index : int;
+      l1_block : Block_hash.t;
+      l1_level : int32;
+      finalized : bool;
+      cemented : bool;
+      commitment : Sc_rollup.Commitment.t;
+      commitment_hash : Sc_rollup.Commitment.Hash.t;
+      first_published_at_level : Raw_level.t;
+      published_at_level : Raw_level.t;
+    }
 
 module Encodings = struct
   open Data_encoding
@@ -144,12 +162,6 @@ module Encodings = struct
 
   let batcher_queue = list queued_message
 
-  let inbox_info =
-    conv
-      (fun {finalized; cemented} -> (finalized, cemented))
-      (fun (finalized, cemented) -> {finalized; cemented})
-    @@ obj2 (req "finalized" bool) (req "cemented" bool)
-
   let commitment_info =
     conv
       (fun {
@@ -210,35 +222,117 @@ module Encodings = struct
           ~description:
             "The message is injected as part of an L1 operation but it is not \
              included in a block."
-          (merge_objs
-             (obj1 (req "status" (constant "injected")))
-             Injector_sigs.injected_info_encoding)
-          (function Injected info -> Some ((), info) | _ -> None)
-          (fun ((), info) -> Injected info);
+          (obj3
+             (req "status" (constant "injected"))
+             (req "operation" L1_operation.encoding)
+             (req
+                "layer1"
+                (obj2
+                   (req "operation_hash" Operation_hash.encoding)
+                   (req "operation_index" int31))))
+          (function
+            | Injected {op; oph; op_index} -> Some ((), op, (oph, op_index))
+            | _ -> None)
+          (fun ((), op, (oph, op_index)) -> Injected {op; oph; op_index});
         case
           (Tag 4)
           ~title:"included"
           ~description:"The message is included in an inbox in an L1 block."
-          (merge_objs
-             (obj1 (req "status" (constant "included")))
-             (merge_objs Injector_sigs.included_info_encoding inbox_info))
+          (obj5
+             (req "status" (constant "included"))
+             (req "operation" L1_operation.encoding)
+             (req
+                "layer1"
+                (obj4
+                   (req "operation_hash" Operation_hash.encoding)
+                   (req "operation_index" int31)
+                   (req "block_hash" Block_hash.encoding)
+                   (req "level" int32)))
+             (req "finalized" bool)
+             (req "cemented" bool))
           (function
-            | Included (info, inbox_info) -> Some ((), (info, inbox_info))
+            | Included
+                {op; oph; op_index; l1_block; l1_level; finalized; cemented} ->
+                Some
+                  ( (),
+                    op,
+                    (oph, op_index, l1_block, l1_level),
+                    finalized,
+                    cemented )
             | _ -> None)
-          (fun ((), (info, inbox_info)) -> Included (info, inbox_info));
+          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented)
+               ->
+            Included
+              {op; oph; op_index; l1_block; l1_level; finalized; cemented});
         case
           (Tag 5)
           ~title:"committed"
           ~description:"The message is included in a committed inbox on L1."
-          (merge_objs (obj1 (req "status" (constant "committed")))
-          @@ merge_objs Injector_sigs.included_info_encoding
-          @@ merge_objs inbox_info (obj1 (req "commitment" commitment_info)))
+          (obj9
+             (req "status" (constant "committed"))
+             (req "operation" L1_operation.encoding)
+             (req
+                "layer1"
+                (obj4
+                   (req "operation_hash" Operation_hash.encoding)
+                   (req "operation_index" int31)
+                   (req "block_hash" Block_hash.encoding)
+                   (req "level" int32)))
+             (req "finalized" bool)
+             (req "cemented" bool)
+             (req "commitment" Sc_rollup.Commitment.encoding)
+             (req "hash" Sc_rollup.Commitment.Hash.encoding)
+             (req "first_published_at_level" Raw_level.encoding)
+             (req "published_at_level" Raw_level.encoding))
           (function
-            | Committed (info, inbox_info, commitment) ->
-                Some ((), (info, (inbox_info, commitment)))
+            | Committed
+                {
+                  op;
+                  oph;
+                  op_index;
+                  l1_block;
+                  l1_level;
+                  finalized;
+                  cemented;
+                  commitment;
+                  commitment_hash;
+                  first_published_at_level;
+                  published_at_level;
+                } ->
+                Some
+                  ( (),
+                    op,
+                    (oph, op_index, l1_block, l1_level),
+                    finalized,
+                    cemented,
+                    commitment,
+                    commitment_hash,
+                    first_published_at_level,
+                    published_at_level )
             | _ -> None)
-          (fun ((), (info, (inbox_info, commitment))) ->
-            Committed (info, inbox_info, commitment));
+          (fun ( (),
+                 op,
+                 (oph, op_index, l1_block, l1_level),
+                 finalized,
+                 cemented,
+                 commitment,
+                 commitment_hash,
+                 first_published_at_level,
+                 published_at_level ) ->
+            Committed
+              {
+                op;
+                oph;
+                op_index;
+                l1_block;
+                l1_level;
+                finalized;
+                cemented;
+                commitment;
+                commitment_hash;
+                first_published_at_level;
+                published_at_level;
+              });
       ]
 
   let message_status_output =

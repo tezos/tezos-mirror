@@ -23,8 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Injector_sigs.S
-    with type state := Node_context.ro
-     and type tag := Configuration.purpose
-     and type operation := L1_operation.t
+open Injector_sigs
+
+module Make (O : PARAM_OPERATION) :
+  INJECTOR_OPERATION with type operation = O.t = struct
+  module Hash =
+    Tezos_crypto.Blake2B.Make
+      (Tezos_crypto.Base58)
+      (struct
+        let name = "injector_operation_hash"
+
+        let title = "An identifier (hash) for an operation in the injector"
+
+        let b58check_prefix = "\064\007\206" (* iop(53) *)
+
+        let size = None
+      end)
+
+  let () =
+    Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "iop" 53
+
+  type operation = O.t
+
+  type hash = Hash.t
+
+  type t = {hash : hash; operation : O.t}
+
+  let hash_inner_operation op =
+    Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn O.encoding op]
+
+  let make operation =
+    let hash = hash_inner_operation operation in
+    {hash; operation}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {hash; operation} -> (hash, operation))
+      (fun (hash, operation) -> {hash; operation})
+    @@ obj2 (req "hash" Hash.encoding) (req "operation" O.encoding)
+
+  let pp ppf {hash; operation} =
+    Format.fprintf ppf "%a (%a)" O.pp operation Hash.pp hash
+end
