@@ -70,7 +70,7 @@ module type S = sig
 
   (** [initial_state empty_tree] computes the initial tree whose hash
       is hard-coded in the protocol. *)
-  val initial_state : tree -> tree Lwt.t
+  val initial_state : version -> tree -> tree Lwt.t
 
   (** [install_boot_sector ~ticks_per_snapshot ~output_validity_period payload
       tree] installs the [payload] passed as an argument in [tree] so that it is

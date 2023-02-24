@@ -81,6 +81,8 @@ let () =
     (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
+  let current_version = Wasm_2_0_0.v0
+
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
   let outbox_validity_period = Int32.of_int 80_640
@@ -260,7 +262,7 @@ module V2_0_0 = struct
 
     open Monad
 
-    let initial_state ~empty = WASM_machine.initial_state empty
+    let initial_state ~empty = WASM_machine.initial_state current_version empty
 
     let install_boot_sector state boot_sector =
       WASM_machine.install_boot_sector

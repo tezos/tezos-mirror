@@ -235,7 +235,9 @@ let test_output () =
     match parsed.it with Script.Textual m -> m | _ -> assert false
   in
   let*! boot_sector = Encode.encode parsed in
-  let*! tree = Wasm.initial_state empty_tree in
+  let*! tree =
+    Wasm.initial_state Sc_rollup_wasm.V2_0_0.current_version empty_tree
+  in
   let*! tree =
     Wasm.install_boot_sector
       ~ticks_per_snapshot:Sc_rollup_wasm.V2_0_0.ticks_per_snapshot

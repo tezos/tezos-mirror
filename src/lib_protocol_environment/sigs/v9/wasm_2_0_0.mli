@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type version
+
+val v0 : version
+
 type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 
 type output = {outbox_level : Bounded.Non_negative_int32.t; message_index : Z.t}
@@ -44,7 +48,7 @@ type info = {
 
 module Make
     (Tree : Context.TREE with type key = string list and type value = bytes) : sig
-  val initial_state : Tree.tree -> Tree.tree Lwt.t
+  val initial_state : version -> Tree.tree -> Tree.tree Lwt.t
 
   val install_boot_sector :
     ticks_per_snapshot:Z.t ->

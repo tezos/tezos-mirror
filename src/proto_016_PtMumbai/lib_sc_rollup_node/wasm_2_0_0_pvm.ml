@@ -62,8 +62,11 @@ module Make_wrapped_tree (Tree : TreeS) :
   let wrap t = PVM_tree t
 end
 
-module Make_backend (Tree : TreeS) =
-  Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+module Make_backend (Tree : TreeS) = struct
+  include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+
+  let initial_state = initial_state V0
+end
 
 module Make_durable_state
     (T : Tezos_tree_encoding.TREE with type tree = Context.tree) :

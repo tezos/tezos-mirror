@@ -24,6 +24,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type version = V0
+
+let version_encoding =
+  (* This encoding is directly used by the protocol. As a consequence,
+     any change done to it needs to be backward compatible!
+
+     We cannot use [string_enum] here because [string_enum] will
+     append the size of the string at the beginning of the encoded
+     bytes. *)
+  Data_encoding.(
+    conv_with_guard
+      (function V0 -> "2.0.0")
+      (function "2.0.0" -> Ok V0 | _ -> Error "not a valid version")
+      Variable.string)
+
 (** Represents the location of an input message. *)
 type input_info = {
   inbox_level : Tezos_base.Bounded.Non_negative_int32.t;
