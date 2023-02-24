@@ -40,6 +40,10 @@ open Sc_rollup_helpers
 
 *)
 
+let default_wasm_pvm_revision = function
+  | Protocol.Alpha -> "2.0.0-r1"
+  | Protocol.Lima | Protocol.Mumbai -> "2.0.0"
+
 let assert_some_client_command cmd ~__LOC__ ?hooks client =
   let*! v_opt = cmd ?hooks client in
   match v_opt with
@@ -4038,7 +4042,7 @@ let test_rpcs ~kind =
       variant = None;
       description = "RPC API should work and be stable";
     }
-  @@ fun _protocol sc_rollup_node sc_client sc_rollup node client ->
+  @@ fun protocol sc_rollup_node sc_client sc_rollup node client ->
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   (* Smart rollup address endpoint test *)
   let*! sc_rollup_address =
@@ -4163,7 +4167,9 @@ let test_rpcs ~kind =
             (fun wasm_version_hex -> Hex.to_string (`Hex wasm_version_hex))
             wasm_version_hex_opt
         in
-        Check.((wasm_version = Some "2.0.0") (option string))
+        Check.(
+          (wasm_version = Some (default_wasm_pvm_revision protocol))
+            (option string))
           ~error_msg:"Decoded WASM version is %L but should be %R" ;
 
         let*! wasm_version_len =
@@ -4174,7 +4180,12 @@ let test_rpcs ~kind =
             ~operation:Sc_rollup_client.Length
             ~key:"/readonly/wasm_version"
         in
-        Check.((wasm_version_len = Some 5L) (option int64))
+        Check.(
+          (wasm_version_len
+          = Some
+              (default_wasm_pvm_revision protocol
+              |> String.length |> Int64.of_int))
+            (option int64))
           ~error_msg:"WASM version value length is %L but should be %R" ;
 
         let*! kernel_subkeys =

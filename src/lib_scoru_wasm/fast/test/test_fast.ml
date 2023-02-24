@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tztest
 module Preimage_map = Map.Make (String)
 open Wasm_utils
+open Tztest_helper
 
 let run_fast = Wasm_fast.Internal_for_tests.compute_step_many_with_hooks
 
@@ -119,9 +119,9 @@ and check_reveal ?write_debug ?(images = Preimage_map.empty) ?metadata
     - [write_debug] is the implementation of the host function to use.
     - [metadata] is used in case of Reveal_metadata step.
     - [images] is a hashmap used in case of reveal steps. *)
-let test_against_both ?write_debug ?(set_input = Wasm_utils.set_full_input_step)
-    ?images ?metadata ~from_binary ~kernel ~messages
-    ?(max_steps = Int64.max_int) () =
+let test_against_both ~version ?write_debug
+    ?(set_input = Wasm_utils.set_full_input_step) ?images ?metadata ~from_binary
+    ~kernel ~messages ?(max_steps = Int64.max_int) () =
   let open Lwt.Syntax in
   let make_folder apply (tree, counter, hashes) message =
     let* info = Wasm_utils.Wasm.get_info tree in
@@ -142,6 +142,7 @@ let test_against_both ?write_debug ?(set_input = Wasm_utils.set_full_input_step)
 
   let* initial_tree =
     Wasm_utils.initial_tree
+      ~version
       ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary
       kernel
@@ -180,11 +181,16 @@ let test_against_both ?write_debug ?(set_input = Wasm_utils.set_full_input_step)
 
   Lwt_result_syntax.return_unit
 
-let test_computation =
+let test_computation ~version =
   Wasm_utils.test_with_kernel "computation" (fun kernel ->
       (* Providing 4 empty messages basically means calling the kernel
          entrypoint 4 times. *)
-      test_against_both ~from_binary:true ~kernel ~messages:[""; ""; ""; ""] ())
+      test_against_both
+        ~version
+        ~from_binary:true
+        ~kernel
+        ~messages:[""; ""; ""; ""]
+        ())
 
 (* kernel that does a fixed number of reboot
    by storing a counter in durable storage
@@ -336,20 +342,24 @@ let kernel_bounded_reboot =
 )
   |}
 
-let test_reboot =
+let test_reboot ~version () =
   test_against_both
+    ~version
     ~from_binary:false
     ~kernel:kernel_bounded_reboot
     ~messages:[""]
+    ()
 
-let test_max_steps =
+let test_max_steps ~version () =
   test_against_both
+    ~version
     ~max_steps:23_001_001_001L
     ~from_binary:false
     ~kernel:kernel_bounded_reboot
     ~messages:[""]
+    ()
 
-let test_too_many_reboots =
+let test_too_many_reboots ~version () =
   (* kernel that
      - increment counter in durable storage
      - reboots without stopping condition
@@ -474,9 +484,9 @@ let test_too_many_reboots =
 )
   |}
   in
-  test_against_both ~from_binary:false ~kernel ~messages:[""]
+  test_against_both ~version ~from_binary:false ~kernel ~messages:[""] ()
 
-let test_store_read_write =
+let test_store_read_write ~version () =
   let kernel =
     {|
 (module
@@ -578,9 +588,14 @@ let test_store_read_write =
 )
   |}
   in
-  test_against_both ~from_binary:false ~kernel ~messages:(List.repeat 100 "")
+  test_against_both
+    ~version
+    ~from_binary:false
+    ~kernel
+    ~messages:(List.repeat 100 "")
+    ()
 
-let test_read_input =
+let test_read_input ~version () =
   let kernel =
     {|
   (module
@@ -641,11 +656,13 @@ let test_read_input =
   let no_of_levels = 257 in
 
   test_against_both
+    ~version
     ~from_binary:false
     ~kernel
     ~messages:(List.repeat no_of_levels msg)
+    ()
 
-let test_big_address =
+let test_big_address ~version () =
   let kernel =
     {|
         (module
@@ -665,9 +682,9 @@ let test_big_address =
       |}
   in
   let msg = "abcd" in
-  test_against_both ~from_binary:false ~kernel ~messages:[msg]
+  test_against_both ~version ~from_binary:false ~kernel ~messages:[msg] ()
 
-let test_reveal_preimage =
+let test_reveal_preimage ~version () =
   let example_hash = "this represents the 33-byte hash " in
   let example_preimage = "This is the expected preimage" in
   let images = Preimage_map.singleton example_hash example_preimage in
@@ -721,11 +738,19 @@ let test_reveal_preimage =
   |}
       example_hash
   in
-  test_against_both ~images ~from_binary:false ~kernel ~messages:[""; ""]
+  test_against_both
+    ~version
+    ~images
+    ~from_binary:false
+    ~kernel
+    ~messages:[""; ""]
+    ()
 
-let test_tx =
+let test_tx ~version () =
   let open Lwt.Syntax in
-  Wasm_utils.test_with_kernel "tx-kernel-no-verif" (fun kernel ->
+  Wasm_utils.test_with_kernel
+    "tx-kernel-no-verif"
+    (fun kernel ->
       let* messages =
         Wasm_utils.read_test_messages ["deposit.out"; "withdrawal.out"]
       in
@@ -741,14 +766,16 @@ let test_tx =
       (* TX Kernel ignores origination level *)
       let metadata = expected_rollup_address ^ "\000\000\000\000" in
       test_against_both
+        ~version
         ~set_input:Wasm_utils.set_full_raw_input_step
         ~from_binary:true
         ~metadata
         ~kernel
         ~messages
         ())
+    ()
 
-let test_compute_step_many_pauses_at_snapshot_when_flag_set () =
+let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   let open Lwt_result_syntax in
   let reveal_builtins =
     Tezos_scoru_wasm.Builtins.
@@ -761,6 +788,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set () =
   in
   let*! initial_tree =
     Wasm_utils.initial_tree
+      ~version
       ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary:false
       kernel_bounded_reboot
@@ -818,7 +846,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set () =
 
   return ()
 
-let test_check_nb_ticks () =
+let test_check_nb_ticks ~version () =
   let open Lwt_result_syntax in
   let reveal_builtins =
     Tezos_scoru_wasm.Builtins.
@@ -831,6 +859,7 @@ let test_check_nb_ticks () =
   in
   let*! initial_tree =
     Wasm_utils.initial_tree
+      ~version
       ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary:false
       kernel_bounded_reboot
@@ -857,19 +886,20 @@ let test_check_nb_ticks () =
   return ()
 
 let tests =
-  [
-    tztest "Big addresses are working correctly" `Quick test_big_address;
-    tztest "Computation kernel" `Quick test_computation;
-    tztest "Store read/write kernel" `Quick test_store_read_write;
-    tztest "read_input" `Quick test_read_input;
-    tztest "reboot" `Quick test_reboot;
-    tztest "max_steps flag" `Quick test_max_steps;
-    tztest "too many reboots" `Quick test_too_many_reboots;
-    tztest "compare nb ticks" `Quick test_check_nb_ticks;
-    tztest "Reveal_preimage kernel" `Quick test_reveal_preimage;
-    tztest "TX kernel" `Quick test_tx;
-    tztest
-      "compute_step_many pauses at snapshot"
-      `Quick
-      test_compute_step_many_pauses_at_snapshot_when_flag_set;
-  ]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("Big addresses are working correctly", `Quick, test_big_address);
+      ("Computation kernel", `Quick, test_computation);
+      ("Store read/write kernel", `Quick, test_store_read_write);
+      ("read_input", `Quick, test_read_input);
+      ("reboot", `Quick, test_reboot);
+      ("max_steps flag", `Quick, test_max_steps);
+      ("too many reboots", `Quick, test_too_many_reboots);
+      ("compare nb ticks", `Quick, test_check_nb_ticks);
+      ("Reveal_preimage kernel", `Quick, test_reveal_preimage);
+      ("TX kernel", `Quick, test_tx);
+      ( "compute_step_many pauses at snapshot",
+        `Quick,
+        test_compute_step_many_pauses_at_snapshot_when_flag_set );
+    ]

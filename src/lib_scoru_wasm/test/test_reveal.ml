@@ -31,10 +31,10 @@
     Subject:      Reveal tests for the tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 open Wasm_utils
+open Tztest_helper
 
 let reveal_preimage_module hash_addr hash_size preimage_addr max_bytes =
   Format.sprintf
@@ -93,7 +93,7 @@ let reveal_returned_size tree =
       | _ -> Stdlib.failwith "Incorrect stack")
   | _ -> Stdlib.failwith "The tick after reveal_builtins is not consistent"
 
-let test_reveal_preimage_gen preimage max_bytes =
+let test_reveal_preimage_gen ~version preimage max_bytes =
   let open Lwt_result_syntax in
   let hash_addr = 120l in
   let preimage_addr = 200l in
@@ -101,7 +101,7 @@ let test_reveal_preimage_gen preimage max_bytes =
   let modl =
     reveal_preimage_module hash_addr hash_size preimage_addr max_bytes
   in
-  let*! state = initial_tree modl in
+  let*! state = initial_tree ~version modl in
   let*! state_snapshotted = eval_until_input_or_reveal_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
@@ -148,29 +148,29 @@ let test_reveal_preimage_gen preimage max_bytes =
 
 (* Test the best conditions for the preimage reveal: its size is below the
    maximum bytes for the preimage, it will be . *)
-let test_reveal_preimage_classic () =
+let test_reveal_preimage_classic ~version () =
   let preimage =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse \
      elementum nec ex sed porttitor."
     (* 100 bytes *)
   in
   let max_bytes = 200l in
-  test_reveal_preimage_gen preimage max_bytes
+  test_reveal_preimage_gen ~version preimage max_bytes
 
-let test_reveal_preimage_above_max () =
+let test_reveal_preimage_above_max ~version () =
   let preimage =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse \
      elementum nec ex sed porttitor."
     (* 100 bytes *)
   in
   let max_bytes = 50l in
-  test_reveal_preimage_gen preimage max_bytes
+  test_reveal_preimage_gen ~version preimage max_bytes
 
-let test_reveal_metadata () =
+let test_reveal_metadata ~version () =
   let open Lwt_result_syntax in
   let metadata_addr = 200l in
   let modl = reveal_metadata_module metadata_addr in
-  let*! state = initial_tree modl in
+  let*! state = initial_tree ~version modl in
   let*! state_snapshotted = eval_until_input_or_reveal_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
@@ -247,7 +247,7 @@ let apply_fast ?(images = Preimage_map.empty) tree =
     Stdlib.failwith "Fast Execution was expected to run!" ;
   tree
 
-let test_fast_exec_reveal () =
+let test_fast_exec_reveal ~version () =
   let open Lwt.Syntax in
   let example_hash = "this represents the 33-byte hash!" in
   let example_preimage = "This is the expected preimage" in
@@ -303,7 +303,7 @@ let test_fast_exec_reveal () =
       example_hash
   in
 
-  let* tree = initial_tree kernel in
+  let* tree = initial_tree ~version kernel in
   let* tree = eval_until_input_or_reveal_requested tree in
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = apply_fast ~images tree in
@@ -322,15 +322,15 @@ let test_fast_exec_reveal () =
   Lwt_result_syntax.return_unit
 
 let tests =
-  [
-    tztest
-      "Test reveal_preimage with preimage length below max_bytes"
-      `Quick
-      test_reveal_preimage_classic;
-    tztest
-      "Test reveal_preimage with preimage length above max_bytes"
-      `Quick
-      test_reveal_preimage_above_max;
-    tztest "Test reveal_metadata" `Quick test_reveal_metadata;
-    tztest "Test reveal_preimage with Fast Exec" `Quick test_fast_exec_reveal;
-  ]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ( "Test reveal_preimage with preimage length below max_bytes",
+        `Quick,
+        test_reveal_preimage_classic );
+      ( "Test reveal_preimage with preimage length above max_bytes",
+        `Quick,
+        test_reveal_preimage_above_max );
+      ("Test reveal_metadata", `Quick, test_reveal_metadata);
+      ("Test reveal_preimage with Fast Exec", `Quick, test_fast_exec_reveal);
+    ]

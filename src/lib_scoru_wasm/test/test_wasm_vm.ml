@@ -1,8 +1,8 @@
-open Tztest
 open Tezos_scoru_wasm
 open Wasm_utils
+open Tztest_helper
 
-let init_tree_with_empty_input () =
+let init_tree_with_empty_input ~version =
   let open Lwt_result_syntax in
   let module_ =
     {|
@@ -15,15 +15,15 @@ let init_tree_with_empty_input () =
       )
     |}
   in
-  let*! tree = initial_tree ~from_binary:false module_ in
+  let*! tree = initial_tree ~version ~from_binary:false module_ in
   let*! tree = eval_until_input_requested tree in
   let*! tree = set_empty_inbox_step 0l tree in
   return tree
 
-let test_padding_state () =
+let test_padding_state ~version () =
   let open Lwt_result_syntax in
   let open Wasm_pvm_state.Internal_state in
-  let* tree = init_tree_with_empty_input () in
+  let* tree = init_tree_with_empty_input ~version in
   let*! pvm_state =
     Encodings_util.Tree_encoding_runner.decode
       Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
@@ -53,9 +53,9 @@ let test_padding_state () =
   in
   return_unit
 
-let test_set_input_step_in_padding () =
+let test_set_input_step_in_padding ~version () =
   let open Lwt_result_syntax in
-  let* tree = init_tree_with_empty_input () in
+  let* tree = init_tree_with_empty_input ~version in
   (* Advance execution for relatively many steps in order to reach Padding tick_state *)
   let*! tree, _ = Wasm.compute_step_many ~max_steps:(Int64.of_int 10000) tree in
 
@@ -84,9 +84,9 @@ let test_set_input_step_in_padding () =
   in
   return_unit
 
-let test_last_input_info_updated_in_set_input_step () =
+let test_last_input_info_updated_in_set_input_step ~version () =
   let open Lwt_result_syntax in
-  let* tree = init_tree_with_empty_input () in
+  let* tree = init_tree_with_empty_input ~version in
   let assert_input_info ?(inp_req = Wasm_pvm_state.Input_required) tree level
       msg_counter =
     let expected_info =
@@ -129,11 +129,12 @@ let test_last_input_info_updated_in_set_input_step () =
   return_unit
 
 let tests =
-  [
-    tztest "Test eval_has_finished: padding" `Quick test_padding_state;
-    tztest "Test set_input_state: padding" `Quick test_set_input_step_in_padding;
-    tztest
-      "Test set_input_state: update last input info"
-      `Quick
-      test_last_input_info_updated_in_set_input_step;
-  ]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("Test eval_has_finished: padding", `Quick, test_padding_state);
+      ("Test set_input_state: padding", `Quick, test_set_input_step_in_padding);
+      ( "Test set_input_state: update last input info",
+        `Quick,
+        test_last_input_info_updated_in_set_input_step );
+    ]

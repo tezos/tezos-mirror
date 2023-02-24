@@ -68,6 +68,7 @@ let handle_module binary name module_ =
   let* _ = link ast in
   let*! tree =
     initial_tree
+      ~version:V1
       ~ticks_per_snapshot:(Z.to_int64 Wasm_2_0_0PVM.ticks_per_snapshot)
       ~outbox_validity_period:Wasm_2_0_0PVM.outbox_validity_period
       ~outbox_message_limit:Wasm_2_0_0PVM.outbox_message_limit

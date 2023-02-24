@@ -250,10 +250,10 @@ This sequence of operations was run:
 null
 
 ./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version'
-"322e302e30"
+"322e302e302d7231"
 
 ./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/wasm_2_0_0/length?key=/readonly/wasm_version'
-"5"
+"8"
 
 ./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/wasm_2_0_0/subkeys?key=/readonly/kernel'
 [ "boot.wasm", "env" ]
