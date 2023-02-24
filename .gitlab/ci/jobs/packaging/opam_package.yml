@@ -1358,6 +1358,8 @@ opam:tezos-scoru-wasm:
 
 # Ignoring unreleased package tezos-scoru-wasm-benchmark.
 
+# Ignoring unreleased package tezos-scoru-wasm-durable-snapshot.
+
 opam:tezos-scoru-wasm-fast:
   extends:
     - .opam_template

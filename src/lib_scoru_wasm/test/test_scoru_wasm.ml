@@ -50,5 +50,6 @@ let () =
       ("Reveal", Test_reveal.tests);
       ("Debug", Test_debug.tests);
       ("Host functions ticks", Test_host_functions_ticks.tests);
+      ("Durable snapshot", Test_durable_shapshot.tests);
     ]
   |> Lwt_main.run

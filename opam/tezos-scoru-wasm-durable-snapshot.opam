@@ -14,15 +14,6 @@ depends: [
   "ppx_deriving"
   "tezos-base"
   "tezos-tree-encoding"
-  "tezos-context"
-  "tezos-base-test-helpers"
-  "tezos-test-helpers"
-  "tezos-scoru-wasm"
-  "tezos-scoru-wasm-durable-snapshot"
-  "tezos-scoru-wasm-fast"
-  "tezos-scoru-wasm-helpers"
-  "qcheck-alcotest" { >= "0.20" }
-  "alcotest-lwt" { >= "1.5.0" }
   "tezos-webassembly-interpreter-extra"
 ]
 build: [
@@ -30,4 +21,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Helpers for test of the smart rollup wasm functionality"
+synopsis: "Durable storage reference implementation"

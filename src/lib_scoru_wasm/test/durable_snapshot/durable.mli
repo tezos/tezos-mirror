@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Version of durable storage corresponding to
+   https://gitlab.com/tezos/tezos/-/blob/668fe735aa20ce0c68b9f836208e57fa15d389c1/src/lib_scoru_wasm/durable.mli
+*)
+
 (** [t] allows a [wrapped_tree] to be manipulated as a tree of
     [chunked_byte_vector] *)
 type t
@@ -90,7 +94,7 @@ val find_value_exn :
 (** [copy_tree_exn tree ?edit_readonly from_key to_key] produces a new tree in which a copy of
     the entire subtree at from_key is copied to to_key.
 
-    [~edit_readonly:true] allows a a tree to be copied into a readonly location.
+    [~edit_readonly:true] allows a tree to be copied into a readonly location.
 
     @raise Readonly_value
 *)
@@ -138,7 +142,7 @@ val hash_exn : t -> key -> Context_hash.t Lwt.t
     key without fetching it. *)
 val set_value_exn : t -> ?edit_readonly:bool -> key -> string -> t Lwt.t
 
-(** [write_value_exn ?edit_readonly durable key offset bytes] writes
+(** [write_value_exn durable ?edit_readonly key offset bytes] writes
     [bytes] to [key], starting at the given [offset].
 
     If no value at [key] exists, it is created.
@@ -152,7 +156,7 @@ val set_value_exn : t -> ?edit_readonly:bool -> key -> string -> t Lwt.t
 val write_value_exn :
   t -> ?edit_readonly:bool -> key -> int64 -> string -> t Lwt.t
 
-(** [read_value durable key offset max_bytes] reads up to [max_bytes]
+(** [read_value_exn durable key offset max_bytes] reads up to [max_bytes]
     bytes from the value at [key], starting at the given [offset].
 
     @raise Value_not_found when [key] is not found.
