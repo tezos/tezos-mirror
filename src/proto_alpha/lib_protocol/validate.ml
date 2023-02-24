@@ -450,9 +450,9 @@ module Consensus = struct
       Tez.(frozen_deposits.current_amount > zero)
       (Zero_frozen_deposits delegate_pkh)
 
-  let get_delegate_details slot_map kind consensus_content =
+  let get_delegate_details slot_map kind slot =
     Result.of_option
-      (Slot.Map.find consensus_content.slot slot_map)
+      (Slot.Map.find slot slot_map)
       ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
 
   (** When validating a block (ie. in [Application],
@@ -573,7 +573,7 @@ module Consensus = struct
       get_delegate_details
         consensus_info.preendorsement_slot_map
         Preendorsement
-        consensus_content
+        consensus_content.slot
     in
     let* () =
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
@@ -654,31 +654,6 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
 
-  (** Validate an endorsement pointing to the grandparent block. This
-      function will only be called in [Mempool] mode. *)
-  let check_grandparent_endorsement vi ~check_signature grandparent
-      (operation : _ operation) {level; round; block_payload_hash = bph; slot} =
-    let open Lwt_result_syntax in
-    let* (_ctxt : t), consensus_key =
-      Stake_distribution.slot_owner vi.ctxt (Level.from_raw vi.ctxt level) slot
-    in
-    let kind = Grandparent_endorsement in
-    (* This function is only called on endorsements whose level is the
-       grandparent's, so there is no need to check the level. *)
-    let*? () = check_round kind grandparent.round round in
-    let*? () = check_payload_hash kind grandparent.payload_hash bph in
-    let*? () =
-      if check_signature then
-        Operation.check_signature
-          consensus_key.consensus_pk
-          vi.chain_id
-          operation
-      else ok_unit
-    in
-    return_unit
-
-  type endorsement_kind = Grandparent_endorsement | Normal_endorsement of int
-
   (** Retrieve the expected branch and payload_hash for endorsements
       from the context.
 
@@ -688,7 +663,7 @@ module Consensus = struct
       an error depending on the mode. *)
   let expected_payload_hash vi (consensus_info : consensus_info) op_level =
     match Consensus.endorsement_branch vi.ctxt with
-    | Some branch_and_payload_hash -> ok branch_and_payload_hash
+    | Some ((_branch : Block_hash.t), payload_hash) -> ok payload_hash
     | None ->
         error
           (match vi.mode with
@@ -713,18 +688,14 @@ module Consensus = struct
                   provided = op_level;
                 })
 
-  (** Validate an endorsement pointing to the predecessor, aka a
-      "normal" endorsement. Only this kind of endorsement may be found
-      during block validation or construction (ie. [Application],
-      [Partial_validation], or [Construction] modes). *)
-  let check_normal_endorsement vi consensus_info ~check_signature
-      (operation : Kind.endorsement operation) =
+  (** Endorsement checks for all modes that involve a block:
+      Application, Partial_validation, and Construction.
+
+      Return the slot owner's consensus key and voting power. *)
+  let check_block_endorsement vi consensus_info
+      {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
-    let (Single (Endorsement consensus_content)) =
-      operation.protocol_data.contents
-    in
-    let {level; round; block_payload_hash = bph; _} = consensus_content in
-    let*? _expected_branch, expected_payload_hash =
+    let*? expected_payload_hash =
       expected_payload_hash vi consensus_info level
     in
     let kind = Endorsement in
@@ -732,23 +703,75 @@ module Consensus = struct
     let*? () = check_round kind consensus_info.predecessor_round round in
     let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
-      get_delegate_details
-        consensus_info.endorsement_slot_map
-        kind
-        consensus_content
+      get_delegate_details consensus_info.endorsement_slot_map kind slot
     in
     let* () =
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
     in
+    return (consensus_key, voting_power)
+
+  (** Endorsement checks for Mempool mode.
+
+      We want this mode to be very permissive, to allow the mempool to
+      accept and propagate consensus operations even if they point to a
+      block which is not known to the mempool (e.g. because the block
+      has just been validated and the mempool has not had time to
+      switch its head to it yet, or because the block belongs to a
+      cousin branch). Therefore, we do not check the round nor the
+      payload, which may correspond to blocks that we do not know of
+      yet. As to the level, we only require it to be the
+      [predecessor_level] (aka the level of the mempool's head) plus or
+      minus one, that is:
+      [predecessor_level - 1 <= op_level <= predecessor_level + 1]
+      (note that [predecessor_level + 1] is also known as [current_level]).
+
+      Return the slot owner's consensus key and voting power (the
+      latter may be fake because it doesn't matter in Mempool mode, but
+      it is included to mirror {!check_block_endorsement}). *)
+  let check_mempool_endorsement vi consensus_info {level; slot; _} =
+    let open Lwt_result_syntax in
     let*? () =
-      if check_signature then
-        Operation.check_signature
-          consensus_key.consensus_pk
-          vi.chain_id
-          operation
+      if Raw_level.(succ level < consensus_info.predecessor_level) then
+        error
+          (Consensus_operation_for_old_level
+             {
+               kind = Endorsement;
+               expected = consensus_info.predecessor_level;
+               provided = level;
+             })
+      else if Raw_level.(level > vi.current_level.level) then
+        error
+          (Consensus_operation_for_future_level
+             {
+               kind = Endorsement;
+               expected = consensus_info.predecessor_level;
+               provided = level;
+             })
       else ok_unit
     in
-    return voting_power
+    if Raw_level.(level = consensus_info.predecessor_level) then
+      (* The endorsement has the same level as would be required if we
+         were validating a block. This means that we can use the
+         pre-computed slot map. *)
+      Lwt.return
+        (get_delegate_details
+           consensus_info.endorsement_slot_map
+           Endorsement
+           slot)
+    else
+      (* We retrieve the key directly from the context, and return a
+         fake voting power since it won't be used anyway in Mempool mode. *)
+      let* (_ctxt : t), consensus_key =
+        Stake_distribution.slot_owner
+          vi.ctxt
+          (Level.from_raw vi.ctxt level)
+          slot
+      in
+      return (consensus_key, 0 (* Fake voting power *))
+  (* We do not check that the frozen deposits are positive because this
+     only needs to be true in the context of a block that actually
+     contains the endorsement, which may not be the same as the current
+     mempool's context. *)
 
   let check_endorsement vi ~check_signature
       (operation : Kind.endorsement operation) =
@@ -761,24 +784,22 @@ module Consensus = struct
     let (Single (Endorsement consensus_content)) =
       operation.protocol_data.contents
     in
-    match vi.mode with
-    | Mempool (Some grandparent)
-      when Raw_level.(
-             succ consensus_content.level = consensus_info.predecessor_level) ->
-        let* () =
-          check_grandparent_endorsement
-            vi
-            ~check_signature
-            grandparent
-            operation
-            (consensus_content : consensus_content)
-        in
-        return Grandparent_endorsement
-    | _ ->
-        let* voting_power =
-          check_normal_endorsement vi consensus_info ~check_signature operation
-        in
-        return (Normal_endorsement voting_power)
+    let* consensus_key, voting_power =
+      match vi.mode with
+      | Application _ | Partial_validation _ | Construction _ ->
+          check_block_endorsement vi consensus_info consensus_content
+      | Mempool _ ->
+          check_mempool_endorsement vi consensus_info consensus_content
+    in
+    let*? () =
+      if check_signature then
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
+      else ok_unit
+    in
+    return voting_power
 
   let check_endorsement_conflict vs oph (operation : Kind.endorsement operation)
       =
@@ -813,9 +834,10 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with endorsements_seen}}
 
-  let may_update_endorsement_power block_state = function
-    | Grandparent_endorsement -> block_state
-    | Normal_endorsement voting_power ->
+  let may_update_endorsement_power vi block_state voting_power =
+    match vi.mode with
+    | Mempool _ -> (* The block_state is not relevant. *) block_state
+    | Application _ | Partial_validation _ | Construction _ ->
         {
           block_state with
           endorsement_power = block_state.endorsement_power + voting_power;
@@ -958,12 +980,12 @@ module Consensus = struct
   let validate_endorsement ~check_signature info operation_state block_state oph
       operation =
     let open Lwt_result_syntax in
-    let* kind = check_endorsement info ~check_signature operation in
+    let* power = check_endorsement info ~check_signature operation in
     let*? () =
       check_endorsement_conflict operation_state oph operation
       |> wrap_endorsement_conflict
     in
-    let block_state = may_update_endorsement_power block_state kind in
+    let block_state = may_update_endorsement_power info block_state power in
     let operation_state = add_endorsement operation_state oph operation in
     return {info; operation_state; block_state}
 end
@@ -2554,7 +2576,7 @@ let check_operation ?(check_signature = true) info (type kind)
       in
       return_unit
   | Single (Endorsement _) ->
-      let* (_kind : Consensus.endorsement_kind) =
+      let* (_voting_power : int) =
         Consensus.check_endorsement info ~check_signature operation
       in
       return_unit
