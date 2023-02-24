@@ -127,7 +127,7 @@ type checkable_payload_hash =
 val finalize_validate_block_header :
   block_header_contents:contents ->
   round:Round_repr.t ->
-  fitness:Fitness_repr.t ->
+  fitness_locked_round:Round_repr.t option ->
   checkable_payload_hash:checkable_payload_hash ->
   locked_round_evidence:locked_round_evidence option ->
   consensus_threshold:int ->
