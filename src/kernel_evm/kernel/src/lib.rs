@@ -62,7 +62,7 @@ pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Resu
 pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
     match init_mock_account(host) {
         Ok(()) => (),
-        Err(_) => panic!("The account should be writable"),
+        Err(_) => debug_msg!(host; "Failed to write the mocked up account"),
     }
 
     let queue = stage_one(host);
@@ -71,3 +71,21 @@ pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
 }
 
 kernel_entry!(main);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use mock_runtime::host::MockHost;
+
+    #[test]
+    // Test the mock account can be written in the durable storage.
+    fn test_init_mock_account() {
+        let mut host = MockHost::default();
+
+        match init_mock_account(&mut host) {
+            Ok(()) => (),
+            Err(_) => panic!("The account should be writable"),
+        }
+    }
+}
