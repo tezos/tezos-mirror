@@ -1871,6 +1871,10 @@ let normalized_lam ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
   unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) Optimized code_field
   >|=? fun (code_field, ctxt) -> (Lam (kdescr, code_field), ctxt)
 
+let normalized_lam_rec ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
+  unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) Optimized code_field
+  >|=? fun (code_field, ctxt) -> (LamRec (kdescr, code_field), ctxt)
+
 (* -- parse data of any type -- *)
 
 (*
@@ -2518,16 +2522,27 @@ and parse_lam_rec :
          @@ ty_eq ~error_details ty ret
          >>? fun (eq, ctxt) ->
          eq >|? fun Eq ->
-         ((LamRec (close_descr descr, script_instr) : (arg, ret) lambda), ctxt))
+         ( (close_descr descr
+             : (arg, (arg, ret) lambda * end_of_stack, ret, end_of_stack) kdescr),
+           ctxt ))
+      >>=? fun (closed_descr, ctxt) ->
+      (normalized_lam_rec [@ocaml.tailcall])
+        ~unparse_code_rec
+        ~stack_depth
+        ctxt
+        closed_descr
+        script_instr
   | Typed {loc; aft = stack_ty; _}, ctxt ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
       tzfail @@ Bad_return (loc, stack_ty, ret)
   | Failed {descr}, ctxt ->
-      return
-        ( (LamRec (close_descr (descr (Item_t (ret, Bot_t))), script_instr)
-            : (arg, ret) lambda),
-          ctxt )
+      (normalized_lam_rec [@ocaml.tailcall])
+        ~unparse_code_rec
+        ~stack_depth
+        ctxt
+        (close_descr (descr (Item_t (ret, Bot_t))))
+        script_instr
 
 and parse_instr :
     type a s.
@@ -3442,7 +3457,10 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       lambda_t loc arg ret >>?= fun lambda_rec_ty ->
       parse_lam_rec
-        ~unparse_code_rec
+        ~unparse_code_rec:(fun ctxt ~stack_depth:_ _unparsing_mode node ->
+          return (node, ctxt))
+        (* No need to normalize the unparsed component to Optimized mode here
+           because the script is already normalized in Optimized mode. *)
         Tc_context.(add_lambda tc_context)
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
