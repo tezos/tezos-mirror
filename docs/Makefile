@@ -4,7 +4,7 @@
 SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
-TMPDOCDIR        = /tmp/octezdoc
+TMPDOCDIR     = /tmp/octezdoc
 BUILDDIR      = _build
 TOPBUILDDIR   = ../_build/default
 
@@ -82,7 +82,9 @@ odoc-lite: docexes
 	# The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
 	# we temporarily deactivate the odoc checks.
 	# cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc
-	cd $(TMPDOCDIR); dune build @doc
+	@echo "Running odoc, outputs messages to $(TMPDOCDIR)/odoc.log"
+	cd $(TMPDOCDIR); dune build @doc >odoc.log 2>&1; \
+	  RESULT=$$?; (grep '^Error:' odoc.log || true); exit $$RESULT
 	@rm -rf _build/api/odoc
 	@mkdir -p _build/api
 	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
