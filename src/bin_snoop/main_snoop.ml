@@ -72,12 +72,12 @@ let list_benchmarks formatter list =
     list
 
 let list_all_benchmarks formatter =
-  list_benchmarks formatter (Registration.all_benchmarks ())
+  list_benchmarks formatter (Registration.all_benchmarks () |> List.map snd)
 
 (* -------------------------------------------------------------------------- *)
 (* Built-in commands implementations *)
 
-let benchmark_cmd (bench_pattern : string)
+let benchmark_cmd (bench_pattern : Namespace.t)
     (bench_opts : Cmdline.benchmark_options) =
   let bench =
     try Registration.find_benchmark_exn bench_pattern
@@ -395,7 +395,7 @@ let codegen_cmd solution model_name codegen_options =
   | None ->
       Format.eprintf "Model %a not found, exiting@." Namespace.pp model_name ;
       exit 1
-  | Some (model, _) ->
+  | Some {Registration.model; _} ->
       let transform =
         match codegen_options with
         | Cmdline.No_transform ->
@@ -442,7 +442,7 @@ let codegen_all_cmd solution regexp codegen_options =
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution in
-  let models = List.filter ok (Registration.all_registered_models ()) in
+  let models = List.filter ok (Registration.all_models ()) in
   let result = generate_code_for_models sol models codegen_options in
   Codegen.pp_module Format.std_formatter result
 
@@ -456,10 +456,6 @@ let codegen_infer_cmd solution codegen_options =
   let solution = Codegen.load_solution solution in
 
   Format.eprintf "Inference model: %s@." solution.inference_model_name ;
-
-  let all_benchmarks =
-    Registration.Name_table.to_seq Registration.bench_table
-  in
 
   let ( let* ) = Option.bind in
   let or_else m f = match m with Some x -> Some x | None -> f () in
@@ -481,7 +477,7 @@ let codegen_infer_cmd solution codegen_options =
       or_else (find_codegen codegen_name) (fun () ->
           find_codegen codegen_name_alpha)
     in
-    Seq.filter_map get_codegen_from_bench all_benchmarks
+    List.filter_map get_codegen_from_bench (Registration.all_benchmarks ())
   in
 
   (* Model's free variables must be included in the solution's keys *)
@@ -492,8 +488,8 @@ let codegen_infer_cmd solution codegen_options =
         (fun fv -> Free_variable.Map.mem fv solution.map)
         fvs
     in
-    Seq.filter
-      (fun (model_name, (model, _)) ->
+    List.filter
+      (fun (model_name, {Registration.model; _}) ->
         let ok = model_fvs_included_in_sol model in
         if not ok then
           Format.eprintf "Skipping model %a@." Namespace.pp model_name ;
@@ -502,10 +498,7 @@ let codegen_infer_cmd solution codegen_options =
   in
 
   let generated_code =
-    generate_code_for_models
-      solution
-      (List.of_seq codegen_models)
-      codegen_options
+    generate_code_for_models solution codegen_models codegen_options
   in
   Codegen.pp_module Format.std_formatter generated_code
 

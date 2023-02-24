@@ -34,7 +34,7 @@ let const_time_model ~const_name ~name =
     ~conv:(fun () -> ())
     ~model:(Model.unknown_const1 ~name ~const:(fv const_name))
 
-let make_bench name info model generator make_bench :
+let make_bench ~name ~info ~model ~generator ~make_bench :
     Tezos_benchmark.Benchmark.t =
   let module Bench : Benchmark.S = struct
     type config = unit
@@ -73,15 +73,15 @@ let make_bloomer () =
 let () =
   Registration.register
   @@ make_bench
-       "bloomer_mem"
-       "Benchmarking Bloomer.mem"
-       (const_time_model ~const_name:"bloomer_mem_const")
-       (fun _rng_state ->
+       ~name:"bloomer_mem"
+       ~info:"Benchmarking Bloomer.mem"
+       ~model:(const_time_model ~const_name:"bloomer_mem_const")
+       ~generator:(fun _rng_state ->
          let bloomer = make_bloomer () in
          let string = "test" in
          Bloomer.add bloomer string ;
          (bloomer, string))
-       (fun generator () ->
+       ~make_bench:(fun generator () ->
          let bloomer, string = generator () in
          let closure () = ignore (Bloomer.mem bloomer string) in
          Generator.Plain {workload = (); closure})
@@ -89,11 +89,11 @@ let () =
 let () =
   Registration.register
   @@ make_bench
-       "bloomer_add"
-       "Benchmarking Bloomer.add"
-       (const_time_model ~const_name:"bloomer_add_const")
-       (fun _rng_state -> make_bloomer ())
-       (fun generator () ->
+       ~name:"bloomer_add"
+       ~info:"Benchmarking Bloomer.add"
+       ~model:(const_time_model ~const_name:"bloomer_add_const")
+       ~generator:(fun _rng_state -> make_bloomer ())
+       ~make_bench:(fun generator () ->
          let bloomer = generator () in
          let closure () = ignore (Bloomer.add bloomer "test") in
          Generator.Plain {workload = (); closure})

@@ -291,57 +291,53 @@ let merge_config_files ?(delete_src = false) ~(dst : string) ~(src : string) ()
   if delete_src then Stdlib.Sys.remove src_path
 
 let edit_config ?(input = `Stdin) config_path namespace =
-  match Registration.find_namespace namespace with
-  | None ->
-      Format.eprintf
-        "Config file edition failed: given namespace is not registered.@."
-  | Some namespace -> (
-      let tmpfile =
-        Filename.(concat (get_temp_dir_name ()) "octez-snoop_config_edit")
-      in
-      let command e = Format.sprintf "%s %s" e tmpfile in
-      let try_edit e =
-        let ret = Stdlib.Sys.command (command e) in
-        if ret != 0 then
-          Format.eprintf "Config file edition failed: could not open editor@."
-        else ()
-      in
-      let config =
-        match Benchmark_helpers.load_json config_path with
-        | Ok c -> Data_encoding.Json.destruct encoding c
-        | Error exn -> raise exn
-      in
-      let base_conf =
-        get_config_strict namespace config |> Data_encoding.Json.to_string
-      in
-      let edited =
-        try
-          match input with
-          | `Edit e -> (
-              let _nwritten =
-                Lwt_main.run @@ Lwt_utils_unix.create_file tmpfile base_conf
-              in
-              try_edit e ;
-              match Benchmark_helpers.load_json tmpfile with
-              | Ok c -> c
-              | Error exn -> raise exn)
-          | `File i -> (
-              match Benchmark_helpers.load_json i with
-              | Ok c -> c
-              | Error exn -> raise exn)
-          | `String s -> Ezjsonm.from_string s
-          | `Stdin -> Ezjsonm.from_channel In_channel.stdin
-        with Ezjsonm.Parse_error (_, s) ->
-          Format.eprintf "Config file edition failed: %s@." s ;
-          exit 1
-      in
-      let new_conf_branch = build_branch edited (Namespace.to_list namespace) in
-      let new_conf = merge_config_trees config new_conf_branch in
-      let new_conf_str =
-        Data_encoding.Json.construct encoding new_conf
-        |> Data_encoding.Json.to_string
-      in
-      let _nwritten =
-        Lwt_main.run @@ Lwt_utils_unix.create_file config_path new_conf_str
-      in
-      match input with `Edit _ -> Stdlib.Sys.remove tmpfile | _ -> ())
+  let namespace = Namespace.of_string namespace in
+  let tmpfile =
+    Filename.(concat (get_temp_dir_name ()) "octez-snoop_config_edit")
+  in
+  let command e = Format.sprintf "%s %s" e tmpfile in
+  let try_edit e =
+    let ret = Stdlib.Sys.command (command e) in
+    if ret != 0 then
+      Format.eprintf "Config file edition failed: could not open editor@."
+    else ()
+  in
+  let config =
+    match Benchmark_helpers.load_json config_path with
+    | Ok c -> Data_encoding.Json.destruct encoding c
+    | Error exn -> raise exn
+  in
+  let base_conf =
+    get_config_strict namespace config |> Data_encoding.Json.to_string
+  in
+  let edited =
+    try
+      match input with
+      | `Edit e -> (
+          let _nwritten =
+            Lwt_main.run @@ Lwt_utils_unix.create_file tmpfile base_conf
+          in
+          try_edit e ;
+          match Benchmark_helpers.load_json tmpfile with
+          | Ok c -> c
+          | Error exn -> raise exn)
+      | `File i -> (
+          match Benchmark_helpers.load_json i with
+          | Ok c -> c
+          | Error exn -> raise exn)
+      | `String s -> Ezjsonm.from_string s
+      | `Stdin -> Ezjsonm.from_channel In_channel.stdin
+    with Ezjsonm.Parse_error (_, s) ->
+      Format.eprintf "Config file edition failed: %s@." s ;
+      exit 1
+  in
+  let new_conf_branch = build_branch edited (Namespace.to_list namespace) in
+  let new_conf = merge_config_trees config new_conf_branch in
+  let new_conf_str =
+    Data_encoding.Json.construct encoding new_conf
+    |> Data_encoding.Json.to_string
+  in
+  let _nwritten =
+    Lwt_main.run @@ Lwt_utils_unix.create_file config_path new_conf_str
+  in
+  match input with `Edit _ -> Stdlib.Sys.remove tmpfile | _ -> ()
