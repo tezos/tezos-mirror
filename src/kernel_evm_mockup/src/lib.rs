@@ -15,6 +15,7 @@ use crate::storage::store_account;
 use crate::wei::{from_eth, Wei};
 
 mod account;
+mod block;
 mod blueprint;
 mod error;
 mod eth_gen;
