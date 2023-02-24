@@ -63,21 +63,24 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
   let open Pages_encoding in
   let* root_hash =
     match pagination_scheme with
-    | Merkle_tree_V0 ->
+    | Pagination_scheme.Merkle_tree_V0 ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4897
            Once new "PUT /preimage" endpoint is implemented, pushing
            a new root hash to the data streamer should be moved there.
            Tezt for testing streaming of root hashes should also use
            the new endpoint. *)
         let* root_hash =
-          Merkle_tree.V0.serialize_payload dac_plugin ~page_store data
+          Merkle_tree.V0.Filesystem.serialize_payload
+            dac_plugin
+            ~page_store
+            data
         in
         let* () = Data_streamer.publish hash_streamer root_hash in
         let*! () =
           Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
         in
         return root_hash
-    | Hash_chain_V0 ->
+    | Pagination_scheme.Hash_chain_V0 ->
         Hash_chain.V0.serialize_payload
           dac_plugin
           ~for_each_page:(fun (hash, content) ->
@@ -115,7 +118,7 @@ let handle_verify_external_message_signature dac_plugin public_keys_opt
         witnesses
 
 let handle_retrieve_preimage dac_plugin page_store hash =
-  Page_store.Filesystem.load dac_plugin page_store ~hash
+  Page_store.Filesystem.load dac_plugin page_store hash
 
 let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
     hash_streamer directory =
@@ -168,9 +171,9 @@ let register_monitor_root_hashes dac_plugin hash_streamer dir =
     (Monitor_services.S.root_hashes dac_plugin)
     (fun () () () -> handle_monitor_root_hashes)
 
-let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
+let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
     hash_streamer =
-  let page_store = Page_store.Filesystem.init reveal_data_dir in
+  let page_store = Node_context.get_page_store node_context in
   Tezos_rpc.Directory.empty
   |> register_serialize_dac_store_preimage
        dac_plugin
@@ -184,8 +187,8 @@ let register dac_plugin reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
    Move this to RPC_server.Legacy once all operating modes are supported. *)
-let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
-    dac_pks_opt dac_sk_uris =
+let start_legacy ~rpc_address ~rpc_port ~threshold cctxt ctxt dac_pks_opt
+    dac_sk_uris =
   let open Lwt_syntax in
   let dir =
     Tezos_rpc.Directory.register_dynamic_directory
@@ -198,7 +201,7 @@ let start_legacy ~rpc_address ~rpc_port ~reveal_data_dir ~threshold cctxt ctxt
             Lwt.return
               (register
                  (module Dac_plugin)
-                 reveal_data_dir
+                 ctxt
                  cctxt
                  dac_pks_opt
                  dac_sk_uris

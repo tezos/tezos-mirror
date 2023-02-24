@@ -220,6 +220,12 @@ let wait_for_root_hash_pushed_to_data_streamer dac_node root_hash =
     "root_hash_pushed_to_the_data_streamer.v0"
     (fun json -> if JSON.(json |> as_string) = root_hash then Some () else None)
 
+let wait_for_received_root_hash_processed dac_node root_hash =
+  Dac_node.wait_for
+    dac_node
+    "dac_node_received_root_hash_processed.v0"
+    (fun json -> if JSON.(json |> as_string) = root_hash then Some () else None)
+
 let wait_for_received_root_hash dac_node root_hash =
   Dac_node.wait_for dac_node "dac_node_new_root_hash_received.v0" (fun json ->
       if JSON.(json |> as_string) = root_hash then Some () else None)
@@ -614,17 +620,17 @@ module Legacy = struct
     in
     Dac_node.Config_file.update dac_node (JSON.put ("mode", mode_updated))
 
-  let test_streaming_of_root_hashes _protocol node client coordinator =
-    let coordinator_serializes_payload ~payload ~expected_rh =
-      let* actual_rh, _l1_operation =
-        RPC.call
-          coordinator
-          (Rollup.Dac.RPC.dac_store_preimage
-             ~payload
-             ~pagination_scheme:"Merkle_tree_V0")
-      in
-      return @@ check_valid_root_hash expected_rh actual_rh
+  let coordinator_serializes_payload coordinator ~payload ~expected_rh =
+    let* actual_rh, _l1_operation =
+      RPC.call
+        coordinator
+        (Rollup.Dac.RPC.dac_store_preimage
+           ~payload
+           ~pagination_scheme:"Merkle_tree_V0")
     in
+    return @@ check_valid_root_hash expected_rh actual_rh
+
+  let test_streaming_of_root_hashes _protocol node client coordinator =
     (* 1. Create two new dac nodes; [observer_1] and [observer_2].
        2. Initialize their default configuration.
        3. Update their configuration so that their dac node client context
@@ -662,11 +668,9 @@ module Legacy = struct
       wait_for_received_root_hash observer_2 expected_rh_2
     in
 
-    (* Test starts here *)
-
-    (* Start running [observer_1]. From now on we expect [observer_1] to monitor
-       streamed root hashes produced by [coordinator]. [coordinator] produces
-       and pushes them as a side effect of serializing dac payload. *)
+    (* Start running [observer_1]. From now on we expect [observer_1] to
+       monitor streamed root hashes produced by [coordinator]. [coordinator]
+       produces and pushes them as a side effect of serializing dac payload. *)
     let observer_1_is_subscribed =
       wait_for_handle_new_subscription_to_hash_streamer coordinator
     in
@@ -676,6 +680,7 @@ module Legacy = struct
        [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
     let* () =
       coordinator_serializes_payload
+        coordinator
         ~payload:payload_1
         ~expected_rh:expected_rh_1
     in
@@ -696,6 +701,7 @@ module Legacy = struct
        i.e. to both [observer_1] and [observer_2] this time. *)
     let* () =
       coordinator_serializes_payload
+        coordinator
         ~payload:payload_2
         ~expected_rh:expected_rh_2
     in
@@ -711,6 +717,134 @@ module Legacy = struct
        resolved after the promise [observer_2_promise_2] has been resolved. *)
     assert (Lwt.is_sleeping observer_2_promise_1) ;
     unit
+
+  (** [check_downloaded_page coordinator observer page_hash] checks that the
+     [observer] has downloaded a page with [page_hash] from the [coordinator],
+     that the contents of the page corresponds to the ones of the
+     [coordinator]. It returns the list  of the hashes contained in the
+     [page_hash], if the page corresponds to a hash page. Otherwise, it returns
+     the empty list. *)
+  let check_downloaded_page coordinator observer page_hash =
+    let* coordinator_hex_encoded_page =
+      RPC.call coordinator (Rollup.Dac.RPC.dac_retrieve_preimage page_hash)
+    in
+    let coordinator_page = Hex.to_string (`Hex coordinator_hex_encoded_page) in
+    (* Check that the page has been saved by the observer. *)
+    let* observer_hex_encoded_page =
+      RPC.call observer (Rollup.Dac.RPC.dac_retrieve_preimage page_hash)
+    in
+    let observer_page = Hex.to_string (`Hex observer_hex_encoded_page) in
+    (* Check that the raw page for the root hash  stored in the coordinator
+       is the same as the raw page stored in the observer. *)
+    Check.(
+      (coordinator_page = observer_page)
+        string
+        ~error_msg:
+          "Returned page does not match the expected one (Current: %L <> \
+           Expected: %R)") ;
+    let version_tag = observer_page.[0] in
+    if version_tag = '\000' then return []
+    else
+      let hash_size = 33 in
+      let preamble_size = 5 in
+      let concatenated_hashes =
+        String.sub observer_page 5 (String.length observer_page - preamble_size)
+      in
+      let rec split_hashes concatenated_hashes hashes =
+        if String.equal concatenated_hashes "" then hashes
+        else
+          let next_hash =
+            Hex.show @@ Hex.of_string
+            @@ String.sub concatenated_hashes 0 hash_size
+          in
+          let next_concatenated_hashes =
+            String.sub
+              concatenated_hashes
+              hash_size
+              (String.length concatenated_hashes - hash_size)
+          in
+          split_hashes next_concatenated_hashes (next_hash :: hashes)
+      in
+      return @@ split_hashes concatenated_hashes []
+
+  let check_downloaded_preimage coordinator observer root_hash =
+    let rec go hashes =
+      match hashes with
+      | [] -> return ()
+      | hash :: hashes ->
+          let* next_hashes = check_downloaded_page coordinator observer hash in
+          go (hashes @ next_hashes)
+    in
+    go [root_hash]
+
+  let sample_payload example_filename =
+    let json =
+      JSON.parse_file @@ "tezt/tests/dac_example_payloads/" ^ example_filename
+      ^ ".json"
+    in
+    let payload =
+      JSON.(json |-> "payload" |> as_string |> fun s -> Hex.to_string (`Hex s))
+    in
+    let root_hash = JSON.(json |-> "root_hash" |> as_string) in
+    (payload, root_hash)
+
+  let test_observer_downloads_pages _protocol node client coordinator =
+    (* 1. Create one new dac nodes; [observer_1],
+       2. Initialize the default configuration,
+       3. Specify a temporary directory within the test data for the observer
+          reveal data dir,
+       4. Update the configuration of the observer so that the dac node client
+          context points to [coordinator]. *)
+    let observer = Dac_node.create ~name:"observer" ~node ~client () in
+    let* _ = Dac_node.init_config observer in
+    let observer_data_dir = Dac_node.data_dir observer in
+    let observer_reveal_data_dir =
+      Filename.concat observer_data_dir "preimages"
+    in
+    let* () =
+      Dac_node.Dac.set_parameters
+        ~reveal_data_dir:observer_reveal_data_dir
+        observer
+    in
+    let () = set_coordinator observer coordinator in
+    (* Payload with more than 4091 bytes to check recursive calls of the
+       committee member to the coordinator.
+       The payload of this JSON file corresponds to the hex encoded version of
+       the Inferno, Canto I, by Dante Alighieri. The original text is also used
+       in the uit tests
+       (see src/proto_alpha/lib_dac/test/test_dac_pages_encoding.ml). Because
+       the unit test and the integration test use pages of different size,
+       the final root hash obtained is different from the one in the unit
+       tests. *)
+    let payload, expected_rh = sample_payload "preimage" in
+    let push_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
+    in
+    let wait_for_observer_subscribed_to_data_streamer =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator
+    in
+    let fetch_root_hash_promise =
+      wait_for_received_root_hash_processed observer expected_rh
+    in
+
+    (* Test starts here *)
+
+    (* Start running [observer_1]. From now on we expect [observer_1] to monitor
+       streamed root hashes produced by [coordinator]. [coordinator] produces
+       and pushes them as a side effect of serializing dac payload. *)
+    let* () = Dac_node.run observer in
+    let* () = wait_for_observer_subscribed_to_data_streamer in
+    (* [coordinator] serializes [payload_1]. We expect it would push
+       [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
+    let* () =
+      coordinator_serializes_payload coordinator ~payload ~expected_rh
+    in
+    (* Assert [coordinator] emitted event that [expected_rh] was pushed
+       to the data_streamer. *)
+    let* () = push_promise in
+    (* Assert [observer] emitted event of received [expected_rh]. *)
+    let* () = fetch_root_hash_promise in
+    check_downloaded_preimage coordinator observer expected_rh
 end
 
 let register ~protocols =
@@ -746,4 +880,9 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_streaming_of_root_hashes_in_legacy_mode"
     Legacy.test_streaming_of_root_hashes
+    protocols ;
+  scenario_with_layer1_and_dac_nodes
+    ~tags:["dac"; "dac_node"]
+    "committee member downloads pages from coordinator"
+    Legacy.test_observer_downloads_pages
     protocols

@@ -58,3 +58,9 @@ val streamed_call :
   'b ->
   'c ->
   (unit -> unit) tzresult Lwt.t
+
+(** [get_preimage cctxt hash] requests the preimage of hash, consisting of a
+    single page, from cctxt. When the request succeeds, the raw page will be
+    returned as a sequence of bytes. *)
+val get_preimage :
+  Dac_plugin.t -> #cctxt -> Dac_plugin.hash -> bytes tzresult Lwt.t

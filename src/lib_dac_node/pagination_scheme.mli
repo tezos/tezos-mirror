@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 TriliTech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+(** The pagination schemes that are supported by the DAC node for converting
+    a payload in a set of pages of 4096 bytes each. *)
+type t = Merkle_tree_V0 | Hash_chain_V0
 
-class unix_cctxt ~rpc_config : cctxt =
-  object
-    inherit
-      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-        rpc_config
-        (Tezos_rpc_http.Media_type.Command_line.of_command_line
-           rpc_config.media_type)
-  end
-
-let make_unix_cctxt ~scheme ~host ~port =
-  let endpoint = Uri.make ~scheme ~host ~port () in
-  let rpc_config =
-    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
-  in
-  new unix_cctxt ~rpc_config
-
-let call (cctxt : #cctxt) = cctxt#call_service
-
-let streamed_call (cctxt : #cctxt) = cctxt#call_streamed_service
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
-   If the preimage was generated using a different plugin, the computation of
-   the hash might fail. In practice it would be better to retrieve the
-   hash of the protocol that the coordinator was using when the page hash
-   was computed.
-*)
-let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) page_hash =
-  call cctxt (RPC_services.retrieve_preimage plugin) ((), page_hash) () ()
+(** The encoding for pagination schemes. *)
+val encoding : t Data_encoding.t

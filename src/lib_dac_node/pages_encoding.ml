@@ -40,13 +40,6 @@ type error +=
   | Cannot_combine_pages_data_of_different_type
   | Hashes_page_repr_expected_single_element
 
-type pagination_scheme = Merkle_tree_V0 | Hash_chain_V0
-
-let pagination_scheme_encoding =
-  Data_encoding.string_enum
-    [("Merkle_tree_V0", Merkle_tree_V0); ("Hash_chain_V0", Hash_chain_V0)]
-
-(* Encoding scheme configuration. *)
 module type CONFIG = sig
   val max_page_size : int
 end
@@ -536,7 +529,7 @@ module Merkle_tree = struct
         match retrieved_hashes with
         | [] -> return @@ Bytes.concat Bytes.empty retrieved_content
         | hash :: hashes -> (
-            let* serialized_page = S.load dac_plugin page_store ~hash in
+            let* serialized_page = S.load dac_plugin page_store hash in
             let*? page = deserialize_page dac_plugin serialized_page in
             match page with
             | Hashes page_hashes ->
@@ -573,21 +566,29 @@ module Merkle_tree = struct
     let deserialize_payload = B.deserialize_payload
   end
 
-  module V0_Buffered =
-    Make_buffered
-      (Page_store.Filesystem)
-      (struct
-        (* Cntents_version_tag used in content pages is 0. *)
-        let content_version = 0
+  module V0_metadata = struct
+    (* Cntents_version_tag used in contents pages is 0. *)
+    let content_version = 0
 
-        (* Hashes_version_tag used in hashes pages is 1. *)
-        let hashes_version = 0
-      end)
-      (struct
-        let max_page_size = 4096
-      end)
+    (* Hashes_version_tag used in hashes pages is 1. *)
+    let hashes_version = 0
+  end
 
-  module V0 = Make (V0_Buffered)
+  module V0_page_size = struct
+    let max_page_size = 4096
+  end
+
+  module V0_Buffered = struct
+    module Filesystem =
+      Make_buffered (Page_store.Filesystem) (V0_metadata) (V0_page_size)
+    module Remote =
+      Make_buffered (Page_store.Remote) (V0_metadata) (V0_page_size)
+  end
+
+  module V0 = struct
+    module Filesystem = Make (V0_Buffered.Filesystem)
+    module Remote = Make (V0_Buffered.Remote)
+  end
 
   module Internal_for_tests = struct
     module Make_buffered = Make_buffered

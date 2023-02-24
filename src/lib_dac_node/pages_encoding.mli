@@ -34,10 +34,6 @@ type error +=
   | Cannot_combine_pages_data_of_different_type
   | Hashes_page_repr_expected_single_element
 
-type pagination_scheme = Merkle_tree_V0 | Hash_chain_V0
-
-val pagination_scheme_encoding : pagination_scheme Data_encoding.t
-
 (* Encoding scheme configuration. *)
 module type CONFIG = sig
   val max_page_size : int
@@ -157,11 +153,11 @@ end
     hashing schemes to be used.
  *)
 module Merkle_tree : sig
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4662
-     Remove `page_store = string` when Hash_chain is removed
-     Context https://gitlab.com/tezos/tezos/-/merge_requests/7465#note_1247831273
-  *)
-  module V0 : Dac_codec with type page_store = Page_store.Filesystem.t
+  module V0 : sig
+    module Filesystem : Dac_codec with type page_store = Page_store.Filesystem.t
+
+    module Remote : Dac_codec with type page_store = Page_store.Remote.t
+  end
 
   (**/**)
 

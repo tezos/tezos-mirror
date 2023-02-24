@@ -120,14 +120,40 @@ module Handler = struct
       to the dac node corresponding to [coordinator_cctxt]. *)
   let new_root_hash ctxt coordinator_cctxt =
     let open Lwt_result_syntax in
-    let handler dac_plugin _stopper root_hash =
+    let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
-      return_unit
+      let*! payload_result =
+        Pages_encoding.Merkle_tree.V0.Remote.deserialize_payload
+          dac_plugin
+          ~page_store:remote_store
+          root_hash
+      in
+      match payload_result with
+      | Ok _ ->
+          let*! () =
+            Event.emit_received_root_hash_processed dac_plugin root_hash
+          in
+          return ()
+      | Error errs ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
+             Improve handling of errors. *)
+          let*! () =
+            Event.emit_processing_root_hash_failed dac_plugin root_hash errs
+          in
+          return ()
     in
     let*? dac_plugin = Node_context.get_dac_plugin ctxt in
+    let remote_store =
+      Page_store.(
+        Remote.init
+          {
+            cctxt = coordinator_cctxt;
+            page_store = Node_context.get_page_store ctxt;
+          })
+    in
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
-      (handler dac_plugin)
+      (handler dac_plugin remote_store)
       (Monitor_services.root_hashes coordinator_cctxt dac_plugin)
 end
 
@@ -188,7 +214,6 @@ let run ~data_dir cctxt =
       start_legacy
         ~rpc_address
         ~rpc_port
-        ~reveal_data_dir
         ~threshold
         cctxt
         ctxt

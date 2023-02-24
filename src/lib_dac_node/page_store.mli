@@ -59,10 +59,17 @@ module type S = sig
     content:bytes ->
     unit tzresult Lwt.t
 
-  (** [load dac_plugin t ~hash] returns [content] of the storage backend [t]
+  (** [mem dac_plugin t hash] Checks whether there is an entry for [hash] in
+      the page storage.
+      It can fail with error [Cannot_read_from_page_storage hash_as_string],
+      if it was not possible to check that the page exists for any reason
+      related to the page storage backend implementation. *)
+  val mem : Dac_plugin.t -> t -> Dac_plugin.hash -> bool tzresult Lwt.t
+
+  (** [load dac_plugin t hash] returns [content] of the storage backend [t]
       represented by a key. When reading fails it returns a
       [Cannot_read_page_from_page_storage] error. *)
-  val load : Dac_plugin.t -> t -> hash:Dac_plugin.hash -> bytes tzresult Lwt.t
+  val load : Dac_plugin.t -> t -> Dac_plugin.hash -> bytes tzresult Lwt.t
 end
 
 (** [Filesystem] is an implementation of the page store backed up by
@@ -70,3 +77,17 @@ end
     path where files will be saved. A page is saved as a file whose
     name is the hex encoded hash of its content. *)
 module Filesystem : S with type configuration = string
+
+(** The configuration type for page stores that fetch pages remotely, when they
+    are not available on the local page store. The parameter [cctxt]
+    corresponds to the client context used to connect to the remote host for
+    fetching pages. *)
+type remote_configuration = {
+  cctxt : Dac_node_client.cctxt;
+  page_store : Filesystem.t;
+}
+
+(** A [Page_store] implementation backed by the local filesystem, which
+   uses a connection to a Dac node to retrieve pages that are not
+   saved locally. *)
+module Remote : S with type configuration = remote_configuration

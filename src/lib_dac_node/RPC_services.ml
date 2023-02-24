@@ -39,7 +39,7 @@ let root_hash_encoding ((module P) : Dac_plugin.t) =
            (string' Plain)))
 
 let store_preimage_request_encoding =
-  let pagination_scheme_encoding = Pages_encoding.pagination_scheme_encoding in
+  let pagination_scheme_encoding = Pagination_scheme.encoding in
   Data_encoding.(
     obj2
       (req "payload" Data_encoding.(bytes' Hex))

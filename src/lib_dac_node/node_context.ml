@@ -51,10 +51,17 @@ type t = {
 
          Eventually, once the legacy mode is removed we should revisit the
          need for this fieeld.*)
+  page_store : Page_store.Filesystem.t;
 }
 
 let init config cctxt coordinator_opt =
-  {status = Starting; config; tezos_node_cctxt = cctxt; coordinator_opt}
+  {
+    status = Starting;
+    config;
+    tezos_node_cctxt = cctxt;
+    coordinator_opt;
+    page_store = Page_store.Filesystem.init config.reveal_data_dir;
+  }
 
 let set_ready ctxt dac_plugin =
   match ctxt.status with
@@ -99,3 +106,5 @@ let get_dac_plugin ctxt =
   match ctxt.status with
   | Ready {dac_plugin; hash_streamer = _} -> Ok dac_plugin
   | Starting -> tzfail Node_not_ready
+
+let get_page_store ctxt = ctxt.page_store

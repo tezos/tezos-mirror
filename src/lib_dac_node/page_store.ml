@@ -75,7 +75,9 @@ module type S = sig
     content:bytes ->
     unit tzresult Lwt.t
 
-  val load : Dac_plugin.t -> t -> hash:Dac_plugin.hash -> bytes tzresult Lwt.t
+  val mem : Dac_plugin.t -> t -> Dac_plugin.hash -> bool tzresult Lwt.t
+
+  val load : Dac_plugin.t -> t -> Dac_plugin.hash -> bytes tzresult Lwt.t
 end
 
 (** Implementation of dac pages storage using filesystem. *)
@@ -104,7 +106,19 @@ module Filesystem : S with type configuration = string = struct
         tzfail
         @@ Cannot_write_page_to_page_storage {hash = hash_string; content}
 
-  let load ((module P) : Dac_plugin.t) data_dir ~hash =
+  let mem ((module P) : Dac_plugin.t) data_dir hash =
+    let open Lwt_result_syntax in
+    let hash_string = P.to_hex hash in
+    let path = path data_dir hash_string in
+    let*! result =
+      Lwt_utils_unix.with_open_in path (fun _fd -> Lwt.return ())
+    in
+    match result with
+    | Ok () -> return true
+    | Error {unix_code = Unix.ENOENT; _} -> return false
+    | Error _ -> tzfail @@ Cannot_read_page_from_page_storage hash_string
+
+  let load ((module P) : Dac_plugin.t) data_dir hash =
     let open Lwt_result_syntax in
     let hash_string = P.to_hex hash in
     let path = path data_dir hash_string in
@@ -113,4 +127,32 @@ module Filesystem : S with type configuration = string = struct
         let*! result = Lwt_utils_unix.read_file path in
         return @@ String.to_bytes result)
       (fun _exn -> tzfail @@ Cannot_read_page_from_page_storage hash_string)
+end
+
+type remote_configuration = {
+  cctxt : Dac_node_client.cctxt;
+  page_store : Filesystem.t;
+}
+
+module Remote : S with type configuration = remote_configuration = struct
+  type t = Dac_node_client.cctxt * Filesystem.t
+
+  type configuration = remote_configuration
+
+  let init {cctxt; page_store} = (cctxt, page_store)
+
+  let save plugin (_cctxt, page_store) ~hash ~content =
+    Filesystem.save plugin page_store ~hash ~content
+
+  let mem plugin (_cctxt, page_store) hash =
+    Filesystem.mem plugin page_store hash
+
+  let load plugin (cctxt, page_store) hash =
+    let open Lwt_result_syntax in
+    let* file_exists_locally = mem plugin (cctxt, page_store) hash in
+    if file_exists_locally then Filesystem.load plugin page_store hash
+    else
+      let* content = Dac_node_client.get_preimage plugin cctxt hash in
+      let+ () = Filesystem.save plugin page_store ~hash ~content in
+      content
 end
