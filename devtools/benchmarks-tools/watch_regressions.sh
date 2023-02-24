@@ -186,7 +186,7 @@ do
     files=$(for d in $DIRS; do local="$INPUT_CSV_DIR/$d/$b"; if [ -f "$local" ]; then echo "$local"; fi; done)
 
     # Comparing all runs from FIRST_DIR.
-    $DUNE exec --no-build gas_parameter_diff -- "$files" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+    $DUNE exec --no-build gas_parameter_diff -- $files > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
 
     # Comparing with the reference and previous runs.
     for current in reference previous
