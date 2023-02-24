@@ -28,6 +28,8 @@ module V2_0_0 : sig
   (** This module provides Proof-Generating Virtual Machine (PVM) running
     WebAssembly (version 2.0.0). *)
 
+  val current_version : Wasm_2_0_0.version
+
   module type S = sig
     include Sc_rollup_PVM_sig.S
 

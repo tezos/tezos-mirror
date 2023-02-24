@@ -28,6 +28,8 @@ open Wasm_pvm_state.Internal_state
 module Wasm = Tezos_webassembly_interpreter
 module Parsing = Binary_parser_encodings
 
+let durable_scope = ["durable"]
+
 let tick_state_encoding =
   let open Tezos_tree_encoding in
   tagged_union
@@ -110,7 +112,7 @@ let durable_buffers_encoding =
   Tezos_tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
 
 let durable_storage_encoding =
-  Tezos_tree_encoding.(scope ["durable"] Durable.encoding)
+  Tezos_tree_encoding.(scope durable_scope Durable.encoding)
 
 let default_buffers validity_period message_limit () =
   Tezos_webassembly_interpreter.Eval.
@@ -236,20 +238,29 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* tree = T.remove tree ["wasm"] in
     Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
-  let initial_state empty_tree =
-    let version = Tezos_lazy_containers.Chunked_byte_vector.of_string "2.0.0" in
-    Tree_encoding_runner.encode
-      Tezos_tree_encoding.(
-        scope ["durable"; "readonly"; "wasm_version"; "@"] chunked_byte_vector)
-      version
-      empty_tree
+  let initial_state version empty_tree =
+    let open Lwt.Syntax in
+    let* durable =
+      Tree_encoding_runner.decode durable_storage_encoding empty_tree
+    in
+    let version_str =
+      Data_encoding.Binary.to_string_exn Wasm_pvm_state.version_encoding version
+    in
+    let* durable =
+      Durable.set_value_exn
+        ~edit_readonly:true
+        durable
+        Constants.version_key
+        version_str
+    in
+    Tree_encoding_runner.encode durable_storage_encoding durable empty_tree
 
   let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period
       ~outbox_message_limit bs tree =
     let open Lwt_syntax in
     let open Tezos_tree_encoding in
     let* durable =
-      Tree_encoding_runner.decode (scope ["durable"] Durable.encoding) tree
+      Tree_encoding_runner.decode (scope durable_scope Durable.encoding) tree
     in
     let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot" in
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm" in
