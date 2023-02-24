@@ -20,12 +20,12 @@ export recommended_node_version=16.18.1
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=4d8e7321c83290c76d178bd18b7bd73b332168e3
+export full_opam_repository_tag=7f0579750a745ea92dc2fe3869d491902e2c29dd
 
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.yml
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-25dac742bf06804f9fe91a8b38f98e12c9a4e80e}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-f75ae248f97f82ed70c683c567b5cb958eca8795}"
 export opam_repository_git="$opam_repository_url.git"
 export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 

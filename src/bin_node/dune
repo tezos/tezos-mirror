@@ -28,7 +28,7 @@
   cmdliner
   fmt.cli
   fmt.tty
-  tls
+  tls-lwt
   prometheus-app.unix
   lwt-exit
   uri
