@@ -38,7 +38,7 @@ type error +=
   | Dal_invalid_page_for_slot of Dal.Page.t
 
 let () =
-  register_error_kind
+  Sc_rollup_node_errors.register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_slot_not_found_in_store"
     ~title:"Dal slot not found in store"
@@ -48,7 +48,7 @@ let () =
     Data_encoding.(obj1 (req "slot_id" Dal.Slot.Header.id_encoding))
     (function Dal_slot_not_found_in_store slot_id -> Some slot_id | _ -> None)
     (fun slot_id -> Dal_slot_not_found_in_store slot_id) ;
-  register_error_kind
+  Sc_rollup_node_errors.register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_invalid_page_for_slot"
     ~title:"Invalid Dal page requested for slot"

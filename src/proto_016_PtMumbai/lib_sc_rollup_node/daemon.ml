@@ -572,6 +572,67 @@ module Make (PVM : Pvm.S) = struct
         Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
         let*! _ = Lwt_exit.exit_and_wait 1 in
         return_unit)
+
+  module Internal_for_tests = struct
+    (** Same as {!process_head} but only builds and stores the L2 block
+        corresponding to [messages]. It is used by the unit tests to build an L2
+        chain. *)
+    let process_messages (node_ctxt : _ Node_context.t) ~predecessor
+        ~predecessor_timestamp head messages =
+      let open Lwt_result_syntax in
+      let* () = Node_context.save_level node_ctxt head in
+      let* inbox_hash, inbox, inbox_witness, messages, ctxt =
+        Inbox.Internal_for_tests.process_messages
+          node_ctxt
+          ~predecessor
+          ~predecessor_timestamp
+          ~level:head.level
+          messages
+      in
+      let* ctxt, _num_messages, num_ticks, initial_tick =
+        Components.Interpreter.process_head
+          node_ctxt
+          ctxt
+          ~predecessor
+          head
+          (inbox, messages)
+      in
+      let*! context_hash = Context.commit ctxt in
+      let* commitment_hash =
+        Components.Commitment.process_head
+          node_ctxt
+          ~predecessor:predecessor.Layer1.hash
+          head
+          ctxt
+      in
+      let level = Raw_level.of_int32_exn head.level in
+      let* previous_commitment_hash =
+        if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+          (* Previous commitment for rollup genesis is itself. *)
+          return node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash
+        else
+          let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
+          Sc_rollup_block.most_recent_commitment pred.header
+      in
+      let header =
+        Sc_rollup_block.
+          {
+            block_hash = head.hash;
+            level;
+            predecessor = predecessor.hash;
+            commitment_hash;
+            previous_commitment_hash;
+            context = context_hash;
+            inbox_witness;
+            inbox_hash;
+          }
+      in
+      let l2_block =
+        Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+      in
+      let* () = Node_context.save_l2_head node_ctxt l2_block in
+      return l2_block
+  end
 end
 
 let run ~data_dir (configuration : Configuration.t)

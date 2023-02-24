@@ -37,7 +37,7 @@ module Parameters :
      and type Operation.t = L1_operation.t = struct
   type state = Node_context.ro
 
-  let events_section = ["sc_rollup.injector"]
+  let events_section = [Protocol.name; "sc_rollup_node"]
 
   module Tag : TAG with type t = Configuration.purpose = struct
     type t = Configuration.purpose

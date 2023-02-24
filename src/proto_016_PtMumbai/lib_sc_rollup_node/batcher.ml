@@ -34,6 +34,10 @@ end
 
 module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
 
+(* Count instances of the batcher functor to allow for multiple worker events
+   without conflicts. *)
+let instances_count = ref 0
+
 module type S = sig
   type status = Pending_batch | Batched of Injector.Inj_operation.hash
 
@@ -61,6 +65,8 @@ module type S = sig
 end
 
 module Make (Simulation : Simulation.S) : S = struct
+  let () = incr instances_count
+
   module PVM = Simulation.PVM
 
   type status = Pending_batch | Batched of Injector.Inj_operation.hash
@@ -263,6 +269,27 @@ module Make (Simulation : Simulation.S) : S = struct
       signer : Tezos_crypto.Signature.public_key_hash;
       conf : Configuration.batcher;
     }
+  end
+
+  module Name = struct
+    (* We only have a single batcher in the node *)
+    type t = unit
+
+    let encoding = Data_encoding.unit
+
+    let base =
+      (* But we can have multiple instances in the unit tests. This is just to
+         avoid conflicts in the events declarations. *)
+      Batcher_events.Worker.section
+      @ [
+          ("worker"
+          ^ if !instances_count = 1 then "" else string_of_int !instances_count
+          );
+        ]
+
+    let pp _ _ = ()
+
+    let equal () () = true
   end
 
   module Worker = Worker.MakeSingle (Name) (Request) (Types)
