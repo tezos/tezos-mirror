@@ -294,6 +294,51 @@ module Test = struct
         | Ok () -> true
         | _ -> false)
 
+  (* The verification of a page fails on input the wrong page (or the wrong proof). *)
+  let test_page_proofs_invalid =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test page proofs invalid page"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init params ;
+        assume (ensure_validity params) ;
+        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let* p = Cryptobox.polynomial_from_slot t params.slot in
+        let* cm = Cryptobox.commit t p in
+        let number_of_pages = params.slot_size / params.page_size in
+        let page_index_prove = Random.int number_of_pages in
+        let page_index_verify = Random.int number_of_pages in
+        assume (page_index_prove <> page_index_verify) ;
+        let* proof = Cryptobox.prove_page t p page_index_prove in
+        let page_prove =
+          Bytes.sub
+            params.slot
+            (page_index_prove * params.page_size)
+            params.page_size
+        in
+        let page_verify =
+          Bytes.sub
+            params.slot
+            (page_index_verify * params.page_size)
+            params.page_size
+        in
+        (* We need [page_prove] and [page_verify] to be distinct, otherwise
+           [Cryptobox.verify_page] will return [Ok ()] (we want to input an
+           incorrect page to trigger the [`Invalid_page] error). *)
+        assume (Bytes.compare page_prove page_verify <> 0) ;
+        Cryptobox.verify_page
+          t
+          cm
+          ~page_index:page_index_verify
+          page_verify
+          proof)
+        |> function
+        | Error `Invalid_page -> true
+        | _ -> false)
+
   (* Tests that a shard comes from the erasure-encoded slot. *)
   let test_shard_proofs =
     let open QCheck2 in
@@ -435,6 +480,7 @@ let () =
             Test.test_erasure_code_failure_not_enough_shards;
             Test.test_erasure_code_failure_invalid_shard_length;
             Test.test_page_proofs;
+            Test.test_page_proofs_invalid;
             Test.test_shard_proofs;
             Test.test_commitment_proof;
             Test.test_polynomial_slot_conversions;
