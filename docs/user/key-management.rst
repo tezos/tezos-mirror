@@ -63,17 +63,17 @@ in the Tezos Wallet app)::
 
    ./octez-client list connected ledgers
 
-You can follow the instructions to import the Ledger encrypted private key and
+This will display some instructions to import the Ledger encrypted private key, and
 you can choose between the root or a derived address.
-We can confirm the addition by listing known addresses::
+We can follow the instructions and then confirm the addition by listing known addresses::
 
-   ./octez-client import secret key my_ledger ledger://tz1XXXXXXXXXX
+   ./octez-client import secret key my_ledger ledger://XXXXXXXXXX
    ./octez-client list known addresses
 
 Optional: we can check that our Ledger signs correctly using the
 following command and confirming on the device::
 
-   octez-client show ledger path ledger://tz1XXXXXXXXXX
+   octez-client show ledger ledger://XXXXXXXXXX
 
 The address can now be used as any other with the exception that
 during an operation the device will prompt you to confirm when it's
