@@ -48,9 +48,6 @@ unit:015_PtLimaPt:
   # overly long job names causing GitLab CI to silently fail.
   variables:
     # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
-    proto_015_PtLimaPt__lib_protocol__1: >
-        @@src/proto_015_PtLimaPt/lib_protocol/test/integration/runtest
-        @src/proto_015_PtLimaPt/lib_protocol/test/integration/gas/runtest
     proto_015_PtLimaPt__lib_protocol__2: >
         @src/proto_015_PtLimaPt/lib_protocol/test/integration/michelson/runtest
         @src/proto_015_PtLimaPt/lib_protocol/test/integration/validate/runtest
@@ -59,7 +56,6 @@ unit:015_PtLimaPt:
   parallel:
     matrix:
       - TEST_TARGETS:
-          - proto_015_PtLimaPt__lib_protocol__1
           - proto_015_PtLimaPt__lib_protocol__2
           - proto_015_PtLimaPt__lib_protocol__3
   script:
@@ -73,9 +69,6 @@ unit:016_PtMumbai:
   # overly long job names causing GitLab CI to silently fail.
   variables:
     # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
-    proto_016_PtMumbai__lib_protocol__1: >
-        @@src/proto_016_PtMumbai/lib_protocol/test/integration/runtest
-        @src/proto_016_PtMumbai/lib_protocol/test/integration/gas/runtest
     proto_016_PtMumbai__lib_protocol__2: >
         @src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/runtest
         @src/proto_016_PtMumbai/lib_protocol/test/integration/validate/runtest
@@ -86,7 +79,6 @@ unit:016_PtMumbai:
   parallel:
     matrix:
       - TEST_TARGETS:
-          - proto_016_PtMumbai__lib_protocol__1
           - proto_016_PtMumbai__lib_protocol__2
           - proto_016_PtMumbai__lib_protocol__3
           - proto_016_PtMumbai
@@ -101,9 +93,6 @@ unit:alpha:
   # overly long job names causing GitLab CI to silently fail.
   variables:
     # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
-    proto_alpha__lib_protocol__1: >
-        @@src/proto_alpha/lib_protocol/test/integration/runtest
-        @src/proto_alpha/lib_protocol/test/integration/gas/runtest
     proto_alpha__lib_protocol__2: >
         @src/proto_alpha/lib_protocol/test/integration/michelson/runtest
         @src/proto_alpha/lib_protocol/test/integration/validate/runtest
@@ -114,7 +103,6 @@ unit:alpha:
   parallel:
     matrix:
       - TEST_TARGETS:
-          - proto_alpha__lib_protocol__1
           - proto_alpha__lib_protocol__2
           - proto_alpha__lib_protocol__3
           - proto_alpha
