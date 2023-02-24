@@ -66,8 +66,8 @@ open Cryptobox_intf
     time [O(n log n)]
     (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}). *)
 
-(** Initial values to parametrize dal cryptographic primitives. It used to build
-    a value of type [t] *)
+(** Initial values for the parameters of the DAL cryptographic primitives.
+    It used to build a value of type [t]. *)
 type parameters = {
   redundancy_factor : int;
   page_size : int;
