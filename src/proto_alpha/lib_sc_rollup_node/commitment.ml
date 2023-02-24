@@ -81,7 +81,13 @@ let sc_rollup_challenge_window node_ctxt =
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
+(* Count instances of the commitment functor to allow for multiple worker events
+   without conflicts. *)
+let instances_count = ref 0
+
 module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
+  let () = incr instances_count
+
   module PVM = PVM
 
   type state = Node_context.ro
@@ -404,6 +410,26 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       type nonrec state = state
 
       type parameters = {node_ctxt : Node_context.ro}
+    end
+
+    module Name = struct
+      (* We only have a single committer in the node *)
+      type t = unit
+
+      let encoding = Data_encoding.unit
+
+      let base =
+        (* But we can have multiple instances in the unit tests. This is just to
+           avoid conflicts in the events declarations. *)
+        [
+          ("sc_rollup_commitment_publisher"
+          ^ if !instances_count = 1 then "" else string_of_int !instances_count
+          );
+        ]
+
+      let pp _ _ = ()
+
+      let equal () () = true
     end
 
     module Worker = Worker.MakeSingle (Name) (Request) (Types)

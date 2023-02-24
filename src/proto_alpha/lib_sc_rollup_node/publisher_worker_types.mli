@@ -38,5 +38,3 @@ module Request : sig
       with type ('a, 'request_error) t := ('a, 'request_error) t
        and type view := view
 end
-
-module Name : Worker_intf.NAME with type t = unit
