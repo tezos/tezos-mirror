@@ -127,7 +127,7 @@ type block = {
   gasLimit : quantity;
   gasUsed : quantity;
   timestamp : quantity;
-  transaction : hash list;
+  transactions : hash list;
   uncles : hash list;
 }
 
@@ -152,7 +152,7 @@ let block_encoding =
            gasLimit;
            gasUsed;
            timestamp;
-           transaction;
+           transactions;
            uncles;
          } ->
       ( ( number,
@@ -172,7 +172,7 @@ let block_encoding =
           gasLimit,
           gasUsed,
           timestamp,
-          transaction,
+          transactions,
           uncles ) ))
     (fun ( ( number,
              hash,
@@ -191,7 +191,7 @@ let block_encoding =
              gasLimit,
              gasUsed,
              timestamp,
-             transaction,
+             transactions,
              uncles ) ) ->
       {
         number;
@@ -211,7 +211,7 @@ let block_encoding =
         gasLimit;
         gasUsed;
         timestamp;
-        transaction;
+        transactions;
         uncles;
       })
     (merge_objs
@@ -234,7 +234,7 @@ let block_encoding =
           (req "gasLimit" quantity_encoding)
           (req "gasUsed" quantity_encoding)
           (req "timestamp" quantity_encoding)
-          (req "transaction" (list hash_encoding))
+          (req "transactions" (list hash_encoding))
           (req "uncles" (list hash_encoding))))
 
 type transaction_log = {

@@ -106,7 +106,7 @@ module Mock = struct
       gasLimit = qty_f @@ Z.of_int 1111111;
       gasUsed = qty_f Z.zero;
       timestamp = qty_f Z.zero;
-      transaction = [transaction_hash];
+      transactions = [transaction_hash];
       uncles = [];
     }
 
