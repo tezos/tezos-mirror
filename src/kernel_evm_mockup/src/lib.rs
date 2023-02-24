@@ -17,6 +17,7 @@ use crate::wei::{from_eth, Wei};
 mod account;
 mod blueprint;
 mod error;
+mod eth_gen;
 mod inbox;
 mod storage;
 mod wei;
