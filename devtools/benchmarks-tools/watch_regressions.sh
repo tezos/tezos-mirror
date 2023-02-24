@@ -145,6 +145,7 @@ fi
 DIRS=""
 for d in "$INPUT_CSV_DIR"/*
 do
+    d=$(basename "$d")
     if [[ "$d" > "$FIRST_DIR" || "$d" == "$FIRST_DIR" ]]
     then
         if [ -z "$DIRS" ]
