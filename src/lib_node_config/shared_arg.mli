@@ -99,7 +99,16 @@ end
 
 val read_config_file : t -> Config_file.t tzresult Lwt.t
 
-val read_data_dir : t -> string tzresult Lwt.t
+(* Returns the [data_dir] and [config_file] from either [config_file]
+   (configuration file value) or [data_dir] (command line value), if
+   any. Otherwise, returns the default values. If both the
+   [config_file] and [data_dir] are given, the [data_dir] overrides
+   the value from the [config_file]. *)
+val resolve_data_dir_and_config_file :
+  ?data_dir:string ->
+  ?config_file:string ->
+  unit ->
+  (string * Config_file.t, tztrace) result Lwt.t
 
 (** Modify a node's network configuration.
 

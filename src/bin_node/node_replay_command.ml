@@ -491,9 +491,13 @@ let process verbosity singleprocess strict blocks args =
   in
   let run =
     let open Lwt_result_syntax in
-    let* data_dir = Shared_arg.read_data_dir args in
+    let* data_dir, config =
+      Shared_arg.resolve_data_dir_and_config_file
+        ?data_dir:args.Shared_arg.data_dir
+        ?config_file:(Some args.config_file)
+        ()
+    in
     let* () = check_data_dir data_dir in
-    let* config = Shared_arg.read_and_patch_config_file args in
     run ?verbosity ~singleprocess ~strict config blocks
   in
   match Lwt_main.run run with

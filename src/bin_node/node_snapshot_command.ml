@@ -108,16 +108,6 @@ module Event = struct
          last checkpoint as the default value"
       ~level:Notice
       ()
-
-  let overriding_config_file_arg =
-    declare_1
-      ~section
-      ~name:"overriding_config_file_arg"
-      ~msg:
-        "the data directory from the --config-file argument was overridden by \
-         the given --data-dir path: {path}"
-      ~level:Warning
-      ("path", Data_encoding.string)
 end
 
 module Term = struct
@@ -134,32 +124,11 @@ module Term = struct
     let run =
       let open Lwt_result_syntax in
       let*! () = Log_config.init_internal_events_with_defaults () in
-      let actual_data_dir =
-        Option.value ~default:Config_file.default_data_dir data_dir
+      let* data_dir, node_config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
       in
-      let config_file =
-        Option.value
-          ~default:
-            Filename.Infix.(
-              actual_data_dir // Data_version.default_config_file_name)
-          config_file
-      in
-      let* node_config = Config_file.read config_file in
       let ({genesis; chain_name; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
-      in
-      let*! data_dir =
-        (* The --data-dir argument overrides the potentially given
-           configuration file. *)
-        match data_dir with
-        | Some data_dir ->
-            let*! () =
-              if not (String.equal data_dir node_config.data_dir) then
-                Event.(emit overriding_config_file_arg) data_dir
-              else Lwt.return_unit
-            in
-            Lwt.return data_dir
-        | None -> Lwt.return node_config.data_dir
       in
       let* () = Data_version.ensure_data_dir genesis data_dir in
       let context_dir = Data_version.context_dir data_dir in
@@ -192,29 +161,8 @@ module Term = struct
     let run =
       let open Lwt_result_syntax in
       let*! () = Log_config.init_internal_events_with_defaults () in
-      let actual_data_dir =
-        Option.value ~default:Config_file.default_data_dir data_dir
-      in
-      let config_file =
-        Option.value
-          ~default:
-            Filename.Infix.(
-              actual_data_dir // Data_version.default_config_file_name)
-          config_file
-      in
-      let* node_config = Config_file.read config_file in
-      let*! data_dir =
-        (* The --data-dir argument overrides the potentially given
-           configuration file. *)
-        match data_dir with
-        | Some data_dir ->
-            let*! () =
-              if not (String.equal data_dir node_config.data_dir) then
-                Event.(emit overriding_config_file_arg) data_dir
-              else Lwt.return_unit
-            in
-            Lwt.return data_dir
-        | None -> Lwt.return node_config.data_dir
+      let* data_dir, node_config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
       in
       let*! existing_data_dir = Lwt_unix.file_exists data_dir in
       let ({genesis; _} : Config_file.blockchain_network) =
