@@ -177,8 +177,7 @@ module Output : sig
   val encoding : (output * JSONRPC.id) Data_encoding.t
 end
 
-module Network_id :
-  METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
+module Network_id : METHOD with type m_input = unit and type m_output = string
 
 module Chain_id :
   METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
