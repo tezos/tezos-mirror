@@ -54,6 +54,9 @@ let evm_proxy_server_version proxy_server =
   let get_version_url = endpoint ^ "/version" in
   RPC.Curl.get get_version_url
 
+(** Prefunded account in the kernel, has a balance of 9999. *)
+let prefunded_account = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE"
+
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
@@ -189,8 +192,43 @@ let test_originate_evm_kernel =
       ~error_msg:"Expected %L to be initialized by the EVM kernel.") ;
   unit
 
+let test_rpc_getBalance =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_balance"]
+    ~title:"RPC method eth_getBalance"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* () = Client.bake_for_and_wait client in
+  let first_evm_run_level = Node.get_level node in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:30.
+      sc_rollup_node
+      first_evm_run_level
+  in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* balance =
+    Eth_cli.balance
+      ~account:prefunded_account
+      ~endpoint:evm_proxy_server_endoint
+  in
+  Check.((balance = 9999) int)
+    ~error_msg:
+      (sf "Expected balance of %s should be %%R, but got %%L" prefunded_account) ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols
+(*
+  The following tests cannot be registered yet, because they rely on
+  the external tool eth not yet available in the CI.
+
+  To test a merge request touching the EVM proxy-server/kernel. Please
+  run these tests manually for now.
+*)
+(* test_rpc_getBalance protocols *)
 
 let register ~protocols = register_evm_proxy_server ~protocols
