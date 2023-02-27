@@ -370,13 +370,26 @@ let column_to_array (m : Maths.matrix) =
 
 let vector_to_array = Maths.vector_to_array
 
-let scores_to_string scores =
-  Format.sprintf
-    "R2-score = %s, RMSE-score = %.3f"
-    (match scores.Inference.r2_score with
-    | None -> "None"
-    | Some f -> Format.sprintf "%3f" f)
-    scores.Inference.rmse_score
+let scores_to_string =
+  let pp_tvalues =
+    Format.pp_print_list
+      ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+      (fun fmt (v, f) ->
+        Format.fprintf
+          fmt
+          "%s = %.1f"
+          (Free_variable.to_namespace v
+          |> Namespace.basename |> underscore_to_dash)
+          f)
+  in
+  fun scores ->
+    let Inference.{r2_score; rmse_score; tvalues} = scores in
+    Format.asprintf
+      "R2-score = %s, RMSE-score = %.3f\\nT-values: %a"
+      (match r2_score with None -> "None" | Some f -> Format.sprintf "%3f" f)
+      rmse_score
+      pp_tvalues
+      tvalues
 
 let validator opts (problem : Inference.problem) (solution : Inference.solution)
     =
