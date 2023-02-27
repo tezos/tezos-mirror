@@ -42,7 +42,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1000 --arg 'Pair (Pair "[SMART_ROLLUP_HASH]" "[TX_ROLLUP_PUBLIC_KEY_HASH]") (Pair 450 "Hello, Ticket!")'
 Node is bootstrapped.
-Estimated gas: 4058.254 units (will add 100 for safety)
+Estimated gas: 4057.820 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -55,7 +55,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000779
     Expected counter: 3
-    Gas limit: 4159
+    Gas limit: 4158
     Storage limit: 87 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000779
@@ -82,7 +82,7 @@ This sequence of operations was run:
           Parameter: (Pair "[TX_ROLLUP_PUBLIC_KEY_HASH]"
                            (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 450)))
           This transaction was successfully applied
-          Consumed gas: 1007.394
+          Consumed gas: 1006.960
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string
@@ -102,7 +102,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '[SMART_ROLLUP_EXTERNAL_MESSAGES]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1003.828 units (will add 100 for safety)
+Estimated gas: 1003.394 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -122,7 +122,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000602
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1003.828
+      Consumed gas: 1003.394
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
