@@ -192,7 +192,8 @@ let live_blocks (state : state) block =
        (fun set ({rpc_context; _} : block) ->
          let hash = rpc_context.Tezos_protocol_environment.block_hash in
          Block_hash.Set.add hash set)
-       (Block_hash.Set.singleton state.genesis_block_true_hash)
+       (Block_hash.Set.of_list
+          [state.genesis_block_true_hash; genesis_predecessor_block_hash])
        segment)
 
 (** Extract the round number from raw fitness. *)
