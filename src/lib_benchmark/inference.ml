@@ -57,12 +57,17 @@ let pp_scores ppf {r2_score; rmse_score} =
     rmse_score
 
 let scores_to_csv_column (model_name, bench_name) scores =
+  let {r2_score; rmse_score; tvalues} = scores in
   let name = model_name ^ "-" ^ Namespace.to_string bench_name in
   let table =
-    (match scores.r2_score with
+    (match r2_score with
     | None -> []
     | Some f -> [("R2_score-" ^ name, Float.to_string f)])
-    @ [("RMSE_score-" ^ name, Float.to_string scores.rmse_score)]
+    @ [("RMSE_score-" ^ name, Float.to_string rmse_score)]
+    @ List.map
+        (fun (v, f) ->
+          ("T-value-" ^ Free_variable.to_string v, Float.to_string f))
+        tvalues
   in
   [List.map fst table; List.map snd table]
 
@@ -461,10 +466,6 @@ let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
                    w_ols
                    w_true) ;
               let tvalue = Matrix.get tvalues (0, i) in
-              Format.eprintf
-                "tvalue-%s := %f@."
-                (Free_variable.to_string variable)
-                tvalue ;
               (variable, tvalue) :: acc)
             nmap
             []
