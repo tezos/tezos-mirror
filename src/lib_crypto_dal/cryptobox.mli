@@ -183,7 +183,7 @@ val polynomial_from_slot :
       [polynomial_to_slot (polynomial_from_slot slot) = slot]. *)
 val polynomial_to_slot : t -> polynomial -> slot
 
-(** [commit polynomial] returns the commitment associated to a
+(** [commit t polynomial] returns the commitment associated to a
      polynomial [p].
 
       Fails with [`Degree_exceeds_srs_length] if the degree of [p]
@@ -249,16 +249,29 @@ val shards_from_polynomial : t -> polynomial -> shard Seq.t
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
 
-(** [verify_shard t commitment shard proof] checks
-     whether [shard] is a portion of the data corresponding to the
-     [commitment] using [proof]. The verification time is
-     constant. The [srs] should be the same as the one used to produce
-     the commitment.
+(** [verify_shard t commitment shard proof] returns [Ok ()]
+    if [shard] is an element of [shards_from_polynomial p] where
+    [commitment = commit t p] for some polynomial [p].
 
-     Returns [Ok ()] if the verification succeeds. Returns
-     [Error `Invalid_shard] if the verification fails, or
-     [Error (`Shard_index_out_of_range msg)] if the shard index
-     is not within the range [0, t.number_of_shards - 1]. *)
+    The verification time is constant.
+
+    Requires:
+    - The SRS (structured reference string) contained in [t]
+    should be the same as the one used to produce the [commitment]
+    and [proof].
+
+    Fails with:
+    - [Error `Invalid_shard] if the verification fails
+    - [Error (`Shard_index_out_of_range msg)] if the shard index
+    is not within the range [0, number_of_shards - 1]
+    (where [number_of_shards] is found in [t]).
+
+    Ensures:
+    - [verify_shard t commitment shard proof = Ok ()] if
+    and only if
+    [Array.mem shard (shards_from_polynomial t polynomial])
+    [proof = (prove_shards t polynomial).(shard.index)],
+    and [commitment = commit t p]. *)
 val verify_shard :
   t ->
   commitment ->
@@ -277,10 +290,22 @@ val prove_commitment : t -> polynomial -> commitment_proof
 val prove_page :
   t -> polynomial -> int -> (page_proof, [> `Segment_index_out_of_range]) result
 
-(** [prove_shards] computes the proofs for all the [shards] that
-     each [shard] is a valid piece of data associated to a polynomial
-     and its commitment. Only the commitment is needed to check the
-     proof. *)
+(** [prove_shards t polynomial] produces [number_of_shards] proofs
+    (π_0, ..., π_{number_of_shards}) for the elements of
+    [polynomial_from_shards polynomial] where [number_of_shards]
+    is declared in [t].
+
+    Requires:
+    - [polynomial = polynomial_from_slot t s] for some slot [s] and the
+    same value [t] used in [prove_shards]. Since the caller of [prove_shards]
+    knows [polynomial], it is its responsibility to enforce this requirement.
+
+    Ensures:
+    - [verify_shard t commitment shard proof = Ok ()] if
+    and only if
+    [Array.mem shard (shards_from_polynomial t polynomial])
+    [proof = (prove_shards t polynomial).(shard.index)],
+    and [commitment = commit t polynomial]. *)
 val prove_shards : t -> polynomial -> shard_proof array
 
 module Internal_for_tests : sig

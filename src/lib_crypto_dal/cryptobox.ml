@@ -995,117 +995,345 @@ module Inner = struct
     let logx = Z.log2 (Z.of_int x) in
     if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
 
-  (* Implementation of fast amortized Kate proofs
-     https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf). *)
+  (* Notations
+     =========
 
-  (* Precompute first part of Toeplitz trick, which doesn't depends on the
-     polynomial’s coefficients. *)
-  let preprocess_multi_reveals ~chunk_len ~degree srs =
-    let open Bls12_381 in
-    let l = 1 lsl chunk_len in
-    let k =
-      let ratio = degree / l in
-      let log_inf = Z.log2 (Z.of_int ratio) in
-      if 1 lsl log_inf < ratio then log_inf else log_inf + 1
-    in
-    let domain = Domains.build_power_of_two k |> Domains.inverse |> inverse in
-    let precompute_srsj j =
-      let quotient = (degree - j) / l in
-      let padding = diff_next_power_of_two (2 * quotient) in
+     [x]_1 (resp. [x]_2) is a shorthand for x.g where
+     - [x] is a scalar element of type [Scalar.t]
+     - [g] is a generator of the subgroup [Bls12_381.G1] (resp. [Bls12_381.G2])
+     - ( . ) is the elliptic curve scalar multiplication in the subgroup
+     [Bls12_381.G1] (resp. [Bls12_381.G2])
+
+     The SRS (Structure Reference String) is defined as:
+     ([1]_1, [τ]_1, [τ^2]_1, [τ^3]_1, ..., [τ^{Srs_g1.length t.srs.raw.srs_g1 - 1}]_1)
+     where τ is secret.
+
+     e : [Bls12_381.G1] * [Bls12_381.G2] → [Bls12_381.GT] is a pairing
+     (bilinear, non-degenerate map such that e(g1, g2) = gT where
+     G1=<g1>, G2=<g2>, GT=<gT>).
+
+     Multi-reveals
+     =============
+
+     This feature is described in the KZG extended paper under section 3.4 as
+     batch opening https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11
+     on arbitrary points. The paper https://eprint.iacr.org/2023/033 shows how
+     to commit and verify quickly when the points form cosets of a group of
+     roots of unity.
+
+     For n dividing [Scalar.order - 1], let w be a primitive n-th root of unity.
+     For l dividing n, let z=w^{n/l} be a primitive l-th root of unity and Z=<z>.
+
+     For i=0, ..., n/l - 1, the proof of the evaluations of P(x) at the l points
+     w^i Z is the KZG commitment to the quotient of the euclidean division of
+     P(x) by the polynomial x^l - w^{i*l} whose only roots are w^i Z.
+     In other words, given the euclidean division
+     P(x)=(x^l-w^{i*l}) * q_i(x) + r_{i}(x), deg r(x) < l,
+     the proof is π_i = [q_i(τ)]_1.
+     Opening at one point corresponds to the case l=1 where r_{i}(x)=P(w^i).
+
+     To verify the proof, we gather the alleged evaluations of P(x) at the points
+     w^i Z. From these possibly correct evaluations, we can construct an alleged
+     remainder r_{i}(x) by computing the inverse DFT on the domain w^i Z, as
+     r_{i}(x)=P(x) on this domain, and as r_{i}(x) is determined by its
+     evaluations at l distinct points. We then check
+     e(c-[r_i(τ)]_1, g_2) ?= e(π, [τ^l]_2 - [w^{i*l}]_2).
+
+
+     Multiple multi-reveals
+     ======================
+
+     We now wish to reveal not on the domain W=<w>, but on several subdomains:
+     the n/l>1 cosets w^i W_0 of l elements each. The committed polynomial P(x)
+     has degree k-1 where k corresponds to the dimension of the Reed-Solomon code
+     (as a vector subspace of dimension k of F^n). We present the result from
+     https://eprint.iacr.org/2023/033, which assumes the size of the domains n
+     and of their cosets l to be powers of two for correct FFT sizes.
+
+     Computing the proofs for all such cosets would cost n/l euclidean divisions
+     and multi-exponentiations. Even though the euclidean division by
+     x^l-w^{i*l} is linear in the degree of the committed polynomial,
+     as well as the multi-exponentiation thanks to the Pippenger algorithm
+     (See https://cr.yp.to/papers/pippenger.pdf), computing all proofs leads to
+     a complexity O(n/l * k). It turns out the proofs for the cosets are related,
+     so all proofs can be computed in time O(n/l log (n/l)).
+
+     Again, for i=0, ..., n/l-1, given the euclidean division
+     P(x)=(x^l-w^{i*l}) q_i(x) + r_i(x), deg r_i(x) < l, the proofs
+     to be computed are π_i ≔ [q_i(τ)]_1.
+
+     We denote d=deg P, m the next power of 2 of (d + 1), and set
+     P_m, P_{m-1}, ..., P_{d+1}=0. For our purposes we further assume
+     l | m, l < m so that z ≔ w^l a primitive n/l-th root of unity.
+
+     The floor designates here the truncated division, where
+     terms x^i for i<0 are dropped:
+
+     q_i(x) = (P(x) - r_i(x)) / (x^l-w^{i*l})
+            = floor((P(x)-r_i(x)) / (x^l-w^{i*l}))
+            = floor(P(x)/(x^l-w^{i*l})) since deg r_i < l
+            = floor(sum_{k=0}^infty P(x)/(x^{(k+1)*l}) w^{k*i*l} (formal power series of 1/(x^l+c))
+            = sum_{k=0}^{m/l-1} floor(P(x)/(x^{(k+1)*l})) z^{i*k}.
+
+     So:
+     - if d >= 2l then
+     q_i(x) = sum_{k=0}^{m/l-1} (P_m x^{m-(k+1)*l} + P_{m-1}x^{m-(k+1)*l-1}
+              + ... + P_{(k+1)*l+1}x + P_{(k+1)*l}) z^{ik}.
+     - if l <= d < 2l then
+     q_i(x) = P_m x^{m-l} + ... + P_d x^{d-l} + ... + P_{l+1} x + P_l.
+
+     There is a subtle condition which is not stated in the original paper
+     (but is more apparent with the above derivation) which is d >= 2l.
+     Indeed, if l <= d < 2l, then the powers of z are absent of the quotient:
+     q_i(x) = P_l + P_{l+1} x + ... + P_d x^{d-l}.
+     For this reason, we assume d >= 2l (thus m > 2l).
+     We could support the other case (l <= d < 2l) but it is a bit cumbersome,
+     and is sort of an edge case for which there are too few shards.
+
+     Thus,
+     π_i = [q_i(x)]_1
+          = sum_{k=0}^{m/l-1} (P_m[τ^{m-(k+1)*l}] + P_{m-1}[τ^{m-(k+1)*l-1}]
+            + ... + P_{(k+1)*l+1}[τ] + P_{(k+1)*l}) z^{i*k}.
+
+     Letting
+     - for 0 <= k <= m/l, h_{k} ≔ sum_{j=k*l}^{m} f_j[τ^{j-k*l}]
+     - for m/l < k <= n/l, h_k ≔ 0,
+     we obtain π_i = sum_{k=0}^{n/l-1}  h_{k+1} z^{i*k}.
+
+     So by definition π=(π_0, ..., π_{n/l-1}) is the
+     EC-DFT_z of the vector (h_1, ..., h_{n/l}) in F^{n/l} ( * ).
+
+     Now, let's address the computation of the coefficients of interest
+     h_k for k=1, ..., n/l. To this end, the authors of
+     https://eprint.iacr.org/2023/033 observe that the computation of the h_k's
+     can be decomposed into the computation of the l "offset" sums:
+
+     forall j=0, ...,l-1,
+     h_{k,j} = P_{m-j}[τ^{m-k*l-j}] + P_{m-l-j}[τ^{m-(k+1)*l-j}]
+     + ... + P_{(m-j) % l + kl}[τ^{(m-j) % l}].
+
+     So the desired coefficients can then be obtained with
+     h_k=sum_{j=0}^{l-1} h_{k,j}. This decomposition of the calculation
+     allows the l vectors (h_{1,j}, ..., h_{floor((m-j)/l), j})
+     for j=0, ..., l-1 to be computed with l Toeplitz matrix-vector multiplications:
+
+     (h_{1,j} h_{2,j} ... h_{floor((m-j)/l) - 1, j} h_{floor((m-j)/l), j})^T
+     =
+     |P_{m-j} P_{m-l-j} P_{m-2*l-j} ...   P_{(m-j)%l+2*l}  P_{(m-j)%l+l}    |
+     |0       P_{m-j}   P_{m-l-j}   ...   P_{(m-j)%l+3*l}  P_{(m-j)%l+2*l}  |
+     |0       0         P_{m-j}     ...   P_{(m-j)%l+4*l}  P_{(m-j)%l+3*l}  |
+     |.       .         .    .           .                 .                |
+     |.       .         .       .        .                 .                |
+     |.       .         .          .     .                 .                |
+     |......................................................................|
+     |0       0         0          ...   P_{m-j}           P_{m-l-j}        |
+     |0       0         0          ...   0                 P_{m-j}          |
+     *
+     (τ^{m-l-j} τ^{m-2*l-j} ... τ^{(m-j)%l+l} τ^{(m-j)%l})^T
+
+     a || b is the concatenation of a and b.
+
+     We can extend this Toeplitz matrix to form a circulant matrix whose columns
+     are shifted versions of the vector
+     c=P_{m-j} || 0^{floor((m-j)/l)-1} || P_{(m-j)%l+l} ... P_{m-j-l}.
+     We can then compute circulant matrix-vector multiplication with the FFT.
+     See this presentation from Kyle Kloster, student at Purdue University:
+     https://www.youtube.com/watch?v=w0peHpfFVpc.
+
+     Given the euclidean divisions m-j = q*l+r, 0 <= r < l for j=0, ...,l-1:
+     1. Compute l EC-FFTs over G_1: forall j=0, ...,l-1,
+     s_j=EC-FFT_{2m/l}(srs_{m-j-l} srs_{m-j-2*l} srs_{m-j-3*l} ... srs_{m-j-q*l=r} || 0^{2m/l - floor((m-j)/l)}).
+
+     The above calculation can be done once per trusted setup and can thus be cached.
+
+     2. Compute l FFTs over the [Scalar] field: forall j=0, ..., l-1:
+
+     P'_j = FFT_{2m/l}(P_{m-j} || 0^{floor((m-j)/l)} || P_{r+l} P_{r+2*l}
+            ... P_{r+(q-1)*l=m-j-l} || 0^{2m/l-2 floor((m-j)/l)}).
+
+     3. Then compute {h}=(h_k)_{k in ⟦1, n/l⟧} with circulant matrix-vector
+     multiplication via FFT:
+         h = sum_{j=0}^{l-1} (h_{1,j} ... h_{floor((m-j)/l), j} || 0^{2m/l- floor((m-j)/l)})
+           = sum_{j=0}^{l-1}EC-IFFT_{2m/l}(P'_j o_{G_1} s_j)
+           = EC-IFFT_{2m/l} (sum_{j=0}^{l-1} (P_j o_{G_1} s_j))
+     where o_{G_1} is the pairwise product for vectors with components in G_1.
+
+     4. The first n/l coefficients is the result of the multiplication by the
+     Toeplitz vector (with a bit of zero padding starting from the m/l-th coefficient):
+     let's call this vector h'. The n/l KZG proofs are given by
+     π=EC-FFT_{n/l}(h') following the observation ( * ).
+
+
+     Complexity of multiple multi-reveals
+     ====================================
+
+     For the preprocessing part (step 1), we count l EC-FFTs on G_1, so the asymptotic complexity
+     of the step is O(l * (m/l) log (m/l))=O(m log(m/l)).
+
+     For the KZG proofs generation part (steps 2 to 4), we count l FFTs on the scalar field F,
+     two EC-FFTs on G_1, and l * 2m/l elliptic curve scalar multiplications in G_1:
+     the runtime complexity is O(l * T_{F}(m/l) + T_{G_1}(n/l) + m),
+     where T_{F} and T_{G_1} represent the runtime cost of the FFT and EC-FFT.
+     Both have the same complexity, even though the latter hides a bigger constant
+     (log of scalar size in bits, here log 256) due to the elliptic curve scalar multiplication.
+
+     Let's recall that l is in our application the length of a shard, n is the length of
+     the erasure code, α its redundancy factor and m ≈ k is the dimension of the erasure code.
+     Calling s the number of shards, we obtain l = n/s = α*k/s.
+     The runtime of the precomputation part can be rewritten as O(k * log (s/α)).
+     And the computation of the n/l KZG proofs becomes
+     O(k * log (s/α) + s * log s).
+     This explains why the algorithm is more efficient with bigger erasure code redundancies α,
+     especially the precomputation part as it performs EC-FFTs.
+
+     For our purposes the length of a shard s << k, so the bottleneck is the pointwise
+     scalar multiplication in G_1. *)
+
+  (* Step 1, returns the pair made of the vectors s_j and the [domain] of length
+     [2 * m / l = 2 * t.k / t.shard_size] used for the computation of the s_j. *)
+  let preprocess_multiple_multi_reveals t =
+    (* The length of a coset [t.shard_length] divides the domain length [t.k].
+       This is because [t.shard_length] divides [t.n], [t.k] divides [t.n]
+       and [t.k > t.shard_length] (see why [m > 2l] above, where [m = t.k] and
+       [l = t.shard_length] here). *)
+    assert (t.k mod t.shard_length = 0) ;
+    let domain_length = 2 * t.k / t.shard_length in
+    (* This is a hack to obtain an array from a Domain.t. *)
+    let domain = Domains.build domain_length |> Domains.inverse |> inverse in
+    let srs = t.srs.raw.srs_g1 in
+    (* Computes
+       points = srs_{m-j-l} srs_{m-j-2l} srs_{m-j-3l} ... srs_{m-j-ql=r}
+                || 0^{2m/l - floor((m-j)/l)},
+       s_j = EC-FFT_{2m/l}(points). *)
+    let s_j j =
+      (* According to the documentation of [( / )], "x / y is the greatest
+         integer less than or equal to the real quotient of x by y". Thus it
+         equals [floor (x /. y)]. *)
+      let quotient = (t.k - j) / t.shard_length in
       let points =
-        Array.init
-          ((2 * quotient) + padding)
-          (fun i ->
+        Array.init domain_length (fun i ->
             if i < quotient then
-              G1.copy (Srs_g1.get srs (degree - j - ((i + 1) * l)))
-            else G1.(copy zero))
+              Bls12_381.G1.copy
+                (Srs_g1.get srs (t.k - j - ((i + 1) * t.shard_length)))
+            else Bls12_381.G1.(copy zero))
       in
-      G1.fft_inplace ~domain ~points ;
+      Bls12_381.G1.fft_inplace ~domain ~points ;
       points
     in
-    (domain, Array.init l precompute_srsj)
+    (domain, Array.init t.shard_length s_j)
 
-  (** Generate proofs of part 3.2.
-  n, r are powers of two, m = 2^(log2(n)-1)
-  coefs are f polynomial’s coefficients [f₀, f₁, f₂, …, fm-1]
-  domain2m is the set of 2m-th roots of unity, used for Toeplitz computation
-  (domain2m, precomputed_srs_part) = preprocess_multi_reveals r n m srs1
-   *)
-  let multiple_multi_reveals ~chunk_len ~chunk_count ~degree
-      ~preprocess:(domain2m, precomputed_srs_part) coefs =
-    let open Bls12_381 in
-    let n = chunk_len + chunk_count in
-    assert (chunk_len < n) ;
-    assert (is_power_of_two degree) ;
-    assert (1 lsl chunk_len < degree) ;
-    assert (degree <= 1 lsl n) ;
-    let l = 1 lsl chunk_len in
-    (* We don’t need the first coefficient f₀. *)
-    let compute_h_j j =
-      let rest = (degree - j) mod l in
-      let quotient = (degree - j) / l in
-      (* Padding in case quotient is not a power of 2 to get proper fft in
-         Toeplitz matrix part. *)
+  (* [multiple_multi_reveals t preprocess coefficients] returns the proofs
+     for each of the [t.number_of_shards] shards.
+
+     Implements the "Multiple multi-reveals" section above. *)
+  let multiple_multi_reveals t ~preprocess:(domain, sj) ~coefficients :
+      shard_proof array =
+    (* The length [t.n] of the domain [t.domain_n] is equal to
+       [2^t.evaluations_per_proof_log * 2^t.proofs_log]. *)
+    let n = t.evaluations_per_proof_log + t.proofs_log in
+    assert (t.n = 1 lsl n) ;
+    (* The log2 of the number of proofs [t.proofs_log] is > 0
+       because [2^t.proofs_log = t.number_of_shards > 0]. *)
+    assert (t.proofs_log > 0 && t.number_of_shards = 1 lsl t.proofs_log) ;
+    assert (t.shard_length = 1 lsl t.evaluations_per_proof_log) ;
+    (* [d >= 2 * l] where [d = t.k - 1] and [l = t.shard_length]. *)
+    assert (2 * t.shard_length < t.k) ;
+    (* Step 2. *)
+    let domain_length = Array.length domain in
+    let h_j j =
+      let remainder = (t.k - j) mod t.shard_length in
+      let quotient = (t.k - j) / t.shard_length in
       let padding = diff_next_power_of_two (2 * quotient) in
-      (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
+      (* points = P_{m-j} || 0^{floor((m-j)/l)} || P_{r+l} P_{r+2l}
+                 ... P_{r+(q-1)l=m-j-l} || 0^{2m/l-2 floor((m-j)/l)}. *)
       let points =
-        Array.init
-          ((2 * quotient) + padding)
-          (fun i ->
+        Array.init domain_length (fun i ->
             if i <= quotient + (padding / 2) then Scalar.(copy zero)
-            else Scalar.copy coefs.(rest + ((i - (quotient + padding)) * l)))
+            else
+              Scalar.copy
+                coefficients.(remainder
+                              + ((i - (quotient + padding)) * t.shard_length)))
       in
-      points.(0) <- Scalar.copy coefs.(degree - j) ;
-      Scalar.fft_inplace ~domain:domain2m ~points ;
-      Array.map2 G1.mul precomputed_srs_part.(j) points
+      (* Set P_{m-j}. *)
+      points.(0) <- Scalar.copy coefficients.(t.k - j) ;
+      (* FFT of step 2. *)
+      Scalar.fft_inplace ~domain ~points ;
+      (* Pairwise product of step 3. *)
+      Array.map2 Bls12_381.G1.mul sj.(j) points
     in
-    let sum = compute_h_j 0 in
+    (* Sum of step 3. *)
+    let sum = h_j 0 in
     let rec sum_hj j =
-      if j = l then ()
+      if j = t.shard_length then ()
       else
-        let hj = compute_h_j j in
-        (* sum.(i) <- sum.(i) + hj.(i) *)
-        Array.iteri (fun i hij -> sum.(i) <- G1.add sum.(i) hij) hj ;
+        let hj = h_j j in
+        Array.iteri (fun i hij -> sum.(i) <- Bls12_381.G1.add sum.(i) hij) hj ;
         sum_hj (j + 1)
     in
     sum_hj 1 ;
-
-    (* Toeplitz matrix-vector multiplication *)
-    G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
-    let hl = Array.sub sum 0 (Array.length domain2m / 2) in
-
-    let phidomain = Domains.build_power_of_two chunk_count in
-    let phidomain = inverse (Domains.inverse phidomain) in
-    (* Kate amortized FFT *)
-    G1.fft ~domain:phidomain ~points:hl
-
-  (* h = polynomial such that h(y×domain[i]) = zi. *)
-  let interpolation_h_poly y domain z_list =
-    Scalar.ifft_inplace ~domain:(Domains.inverse domain) ~points:z_list ;
-    let inv_y = Scalar.inverse_exn y in
-    Array.fold_left_map
-      (fun inv_yi h -> Scalar.(mul inv_yi inv_y, mul h inv_yi))
-      Scalar.(copy one)
-      z_list
-    |> snd |> Polynomials.of_dense
-
-  (* Part 3.2 verifier : verifies that f(w×domain.(i)) = evaluations.(i). *)
-  let verify t cm_f srs_point domain (w, evaluations) proof =
-    let open Bls12_381 in
-    let h = interpolation_h_poly w domain evaluations in
-    let cm_h = commit t h in
-    let l = Domains.length domain in
-    let sl_min_yl =
-      G2.(add srs_point (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
+    (* Step 3. Toeplitz matrix-vector multiplication *)
+    Bls12_381.G1.ifft_inplace ~domain:(inverse domain) ~points:sum ;
+    (* Keep first n / l coefficients *)
+    let points = Array.sub sum 0 (Array.length domain / 2) in
+    (* Step 4. *)
+    (* This is a hack to convert a Domain.t to an array. *)
+    let domain =
+      Domains.build_power_of_two t.proofs_log |> Domains.inverse |> inverse
     in
-    let diff_commits = G1.(add cm_h (negate cm_f)) in
-    Pairing.pairing_check [(diff_commits, G2.(copy one)); (proof, sl_min_yl)]
+    Bls12_381.G1.fft ~domain ~points
 
-  let precompute_shards_proofs t =
-    preprocess_multi_reveals
-      ~chunk_len:t.evaluations_per_proof_log
-      ~degree:t.k
-      t.srs.raw.srs_g1
+  (* [interpolation_poly root domain evaluations] returns the unique
+     polynomial P of degree [< Domains.length domain] verifying
+     P(root * domain[i]) = evaluations[i].
+
+     Requires:
+     - [(Array.length evaluations = Domains.length domain)] *)
+  let interpolation_poly ~root ~domain ~evaluations =
+    assert (Array.length evaluations = Domains.length domain) ;
+    Scalar.ifft_inplace ~domain:(Domains.inverse domain) ~points:evaluations ;
+    (* Computes root_inverse = 1/root. *)
+    let root_inverse = Scalar.inverse_exn root in
+    (* Computes evaluations[i] = evaluations[i] * root_inverse^i. *)
+    Polynomials.of_dense
+      (snd
+         (Array.fold_left_map
+            (fun root_pow_inverse coefficient ->
+              ( Scalar.mul root_pow_inverse root_inverse,
+                Scalar.mul coefficient root_pow_inverse ))
+            Scalar.(copy one)
+            evaluations))
+
+  (* [verify t commitment srs_point domain root evaluations proof]
+     verifies that P(root * domain.(i)) = evaluations.(i),
+     where
+     - [P = commit t s] for some slot [s]
+     - [l := Array.length evaluations = Domains.length domain]
+     - [srs_point = Srs_g2.get t.srs.raw.srs_g2 l]
+     - [root = w^i] where [w] is a primitive [n]-th root of unity for [l] dividing [n]
+     - [domain = (1, z, z^2, ..., z^{l - 1})] where [z = w^{n/l}] is a primitive
+     [l]-th root of unity
+
+     Implements the "Multi-reveals" section above. *)
+  let verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof =
+    let open Bls12_381 in
+    (* Compute r_i(x). *)
+    let remainder = interpolation_poly ~root ~domain ~evaluations in
+    (* Compute [r_i(τ)]_1. *)
+    let commitment_remainder = commit t remainder in
+    (* Compute [w^{i * l}]. *)
+    let root_pow = Scalar.pow root (Z.of_int (Domains.length domain)) in
+    (* Compute [τ^l]_2 - [w^{i * l}]_2). *)
+    let commit_srs_point_minus_root_pow =
+      G2.(add srs_point (negate (mul (copy one) root_pow)))
+    in
+    (* Compute [r_i(τ)]_1-c. *)
+    let diff_commits = G1.(add commitment_remainder (negate commitment)) in
+    (* Checks e(c-[r_i(τ)]_1, g_2) ?= e(π, [τ^l]_2 - [w^{i * l}]_2)
+       by checking
+       [0]_1 ?= -e(c-[r_i(τ)]_1, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2)
+              = e([r_i(τ)]_1-c, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2). *)
+    Pairing.pairing_check
+      [(diff_commits, G2.(copy one)); (proof, commit_srs_point_minus_root_pow)]
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
@@ -1131,19 +1359,16 @@ module Inner = struct
     precomp
 
   let prove_shards t p =
-    let preprocess = precompute_shards_proofs t in
-    let p' = Array.init (t.k + 1) (fun _ -> Scalar.(copy zero)) in
+    (* Precomputes step. 1 of multiple multi-reveals. *)
+    let preprocess = preprocess_multiple_multi_reveals t in
+    (* Resizing input polynomial [p] to obtain an array of length [t.k + 1]. *)
+    let coefficients = Array.init (t.k + 1) (fun _ -> Scalar.(copy zero)) in
     let p_length = Polynomials.degree p + 1 in
     let p = Polynomials.to_dense_coefficients p in
-    Array.blit p 0 p' 0 p_length ;
-    multiple_multi_reveals
-      ~chunk_len:t.evaluations_per_proof_log
-      ~chunk_count:t.proofs_log
-      ~degree:t.k
-      ~preprocess
-      p'
+    Array.blit p 0 coefficients 0 p_length ;
+    multiple_multi_reveals t ~preprocess ~coefficients
 
-  let verify_shard (t : t) cm {index = shard_index; share = shard_evaluations}
+  let verify_shard (t : t) commitment {index = shard_index; share = evaluations}
       proof =
     if shard_index < 0 || shard_index >= t.number_of_shards then
       Error
@@ -1155,35 +1380,12 @@ module Inner = struct
              0
              (t.number_of_shards - 1)))
     else
-      let d_n = Domains.build_power_of_two t.evaluations_log in
-      let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
-      if
-        verify
-          t
-          cm
-          t.srs.kate_amortized_srs_g2_shards
-          domain
-          (Domains.get d_n shard_index, shard_evaluations)
-          proof
-      then Ok ()
+      let root = Domains.get t.domain_n shard_index in
+      let domain = Domains.build t.shard_length in
+      let srs_point = t.srs.kate_amortized_srs_g2_shards in
+      if verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof then
+        Ok ()
       else Error `Invalid_shard
-
-  let _prove_single t p z =
-    let q, _ =
-      Polynomials.(
-        division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
-    in
-    commit t q
-
-  let _verify_single t cm ~point ~evaluation proof =
-    let h_secret = Srs_g2.get t.srs.raw.srs_g2 1 in
-    Bls12_381.(
-      Pairing.pairing_check
-        [
-          ( G1.(add cm (negate (mul (copy one) evaluation))),
-            G2.(negate (copy one)) );
-          (proof, G2.(add h_secret (negate (mul (copy one) point))));
-        ])
 
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then
@@ -1198,7 +1400,7 @@ module Inner = struct
 
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
-  let verify_page t cm ~page_index page proof =
+  let verify_page t commitment ~page_index page proof =
     if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
@@ -1207,14 +1409,16 @@ module Inner = struct
       if expected_page_length <> got_page_length then
         Error `Page_length_mismatch
       else
-        let domain =
-          Domains.build_power_of_two Z.(log2up (of_int t.page_length))
-        in
-        let slot_page_evaluations =
-          Array.init
-            (1 lsl Z.(log2up (of_int t.page_length)))
-            (function
+        (* The [page_length] is not necessarily a power of two,
+           so we take the next power of two. *)
+        let length = 1 lsl Z.(log2up (of_int t.page_length)) in
+        let domain = Domains.build length in
+        let evaluations =
+          Array.init length (function
               | i when i < t.page_length - 1 ->
+                  (* Parse the [page] by chunks of [scalar_bytes_amount] bytes.
+                     These chunks are interpreted as [Scalar.t] elements and stored
+                     in [evaluations]. *)
                   let dst = Bytes.create scalar_bytes_amount in
                   Bytes.blit
                     page
@@ -1224,6 +1428,8 @@ module Inner = struct
                     scalar_bytes_amount ;
                   Scalar.of_bytes_exn dst
               | i when i = t.page_length - 1 ->
+                  (* Store the remaining bytes in the last nonzero coefficient
+                     of evaluations. *)
                   let dst = Bytes.create t.remaining_bytes in
                   Bytes.blit
                     page
@@ -1234,14 +1440,16 @@ module Inner = struct
                   Scalar.of_bytes_exn dst
               | _ -> Scalar.(copy zero))
         in
+        let root = Domains.get t.domain_k page_index in
         if
           verify
             t
-            cm
-            t.srs.kate_amortized_srs_g2_pages
-            domain
-            (Domains.get t.domain_k page_index, slot_page_evaluations)
-            proof
+            ~commitment
+            ~srs_point:t.srs.kate_amortized_srs_g2_pages
+            ~domain
+            ~root
+            ~evaluations
+            ~proof
         then Ok ()
         else Error `Invalid_page
 end
