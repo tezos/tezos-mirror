@@ -3548,7 +3548,7 @@ module Sc_rollup : sig
       destination:rollup ->
       context tzresult Lwt.t
 
-    val finalize_inbox_level : context -> context Lwt.t
+    val finalize_inbox_level : context -> context tzresult Lwt.t
 
     val add_info_per_level : predecessor:Block_hash.t -> context -> context
 

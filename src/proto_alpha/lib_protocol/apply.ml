@@ -2589,7 +2589,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
-  let*! ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
+  let* ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in

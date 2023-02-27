@@ -155,7 +155,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
-      Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>= fun ctxt ->
+      Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>=? fun ctxt ->
       return
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
