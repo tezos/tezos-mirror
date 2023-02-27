@@ -41,7 +41,7 @@ let wait_for_n_injections n node =
     | Some _ | None -> None
   in
   let* _ =
-    Node.wait_for node "request_completed_notice.v0" (Daemon.n_events n filter)
+    Node.wait_for node "request_completed_info.v0" (Daemon.n_events n filter)
   in
   unit
 

@@ -2166,7 +2166,7 @@ let pp_mempool_count fmt
          "completed": 0.00190934
        }
      },
-     "level": "notice"
+     "level": "info"
    }
   ]}
  *)
@@ -2176,7 +2176,7 @@ let wait_for_injection node =
     | Some s when s = "inject" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
+  let* _ = Node.wait_for node "request_completed_info.v0" filter in
   return ()
 
 (** Matches events which contain an flush request.

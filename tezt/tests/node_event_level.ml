@@ -66,9 +66,9 @@ let wait_for_request_kind ~level (request_kind : string) node =
   Node.wait_for node (get_request_level level) filter
 
 (* Wait for the request signaling the injection of a new operation in
-   the mempool. This event has level "notice".
+   the mempool. This event has level "info".
 *)
-let wait_for_injection = wait_for_request_kind ~level:"notice" "inject"
+let wait_for_injection = wait_for_request_kind ~level:"info" "inject"
 
 (* Wait for the request signaling a flush of the state of the mempool.
    This event has level "notice".
@@ -85,8 +85,8 @@ let wait_for_arrival = wait_for_request_kind ~level:"debug" "arrived"
 (* Inject a transfer operation from [client] and wait for an injection
    event on [node] (which should be the node associated to [client]).
 *)
-let transfer_and_wait_for_injection node client amount_int giver_key
-    receiver_key =
+let transfer_and_wait_for_injection ?(wait_for_injection = wait_for_injection)
+    node client amount_int giver_key receiver_key =
   let wait_for = wait_for_injection node in
   let* () =
     Client.transfer
@@ -399,8 +399,16 @@ let test_event_levels =
   Log.info "Injection and arrival received for first transfer." ;
   let wait1e = wait_for_arrival node_1 in
   Log.info "BEFORE TRANSFER" ;
+
+  (* Since this node has its event at notice level we cannot use the
+     request_completed_info event to wait for the injection. Instead we use the
+     operation_injected event at notice level. *)
+  let wait_for_injection node =
+    Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
+  in
   let* () =
     transfer_and_wait_for_injection
+      ~wait_for_injection
       node_3
       client_3
       3
