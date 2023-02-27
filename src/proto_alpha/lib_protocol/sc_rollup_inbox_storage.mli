@@ -57,7 +57,7 @@ val add_protocol_migration : Raw_context.t -> Raw_context.t Lwt.t
 
 (** Adds the [Info_per_level] in the in-memory inbox level witness. *)
 val add_info_per_level :
-  predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t Lwt.t
+  predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t
 
 (** [finalize_inbox_level ctxt] ends the internal representation for the block.
 *)

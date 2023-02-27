@@ -119,7 +119,7 @@ let finalize_inbox_level ctxt =
     let open Lwt_result_syntax in
     let* inbox, ctxt = get_inbox ctxt in
     let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
-    let*? inbox =
+    let inbox =
       Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness
     in
     let* ctxt = Store.Inbox.update ctxt inbox in
@@ -171,42 +171,19 @@ let add_protocol_migration ctxt =
       return ctxt
 
 let add_info_per_level ~predecessor ctxt =
-  let open Lwt_syntax in
-  let* res =
-    let open Lwt_result_syntax in
-    let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
-    let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
-    let*? witness =
-      Sc_rollup_inbox_repr.add_info_per_level_no_history
-        ~predecessor_timestamp
-        ~predecessor
-        witness
-    in
-    let ctxt =
-      Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
-    in
-    return ctxt
+  let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
+  let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+  let witness =
+    Sc_rollup_inbox_repr.add_info_per_level_no_history
+      ~predecessor_timestamp
+      ~predecessor
+      witness
   in
-  match res with
-  | Ok ctxt -> return ctxt
-  | Error err ->
-      (* As a protection, we backtrack the [ctxt] if adding the info per level
-         failed. This way, we cannot make [begin_application],
-         [begin_partial_application] and [begin_full_construction] fail. *)
-      Logging.(
-        log
-          Fatal
-          "Adding [Info_per_level] failed because of %a, the context is \
-           backtracked. Smart rollups inbox failed to finalize this block, \
-           this behavior is undefined and its consequence is unexplored."
-          pp_trace
-          err) ;
-      return ctxt
+  Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
 
 let init_inbox ~predecessor ctxt =
   let open Lwt_syntax in
   let* res =
-    let open Lwt_result_syntax in
     let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
     let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
     let*? inbox =
@@ -217,8 +194,7 @@ let init_inbox ~predecessor ctxt =
         ~predecessor
         level
     in
-    let* ctxt = Store.Inbox.init ctxt inbox in
-    return ctxt
+    Store.Inbox.init ctxt inbox
   in
   match res with
   | Ok ctxt -> return ctxt

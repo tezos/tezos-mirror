@@ -330,13 +330,13 @@ val add_info_per_level_no_history :
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Sc_rollup_inbox_merkelized_payload_hashes_repr.t ->
-  Sc_rollup_inbox_merkelized_payload_hashes_repr.t tzresult
+  Sc_rollup_inbox_merkelized_payload_hashes_repr.t
 
 (** [finalize_inbox_level payloads_history history inbox level_witness] updates
     the current inbox's level witness by adding [EOL], and archives the current
     level. *)
 val finalize_inbox_level_no_history :
-  t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t tzresult
+  t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t
 
 (** [genesis ~protocol_migration_message ~timestamp ~predecessor
     level] initializes the inbox at some given [level] with: [SOL],

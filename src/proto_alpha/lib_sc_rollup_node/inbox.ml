@@ -237,5 +237,5 @@ let payloads_history_of_messages ~is_migration_block ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)
          dummy_inbox
          messages
-     in
-     payloads_history
+  in
+  payloads_history

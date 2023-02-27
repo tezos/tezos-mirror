@@ -70,6 +70,10 @@ val remember :
   Sc_rollup_inbox_message_repr.serialized ->
   History.t tzresult
 
+(** [genesis_no_history payload] is the initial merkelized payload hashes with
+    index 0. *)
+val genesis_no_history : Sc_rollup_inbox_message_repr.serialized -> t
+
 (** [genesis history payload] is the initial merkelized payload hashes with
     index 0. It is remembered in [history] using [remember]. *)
 val genesis :
@@ -77,9 +81,13 @@ val genesis :
   Sc_rollup_inbox_message_repr.serialized ->
   (History.t * t) tzresult
 
-(** [add_payload history merkelized payload] creates a new {!t} with [payload]
+(** [add_payload_no_history merkelized payload] creates a new {!t} with [payload]
     and [merkelized] as ancestor (i.e. [index = succ (get_index
-    merkelized)]). [merkelized] is remembered in [history] with [remember]. *)
+    merkelized)]). *)
+val add_payload_no_history : t -> Sc_rollup_inbox_message_repr.serialized -> t
+
+(** [add_payload] is identical to {!add_payload_no_history} but the resulting
+    [merkelized] is remembered in [history] with [remember]. *)
 val add_payload :
   History.t ->
   t ->

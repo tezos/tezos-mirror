@@ -197,10 +197,27 @@ let hash_serialized_message (payload : serialized) =
 
 let start_of_level_serialized =
   (* If [Start_of_level] cannot be serialized, this will be detected at
-     compilation time as we are defining a top-level value. *)
+     startup time as we are defining a top-level value. *)
   Data_encoding.Binary.to_string_exn encoding (Internal Start_of_level)
 
 let end_of_level_serialized =
   (* If [End_of_level] cannot be serialized, this will be detected at
-     compilation time as we are defining a top-level value. *)
+     startup time as we are defining a top-level value. *)
   Data_encoding.Binary.to_string_exn encoding (Internal End_of_level)
+
+let info_per_level_serialized ~predecessor_timestamp ~predecessor =
+  match
+    serialize (Internal (Info_per_level {predecessor_timestamp; predecessor}))
+  with
+  | Error _ ->
+      (* The info per level should always be serializable as the encoding
+         functions for this case do not fail. *)
+      assert false
+  | Ok info -> info
+
+let (_dummy_serialized_info_per_level_serialized : serialized) =
+  (* This allows to detect an error, at startup, we might have introduced in the
+     encoding of serialization of info per level messages . *)
+  info_per_level_serialized
+    ~predecessor_timestamp:(Time.of_seconds Int64.min_int)
+    ~predecessor:Block_hash.zero

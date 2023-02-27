@@ -612,11 +612,10 @@ let list_of_inputs_from_list_of_messages
     payloads_per_levels
 
 let dumb_init level =
-  WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Sc_rollup.Inbox.genesis
-       ~predecessor_timestamp:Time.Protocol.epoch
-       ~predecessor:Block_hash.zero
-       level
+  Sc_rollup.Inbox.genesis
+    ~predecessor_timestamp:Time.Protocol.epoch
+    ~predecessor:Block_hash.zero
+    level
 
 let dumb_init_repr level =
   WithExceptions.Result.get_ok ~loc:__LOC__
@@ -820,12 +819,11 @@ module Protocol_inbox = struct
                  messages
           in
           let witness = Sc_rollup.Inbox.init_witness_no_history in
-          let* witness =
-            Environment.wrap_tzresult
-            @@ Sc_rollup.Inbox.add_info_per_level_no_history
-                 ~predecessor_timestamp
-                 ~predecessor
-                 witness
+          let witness =
+            Sc_rollup.Inbox.add_info_per_level_no_history
+              ~predecessor_timestamp
+              ~predecessor
+              witness
           in
           let* witness =
             if List.is_empty payloads then ok witness
@@ -833,9 +831,8 @@ module Protocol_inbox = struct
               Environment.wrap_tzresult
               @@ Sc_rollup.Inbox.add_messages_no_history payloads witness
           in
-          let* inbox =
-            Environment.wrap_tzresult
-            @@ Sc_rollup.Inbox.finalize_inbox_level_no_history inbox witness
+          let inbox =
+            Sc_rollup.Inbox.finalize_inbox_level_no_history inbox witness
           in
           aux inbox rst
     in

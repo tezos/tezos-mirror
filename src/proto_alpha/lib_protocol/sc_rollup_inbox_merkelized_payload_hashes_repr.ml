@@ -149,24 +149,28 @@ let remember history merkelized payload =
   let prev_cell_ptr = hash merkelized in
   History.remember prev_cell_ptr {merkelized; payload} history
 
-let genesis history payload =
-  let open Result_syntax in
+let genesis_no_history payload =
   let payload_hash =
     Sc_rollup_inbox_message_repr.hash_serialized_message payload
   in
-  let merkelized = Skip_list.genesis payload_hash in
+  Skip_list.genesis payload_hash
+
+let genesis history payload =
+  let open Result_syntax in
+  let merkelized = genesis_no_history payload in
   let+ history = remember history merkelized payload in
   (history, merkelized)
 
+let add_payload_no_history prev_merkelized payload =
+  let prev_merkelized_ptr = hash prev_merkelized in
+  Skip_list.next
+    ~prev_cell:prev_merkelized
+    ~prev_cell_ptr:prev_merkelized_ptr
+    (Sc_rollup_inbox_message_repr.hash_serialized_message payload)
+
 let add_payload history prev_merkelized payload =
   let open Result_syntax in
-  let prev_merkelized_ptr = hash prev_merkelized in
-  let merkelized =
-    Skip_list.next
-      ~prev_cell:prev_merkelized
-      ~prev_cell_ptr:prev_merkelized_ptr
-      (Sc_rollup_inbox_message_repr.hash_serialized_message payload)
-  in
+  let merkelized = add_payload_no_history prev_merkelized payload in
   let* history = remember history merkelized payload in
   return (history, merkelized)
 
