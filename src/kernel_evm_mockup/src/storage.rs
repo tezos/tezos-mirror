@@ -46,13 +46,13 @@ fn write_u256(host: &mut impl Runtime, path: &OwnedPath, value: U256) -> Result<
     host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
-pub fn address_path(address: Hash) -> Result<OwnedPath, Error> {
+fn address_path(address: Hash) -> Result<OwnedPath, Error> {
     let address: &str = from_utf8(address)?;
     let address_path: Vec<u8> = format!("/{}", &address).into();
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
 
-pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
+fn account_path(address: Hash) -> Result<OwnedPath, Error> {
     let address_hash = address_path(address)?;
     concat(&EVM_ACCOUNTS, &address_hash).map_err(Error::from)
 }
@@ -111,7 +111,7 @@ pub fn read_account<Host: Runtime + RawRollupCore>(
     })
 }
 
-pub fn store_nonce<Host: Runtime + RawRollupCore>(
+fn store_nonce<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account_path: &OwnedPath,
     nonce: u64,
@@ -121,7 +121,7 @@ pub fn store_nonce<Host: Runtime + RawRollupCore>(
         .map_err(Error::from)
 }
 
-pub fn store_balance<Host: Runtime + RawRollupCore>(
+fn store_balance<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account_path: &OwnedPath,
     balance: Wei,
@@ -130,7 +130,7 @@ pub fn store_balance<Host: Runtime + RawRollupCore>(
     write_u256(host, &path, balance)
 }
 
-pub fn store_code_hash<Host: Runtime + RawRollupCore>(
+fn store_code_hash<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account_path: &OwnedPath,
     code_hash: Hash,
