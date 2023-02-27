@@ -117,7 +117,7 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
       in
       Assert.assert_true
         (Format.sprintf
-           "check_invariant: checkpoint.level(%ld) < \
+           "check_invariant: checkpoint.level(%ld) >= \
             head.last_preserved_block_level(%ld)"
            (snd checkpoint)
            expected_checkpoint_level)

@@ -268,7 +268,7 @@ let check_baking_continuity ~test_descr ~exported_chain_store
     checkpoint' ;
   return_unit
 
-let test store_path ~test_descr ?exported_block_level
+let test_export_import store_path ~test_descr ?exported_block_level
     ~nb_blocks_to_bake_before_export ~rolling ~export_mode store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
@@ -387,7 +387,7 @@ let test store_path ~test_descr ?exported_block_level
           let*! _ = Store.close_store store' in
           Lwt.return_unit)
 
-let make_tests speed genesis_parameters =
+let make_tests_export_import speed genesis_parameters =
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
   let {
     Parameters.constants =
@@ -488,7 +488,7 @@ let make_tests speed genesis_parameters =
                      Alpha_utils.default_patch_context ctxt)
                    ( test_descr,
                      fun store_path store ->
-                       test
+                       test_export_import
                          ?exported_block_level
                          ~nb_blocks_to_bake_before_export:nb_initial_blocks
                          ~rolling
@@ -752,8 +752,8 @@ let make_tests_drag_after_import speed =
 
 let tests speed =
   let test_cases =
-    let generated_tests =
-      make_tests
+    let export_import_tests =
+      make_tests_export_import
         speed
         Tezos_protocol_alpha_parameters.Default_parameters.(
           parameters_of_constants
@@ -761,6 +761,6 @@ let tests speed =
     in
     let tests_rolling = make_tests_rolling speed in
     let tests_drag_after_import = make_tests_drag_after_import speed in
-    tests_rolling @ tests_drag_after_import @ generated_tests
+    tests_rolling @ tests_drag_after_import @ export_import_tests
   in
   ("snapshots", test_cases)
