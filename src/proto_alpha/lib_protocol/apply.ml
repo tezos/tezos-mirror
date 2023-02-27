@@ -2184,9 +2184,16 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
+let find_in_slot_map consensus_content slot_map =
+  match Slot.Map.find consensus_content.slot slot_map with
+  | Some (consensus_key, power) -> return (consensus_key, power)
+  | None ->
+      (* This should not happen: operation validation should have failed. *)
+      tzfail Faulty_validation_wrong_slot
+
 let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
-    (context * Kind.preendorsement contents_result_list) tzresult =
-  let open Result_syntax in
+    (context * Kind.preendorsement contents_result_list) tzresult Lwt.t =
+  let open Lwt_result_syntax in
   let ctxt =
     match mode with
     | Full_construction _ -> (
@@ -2195,34 +2202,59 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
         | Some _ -> ctxt)
     | Application _ | Partial_construction _ -> ctxt
   in
-  match Slot.Map.find content.slot (Consensus.allowed_preendorsements ctxt) with
-  | None ->
-      (* This should not happen: operation validation should have failed. *)
-      error Faulty_validation_wrong_slot
-  | Some ({delegate; consensus_pkh; _}, preendorsement_power) ->
-      let* ctxt =
+  let mk_preendorsement_result {Consensus_key.delegate; consensus_pkh; _}
+      preendorsement_power =
+    Single_result
+      (Preendorsement_result
+         {
+           balance_updates = [];
+           delegate;
+           consensus_key = consensus_pkh;
+           preendorsement_power;
+         })
+  in
+  match mode with
+  | Application _ | Full_construction _ ->
+      let* consensus_key, power =
+        find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
+      in
+      let*? ctxt =
         Consensus.record_preendorsement
           ctxt
           ~initial_slot:content.slot
-          ~power:preendorsement_power
+          ~power
           content.round
       in
       return
-        ( ctxt,
-          Single_result
-            (Preendorsement_result
-               {
-                 balance_updates = [];
-                 delegate;
-                 consensus_key = consensus_pkh;
-                 preendorsement_power;
-               }) )
-
-let is_grandparent_endorsement mode content =
-  match mode with
+        (ctxt, mk_preendorsement_result (Consensus_key.pkh consensus_key) power)
   | Partial_construction {predecessor_level; _} ->
-      Raw_level.(succ content.level = predecessor_level)
-  | _ -> false
+      (* In mempool mode, preendorsements are allowed for various levels
+         and rounds. We do not record preendorsements because we could get
+         false-positive conflicts for preendorsements with the same slot
+         but different levels/rounds. We could record just preendorsements
+         for the mempool head's level and round (the most usual
+         preendorsements), but we don't need to, because there is no block
+         to finalize anyway in this mode. *)
+      let* ctxt, consensus_key, power =
+        if Raw_level.(content.level = predecessor_level) then
+          (* We can use the pre-computed slot map, which contains the
+             consensus rights at the predecessor level. *)
+          let* consensus_key, power =
+            find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
+          in
+          return (ctxt, consensus_key, power)
+        else
+          (* We retrieve the key directly, and return a fake voting
+             power of 0 because it doesn't matter for a past or future
+             preendorsement.*)
+          let level = Level.from_raw ctxt content.level in
+          let* ctxt, consensus_key =
+            Stake_distribution.slot_owner ctxt level content.slot
+          in
+          return (ctxt, consensus_key, 0)
+      in
+      return
+        (ctxt, mk_preendorsement_result (Consensus_key.pkh consensus_key) power)
 
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
@@ -2238,24 +2270,44 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
            endorsement_power;
          })
   in
-  if is_grandparent_endorsement mode content then
-    let level = Level.from_raw ctxt content.level in
-    let* ctxt, ({delegate; _} as consensus_key) =
-      Stake_distribution.slot_owner ctxt level content.slot
-    in
-    let*? ctxt = Consensus.record_grand_parent_endorsement ctxt delegate in
-    return (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) 0)
-  else
-    match Slot.Map.find content.slot (Consensus.allowed_endorsements ctxt) with
-    | None ->
-        (* This should not happen: operation validation should have failed. *)
-        tzfail Faulty_validation_wrong_slot
-    | Some (consensus_key, power) ->
-        let*? ctxt =
-          Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
-        in
-        return
-          (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) power)
+  match mode with
+  | Application _ | Full_construction _ ->
+      let* consensus_key, power =
+        find_in_slot_map content (Consensus.allowed_endorsements ctxt)
+      in
+      let*? ctxt =
+        Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
+      in
+      return
+        (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) power)
+  | Partial_construction {predecessor_level; _} ->
+      (* In mempool mode, endorsements are allowed for various levels
+         and rounds. We do not record endorsements because we could get
+         false-positive conflicts for endorsements with the same slot
+         but different levels/rounds. We could record just endorsements
+         for the predecessor's level and round (the most usual
+         endorsements), but we don't need to, because there is no block
+         to finalize anyway in this mode. *)
+      let* ctxt, consensus_key, power =
+        if Raw_level.(content.level = predecessor_level) then
+          (* We can use the pre-computed slot map, which contains the
+             consensus rights at the predecessor level. *)
+          let* consensus_key, power =
+            find_in_slot_map content (Consensus.allowed_endorsements ctxt)
+          in
+          return (ctxt, consensus_key, power)
+        else
+          (* We retrieve the key directly, and return a fake voting
+             power of 0 because it doesn't matter for a past or future
+             endorsement.*)
+          let level = Level.from_raw ctxt content.level in
+          let* ctxt, consensus_key =
+            Stake_distribution.slot_owner ctxt level content.slot
+          in
+          return (ctxt, consensus_key, 0)
+      in
+      return
+        (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) power)
 
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
@@ -2357,7 +2409,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   in
   match contents_list with
   | Single (Preendorsement consensus_content) ->
-      record_preendorsement ctxt mode consensus_content |> Lwt.return
+      record_preendorsement ctxt mode consensus_content
   | Single (Endorsement consensus_content) ->
       record_endorsement ctxt mode consensus_content
   | Single (Dal_attestation op) ->
@@ -3026,6 +3078,10 @@ let finalize_block (application_state : application_state) shell_header_opt =
       in
       return (result, receipt)
   | Partial_construction {predecessor_fitness; _} ->
+      (* Fake finalization to return a correct type, because there is no
+         block to finalize in mempool mode. If this changes in the
+         future, beware that consensus operations are not recorded by
+         {!record_preendorsement} and {!record_endorsement} in this mode. *)
       let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
       let level_info = Level.current ctxt in
       let result = finalize ctxt predecessor_fitness in
