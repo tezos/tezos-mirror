@@ -1,0 +1,346 @@
+// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
+
+#[link(wasm_import_module = "smart_rollup_core")]
+extern "C" {
+    /// If `/input/consumed >= /input/bytes`, return `0`.
+    ///
+    /// Otherwise:
+    /// - Fills the given buffer with up to `max_bytes` and returns actual
+    ///   number written.
+    /// - Write the current value of `/input/{type,level,id}` to
+    ///   `{type,level,id}`.
+    pub fn read_input(
+        message_info: *mut ReadInputMessageInfo,
+        dst: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
+
+    /// Write the given number of bytes to output.
+    ///
+    /// Fails with [Error::InputOutputTooLarge] if output size is greater than
+    /// [MAX_OUTPUT_SIZE].
+    pub fn write_output(src: *const u8, num_bytes: usize) -> i32;
+
+    /// Write the given number of bytes to the debug log.
+    pub fn write_debug(src: *const u8, num_bytes: usize);
+
+    /// Return whether the given key exists.
+    pub fn store_has(path: *const u8, path_len: usize) -> i32;
+
+    /// Read up to `num_bytes` bytes from the given key into memory.
+    ///
+    /// Returns the number of bytes copied to memory.  The bytes read from storage begin
+    /// at `offset`.
+    pub fn store_read(
+        path: *const u8,
+        path_len: usize,
+        offset: usize,
+        dst: *mut u8,
+        num_bytes: usize,
+    ) -> i32;
+
+    /// Write the given number of bytes from memory to the given key, starting at `offset`.
+    ///
+    /// Returns [Error::InputOutputTooLarge] if output size is greater than
+    /// [MAX_FILE_CHUNK_SIZE].
+    pub fn store_write(
+        path: *const u8,
+        path_len: usize,
+        offset: usize,
+        src: *const u8,
+        num_bytes: usize,
+    ) -> i32;
+
+    /// Delete the given key.
+    pub fn store_delete(path: *const u8, path_len: usize) -> i32;
+
+    /// Get the number of subkeys by prefix.
+    pub fn store_list_size(path: *const u8, path_len: usize) -> i64;
+
+    /// Get subkey path at `index` with a given prefix.
+    ///
+    /// Writes the encoded path of the subkey given by `index` - minus the
+    /// *prefix* `path` - to `dst`.  Returns the size of the subkey path in
+    /// bytes.
+    ///
+    /// It can be used together with `store_list_size` to *enumerate* subkeys.
+    ///
+    /// # Examples
+    ///
+    /// If the set of keys is `{/a/x, /a/y/z, /b/x}`, then:
+    /// ```no_run
+    /// # use tezos_smart_rollup_core::smart_rollup_core::{store_list_size, store_list_get};
+    /// # use std::slice::from_raw_parts;
+    ///
+    /// let prefix = [b'/', b'a'];
+    /// let path = prefix.as_ptr();
+    /// let len = prefix.len();
+    ///
+    /// assert_eq!(2, unsafe { store_list_size(path, len) });
+    ///
+    /// let first_subkey = std::ptr::null_mut();
+    /// let second_subkey = std::ptr::null_mut();
+    ///
+    /// let first_size = unsafe { store_list_get(path, len, 0, first_subkey, 1024) };
+    /// let second_size = unsafe { store_list_get(path, len, 1, second_subkey, 1024) };
+    ///
+    /// let first_slice = unsafe { from_raw_parts(first_subkey, first_size as usize) };
+    /// let second_slice = unsafe { from_raw_parts(second_subkey, second_size as usize) };
+    ///
+    /// assert_eq!([b'/', b'x'], first_slice);
+    /// assert_eq!([b'/', b'y', b'/', b'z'], second_slice);
+    /// ```
+    pub fn store_list_get(
+        path: *const u8,
+        path_len: usize,
+        index: i64,
+        dst: *mut u8,
+        max_size: usize,
+    ) -> i32;
+
+    /// Move a location in the store from one key to another
+    /// Reboot if the key doesn't exist.
+    /// Overwrites the destination, if it already exists
+    ///
+    /// e.g. if we have a store with `/x/y/z` containing a value
+    /// `store_move /x/y /a/b`
+    /// results in a store with `/a/b/z` as a location with a value
+    /// (location `/x/y/z` will hold no value after the call to
+    /// `store_move`).
+    pub fn store_move(
+        from_path: *const u8,
+        from_path_len: usize,
+        to_path: *const u8,
+        to_path_len: usize,
+    ) -> i32;
+
+    /// Copy a location in the store from one key to another
+    /// Reboot if the key doesn't exist.
+    /// Overwrites the destination, if it already exists.
+    ///
+    /// e.g. if we have a store with `/x/y/z` containing a value
+    /// `store_copy /x/y /a/b`
+    /// results in a store with `/x/y/z; /a/b/z` as locations with values.
+    pub fn store_copy(
+        from_path: *const u8,
+        from_path_len: usize,
+        to_path: *const u8,
+        to_path_len: usize,
+    ) -> i32;
+
+    /// Loads the preimage of a given 32-byte hash in memory.
+    /// If the preimage is larger than `max_bytes`, its contents is trimmed.
+    pub fn reveal_preimage(
+        hash_addr: *const u8,
+        hash_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
+
+    /// Return the size of value stored at `path`
+    pub fn store_value_size(path: *const u8, path_len: usize) -> i32;
+
+    /// Loads the 20-byte address of the rollup, followed by the 4-byte
+    /// origination level into memory.
+    /// Returns the size of data read (will always be 24).
+    pub fn reveal_metadata(destination_addr: *mut u8, max_bytes: usize) -> i32;
+}
+
+/// Wrapper trait for 'rollup_core' host functions.
+///
+/// Will be mocked out in unit tests.  Parameterised by `&self` - note that while
+/// these function may cause side effects, they are unsafe to call.
+///
+/// # Safety
+/// The caller should take care to give correct buffer sizes, pointers, and
+/// path-encodings.  See safety notes on each method for more details.
+#[cfg_attr(feature = "testing", mockall::automock)]
+pub unsafe trait SmartRollupCore {
+    /// See [read_input].
+    ///
+    /// # Safety
+    /// - `message_info` must all be valid pointer to a `ReadInputMessageInfo`.
+    /// - `dst` must point to a mutable slice of bytes with `capacity >= max_bytes`.
+    ///
+    /// The respective pointers must only be consumed if `return > 0`.
+    unsafe fn read_input(
+        &self,
+        message_info: *mut ReadInputMessageInfo,
+        dst: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
+
+    /// See [write_output].
+    ///
+    /// # Safety
+    /// - `src` must be a ptr to an initialised slice of bytes.
+    /// - `num_bytes` must be the length of that slice.
+    unsafe fn write_output(&self, src: *const u8, num_bytes: usize) -> i32;
+
+    /// See [write_debug].
+    ///
+    /// # Safety
+    /// - `src` must be a ptr to an initialised slice of bytes.
+    /// - `num_bytes` must be the length of that slice.
+    unsafe fn write_debug(src: *const u8, num_bytes: usize);
+
+    /// See [store_has].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    unsafe fn store_has(&self, path: *const u8, path_len: usize) -> i32;
+
+    /// See [store_read].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    /// - `dst` must point to a mutable slice of bytes with `capacity >= max_bytes`.
+    ///
+    /// # Traps
+    /// `traps` if `path` does not exist.  You should check with [store_has] first.
+    unsafe fn store_read(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        offset: usize,
+        dst: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
+
+    /// See [store_write].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    /// - `dst` must point to a slice of bytes with `length >= num_bytes`.
+    unsafe fn store_write(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        offset: usize,
+        src: *const u8,
+        num_bytes: usize,
+    ) -> i32;
+
+    /// See [store_delete].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    ///
+    /// # Traps
+    /// `traps` if `path` does not exist.  You should check with [store_has] first.
+    unsafe fn store_delete(&self, path: *const u8, len: usize) -> i32;
+
+    /// See [store_list_size].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    ///
+    /// # Traps
+    /// `traps` if `path` does not exist.  You should check with [store_has] first.
+    unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64;
+
+    /// See [store_list_get].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    /// - `dst` must point to a mutable slice of bytes with `capacity >= max_size`.
+    ///
+    /// # Traps
+    /// `traps` if:
+    /// - `path` does not exist.  You should check with [store_has] first.
+    /// - `index > store_list_size(path) || index < 0`
+    unsafe fn store_list_get(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        index: i64,
+        dst: *mut u8,
+        max_size: usize,
+    ) -> i32;
+
+    /// See [store_move] above.
+    ///
+    /// # Safety
+    /// - `from_path` and `to_path` must be pointers to correctly path encoded slices
+    ///   bytes.
+    /// - `from_path_len` and `to_path_len` must be length of those slices respectively.
+    ///
+    /// # Traps
+    /// - if `from_path` doesn't exist
+    /// - if `from_path` is a prefix of `to_path`?
+    unsafe fn store_move(
+        &self,
+        from_path: *const u8,
+        from_path_len: usize,
+        to_path: *const u8,
+        to_path_len: usize,
+    ) -> i32;
+
+    /// See [store_copy] above.
+    ///
+    /// # Safety
+    /// - `from_path` and `to_path` must be pointers to correctly path encoded slices
+    ///   bytes.
+    /// - `from_path_len` and `to_path_len` must be length of those slices respectively.
+    ///
+    /// # Traps
+    /// - if `from_path` doesn't exist
+    /// - if `from_path` is a prefix of `to_path`?
+    unsafe fn store_copy(
+        &self,
+        from_path: *const u8,
+        from_path_len: usize,
+        to_path: *const u8,
+        to_path_len: usize,
+    ) -> i32;
+
+    /// Loads the preimage of a given hash of size `PREIMAGE_HASH_BYTES` in memory.
+    /// If the preimage is larger than `max_bytes`, its contents is trimmed.
+    ///
+    /// # Safety
+    /// - `hash_addr` must be a ptr to a slice containing a hash
+    /// - `hash_len` must be the length of the slice
+    /// - `destination_addr `must point to a mutable slice of bytes with
+    ///   `capacity >= max_size`.
+    unsafe fn reveal_preimage(
+        &self,
+        hash_addr: *const u8,
+        hash_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
+
+    /// See [store_value_size] above.
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32;
+
+    /// Loads the 24-byte metedata (20-byte address of the rollup followed by the 4-byte
+    /// origination level) into memory.
+    ///
+    /// # Safety
+    /// - `destination_addr` must point to a mutable slice of bytes with
+    ///   `capacity >= max_bytes`
+    unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32;
+}
+
+/// Information about message level & id.
+#[repr(C)]
+pub struct ReadInputMessageInfo {
+    /// The current inbox level.
+    pub level: i32,
+    /// The message id at the current level.
+    pub id: i32,
+}
