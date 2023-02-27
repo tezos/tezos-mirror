@@ -10,8 +10,9 @@ use host::runtime::{load_value_slice, Runtime};
 use std::str::from_utf8;
 
 use crate::account::*;
+use crate::block::L2Block;
 use crate::error::Error;
-use crate::eth_gen::Hash;
+use crate::eth_gen::{Hash, L2Level, RawTransactions};
 use crate::wei::Wei;
 
 use primitive_types::U256;
@@ -21,6 +22,12 @@ const EVM_ACCOUNTS: RefPath = RefPath::assert_from(b"/eth_accounts");
 const EVM_ACCOUNT_BALANCE: RefPath = RefPath::assert_from(b"/balance");
 const EVM_ACCOUNT_NONCE: RefPath = RefPath::assert_from(b"/nonce");
 const EVM_ACCOUNT_CODE_HASH: RefPath = RefPath::assert_from(b"/code_hash");
+
+const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/evm/blocks/current");
+const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/blocks");
+const EVM_BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
+const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
+const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
 const CODE_HASH_SIZE: usize = 32;
 
@@ -48,6 +55,13 @@ pub fn address_path(address: Hash) -> Result<OwnedPath, Error> {
 pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
     let address_hash = address_path(address)?;
     concat(&EVM_ACCOUNTS, &address_hash).map_err(Error::from)
+}
+
+fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
+    let number: &str = &number.to_string();
+    let raw_number_path: Vec<u8> = format!("/{}", &number).into();
+    let number_path = OwnedPath::try_from(raw_number_path).map_err(Error::from)?;
+    concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
 }
 
 pub fn read_account_nonce<Host: Runtime + RawRollupCore>(
@@ -133,4 +147,64 @@ pub fn store_account<Host: Runtime + RawRollupCore>(
     store_nonce(host, &account_path, account.nonce)?;
     store_balance(host, &account_path, account.balance)?;
     store_code_hash(host, &account_path, &account.code_hash)
+}
+
+fn store_block_number<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+    block_number: L2Level,
+) -> Result<(), Error> {
+    let path = concat(block_path, &EVM_BLOCKS_NUMBER)?;
+    host.store_write(&path, &u64::to_le_bytes(block_number), 0)
+        .map_err(Error::from)
+}
+
+fn store_block_hash<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+    block_hash: Hash,
+) -> Result<(), Error> {
+    let path = concat(block_path, &EVM_BLOCKS_HASH)?;
+    host.store_write(&path, block_hash, 0).map_err(Error::from)
+}
+
+fn store_block_transactions<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+    block_transactions: &RawTransactions,
+) -> Result<(), Error> {
+    let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
+    /* For now, to keep it simple we made the assumption that ONE BLOCK = ONE TRANSACTION,
+    this is why the following code make sense in this case: */
+    let transaction = &block_transactions[0];
+    host.store_write(&path, transaction, 0).map_err(Error::from)
+}
+
+fn store_block<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    block: &L2Block,
+    block_path: OwnedPath,
+) -> Result<(), Error> {
+    store_block_number(host, &block_path, block.number)?;
+    store_block_hash(host, &block_path, &block.hash)?;
+    store_block_transactions(host, &block_path, &block.transactions)
+}
+
+pub fn store_block_by_number<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    block: &L2Block,
+) -> Result<(), Error> {
+    let block_path = block_path(block.number)?;
+    store_block(host, block, block_path)
+}
+
+pub fn store_current_block<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    block: L2Block,
+) -> Result<(), Error> {
+    let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
+    store_block(host, &block, current_block_path)?;
+    /* When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
+    path as well, thus the following line: */
+    store_block_by_number(host, &block)
 }
