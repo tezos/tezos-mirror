@@ -23,15 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+type tez = {mutez : int64}
 
-(** Type to represent {e appoximate upper-bounds} for the fee and limits, used
-    to compute an upper bound on the size (in bytes) of an operation. *)
-type approximate_fee_bound = {
-  fee : Tez.t;
-  counter : Manager_counter.t;
-  gas_limit : Gas.Arith.integral;
-  storage_limit : Z.t;
+type fee_parameter = {
+  minimal_fees : tez;
+  minimal_nanotez_per_byte : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t;
+  force_low_fee : bool;
+  fee_cap : tez;
+  burn_cap : tez;
 }
 
 type injection_strategy =
@@ -58,6 +58,13 @@ type unsuccessful_status =
 
 type operation_status = Successful | Unsuccessful of unsuccessful_status
 
+type simulation_status = {index_in_batch : int; status : operation_status}
+
+type 'unsigned_op simulation_result = {
+  operations_statuses : simulation_status list;
+  unsigned_operation : 'unsigned_op;
+}
+
 (** Action to be taken for unsuccessful operation. *)
 type retry_action =
   | Retry  (** The operation is retried by being re-queued for injection. *)
@@ -83,9 +90,6 @@ module type PARAM_OPERATION = sig
 
   (** An encoding for injector's operations *)
   val encoding : t Data_encoding.t
-
-  (** Convert an injector operation to a manager_operation of the protocol *)
-  val to_manager_operation : t -> packed_manager_operation
 
   (** Pretty-printing injector's operations *)
   val pp : Format.formatter -> t -> unit
@@ -144,14 +148,9 @@ module type PARAMETERS = sig
       persistent information. *)
   val operation_tag : Operation.t -> Tag.t
 
-  (** Returns the {e approximate upper-bounds} for the fee and limits of an
-      operation, used to compute an upper bound on the size (in bytes) for this
-      operation. *)
-  val approximate_fee_bound : state -> Operation.t -> approximate_fee_bound
-
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)
-  val fee_parameter : state -> Operation.t -> Injection.fee_parameter
+  val fee_parameter : state -> Operation.t -> fee_parameter
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
@@ -162,6 +161,71 @@ module type PARAMETERS = sig
      allows to incrementally build "or-batches" by iteratively removing
      operations that fail from the desired batch. *)
   val batch_must_succeed : Operation.t list -> [`All | `At_least_one]
+end
+
+module type PROTOCOL_CLIENT = sig
+  type state
+
+  type operation
+
+  type unsigned_operation
+
+  val max_operation_data_length : int
+
+  (** The validation pass of manager operations. *)
+  val manager_pass : int
+
+  (** [operation_status block oph ~index] returns the status of the operation at
+      position [index] in the L1 batch [oph] included in the block [block]. It
+      returns [None] if the operation with the given index is not in the
+      block. *)
+  val operation_status :
+    state ->
+    Block_hash.t ->
+    Operation_hash.t ->
+    index:int ->
+    operation_status option tzresult Lwt.t
+
+  (** Size of an operation in bytes according to the protocol. This only
+      accounts for the actual content of the corresponding manager operation
+      (and not its fees, gas, etc.). *)
+  val operation_size : operation -> int
+
+  (** An upper bound of the overhead added to manager operations in
+      bytes. Typically, this would include the source, fees, counter, gas limit,
+      and storage limit. *)
+  val operation_size_overhead : int
+
+  (** Simulating a batch of operations. This function returns the simulation
+      result for each of these operations (with its associated index in the
+      batch, in case there is a revelation operation added) together with a
+      Tezos raw unsigned operation that can be directly injected on a node if
+      one wishes to. *)
+  val simulate_operations :
+    #Client_context.full ->
+    force:bool ->
+    source:Signature.public_key_hash ->
+    src_pk:Signature.public_key ->
+    successor_level:bool ->
+    fee_parameter:fee_parameter ->
+    operation list ->
+    ( unsigned_operation simulation_result,
+      [`Exceeds_quotas of tztrace | `TzError of tztrace] )
+    result
+    Lwt.t
+
+  (** Sign an unsigned operation an return the serialized signed operation,
+      ready for injection. *)
+  val sign_operation :
+    #Client_context.full ->
+    Client_keys.sk_uri ->
+    unsigned_operation ->
+    bytes tzresult Lwt.t
+
+  (** [time_until_next_block state block_header] computes the time until the
+      block following [block_header], with respect to the current time. *)
+  val time_until_next_block :
+    state -> Tezos_base.Block_header.t option -> Ptime.span
 end
 
 (** Output signature for functor {!Injector_functor.Make}. *)
@@ -221,11 +285,11 @@ module type S = sig
       be useful to set this value to something [> 0] if we want to retrieve
       information about operations included on L1 for a given period. *)
   val init :
-    #Protocol_client_context.full ->
+    #Client_context.full ->
     data_dir:string ->
     ?retention_period:int ->
     state ->
-    signers:(public_key_hash * injection_strategy * tag list) list ->
+    signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
   (** Add an operation as pending injection in the injector. If the source is
@@ -233,16 +297,17 @@ module type S = sig
       corresponding tag. It returns the hash of the operation in the injector
       queue. *)
   val add_pending_operation :
-    ?source:public_key_hash -> operation -> Inj_operation.Hash.t tzresult Lwt.t
+    ?source:Signature.public_key_hash ->
+    operation ->
+    Inj_operation.Hash.t tzresult Lwt.t
 
   (** Notify the injector of a new Tezos head. The injector marks the operations
       appropriately (for instance reverted operations that are part of a
       reorganization are put back in the pending queue). When an operation is
       considered as {e confirmed}, it disappears from the injector. *)
   val new_tezos_head :
-    Protocol_client_context.Alpha_block_services.block_info ->
-    Protocol_client_context.Alpha_block_services.block_info
-    Injector_common.reorg ->
+    Block_hash.t * int32 ->
+    (Block_hash.t * int32) Injector_common.reorg ->
     unit Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]

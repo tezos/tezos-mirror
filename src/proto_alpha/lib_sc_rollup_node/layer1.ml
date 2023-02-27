@@ -26,7 +26,7 @@
 open Configuration
 open Protocol.Alpha_context
 open Plugin
-open Injector_common
+open Protocol_client_context
 
 (**
 
@@ -241,25 +241,79 @@ let shutdown state =
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)
 let fetch_tezos_shell_header l1_ctxt hash =
+  let open Lwt_syntax in
   trace (Cannot_find_block hash)
-  @@ fetch_tezos_shell_header
-       l1_ctxt.cctxt
-       hash
-       ~find_in_cache:(fun h fetch_by_rpc ->
-         let res =
-           Blocks_cache.bind l1_ctxt.blocks_cache h (function
-               | Some block_info -> Lwt.return_some block_info.header.shell
-               | None -> Lwt.return_none)
-         in
-         match res with Some lwt -> lwt | None -> fetch_by_rpc h)
+  @@
+  let errors = ref None in
+  let fetch hash =
+    let* shell_header =
+      Tezos_shell_services.Shell_services.Blocks.Header.shell_header
+        l1_ctxt.cctxt
+        ~chain:`Main
+        ~block:(`Hash (hash, 0))
+        ()
+    in
+    match shell_header with
+    | Error errs ->
+        errors := Some errs ;
+        return_none
+    | Ok shell_header -> return_some shell_header
+  in
+  let+ shell_header =
+    let res =
+      Blocks_cache.bind l1_ctxt.blocks_cache hash (function
+          | Some block_info -> Lwt.return_some block_info.header.shell
+          | None -> Lwt.return_none)
+    in
+    match res with Some lwt -> lwt | None -> fetch hash
+  in
+  match (shell_header, !errors) with
+  | None, None ->
+      (* This should not happen if {!find_in_cache} behaves correctly,
+         i.e. calls {!fetch} for cache misses. *)
+      error_with
+        "Fetching Tezos block %a failed unexpectedly"
+        Block_hash.pp
+        hash
+  | None, Some errs -> Error errs
+  | Some shell_header, _ -> Ok shell_header
 
 (** [fetch_tezos_block l1_ctxt hash] returns a block info given a block
     hash. Looks for the block in the blocks cache first, and fetches it from the
     L1 node otherwise. *)
 let fetch_tezos_block l1_ctxt hash =
+  let open Lwt_syntax in
   trace (Cannot_find_block hash)
-  @@ fetch_tezos_block l1_ctxt.cctxt hash ~find_in_cache:(fun h fetch_by_rpc ->
-         Blocks_cache.bind_or_put l1_ctxt.blocks_cache h fetch_by_rpc Lwt.return)
+  @@
+  let errors = ref None in
+  let fetch hash =
+    let* block =
+      Alpha_block_services.info
+        l1_ctxt.cctxt
+        ~chain:`Main
+        ~block:(`Hash (hash, 0))
+        ~metadata:`Always
+        ()
+    in
+    match block with
+    | Error errs ->
+        errors := Some errs ;
+        return_none
+    | Ok block -> return_some block
+  in
+  let+ block =
+    Blocks_cache.bind_or_put l1_ctxt.blocks_cache hash fetch Lwt.return
+  in
+  match (block, !errors) with
+  | None, None ->
+      (* This should not happen if {!find_in_cache} behaves correctly,
+         i.e. calls {!fetch} for cache misses. *)
+      error_with
+        "Fetching Tezos block %a failed unexpectedly"
+        Block_hash.pp
+        hash
+  | None, Some errs -> Error errs
+  | Some block, _ -> Ok block
 
 let nth_predecessor l1_state n block =
   let open Lwt_result_syntax in
@@ -281,10 +335,11 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
       let* old_head_pred = get_predecessor l1_state old_head in
       let* new_head_pred = get_predecessor l1_state new_head in
       let reorg =
-        {
-          old_chain = old_head :: reorg.old_chain;
-          new_chain = new_head :: reorg.new_chain;
-        }
+        Injector_common.
+          {
+            old_chain = old_head :: reorg.old_chain;
+            new_chain = new_head :: reorg.new_chain;
+          }
       in
       aux reorg old_head_pred new_head_pred
   in
@@ -292,13 +347,14 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
      level *)
   let distance = Int32.(to_int @@ abs @@ sub new_head.level old_head.level) in
   let* old_head, new_head, reorg =
-    if old_head.level = new_head.level then return (old_head, new_head, no_reorg)
+    if old_head.level = new_head.level then
+      return (old_head, new_head, Injector_common.no_reorg)
     else if old_head.level < new_head.level then
       let+ new_head, new_chain = nth_predecessor l1_state distance new_head in
-      (old_head, new_head, {no_reorg with new_chain})
+      (old_head, new_head, {Injector_common.no_reorg with new_chain})
     else
       let+ old_head, old_chain = nth_predecessor l1_state distance old_head in
-      (old_head, new_head, {no_reorg with old_chain})
+      (old_head, new_head, {Injector_common.no_reorg with old_chain})
   in
   assert (old_head.level = new_head.level) ;
   aux reorg old_head new_head
@@ -309,7 +365,7 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
   match old_head with
   | `Level l ->
       (* No known tezos head, we want all blocks from l. *)
-      if new_head.level < l then return no_reorg
+      if new_head.level < l then return Injector_common.no_reorg
       else
         let* _block_at_l, new_chain =
           nth_predecessor
@@ -317,5 +373,5 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
             (Int32.sub new_head.level l |> Int32.to_int)
             new_head
         in
-        return {old_chain = []; new_chain}
+        return Injector_common.{old_chain = []; new_chain}
   | `Head old_head -> get_tezos_reorg_for_new_head l1_state old_head new_head

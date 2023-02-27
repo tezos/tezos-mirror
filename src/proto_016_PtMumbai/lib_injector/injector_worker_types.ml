@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
-open Protocol
-open Alpha_context
 open Injector_common
 open Injector_sigs
 
@@ -33,7 +30,7 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
   type ('a, 'b) t =
     | Add_pending : L1_operation.t -> (unit, error trace) t
     | New_tezos_head :
-        Alpha_block_services.block_info * Alpha_block_services.block_info reorg
+        (Block_hash.t * int32) * (Block_hash.t * int32) reorg
         -> (unit, error trace) t
     | Inject : (unit, error trace) t
 
@@ -56,12 +53,13 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
         case
           (Tag 1)
           ~title:"New_tezos_head"
-          (obj3
+          (let block_level =
+             obj2 (req "block" Block_hash.encoding) (req "level" int32)
+           in
+           obj3
              (req "request" (constant "new_tezos_head"))
-             (req "head" Alpha_block_services.block_info_encoding)
-             (req
-                "reorg"
-                (reorg_encoding Alpha_block_services.block_info_encoding)))
+             (req "head" block_level)
+             (req "reorg" (reorg_encoding block_level)))
           (function
             | View (New_tezos_head (b, r)) -> Some ((), b, r) | _ -> None)
           (fun ((), b, r) -> View (New_tezos_head (b, r)));
@@ -77,12 +75,13 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
     match r with
     | Add_pending op ->
         Format.fprintf ppf "request add %a to pending queue" L1_operation.pp op
-    | New_tezos_head (b, r) ->
+    | New_tezos_head ((block, level), r) ->
         Format.fprintf
           ppf
-          "switching to new Tezos head %a"
+          "switching to new Tezos head %a at level %ld"
           Block_hash.pp
-          b.Alpha_block_services.hash ;
+          block
+          level ;
         if r.old_chain <> [] || r.new_chain <> [] then
           Format.fprintf
             ppf
@@ -93,7 +92,7 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
 end
 
 module Name = struct
-  type t = public_key_hash
+  type t = Signature.public_key_hash
 
   let encoding = Tezos_crypto.Signature.Public_key_hash.encoding
 
