@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Node_context
-open Protocol.Alpha_context
+module Request = struct
+  type ('a, 'b) t =
+    | Publish : (unit, error trace) t
+    | Cement : (unit, error trace) t
 
-module Make (PVM : Pvm.S) = struct
-  let get_state_of_lcc node_ctxt =
-    let open Lwt_result_syntax in
-    let lcc = Reference.get node_ctxt.lcc in
-    let* block_hash =
-      Node_context.hash_of_level node_ctxt (Raw_level.to_int32 lcc.level)
-    in
-    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
-    let*! state = PVM.State.find ctxt in
-    return state
+  type view = View : _ t -> view
 
-  let proof_of_output node_ctxt output =
-    let open Lwt_result_syntax in
-    let* state = get_state_of_lcc node_ctxt in
-    let lcc = Reference.get node_ctxt.lcc in
-    match state with
-    | None ->
-        (*
-           This case should never happen as origination creates an LCC which
-           must have been considered by the rollup node at startup time.
-        *)
-        failwith "Error producing outbox proof (no cemented state in the node)"
-    | Some state -> (
-        let*! proof = PVM.produce_output_proof node_ctxt.context state output in
-        match proof with
-        | Ok proof ->
-            let serialized_proof =
-              Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
-            in
-            return @@ (lcc.commitment, serialized_proof)
-        | Error err ->
-            failwith
-              "Error producing outbox proof (%a)"
-              Environment.Error_monad.pp
-              err)
+  let view req = View req
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Publish"
+          (obj1 (req "request" (constant "publish")))
+          (function View Publish -> Some () | _ -> None)
+          (fun () -> View Publish);
+        case
+          (Tag 1)
+          ~title:"Cement"
+          (obj1 (req "request" (constant "cement")))
+          (function View Cement -> Some () | _ -> None)
+          (fun () -> View Cement);
+      ]
+
+  let pp ppf (View r) =
+    match r with
+    | Publish -> Format.pp_print_string ppf "publish"
+    | Cement -> Format.pp_print_string ppf "cement"
+end
+
+module Name = struct
+  (* We only have a single commitment publisher right now *)
+  type t = unit
+
+  let encoding = Data_encoding.unit
+
+  let base = ["sc_rollup_commitment_publisher"]
+
+  let pp _ _ = ()
+
+  let equal () () = true
 end

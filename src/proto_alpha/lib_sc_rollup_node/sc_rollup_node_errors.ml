@@ -44,6 +44,7 @@ type error +=
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
   | No_batcher
+  | No_publisher
 
 type error +=
   | Lost_game of
@@ -254,4 +255,17 @@ let () =
     `Permanent
     Data_encoding.unit
     (function No_batcher -> Some () | _ -> None)
-    (fun () -> No_batcher)
+    (fun () -> No_batcher) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_publisher"
+    ~title:"No publisher for this node"
+    ~description:"This node does not have an operator to publish commitments"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "This rollup node does not have an operator to publish commitments.")
+    `Permanent
+    Data_encoding.unit
+    (function No_publisher -> Some () | _ -> None)
+    (fun () -> No_publisher)

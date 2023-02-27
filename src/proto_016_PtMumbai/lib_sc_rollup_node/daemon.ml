@@ -92,11 +92,11 @@ module Make (PVM : Pvm.S) = struct
       when Node_context.is_operator node_ctxt source ->
         (* Published commitment --------------------------------------------- *)
         let save_lpc =
-          match node_ctxt.lpc with
+          match Reference.get node_ctxt.lpc with
           | None -> true
           | Some lpc -> Raw_level.(commitment.inbox_level >= lpc.inbox_level)
         in
-        if save_lpc then node_ctxt.lpc <- Some commitment ;
+        if save_lpc then Reference.set node_ctxt.lpc (Some commitment) ;
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
@@ -171,9 +171,10 @@ module Make (PVM : Pvm.S) = struct
                  on_l1 = commitment;
                })
         in
+        let lcc = Reference.get node_ctxt.lcc in
         let*! () =
-          if Raw_level.(inbox_level > node_ctxt.lcc.level) then (
-            node_ctxt.lcc <- {commitment; level = inbox_level} ;
+          if Raw_level.(inbox_level > lcc.level) then (
+            Reference.set node_ctxt.lcc {commitment; level = inbox_level} ;
             Commitment_event.last_cemented_commitment_updated
               commitment
               inbox_level)
@@ -425,8 +426,8 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
-    let* () = Components.Commitment.publish_commitments node_ctxt in
-    let* () = Components.Commitment.cement_commitments node_ctxt in
+    let* () = Components.Commitment.Publisher.publish_commitments () in
+    let* () = Components.Commitment.Publisher.cement_commitments () in
     let* () = notify_injector node_ctxt new_head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let* () = Components.Refutation_game.process head node_ctxt in
@@ -489,6 +490,8 @@ module Make (PVM : Pvm.S) = struct
     let* () = Injector.shutdown () in
     let* () = message "Shutting down Batcher@." in
     let* () = Components.Batcher.shutdown () in
+    let* () = message "Shutting down Commitment Publisher@." in
+    let* () = Components.Commitment.Publisher.shutdown () in
     let* (_ : unit tzresult) = Node_context.close node_ctxt in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
@@ -525,7 +528,6 @@ module Make (PVM : Pvm.S) = struct
         install_finalizer node_ctxt rpc_server
       in
       let*! () = Inbox.start () in
-      let*! () = Components.Commitment.start () in
       let signers =
         Configuration.Operator_purpose_map.bindings node_ctxt.operators
         |> List.fold_left
@@ -551,6 +553,7 @@ module Make (PVM : Pvm.S) = struct
                in
                (operator, strategy, purposes))
       in
+      let* () = Components.Commitment.Publisher.init node_ctxt in
       let* () =
         Injector.init
           node_ctxt.cctxt

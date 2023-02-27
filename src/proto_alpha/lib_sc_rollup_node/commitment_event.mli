@@ -27,6 +27,7 @@
     when it is storing and publishing commitments (see {!Commitment}). *)
 
 open Protocol.Alpha_context
+open Publisher_worker_types
 
 val starting : unit -> unit Lwt.t
 
@@ -69,3 +70,19 @@ val compute_commitment : Raw_level.t -> unit Lwt.t
     being published. *)
 val publish_commitment :
   Sc_rollup.Commitment.Hash.t -> Raw_level.t -> unit Lwt.t
+
+(** Events emmitted by the Publisher worker *)
+module Publisher : sig
+  (** [request_failed view status errors] emits the event that a worker
+      request [view] has failed with [status] after producing [errors]. *)
+  val request_failed :
+    Request.view ->
+    Worker_types.request_status ->
+    Error_monad.tztrace ->
+    unit Lwt.t
+
+  (** [request_completed view status] emits the event that a worker
+      request [view] has been completed with [status]. *)
+  val request_completed :
+    Request.view -> Worker_types.request_status -> unit Lwt.t
+end

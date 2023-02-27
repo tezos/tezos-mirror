@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Node_context
-open Protocol.Alpha_context
+module Request : sig
+  (** Type of requests accepted by the publisher worker. *)
+  type ('a, 'b) t =
+    | Publish : (unit, error trace) t
+        (** Request to publish new commitments in L1. *)
+    | Cement : (unit, error trace) t
+        (** Request to cement commitments in L1. *)
 
-module Make (PVM : Pvm.S) = struct
-  let get_state_of_lcc node_ctxt =
-    let open Lwt_result_syntax in
-    let lcc = Reference.get node_ctxt.lcc in
-    let* block_hash =
-      Node_context.hash_of_level node_ctxt (Raw_level.to_int32 lcc.level)
-    in
-    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
-    let*! state = PVM.State.find ctxt in
-    return state
+  type view = View : _ t -> view
 
-  let proof_of_output node_ctxt output =
-    let open Lwt_result_syntax in
-    let* state = get_state_of_lcc node_ctxt in
-    let lcc = Reference.get node_ctxt.lcc in
-    match state with
-    | None ->
-        (*
-           This case should never happen as origination creates an LCC which
-           must have been considered by the rollup node at startup time.
-        *)
-        failwith "Error producing outbox proof (no cemented state in the node)"
-    | Some state -> (
-        let*! proof = PVM.produce_output_proof node_ctxt.context state output in
-        match proof with
-        | Ok proof ->
-            let serialized_proof =
-              Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
-            in
-            return @@ (lcc.commitment, serialized_proof)
-        | Error err ->
-            failwith
-              "Error producing outbox proof (%a)"
-              Environment.Error_monad.pp
-              err)
+  include
+    Worker_intf.REQUEST
+      with type ('a, 'request_error) t := ('a, 'request_error) t
+       and type view := view
 end
+
+module Name : Worker_intf.NAME with type t = unit

@@ -43,6 +43,7 @@
 
 open Protocol
 open Alpha_context
+open Publisher_worker_types
 
 module Lwt_result_option_syntax = struct
   let ( let** ) a f =
@@ -82,6 +83,8 @@ let next_commitment_level node_ctxt last_commitment_level =
 
 module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   module PVM = PVM
+
+  type state = Node_context.ro
 
   let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
     let open Lwt_result_syntax in
@@ -184,7 +187,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let missing_commitments (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
     let lpc_level =
-      match node_ctxt.lpc with
+      match Reference.get node_ctxt.lpc with
       | None -> node_ctxt.genesis_info.level
       | Some lpc -> lpc.inbox_level
     in
@@ -201,10 +204,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let* commitment =
         Node_context.find_commitment node_ctxt commitment_hash
       in
+      let lcc = Reference.get node_ctxt.lcc in
       match commitment with
       | None -> return acc
-      | Some commitment
-        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+      | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
           (* Commitment is before or at the LCC, we have reached the end. *)
           return acc
       | Some commitment when Raw_level.(commitment.inbox_level <= lpc_level) ->
@@ -252,7 +255,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let* _hash = Injector.add_pending_operation ~source publish_operation in
     return_unit
 
-  let publish_commitments (node_ctxt : _ Node_context.t) =
+  let on_publish_commitments (node_ctxt : state) =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Publish in
     if Node_context.is_accuser node_ctxt then
@@ -271,12 +274,13 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Publish in
+    let lcc = Reference.get node_ctxt.lcc in
     match operator with
     | None ->
         (* Configured to not publish commitments *)
         return_unit
     | Some source ->
-        when_ (commitment.inbox_level > node_ctxt.lcc.level) @@ fun () ->
+        when_ (commitment.inbox_level > lcc.level) @@ fun () ->
         publish_commitment node_ctxt ~source commitment
 
   (* Commitments can only be cemented after [sc_rollup_challenge_window] has
@@ -306,8 +310,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       return
       @@ sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
     in
-    if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then
-      return_none
+    let lcc = Reference.get node_ctxt.lcc in
+    if Raw_level.(cementable_level_bound <= lcc.level) then return_none
     else
       let** cementable_bound_block =
         Node_context.find_l2_block_by_level
@@ -324,14 +328,14 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let open Lwt_result_option_list_syntax in
     let*& head = Node_context.last_processed_head_opt node_ctxt in
     let head_level = head.header.level in
+    let lcc = Reference.get node_ctxt.lcc in
     let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
       let* commitment =
         Node_context.find_commitment node_ctxt commitment_hash
       in
       match commitment with
       | None -> return acc
-      | Some commitment
-        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+      | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
           (* If we have moved backward passed or at the current LCC then we have
              reached the end. *)
           return acc
@@ -382,7 +386,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let* _hash = Injector.add_pending_operation ~source cement_operation in
     return_unit
 
-  let cement_commitments node_ctxt =
+  let on_cement_commitments (node_ctxt : state) =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Cement in
     match operator with
@@ -395,5 +399,93 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           (cement_commitment node_ctxt ~source)
           cementable_commitments
 
-  let start () = Commitment_event.starting ()
+  module Publisher = struct
+    module Types = struct
+      type nonrec state = state
+
+      type parameters = {node_ctxt : Node_context.ro}
+    end
+
+    module Worker = Worker.MakeSingle (Name) (Request) (Types)
+
+    type worker = Worker.infinite Worker.queue Worker.t
+
+    module Handlers = struct
+      type self = worker
+
+      let on_request :
+          type r request_error.
+          worker ->
+          (r, request_error) Request.t ->
+          (r, request_error) result Lwt.t =
+       fun w request ->
+        let state = Worker.state w in
+        match request with
+        | Request.Publish -> protect @@ fun () -> on_publish_commitments state
+        | Request.Cement -> protect @@ fun () -> on_cement_commitments state
+
+      type launch_error = error trace
+
+      let on_launch _w () Types.{node_ctxt} = return node_ctxt
+
+      let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
+          unit tzresult Lwt.t =
+        let open Lwt_result_syntax in
+        let request_view = Request.view r in
+        let emit_and_return_errors errs =
+          let*! () =
+            Commitment_event.Publisher.request_failed request_view st errs
+          in
+          return_unit
+        in
+        match r with
+        | Request.Publish -> emit_and_return_errors errs
+        | Request.Cement -> emit_and_return_errors errs
+
+      let on_completion _w r _ st =
+        Commitment_event.Publisher.request_completed (Request.view r) st
+
+      let on_no_request _ = Lwt.return_unit
+
+      let on_close _w = Lwt.return_unit
+    end
+
+    let table = Worker.create_table Queue
+
+    let worker_promise, worker_waker = Lwt.task ()
+
+    let init node_ctxt =
+      let open Lwt_result_syntax in
+      let*! () = Commitment_event.starting () in
+      let node_ctxt = Node_context.readonly node_ctxt in
+      let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
+      Lwt.wakeup worker_waker worker
+
+    (* This is a publisher worker for a single scoru *)
+    let worker =
+      lazy
+        (match Lwt.state worker_promise with
+        | Lwt.Return worker -> ok worker
+        | Lwt.Fail _ | Lwt.Sleep -> error Sc_rollup_node_errors.No_publisher)
+
+    let publish_commitments () =
+      let open Lwt_result_syntax in
+      let*? w = Lazy.force worker in
+      let*! (_pushed : bool) = Worker.Queue.push_request w Request.Publish in
+      return_unit
+
+    let cement_commitments () =
+      let open Lwt_result_syntax in
+      let*? w = Lazy.force worker in
+      let*! (_pushed : bool) = Worker.Queue.push_request w Request.Cement in
+      return_unit
+
+    let shutdown () =
+      let w = Lazy.force worker in
+      match w with
+      | Error _ ->
+          (* There is no publisher, nothing to do *)
+          Lwt.return_unit
+      | Ok w -> Worker.shutdown w
+  end
 end
