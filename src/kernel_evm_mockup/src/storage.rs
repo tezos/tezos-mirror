@@ -11,6 +11,7 @@ use std::str::from_utf8;
 
 use crate::account::*;
 use crate::error::Error;
+use crate::eth_gen::Hash;
 use crate::wei::Wei;
 
 use primitive_types::U256;
