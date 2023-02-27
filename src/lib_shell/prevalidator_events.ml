@@ -109,16 +109,23 @@ let operation_reclassified =
     ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
 
-let request_completed_notice =
-  declare_2
+let operation_injected =
+  declare_1
     ~section
-    ~name:"request_completed_notice"
-    ~msg:"{view} in {worker_status}"
+    ~name:"operation_injected"
+    ~msg:"operation {oph} injected "
     ~level:Notice
-    ~pp1:Request.pp
-    ~pp2:Worker_types.pp_status_completed
-    ("view", Request.encoding)
-    ("worker_status", Worker_types.request_status_encoding)
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
+
+let operation_banned =
+  declare_1
+    ~section
+    ~name:"operation_banned"
+    ~msg:"operation {oph} banned"
+    ~level:Notice
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
 
 let request_completed_info =
   declare_2

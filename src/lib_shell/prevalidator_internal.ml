@@ -638,6 +638,7 @@ module Make_s
               in
               pv.shell.pending <-
                 Pending_ops.add parsed_op prio pv.shell.pending ;
+              let*! () = Events.(emit operation_injected) oph in
               return_unit)
             else if
               not
@@ -691,6 +692,7 @@ module Make_s
                   let*! v =
                     update_advertised_mempool_fields pv.shell delta_mempool
                   in
+                  let*! () = Events.(emit operation_injected) oph in
                   return v
               | Some
                   ( _h,
@@ -833,9 +835,12 @@ module Make_s
               return_unit)
 
     let on_ban pv oph_to_ban =
+      let open Lwt_result_syntax in
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      remove ~flush_if_prechecked:true pv oph_to_ban
+      let* res = remove ~flush_if_prechecked:true pv oph_to_ban in
+      let*! () = Events.(emit operation_banned) oph_to_ban in
+      return res
   end
 end
 
@@ -1403,9 +1408,7 @@ module Make
     let on_completion _w r _ st =
       Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
       match Request.view r with
-      | View (Inject _) | View (Ban _) ->
-          Events.(emit request_completed_notice) (Request.view r, st)
-      | Request.View (Flush _) ->
+      | View (Inject _) | View (Ban _) | Request.View (Flush _) ->
           Events.(emit request_completed_info) (Request.view r, st)
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
           Events.(emit request_completed_debug) (Request.view r, st)
