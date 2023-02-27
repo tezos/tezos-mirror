@@ -2420,10 +2420,11 @@ let propagation_future_endorsement =
   in
   let step9_msg =
     "Step 9: ensure that endorsement is in node_2 mempool and classified as \
-     branch_delayed"
+     branch_delayed (resp. applied from protocol 017 on)"
   in
   let step10_msg =
-    "Step 10: ensure that endorsement is not in node_3 mempool"
+    "Step 10: ensure that endorsement is not in node_3 mempool (from protocol \
+     017 on, it should be applied in node_3 mempool)"
   in
   let step11_msg = "Step 11: Reconnect node_1 and node_2, new head on node_2" in
   let step12_msg =
@@ -2495,14 +2496,22 @@ let propagation_future_endorsement =
   let* () = Client.Admin.connect_address client_2 ~peer:node_3 in
   let* _ = mempool_synchronisation client_3 node_3 in
   Log.info "%s" step8_msg ;
+  (* From protocol N on, consensus operations that are one level in
+     the future are accepted and propagated by the mempool. *)
+  let accept_one_level_in_future = Protocol.number protocol >= 017 in
   let* _ =
-    check_if_op_is_in_mempool
-      client_2
-      ~classification:(Some "branch_delayed")
-      hash
+    let classification =
+      Some (if accept_one_level_in_future then "applied" else "branch_delayed")
+    in
+    check_if_op_is_in_mempool client_2 ~classification hash
   in
   Log.info "%s" step9_msg ;
-  let* _ = check_if_op_is_in_mempool client_3 ~classification:None hash in
+  let* _ =
+    let classification =
+      if accept_one_level_in_future then Some "applied" else None
+    in
+    check_if_op_is_in_mempool client_3 ~classification hash
+  in
   Log.info "%s" step10_msg ;
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
