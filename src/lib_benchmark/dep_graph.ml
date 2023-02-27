@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,25 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Models associated to benchmarks have free variables. Some of these
-   variables are to be inferred from the empirical data, but some others
-   must be provided by other models and correspond to _dependencies_
-   of a model upon the result of another one.
-
-   The goal of this module is to take as input a set of models seen as
-   sets of free variables and infer back a partial dependency ordering
-   among them. In particular, a topological sort of this partial ordering
-   yields a scheduling for the inference process that respects cross-model
-   dependencies.
-
-   Such a problem does not always have a solution, or can have several
-   solutions (ie it is in general ill-posed). When there's more than
-   one possible solution, we use a simple heuristic to pick one.
-*)
-
 module Fv_map = Free_variable.Map
 module Fv_set = Free_variable.Set
-module Fv_set_set = Set.Make (Free_variable.Set)
 
 module Directed_graph = Graph.Imperative.Digraph.Concrete (struct
   type t = string
@@ -263,16 +246,6 @@ let pp_print_set fmtr (set : Free_variable.Set.t) =
     elts ;
   Format.fprintf fmtr " }"
 
-let pp_print_set_set fmtr (set_set : Fv_set_set.t) =
-  let elts = Fv_set_set.elements set_set in
-  Format.fprintf fmtr "{ " ;
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ";")
-    pp_print_set
-    fmtr
-    elts ;
-  Format.fprintf fmtr " }"
-
 let get_free_variables (type workload) (model : workload Model.t)
     (workload : workload) : Free_variable.Set.t =
   let applied = Model.apply model workload in
@@ -287,28 +260,10 @@ let add_names (state : string Solver.state) (filename : string)
   Format.eprintf "for %s, adding names %a@." filename pp_print_set names ;
   Solver.add_node state names filename
 
-exception
-  Variable_solved_by_several_datasets of {
-    free_var : Free_variable.t;
-    filename : string;
-    other_file : string;
-  }
-
 exception Missing_file_for_free_variable of {free_var : Free_variable.t}
 
 let () =
   Printexc.register_printer (function
-      | Variable_solved_by_several_datasets {free_var; filename; other_file} ->
-          let error =
-            Format.asprintf
-              "Variable %a has conflicting constraints from datasets %s and %s.\n\
-               Try to remove one?\n"
-              Free_variable.pp
-              free_var
-              filename
-              other_file
-          in
-          Some error
       | Missing_file_for_free_variable {free_var} ->
           let error =
             Format.asprintf
@@ -398,7 +353,7 @@ let load_files (model_name : string) (files : string list) =
         let filename_short = prune filename in
         let measurement = Measure.load ~filename in
         match measurement with
-        | Tezos_benchmark.Measure.Measurement ((module Bench), m) -> (
+        | Measure.Measurement ((module Bench), m) -> (
             match find_model_or_generic model_name Bench.models with
             | None -> graph
             | Some model ->
