@@ -1529,16 +1529,8 @@ let obj10_open :
     (t9a, t9b) field_open ->
     (t10a, t10b) field_open ->
     (module S
-       with type input = t1b
-                         * t2b
-                         * t3b
-                         * t4b
-                         * t5b
-                         * t6b
-                         * t7b
-                         * t8b
-                         * t9b
-                         * t10b) =
+       with type input =
+         t1b * t2b * t3b * t4b * t5b * t6b * t7b * t8b * t9b * t10b) =
  fun f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 ->
   let (module Tup) =
     tup10
