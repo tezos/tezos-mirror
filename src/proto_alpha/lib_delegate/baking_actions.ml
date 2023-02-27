@@ -379,9 +379,10 @@ let inject_preendorsements state ~preendorsements =
     (fun (((consensus_key, _) as delegate), consensus_content) ->
       Events.(emit signing_preendorsement delegate) >>= fun () ->
       let shell =
+        (* The branch is the latest finalized block. *)
         {
           Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.hash;
+            state.level_state.latest_proposal.predecessor.shell.predecessor;
         }
       in
       let contents = Single (Preendorsement consensus_content) in
@@ -466,9 +467,10 @@ let sign_endorsements state endorsements =
     (fun (((consensus_key, _) as delegate), consensus_content) ->
       Events.(emit signing_endorsement delegate) >>= fun () ->
       let shell =
+        (* The branch is the latest finalized block. *)
         {
           Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.hash;
+            state.level_state.latest_proposal.predecessor.shell.predecessor;
         }
       in
       let contents =
