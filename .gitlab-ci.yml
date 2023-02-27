@@ -1,5 +1,6 @@
 stages:
   - build
+  - docker
 
 fmt:
   stage: build
@@ -22,3 +23,41 @@ build:
     paths:
       - archiver/main.exe
       - server/main.exe
+
+server_docker:
+  stage: docker
+  needs: ["build"]
+  image: docker
+  tags:
+    - devops
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t ${CI_REGISTRY_IMAGE}/server:${CI_COMMIT_REF_SLUG} -f Dockerfile.server .
+    - docker push ${CI_REGISTRY_IMAGE}/server:${CI_COMMIT_REF_SLUG}
+  rules:
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_REGISTRY_IMAGE
+      when: manual
+      allow_failure: true
+
+archiver_docker:
+  stage: docker
+  needs: ["build"]
+  image: docker
+  tags:
+    - devops
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t ${CI_REGISTRY_IMAGE}/archiver:${CI_COMMIT_REF_SLUG} -f Dockerfile.archiver .
+    - docker push ${CI_REGISTRY_IMAGE}/archiver:${CI_COMMIT_REF_SLUG}
+  rules:
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
+    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_REGISTRY_IMAGE
+      when: manual
+      allow_failure: true

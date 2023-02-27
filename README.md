@@ -10,7 +10,7 @@ It is splitted in 2 parts:
 
 ## Building
 
-- Install dependencies by doing `opam install tezos caqti-lwt
+- Install dependencies by doing `opam install octez caqti-lwt
   caqti-driver-sqlite`
 - clone this repo, `cd teztale` and do `make`
 
@@ -43,17 +43,30 @@ Then you can launch the server by giving your config file as argument like
 server/main.exe ./config.json
 ```
 
+For testing purpose **only**, you can use `server/main.exe
+examples/config.json`
 ### Archiver
 
-Run a tezos node, with a RPC server opened on localhost:8732 and do
+Run an octez node, with a RPC server open on localhost:8732 and do
 ```
 archiver/main.exe feed <teztale-server-endpoint> -u <login> -p <password>
 ```
 
-`teztale-archiver` is a tezos client, it thus accepts the same global
+`teztale-archiver` is an octez client, it thus accepts the same global
 options as the client (especially the `--endpoint` option to specify
 where to reach octez node RPC endpoint).
 
 <!--
 if run on public (test)network, it will use tzkt api to find delegate aliases.
 -->
+
+## Docker images
+
+Docker images containing the binaries are available in the docker
+image registry of the project on gitlab.
+
+You can take inspiration from the <./docker-compose.yml> file provided
+to set them up. You must at least edit the config.json file mounted in
+the teztale-server container to move away of the super unsecure
+<examples/config.json>! (and the login/password used by the
+teztale-archiver container accordingly).
