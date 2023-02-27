@@ -74,7 +74,8 @@ let test_consensus_operation_preendorsement_for_future_level () =
 
 (** Consensus operation for old level : apply a preendorsement with a level in the past *)
 let test_consensus_operation_preendorsement_for_old_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, grandparent) ->
+  Block.bake grandparent >>=? fun pred ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -97,11 +98,6 @@ let test_consensus_operation_preendorsement_for_future_round () =
     ~loc:__LOC__
     ~endorsed_block:pred
     ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
-          true
-      | _ -> false)
     Preendorsement
     Mempool
 
@@ -113,11 +109,6 @@ let test_consensus_operation_preendorsement_for_old_round () =
     ~loc:__LOC__
     ~endorsed_block:pred
     ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
-          true
-      | _ -> false)
     Preendorsement
     Mempool
 
@@ -128,12 +119,6 @@ let test_consensus_operation_preendorsement_on_competing_proposal () =
     ~loc:__LOC__
     ~endorsed_block:pred
     ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
-          true
-      | _ -> false)
     Preendorsement
     Mempool
 

@@ -229,16 +229,19 @@ let error_future_level = function
 
 (** Endorsement that is one level in the future (pointing to the same
     level as the block/mempool containing the endorsement instead of
-    its predecessor/head). It should fail in all modes. *)
+    its predecessor/head). It should fail in a block (application or
+    construction) but succeed in a mempool. *)
 let test_one_level_in_the_future () =
   let open Lwt_result_syntax in
   let* _genesis, predecessor = init_genesis () in
   let* next_level_block = Block.bake predecessor in
-  Consensus_helpers.test_consensus_operation_all_modes
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block:next_level_block
     ~predecessor
-    ~error:error_future_level
+    ~application_error:error_future_level
+    ~construction_error:error_future_level
+    ?mempool_error:None
     Endorsement
 
 (** Endorsement that is two levels in the future. It should fail in
@@ -263,30 +266,36 @@ let error_old_round = function
       true
   | _ -> false
 
-(** Endorsement that is one round too old. It should fail in all modes. *)
+(** Endorsement that is one round too old. It should fail in a block
+    (application or construction) but succeed in a mempool. *)
 let test_one_round_too_old () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
   let* round0_block = Block.bake b in
   let* predecessor = Block.bake ~policy:(By_round 1) b in
-  Consensus_helpers.test_consensus_operation_all_modes
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block:round0_block
     ~predecessor
-    ~error:error_old_round
+    ~application_error:error_old_round
+    ~construction_error:error_old_round
+    ?mempool_error:None
     Endorsement
 
-(** Endorsement that is many rounds too old. It should fail in all modes. *)
+(** Endorsement that is many rounds too old. It should fail in a block
+    (application or construction) but succeed in a mempool. *)
 let test_many_rounds_too_old () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
   let* round5_block = Block.bake ~policy:(By_round 5) b in
   let* predecessor = Block.bake ~policy:(By_round 15) b in
-  Consensus_helpers.test_consensus_operation_all_modes
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block:round5_block
     ~predecessor
-    ~error:error_old_round
+    ~application_error:error_old_round
+    ~construction_error:error_old_round
+    ?mempool_error:None
     Endorsement
 
 let error_future_round = function
@@ -295,49 +304,59 @@ let error_future_round = function
       true
   | _ -> false
 
-(** Endorsement that is one round in the future. It should fail in all modes. *)
+(** Endorsement that is one round in the future. It should fail in a
+    block (application or construction) but succeed in a mempool. *)
 let test_one_round_in_the_future () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
   let* predecessor = Block.bake b in
   let* round1_block = Block.bake ~policy:(By_round 1) b in
-  Consensus_helpers.test_consensus_operation_all_modes
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block:round1_block
     ~predecessor
-    ~error:error_future_round
+    ~application_error:error_future_round
+    ~construction_error:error_future_round
+    ?mempool_error:None
     Endorsement
 
-(** Endorsement that is many rounds in the future. It should fail in
-    all modes. *)
+(** Endorsement that is many rounds in the future. It should fail in a
+    block (application or construction) but succeed in a mempool. *)
 let test_many_rounds_future () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
   let* predecessor = Block.bake ~policy:(By_round 5) b in
   let* round15_block = Block.bake ~policy:(By_round 15) b in
-  Consensus_helpers.test_consensus_operation_all_modes
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block:round15_block
     ~predecessor
-    ~error:error_future_round
+    ~application_error:error_future_round
+    ~construction_error:error_future_round
+    ?mempool_error:None
     Endorsement
 
 (** {2 Wrong payload hash} *)
 
-(** Endorsement with an incorrect payload hash. *)
+(** Endorsement with an incorrect payload hash. It should fail in a
+    block (application or construction) but succeed in a mempool. *)
 let test_wrong_payload_hash () =
   let open Lwt_result_syntax in
   let* _genesis, endorsed_block = init_genesis () in
-  Consensus_helpers.test_consensus_operation_all_modes
+  let error_wrong_payload_hash = function
+    | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
+        {kind; _}
+      when kind = Validate_errors.Consensus.Endorsement ->
+        true
+    | _ -> false
+  in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block
     ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
+    ~application_error:error_wrong_payload_hash
+    ~construction_error:error_wrong_payload_hash
+    ?mempool_error:None
     Endorsement
 
 (** {1 Conflict tests}

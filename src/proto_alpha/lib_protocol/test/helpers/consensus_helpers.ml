@@ -178,10 +178,5 @@ let test_consensus_op_for_next ~genesis ~kind ~next =
   Incremental.add_operation inc operation >>=? fun inc ->
   delegate_of_slot ~different_slot:true slot (B b2) >>=? fun delegate ->
   dorsement ~endorsed_block:b2 ~delegate >>=? fun operation ->
-  Incremental.add_operation inc operation >>= fun res ->
-  let error_title =
-    match next with
-    | `Level -> "Consensus operation for future level"
-    | `Round -> "Consensus operation for future round"
-  in
-  Assert.proto_error_with_info ~loc:__LOC__ res error_title
+  Incremental.add_operation inc operation >>=? fun (_ : Incremental.t) ->
+  return_unit
