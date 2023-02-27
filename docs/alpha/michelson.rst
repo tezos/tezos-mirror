@@ -851,43 +851,12 @@ A detailed description of the following instructions can be found in the `intera
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
 
--  ``LEFT 'b``: Pack a value in a union (left case).
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : 'S   ->   or 'a 'b : 'S
-
-    > LEFT / v : S  =>  (Left v) : S
-
--  ``RIGHT 'a``: Pack a value in a union (right case).
-
-::
-
-    :: 'b : 'S   ->   or 'a 'b : 'S
-
-    > RIGHT / v : S  =>  (Right v) : S
-
--  ``IF_LEFT bt bf``: Inspect a value of a union.
-
-::
-
-    :: or 'a 'b : 'A   ->   'B
-       iff   bt :: [ 'a : 'A -> 'B]
-             bf :: [ 'b : 'A -> 'B]
-
-    > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
-    > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
-
--  ``COMPARE``: Unions comparison
-
-::
-
-    :: or 'a 'b : or 'a 'b : 'S   ->   int : 'S
-
-    > COMPARE / (Left a) : (Left b) : S  =>  COMPARE / a : b : S
-    > COMPARE / (Left _) : (Right _) : S  =>  -1 : S
-    > COMPARE / (Right _) : (Left _) : S  =>  1 : S
-    > COMPARE / (Right a) : (Right b) : S  =>  COMPARE / a : b : S
+-  ``LEFT 'b``: Pack a value in a union (left case) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LEFT>`__).
+-  ``RIGHT 'a``: Pack a value in a union (right case) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-RIGHT>`__).
+-  ``IF_LEFT bt bf``: Inspect a value of a union (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_LEFT>`__).
+-  ``COMPARE``: Unions comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on lists
 ~~~~~~~~~~~~~~~~~~~
