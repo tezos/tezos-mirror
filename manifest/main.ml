@@ -1084,11 +1084,11 @@ let octez_clic_unix =
       ]
 
 let _octez_clic_tests =
-  test
-    "test_clic"
+  tezt
+    ["test_clic"]
     ~path:"src/lib_clic/test"
     ~opam:"tezos-clic"
-    ~deps:[octez_stdlib |> open_; octez_clic |> open_; alcotest_lwt]
+    ~deps:[octez_stdlib |> open_; octez_clic |> open_; lwt_unix; alcotezt]
 
 let _octez_clic_example =
   private_exe
