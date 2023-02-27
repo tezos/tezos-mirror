@@ -12,6 +12,7 @@ pub struct Blueprint {
     pub transactions: Vec<Transaction>,
 }
 
+#[derive(Default)]
 pub struct Queue {
     // In our case, to make it simple and straightforward it will be
     // an array of pendings transactions even though it'll be only a
@@ -20,6 +21,12 @@ pub struct Queue {
 }
 
 impl Queue {
+    pub fn new() -> Queue {
+        Queue {
+            proposals: Vec::new(),
+        }
+    }
+
     pub fn add(queue: &mut Queue, transactions: Vec<Transaction>) {
         queue.proposals.push(Blueprint { transactions })
     }
