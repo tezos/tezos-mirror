@@ -785,12 +785,13 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       | `Minimal -> I.minimal
     in
     let+ repo =
+      let env = Tezos_context_helpers.Env.v in
       let index_log_size =
         Option.value
           tbl_log_size
-          ~default:Tezos_context_helpers.Env.(v.index_log_size)
+          ~default:Tezos_context_helpers.Env.(env.index_log_size)
       in
-      let lru_size = Tezos_context_helpers.Env.lru_size in
+      let lru_size = env.lru_size in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
