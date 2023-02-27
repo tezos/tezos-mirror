@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_context_disk
 open Context.Proof
 open Qcheck2_helpers
 open QCheck2

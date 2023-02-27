@@ -1956,8 +1956,8 @@ let octez_context =
     ~deps:[octez_context_disk; octez_context_memory]
 
 let _octez_context_tests =
-  test
-    "test"
+  tezt
+    ["test_context"; "test_merkle_proof"]
     ~path:"src/lib_context/test"
     ~opam:"tezos-context"
     ~deps:
@@ -1967,16 +1967,17 @@ let _octez_context_tests =
         octez_context_sigs;
         octez_context_disk;
         octez_context_memory;
+        octez_context_encoding;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         octez_test_helpers_extra;
-        alcotest_lwt;
+        qcheck_alcotest;
+        alcotezt;
       ]
-    ~modules:["test_context"; "test"]
 
 let _octez_context_memory_tests =
-  test
-    "test"
+  tezt
+    ["test"]
     ~path:"src/lib_context/memory/test"
     ~opam:"tezos-context"
     ~deps:
@@ -1986,7 +1987,7 @@ let _octez_context_memory_tests =
         octez_context_disk;
         octez_context_memory;
         octez_stdlib_unix |> open_;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 (* This binding assumes that librustzcash.a is installed in the system default
@@ -2707,23 +2708,6 @@ let _octez_rpc_http_server_tests =
         qcheck_alcotest;
         alcotest_lwt;
       ]
-
-let _octez_context_merkle_proof_tests =
-  test
-    "test_merkle_proof"
-    ~path:"src/lib_context/test"
-    ~opam:"tezos-context"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_context_disk |> open_;
-        octez_context_encoding;
-        octez_stdlib_unix |> open_;
-        qcheck_alcotest;
-        octez_test_helpers |> open_;
-      ]
-    ~modules:["test_merkle_proof"]
 
 let octez_client_base =
   public_lib
