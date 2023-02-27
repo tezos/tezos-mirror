@@ -36,6 +36,9 @@ Smart Rollups
 
 - Use ``Ticket_transfer`` module in ``sc_rollup_operations``. (MR :gl:`!7438`)
 
+- Refactor WASM PVM to enable breaking changes such as new host functions and
+  parameterization of maximum call depth. (MRs :gl:`!7724`, :gl:`!7726`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
@@ -78,3 +81,9 @@ Internal
 - Update migration for Mumbai. (MR :gl:`!7428`)
 
 - Michelson: add a forgotten tailcall annotation (MR :gl:`!7656`)
+
+- Michelson: the Michelson type "or", previously referred to as ``union`` internally,
+  is now referred to as ``or`` if there is no clash with the OCaml keyword "or".
+  Otherwise it is referred to as ``or_``. (MR :gl:`!7546`)
+
+- Refactor and simplify consensus operation validation. (MR :gl:`!7720`)
