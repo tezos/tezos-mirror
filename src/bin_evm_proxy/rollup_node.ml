@@ -43,7 +43,7 @@ module RPC = struct
     Service.get_service
       ~description:"Smart rollup address"
       ~query:Query.empty
-      ~output:Data_encoding.string
+      ~output:(Data_encoding.Fixed.bytes 20)
       (open_root / "global" / "smart_rollup_address")
 
   type state_value_query = {key : string}
@@ -80,18 +80,22 @@ module RPC = struct
             (list string))
       (open_root / "local" / "batcher" / "injection")
 
-  let call_service ~base =
-    Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-      Media_type.all_media_types
-      ~base
+  let call_service ~base ?(media_types = Media_type.all_media_types) =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
 
-  (** We use [rpc get /global/smart_rollup_address] to check if the rollup-node
-      answers. *)
-  let is_connected base =
+  let smart_rollup_address base =
     let open Lwt_result_syntax in
-    let*! answer = call_service ~base smart_rollup_address () () () in
+    let*! answer =
+      call_service
+        ~base
+        ~media_types:[Media_type.octet_stream]
+        smart_rollup_address
+        ()
+        ()
+        ()
+    in
     match answer with
-    | Ok _ -> return ()
+    | Ok address -> return (Bytes.to_string address)
     | Error tztrace ->
         failwith
           "Failed to communicate with %a, because %a"
@@ -121,7 +125,7 @@ module RPC = struct
 end
 
 module type S = sig
-  val assert_connected : unit tzresult Lwt.t
+  val smart_rollup_address : string tzresult Lwt.t
 
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
@@ -131,7 +135,7 @@ end
 module Make (Base : sig
   val base : Uri.t
 end) : S = struct
-  let assert_connected = RPC.is_connected Base.base
+  let smart_rollup_address = RPC.smart_rollup_address Base.base
 
   let balance = RPC.balance Base.base
 

@@ -135,7 +135,8 @@ module Mock = struct
   let call = hash_f "0x"
 end
 
-let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
+let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
+    =
   Directory.register0 dir dispatch_service (fun () (input, id) ->
       let open Lwt_result_syntax in
       let* output =
@@ -145,8 +146,8 @@ let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
         | Chain_id.Input _ -> return (Chain_id.Output (Ok Mock.chain_id))
         | Get_balance.Input (Some (address, _block_param)) ->
             let* balance =
-              match rollup_node_rpc with
-              | Some (module Rollup_node_rpc) ->
+              match rollup_node_config with
+              | Some ((module Rollup_node_rpc), _smart_rollup_address) ->
                   let* balance = Rollup_node_rpc.balance address in
                   return balance
               | None -> return Mock.balance
@@ -179,5 +180,5 @@ let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
       in
       return (output, id))
 
-let directory (rollup_node_rpc : (module Rollup_node.S) option) =
-  Directory.empty |> version |> dispatch rollup_node_rpc
+let directory (rollup_node_config : ((module Rollup_node.S) * string) option) =
+  Directory.empty |> version |> dispatch rollup_node_config

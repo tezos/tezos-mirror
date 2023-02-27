@@ -98,17 +98,18 @@ let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
   let host = Ipaddr.V6.to_string p2p_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
-  let* rollup_node_rpc =
+  let* rollup_node_config =
     match rollup_node_endpoint with
     | Endpoint endpoint ->
         let module Rollup_node_rpc = Rollup_node.Make (struct
           let base = endpoint
         end) in
-        let* () = Rollup_node_rpc.assert_connected in
-        return_some (module Rollup_node_rpc : Rollup_node.S)
+        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+        return_some
+          ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
     | Mockup -> return_none
   in
-  let directory = Services.directory rollup_node_rpc in
+  let directory = Services.directory rollup_node_config in
   let server =
     RPC_server.init_server
       ~acl
