@@ -309,7 +309,7 @@ docker images or can be compiled from sources. Please refer to the
 for installation details.
 
 An Octez rollup node needs an Octez node to run. We assume that
-a rollup node has been launched locally, typically by issuing:
+an Octez node has been launched locally, typically by issuing:
 
 .. code:: sh
 

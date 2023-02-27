@@ -298,7 +298,7 @@ Prerequisites
 ^^^^^^^^^^^^^
 
 An Octez rollup node needs an Octez node to run. We assume that
-a rollup node has been launched locally, typically by issuing:
+an Octez node has been launched locally, typically by issuing:
 
 .. code:: sh
 
