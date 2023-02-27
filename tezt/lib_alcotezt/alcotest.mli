@@ -82,6 +82,9 @@ val testable :
 (** [pp t] is [t]'s pretty-printer. *)
 val pp : 'a testable -> Format.formatter -> 'a -> return
 
+(** [of_pp pp] tests values which can be printed using [pp] and compared using {!Stdlib.compare} *)
+val of_pp : (Format.formatter -> 'a -> return) -> 'a testable
+
 (** [equal t] is [t]'s equality. *)
 val equal : 'a testable -> 'a -> 'a -> bool
 

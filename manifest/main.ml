@@ -4103,11 +4103,47 @@ end = struct
             ]
       in
       let _unit =
-        test
-          "main"
+        let modules =
+          [
+            ("test_main", true);
+            ("test_bond_id_repr", true);
+            ("test_consensus_key", true);
+            ("test_contract_repr", true);
+            ("test_destination_repr", true);
+            ("test_fitness", true);
+            ("test_fixed_point", true);
+            ("test_gas_monad", true);
+            ("test_global_constants_storage", true);
+            ("test_level_module", true);
+            ("test_liquidity_baking_repr", true);
+            ("test_merkle_list", true);
+            ("test_operation_repr", true);
+            ("test_qty", true);
+            ("test_receipt", true);
+            ("test_round_repr", true);
+            ("test_saturation", true);
+            ("test_sc_rollup_arith", N.(number >= 016));
+            ("test_sc_rollup_game", N.(number >= 016));
+            ("test_sc_rollup_inbox", N.(number >= 016));
+            ("test_sc_rollup_management_protocol", N.(number >= 016));
+            ("test_sc_rollup_storage", N.(number >= 016));
+            ("test_skip_list_repr", true);
+            ("test_tez_repr", true);
+            ("test_time_repr", true);
+            ("test_zk_rollup_storage", true);
+            ("test_sc_rollup_inbox_legacy", N.(number >= 016));
+            ("test_sc_rollup_wasm", N.(number >= 016));
+            ("test_local_contexts", N.(number >= 016));
+            ("test_dal_slot_proof", N.(number >= 016));
+            ("test_tx_rollup_l2_apply", N.(number >= 015 && number <= 016));
+            ("test_tx_rollup_l2", N.(number >= 015 && number <= 016));
+          ]
+          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+        in
+        tezt
+          modules
           ~path:(path // "lib_protocol/test/unit")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-          ~alias:""
           ~with_macos_security_framework:true
           ~deps:
             [
@@ -4123,7 +4159,7 @@ end = struct
               main |> open_;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
-              alcotest_lwt;
+              alcotezt;
               octez_scoru_wasm_helpers |> if_ N.(number >= 016) |> open_;
               octez_stdlib |> if_ N.(number >= 013) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
@@ -4132,14 +4168,6 @@ end = struct
               |> if_ N.(number >= 016)
               |> open_;
             ]
-          ~dune:
-            Dune.
-              [
-                alias_rule
-                  "runtest"
-                  ~package:(sf "tezos-protocol-%s-tests" name_dash)
-                  ~action:(run_exe "main" ["test"; "Unit"]);
-              ]
       in
       let _regresssion =
         if N.(number >= 014) then
