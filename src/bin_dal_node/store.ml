@@ -39,7 +39,7 @@ let shard_store_path = "shard_store"
 
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Irmin.Info.Default.v ~author:"DAL Node" ~message date
+  Info.v ~author:"DAL Node" ~message date
 
 let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
