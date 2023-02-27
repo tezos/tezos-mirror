@@ -300,10 +300,10 @@ Prerequisites
 To experiment with the commands described in this section, we use
 the `Dailynet <https://teztnets.xyz/dailynet-about>`_.
 In this section, we assume that ``${OPERATOR_ADDR}`` is a valid
-implicit account on DailyNet owned by the reader.
+implicit account on Dailynet owned by the reader.
 
 Notice that you need a specific development version of Octez to
-participate to DailyNet. This version is either available from
+participate to Dailynet. This version is either available from
 docker images or can be compiled from sources. Please refer to the
 `Dailynet <https://teztnets.xyz/dailynet-about>`_ website
 for installation details.
