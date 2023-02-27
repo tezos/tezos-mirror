@@ -190,6 +190,7 @@ let init ~readonly input =
           user_activated_protocol_overrides;
           operation_metadata_size_limit;
           dal_config;
+          log_config;
         } =
     External_validation.recv input External_validation.parameters_encoding
   in
@@ -218,9 +219,10 @@ let init ~readonly input =
       genesis,
       user_activated_upgrades,
       user_activated_protocol_overrides,
-      operation_metadata_size_limit )
+      operation_metadata_size_limit,
+      log_config )
 
-let run ~readonly input output =
+let run ~readonly ~using_std_channel input output =
   let open Lwt_result_syntax in
   let* () = handshake input output in
   let* ( context_index,
@@ -228,8 +230,19 @@ let run ~readonly input output =
          genesis,
          user_activated_upgrades,
          user_activated_protocol_overrides,
-         operation_metadata_size_limit ) =
+         operation_metadata_size_limit,
+         log_config ) =
     init ~readonly input
+  in
+  let*! () =
+    (* if the external validator is spawned in a standalone way and communicates
+       with the node through stdin/stdoud, we do no start the logging system. *)
+    if using_std_channel then Lwt.return_unit
+    else
+      Tezos_base_unix.Internal_event_unix.init
+        ~configuration:log_config.internal_events
+        ~lwt_log_sink:log_config.lwt_log_sink_unix
+        ()
   in
   let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
@@ -562,10 +575,9 @@ let run ~readonly input output =
 let main ?socket_dir ~readonly () =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
-  let*! in_channel, out_channel =
+  let*! in_channel, out_channel, using_std_channel =
     match socket_dir with
     | Some socket_dir ->
-        let*! () = Tezos_base_unix.Internal_event_unix.init () in
         let pid = Unix.getpid () in
         let socket_path = External_validation.socket_path ~socket_dir ~pid in
         let*! socket_process =
@@ -573,13 +585,13 @@ let main ?socket_dir ~readonly () =
         in
         let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
         let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
-        Lwt.return (socket_in, socket_out)
-    | None -> Lwt.return (Lwt_io.stdin, Lwt_io.stdout)
+        Lwt.return (socket_in, socket_out, false)
+    | None -> Lwt.return (Lwt_io.stdin, Lwt_io.stdout, true)
   in
   let*! () = Events.(emit initialized ()) in
   let*! r =
     Error_monad.catch_es (fun () ->
-        let* () = run ~readonly in_channel out_channel in
+        let* () = run ~readonly ~using_std_channel in_channel out_channel in
         let*! r = Lwt_canceler.cancel canceler in
         match r with
         | Ok () | Error [] -> return_unit

@@ -51,7 +51,7 @@ let make_default_internal_events ~data_dir =
         ();
     ]
 
-let init_internal_events_with_defaults ?internal_events ?verbosity
+let make_internal_events_with_defaults ?internal_events ?verbosity
     ?(log_cfg = lwt_log_sink_default_cfg) () =
   let log_cfg =
     match verbosity with
@@ -66,7 +66,11 @@ let init_internal_events_with_defaults ?internal_events ?verbosity
           make_default_internal_events ~data_dir
         else internal_events
   in
-  Tezos_base_unix.Internal_event_unix.init
-    ~lwt_log_sink:log_cfg
-    ~configuration:internal_events
-    ()
+  (log_cfg, internal_events)
+
+let init_internal_events_with_defaults ?internal_events ?verbosity
+    ?(log_cfg = lwt_log_sink_default_cfg) () =
+  let lwt_log_sink, configuration =
+    make_internal_events_with_defaults ?internal_events ?verbosity ~log_cfg ()
+  in
+  Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ~configuration ()
