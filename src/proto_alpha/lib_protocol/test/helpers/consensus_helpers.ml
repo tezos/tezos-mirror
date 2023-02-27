@@ -26,25 +26,48 @@
 open Protocol
 open Alpha_context
 
-let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
-    ?round ~endorsed_block ~error ~is_preendorsement ~loc () =
-  (if is_preendorsement then
-   Op.preendorsement ?block_payload_hash ?level ?slot ?round endorsed_block
-  else Op.endorsement ?block_payload_hash ?level ?slot ?round endorsed_block)
-  >>=? fun operation ->
+type mode = Application | Construction | Mempool
+
+type kind = Preendorsement | Endorsement
+
+(** Craft an endorsement or preendorsement, and bake a block
+    containing it (in application or construction modes) or inject it
+    into a mempool. Check that it fails as specified by [error].
+
+    By default, the (pre)endorsement is for the first slot and is
+    signed by the delegate that owns this slot. Moreover, the operation
+    points to the given [endorsed_block]: in other words, it has that
+    block's level, round, payload hash, and its branch is the
+    predecessor of that block. Optional arguments allow to override
+    these default parameters.
+
+    The [endorsed_block] is also used as the predecessor of the baked
+    block, or as the head of the mempool. *)
+let test_consensus_operation ?slot ?level ?round ?block_payload_hash
+    ~endorsed_block ~error ~loc kind mode =
+  let open Lwt_result_syntax in
+  let* operation =
+    match kind with
+    | Preendorsement ->
+        Op.preendorsement ?slot ?level ?round ?block_payload_hash endorsed_block
+    | Endorsement ->
+        Op.endorsement ?slot ?level ?round ?block_payload_hash endorsed_block
+  in
   let assert_error res = Assert.proto_error ~loc res error in
-  match construction_mode with
-  | None ->
-      (* meaning Application mode *)
-      Block.bake ~operation endorsed_block >>= assert_error
-  | Some (pred, protocol_data) ->
-      (* meaning partial construction or full construction mode, depending on
-         [protocol_data] *)
-      Block.get_construction_vstate ~protocol_data pred
-      >>=? fun (validation_state, _application_state) ->
-      let oph = Operation.hash_packed operation in
-      validate_operation validation_state oph operation
-      >|= Environment.wrap_tzresult >>= assert_error
+  match mode with
+  | Application ->
+      Block.bake ~baking_mode:Application ~operation endorsed_block
+      >>= assert_error
+  | Construction ->
+      Block.bake ~baking_mode:Baking ~operation endorsed_block >>= assert_error
+  | Mempool ->
+      let*! res =
+        let* inc =
+          Incremental.begin_construction ~mempool_mode:true endorsed_block
+        in
+        Incremental.validate_operation inc operation
+      in
+      assert_error res
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in

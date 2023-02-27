@@ -162,7 +162,6 @@ let test_consensus_operation_endorsement_for_future_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:pred
     ~level
     ~error:(function
@@ -170,8 +169,8 @@ let test_consensus_operation_endorsement_for_future_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Endorsement
+    Mempool
 
 (** Consensus operation for old level : apply an endorsement one level in the past *)
 let test_consensus_operation_endorsement_for_predecessor_level () =
@@ -180,7 +179,6 @@ let test_consensus_operation_endorsement_for_predecessor_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:pred
     ~level
     ~error:(function
@@ -188,8 +186,8 @@ let test_consensus_operation_endorsement_for_predecessor_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Endorsement
+    Mempool
 
 (** Consensus operation for old level : apply an endorsement with more than one level in the past *)
 let test_consensus_operation_endorsement_for_old_level () =
@@ -199,7 +197,6 @@ let test_consensus_operation_endorsement_for_old_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:pred
     ~level
     ~error:(function
@@ -207,8 +204,8 @@ let test_consensus_operation_endorsement_for_old_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Endorsement
+    Mempool
 
 (** Consensus operation for future round : apply an endorsement with a round in the future *)
 let test_consensus_operation_endorsement_for_future_round () =
@@ -216,7 +213,6 @@ let test_consensus_operation_endorsement_for_future_round () =
   Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:pred
     ~round
     ~error:(function
@@ -224,8 +220,8 @@ let test_consensus_operation_endorsement_for_future_round () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Endorsement
+    Mempool
 
 (** Consensus operation for old round : apply an endorsement with a round in the past *)
 let test_consensus_operation_endorsement_for_old_round () =
@@ -233,7 +229,6 @@ let test_consensus_operation_endorsement_for_old_round () =
   Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:pred
     ~round
     ~error:(function
@@ -241,15 +236,14 @@ let test_consensus_operation_endorsement_for_old_round () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Endorsement
+    Mempool
 
 (** Consensus operation on competing proposal : apply an endorsement on a competing proposal *)
 let test_consensus_operation_endorsement_on_competing_proposal () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:pred
     ~block_payload_hash:Block_payload_hash.zero
     ~error:(function
@@ -258,8 +252,8 @@ let test_consensus_operation_endorsement_on_competing_proposal () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Endorsement
+    Mempool
 
 (** Wrong round : apply an endorsement with an incorrect round *)
 let test_wrong_round () =
@@ -267,7 +261,6 @@ let test_wrong_round () =
   Environment.wrap_tzresult (Round.of_int 2) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:b
     ~round
     ~error:(function
@@ -275,7 +268,8 @@ let test_wrong_round () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ()
+    Endorsement
+    Application
 
 (** Wrong level : apply an endorsement with an incorrect level *)
 let test_wrong_level () =
@@ -285,7 +279,6 @@ let test_wrong_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:b
     ~level
     ~error:(function
@@ -293,14 +286,14 @@ let test_wrong_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ()
+    Endorsement
+    Application
 
 (** Wrong payload hash : apply an endorsement with an incorrect payload hash *)
 let test_wrong_payload_hash () =
   init_genesis () >>=? fun (_genesis, b) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:b
     ~block_payload_hash:Block_payload_hash.zero
     ~error:(function
@@ -309,7 +302,8 @@ let test_wrong_payload_hash () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ()
+    Endorsement
+    Application
 
 let test_wrong_slot_used () =
   init_genesis () >>=? fun (_genesis, b) ->
@@ -320,7 +314,6 @@ let test_wrong_slot_used () =
   >>=? fun slot ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:false
     ~endorsed_block:b
     ~slot
     ~error:(function
@@ -329,7 +322,8 @@ let test_wrong_slot_used () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ()
+    Endorsement
+    Application
 
 (** Check that:
     - a block with not enough endorsement cannot be baked;
