@@ -24,10 +24,33 @@
 (*****************************************************************************)
 
 module Parameters = struct
+  type legacy_mode_settings = {threshold : int; dac_members : string list}
+
+  type coordinator_mode_settings = {threshold : int; dac_members : string list}
+
+  type dac_member_mode_settings = {
+    address : string;
+    coordinator_rpc_host : string;
+    coordinator_rpc_port : int;
+  }
+
+  type observer_mode_settings = {
+    coordinator_rpc_host : string;
+    coordinator_rpc_port : int;
+  }
+
+  type mode_settings =
+    | Legacy of legacy_mode_settings
+    | Coordinator of coordinator_mode_settings
+    | Dac_member of dac_member_mode_settings
+    | Observer of observer_mode_settings
+
   type persistent_state = {
     data_dir : string;
+    reveal_data_dir : string;
     rpc_host : string;
     rpc_port : int;
+    mode : mode_settings;
     node : Node.t;
     client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
@@ -58,6 +81,13 @@ let is_running_not_ready dac_node =
 
 let name dac_node = dac_node.name
 
+let mode dac_node =
+  match dac_node.persistent_state.mode with
+  | Legacy _ -> "Legacy"
+  | Coordinator _ -> "Coordinator"
+  | Dac_member _ -> "Dac_member"
+  | Observer _ -> "Observer"
+
 let rpc_host dac_node = dac_node.persistent_state.rpc_host
 
 let rpc_port dac_node = dac_node.persistent_state.rpc_port
@@ -71,20 +101,81 @@ let endpoint dac_node =
 
 let data_dir dac_node = dac_node.persistent_state.data_dir
 
+let reveal_data_dir dac_node = dac_node.persistent_state.reveal_data_dir
+
 let spawn_command dac_node =
   Process.spawn ~name:dac_node.name ~color:dac_node.color dac_node.path
 
 let spawn_config_init dac_node =
-  spawn_command dac_node
-  @@ [
-       "init-config";
-       "--data-dir";
-       data_dir dac_node;
-       "--rpc-port";
-       string_of_int (rpc_port dac_node);
-       "--rpc-addr";
-       rpc_host dac_node;
-     ]
+  let arg_command =
+    [
+      "--data-dir";
+      data_dir dac_node;
+      "--rpc-port";
+      string_of_int (rpc_port dac_node);
+      "--rpc-addr";
+      rpc_host dac_node;
+      "--reveal-data-dir";
+      reveal_data_dir dac_node;
+    ]
+  in
+  let mode_command =
+    match dac_node.persistent_state.mode with
+    | Legacy legacy_params ->
+        [
+          "configure";
+          "as";
+          "legacy";
+          "with";
+          "threshold";
+          Int.to_string legacy_params.threshold;
+          "and";
+          "data";
+          "availability";
+          "committee";
+          "members";
+        ]
+        @ legacy_params.dac_members
+    | Coordinator coordinator_params ->
+        [
+          "configure";
+          "as";
+          "coordinator";
+          "with";
+          "threshold";
+          Int.to_string coordinator_params.threshold;
+          "and";
+          "data";
+          "availability";
+          "committee";
+          "members";
+        ]
+        @ coordinator_params.dac_members
+    | Dac_member dac_member_params ->
+        let coordinator_host =
+          dac_member_params.coordinator_rpc_host ^ ":"
+          ^ Int.to_string dac_member_params.coordinator_rpc_port
+        in
+        [
+          "configure";
+          "as";
+          "committee";
+          "member";
+          "with";
+          "coordinator";
+          coordinator_host;
+          "and";
+          "signer";
+          dac_member_params.address;
+        ]
+    | Observer observer_params ->
+        let coordinator_host =
+          observer_params.coordinator_rpc_host ^ ":"
+          ^ Int.to_string observer_params.coordinator_rpc_port
+        in
+        ["configure"; "as"; "observer"; "with"; "coordinator"; coordinator_host]
+  in
+  spawn_command dac_node (mode_command @ arg_command)
 
 let init_config dac_node =
   let process = spawn_config_init dac_node in
@@ -92,41 +183,6 @@ let init_config dac_node =
   match output =~* rex "DAC node configuration written in ([^\n]*)" with
   | None -> failwith "DAC node configuration initialization failed"
   | Some filename -> return filename
-
-module Dac = struct
-  let spawn_set_parameters ?threshold ?reveal_data_dir dac_node =
-    let threshold_arg =
-      match threshold with
-      | None -> []
-      | Some threshold -> ["--threshold"; Int.to_string threshold]
-    in
-    let reveal_data_dir_arg =
-      match reveal_data_dir with
-      | None -> []
-      | Some reveal_data_dir -> ["--reveal-data-dir"; reveal_data_dir]
-    in
-    let data_dir_arg = ["--data-dir"; data_dir dac_node] in
-    spawn_command dac_node
-    @@ ["set"; "dac"; "parameters"]
-    @ threshold_arg @ reveal_data_dir_arg @ data_dir_arg
-
-  let set_parameters ?threshold ?reveal_data_dir dac_node =
-    spawn_set_parameters ?threshold ?reveal_data_dir dac_node |> Process.check
-
-  let spawn_add_committee_member ~address dac_node =
-    let base_dir_argument =
-      ["--base-dir"; Client.base_dir dac_node.persistent_state.client]
-    in
-    spawn_command
-      dac_node
-      (base_dir_argument
-      @ ["add"; "data"; "availability"; "committee"; "member"]
-      @ [address]
-      @ ["--data-dir"; dac_node.persistent_state.data_dir])
-
-  let add_committee_member ~address dac_node =
-    spawn_add_committee_member ~address dac_node |> Process.check
-end
 
 module Config_file = struct
   let filename dac_node = sf "%s/config.json" @@ data_dir dac_node
@@ -180,10 +236,16 @@ let handle_event dac_node {name; value = _; timestamp = _} =
   match name with "dac_node_is_ready.v0" -> set_ready dac_node | _ -> ()
 
 let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ~node ~client () =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~mode ~node ~client ()
+    =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
+  in
+  let reveal_data_dir =
+    match reveal_data_dir with
+    | None -> Temp.dir (name ^ "preimages")
+    | Some dir -> dir
   in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
@@ -194,10 +256,99 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
       ~name
       ?color
       ?event_pipe
-      {data_dir; rpc_host; rpc_port; pending_ready = []; node; client}
+      {
+        data_dir;
+        reveal_data_dir;
+        rpc_host;
+        rpc_port;
+        mode;
+        pending_ready = [];
+        node;
+        client;
+      }
   in
   on_event dac_node (handle_event dac_node) ;
   dac_node
+
+let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold ~dac_members
+    ~node ~client () =
+  let mode = Legacy {threshold; dac_members} in
+  create
+    ~path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ~rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ~mode
+    ~node
+    ~client
+    ()
+
+let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
+    ~dac_members ~node ~client () =
+  let mode = Coordinator {threshold; dac_members} in
+  create
+    ~path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ~rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ~mode
+    ~node
+    ~client
+    ()
+
+let create_dac_member ?(path = Constant.dac_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
+    ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port ~address ~node
+    ~client () =
+  let coordinator_rpc_port =
+    match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
+  in
+  let mode = Dac_member {address; coordinator_rpc_host; coordinator_rpc_port} in
+  create
+    ~path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ~rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ~mode
+    ~node
+    ~client
+    ()
+
+let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
+    ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port ~node ~client ()
+    =
+  let coordinator_rpc_port =
+    match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
+  in
+  let mode = Observer {coordinator_rpc_host; coordinator_rpc_port} in
+  create
+    ~path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ~rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ~mode
+    ~node
+    ~client
+    ()
 
 let make_arguments node =
   let base_dir_args =

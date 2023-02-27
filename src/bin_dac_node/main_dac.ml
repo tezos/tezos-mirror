@@ -24,6 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Invalid_positive_int_parameter of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dac.node.dac.invalid_positive_int_parameter"
+    ~title:"Argument is not a positive integer"
+    ~description:"Argument must be a positive integer"
+    ~pp:(fun ppf reveal_data_path ->
+      Format.fprintf
+        ppf
+        "Expected a valid positive integer, provided %s instead"
+        reveal_data_path)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Invalid_positive_int_parameter s -> Some s | _ -> None)
+    (fun s -> Invalid_positive_int_parameter s)
+
 let group =
   {Tezos_clic.name = "dac-node"; title = "Commands related to the DAC node"}
 
@@ -39,6 +56,43 @@ let data_dir_arg =
     ~default
     (Client_config.string_parameter ())
 
+let reveal_data_dir_arg =
+  let default = Configuration.default_reveal_data_dir in
+  Tezos_clic.default_arg
+    ~long:"reveal-data-dir"
+    ~placeholder:"reveal-data-dir"
+    ~doc:"The directory where reveal preimage pages are saved."
+    ~default
+    (Client_config.string_parameter ())
+
+let tz4_address_parameter =
+  Tezos_clic.parameter (fun _cctxt s ->
+      let open Lwt_result_syntax in
+      let*? bls_pkh = Signature.Bls.Public_key_hash.of_b58check s in
+      let pkh : Tezos_crypto.Aggregate_signature.public_key_hash =
+        Tezos_crypto.Aggregate_signature.Bls12_381 bls_pkh
+      in
+      return pkh)
+
+let tz4_address_param ?(name = "public key hash")
+    ?(desc = "bls public key hash to use") =
+  let desc = String.concat "\n" [desc; "A tz4 address"] in
+  Tezos_clic.param ~name ~desc tz4_address_parameter
+
+let positive_int_parameter =
+  Tezos_clic.parameter (fun _cctxt p ->
+      let open Lwt_result_syntax in
+      let* i =
+        try Lwt.return_ok (int_of_string p)
+        with _ -> tzfail @@ Invalid_positive_int_parameter p
+      in
+      if i < 0 then tzfail @@ Invalid_positive_int_parameter p else return i)
+
+let threshold_param ?(name = "DAC threshold parameter")
+    ?(desc =
+      "Number of DAC member signatures required to validate a root page hash") =
+  Tezos_clic.param ~name ~desc positive_int_parameter
+
 let rpc_address_arg =
   let default = Configuration.default_rpc_address in
   Tezos_clic.default_arg
@@ -51,16 +105,6 @@ let rpc_address_arg =
     ~default
     (Client_config.string_parameter ())
 
-let int_parameter =
-  let open Tezos_clic in
-  parameter (fun _ p ->
-      let open Lwt_result_syntax in
-      let* i =
-        try Lwt.return_ok (int_of_string p)
-        with _ -> failwith "Cannot read int"
-      in
-      if i < 0 then failwith "Parameter must be non-negative" else return i)
-
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
   Tezos_clic.default_arg
@@ -71,152 +115,124 @@ let rpc_port_arg =
          "The port the DAC node listens to. Default value is %s"
          default)
     ~default
-    int_parameter
+    positive_int_parameter
 
-let config_init_command =
-  let open Lwt_result_syntax in
-  let open Tezos_clic in
-  command
-    ~group
-    ~desc:"Configure DAC node."
-    (args3 data_dir_arg rpc_address_arg rpc_port_arg)
-    (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_address, rpc_port) cctxt ->
-      let open Configuration in
-      let config =
-        {
-          data_dir;
-          rpc_address;
-          rpc_port;
-          mode =
-            Legacy
-              {
-                threshold = 0;
-                dac_members_addresses = [];
-                dac_cctxt_config = None;
-              };
-          reveal_data_dir = default_reveal_data_dir;
-        }
-      in
-      let* () = save config in
-      let*! _ =
-        cctxt#message "DAC node configuration written in %s" (filename config)
-      in
-      return ())
+let coordinator_rpc_parameter =
+  Tezos_clic.parameter (fun _cctxt h ->
+      match String.split ':' h with
+      | [host_name; port] -> (
+          try Lwt.return_ok (host_name, int_of_string port)
+          with _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
+      | _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
 
-(* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4125
-   Move the following commands to a dac node once we have one. *)
-module Dac_client = struct
-  let reveal_data_dir_arg =
-    Tezos_clic.arg
-      ~long:"reveal-data-dir"
-      ~placeholder:"reveal-data-dir"
-      ~doc:"The directory where reveal preimage pages are saved."
-      (Client_config.string_parameter ())
+let coordinator_rpc_param ?(name = "DAC coordinator rpc address parameter")
+    ?(desc = "The address of the DAC coordinator") =
+  let desc =
+    String.concat "\n" [desc; "An address of the form <rpc_address>:<rpc_port>"]
+  in
+  Tezos_clic.param ~name ~desc coordinator_rpc_parameter
 
-  let threshold_arg =
-    Tezos_clic.arg
-      ~long:"threshold"
-      ~placeholder:"threshold"
-      ~doc:
-        "The number of signatures needed from the Data Availability Committee \
-         members to validate reveal data.)"
-      int_parameter
-
-  let tz4_address_parameter () =
-    Tezos_clic.parameter (fun _cctxt s ->
-        let open Lwt_result_syntax in
-        let*? bls_pkh = Signature.Bls.Public_key_hash.of_b58check s in
-        let pkh : Tezos_crypto.Aggregate_signature.public_key_hash =
-          Tezos_crypto.Aggregate_signature.Bls12_381 bls_pkh
-        in
-        return pkh)
-
-  let tz4_address_param ?(name = "public key hash")
-      ?(desc = "bls public key hash to use") =
-    let desc = String.concat "\n" [desc; "A tz4 address"] in
-    Tezos_clic.param ~name ~desc (tz4_address_parameter ())
-
-  (** Add an account alias as a member of the Data availability Committee in the
-    configuration of the Dac node. *)
-  let add_dac_alias_command =
+module Config_init = struct
+  let create_configuration ~data_dir ~reveal_data_dir ~rpc_address ~rpc_port
+      mode (cctxt : Client_context.full) =
     let open Lwt_result_syntax in
+    let open Configuration in
+    let config = {data_dir; rpc_address; rpc_port; reveal_data_dir; mode} in
+    let* () = save config in
+    let*! _ =
+      cctxt#message "DAC node configuration written in %s" (filename config)
+    in
+    return ()
+
+  let legacy_command =
     let open Tezos_clic in
     command
       ~group
-      ~desc:"Add an account alias as Data Availability Committee member"
-      (args1 data_dir_arg)
-      (prefixes ["add"; "data"; "availability"; "committee"; "member"]
+      ~desc:"Configure DAC node in legacy mode."
+      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (prefixes ["configure"; "as"; "legacy"; "with"; "threshold"]
+      @@ threshold_param
+      @@ prefixes ["and"; "data"; "availability"; "committee"; "members"]
+      @@ seq_of_param @@ tz4_address_param)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+           threshold
+           dac_members_addresses
+           cctxt ->
+        create_configuration
+          ~data_dir
+          ~reveal_data_dir
+          ~rpc_address
+          ~rpc_port
+          (Configuration.Legacy
+             {threshold; dac_members_addresses; dac_cctxt_config = None})
+          cctxt)
+
+  let coordinator_command =
+    let open Tezos_clic in
+    command
+      ~group
+      ~desc:"Configure DAC node in coordinator mode."
+      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (prefixes ["configure"; "as"; "coordinator"; "with"; "threshold"]
+      @@ threshold_param
+      @@ prefixes ["and"; "data"; "availability"; "committee"; "members"]
+      @@ seq_of_param @@ tz4_address_param)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+           threshold
+           dac_members_addresses
+           cctxt ->
+        create_configuration
+          ~data_dir
+          ~reveal_data_dir
+          ~rpc_address
+          ~rpc_port
+          (Coordinator {threshold; dac_members_addresses})
+          cctxt)
+
+  let dac_member_command =
+    let open Tezos_clic in
+    command
+      ~group
+      ~desc:"Configure DAC node in committee member mode."
+      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (prefixes
+         ["configure"; "as"; "commmittee"; "member"; "with"; "coordinator"]
+      @@ coordinator_rpc_param
+      @@ prefixes ["and"; "signer"]
       @@ tz4_address_param @@ stop)
-      (fun data_dir dac_member_address cctxt ->
-        let open Configuration in
-        let* config = load ~data_dir in
-        let* ({dac_members_addresses = old_dac_members_addresses; _} as
-             legacy_config) =
-          match config.mode with
-          | Legacy config -> return config
-          | _ -> failwith "Configuration is not in legacy mode"
-        in
-        if
-          List.mem
-            ~equal:Tezos_crypto.Aggregate_signature.Public_key_hash.equal
-            dac_member_address
-            old_dac_members_addresses
-        then
-          let*! _ =
-            cctxt#message
-              "Alias is already listed as a DAC member %s"
-              (filename config)
-          in
-          return_unit
-        else
-          let dac_members_addresses =
-            old_dac_members_addresses @ [dac_member_address]
-          in
-          let mode = Legacy {legacy_config with dac_members_addresses} in
-          let* () = save {config with mode} in
-          let*! _ =
-            cctxt#message
-              "DAC address added to configuration in %s"
-              (filename config)
-          in
-          return_unit)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+           (coordinator_rpc_address, coordinator_rpc_port)
+           address
+           cctxt ->
+        create_configuration
+          ~data_dir
+          ~reveal_data_dir
+          ~rpc_address
+          ~rpc_port
+          (Dac_member {coordinator_rpc_address; coordinator_rpc_port; address})
+          cctxt)
 
-  (* DAC/TODO: https://gitlab.com/tezos/tezos/-/issues/4136
-     Add option to specify a list of addresses from a file. *)
-  let set_parameters_command =
-    let open Lwt_result_syntax in
+  let observer_command =
     let open Tezos_clic in
     command
       ~group
-      ~desc:"Configure DAC parameters."
-      (args3 data_dir_arg threshold_arg reveal_data_dir_arg)
-      (prefixes ["set"; "dac"; "parameters"] stop)
-      (fun (data_dir, threshold, reveal_data_dir) cctxt ->
-        let open Configuration in
-        let* config = load ~data_dir in
-        let* legacy_config =
-          match config.mode with
-          | Legacy config -> return config
-          | _ -> failwith "Only legacy mode supported."
-        in
-        let threshold =
-          Option.value threshold ~default:legacy_config.threshold
-        in
-        let reveal_data_dir =
-          Option.value reveal_data_dir ~default:config.reveal_data_dir
-        in
-        let mode = Legacy {legacy_config with threshold} in
-        let config = {config with reveal_data_dir; mode} in
-        let* () = save config in
-        let*! _ =
-          cctxt#message
-            "DAC parameters set for configuration in %s"
-            (filename config)
-        in
-        return ())
+      ~desc:"Configure DAC node in observer mode."
+      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (prefixes ["configure"; "as"; "observer"; "with"; "coordinator"]
+      @@ coordinator_rpc_param @@ stop)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+           (coordinator_rpc_address, coordinator_rpc_port)
+           cctxt ->
+        create_configuration
+          ~data_dir
+          ~reveal_data_dir
+          ~rpc_address
+          ~rpc_port
+          (Observer {coordinator_rpc_address; coordinator_rpc_port})
+          cctxt)
 
-  let commands = [add_dac_alias_command; set_parameters_command]
+  let commands =
+    [legacy_command; coordinator_command; dac_member_command; observer_command]
 end
 
 let run_command =
@@ -228,7 +244,7 @@ let run_command =
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
 
-let commands () = [run_command; config_init_command] @ Dac_client.commands
+let commands () = [run_command] @ Config_init.commands
 
 let select_commands _ _ =
   let open Lwt_result_syntax in

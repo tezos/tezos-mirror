@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,6 +27,7 @@
 (* Testing
    -------
    Component:    Smart Optimistic Rollups: EVM Kernel
+   Requirement:  make -f kernels.mk build-kernels
    Invocation:   dune exec tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 
@@ -55,24 +57,27 @@ let evm_proxy_server_version proxy_server =
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
-  let with_dac_node node client key f = Dac.with_dac_node node client f key in
-  with_dac_node node client rollup_operator_key @@ fun operator_key dac_node ->
-  (* Start a rollup node *)
   let sc_rollup_node =
     Sc_rollup_node.create
       ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client)
-      ~default_operator:operator_key
+      ~default_operator:rollup_operator_key
   in
+  let with_dac_node node client f =
+    Dac.with_legacy_dac_node
+      ~sc_rollup_node
+      node
+      client
+      f
+      ~pvm_name:pvm_kind
+      ~threshold:0
+      ~dac_members:0
+  in
+  with_dac_node node client @@ fun dac_node _dac_members ->
+  (* Start a rollup node *)
   (* Prepare DAL/DAC: put reveal data in rollup node directory. *)
-  let* () = Dac_node.terminate dac_node in
-  let reveal_data_dir =
-    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_kind
-  in
-  let* () = Dac_node.Dac.set_parameters ~reveal_data_dir dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready:true in
   let* installer_kernel =
     prepare_installer_kernel ~base_installee:"./" ~dac_node "evm_mockup_kernel"
   in
