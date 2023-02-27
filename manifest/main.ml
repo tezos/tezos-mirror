@@ -4687,12 +4687,14 @@ module Protocol = Protocol
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if active @@ fun () ->
-      tests
+      tezt
         [
           "test_consensus_filter";
           "test_filter_state";
           "test_plugin";
           "test_conflict_handler";
+          "test_utils";
+          "generators";
         ]
         ~path:(path // "lib_plugin/test")
         ~with_macos_security_framework:true
@@ -4704,7 +4706,7 @@ module Protocol = Protocol
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_base_test_helpers |> open_;
             octez_base_unix |> if_ N.(number >= 013);
-            alcotest_lwt;
+            alcotezt;
             octez_test_helpers |> open_;
             qcheck_alcotest;
             octez_stdlib_unix;

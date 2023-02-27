@@ -71,7 +71,7 @@ let () =
   Alcotest_lwt.run
     "Plugin"
     [
-      ( "on_flush",
+      ( Protocol.name ^ ": on_flush",
         [
           Tztest.tztest
             "[on_flush ~validation_state ...] yields an empty state "

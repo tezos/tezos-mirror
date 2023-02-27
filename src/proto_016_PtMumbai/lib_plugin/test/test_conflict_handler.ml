@@ -262,7 +262,7 @@ let () =
   Alcotest_lwt.run
     "conflict_handler"
     [
-      ( "conflict_handler",
+      ( Protocol.name ^ ": conflict_handler",
         [
           Tztest.tztest
             "Random operations (not both manager)"

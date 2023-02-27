@@ -187,6 +187,7 @@ let () =
   Alcotest.run
     "Filter_state"
     [
-      ("add_manager_op", qcheck_wrap [test_add_manager_op]);
-      ("remove", qcheck_wrap [test_remove_present; test_remove_unknown]);
+      (Protocol.name ^ ": add_manager_op", qcheck_wrap [test_add_manager_op]);
+      ( Protocol.name ^ ": remove",
+        qcheck_wrap [test_remove_present; test_remove_unknown] );
     ]
