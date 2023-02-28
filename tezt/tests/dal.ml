@@ -2552,8 +2552,8 @@ let register ~protocols =
     test_dal_node_get_assigned_shard_indices
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "dal node GET /profiles/<public_key_hash>/attested_levels/<level>/att\n\
-     estable_slots"
+    "dal node GET \
+     /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
