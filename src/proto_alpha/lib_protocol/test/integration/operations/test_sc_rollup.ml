@@ -2637,7 +2637,8 @@ let input_included ~snapshot ~full_history_inbox (l, n) =
     Tezos level, even if no messages are added to the inbox. *)
 let test_automatically_added_internal_messages () =
   let open Lwt_result_syntax in
-  let assert_input_included ~snapshot ~full_history_inbox (l, n) input =
+  let assert_input_included ~__LOC__ ~snapshot ~full_history_inbox (l, n) input
+      =
     let* input_verified = input_included ~snapshot ~full_history_inbox (l, n) in
     Assert.equal
       ~loc:__LOC__
@@ -2649,6 +2650,48 @@ let test_automatically_added_internal_messages () =
         | Some v -> Sc_rollup.pp_input ppf v)
       input_verified
       input
+  in
+
+  let assert_sol ~snapshot ~full_history_inbox ~inbox_level =
+    let sol = Sc_rollup_helpers.make_sol ~inbox_level in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, Z.zero)
+      (Some sol)
+  in
+
+  let assert_ipl ~snapshot ~full_history_inbox ~level_info ~inbox_level =
+    let predecessor_timestamp, predecessor = level_info in
+    let info_per_level =
+      Sc_rollup_helpers.make_info_per_level
+        ~inbox_level
+        ~predecessor_timestamp
+        ~predecessor
+    in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, Z.one)
+      (Some info_per_level)
+  in
+
+  let assert_eol ~snapshot ~full_history_inbox ~inbox_level ~message_counter =
+    let eol = Sc_rollup_helpers.make_eol ~inbox_level ~message_counter in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, message_counter)
+      (Some eol)
+  in
+
+  let assert_no_message ~snapshot ~full_history_inbox ~inbox_level
+      ~message_counter =
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, message_counter)
+      None
   in
 
   let info_per_block (block : Block.t) =
@@ -2676,6 +2719,7 @@ let test_automatically_added_internal_messages () =
   let* inbox = Context.Sc_rollup.inbox (B block) in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
 
+  let level_zero = Raw_level.of_int32_exn 0l in
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
   let*? ({inbox; _} as full_history_inbox) =
@@ -2684,52 +2728,75 @@ let test_automatically_added_internal_messages () =
       [(level_one_info, level_one, []); (level_two_info, level_two, ["foo"])]
   in
 
-  (* Assert SOL is at position 0. *)
-  let sol = Sc_rollup_helpers.make_sol ~inbox_level:level_two in
+  (* Assertions about level 0. *)
   let* () =
-    assert_input_included
+    assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_zero
+  in
+  let* () =
+    assert_ipl
+      ~__LOC__
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.zero)
-      (Some sol)
+      ~inbox_level:level_zero
+      ~level_info:level_zero_info
+  in
+  let* () =
+    assert_eol
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_zero
+      ~message_counter:(Z.of_int 2)
   in
 
-  (* Assert Info_per_level is at position 1. *)
-  let predecessor_timestamp, predecessor = level_two_info in
-  let info_per_level =
-    Sc_rollup_helpers.make_info_per_level
+  (* Assertions about level 1. *)
+  let* () =
+    assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_one
+  in
+  let* () =
+    assert_ipl
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_one
+      ~level_info:level_one_info
+  in
+  let* () =
+    assert_eol
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_one
+      ~message_counter:(Z.of_int 2)
+  in
+
+  (* Assertions about level 2. *)
+  let* () =
+    assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_two
+  in
+  let* () =
+    assert_ipl
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
       ~inbox_level:level_two
-      ~predecessor_timestamp
-      ~predecessor
+      ~level_info:level_two_info
   in
   let* () =
-    assert_input_included
+    assert_eol
+      ~__LOC__
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.one)
-      (Some info_per_level)
-  in
-
-  (* Assert EOL is at the end of inbox level. *)
-  let eol =
-    Sc_rollup_helpers.make_eol
       ~inbox_level:level_two
       ~message_counter:(Z.of_int 3)
   in
   let* () =
-    assert_input_included
+    assert_no_message
+      ~__LOC__
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.of_int 3)
-      (Some eol)
-  in
-  (* Assert EOL was the last message of the inbox level. *)
-  let* () =
-    assert_input_included
-      ~snapshot
-      ~full_history_inbox
-      (level_two, Z.of_int 4)
-      None
+      ~inbox_level:level_two
+      ~message_counter:(Z.of_int 4)
   in
 
   (* Assert the computed inbox and protocol's inbox are equal. *)
