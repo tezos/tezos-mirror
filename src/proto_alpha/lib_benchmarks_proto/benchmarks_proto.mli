@@ -25,32 +25,54 @@
 
 module Benchmark_base = Benchmark
 
-module Benchmark = struct
+module Benchmark : sig
+  (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
+      [registration_simple] below. *)
   module type S = sig
+    (** Name of the benchmark *)
     val name : Namespace.t
 
+    (** Description of the benchmark *)
     val info : string
 
+    (** Filename of the benchmark module *)
     val module_location : string
 
+    (** Tags of the benchmark *)
     val tags : string list
 
+    (** Configuration of the benchmark (eg sampling parameters, paths, etc) *)
     type config
 
+    (** Default configuration of the benchmark *)
     val default_config : config
 
+    (** Configuration encoding *)
     val config_encoding : config Data_encoding.t
 
+    (** Benchmark workload *)
     type workload
 
+    (** Workload encoding *)
     val workload_encoding : workload Data_encoding.t
 
+    (** Optional conversion to vector, for report generation purposes *)
     val workload_to_vector : workload -> Sparse_vec.String.t
 
+    (** Cost model *)
     val model : workload Model.t
 
+    (** Generated code file location, automatically prefix by
+        "src/proto_alpha/lib_protocol/"
+        and suffixed by
+        "_costs_generated.ml".
+        It is optional in case some benchmarks don't output code, but are used
+        for verification purposes. *)
     val generated_code_destination : string option
 
+    (** Creates a  benchmark, ready to be run.
+        The benchmarks are thunked to prevent evaluating the workload until
+        needed. *)
     val create_benchmark :
       rng_state:Random.State.t -> config -> workload Generator.benchmark
   end
@@ -58,30 +80,10 @@ module Benchmark = struct
   type t = (module S)
 end
 
-module Registration = struct
-  let ns = Namespace.root
+module Registration : sig
+  val ns : Namespace.cons
 
-  let register ((module Bench) : Benchmark.t) =
-    let module B : Benchmark_base.S = struct
-      include Bench
-
-      let generated_code_destination =
-        Option.map
-          (fun destination ->
-            Filename.concat
-              "src/proto_alpha/lib_protocol"
-              (destination ^ "_costs_generated.ml"))
-          Bench.generated_code_destination
-
-      (* The value will be used later in lib_benchmark/registration.ml for
-         codegen file destination. *)
-      let () = ignore generated_code_destination
-
-      let models = [(Namespace.(cons name "model" |> to_string), Bench.model)]
-
-      let create_benchmarks ~rng_state ~bench_num config =
-        List.repeat bench_num (fun () ->
-            Bench.create_benchmark ~rng_state config)
-    end in
-    Registration_helpers.register (module B)
+  (** Registers a benchmark with a model, model names are uniformely generated
+  *)
+  val register : Benchmark.t -> unit
 end
