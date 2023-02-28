@@ -3,19 +3,41 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![allow(dead_code)]
+use crate::inbox::{read_input, Transaction};
+use host::rollup_core::RawRollupCore;
+use host::runtime::Runtime;
 
-use crate::inbox::Messages;
+/// The blueprint of a block is a list of transactions.
+pub struct Blueprint {
+    pub transactions: Vec<Transaction>,
+}
 
 pub struct Queue {
     // In our case, to make it simple and straightforward it will be
     // an array of pendings transactions even though it'll be only a
     // singleton for our needs.
-    pub proposal: Vec<Messages>,
+    pub proposals: Vec<Blueprint>,
 }
 
 impl Queue {
-    pub fn add(mut queue: Queue, messages: Messages) {
-        queue.proposal.push(messages)
+    pub fn add(queue: &mut Queue, transactions: Vec<Transaction>) {
+        queue.proposals.push(Blueprint { transactions })
+    }
+}
+
+fn fetch_transactions<Host: Runtime + RawRollupCore>(host: &mut Host, blueprint: &mut Blueprint) {
+    if let Ok(transaction) = read_input(host, 4096) {
+        blueprint.transactions.push(transaction);
+        fetch_transactions(host, blueprint)
+    }
+}
+
+pub fn fetch<Host: Runtime + RawRollupCore>(host: &mut Host) -> Queue {
+    let mut blueprint = Blueprint {
+        transactions: Vec::new(),
+    };
+    fetch_transactions(host, &mut blueprint);
+    Queue {
+        proposals: vec![blueprint],
     }
 }
