@@ -202,6 +202,25 @@ module Simulation = struct
     then Test.fail "Did not report operation backtracked/failure/skipping" ;
     unit
 
+  let failing_first_multiple_force =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simulation of first failing operation in batch with force"
+      ~tags:["client"; "simulation"; "failing"; "multiple"; "batch"; "force"]
+    @@ multiple_transfers
+         ~args:["False"; "True"; "True"; "True"; "True"; "True"]
+         ~simulation:true
+         ~force:true
+    @@ fun Runnable.{value; _} ->
+    let* stdout = Process.check_and_read_stdout ~expect_failure:false value in
+    if
+      stdout
+      =~! rex
+            "Simulation result:[\\S\\s.]*This operation FAILED([\\S\\s.]*This \
+             operation was skipped){5}"
+    then Test.fail "Did not report operation failure/skipping*5" ;
+    unit
+
   let injection_force =
     Protocol.register_test
       ~__FILE__
@@ -230,6 +249,7 @@ module Simulation = struct
     failing protocol ;
     failing_force protocol ;
     failing_multiple_force protocol ;
+    failing_first_multiple_force protocol ;
     injection_force protocol ;
     injection_multiple_force protocol
 end
