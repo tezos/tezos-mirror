@@ -5442,7 +5442,6 @@ module Protocol = Protocol
             benchmark |> if_some |> open_;
             test_helpers |> open_;
             octez_error_monad;
-            alcotest_lwt;
             prbnmcn_stats;
           ]
         ~alias:""
