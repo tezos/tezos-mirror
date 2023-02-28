@@ -285,10 +285,8 @@ let perform_big_map_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
-let perform_skip_list_benchmarks snoop proto =
-  let* benches =
-    Snoop.(list_benchmarks ~mode:All ~tags:[Skip_list; Proto proto] snoop)
-  in
+let perform_skip_list_benchmarks snoop _proto =
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Skip_list] snoop) in
   perform_benchmarks [] snoop benches
 
 let perform_sc_rollup_benchmarks snoop proto =
