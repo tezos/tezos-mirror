@@ -27,14 +27,14 @@ open Cryptobox_intf
 
 (** {0 Cryptography for the Data Availability Layer}
 
-    The data availability layer (DAL) reduces the storage strain on the
+    The Data Availability Layer (DAL) reduces the storage strain on the
     blockchain by only storing on-chain constant-size cryptographic
     {!type:commitment}s to arbitrary data blobs called {!type:slot}s.
     The slots themselves are stored off-chain and are made available by the DAL.
 
-    A slot is encoded with an MDS (Maximum Distance Separable) code. The
-    resulting encoded slot is partitioned into {!type:shard}s, allowing
-    retrieval of the slot with any subset of
+    A slot is encoded with some redundancy using a so-called MDS (Maximum
+    Distance Separable) code. The resulting encoded slot is partitioned into
+    {!type:shard}s, allowing retrieval of the slot with any subset of
     [{!recfield:parameters.number_of_shards}/{!recfield:parameters.redundancy_factor}]
     out of [{!recfield:parameters.number_of_shards}] shards. By doing so,
     we can guarantee high data availability provided a certain fraction of
@@ -43,22 +43,17 @@ open Cryptobox_intf
     {!recfield:parameters.redundancy_factor}. MDS codes have no unnecessary
     redundancy.
 
-    Compatibility between the commitment scheme and the MDS code is achieved
-    by using the KZG polynomial commitment scheme and Reed-Solomon
-    codes. Indeed, Reed-Solomon codes are evaluations of polynomials, and KZG
-    allows proving and verifying evaluations of polynomials.
-
-    The DAL nodes can verify in constant time that they downloaded the correct
-    shard using constant-sized
-    {{: https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf}KZG proofs}
+    One can verify in constant time that the correct shard was retrieved
+    using a constant-sized
+    {{: https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf}KZG proof}
     {!type:shard_proof} (see function [verifyEval] in section 3.3) and the
-    slot commitment. This mitigates the barriers in terms of bandwidth and
-    storage to participate in the DAL network so that more actors can increase
-    its efficacy and security -- to prevent data availability attacks, for instance.
+    slot commitment.
 
-    The L1 can also verify in constant time that it downloaded the correct
-    slot segment called {type:Verifier.page} it queried using KZG proofs
-    {!type:page_proof} and the slot commitment.
+    A {!type:slot} is partioned into
+    [{!recfield:parameters.slot_size}/{!recfield:parameters.page_size}] segments
+    called {!type:Verifier.page}s of size {!recfield:parameters.page_size}.
+    One can also verify in constant time that the correct page
+    was retrieved using a KZG proof {!type:page_proof} and the slot commitment.
 
     A challenge is to keep the proving time for the {!type:shard_proof}s
     almost proportional to the length [n] of the slot encoded with the MDS
@@ -66,8 +61,8 @@ open Cryptobox_intf
     time [O(n log n)]
     (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}). *)
 
-(** Initial values to parametrize dal cryptographic primitives. It used to build
-    a value of type [t] *)
+(** Initial values for the parameters of the DAL cryptographic primitives.
+    It used to build a value of type [t]. *)
 type parameters = {
   redundancy_factor : int;
   page_size : int;
@@ -106,6 +101,8 @@ type commitment_proof
 
 type page_proof
 
+type ('a, 'b) error_container = {given : 'a; expected : 'b}
+
 module Verifier :
   VERIFIER
     with type t = t
@@ -113,6 +110,7 @@ module Verifier :
      and type commitment = commitment
      and type commitment_proof = commitment_proof
      and type page_proof = page_proof
+     and type ('a, 'b) error_container = ('a, 'b) error_container
 
 include
   VERIFIER
@@ -121,6 +119,7 @@ include
      and type commitment := commitment
      and type commitment_proof := commitment_proof
      and type page_proof := page_proof
+     and type ('a, 'b) error_container := ('a, 'b) error_container
 
 (** The primitives exposed in this modules require some
    preprocessing. This preprocessing generates data from an unknown
@@ -186,9 +185,15 @@ val polynomial_to_slot : t -> polynomial -> slot
 (** [commit t polynomial] returns the commitment associated to a
      polynomial [p].
 
-      Fails with [`Degree_exceeds_srs_length] if the degree of [p]
-     exceeds the SRS size. *)
-val commit : t -> polynomial -> commitment
+      Fails with [`Invalid_degree_strictly_less_than_expected _]
+      if the degree of [p] exceeds the SRS size. *)
+val commit :
+  t ->
+  polynomial ->
+  ( commitment,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
+  )
+  Result.t
 
 (** A portion of the data represented by a polynomial. *)
 type share
@@ -262,6 +267,8 @@ type shard_proof
 
     Fails with:
     - [Error `Invalid_shard] if the verification fails
+    - [Error `Invalid_degree_strictly_less_than_expected _] if the
+    SRS contained in [t] is too small to proceed with the verification
     - [Error (`Shard_index_out_of_range msg)] if the shard index
     is not within the range [0, number_of_shards - 1]
     (where [number_of_shards] is found in [t]).
@@ -277,18 +284,54 @@ val verify_shard :
   commitment ->
   shard ->
   shard_proof ->
-  (unit, [> `Shard_index_out_of_range of string | `Invalid_shard]) result
+  ( unit,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Invalid_shard
+    | `Shard_index_out_of_range of string ] )
+  Result.t
 
-(** [prove_commitment t polynomial] produces a proof that the
-     slot represented by [polynomial] has its size bounded by
-     [t.slot_size]. *)
-val prove_commitment : t -> polynomial -> commitment_proof
+(** [prove_commitment t polynomial] produces a proof that the slot represented
+    by [polynomial] has its size bounded by [slot_size] declared in [t].
 
-(** [prove_page] produces a proof that the [n]th page computed
-     is part of a commitment. This page corresponds to the original
-     data and are split into [C.page_size]. *)
+    Fails with:
+    - [Error `Invalid_degree_strictly_less_than_expected _] if the SRS
+    contained in [t] is too small to produce the proof *)
+val prove_commitment :
+  t ->
+  polynomial ->
+  ( commitment_proof,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
+  )
+  Result.t
+
+(** [prove_page t polynomial n] produces a proof for the [n]-th page of
+    the [slot] such that [polynomial = polynomial_from_slot t slot].
+    This proof can be used to verify given a commitment to a slot that
+    a byte sequence is indeed the [n]-th page of the slot
+    (see Ensures section below).
+
+    Fails with:
+    - [Error `Invalid_degree_strictly_less_than_expected _] if the SRS
+    contained in [t] is too small to produce the proof
+    - [Error (`Segment_index_out_of_range msg)] if the page index
+    is not within the range [0, slot_size/page_size - 1]
+    (where [slot_size] and [page_size] are found in [t]).
+
+    Ensures:
+    - [verify_page t commitment ~page_index page page_proof = Ok ()] if
+    and only if
+    [page = Bytes.sub slot (page_index * t.page_size) t.page_size]),
+    [page_proof = prove_page t polynomial page_index],
+    [p = polynomial_from_slot t slot],
+    and [commitment = commit t p]. *)
 val prove_page :
-  t -> polynomial -> int -> (page_proof, [> `Segment_index_out_of_range]) result
+  t ->
+  polynomial ->
+  int ->
+  ( page_proof,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Segment_index_out_of_range ] )
+  Result.t
 
 (** [prove_shards t polynomial] produces [number_of_shards] proofs
     (π_0, ..., π_{number_of_shards}) for the elements of

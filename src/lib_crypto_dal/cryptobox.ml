@@ -272,6 +272,8 @@ module Inner = struct
     let encoding = raw_encoding
   end
 
+  type ('a, 'b) error_container = {given : 'a; expected : 'b}
+
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
   let scalar_bytes_amount = Scalar.size_in_bytes - 1
@@ -937,7 +939,13 @@ module Inner = struct
       in
       Ok (Polynomials.copy ~len p)
 
-  let commit t p = Srs_g1.pippenger t.srs.raw.srs_g1 p
+  let commit t p =
+    let degree = Polynomials.degree p in
+    if degree >= t.k then
+      Error
+        (`Invalid_degree_strictly_less_than_expected
+          {given = degree; expected = t.k})
+    else Ok (Srs_g1.pippenger t.srs.raw.srs_g1 p)
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = t.k - 1 since we don't want to commit
@@ -1316,10 +1324,11 @@ module Inner = struct
      Implements the "Multi-reveals" section above. *)
   let verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof =
     let open Bls12_381 in
+    let open Result_syntax in
     (* Compute r_i(x). *)
     let remainder = interpolation_poly ~root ~domain ~evaluations in
     (* Compute [r_i(τ)]_1. *)
-    let commitment_remainder = commit t remainder in
+    let* commitment_remainder = commit t remainder in
     (* Compute [w^{i * l}]. *)
     let root_pow = Scalar.pow root (Z.of_int (Domains.length domain)) in
     (* Compute [τ^l]_2 - [w^{i * l}]_2). *)
@@ -1332,8 +1341,12 @@ module Inner = struct
        by checking
        [0]_1 ?= -e(c-[r_i(τ)]_1, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2)
               = e([r_i(τ)]_1-c, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2). *)
-    Pairing.pairing_check
-      [(diff_commits, G2.(copy one)); (proof, commit_srs_point_minus_root_pow)]
+    Ok
+      (Pairing.pairing_check
+         [
+           (diff_commits, G2.(copy one));
+           (proof, commit_srs_point_minus_root_pow);
+         ])
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
@@ -1383,9 +1396,12 @@ module Inner = struct
       let root = Domains.get t.domain_n shard_index in
       let domain = Domains.build t.shard_length in
       let srs_point = t.srs.kate_amortized_srs_g2_shards in
-      if verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof then
-        Ok ()
-      else Error `Invalid_shard
+      match
+        verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof
+      with
+      | Ok true -> Ok ()
+      | Ok false -> Error `Invalid_shard
+      | Error e -> Error e
 
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then
@@ -1396,7 +1412,7 @@ module Inner = struct
       let quotient, _ =
         Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
       in
-      Ok (commit t quotient)
+      commit t quotient
 
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
@@ -1441,7 +1457,7 @@ module Inner = struct
               | _ -> Scalar.(copy zero))
         in
         let root = Domains.get t.domain_k page_index in
-        if
+        match
           verify
             t
             ~commitment
@@ -1450,8 +1466,10 @@ module Inner = struct
             ~root
             ~evaluations
             ~proof
-        then Ok ()
-        else Error `Invalid_page
+        with
+        | Ok true -> Ok ()
+        | Ok false -> Error `Invalid_page
+        | Error e -> Error e
 end
 
 include Inner
