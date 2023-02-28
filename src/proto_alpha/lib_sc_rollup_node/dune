@@ -33,7 +33,7 @@
   irmin
   aches
   aches-lwt
-  tezos-injector-alpha
+  octez-injector
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
   tezos-crypto-dal
@@ -57,5 +57,5 @@
   -open Tezos_smart_rollup_alpha
   -open Tezos_layer2_utils_alpha
   -open Tezos_layer2_store
-  -open Tezos_injector_alpha
+  -open Octez_injector
   -open Tezos_crypto_dal))

@@ -11,7 +11,7 @@
   tezos-protocol-plugin-alpha
   tezos-protocol-alpha.parameters
   tezos-rpc
-  tezos-injector-alpha)
+  octez-injector)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -21,4 +21,4 @@
   -open Tezos_protocol_alpha
   -open Tezos_protocol_plugin_alpha
   -open Tezos_protocol_alpha_parameters
-  -open Tezos_injector_alpha))
+  -open Octez_injector))

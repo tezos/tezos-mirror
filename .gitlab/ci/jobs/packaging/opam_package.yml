@@ -258,6 +258,13 @@ opam:octez-codec:
 
 # Ignoring unreleased package octez-evm-proxy.
 
+opam:octez-injector:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-injector
+
 opam:octez-node:
   extends:
     - .opam_template
@@ -846,15 +853,6 @@ opam:tezos-injector-015-PtLimaPt:
     - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-injector-015-PtLimaPt
-
-opam:tezos-injector-016-PtMumbai:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-injector-016-PtMumbai
-
-# Ignoring unreleased package tezos-injector-alpha.
 
 opam:tezos-layer2-store:
   extends:
