@@ -2,15 +2,17 @@ open Data_encoding
 
 (* length in bytes for some num representations *)
 
-let l_Z i = String.length (Result.get_ok (Binary.to_string z (Z.of_int64 i)))
+let l_Z i =
+  String.length (Stdlib.Result.get_ok (Binary.to_string z (Z.of_int64 i)))
 
-let l_N i = String.length (Result.get_ok (Binary.to_string n (Z.of_int64 i)))
+let l_N i =
+  String.length (Stdlib.Result.get_ok (Binary.to_string n (Z.of_int64 i)))
 
 (* note about compact: we use a full byte of tag, but if there are two free bits
    of shared tag this is free. *)
 let l_C i =
   String.length
-    (Result.get_ok
+    (Stdlib.Result.get_ok
        (Binary.to_string (Compact.make ~tag_size:`Uint8 Compact.int64) i))
 
 (* [find l target 0L Int64.max_int] finds a pair [(a,b)] of int64 such that:

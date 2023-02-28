@@ -26,7 +26,7 @@
 open Data_encoding
 
 let pp encoding s =
-  let binary = Result.get_ok @@ Binary.to_string encoding s in
+  let binary = Stdlib.Result.get_ok @@ Binary.to_string encoding s in
   Seq.iter
     (fun char -> Format.printf "\\x%02x" (Char.code char))
     (String.to_seq binary) ;

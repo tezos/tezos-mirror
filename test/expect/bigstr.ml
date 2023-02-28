@@ -30,7 +30,7 @@ let pp encoding s =
   let res = Ezjsonm.value_to_string json in
   Format.printf "JSON: %s; BINARY: " res ;
   assert (Json.destruct encoding json = s) ;
-  let binary = Result.get_ok @@ Binary.to_string encoding s in
+  let binary = Stdlib.Result.get_ok @@ Binary.to_string encoding s in
   Seq.iter
     (fun char -> Format.printf "\\x%02x" (Char.code char))
     (String.to_seq binary) ;

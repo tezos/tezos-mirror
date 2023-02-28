@@ -59,11 +59,11 @@ let non_empty_int8s = NonEmptyList.encoding Data_encoding.int8
 let non_empty_list_roundtrip x xs =
   let data = NonEmptyList.cons x xs in
   let s = Data_encoding.Binary.to_string non_empty_int8s data in
-  assert (Result.is_ok s) ;
-  let s = Result.get_ok s in
+  assert (Stdlib.Result.is_ok s) ;
+  let s = Stdlib.Result.get_ok s in
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
-  assert (Result.is_ok d) ;
-  assert (Result.get_ok d = data) ;
+  assert (Stdlib.Result.is_ok d) ;
+  assert (Stdlib.Result.get_ok d = data) ;
   ()
 
 let non_empty_list_roundtrip () =
@@ -79,12 +79,12 @@ let non_empty_list_is_a_list_that_is_not_empty xs =
   let data = xs in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
-  assert (Result.is_ok s) ;
-  let s = Result.get_ok s in
+  assert (Stdlib.Result.is_ok s) ;
+  let s = Stdlib.Result.get_ok s in
   (* decode with non-empty-list *)
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
-  assert (Result.is_ok d) ;
-  let d = Result.get_ok d in
+  assert (Stdlib.Result.is_ok d) ;
+  let d = Stdlib.Result.get_ok d in
   assert ((d : int NonEmptyList.t :> int list) = data) ;
   ()
 
@@ -100,12 +100,12 @@ let non_empty_list_is_not_an_empty_list () =
   let data = [] in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
-  assert (Result.is_ok s) ;
-  let s = Result.get_ok s in
+  assert (Stdlib.Result.is_ok s) ;
+  let s = Stdlib.Result.get_ok s in
   (* decode with non-empty-list *)
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
-  assert (Result.is_error d) ;
-  let d = Result.get_error d in
+  assert (Stdlib.Result.is_error d) ;
+  let d = Stdlib.Result.get_error d in
   assert (
     match d with
     | Data_encoding.Binary.User_invariant_guard _ -> true
@@ -141,11 +141,11 @@ let sorted_int8s = SortedList.encoding Data_encoding.int8
 let sorted_list_roundtrips xs =
   let data = SortedList.of_list xs in
   let s = Data_encoding.Binary.to_string sorted_int8s data in
-  assert (Result.is_ok s) ;
-  let s = Result.get_ok s in
+  assert (Stdlib.Result.is_ok s) ;
+  let s = Stdlib.Result.get_ok s in
   let d = Data_encoding.Binary.of_string sorted_int8s s in
-  assert (Result.is_ok d) ;
-  assert (Result.get_ok d = data) ;
+  assert (Stdlib.Result.is_ok d) ;
+  assert (Stdlib.Result.get_ok d = data) ;
   ()
 
 let sorted_list_roundtrips () =
@@ -163,12 +163,12 @@ let sorted_list_is_a_list_that_is_sorted xs =
   let data = List.sort compare xs in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
-  assert (Result.is_ok s) ;
-  let s = Result.get_ok s in
+  assert (Stdlib.Result.is_ok s) ;
+  let s = Stdlib.Result.get_ok s in
   (* decode with sorted-list *)
   let d = Data_encoding.Binary.of_string sorted_int8s s in
-  assert (Result.is_ok d) ;
-  let d = Result.get_ok d in
+  assert (Stdlib.Result.is_ok d) ;
+  let d = Stdlib.Result.get_ok d in
   assert ((d : int SortedList.t :> int list) = data) ;
   ()
 
@@ -184,12 +184,12 @@ let sorted_list_is_not_a_list_that_is_not_sorted xs =
   let data = xs in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
-  assert (Result.is_ok s) ;
-  let s = Result.get_ok s in
+  assert (Stdlib.Result.is_ok s) ;
+  let s = Stdlib.Result.get_ok s in
   (* decode with sorted-list *)
   let d = Data_encoding.Binary.of_string sorted_int8s s in
-  assert (Result.is_error d) ;
-  let d = Result.get_error d in
+  assert (Stdlib.Result.is_error d) ;
+  let d = Stdlib.Result.get_error d in
   assert (
     match d with
     | Data_encoding.Binary.User_invariant_guard _ -> true
