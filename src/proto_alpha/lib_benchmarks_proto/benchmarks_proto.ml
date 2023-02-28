@@ -78,6 +78,9 @@ module Benchmark = struct
   type t = (module S)
 end
 
+module Registration = struct
+  let ns = Namespace.root
+
 (** Registers a benchmark with a model, model names are uniformely generated *)
 let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark_base.S = struct
@@ -101,3 +104,4 @@ let register ((module Bench) : Benchmark.t) =
       List.repeat bench_num (fun () -> Bench.create_benchmark ~rng_state config)
   end in
   Registration_helpers.register (module B)
+end

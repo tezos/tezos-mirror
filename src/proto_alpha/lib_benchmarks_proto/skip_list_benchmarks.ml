@@ -33,7 +33,7 @@ module Skip_list = Skip_list_repr.Make (struct
   let basis = 4
 end)
 
-let ns = Namespace.make Registration_helpers.ns "skip_list"
+let ns = Namespace.make Registration.ns "skip_list"
 
 let fv s = Free_variable.of_namespace (ns s)
 
@@ -182,6 +182,6 @@ module Hash_cell : Benchmark.S = struct
     Generator.Plain {workload; closure}
 end
 
-let () = register (module Next)
+let () = Registration.register (module Next)
 
-let () = register (module Hash_cell)
+let () = Registration.register (module Hash_cell)
