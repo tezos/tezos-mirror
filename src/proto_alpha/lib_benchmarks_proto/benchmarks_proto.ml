@@ -47,7 +47,7 @@ module Benchmark = struct
 
     val workload_to_vector : workload -> Sparse_vec.String.t
 
-    val model : workload Model.t
+    val model : name:Namespace.t -> workload Model.t
 
     val generated_code_destination : string option
 
@@ -77,7 +77,8 @@ module Registration = struct
          codegen file destination. *)
       let () = ignore generated_code_destination
 
-      let models = [(Namespace.(cons name "model" |> to_string), Bench.model)]
+      let models =
+        [(Namespace.(cons name "model" |> to_string), Bench.model ~name)]
 
       let create_benchmarks ~rng_state ~bench_num config =
         List.repeat bench_num (fun () ->

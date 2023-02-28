@@ -60,7 +60,7 @@ module Benchmark : sig
     val workload_to_vector : workload -> Sparse_vec.String.t
 
     (** Cost model *)
-    val model : workload Model.t
+    val model : name:Namespace.t -> workload Model.t
 
     (** Generated code file location, automatically prefix by
         "src/proto_alpha/lib_protocol/"
