@@ -226,8 +226,10 @@ Core developers are also provided reference materials for internal APIs of Octez
    :caption: Developer doc
    :hidden:
 
-   developer/rpc
    developer/michelson_anti_patterns
+   developer/rpc
+   api/errors
+   api/openapi
 
 .. toctree::
    :maxdepth: 2
@@ -243,6 +245,7 @@ Core developers are also provided reference materials for internal APIs of Octez
    developer/encodings
    developer/merkle-proof-encoding-formats
    developer/openmetrics
+   api/api-inline
 
 .. toctree::
    :maxdepth: 2
@@ -263,12 +266,3 @@ Core developers are also provided reference materials for internal APIs of Octez
    releases/releases
    releases/version-16
    releases/history
-
-.. toctree::
-   :maxdepth: 2
-   :caption: APIs
-   :hidden:
-
-   api/api-inline
-   api/openapi
-   api/errors
