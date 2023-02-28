@@ -91,7 +91,11 @@ end
 module Model : sig
   open Model
 
-  val make : conv:('a -> 'b) -> model:'b model -> 'a t
+  val make :
+    name:Namespace.t ->
+    conv:('a -> 'b) ->
+    model:(name:Namespace.t -> 'b model) ->
+    'a t
 
   val affine :
     name:Namespace.t ->

@@ -88,4 +88,6 @@ end
 
 module Model = struct
   include Model
+
+  let make ~name ~conv ~model = make ~conv ~model:(model ~name)
 end

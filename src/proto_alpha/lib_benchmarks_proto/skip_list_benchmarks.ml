@@ -69,7 +69,7 @@ module Next : Benchmark.S = struct
 
   let model =
     let conv x = (x, ()) in
-    Model.make ~conv ~model:(Model.logn ~name ~coeff:(fv "len_coeff"))
+    Model.make ~name ~conv ~model:(Model.logn ~coeff:(fv "len_coeff"))
 
   let create_skip_list_of_len len =
     let rec go n cell =
@@ -145,10 +145,10 @@ module Hash_cell : Benchmark.S = struct
 
   let model =
     Model.make
+      ~name
       ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
       ~model:
         (Model.affine
-           ~name
            ~intercept:(fv "cost_hash_skip_list_cell")
            ~coeff:(fv "cost_hash_skip_list_cell_coef"))
 
