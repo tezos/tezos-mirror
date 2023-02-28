@@ -36,10 +36,9 @@
 
 type slot = bytes
 
-(** [get_shard cryptobox store commitment shard_id] gets the shard associated to
+(** [get_shard store commitment shard_id] gets the shard associated to
     [commitment] at the range [shard_id]. *)
 val get_shard :
-  Cryptobox.t ->
   Store.Shards.t ->
   Cryptobox.commitment ->
   int ->
