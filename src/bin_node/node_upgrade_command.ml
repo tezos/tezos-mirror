@@ -60,7 +60,7 @@ module Term = struct
   let process subcommand args status sandbox_file =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Log_config.init_internal_events_with_defaults () in
       match subcommand with
       | Storage -> (
           let* config = Config_file.read args.Shared_arg.config_file in

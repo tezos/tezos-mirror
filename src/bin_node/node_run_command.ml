@@ -505,20 +505,11 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* Main loop *)
-  let log_cfg =
-    match verbosity with
-    | None -> config.log
-    | Some default_level -> {config.log with default_level}
-  in
-  let internal_events =
-    if Internal_event_config.(is_empty config.internal_events) then
-      Config_file.make_default_internal_events ~data_dir:config.data_dir
-    else config.internal_events
-  in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:log_cfg
-      ~configuration:internal_events
+    Log_config.init_internal_events_with_defaults
+      ~internal_events:(config.internal_events, config.data_dir)
+      ?verbosity
+      ~log_cfg:config.log
       ()
   in
   let*! () =

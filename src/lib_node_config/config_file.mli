@@ -83,10 +83,6 @@ and rpc = {
 
 and tls = {cert : string; key : string}
 
-(** Creates the default internal event configuration using [data_dir] *)
-val make_default_internal_events :
-  data_dir:string -> Tezos_base.Internal_event_config.t
-
 val data_dir_env_name : string
 
 val default_data_dir : string
