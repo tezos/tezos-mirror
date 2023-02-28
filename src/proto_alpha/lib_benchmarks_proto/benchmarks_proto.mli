@@ -94,14 +94,14 @@ module Model : sig
   val make :
     name:Namespace.t ->
     conv:('a -> 'b) ->
-    model:(name:Namespace.t -> 'b model) ->
+    model:(Namespace.t -> 'b model) ->
     'a t
 
   val affine :
-    name:Namespace.t ->
-    intercept:Free_variable.t ->
-    coeff:Free_variable.t ->
+    ?intercept:Free_variable.t ->
+    ?coeff:Free_variable.t ->
+    Namespace.t ->
     (int * unit) model
 
-  val logn : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
+  val logn : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
 end

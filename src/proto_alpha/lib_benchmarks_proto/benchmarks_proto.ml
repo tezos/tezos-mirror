@@ -90,5 +90,16 @@ end
 module Model = struct
   include Model
 
-  let make ~name ~conv ~model = make ~conv ~model:(model ~name)
+  let make ~name ~conv ~model = make ~conv ~model:(model name)
+
+  let affine ?intercept ?coeff name =
+    let ns s = Free_variable.of_namespace (Namespace.cons name s) in
+    let intercept = Option.value ~default:(ns "intercept") intercept in
+    let coeff = Option.value ~default:(ns "coeff") coeff in
+    affine ~name ~intercept ~coeff
+
+  let logn ?coeff name =
+    let ns s = Free_variable.of_namespace (Namespace.cons name s) in
+    let coeff = Option.value ~default:(ns "coeff") coeff in
+    logn ~name ~coeff
 end
