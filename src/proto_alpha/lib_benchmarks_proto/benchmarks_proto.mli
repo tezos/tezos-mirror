@@ -87,3 +87,17 @@ module Registration : sig
   *)
   val register : Benchmark.t -> unit
 end
+
+module Model : sig
+  open Model
+
+  val make : conv:('a -> 'b) -> model:'b model -> 'a t
+
+  val affine :
+    name:Namespace.t ->
+    intercept:Free_variable.t ->
+    coeff:Free_variable.t ->
+    (int * unit) model
+
+  val logn : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
+end

@@ -85,3 +85,7 @@ module Registration = struct
     end in
     Registration_helpers.register (module B)
 end
+
+module Model = struct
+  include Model
+end
