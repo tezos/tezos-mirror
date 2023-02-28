@@ -5,11 +5,9 @@
 // SPDX-License-Identifier: MIT
 
 //! Defines the *raw* bindings to the **smart_rollup_core** host module.
-//!
-//! These can be accessed by a kernel running in safe mode - which prevents the
-//! kernel messing up the state tree w.r.t. hardware gas limits, and inputs.
 
 #![cfg_attr(not(any(test, feature = "testing")), no_std)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod rollup_host;
 pub mod smart_rollup_core;
@@ -62,14 +60,14 @@ pub const GENERIC_INVALID_ACCESS: i32 = -8;
 /// A value cannot be modified if it is readonly.
 pub const STORE_READONLY_VALUE: i32 = -9;
 
-/// None ValueType discriminant
+/// None ValueType discriminant.
 pub const VALUE_TYPE_NONE: i32 = 0;
 
-/// Value ValueType discriminant, for a simple value in the store
+/// Value ValueType discriminant, for a simple value in the store.
 pub const VALUE_TYPE_VALUE: i32 = 1;
 
-/// Subtree ValueType discriminant, for a subtree node in the store
+/// Subtree ValueType discriminant, for a subtree node in the store.
 pub const VALUE_TYPE_SUBTREE: i32 = 2;
 
-/// Value with subtree ValueType discriminant, for a value carrying a subtree node in the store
+/// Value with subtree ValueType discriminant, for a value carrying a subtree node in the store.
 pub const VALUE_TYPE_VALUE_WITH_SUBTREE: i32 = 3;

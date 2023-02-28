@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Implementation of [RawRollupCore] that used when compiling to **wasm**.
+//! Implementation of [`SmartRollupCore`] used when compiling to **wasm**.
 
 use crate::smart_rollup_core as core;
 use crate::smart_rollup_core::ReadInputMessageInfo;
@@ -13,7 +13,7 @@ use crate::SmartRollupCore;
 /// The runtime host when running in `wasm` rollup.
 ///
 /// # Safety
-/// The only way to create an instance of `WasmHost` is to call [`WasmHost::new`], which
+/// The only way to create an instance of `RollupHost` is to call [`RollupHost::new`], which
 /// itself is *unsafe* to call. This is done to enforce the invariant that a kernel only
 /// ever holds *one* reference of its *runtime*.
 ///
@@ -28,7 +28,7 @@ impl RollupHost {
     /// # Safety
     /// **Must** only ever be called once per *kernel entry*. Multiple
     /// instances of `WasmHost` may conflict with each other - breaking invariants
-    /// elsewhere in this crate which make assumptions about the behaviour of the runtime.
+    /// elsewhere which make assumptions about the behaviour of the runtime.
     pub unsafe fn new() -> Self {
         Self {}
     }

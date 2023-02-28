@@ -4,6 +4,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! Definition of the `smart_rollup_core` host functions.
+//!
+//! Links directly to the module provided by the smart rollup system, when
+//! targetting `wasm32-unknown-unknown`.
+
 #[link(wasm_import_module = "smart_rollup_core")]
 extern "C" {
     /// If `/input/consumed >= /input/bytes`, return `0`.
@@ -11,8 +16,7 @@ extern "C" {
     /// Otherwise:
     /// - Fills the given buffer with up to `max_bytes` and returns actual
     ///   number written.
-    /// - Write the current value of `/input/{type,level,id}` to
-    ///   `{type,level,id}`.
+    /// - Sets the `level` and `id` of the message to `message_info`.
     pub fn read_input(
         message_info: *mut ReadInputMessageInfo,
         dst: *mut u8,
@@ -21,19 +25,22 @@ extern "C" {
 
     /// Write the given number of bytes to output.
     ///
-    /// Fails with [Error::InputOutputTooLarge] if output size is greater than
-    /// [MAX_OUTPUT_SIZE].
+    /// Returns [`INPUT_OUTPUT_TOO_LARGE`] if output size is greater than
+    /// [`MAX_OUTPUT_SIZE`].
+    ///
+    /// [`INPUT_OUTPUT_TOO_LARGE`]: crate::INPUT_OUTPUT_TOO_LARGE
+    /// [`MAX_OUTPUT_SIZE`]: crate::MAX_OUTPUT_SIZE
     pub fn write_output(src: *const u8, num_bytes: usize) -> i32;
 
     /// Write the given number of bytes to the debug log.
     pub fn write_debug(src: *const u8, num_bytes: usize);
 
-    /// Return whether the given key exists.
+    /// Return whether the given path exists in durable storage.
     pub fn store_has(path: *const u8, path_len: usize) -> i32;
 
-    /// Read up to `num_bytes` bytes from the given key into memory.
+    /// Read up to `num_bytes` bytes from the value at `path` into memory.
     ///
-    /// Returns the number of bytes copied to memory.  The bytes read from storage begin
+    /// Returns the number of bytes copied to memory. The bytes read from storage begin
     /// at `offset`.
     pub fn store_read(
         path: *const u8,
@@ -45,8 +52,11 @@ extern "C" {
 
     /// Write the given number of bytes from memory to the given key, starting at `offset`.
     ///
-    /// Returns [Error::InputOutputTooLarge] if output size is greater than
-    /// [MAX_FILE_CHUNK_SIZE].
+    /// Returns [`INPUT_OUTPUT_TOO_LARGE`] if output size is greater than
+    /// [`MAX_FILE_CHUNK_SIZE`].
+    ///
+    /// [`INPUT_OUTPUT_TOO_LARGE`]: crate::INPUT_OUTPUT_TOO_LARGE
+    /// [`MAX_FILE_CHUNK_SIZE`]: crate::MAX_FILE_CHUNK_SIZE
     pub fn store_write(
         path: *const u8,
         path_len: usize,
@@ -55,10 +65,10 @@ extern "C" {
         num_bytes: usize,
     ) -> i32;
 
-    /// Delete the given key.
+    /// Delete the value and/or subkeys of `path` from storage.
     pub fn store_delete(path: *const u8, path_len: usize) -> i32;
 
-    /// Get the number of subkeys by prefix.
+    /// Get the number of subkeys of the prefix given by `path`.
     pub fn store_list_size(path: *const u8, path_len: usize) -> i64;
 
     /// Get subkey path at `index` with a given prefix.
@@ -102,9 +112,9 @@ extern "C" {
         max_size: usize,
     ) -> i32;
 
-    /// Move a location in the store from one key to another
-    /// Reboot if the key doesn't exist.
-    /// Overwrites the destination, if it already exists
+    /// Moves the value and/or subkeys of `from_path` to `to_path`.
+    ///
+    /// Overwrites the destination, if it already exists.
     ///
     /// e.g. if we have a store with `/x/y/z` containing a value
     /// `store_move /x/y /a/b`
@@ -118,8 +128,8 @@ extern "C" {
         to_path_len: usize,
     ) -> i32;
 
-    /// Copy a location in the store from one key to another
-    /// Reboot if the key doesn't exist.
+    /// Copies the value and/or subkeys of `from_path` to `to_path`.
+    ///
     /// Overwrites the destination, if it already exists.
     ///
     /// e.g. if we have a store with `/x/y/z` containing a value
@@ -132,7 +142,8 @@ extern "C" {
         to_path_len: usize,
     ) -> i32;
 
-    /// Loads the preimage of a given 32-byte hash in memory.
+    /// Loads the preimage of a preimage-hash to memory.
+    ///
     /// If the preimage is larger than `max_bytes`, its contents is trimmed.
     pub fn reveal_preimage(
         hash_addr: *const u8,
@@ -141,23 +152,44 @@ extern "C" {
         max_bytes: usize,
     ) -> i32;
 
-    /// Return the size of value stored at `path`
+    /// Return the size (in bytes) of the value stored at `path`.
     pub fn store_value_size(path: *const u8, path_len: usize) -> i32;
 
-    /// Loads the 20-byte address of the rollup, followed by the 4-byte
-    /// origination level into memory.
+    /// Loads the rollup metadata into memory.
+    ///
+    /// This is made of the:
+    /// - 20-byte address of the rollup.
+    /// - 4-byte origination level.
+    ///
     /// Returns the size of data read (will always be 24).
     pub fn reveal_metadata(destination_addr: *mut u8, max_bytes: usize) -> i32;
 }
 
-/// Wrapper trait for 'rollup_core' host functions.
+/// Wrapper trait for `smart_rollup_core` host functions.
 ///
-/// Will be mocked out in unit tests.  Parameterised by `&self` - note that while
+/// Parameterised by `&self` - note that while
 /// these function may cause side effects, they are unsafe to call.
+///
+/// While [`RollupHost`] is the implementor used when running in a smart-rollup,
+/// alternative hosts can be used - for example in unit tests.
 ///
 /// # Safety
 /// The caller should take care to give correct buffer sizes, pointers, and
 /// path-encodings.  See safety notes on each method for more details.
+///
+/// # Error handling
+/// Most functions in *SmartRollupCore* return `i32`. When used correctly, this
+/// result will tend to be positive (for example to represent the number of
+/// bytes read/written to/from memory.)
+///
+/// There may be situtations where a host function does return an error (for
+/// example `store_read` on a non-existent value would return an error). As
+/// a result, you should be careful to check for possible errors after calling
+/// host functions.
+///
+/// A full list of error codes is given in the [top-level](./lib.rs).
+///
+/// [`RollupHost`]: crate::rollup_host::RollupHost
 #[cfg_attr(feature = "testing", mockall::automock)]
 pub unsafe trait SmartRollupCore {
     /// See [read_input].
@@ -166,7 +198,7 @@ pub unsafe trait SmartRollupCore {
     /// - `message_info` must all be valid pointer to a `ReadInputMessageInfo`.
     /// - `dst` must point to a mutable slice of bytes with `capacity >= max_bytes`.
     ///
-    /// The respective pointers must only be consumed if `return > 0`.
+    /// If `return > 0`, the `message_info` & `dst` are guaranteed to be initialised.
     unsafe fn read_input(
         &self,
         message_info: *mut ReadInputMessageInfo,
@@ -192,18 +224,15 @@ pub unsafe trait SmartRollupCore {
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `len` must be the length of that slice.
+    /// - `path_len` must be the length of that slice.
     unsafe fn store_has(&self, path: *const u8, path_len: usize) -> i32;
 
     /// See [store_read].
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `len` must be the length of that slice.
+    /// - `path_len` must be the length of that slice.
     /// - `dst` must point to a mutable slice of bytes with `capacity >= max_bytes`.
-    ///
-    /// # Traps
-    /// `traps` if `path` does not exist.  You should check with [store_has] first.
     unsafe fn store_read(
         &self,
         path: *const u8,
@@ -217,7 +246,7 @@ pub unsafe trait SmartRollupCore {
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `len` must be the length of that slice.
+    /// - `path_len` must be the length of that slice.
     /// - `dst` must point to a slice of bytes with `length >= num_bytes`.
     unsafe fn store_write(
         &self,
@@ -233,32 +262,21 @@ pub unsafe trait SmartRollupCore {
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
     /// - `len` must be the length of that slice.
-    ///
-    /// # Traps
-    /// `traps` if `path` does not exist.  You should check with [store_has] first.
     unsafe fn store_delete(&self, path: *const u8, len: usize) -> i32;
 
     /// See [store_list_size].
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `len` must be the length of that slice.
-    ///
-    /// # Traps
-    /// `traps` if `path` does not exist.  You should check with [store_has] first.
+    /// - `path_len` must be the length of that slice.
     unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64;
 
     /// See [store_list_get].
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `len` must be the length of that slice.
+    /// - `path_len` must be the length of that slice.
     /// - `dst` must point to a mutable slice of bytes with `capacity >= max_size`.
-    ///
-    /// # Traps
-    /// `traps` if:
-    /// - `path` does not exist.  You should check with [store_has] first.
-    /// - `index > store_list_size(path) || index < 0`
     unsafe fn store_list_get(
         &self,
         path: *const u8,
@@ -274,10 +292,6 @@ pub unsafe trait SmartRollupCore {
     /// - `from_path` and `to_path` must be pointers to correctly path encoded slices
     ///   bytes.
     /// - `from_path_len` and `to_path_len` must be length of those slices respectively.
-    ///
-    /// # Traps
-    /// - if `from_path` doesn't exist
-    /// - if `from_path` is a prefix of `to_path`?
     unsafe fn store_move(
         &self,
         from_path: *const u8,
@@ -292,10 +306,6 @@ pub unsafe trait SmartRollupCore {
     /// - `from_path` and `to_path` must be pointers to correctly path encoded slices
     ///   bytes.
     /// - `from_path_len` and `to_path_len` must be length of those slices respectively.
-    ///
-    /// # Traps
-    /// - if `from_path` doesn't exist
-    /// - if `from_path` is a prefix of `to_path`?
     unsafe fn store_copy(
         &self,
         from_path: *const u8,
@@ -308,8 +318,8 @@ pub unsafe trait SmartRollupCore {
     /// If the preimage is larger than `max_bytes`, its contents is trimmed.
     ///
     /// # Safety
-    /// - `hash_addr` must be a ptr to a slice containing a hash
-    /// - `hash_len` must be the length of the slice
+    /// - `hash_addr` must be a ptr to a slice containing a hash.
+    /// - `hash_len` must be the length of the slice.
     /// - `destination_addr `must point to a mutable slice of bytes with
     ///   `capacity >= max_size`.
     unsafe fn reveal_preimage(
@@ -324,7 +334,7 @@ pub unsafe trait SmartRollupCore {
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `len` must be the length of that slice.
+    /// - `path_len` must be the length of that slice.
     unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32;
 
     /// Loads the 24-byte metedata (20-byte address of the rollup followed by the 4-byte
