@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Benchmark_simple = struct
+module Benchmark_base = Benchmark
+
+module Benchmark = struct
   (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
       [registration_simple] below. *)
   module type S = sig
@@ -77,8 +79,8 @@ module Benchmark_simple = struct
 end
 
 (** Registers a benchmark with a model, model names are uniformely generated *)
-let register_simple ((module Bench) : Benchmark_simple.t) =
-  let module B : Benchmark.S = struct
+let register_simple ((module Bench) : Benchmark.t) =
+  let module B : Benchmark_base.S = struct
     include Bench
 
     let generated_code_destination =
