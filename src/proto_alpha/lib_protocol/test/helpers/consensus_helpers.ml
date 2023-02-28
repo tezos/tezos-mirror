@@ -49,13 +49,14 @@ type kind = Preendorsement | Endorsement
 
     The [endorsed_block] is also used as the predecessor of the baked
     block, or as the head of the mempool. *)
-let test_consensus_operation ?slot ?level ?round ?block_payload_hash ?branch
-    ~endorsed_block ?error ~loc kind mode =
+let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
+    ?branch ~endorsed_block ?error ~loc kind mode =
   let open Lwt_result_syntax in
   let* operation =
     match kind with
     | Preendorsement ->
         Op.preendorsement
+          ?delegate
           ?slot
           ?level
           ?round
@@ -64,6 +65,7 @@ let test_consensus_operation ?slot ?level ?round ?block_payload_hash ?branch
           endorsed_block
     | Endorsement ->
         Op.endorsement
+          ?delegate
           ?slot
           ?level
           ?round
@@ -96,11 +98,12 @@ let test_consensus_operation ?slot ?level ?round ?block_payload_hash ?branch
       in
       check_error res
 
-let test_consensus_operation_all_modes ?slot ?level ?round ?block_payload_hash
-    ?branch ~endorsed_block ?error ~loc kind =
+let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
+    ?block_payload_hash ?branch ~endorsed_block ?error ~loc kind =
   List.iter_es
     (fun mode ->
       test_consensus_operation
+        ?delegate
         ?slot
         ?level
         ?round

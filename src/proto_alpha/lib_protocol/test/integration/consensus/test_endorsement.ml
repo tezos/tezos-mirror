@@ -102,6 +102,8 @@ let test_fitness_gap () =
 
     The following test scenarios are supposed to raise errors. *)
 
+(** {2 Wrong slot} *)
+
 (** Apply an endorsement with a negative slot. *)
 let test_negative_slot () =
   Context.init_n 5 () >>=? fun (genesis, _contracts) ->
@@ -118,50 +120,63 @@ let test_negative_slot () =
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
 
-(** Apply an endorsement with a non-normalized slot (that is, not the smallest
-   possible). *)
-let test_non_normalized_slot () =
-  Context.init_n 5 () >>=? fun (genesis, _contracts) ->
-  Block.bake genesis >>=? fun b ->
-  Context.get_endorsers (B b) >>=? fun endorsers_list ->
-  (* find an endorsers with more than 1 slot *)
-  List.find_map
-    (function
-      | {Plugin.RPC.Validators.delegate; slots; _} ->
-          if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
-          else None)
-    endorsers_list
-  |> function
-  | None -> assert false
-  | Some (delegate, slots) ->
-      let set_slots = Slot.Set.of_list slots in
-      (* no duplicated slots *)
-      Assert.equal_int
-        ~loc:__LOC__
-        (Slot.Set.cardinal set_slots)
-        (List.length slots)
-      >>=? fun () ->
-      (* the first slot should be the smallest slot *)
-      Assert.equal
-        ~loc:__LOC__
-        (fun x y -> Slot.compare x y = 0)
-        "the first slot is not the smallest"
-        Slot.pp
-        (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd slots)
-        (WithExceptions.Option.get ~loc:__LOC__ @@ Slot.Set.min_elt set_slots)
-      >>=? fun () ->
-      let slot =
-        match List.hd (List.rev slots) with None -> assert false | Some s -> s
-      in
-      Op.endorsement ~delegate ~slot b >>=? fun operation ->
-      let policy = Block.Excluding [delegate] in
-      Block.bake ~policy ~operation b >>= fun res ->
-      Assert.proto_error ~loc:__LOC__ res (function
-          | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-              {kind}
-            when kind = Validate_errors.Consensus.Endorsement ->
-              true
-          | _ -> false)
+(** Endorsement with a non-normalized slot (that is, a slot that
+    belongs to the delegate but is not the delegate's smallest slot). *)
+let test_not_smallest_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* endorsers = Context.get_endorsers (B b) in
+  let delegate, slots =
+    (* Find an endorser with more than 1 slot. *)
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (List.find_map
+         (fun {RPC.Validators.delegate; slots; _} ->
+           if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
+           else None)
+         endorsers)
+  in
+  (* Check that the slots are sorted and have no duplicates. *)
+  let rec check_sorted = function
+    | [] | [_] -> true
+    | x :: (y :: _ as t) -> Slot.compare x y < 0 && check_sorted t
+  in
+  assert (check_sorted slots) ;
+  let slot =
+    match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
+  in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:b
+    ~delegate
+    ~slot
+    ~error:(function
+      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+          {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
+    Endorsement
+
+(** Endorsement with a slot that does not belong to the delegate. *)
+let test_other_delegate_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* endorsers = Context.get_endorsers (B b) in
+  let delegate, other_delegate_slot =
+    match endorsers with
+    | [] | [_] -> assert false (* at least two delegates with rights *)
+    | {delegate; _} :: {slots; _} :: _ ->
+        (delegate, WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
+  in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:b
+    ~delegate
+    ~slot:other_delegate_slot
+    ~error:(function
+      | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
+    Endorsement
 
 (** Invalid_endorsement_level: apply an endorsement with an incorrect
     level (i.e. the predecessor level). *)
@@ -340,26 +355,6 @@ let test_wrong_payload_hash () =
     Endorsement
     Application
 
-let test_wrong_slot_used () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Context.get_endorser (B b) >>=? fun (_, slots) ->
-  (match slots with
-  | _x :: y :: _ -> return y
-  | _ -> failwith "Slots size should be at least of 2 ")
-  >>=? fun slot ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:b
-    ~slot
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Application
-
 (** Check that:
     - a block with not enough endorsement cannot be baked;
     - a block with enough endorsement is baked. *)
@@ -402,27 +397,6 @@ let test_preendorsement_endorsement_same_level () =
   Op.preendorsement b1 >>=? fun op_preendo ->
   Incremental.add_operation i op_preendo >>=? fun (_i : Incremental.t) ->
   return_unit
-
-(** Test for endorsement injection with wrong slot in mempool mode. This
-    test is expected to fail *)
-let test_wrong_endorsement_slot_in_mempool_mode () =
-  Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _) ->
-  Block.bake genesis >>=? fun b1 ->
-  let module V = Plugin.RPC.Validators in
-  (Context.get_endorsers (B b1) >>=? function
-   | {V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
-       (* we didn't use min slot for the injection. It's bad !*)
-       return (Some non_canonical_slot)
-   | _ -> assert false)
-  >>=? fun slot ->
-  Op.endorsement ?slot b1 >>=? fun endo ->
-  Incremental.begin_construction ~mempool_mode:true b1 >>=? fun i ->
-  Incremental.add_operation i endo >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation {kind}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
 
 (** Endorsement for next level *)
 let test_endorsement_for_next_level () =
@@ -527,11 +501,10 @@ let tests =
     Tztest.tztest "Non-zero round" `Quick test_non_zero_round;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Negative tests *)
+    (* Wrong slot *)
     Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
-    Tztest.tztest
-      "Endorsement wrapped with non-normalized slot"
-      `Quick
-      test_non_normalized_slot;
+    Tztest.tztest "Non-normalized slot" `Quick test_not_smallest_slot;
+    Tztest.tztest "Slot of another delegate" `Quick test_other_delegate_slot;
     Tztest.tztest
       "Invalid endorsement level"
       `Quick
@@ -568,10 +541,6 @@ let tests =
       `Quick
       test_wrong_payload_hash;
     Tztest.tztest
-      "Wrong slot used for consensus operation"
-      `Quick
-      test_wrong_slot_used;
-    Tztest.tztest
       "sufficient endorsement threshold"
       `Quick
       (test_endorsement_threshold ~sufficient_threshold:true);
@@ -583,10 +552,6 @@ let tests =
       "Endorsement/Preendorsement at same level"
       `Quick
       test_preendorsement_endorsement_same_level;
-    Tztest.tztest
-      "Wrong endorsement slot in mempool mode"
-      `Quick
-      test_wrong_endorsement_slot_in_mempool_mode;
     Tztest.tztest
       "Endorsement for next level"
       `Quick
