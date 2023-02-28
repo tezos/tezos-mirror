@@ -79,7 +79,7 @@ module Benchmark = struct
 end
 
 (** Registers a benchmark with a model, model names are uniformely generated *)
-let register_simple ((module Bench) : Benchmark.t) =
+let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark_base.S = struct
     include Bench
 
