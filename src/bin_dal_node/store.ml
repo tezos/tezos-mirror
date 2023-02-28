@@ -74,6 +74,10 @@ module Shards = struct
     let*! () =
       Event.(emit stored_slot_shards (commitment, Seq.length shards))
     in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
+
+       DAL/Node: rehaul the store  abstraction & notification system.
+    *)
     return @@ Lwt_watcher.notify shards_watcher commitment
 
   let init node_store_dir shard_store_dir =
@@ -161,6 +165,10 @@ let decode_profile profile =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string Services.Types.profile_encoding profile
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
+
+   DAL/Node: Replace Irmin storage for paths
+*)
 module Legacy = struct
   module Path : sig
     type t = string list
