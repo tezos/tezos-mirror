@@ -941,10 +941,11 @@ module Inner = struct
 
   let commit t p =
     let degree = Polynomials.degree p in
-    if degree >= t.k then
+    let srs_g1_size = Srs_g1.size t.srs.raw.srs_g1 in
+    if degree >= srs_g1_size then
       Error
         (`Invalid_degree_strictly_less_than_expected
-          {given = degree; expected = t.k})
+          {given = degree; expected = srs_g1_size})
     else Ok (Srs_g1.pippenger t.srs.raw.srs_g1 p)
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
