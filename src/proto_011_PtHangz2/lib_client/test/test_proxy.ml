@@ -65,6 +65,7 @@ let test_split_key =
     let pp_sep fmt () = Format.fprintf fmt "/" in
     Format.pp_print_list ~pp_sep Format.pp_print_string
   in
+
   QCheck2.Test.make
     ~name:"[fst (split_key s)] is a prefix of [s]"
     QCheck2.Gen.(pair proxy_mode_gen key_gen)
@@ -85,4 +86,4 @@ let test_split_key =
 let () =
   Alcotest.run
     "tezos-lib-client-proxy"
-    [("proxy", Qcheck_helpers.qcheck_wrap [test_split_key])]
+    [(Protocol.name ^ ": proxy", Qcheck_helpers.qcheck_wrap [test_split_key])]

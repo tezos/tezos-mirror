@@ -91,7 +91,7 @@ let () =
   Alcotest_lwt.run
     "tezos-lib-client-proto-contracts"
     [
-      ( "client_proto_contracts",
+      ( Protocol.name ^ ": client_proto_contracts 012",
         [Tztest.tztest "test_find_destination" `Quick test_find_destination] );
     ]
   |> Lwt_main.run
