@@ -1,14 +1,24 @@
+stages:
+  - build
+
 fmt:
+  stage: build
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   script:
-    - opam install ocamlformat.0.21.0
-    - eval $(opam env)
+    - opam-2.1 install ocamlformat.0.21.0
     - dune build @fmt
 
 build:
+  stage: build
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   before_script:
     - sudo apt update
   script:
     - OPAMJOBS=`nproc` opam-2.1 install --deps-only -y ./teztale-full.opam
     - dune build
+  artifacts:
+    name: binaries
+    expire_in: 1 week
+    paths:
+      - archiver/main.exe
+      - server/main.exe
