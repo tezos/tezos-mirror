@@ -142,11 +142,37 @@ val unparse_contract :
   'b typed_contract ->
   ('loc Script.michelson_node * context, error trace) result
 
-(** [MICHESLON_PARSER] signature describes a set of dependencies required to
+(** Lambdas are normalized at parsing and also at unparsing. These
+    normalizations require to parse and unparse data appearing inside
+    PUSH and introduces a mutual dependency between this module and
+    [Script_ir_translator] which is resolved as follows:
+    - [Script_ir_translator.parse_data] takes the normalization function
+      [unparse_code_rec] as argument,
+    - the unparsing function [unparse_data_rec] and the normalization
+      function [unparse_code_rec] are mutually defined in a functor
+      parameterized by the missing bits from [Script_ir_translator]; see the
+      module signature [MICHELSON_PARSER] below.
+ *)
+
+(** The [unparse_code_rec] function is not exported (except through
+    the [Internal_for_benchmarking] module), but needs to be called by
+    [parse_data] to normalize lambdas so it is passed as argument to
+    the [parse_data] of the [MICHELSON_PARSER] signature below and to
+    several functions of [Script_ir_translator]. To avoid repeating the
+    signature of this function we define a type alias for it. *)
+type unparse_code_rec =
+  context ->
+  stack_depth:int ->
+  unparsing_mode ->
+  Script.node ->
+  (Script.node * context) tzresult Lwt.t
+
+(** [MICHELSON_PARSER] signature describes a set of dependencies required to
     unparse arbitrary values in the IR. Because some of those values contain
     just a Michelson code that does not need to be parsed immediately,
     unparsing them requires extracting information from that code – that's
     why we depend on the parser here. *)
+
 module type MICHELSON_PARSER = sig
   val opened_ticket_type :
     Script.location ->
@@ -162,6 +188,7 @@ module type MICHELSON_PARSER = sig
     (ex_ty * context) tzresult
 
   val parse_data :
+    unparse_code_rec:unparse_code_rec ->
     elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
