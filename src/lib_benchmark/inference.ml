@@ -342,28 +342,28 @@ let wrap_python_solver ~input ~output solver =
 
 let ridge ~alpha ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
-      Scikit.LinearModel.ridge ~alpha ~input ~output ())
+      Pyinference.LinearModel.ridge ~alpha ~input ~output ())
 
 let lasso ~alpha ~positive ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
-      Scikit.LinearModel.lasso ~alpha ~positive ~input ~output ())
+      Pyinference.LinearModel.lasso ~alpha ~positive ~input ~output ())
 
 let nnls ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
-      Scikit.LinearModel.nnls ~input ~output)
+      Pyinference.LinearModel.nnls ~input ~output)
 
 let predict_output ~input ~weights =
   let input = to_scipy input in
   let weights = to_scipy weights in
-  Scikit.predict_output ~input ~weights
+  Pyinference.predict_output ~input ~weights
 
 let r2_score ~output ~prediction =
   let output = to_scipy output in
-  Scikit.r2_score ~output ~prediction
+  Pyinference.r2_score ~output ~prediction
 
 let rmse_score ~output ~prediction =
   let output = to_scipy output in
-  Scikit.rmse_score ~output ~prediction
+  Pyinference.rmse_score ~output ~prediction
 
 let calculate_benchmark_scores ~input ~output =
   let output =
@@ -399,7 +399,7 @@ let calculate_benchmark_scores ~input ~output =
 
   let input = to_scipy input in
   let output = to_scipy_vector output in
-  let params, tvalues = Scikit.benchmark_score ~input ~output in
+  let params, tvalues = Pyinference.benchmark_score ~input ~output in
   (params |> of_scipy, tvalues |> of_scipy)
 
 let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
