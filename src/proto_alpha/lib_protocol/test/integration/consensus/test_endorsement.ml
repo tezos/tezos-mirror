@@ -178,18 +178,48 @@ let test_other_delegate_slot () =
       | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
     Endorsement
 
-(** Invalid_endorsement_level: apply an endorsement with an incorrect
-    level (i.e. the predecessor level). *)
-let test_invalid_endorsement_level () =
-  init_genesis () >>=? fun (genesis, b) ->
-  Context.get_level (B genesis) >>?= fun genesis_level ->
-  Op.endorsement ~level:genesis_level b >>=? fun operation ->
-  Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
+(** {2 Wrong level} *)
+
+let error_old_level = function
+  | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one level too old, aka grandparent endorsement
+    (the endorsement is expected to point to the level of the
+    predecessor of the block/mempool containing the endorsement, but
+    instead it points to the grandparent's level).
+
+    This endorsement should fail in a block (application or
+    construction), but be accepted in mempool mode. *)
+let test_one_level_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis () in
+  let* predecessor = Block.bake grandparent in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:grandparent
+    ~predecessor
+    ~application_error:error_old_level
+    ~construction_error:error_old_level
+    ?mempool_error:None
+    Endorsement
+
+(** Endorsement that is two levels too old (pointing to the
+    great-grandparent instead of the predecessor). It should fail in
+    all modes. *)
+let test_two_levels_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, greatgrandparent = init_genesis () in
+  let* grandparent = Block.bake greatgrandparent in
+  let* predecessor = Block.bake grandparent in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:greatgrandparent
+    ~predecessor
+    ~error:error_old_level
+    Endorsement
 
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
@@ -216,41 +246,6 @@ let test_consensus_operation_endorsement_for_future_level () =
     ~level
     ~error:(function
       | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Mempool
-
-(** Consensus operation for old level : apply an endorsement one level in the past *)
-let test_consensus_operation_endorsement_for_predecessor_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:pred
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Mempool
-
-(** Consensus operation for old level : apply an endorsement with more than one level in the past *)
-let test_consensus_operation_endorsement_for_old_level () =
-  init_genesis () >>=? fun (genesis, pred) ->
-  Block.bake genesis >>=? fun _next_block ->
-  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:pred
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
@@ -315,24 +310,6 @@ let test_wrong_round () =
     ~round
     ~error:(function
       | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Application
-
-(** Wrong level : apply an endorsement with an incorrect level *)
-let test_wrong_level () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  (* let context = Context.B genesis in*)
-  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:b
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
@@ -414,20 +391,6 @@ let test_endorsement_for_next_round () =
     ~kind:`Endorsement
     ~next:`Round
 
-(** Endorsement of grandparent  *)
-let test_endorsement_grandparent () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
-  (* Endorsement on grandparent *)
-  Op.endorsement b_gp >>=? fun op1 ->
-  (* Endorsement on parent *)
-  Op.endorsement b >>=? fun op2 ->
-  (* Both should be accepted by the mempool *)
-  Incremental.add_operation i op1 >>=? fun i ->
-  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
-
 (** Double inclusion of grandparent endorsement *)
 let test_double_endorsement_grandparent () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
@@ -465,34 +428,6 @@ let test_endorsement_grandparent_same_slot () =
   Incremental.add_operation i op1 >>=? fun i ->
   Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
 
-(** Endorsement of grandparent in application mode should be rejected *)
-let test_endorsement_grandparent_application () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Op.endorsement b_gp >>=? fun operation ->
-  Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-
-(** Endorsement of grandparent in full construction mode should be rejected *)
-let test_endorsement_grandparent_full_construction () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Incremental.begin_construction b >>=? fun i ->
-  (* Endorsement on grandparent *)
-  Op.endorsement b_gp >>=? fun op1 ->
-  Incremental.add_operation i op1 >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-
 let tests =
   [
     (* Positive tests *)
@@ -505,23 +440,14 @@ let tests =
     Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
     Tztest.tztest "Non-normalized slot" `Quick test_not_smallest_slot;
     Tztest.tztest "Slot of another delegate" `Quick test_other_delegate_slot;
-    Tztest.tztest
-      "Invalid endorsement level"
-      `Quick
-      test_invalid_endorsement_level;
+    (* Wrong level *)
+    Tztest.tztest "One level too old" `Quick test_one_level_too_old;
+    Tztest.tztest "Two levels too old" `Quick test_two_levels_too_old;
     Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
     Tztest.tztest
       "Endorsement for future level"
       `Quick
       test_consensus_operation_endorsement_for_future_level;
-    Tztest.tztest
-      "Endorsement for predecessor level"
-      `Quick
-      test_consensus_operation_endorsement_for_old_level;
-    Tztest.tztest
-      "Endorsement for old level"
-      `Quick
-      test_consensus_operation_endorsement_for_old_level;
     Tztest.tztest
       "Endorsement for future round"
       `Quick
@@ -534,7 +460,6 @@ let tests =
       "Endorsement on competing proposal"
       `Quick
       test_consensus_operation_endorsement_on_competing_proposal;
-    Tztest.tztest "Wrong level for consensus operation" `Quick test_wrong_level;
     Tztest.tztest "Wrong round for consensus operation" `Quick test_wrong_round;
     Tztest.tztest
       "Wrong payload hash for consensus operation"
@@ -561,10 +486,6 @@ let tests =
       `Quick
       test_endorsement_for_next_round;
     Tztest.tztest
-      "Endorsement for grandparent"
-      `Quick
-      test_endorsement_grandparent;
-    Tztest.tztest
       "Double endorsement of grandparent"
       `Quick
       test_double_endorsement_grandparent;
@@ -572,12 +493,4 @@ let tests =
       "Endorsement for grandparent on same slot as parent"
       `Quick
       test_endorsement_grandparent_same_slot;
-    Tztest.tztest
-      "Endorsement for grandparent in application mode"
-      `Quick
-      test_endorsement_grandparent_application;
-    Tztest.tztest
-      "Endorsement for grandparent in full construction mode"
-      `Quick
-      test_endorsement_grandparent_full_construction;
   ]

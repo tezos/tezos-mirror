@@ -47,10 +47,12 @@ type kind = Preendorsement | Endorsement
     predecessor of that block. Optional arguments allow to override
     these default parameters.
 
-    The [endorsed_block] is also used as the predecessor of the baked
-    block, or as the head of the mempool. *)
+    The [predecessor] is used as the predecessor of the baked block or
+    the head of the mempool. When it is not provided, we use the
+    [endorsed_block] for this. *)
 let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
-    ?branch ~endorsed_block ?error ~loc kind mode =
+    ?branch ~endorsed_block ?(predecessor = endorsed_block) ?error ~loc kind
+    mode =
   let open Lwt_result_syntax in
   let* operation =
     match kind with
@@ -82,14 +84,13 @@ let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
   in
   match mode with
   | Application ->
-      Block.bake ~baking_mode:Application ~operation endorsed_block
-      >>= check_error
+      Block.bake ~baking_mode:Application ~operation predecessor >>= check_error
   | Construction ->
-      Block.bake ~baking_mode:Baking ~operation endorsed_block >>= check_error
+      Block.bake ~baking_mode:Baking ~operation predecessor >>= check_error
   | Mempool ->
       let*! res =
         let* inc =
-          Incremental.begin_construction ~mempool_mode:true endorsed_block
+          Incremental.begin_construction ~mempool_mode:true predecessor
         in
         let* inc = Incremental.add_operation inc operation in
         (* Finalization doesn't do much in mempool mode, but some RPCs
@@ -98,10 +99,11 @@ let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
       in
       check_error res
 
-let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
-    ?block_payload_hash ?branch ~endorsed_block ?error ~loc kind =
+let test_consensus_operation_all_modes_different_outcomes ?delegate ?slot ?level
+    ?round ?block_payload_hash ?branch ~endorsed_block ?predecessor ~loc
+    ?application_error ?construction_error ?mempool_error kind =
   List.iter_es
-    (fun mode ->
+    (fun (mode, error) ->
       test_consensus_operation
         ?delegate
         ?slot
@@ -110,11 +112,33 @@ let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
         ?block_payload_hash
         ?branch
         ~endorsed_block
+        ?predecessor
         ?error
         ~loc:(Format.sprintf "%s (%s mode)" loc (show_mode mode))
         kind
         mode)
-    [Application; Construction; Mempool]
+    [
+      (Application, application_error);
+      (Construction, construction_error);
+      (Mempool, mempool_error);
+    ]
+
+let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
+    ?block_payload_hash ?branch ~endorsed_block ?predecessor ?error ~loc kind =
+  test_consensus_operation_all_modes_different_outcomes
+    ?delegate
+    ?slot
+    ?level
+    ?round
+    ?block_payload_hash
+    ?branch
+    ~endorsed_block
+    ?predecessor
+    ~loc
+    ?application_error:error
+    ?construction_error:error
+    ?mempool_error:error
+    kind
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in
