@@ -27,10 +27,7 @@
 type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
-  | Hash_of_page_is_invalid of {
-      expected : Dac_plugin.hash;
-      actual : Dac_plugin.hash;
-    }
+  | Invalid_page_hash of {expected : Dac_plugin.hash; actual : Dac_plugin.hash}
 
 let () =
   register_error_kind
@@ -79,12 +76,12 @@ let () =
         (Dac_plugin.hash_to_bytes actual))
     Data_encoding.(
       obj2
-        (req "expected" Dac_plugin.raw_encoding)
-        (req "acual" Dac_plugin.raw_encoding))
+        (req "expected" Dac_plugin.non_proto_encoding_unsafe)
+        (req "acual" Dac_plugin.non_proto_encoding_unsafe))
     (function
-      | Hash_of_page_is_invalid {expected; actual} -> Some (expected, actual)
+      | Invalid_page_hash {expected; actual} -> Some (expected, actual)
       | _ -> None)
-    (fun (expected, actual) -> Hash_of_page_is_invalid {expected; actual})
+    (fun (expected, actual) -> Invalid_page_hash {expected; actual})
 
 module type S = sig
   type t
@@ -154,12 +151,40 @@ module Filesystem : S with type configuration = string = struct
       (fun _exn -> tzfail @@ Cannot_read_page_from_page_storage hash_string)
 end
 
+module With_data_integrity_check (P : S) :
+  S with type configuration = P.configuration and type t = P.t = struct
+  type t = P.t
+
+  type configuration = P.configuration
+
+  let init config = P.init config
+
+  let save plugin page_store ~hash ~content =
+    let open Lwt_result_syntax in
+    let ((module Plugin) : Dac_plugin.t) = plugin in
+    let scheme = Plugin.scheme_of_hash hash in
+    let content_hash = Plugin.hash_bytes [content] ~scheme in
+    if not @@ Plugin.equal hash content_hash then
+      tzfail @@ Invalid_page_hash {expected = hash; actual = content_hash}
+    else P.save plugin page_store ~hash ~content
+
+  let mem = P.mem
+
+  let load = P.load
+end
+
+module Filesystem_with_integrity_check :
+  S with type configuration = string and type t = Filesystem.t =
+  With_data_integrity_check (Filesystem)
+
 type remote_configuration = {
   cctxt : Dac_node_client.cctxt;
   page_store : Filesystem.t;
 }
 
 module Remote : S with type configuration = remote_configuration = struct
+  module F = Filesystem_with_integrity_check
+
   type t = Dac_node_client.cctxt * Filesystem.t
 
   type configuration = remote_configuration
@@ -167,25 +192,23 @@ module Remote : S with type configuration = remote_configuration = struct
   let init {cctxt; page_store} = (cctxt, page_store)
 
   let save plugin (_cctxt, page_store) ~hash ~content =
-    Filesystem.save plugin page_store ~hash ~content
+    F.save plugin page_store ~hash ~content
 
-  let mem plugin (_cctxt, page_store) hash =
-    Filesystem.mem plugin page_store hash
+  let mem plugin (_cctxt, page_store) hash = F.mem plugin page_store hash
 
   let load plugin (cctxt, page_store) hash =
     let open Lwt_result_syntax in
     let (module Plugin : Dac_plugin.T) = plugin in
     let* file_exists_locally = mem plugin (cctxt, page_store) hash in
-    if file_exists_locally then Filesystem.load plugin page_store hash
+    if file_exists_locally then F.load plugin page_store hash
     else
-      let hashing_scheme = Plugin.scheme_of_hash hash in
       let* content = Dac_node_client.get_preimage plugin cctxt hash in
-      let fetched_hash = Plugin.hash_bytes ~scheme:hashing_scheme [content] in
-      (* TODO: expose Dac_hash.equal from protocol. *)
-      if not @@ Plugin.equal hash fetched_hash then
-        tzfail
-        @@ Hash_of_page_is_invalid {expected = hash; actual = fetched_hash}
-      else
-        let+ () = Filesystem.save plugin page_store ~hash ~content in
-        content
+      let+ () = F.save plugin page_store ~hash ~content in
+      content
+end
+
+module Internal_for_tests_only = struct
+  module With_data_integrity_check : functor (P : S) ->
+    S with type configuration = P.configuration and type t = P.t =
+    With_data_integrity_check
 end

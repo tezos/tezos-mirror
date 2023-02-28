@@ -30,10 +30,7 @@
 type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
-  | Hash_of_page_is_invalid of {
-      expected : Dac_plugin.hash;
-      actual : Dac_plugin.hash;
-    }
+  | Invalid_page_hash of {expected : Dac_plugin.hash; actual : Dac_plugin.hash}
 
 (** [S] is the module type defining the backend required for
     persisting DAC pages data onto the page storage. *)
@@ -95,3 +92,15 @@ type remote_configuration = {
    uses a connection to a Dac node to retrieve pages that are not
    saved locally. *)
 module Remote : S with type configuration = remote_configuration
+
+(** Module with functors for constructing page stores. Reserved for
+    internal use for tests only.*)
+module Internal_for_tests_only : sig
+  (** [With_data_integrity_check] tweaks a module [P] of type [Page_store]
+      so that the [content] of a page is verified against the [hash] supplied,
+      before the page is saved in the underlying [Page_store]. If the
+      verification of the hash fails, the
+      page is not saved and the error [Hash_of_page_is_invalid] is returned.  *)
+  module With_data_integrity_check : functor (P : S) ->
+    S with type configuration = P.configuration and type t = P.t
+end
