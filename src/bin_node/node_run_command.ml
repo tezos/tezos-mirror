@@ -509,7 +509,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   (* Main loop *)
   let lwt_log_sink_unix, internal_events =
     Log_config.make_internal_events_with_defaults
-      ~internal_events:(config.internal_events, config.data_dir)
+      ~internal_events:config.internal_events
       ?verbosity
       ~log_cfg:config.log
       ()
