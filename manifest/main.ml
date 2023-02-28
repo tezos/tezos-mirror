@@ -5683,16 +5683,24 @@ let _octez_store_tests =
         ]
 
 let _octez_shell_tests =
-  tests
+  tezt
     [
-      "test_shell";
-      "test_synchronisation_heuristic_fuzzy";
-      "test_shell_operation";
+      "generators";
+      "generators_tree";
+      "shell_test_helpers";
+      "test_consensus_heuristic";
+      "test_node";
+      "test_peer_validator";
       "test_prevalidation";
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
-      "test_peer_validator";
+      "test_protocol_validator";
+      "test_shell";
+      "test_shell_operation";
+      "test_synchronisation_heuristic";
+      "test_synchronisation_heuristic_fuzzy";
+      "test_validator";
     ]
     ~path:"src/lib_shell/test"
     ~with_macos_security_framework:true
@@ -5717,7 +5725,7 @@ let _octez_shell_tests =
         octez_validation |> open_;
         octez_event_logging_test_helpers |> open_;
         octez_test_helpers |> open_;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 (* INTERNAL EXES *)
