@@ -93,7 +93,7 @@ end
 (** Store context *)
 type node_store = {
   store : t;
-  shard_store : Shard_store.t;
+  shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
@@ -105,15 +105,11 @@ let open_shards_stream {shards_watcher; _} =
 (** [init config] inits the store on the filesystem using the given [config]. *)
 let init config =
   let open Lwt_result_syntax in
-  let dir = Configuration.data_dir_path config path in
+  let base_dir = Configuration.data_dir_path config path in
   let shards_watcher = Lwt_watcher.create_input () in
-  let*! repo = Repo.v (Irmin_pack.config dir) in
+  let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let* shard_store =
-    Shard_store.init
-      ~max_mutexes:Constants.shards_max_mutexes
-      (Filename.concat dir shard_store_path)
-  in
+  let shard_store = Shards.init base_dir shard_store_path in
   let*! () = Event.(emit store_is_ready ()) in
   return {shard_store; store; shards_watcher}
 
@@ -636,15 +632,4 @@ module Legacy = struct
           (fun header ->
             if header.Services.Types.status = hs then Some header else None)
           accu
-
-  let save_shards store commitment shards =
-    let open Lwt_result_syntax in
-    let* () =
-      Shard_store.write_shards store.shard_store commitment shards
-      |> Errors.other_lwt_result
-    in
-    let*! () =
-      Event.(emit stored_slot_shards (commitment, Seq.length shards))
-    in
-    return @@ Lwt_watcher.notify store.shards_watcher commitment
 end

@@ -64,7 +64,7 @@ let get_attestable_slots ctxt store cryptobox proto_parameters pkh
       | Error `Not_found -> return false
       | Error (#decoding as e) -> fail (e :> [Errors.decoding | Errors.other])
       | Ok commitment ->
-          Shard_store.are_shards_available
+          Store.Shards.are_shards_available
             ~share_size
             store.shard_store
             commitment

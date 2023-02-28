@@ -155,26 +155,62 @@ let save_shards store cryptobox commitment shards =
     if Cryptobox.Commitment.equal commitment rebuilt_commitment then Ok ()
     else Result_syntax.fail [Invalid_shards_slot_header_association]
   in
-  Store.Legacy.save_shards store commitment shards |> Errors.to_tzresult
+  Store.(
+    Shards.save_and_notify
+      store.shard_store
+      store.shards_watcher
+      commitment
+      shards)
+  |> Errors.to_tzresult
 
-let get_shard dal_constants store slot_header shard_id =
+let get_shard _dal_constants store slot_header shard_id =
   let open Lwt_result_syntax in
-  let share_size = Cryptobox.encoded_share_size dal_constants in
-  let* r = Shard_store.read_shard ~share_size store slot_header shard_id in
-  return r
+  let* share = Store.Shards.read_value store (slot_header, shard_id) in
+  return {Cryptobox.share; index = shard_id}
+
+let with_commitment_as_seq commitment shards_indices =
+  Seq.map (fun index -> (commitment, index)) @@ List.to_seq shards_indices
+
+let rev_fetched_values_as seq f init =
+  Seq_s.E.fold_left
+    (fun acc ((_commitment, shard_id), v) ->
+      match v with
+      | Error err -> Error err
+      | Ok v -> Ok (f Cryptobox.{index = shard_id; share = v} acc))
+    init
+    seq
 
 let get_shards dal_constants store slot_header shard_ids =
   let open Lwt_result_syntax in
-  let share_size = Cryptobox.encoded_share_size dal_constants in
-  let* r =
-    Shard_store.read_shards_subset ~share_size store slot_header shard_ids
+  let _share_size = Cryptobox.encoded_share_size dal_constants in
+  let res =
+    Store.Shards.read_values store
+    @@ with_commitment_as_seq slot_header shard_ids
   in
-  return r
+  let* rev_list = rev_fetched_values_as res List.cons [] in
+  return @@ List.rev rev_list
 
 let get_slot cryptobox store slot_header =
   let open Lwt_result_syntax in
-  let share_size = Cryptobox.encoded_share_size cryptobox in
-  let* shards = Shard_store.read_shards ~share_size store slot_header in
+  let {Cryptobox.number_of_shards; redundancy_factor; _} =
+    Cryptobox.parameters cryptobox
+  in
+  let minimal_number_of_shards =
+    assert (number_of_shards mod redundancy_factor = 0) ;
+    number_of_shards / redundancy_factor
+  in
+  let rec loop acc shard_id remaining =
+    if remaining <= 0 then return acc
+    else if shard_id >= number_of_shards then
+      let provided = minimal_number_of_shards - remaining in
+      tzfail @@ Missing_shards {provided; required = minimal_number_of_shards}
+    else
+      let*! res = get_shard cryptobox store slot_header shard_id in
+      match res with
+      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
+      | Error _ -> loop acc (shard_id + 1) remaining
+  in
+  let* shards = loop Seq.empty 0 minimal_number_of_shards in
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in

@@ -40,7 +40,7 @@ type slot = bytes
     [slot_header] at the range [shard_id]. *)
 val get_shard :
   Cryptobox.t ->
-  Shard_store.t ->
+  Store.Shards.t ->
   Cryptobox.commitment ->
   int ->
   Cryptobox.shard tzresult Lwt.t
@@ -49,7 +49,7 @@ val get_shard :
     associated to [slot_header] at the ranges [shard_ids]. *)
 val get_shards :
   Cryptobox.t ->
-  Shard_store.t ->
+  Store.Shards.t ->
   Cryptobox.commitment ->
   int list ->
   Cryptobox.shard list tzresult Lwt.t
@@ -63,7 +63,7 @@ val get_shards :
     [Cryptobox.parameters] argument. *)
 val get_slot_pages :
   Cryptobox.t ->
-  Shard_store.t ->
+  Store.Shards.t ->
   Cryptobox.commitment ->
   bytes list tzresult Lwt.t
 
