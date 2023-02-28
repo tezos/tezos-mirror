@@ -719,6 +719,33 @@ module Codegen_inferred_cmd = struct
       codegen_infer_handler
 end
 
+module Solution_print_cmd = struct
+  let solution_print_handler () solutions () =
+    commandline_outcome_ref := Some (Solution_print solutions) ;
+    Lwt.return_ok ()
+
+  let group =
+    {Tezos_clic.name = "solution"; title = "Command for solution file"}
+
+  let params =
+    Tezos_clic.(
+      prefixes ["solution"; "print"]
+      @@ seq_of_param
+           (string
+              ~name:"SOLUTION-FILE"
+              ~desc:
+                "File containing solution, as obtained using the \
+                 --save-solution switch"))
+
+  let command =
+    Tezos_clic.command
+      ~group
+      ~desc:"Print out the given solution file(s)"
+      Tezos_clic.no_options
+      params
+      solution_print_handler
+end
+
 module List_cmd = struct
   (* ------------------------------------------------------------------------- *)
 
@@ -1370,6 +1397,7 @@ let all_commands =
     Codegen_all_cmd.command;
     Codegen_inferred_cmd.command;
     Generate_config_cmd.command;
+    Solution_print_cmd.command;
   ]
   @ List_cmd.commands @ Config_cmd.commands @ Workload_cmd.commands
   @ Display_info_cmd.commands
