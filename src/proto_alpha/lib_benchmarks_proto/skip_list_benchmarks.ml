@@ -69,7 +69,7 @@ module Next : Benchmark.S = struct
 
   let model =
     let conv x = (x, ()) in
-    Model.make ~conv ~model:(Model.logn ~coeff:(fv "len_coeff"))
+    Model.make ~conv ~model:Model.logn
 
   let create_skip_list_of_len len =
     let rec go n cell =
@@ -147,9 +147,7 @@ module Hash_cell : Benchmark.S = struct
     Model.make
       ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
       ~model:
-        (Model.affine
-           ~intercept:(fv "cost_hash_skip_list_cell")
-           ~coeff:(fv "cost_hash_skip_list_cell_coef"))
+        Model.affine
 
   let create_benchmark ~rng_state conf =
     (* Since the model we want to infer is logarithmic in
