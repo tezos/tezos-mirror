@@ -153,8 +153,10 @@ let process_consensus_op (type kind) cctxt
   | Some existing_op
     when Block_payload_hash.(
            get_payload_hash op_kind existing_op
-           <> get_payload_hash op_kind new_op) ->
-      (* same level and round, and different payload hash for this slot *)
+           <> get_payload_hash op_kind new_op)
+         || Block_hash.(existing_op.shell.branch <> new_op.shell.branch) ->
+      (* same slot, level, and round, and:
+         different payload hash OR different branch *)
       let new_op_hash, existing_op_hash =
         (Operation.hash new_op, Operation.hash existing_op)
       in

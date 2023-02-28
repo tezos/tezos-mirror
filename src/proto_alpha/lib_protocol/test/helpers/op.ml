@@ -43,13 +43,16 @@ let sign ?(watermark = Signature.Generic_operation) sk branch contents =
 (** Generates the block payload hash based on the hash [pred_hash] of
     the predecessor block and the hash of non-consensus operations of
     the current block [b]. *)
-let mk_block_payload_hash predecessor_hash payload_round (b : Block.t) =
+let mk_block_payload_hash payload_round (b : Block.t) =
   let ops = Block.Forge.classify_operations b.operations in
   let non_consensus_operations =
     List.concat (match List.tl ops with None -> [] | Some l -> l)
   in
   let hashes = List.map Operation.hash_packed non_consensus_operations in
-  Block_payload.hash ~predecessor_hash ~payload_round hashes
+  Block_payload.hash
+    ~predecessor_hash:b.header.shell.predecessor
+    ~payload_round
+    hashes
 
 let mk_consensus_content_signer_and_pred_branch ?delegate ?slot ?level ?round
     ?block_payload_hash ?pred_branch endorsed_block =
@@ -87,7 +90,7 @@ let mk_consensus_content_signer_and_pred_branch ?delegate ?slot ?level ?round
   in
   let block_payload_hash =
     match block_payload_hash with
-    | None -> mk_block_payload_hash pred_branch round endorsed_block
+    | None -> mk_block_payload_hash round endorsed_block
     | Some block_payload_hash -> block_payload_hash
   in
   let consensus_content = {slot; level; round; block_payload_hash} in

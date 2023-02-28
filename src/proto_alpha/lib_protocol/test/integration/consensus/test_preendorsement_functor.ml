@@ -96,23 +96,6 @@ end = struct
   let include_preendorsement_in_block_with_locked_round () =
     aux_simple_preendorsement_inclusion ~loc:__LOC__ ()
 
-  (** KO: bake a block "_b2_1" at round 1, containing a PQC and a locked
-    round of round 0. But the preendorsement is on a bad branch *)
-  let test_preendorsement_with_bad_branch () =
-    aux_simple_preendorsement_inclusion
-    (* preendorsement should be on branch _pred to be valid *)
-      ~preend_branch:(fun predpred _pred _curr -> predpred)
-      ~loc:__LOC__
-      ~post_process:
-        (Error
-           (function
-           | Validate_errors.Consensus.Wrong_consensus_operation_branch
-               {kind; _}
-             when kind = Validate_errors.Consensus.Preendorsement ->
-               true
-           | _ -> false))
-      ()
-
   (** KO: The same preendorsement injected twice in the PQC *)
   let duplicate_preendorsement_in_pqc () =
     aux_simple_preendorsement_inclusion (* inject the op twice *)
@@ -260,10 +243,6 @@ end = struct
         "ok: include_preendorsement_in_block_with_locked_round"
         `Quick
         include_preendorsement_in_block_with_locked_round;
-      my_tztest
-        "ko: test_preendorsement_with_bad_branch"
-        `Quick
-        test_preendorsement_with_bad_branch;
       my_tztest
         "ko: duplicate_preendorsement_in_pqc"
         `Quick

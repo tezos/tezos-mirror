@@ -61,6 +61,10 @@ let double_endorsement ctxt ?(correct_order = true) op1 op2 =
   let e1, e2 = order_endorsements ~correct_order op1 op2 in
   Op.double_endorsement ctxt e1 e2
 
+let double_preendorsement ctxt ?(correct_order = true) op1 op2 =
+  let e1, e2 = order_endorsements ~correct_order op1 op2 in
+  Op.double_preendorsement ctxt e1 e2
+
 (** This test verifies that when a "cheater" double endorses and
     doesn't have enough tokens to re-freeze of full deposit, we only
     freeze what we can (i.e. the remaining balance) but we check that
@@ -125,6 +129,25 @@ let test_valid_double_endorsement_evidence () =
   >>=? fun full_balance_with_rewards ->
   let real_reward = Test_tez.(full_balance_with_rewards -! full_balance) in
   Assert.equal_tez ~loc:__LOC__ expected_reward real_reward
+
+(** Check that a double (pre)endorsement evidence with equivalent
+    endorsements but on different branches succeeds. *)
+let test_different_branch () =
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
+  Block.bake genesis >>=? fun blk ->
+  Context.get_endorser (B blk) >>=? fun (endorser, _slots) ->
+  Op.raw_endorsement ~delegate:endorser blk >>=? fun endorsement_a ->
+  Op.raw_endorsement ~pred_branch:Block_hash.zero ~delegate:endorser blk
+  >>=? fun endorsement_b ->
+  let operation = double_endorsement (B blk) endorsement_a endorsement_b in
+  Block.bake ~operation blk >>=? fun _blk ->
+  Op.raw_preendorsement ~delegate:endorser blk >>=? fun preendorsement_a ->
+  Op.raw_preendorsement ~pred_branch:Block_hash.zero ~delegate:endorser blk
+  >>=? fun preendorsement_b ->
+  let operation =
+    double_preendorsement (B blk) preendorsement_a preendorsement_b
+  in
+  Block.bake ~operation blk >>=? fun _blk -> return_unit
 
 (** Say a delegate double-endorses twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
@@ -472,6 +495,10 @@ let tests =
       "valid double endorsement evidence"
       `Quick
       test_valid_double_endorsement_evidence;
+    Tztest.tztest
+      "valid evidence with same (pre)endorsements on different branches"
+      `Quick
+      test_different_branch;
     Tztest.tztest
       "2 valid double endorsement evidences lead to not being able to bake"
       `Quick

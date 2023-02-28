@@ -69,6 +69,9 @@ Minor Changes
 
 - Adapt new mempool with proto add_operation. (MR :gl:`!6749`)
 
+- Relax (pre)endorsements branch condition and allow denunciations of
+  a same endorsement on different branches. (MR :gl:`!7828`)
+
 Internal
 --------
 
