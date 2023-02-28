@@ -53,6 +53,10 @@ module Configuration :
 
     let add = ( + )
 
+    let sub = ( - )
+
+    let mul_span = ( * )
+
     include Compare.Int
   end
 
@@ -80,17 +84,24 @@ end
 
 module GS = Make (Configuration)
 
-let limits =
+(* Most of these limits are the default ones used by the Go implementation. *)
+let default_limits =
   {
-    max_recv_ihave_per_heartbeat = 0;
-    max_sent_iwant_per_heartbeat = 0;
-    expected_peers_per_topic = 0;
+    max_recv_ihave_per_heartbeat = 10;
+    max_sent_iwant_per_heartbeat = 5000;
+    degree_optimal = 6;
     gossip_publish_threshold = 0.;
     accept_px_threshold = 0.;
-    unsubscribe_backoff = 0;
-    graft_flood_backoff = 0;
-    prune_backoff = 0;
-    retain_duration = 0;
+    unsubscribe_backoff = 10;
+    graft_flood_backoff = -50;
+    prune_backoff = 60;
+    retain_duration = 10;
+    heartbeat_interval = 1;
+    backoff_cleanup_ticks = 15;
+    degree_low = 5;
+    degree_high = 12;
+    degree_score = 4;
+    degree_out = 2;
   }
 
 let parameters = {peer_filter = (fun _peer _action -> true)}
@@ -118,7 +129,7 @@ let init_state ~(peer_no : int) ~(topics : string list) ~(direct : bool)
       (fun state topic ->
         let state, _output = GS.join topic state in
         state)
-      (GS.make rng limits parameters)
+      (GS.make rng default_limits parameters)
       topics
   in
   let peers =
