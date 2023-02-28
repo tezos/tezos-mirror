@@ -2684,7 +2684,6 @@ let test_automatically_added_internal_messages () =
       [(level_one_info, level_one, []); (level_two_info, level_two, ["foo"])]
   in
 
-  let level_two = Raw_level.of_int32_exn 2l in
   (* Assert SOL is at position 0. *)
   let sol = Sc_rollup_helpers.make_sol ~inbox_level:level_two in
   let* () =
