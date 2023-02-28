@@ -138,11 +138,10 @@ module Profile_handlers = struct
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
   let get_attestable_slots ctxt pkh attested_level () () =
-    call_handler2 ctxt (fun store {cryptobox; proto_parameters; _} ->
+    call_handler2 ctxt (fun store {proto_parameters; _} ->
         Profile_manager.get_attestable_slots
           ctxt
           store
-          cryptobox
           proto_parameters
           pkh
           ~attested_level

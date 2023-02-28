@@ -50,7 +50,9 @@ module Shards = struct
 
   type nonrec t = (Cryptobox.Commitment.t * int, Cryptobox.share) t
 
-  let are_shards_available ~share_size:_ store commitment shard_indexes =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
+     Make storage more resilient to DAL parameters change. *)
+  let are_shards_available store commitment shard_indexes =
     let open Lwt_result_syntax in
     List.for_all_es
       (fun index ->
