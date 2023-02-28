@@ -35,7 +35,7 @@ let path = "store"
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
-let shard_store_path = "shard_store"
+let shard_store_dir = "shard_store"
 
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
@@ -46,8 +46,7 @@ let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 
 module Shards = struct
-  module KV_store = Key_value_store
-  include KV_store
+  include Key_value_store
 
   type nonrec t = (Cryptobox.Commitment.t * int, Cryptobox.share) t
 
@@ -55,7 +54,7 @@ module Shards = struct
     let open Lwt_result_syntax in
     List.for_all_es
       (fun index ->
-        let*! value = KV_store.read_value store (commitment, index) in
+        let*! value = read_value store (commitment, index) in
         match value with
         | Ok _ -> return true
         | Error [Stored_data.Missing_stored_data _] -> return false
@@ -69,24 +68,19 @@ module Shards = struct
         (fun {Cryptobox.index; share} -> ((commitment, index), share))
         shards
     in
-    let* () =
-      KV_store.write_values shards_store shards |> Errors.other_lwt_result
-    in
+    let* () = write_values shards_store shards |> Errors.other_lwt_result in
     let*! () =
       Event.(emit stored_slot_shards (commitment, Seq.length shards))
     in
     return @@ Lwt_watcher.notify shards_watcher commitment
 
   let init node_store_dir shard_store_dir =
-    KV_store.init
-      ~lru_size:Constants.shards_max_mutexes
-      (fun (commitment, index) ->
+    let ( // ) = Filename.concat in
+    let dir_path = node_store_dir // shard_store_dir in
+    init ~lru_size:Constants.shards_max_mutexes (fun (commitment, index) ->
         let commitment_string = Cryptobox.Commitment.to_b58check commitment in
         let filename = string_of_int index in
-        let filepath =
-          let ( // ) = Filename.concat in
-          node_store_dir // shard_store_dir // commitment_string // filename
-        in
+        let filepath = dir_path // commitment_string // filename in
         Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
 end
 
@@ -109,7 +103,7 @@ let init config =
   let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let shard_store = Shards.init base_dir shard_store_path in
+  let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return {shard_store; store; shards_watcher}
 
