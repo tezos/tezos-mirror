@@ -30,7 +30,10 @@
 type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
-  | Invalid_page_hash of {expected : Dac_plugin.hash; actual : Dac_plugin.hash}
+  | Incorrect_page_hash of {
+      expected : Dac_plugin.hash;
+      actual : Dac_plugin.hash;
+    }
 
 (** [S] is the module type defining the backend required for
     persisting DAC pages data onto the page storage. *)
@@ -93,14 +96,29 @@ type remote_configuration = {
    saved locally. *)
 module Remote : S with type configuration = remote_configuration
 
-(** Module with functors for constructing page stores. Reserved for
-    internal use for tests only.*)
-module Internal_for_tests_only : sig
+(**/**)
+
+module Internal_for_tests : sig
   (** [With_data_integrity_check] tweaks a module [P] of type [Page_store]
       so that the [content] of a page is verified against the [hash] supplied,
       before the page is saved in the underlying [Page_store]. If the
       verification of the hash fails, the
-      page is not saved and the error [Hash_of_page_is_invalid] is returned.  *)
-  module With_data_integrity_check : functor (P : S) ->
+      page is not saved and the error [Hash_of_page_is_invalid] is returned. *)
+  module With_data_integrity_check (P : S) :
     S with type configuration = P.configuration and type t = P.t
+
+  (** [With_remote_context(R)(P)] tweaks a module [P] of type [Page_store]
+      so that it will fetch pages using a function [R.fetch] to load pages
+      remotely and saved them in the page store of type [P], when a page
+      is not present in said store. *)
+  module With_remote_fetch (R : sig
+    type remote_context
+
+    val fetch :
+      Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
+  end)
+  (P : S) :
+    S
+      with type configuration = R.remote_context * P.t
+       and type t = R.remote_context * P.t
 end
