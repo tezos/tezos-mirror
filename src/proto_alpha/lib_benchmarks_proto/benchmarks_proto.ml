@@ -81,27 +81,29 @@ end
 module Registration = struct
   let ns = Namespace.root
 
-(** Registers a benchmark with a model, model names are uniformely generated *)
-let register ((module Bench) : Benchmark.t) =
-  let module B : Benchmark_base.S = struct
-    include Bench
+  (** Registers a benchmark with a model, model names are uniformely generated
+  *)
+  let register ((module Bench) : Benchmark.t) =
+    let module B : Benchmark_base.S = struct
+      include Bench
 
-    let generated_code_destination =
-      Option.map
-        (fun destination ->
-          Filename.concat
-            "src/proto_alpha/lib_protocol"
-            (destination ^ "_costs_generated.ml"))
-        Bench.generated_code_destination
+      let generated_code_destination =
+        Option.map
+          (fun destination ->
+            Filename.concat
+              "src/proto_alpha/lib_protocol"
+              (destination ^ "_costs_generated.ml"))
+          Bench.generated_code_destination
 
-    (* The value will be used later in lib_benchmark/registration.ml for codegen
-       file destination. *)
-    let () = ignore generated_code_destination
+      (* The value will be used later in lib_benchmark/registration.ml for
+         codegen file destination. *)
+      let () = ignore generated_code_destination
 
-    let models = [(Namespace.(cons name "model" |> to_string), Bench.model)]
+      let models = [(Namespace.(cons name "model" |> to_string), Bench.model)]
 
-    let create_benchmarks ~rng_state ~bench_num config =
-      List.repeat bench_num (fun () -> Bench.create_benchmark ~rng_state config)
-  end in
-  Registration_helpers.register (module B)
+      let create_benchmarks ~rng_state ~bench_num config =
+        List.repeat bench_num (fun () ->
+            Bench.create_benchmark ~rng_state config)
+    end in
+    Registration_helpers.register (module B)
 end
