@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -140,6 +140,11 @@ let copy_tree_exn tree ?(edit_readonly = false) from_key to_key =
   T.add_tree tree to_key move_tree
 
 let count_subtrees tree key = T.length tree @@ key_contents key
+
+let list tree key =
+  let open Lwt.Syntax in
+  let+ subtrees = T.list tree @@ key_contents key in
+  List.map (fun (name, _) -> if name == "@" then "" else name) subtrees
 
 let delete ?(edit_readonly = false) tree key =
   if not edit_readonly then assert_key_writeable key ;
