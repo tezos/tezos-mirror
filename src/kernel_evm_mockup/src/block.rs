@@ -41,10 +41,10 @@ impl L2Block {
         L2Block::DUMMY_HASH.into()
     }
 
-    pub fn new(number: L2Level, hash: OwnedHash, transactions: RawTransactions) -> Self {
+    pub fn new(number: L2Level, transactions: RawTransactions) -> Self {
         L2Block {
             number,
-            hash,
+            hash: L2Block::dummy_hash(),
             parent_hash: L2Block::dummy_hash(),
             nonce: L2Block::DUMMY_QUANTITY,
             sha3_uncles: L2Block::dummy_hash(),
