@@ -322,6 +322,24 @@ let test_many_rounds_future () =
     ~error:error_future_round
     Endorsement
 
+(** {2 Wrong payload hash} *)
+
+(** Endorsement with an incorrect payload hash. *)
+let test_wrong_payload_hash () =
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    ~block_payload_hash:Block_payload_hash.zero
+    ~error:(function
+      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
+          {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
+    Endorsement
+
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
   init_genesis () >>=? fun (_genesis, b) ->
@@ -335,38 +353,6 @@ let test_duplicate_endorsement () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-
-(** Consensus operation on competing proposal : apply an endorsement on a competing proposal *)
-let test_consensus_operation_endorsement_on_competing_proposal () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:pred
-    ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Mempool
-
-(** Wrong payload hash : apply an endorsement with an incorrect payload hash *)
-let test_wrong_payload_hash () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:b
-    ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Application
 
 (** Check that:
     - a block with not enough endorsement cannot be baked;
@@ -470,15 +456,9 @@ let tests =
     Tztest.tztest "Many rounds too old" `Quick test_many_rounds_too_old;
     Tztest.tztest "One round in the future" `Quick test_one_round_in_the_future;
     Tztest.tztest "Many rounds in the future" `Quick test_many_rounds_future;
+    (* Wrong payload hash *)
+    Tztest.tztest "Wrong payload hash" `Quick test_wrong_payload_hash;
     Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
-    Tztest.tztest
-      "Endorsement on competing proposal"
-      `Quick
-      test_consensus_operation_endorsement_on_competing_proposal;
-    Tztest.tztest
-      "Wrong payload hash for consensus operation"
-      `Quick
-      test_wrong_payload_hash;
     Tztest.tztest
       "sufficient endorsement threshold"
       `Quick
