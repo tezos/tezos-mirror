@@ -3056,17 +3056,17 @@ module Unsafe = struct
             (fun (_ : exn) -> Lwt.return_true)
         in
         let*! () =
-          if not is_locked then Lwt.return_unit
-          else
-            Animation.three_dots
-              ~progress_display_mode:Auto
-              ~msg:
-                "The storage is locked by a context prunning. Waiting for it \
-                 to finish before exporting the snapshot"
-            @@ fun () ->
-            Lwt.finalize
-              (fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
-              (fun () -> Lwt_unix.close fd)
+          Lwt.finalize
+            (fun () ->
+              if not is_locked then Lwt.return_unit
+              else
+                Animation.three_dots
+                  ~progress_display_mode:Auto
+                  ~msg:
+                    "The storage is locked by a context prunning. Waiting for \
+                     it to finish before exporting the snapshot"
+                @@ fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
+            (fun () -> Lwt_unix.close fd)
         in
         let* store =
           load_store
@@ -3081,7 +3081,10 @@ module Unsafe = struct
         let chain_store = main_chain_store store in
         Lwt.finalize
           (fun () -> locked_f chain_store)
-          (fun () -> close_store store))
+          (fun () ->
+            let*! () = may_unlock lockfile in
+            let*! () = Lwt_unix.close lockfile in
+            close_store store))
       ~on_error:(fun errs ->
         let*! () = may_unlock lockfile in
         Lwt.return (Error errs))

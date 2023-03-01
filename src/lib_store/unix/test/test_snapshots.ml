@@ -710,6 +710,7 @@ let test_drag_after_import export_mode =
     (* With the given constants, it is required to bake 7 cycles to
        trigger the first merge. *)
     let* _h = restart 7 export_block in
+    let*! () = Store.close_store store' in
     return_unit
   in
   wrap_test
