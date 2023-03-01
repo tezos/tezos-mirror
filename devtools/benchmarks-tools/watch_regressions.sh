@@ -167,6 +167,10 @@ export REF_DIR
 if [ "$REF_DIR" = "" ]
 then
     REF_DIR="$FIRST_DIR"
+else
+    # If a reference directory is set by the user, let's add it to the list of
+    # all directories.
+    DIRS="$REF_DIR $DIRS"
 fi
 
 DUNE="/data/redbull/tezos/_opam/bin/dune"
