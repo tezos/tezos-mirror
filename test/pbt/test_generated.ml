@@ -211,6 +211,12 @@ let test_full_and_v_json (full_and_v : full_and_v) =
       let module Full = (val full) in
       roundtrip_json Full.pp Full.encoding v
 
+let test_full_and_v_json_stream (full_and_v : full_and_v) =
+  match full_and_v with
+  | FullAndV (full, v) ->
+      let module Full = (val full) in
+      roundtrip_json_stream Full.pp Full.encoding v
+
 let test_full_and_v_binary_to_bytes (full_and_v : full_and_v) =
   match full_and_v with
   | FullAndV (full, v) ->
@@ -251,4 +257,14 @@ let () =
     ~name:"json roundtrips (construct/destruct)"
     [gen]
     test_full_and_v_json ;
+  ignore test_full_and_v_json_stream ;
+  (* TODO:
+      - Don't use [=] on floats because we don't have that level of precision
+      - Improve perfs (use blit-instructions with a large enough buffer)
+      - Escape strings when utf8 is malformed during streaming
+     add_test
+       ~name:"json roundtrips (construct/destruct)"
+       [gen]
+       test_full_and_v_json_stream ;
+  *)
   ()
