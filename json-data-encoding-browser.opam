@@ -14,7 +14,7 @@ build: [
 
 depends: [
   "ocaml" {>= "4.10"}
-  "dune" {>= "2.0"}
+  "dune" {>= "3.0"}
   "json-data-encoding" {= version }
   "js_of_ocaml" {>= "3.3.0"}
 ]

@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/nomadic-labs/data-encoding.git"
 license: "MIT"
 depends: [
   "ocaml" { >= "4.10" }
-  "dune" { >= "2.0" }
+  "dune" { >= "3.0" }
   "ezjsonm" { >= "1.1.0" }
   "zarith" {>= "1.4"}
   "zarith_stubs_js"
