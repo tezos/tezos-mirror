@@ -765,18 +765,33 @@ let finalize_inbox_level_no_history inbox witness =
   in
   return inbox
 
-let add_all_messages ~predecessor_timestamp ~predecessor history inbox messages
-    =
+let add_all_messages ~protocol_migration_message ~predecessor_timestamp
+    ~predecessor history inbox messages =
   let open Result_syntax in
   let* payloads = List.map_e Sc_rollup_inbox_message_repr.serialize messages in
+  let is_first_block = Option.is_some protocol_migration_message in
   let payloads_history =
     (* Must remember every [payloads] and internal messages pushed by the
        protocol: SOL/Info_per_level/EOL. *)
-    let capacity = List.length payloads + 3 |> Int64.of_int in
+    let capacity =
+      (List.length payloads + 3 + if is_first_block then 1 else 0)
+      |> Int64.of_int
+    in
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.empty ~capacity
   in
-  (* Add [SOL] and [Info_per_level]. *)
+  (* Add [SOL], possibly [Protocol_migration], and [Info_per_level]. *)
   let* payloads_history, witness = init_witness payloads_history in
+  let* payloads_history, witness =
+    match protocol_migration_message with
+    | Some protocol_migration_message ->
+        let* message =
+          Sc_rollup_inbox_message_repr.serialize
+            (Internal protocol_migration_message)
+        in
+        add_message message payloads_history witness
+    | None -> return (payloads_history, witness)
+  in
+
   let* payloads_history, witness =
     add_info_per_level
       ~predecessor_timestamp
@@ -799,22 +814,35 @@ let add_all_messages ~predecessor_timestamp ~predecessor history inbox messages
   let messages =
     let open Sc_rollup_inbox_message_repr in
     let sol = Internal Start_of_level in
+    let migration =
+      Option.fold
+        ~none:[]
+        ~some:(fun x -> [Internal x])
+        protocol_migration_message
+    in
     let info_per_level =
       Internal (Info_per_level {predecessor_timestamp; predecessor})
     in
     let eol = Internal End_of_level in
-    [sol; info_per_level] @ messages @ [eol]
+    [sol] @ migration @ [info_per_level] @ messages @ [eol]
   in
 
   return (payloads_history, history, inbox, witness, messages)
 
-let genesis ~predecessor_timestamp ~predecessor level =
+let genesis ~protocol_migration_message ~predecessor_timestamp ~predecessor
+    level =
   let open Result_syntax in
   let no_payloads_history =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.no_history
   in
-  (* 1. Add [SOL] and [Info_per_level]. *)
+  (* 1. Add [SOL], [Protocol_migration], and [Info_per_level]. *)
   let witness = init_witness_no_history in
+  let* protocol_migration =
+    Sc_rollup_inbox_message_repr.serialize (Internal protocol_migration_message)
+  in
+  let* _payloads_history, witness =
+    add_protocol_internal_message protocol_migration no_payloads_history witness
+  in
   let* witness =
     add_info_per_level_no_history ~predecessor_timestamp ~predecessor witness
   in

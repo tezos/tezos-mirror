@@ -1135,6 +1135,9 @@ module Make (Context : P) :
                   return (Some payload)
               | _ -> return None)
           | _ -> return None)
+      | Ok (Internal (Protocol_migration _)) ->
+          let* () = incr_internal_message_counter in
+          return None
       | Ok (Internal Start_of_level) ->
           let* () = incr_internal_message_counter in
           return None

@@ -128,6 +128,8 @@ let pp_input ppf bytes =
         Data_encoding.Json.pp ppf json
     | Internal Start_of_level -> Format.fprintf ppf "Start_of_level"
     | Internal End_of_level -> Format.fprintf ppf "End_of_level"
+    | Internal (Protocol_migration proto) ->
+        Format.fprintf ppf "Protocol_migration %s" proto
     | Internal (Info_per_level {predecessor_timestamp; predecessor}) ->
         Format.fprintf
           ppf

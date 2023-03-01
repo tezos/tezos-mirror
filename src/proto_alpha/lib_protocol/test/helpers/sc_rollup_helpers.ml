@@ -259,10 +259,21 @@ let make_eol ~inbox_level ~message_counter =
   let payload = make_internal_inbox_message End_of_level in
   make_input ~inbox_level ~message_counter payload
 
-let make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor =
+let make_info_per_level ~during_migration ~inbox_level ~predecessor_timestamp
+    ~predecessor =
   let payload =
     make_internal_inbox_message
       (Info_per_level {predecessor_timestamp; predecessor})
+  in
+  make_input
+    ~inbox_level
+    ~message_counter:(if during_migration then Z.of_int 2 else Z.one)
+    payload
+
+let make_protocol_migration ~inbox_level =
+  let payload =
+    make_internal_inbox_message
+      Sc_rollup.Inbox_message.protocol_migration_internal_message
   in
   make_input ~inbox_level ~message_counter:Z.one payload
 
@@ -348,7 +359,11 @@ let make_inputs predecessor_timestamp predecessor messages inbox_level =
   let sol = make_sol ~inbox_level in
   (* Info_per_level is at index 1. *)
   let info_per_level =
-    make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor
+    make_info_per_level
+      ~during_migration:false
+      ~inbox_level
+      ~predecessor_timestamp
+      ~predecessor
   in
   (* External inputs start at index 2. *)
   let external_inputs =
@@ -606,6 +621,8 @@ let dumb_init level =
 let dumb_init_repr level =
   WithExceptions.Result.get_ok ~loc:__LOC__
   @@ Sc_rollup_inbox_repr.genesis
+       ~protocol_migration_message:
+         Raw_context.protocol_migration_internal_message
        ~predecessor_timestamp:Time.Protocol.epoch
        ~predecessor:Block_hash.zero
        level
@@ -658,6 +675,20 @@ module Node_inbox = struct
     in
     let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
     let payloads_histories = Payloads_histories.empty in
+    let* payloads_history, history, _inbox, _payloads, _messages =
+      Environment.wrap_tzresult
+      @@ Sc_rollup.Inbox.add_all_messages
+           ~first_block:true
+           ~predecessor_timestamp:genesis_predecessor_timestamp
+           ~predecessor:genesis_predecessor
+           history
+           inbox
+           []
+    in
+    let witness_hash = Sc_rollup.Inbox.current_witness inbox in
+    let payloads_histories =
+      Payloads_histories.add witness_hash payloads_history payloads_histories
+    in
     return {inbox; history; payloads_histories}
 
   let fill_inbox node_inbox payloads_per_levels =
@@ -682,6 +713,7 @@ module Node_inbox = struct
           let* payloads_history, history, inbox, witness, _messages =
             Environment.wrap_tzresult
             @@ Sc_rollup.Inbox.add_all_messages
+                 ~first_block:false
                  ~predecessor_timestamp
                  ~predecessor
                  history

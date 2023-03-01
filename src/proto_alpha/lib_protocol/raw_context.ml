@@ -667,6 +667,9 @@ let version_value = "alpha_current"
 
 let version = "v1"
 
+let protocol_migration_internal_message =
+  Sc_rollup_inbox_message_repr.Protocol_migration version_value
+
 let cycle_eras_key = [version; "cycle_eras"]
 
 let constants_key = [version; "constants"]

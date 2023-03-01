@@ -3264,6 +3264,9 @@ module Sc_rollup : sig
           predecessor_timestamp : Time.t;
           predecessor : Block_hash.t;
         }
+      | Protocol_migration of string
+
+    val protocol_migration_internal_message : internal_inbox_message
 
     type t = Internal of internal_inbox_message | External of string
 
@@ -3425,6 +3428,7 @@ module Sc_rollup : sig
     val serialized_proof_encoding : serialized_proof Data_encoding.t
 
     val add_all_messages :
+      first_block:bool ->
       predecessor_timestamp:Time.t ->
       predecessor:Block_hash.t ->
       History.t ->

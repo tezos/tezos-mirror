@@ -73,6 +73,11 @@ type t
 
 type root = t
 
+(** The internal message to be injected into the smart rollups’ shared
+    inbox when validating the very first block of this protocol. *)
+val protocol_migration_internal_message :
+  Sc_rollup_inbox_message_repr.internal_inbox_message
+
 (** Retrieves the state of the database and gives its abstract view.
     It also returns wether this is the first block validated
     with this version of the protocol. *)

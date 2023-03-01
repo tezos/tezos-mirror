@@ -140,6 +140,36 @@ let finalize_inbox_level ctxt =
           err) ;
       return ctxt
 
+let add_protocol_migration ctxt =
+  let open Lwt_syntax in
+  let res =
+    let open Result_syntax in
+    let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+    let* protocol_migration =
+      Sc_rollup_inbox_message_repr.serialize
+        (Internal Raw_context.protocol_migration_internal_message)
+    in
+    let+ witness =
+      Sc_rollup_inbox_repr.add_messages_no_history [protocol_migration] witness
+    in
+    Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
+  in
+  match res with
+  | Ok ctxt -> return ctxt
+  | Error err ->
+      (* As a protection, we backtrack the [ctxt] if adding the info per level
+         failed. This way, we cannot make [begin_application],
+         [begin_partial_application] and [begin_full_construction] fail. *)
+      Logging.(
+        log
+          Fatal
+          "Adding [Protocol_migration] failed because of %a, the context is \
+           backtracked. Smart rollups inbox might be inconsistent, this \
+           behavior is undefined and its consequence is unexplored."
+          pp_trace
+          err) ;
+      return ctxt
+
 let add_info_per_level ~predecessor ctxt =
   let open Lwt_syntax in
   let* res =
@@ -180,7 +210,12 @@ let init_inbox ~predecessor ctxt =
     let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
     let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
     let*? inbox =
-      Sc_rollup_inbox_repr.genesis ~predecessor_timestamp ~predecessor level
+      Sc_rollup_inbox_repr.genesis
+        ~protocol_migration_message:
+          Raw_context.protocol_migration_internal_message
+        ~predecessor_timestamp
+        ~predecessor
+        level
     in
     let* ctxt = Store.Inbox.init ctxt inbox in
     return ctxt

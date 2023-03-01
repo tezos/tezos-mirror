@@ -68,6 +68,7 @@ type internal_inbox_message =
       predecessor : Block_hash.t;
           (** Predecessor of the block this message is pushed. *)
     }
+  | Protocol_migration of string
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

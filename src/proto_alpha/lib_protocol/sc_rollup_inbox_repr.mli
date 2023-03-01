@@ -234,8 +234,13 @@ val serialized_proof_encoding : serialized_proof Data_encoding.t
     Adds the messages pushed by the protocol and returns a list of messages
     including them. The caller will need to execute this list of messages,
     otherwise, it might miss some internal inputs.
- *)
+
+    The expected value of [protocol_migration_message] is either [Some
+    Raw_context.protocol_migration_internal_message] (during the first
+    block of this protocol) or [None]. *)
 val add_all_messages :
+  protocol_migration_message:
+    Sc_rollup_inbox_message_repr.internal_inbox_message option ->
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   History.t ->
@@ -333,10 +338,15 @@ val add_info_per_level_no_history :
 val finalize_inbox_level_no_history :
   t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t tzresult
 
-(** [genesis ~timestamp ~predecessor level] initializes the inbox at some
-    given [level] with: [SOL], [Info_per_level {timestamp; predecessor}] and
-    [EOL] inside. *)
+(** [genesis ~protocol_migration_message ~timestamp ~predecessor
+    level] initializes the inbox at some given [level] with: [SOL],
+    [protocol_migration_message], [Info_per_level {timestamp;
+    predecessor}] and [EOL] inside.
+
+    The expected value of [protocol_migration_message] is
+    [Raw_context.protocol_migration_internal_message]. *)
 val genesis :
+  protocol_migration_message:Sc_rollup_inbox_message_repr.internal_inbox_message ->
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Raw_level_repr.t ->

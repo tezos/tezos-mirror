@@ -104,7 +104,11 @@ let add_messages ~predecessor_timestamp ~predecessor inbox messages =
              inbox,
              witness,
              messages_with_protocol_internal_messages ) =
+       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4918 Inject
+          [Protocol_migration (Proto_017)] when migrating to proto_alpha
+          (N after next snapshot). *)
        Sc_rollup.Inbox.add_all_messages
+         ~first_block:false
          ~predecessor_timestamp
          ~predecessor
          no_history
@@ -211,7 +215,11 @@ let payloads_history_of_messages ~predecessor ~predecessor_timestamp messages =
             _inbox,
             _witness,
             _messages_with_protocol_internal_messages ) =
+       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4918 Inject
+          [Protocol_migration (Proto_017)] when migrating to proto_alpha
+          (N after next snapshot). *)
        Sc_rollup.Inbox.add_all_messages
+         ~first_block:false
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)

@@ -67,6 +67,7 @@ type internal_inbox_message =
       predecessor_timestamp : Time.t;
       predecessor : Block_hash.t;
     }
+  | Protocol_migration of string
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
@@ -113,6 +114,12 @@ let internal_inbox_message_encoding =
           | _ -> None)
         (fun ((), predecessor_timestamp, predecessor) ->
           Info_per_level {predecessor_timestamp; predecessor});
+      case
+        (Tag 4)
+        ~title:"Protocol_migration"
+        (obj2 (kind "protocol_migration") (req "protocol" (string Hex)))
+        (function Protocol_migration proto -> Some ((), proto) | _ -> None)
+        (fun ((), proto) -> Protocol_migration proto);
     ]
 
 type t = Internal of internal_inbox_message | External of string

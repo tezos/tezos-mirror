@@ -61,7 +61,14 @@ module Sc_rollup = struct
   include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith
   module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
-  module Inbox_message = Sc_rollup_inbox_message_repr
+
+  module Inbox_message = struct
+    include Sc_rollup_inbox_message_repr
+
+    let protocol_migration_internal_message =
+      Raw_context.protocol_migration_internal_message
+  end
+
   module Inbox_merkelized_payload_hashes =
     Sc_rollup_inbox_merkelized_payload_hashes_repr
 
@@ -73,6 +80,18 @@ module Sc_rollup = struct
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
+
+    let genesis =
+      genesis
+        ~protocol_migration_message:
+          Inbox_message.protocol_migration_internal_message
+
+    let add_all_messages ~first_block =
+      add_all_messages
+        ~protocol_migration_message:
+          (if first_block then
+           Some Inbox_message.protocol_migration_internal_message
+          else None)
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests
