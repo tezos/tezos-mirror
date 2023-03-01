@@ -372,6 +372,10 @@ module Internal_for_tests : sig
      represent the same polynomial. *)
   val polynomials_equal : polynomial -> polynomial -> bool
 
+  (* [page_proof_equal proof1 proof2] returns true if and only if [proof1]
+     and [proof2] represent the same proof. *)
+  val page_proof_equal : page_proof -> page_proof -> bool
+
   (* [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool

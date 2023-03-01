@@ -313,6 +313,7 @@ module Test = struct
         let page_index_verify = Random.int number_of_pages in
         assume (page_index_prove <> page_index_verify) ;
         let* proof = Cryptobox.prove_page t p page_index_prove in
+        let* proof_verify = Cryptobox.prove_page t p page_index_verify in
         let page_prove =
           Bytes.sub
             params.slot
@@ -329,6 +330,10 @@ module Test = struct
            [Cryptobox.verify_page] will return [Ok ()] (we want to input an
            incorrect page to trigger the [`Invalid_page] error). *)
         assume (Bytes.compare page_prove page_verify <> 0) ;
+        (* We need [proof] and [proof_verify] to be distinct. *)
+        assume
+          (not
+             (Cryptobox.Internal_for_tests.page_proof_equal proof proof_verify)) ;
         Cryptobox.verify_page
           t
           cm
