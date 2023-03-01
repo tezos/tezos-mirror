@@ -2081,8 +2081,16 @@ let octez_sapling =
         ]
 
 let _octez_sapling_tests =
-  tests
-    ["test_rustzcash"; "test_keys"; "test_merkle"; "test_roots"; "test_sapling"]
+  tezt
+    [
+      "test_rustzcash";
+      "test_keys";
+      "test_merkle";
+      "test_roots";
+      "test_sapling";
+      "keys";
+      "example";
+    ]
     ~path:"src/lib_sapling/test"
     ~with_macos_security_framework:true
     ~opam:"tezos-sapling"
@@ -2098,9 +2106,8 @@ let _octez_sapling_tests =
         octez_stdlib_unix;
         data_encoding |> open_;
         octez_base_test_helpers |> open_;
-        alcotest_lwt;
+        alcotezt;
       ]
-    ~all_modules_except:["test_js"]
     ~opam_with_test:Never
 
 let _octez_sapling_js_tests =
