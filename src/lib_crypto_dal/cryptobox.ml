@@ -1517,6 +1517,8 @@ module Internal_for_tests = struct
 
   let polynomials_equal = Polynomials.equal
 
+  let page_proof_equal = Bls12_381.G1.eq
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let k = slot_as_polynomial_length ~slot_size in
