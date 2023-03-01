@@ -1,4 +1,7 @@
-KERNELS = evm_mockup_kernel.wasm
+KERNELS = kernel_sdk evm_mockup_kernel.wasm
+
+kernel_sdk:
+	@make -C src/kernel_sdk
 
 evm_mockup_kernel.wasm::
 	@make -C src/kernel_evm_mockup
@@ -6,6 +9,7 @@ evm_mockup_kernel.wasm::
 	@wasm-strip $@
 
 build-deps:
+	@make -C src/kernel_sdk build-deps
 	@make -C src/kernel_evm_mockup build-deps
 
 .PHONY: build-kernels

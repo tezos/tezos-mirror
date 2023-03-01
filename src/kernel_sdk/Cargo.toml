@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[workspace]
+
+members = [
+  "tezos_smart_rollup_core"
+]
