@@ -33,3 +33,20 @@ let balance ~account ~endpoint =
     spawn_command ["address:balance"; account; "--network"; endpoint]
   in
   return (int_of_string (String.trim answer))
+
+let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
+  let* answer =
+    spawn_command
+      [
+        "transaction:send";
+        "--pk";
+        source_private_key;
+        "--to";
+        to_public_key;
+        "--value";
+        Z.to_string value;
+        "--network";
+        endpoint;
+      ]
+  in
+  return (String.trim answer)

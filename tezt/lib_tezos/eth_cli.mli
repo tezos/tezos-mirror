@@ -26,3 +26,14 @@
 (** [balance ~account ~endpoint] asks the balance of [account] to the
     JSON-RPC API server listening at [endpoint]. *)
 val balance : account:string -> endpoint:string -> int Lwt.t
+
+(** [transaction_send ~source_private_key ~to_public_key ~value
+    ~endpoint] crafts and signs a transaction transferring [value] (as
+    Wei) from [source_private_key] to [to_public_key], sends the raw
+    transaction to the JSON-RPI API server listening at [endpoint]. *)
+val transaction_send :
+  source_private_key:string ->
+  to_public_key:string ->
+  value:Z.t ->
+  endpoint:string ->
+  string Lwt.t
