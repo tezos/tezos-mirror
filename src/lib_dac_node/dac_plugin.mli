@@ -44,6 +44,9 @@ module type T = sig
   (** The encoding of reveal hashes. *)
   val encoding : hash Data_encoding.t
 
+  (** [equal h1 h2] determines if [h1] and [h2] are the same hash. *)
+  val equal : hash -> hash -> bool
+
   (** [hash_string ~scheme ?key strings] hashes [strings] using the
     supported hashing [scheme] given in input. *)
   val hash_string :

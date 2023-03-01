@@ -34,6 +34,8 @@ type supported_hashes = Blake2B
 module type T = sig
   val encoding : hash Data_encoding.t
 
+  val equal : hash -> hash -> bool
+
   val hash_string :
     scheme:supported_hashes -> ?key:string -> string list -> hash
 

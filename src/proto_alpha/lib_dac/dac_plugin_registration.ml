@@ -61,6 +61,9 @@ end) : Dac_plugin.T = struct
                Result.of_option ~error:"Not a valid hash" (of_hex str))
              (string' Plain)))
 
+  let equal h1 h2 =
+    Protocol.Sc_rollup_reveal_hash.equal (to_reveal_hash h1) (to_reveal_hash h2)
+
   let dac_hash_to_proto_supported_hashes = function
     | Dac_plugin.Blake2B -> Protocol.Sc_rollup_reveal_hash.Blake2B
 
