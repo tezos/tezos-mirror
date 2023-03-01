@@ -10,7 +10,9 @@
   tezos-protocol-alpha
   tezos-baking-alpha.tenderbrute)
  (link_flags
-  (:standard -linkall))
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

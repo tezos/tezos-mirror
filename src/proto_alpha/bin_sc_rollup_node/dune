@@ -42,7 +42,8 @@
   octez-node-config)
  (link_flags
   (:standard)
-  (:include %{workspace_root}/static-link-flags.sexp))
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base

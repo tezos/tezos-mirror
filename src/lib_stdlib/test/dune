@@ -19,6 +19,9 @@
   tezos-test-helpers
   qcheck-alcotest)
  (js_of_ocaml)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_stdlib
