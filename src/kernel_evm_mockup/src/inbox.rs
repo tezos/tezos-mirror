@@ -9,9 +9,11 @@ use host::input::Message;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
+use crate::eth_gen::RawTransaction;
+
 pub struct Transaction {
     pub level: i32,
-    pub tx: Vec<u8>,
+    pub tx: RawTransaction,
 }
 
 pub enum Error {
