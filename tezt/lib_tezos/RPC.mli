@@ -201,6 +201,9 @@ val get_network_points : (string * JSON.t) list t
 (** RPC: [GET /network/points/<point_id>] *)
 val get_network_point : string -> JSON.t t
 
+(** RPC: [PATCH /network/points] *)
+val patch_network_point : string -> JSON.t -> unit t
+
 (** RPC: [GET /network/points/<point_id>/ban] *)
 val get_network_point_ban : string -> JSON.t t
 

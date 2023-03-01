@@ -455,6 +455,12 @@ module Admin = struct
   let ban_peer ?endpoint ~peer client =
     spawn_ban_peer ?endpoint ~peer client |> Process.check
 
+  let spawn_p2p_stat ?endpoint client =
+    spawn_command ?endpoint client ["p2p"; "stat"]
+
+  let p2p_stat ?endpoint client =
+    spawn_p2p_stat ?endpoint client |> Process.check_and_read_stdout
+
   let spawn_inject_protocol ?endpoint ~protocol_path client =
     spawn_command ?endpoint client ["inject"; "protocol"; protocol_path]
 

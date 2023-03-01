@@ -466,6 +466,18 @@ val wait_for_full :
 (** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
+(** Wait for a node to receive a given number of connections.
+
+    [wait_for_connections node n] waits until [node] receives [n]
+    ["connection"] Chain validator events. *)
+val wait_for_connections : t -> int -> unit Lwt.t
+
+(** Wait for a node to receive a given number of disconnections.
+
+    [wait_for_disconnections node n] waits until [node] receives
+    [n] ["disconnection"] Chain validator events. *)
+val wait_for_disconnections : t -> int -> unit Lwt.t
+
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
 

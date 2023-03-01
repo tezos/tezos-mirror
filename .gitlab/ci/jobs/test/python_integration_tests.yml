@@ -4,12 +4,6 @@
 
 include: .gitlab/ci/jobs/test/common.yml
 
-integration:pytest:
-  extends:
-    - .pytest_integration
-  variables:
-    TESTS: "tests_alpha"
-
 integration:pytest_examples:
   extends: .pytest_template
   script:

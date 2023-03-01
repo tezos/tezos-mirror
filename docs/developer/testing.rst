@@ -192,12 +192,6 @@ Typical use cases:
  - Detecting unintended changes in the output of a component, using
    ``pytest-regtest``.
 
-Example tests:
- - Setting up networks of nodes and ensuring their connection
-   (in :src:`tests_python/tests_alpha/test_p2p.py`).
-   To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
-   the Octez root.
-
 References:
  - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
  - :doc:`python_testing_framework`

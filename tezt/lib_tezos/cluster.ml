@@ -80,19 +80,6 @@ let ring = meta_ring symmetric_add_peer
 
 let star = meta_star symmetric_add_peer
 
-let wait_for_connections node connections =
-  let counter = ref 0 in
-  let waiter, resolver = Lwt.task () in
-  Node.on_event node (fun {name; _} ->
-      match name with
-      | "connection.v0" ->
-          incr counter ;
-          if !counter = connections then Lwt.wakeup resolver ()
-      | "disconnection.v0" -> Log.warn "The topology of the test has changed"
-      | _ -> ()) ;
-  let* () = Node.wait_for_ready node in
-  waiter
-
 let start ?(public = false) ?event_level ?event_sections_levels
     ?(wait_connections = false) nodes =
   let start_node node =
@@ -108,7 +95,14 @@ let start ?(public = false) ?event_level ?event_sections_levels
     in
     let waiter =
       let* () =
-        if wait_connections then wait_for_connections node n else unit
+        if wait_connections then (
+          Node.on_event node (fun {name; _} ->
+              match name with
+              | "disconnection.v0" ->
+                  Log.warn "The topology of the test has changed"
+              | _ -> ()) ;
+          Node.wait_for_connections node n)
+        else unit
       in
       Node.wait_for_ready node
     in

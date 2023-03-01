@@ -13,7 +13,6 @@ unified_coverage:
   # the `dependencies: []` in `.default_settings` with a list of jobs.
   # Each new job in the stage test needs to be manually added to this list.
   dependencies:
-    - "integration:pytest"
     - "test-liquidity-baking-scripts"
     - "tezt 1/40"
     - "tezt 2/40"
