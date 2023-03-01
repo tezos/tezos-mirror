@@ -647,9 +647,9 @@ module Inner = struct
   let polynomial_to_slot t p =
     (* The last operation of [polynomial_from_slot] is the interpolation,
        so we undo it with an evaluation on the same domain [t.domain_polynomial_length]. *)
-    let eval =
-      Evaluations.evaluation_fft t.domain_polynomial_length p
-      |> Evaluations.to_array
+    let evaluations =
+      Evaluations.to_array
+        (Evaluations.evaluation_fft t.domain_polynomial_length p)
     in
     let slot = Bytes.make t.slot_size '0' in
     let offset = ref 0 in
@@ -657,12 +657,12 @@ module Inner = struct
     for page = 0 to t.pages_per_slot - 1 do
       for elt = 0 to t.page_length - 2 do
         let idx = (elt * t.pages_per_slot) + page in
-        let coeff = Scalar.to_bytes (Array.get eval idx) in
+        let coeff = Scalar.to_bytes (Array.get evaluations idx) in
         Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
         offset := !offset + scalar_bytes_amount
       done ;
       let idx = ((t.page_length - 1) * t.pages_per_slot) + page in
-      let coeff = Scalar.to_bytes (Array.get eval idx) in
+      let coeff = Scalar.to_bytes (Array.get evaluations idx) in
       Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
       offset := !offset + t.remaining_bytes
     done ;
