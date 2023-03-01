@@ -2729,8 +2729,8 @@ let octez_rpc_http_server =
     ~modules:["RPC_server"; "RPC_middleware"]
 
 let _octez_rpc_http_server_tests =
-  test
-    "test_rpc_http"
+  tezt
+    ["test_rpc_http"]
     ~path:"src/lib_rpc_http/test"
     ~opam:"tezos-rpc-http-server"
     ~deps:
@@ -2743,7 +2743,7 @@ let _octez_rpc_http_server_tests =
         octez_base_test_helpers |> open_;
         octez_rpc_http_server |> open_;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_client_base =
