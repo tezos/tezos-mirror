@@ -514,6 +514,7 @@ let get_inbox_by_block_hash node_ctxt hash =
   inbox_of_head node_ctxt {hash; level}
 
 type messages_info = {
+  is_migration_block : bool;
   predecessor : Block_hash.t;
   predecessor_timestamp : Timestamp.t;
   messages : Sc_rollup.Inbox_message.t list;
@@ -528,15 +529,22 @@ let get_messages {store; _} messages_hash =
         "Could not retrieve messages with payloads merkelized hash %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
         messages_hash
-  | Some (messages, (predecessor, predecessor_timestamp, _num_messages)) ->
-      return {predecessor; predecessor_timestamp; messages}
+  | Some
+      ( messages,
+        (is_migration_block, predecessor, predecessor_timestamp, _num_messages)
+      ) ->
+      return {is_migration_block; predecessor; predecessor_timestamp; messages}
 
 let find_messages {store; _} hash =
   let open Lwt_result_syntax in
   let+ msgs = Store.Messages.read store.messages hash in
   Option.map
-    (fun (messages, (predecessor, predecessor_timestamp, _num_messages)) ->
-      {predecessor; predecessor_timestamp; messages})
+    (fun ( messages,
+           ( is_migration_block,
+             predecessor,
+             predecessor_timestamp,
+             _num_messages ) ) ->
+      {is_migration_block; predecessor; predecessor_timestamp; messages})
     msgs
 
 let get_num_messages {store; _} hash =
@@ -548,15 +556,19 @@ let get_num_messages {store; _} hash =
         "Could not retrieve number of messages for inbox witness %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
         hash
-  | Some (_predecessor, _predecessor_timestamp, num_messages) ->
+  | Some (_first_block, _predecessor, _predecessor_timestamp, num_messages) ->
       return num_messages
 
-let save_messages {store; _} key {predecessor; predecessor_timestamp; messages}
-    =
+let save_messages {store; _} key
+    {is_migration_block; predecessor; predecessor_timestamp; messages} =
   Store.Messages.append
     store.messages
     ~key
-    ~header:(predecessor, predecessor_timestamp, List.length messages)
+    ~header:
+      ( is_migration_block,
+        predecessor,
+        predecessor_timestamp,
+        List.length messages )
     ~value:messages
 
 let get_full_l2_block node_ctxt block_hash =
