@@ -60,7 +60,7 @@ let test_simple_endorsement () =
     validity. *)
 let test_endorsement_with_arbitrary_branch () =
   init_genesis () >>=? fun (_genesis, blk) ->
-  Op.endorsement ~pred_branch:Block_hash.zero blk >>=? fun operation ->
+  Op.endorsement ~branch:Block_hash.zero blk >>=? fun operation ->
   Block.bake ~operation blk >>=? fun _blk -> return_unit
 
 (****************************************************************)
