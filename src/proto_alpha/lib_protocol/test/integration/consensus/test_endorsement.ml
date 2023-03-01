@@ -255,6 +255,73 @@ let test_two_levels_future () =
     ~error:error_future_level
     Endorsement
 
+(** {2 Wrong round} *)
+
+let error_old_round = function
+  | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one round too old. It should fail in all modes. *)
+let test_one_round_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* round0_block = Block.bake b in
+  let* predecessor = Block.bake ~policy:(By_round 1) b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:round0_block
+    ~predecessor
+    ~error:error_old_round
+    Endorsement
+
+(** Endorsement that is many rounds too old. It should fail in all modes. *)
+let test_many_rounds_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* round5_block = Block.bake ~policy:(By_round 5) b in
+  let* predecessor = Block.bake ~policy:(By_round 15) b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:round5_block
+    ~predecessor
+    ~error:error_old_round
+    Endorsement
+
+let error_future_round = function
+  | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one round in the future. It should fail in all modes. *)
+let test_one_round_in_the_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* predecessor = Block.bake b in
+  let* round1_block = Block.bake ~policy:(By_round 1) b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:round1_block
+    ~predecessor
+    ~error:error_future_round
+    Endorsement
+
+(** Endorsement that is many rounds in the future. It should fail in
+    all modes. *)
+let test_many_rounds_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* predecessor = Block.bake ~policy:(By_round 5) b in
+  let* round15_block = Block.bake ~policy:(By_round 15) b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:round15_block
+    ~predecessor
+    ~error:error_future_round
+    Endorsement
+
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
   init_genesis () >>=? fun (_genesis, b) ->
@@ -268,38 +335,6 @@ let test_duplicate_endorsement () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-
-(** Consensus operation for future round : apply an endorsement with a round in the future *)
-let test_consensus_operation_endorsement_for_future_round () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:pred
-    ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Mempool
-
-(** Consensus operation for old round : apply an endorsement with a round in the past *)
-let test_consensus_operation_endorsement_for_old_round () =
-  init_genesis ~policy:(By_round 10) () >>=? fun (_genesis, pred) ->
-  Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:pred
-    ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Mempool
 
 (** Consensus operation on competing proposal : apply an endorsement on a competing proposal *)
 let test_consensus_operation_endorsement_on_competing_proposal () =
@@ -316,22 +351,6 @@ let test_consensus_operation_endorsement_on_competing_proposal () =
       | _ -> false)
     Endorsement
     Mempool
-
-(** Wrong round : apply an endorsement with an incorrect round *)
-let test_wrong_round () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Environment.wrap_tzresult (Round.of_int 2) >>?= fun round ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:b
-    ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Application
 
 (** Wrong payload hash : apply an endorsement with an incorrect payload hash *)
 let test_wrong_payload_hash () =
@@ -392,14 +411,6 @@ let test_preendorsement_endorsement_same_level () =
   Incremental.add_operation i op_preendo >>=? fun (_i : Incremental.t) ->
   return_unit
 
-(** Endorsement for next round *)
-let test_endorsement_for_next_round () =
-  init_genesis () >>=? fun (genesis, _) ->
-  Consensus_helpers.test_consensus_op_for_next
-    ~genesis
-    ~kind:`Endorsement
-    ~next:`Round
-
 (** Double inclusion of grandparent endorsement *)
 let test_double_endorsement_grandparent () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
@@ -454,20 +465,16 @@ let tests =
     Tztest.tztest "Two levels too old" `Quick test_two_levels_too_old;
     Tztest.tztest "One level in the future" `Quick test_one_level_in_the_future;
     Tztest.tztest "Two levels in the future" `Quick test_two_levels_future;
+    (* Wrong round *)
+    Tztest.tztest "One round too old" `Quick test_one_round_too_old;
+    Tztest.tztest "Many rounds too old" `Quick test_many_rounds_too_old;
+    Tztest.tztest "One round in the future" `Quick test_one_round_in_the_future;
+    Tztest.tztest "Many rounds in the future" `Quick test_many_rounds_future;
     Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
-    Tztest.tztest
-      "Endorsement for future round"
-      `Quick
-      test_consensus_operation_endorsement_for_future_round;
-    Tztest.tztest
-      "Endorsement for old round"
-      `Quick
-      test_consensus_operation_endorsement_for_old_round;
     Tztest.tztest
       "Endorsement on competing proposal"
       `Quick
       test_consensus_operation_endorsement_on_competing_proposal;
-    Tztest.tztest "Wrong round for consensus operation" `Quick test_wrong_round;
     Tztest.tztest
       "Wrong payload hash for consensus operation"
       `Quick
@@ -484,10 +491,6 @@ let tests =
       "Endorsement/Preendorsement at same level"
       `Quick
       test_preendorsement_endorsement_same_level;
-    Tztest.tztest
-      "Endorsement for next round"
-      `Quick
-      test_endorsement_for_next_round;
     Tztest.tztest
       "Double endorsement of grandparent"
       `Quick
