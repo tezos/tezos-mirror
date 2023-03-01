@@ -2,7 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::blueprint::Queue;
 use crate::eth_gen::{L2Level, OwnedHash, Quantity, RawTransactions};
+use crate::inbox;
+use crate::storage;
+use host::rollup_core::RawRollupCore;
+use host::runtime::Runtime;
 
 pub struct L2Block {
     // This choice of a L2 block representation is totally
@@ -63,5 +68,24 @@ impl L2Block {
             transactions,
             uncles: Vec::new(),
         }
+    }
+}
+
+pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
+    for proposal in queue.proposals.iter() {
+        let current_level = storage::read_current_block_number(host);
+        let next_level = match current_level {
+            Ok(current_level) => current_level + 1,
+            Err(_) => 0,
+        };
+        let raw_transactions = proposal
+            .transactions
+            .iter()
+            .map(inbox::Transaction::to_raw_transaction)
+            .collect();
+        let next_block = L2Block::new(next_level, raw_transactions);
+        storage::store_current_block(host, next_block).unwrap_or_else(|_| {
+            panic!("Error while storing the current block: stopping the daemon.")
+        })
     }
 }

@@ -28,6 +28,10 @@ impl Transaction {
             tx,
         }
     }
+
+    pub fn to_raw_transaction(&self) -> RawTransaction {
+        self.tx.clone()
+    }
 }
 
 pub fn read_input<Host: Runtime + RawRollupCore>(
