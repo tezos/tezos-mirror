@@ -213,6 +213,8 @@
 (package (name tezos-signer-services))
 (package (name tezos-smart-rollup-016-PtMumbai))
 (package (name tezos-smart-rollup-alpha))
+(package (name tezos-smart-rollup-layer2-016-PtMumbai))
+(package (name tezos-smart-rollup-layer2-alpha))
 (package (name tezos-stdlib))
 (package (name tezos-stdlib-unix))
 (package (name tezos-store))

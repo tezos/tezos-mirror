@@ -17,6 +17,7 @@ depends: [
   "tezos-client-base-unix"
   "tezos-client-016-PtMumbai"
   "tezos-smart-rollup-016-PtMumbai"
+  "tezos-smart-rollup-layer2-016-PtMumbai"
   "tezos-clic"
 ]
 build: [

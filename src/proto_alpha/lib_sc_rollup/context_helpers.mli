@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** [In_memory] is a context that can be used to instantiate an Arith
+    or Wasm PVM. It's signature is
+    {!Protocol.Alpha_context.Sc_rollup.ArithPVM.P} =
+    {!Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM.P} *)
+module In_memory : sig
+  include
+    Protocol.Alpha_context.Sc_rollup.ArithPVM.P
+      with type proof =
+        Tezos_context_memory.Context.Proof.tree
+        Tezos_context_memory.Context.Proof.t
 
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
-
-module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
-
-module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
+  val make_empty_context : ?root:string -> unit -> Tree.t
+end

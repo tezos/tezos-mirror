@@ -92,9 +92,8 @@ let prepare_installer_kernel
   in
   return installer
 
-(** [boot_sector_of k] returns a valid boot sector for a PVM of
-    kind [kind]. *)
-let boot_sector_of = function
+let default_boot_sector_of ~kind =
+  match kind with
   | "arith" -> ""
   | "wasm_2_0_0" -> Constant.wasm_echo_kernel_boot_sector
   | kind -> raise (Invalid_argument kind)
@@ -122,7 +121,7 @@ let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
     ?(src = Constant.bootstrap1.alias) ~kind ?(parameters_ty = "string")
-    ?(boot_sector = boot_sector_of kind) client =
+    ?(boot_sector = default_boot_sector_of ~kind) client =
   let* sc_rollup =
     Client.Sc_rollup.(
       originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)

@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-protocol-alpha"
+  "tezos-smart-rollup-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]

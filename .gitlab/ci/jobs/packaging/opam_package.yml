@@ -453,14 +453,14 @@ opam:tezos-client-000-Ps9mPmXa:
 opam:tezos-client-001-PtCJ7pwo:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-client-001-PtCJ7pwo
 
 opam:tezos-client-002-PsYLVpVv:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-client-002-PsYLVpVv
 
@@ -509,7 +509,7 @@ opam:tezos-client-008-PtEdo2Zk:
 opam:tezos-client-009-PsFLoren:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-client-009-PsFLoren
 
@@ -743,21 +743,21 @@ opam:tezos-embedded-protocol-009-PsFLoren:
 opam:tezos-embedded-protocol-010-PtGRANAD:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-010-PtGRANAD
 
 opam:tezos-embedded-protocol-011-PtHangz2:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-011-PtHangz2
 
 opam:tezos-embedded-protocol-012-Psithaca:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-012-Psithaca
 
@@ -1079,7 +1079,7 @@ opam:tezos-protocol-016-PtMumbai:
 opam:tezos-protocol-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-alpha
 
@@ -1088,14 +1088,14 @@ opam:tezos-protocol-alpha:
 opam:tezos-protocol-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-demo-counter
 
 opam:tezos-protocol-demo-noops:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-demo-noops
 
@@ -1276,14 +1276,14 @@ opam:tezos-protocol-plugin-alpha-registerer:
 opam:tezos-protocol-updater:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-updater
 
 opam:tezos-proxy:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-proxy
 
@@ -1311,7 +1311,7 @@ opam:tezos-rpc:
 opam:tezos-rpc-http:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-rpc-http
 
@@ -1409,7 +1409,7 @@ opam:tezos-shell-services-test-helpers:
 opam:tezos-signer-backends:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-signer-backends
 
@@ -1423,11 +1423,25 @@ opam:tezos-signer-services:
 opam:tezos-smart-rollup-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-smart-rollup-016-PtMumbai
 
-# Ignoring unreleased package tezos-smart-rollup-alpha.
+opam:tezos-smart-rollup-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_5
+  variables:
+    package: tezos-smart-rollup-alpha
+
+opam:tezos-smart-rollup-layer2-016-PtMumbai:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: tezos-smart-rollup-layer2-016-PtMumbai
+
+# Ignoring unreleased package tezos-smart-rollup-layer2-alpha.
 
 opam:tezos-stdlib:
   extends:
@@ -1460,7 +1474,7 @@ opam:tezos-test-helpers:
 opam:tezos-test-helpers-extra:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-test-helpers-extra
 
@@ -1471,7 +1485,7 @@ opam:tezos-test-helpers-extra:
 opam:tezos-tree-encoding:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-tree-encoding
 
@@ -1494,7 +1508,7 @@ opam:tezos-validation:
 opam:tezos-version:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-version
 
