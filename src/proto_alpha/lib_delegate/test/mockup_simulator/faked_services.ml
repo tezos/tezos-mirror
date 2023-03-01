@@ -8,13 +8,24 @@ module type Mocked_services_hooks = sig
   type mempool = Mockup.M.Block_services.Mempool.t
 
   (** The baker and endorser rely on this stream to be notified of new
-     blocks. *)
+     valid blocks. *)
+  val monitor_validated_blocks :
+    unit ->
+    (Chain_id.t * Block_hash.t * Block_header.t * Operation.t list list)
+    Tezos_rpc.Answer.stream
+
+  (** The baker and endorser rely on this stream to be notified of new
+     heads. *)
   val monitor_heads :
     unit -> (Block_hash.t * Block_header.t) Tezos_rpc.Answer.stream
 
   (** Returns current and next protocol for a block. *)
   val protocols :
     Block_services.block -> Block_services.protocols tzresult Lwt.t
+
+  (** [raw_header] returns the byte encoded block header of the block
+      associated to the given block specification. *)
+  val raw_header : Block_services.block -> bytes tzresult Lwt.t
 
   (** [header] returns the block header of the block associated to the given
      block specification. *)
@@ -112,6 +123,13 @@ end
 type hooks = (module Mocked_services_hooks)
 
 module Make (Hooks : Mocked_services_hooks) = struct
+  let monitor_validated_blocks =
+    Directory.gen_register0
+      Directory.empty
+      Monitor_services.S.validated_blocks
+      (fun _next_protocol _ ->
+        Tezos_rpc.Answer.return_stream (Hooks.monitor_validated_blocks ()))
+
   let monitor_heads =
     Directory.gen_register1
       Directory.empty
@@ -136,6 +154,14 @@ module Make (Hooks : Mocked_services_hooks) = struct
     in
     Directory.register Directory.empty service (fun (_, block) () () ->
         Hooks.protocols block)
+
+  let raw_header =
+    Directory.prefix
+      (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
+    @@ Directory.register
+         Directory.empty
+         Mockup.M.Block_services.S.raw_header
+         (fun (((), _chain), block) _ _ -> Hooks.raw_header block)
 
   let header =
     Directory.prefix
@@ -206,6 +232,17 @@ module Make (Hooks : Mocked_services_hooks) = struct
       (fun () _chain bytes ->
         match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
         | None -> failwith "faked_services.inject_operation: can't deserialize"
+        | Some operation -> Hooks.inject_operation operation)
+
+  let inject_private_operation =
+    Directory.register
+      Directory.empty
+      Injection_services.S.private_operation
+      (fun () _chain bytes ->
+        match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
+        | None ->
+            failwith
+              "faked_services.inject_private_operation: can't deserialize"
         | Some operation -> Hooks.inject_operation operation)
 
   let broadcast_block =
@@ -281,15 +318,31 @@ module Make (Hooks : Mocked_services_hooks) = struct
          (fun (_, block) () () -> Hooks.raw_protocol_data block)
 
   let shell_directory chain_id =
-    let merge = Directory.merge in
-    Directory.empty |> merge monitor_heads |> merge protocols |> merge header
-    |> merge operations |> merge hash |> merge shell_header
-    |> merge resulting_context_hash
-    |> merge (chain chain_id)
-    |> merge inject_block |> merge inject_operation |> merge monitor_operations
-    |> merge list_blocks |> merge live_blocks |> merge raw_protocol_data
-    |> merge broadcast_block |> merge broadcast_operation
-    |> merge monitor_bootstrapped
+    List.fold_left
+      Directory.merge
+      Directory.empty
+      [
+        monitor_validated_blocks;
+        monitor_heads;
+        protocols;
+        raw_header;
+        header;
+        operations;
+        hash;
+        shell_header;
+        resulting_context_hash;
+        chain chain_id;
+        inject_block;
+        inject_operation;
+        inject_private_operation;
+        monitor_operations;
+        list_blocks;
+        live_blocks;
+        raw_protocol_data;
+        broadcast_block;
+        broadcast_operation;
+        monitor_bootstrapped;
+      ]
 
   let directory chain_id =
     let proto_directory =

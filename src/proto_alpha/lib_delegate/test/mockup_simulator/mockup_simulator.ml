@@ -60,10 +60,17 @@ type state = {
      that functionality. *)
   ctxt_table : Tezos_protocol_environment.rpc_context Context_hash.Table.t;
       (** The context table allows us to look up rpc_context by its hash. *)
+  validated_blocks_pipe :
+    (Block_hash.t * Block_header.t * Operation.t list list) Lwt_pipe.Unbounded.t;
+      (** [validated_blocks_pipe] is used to implement the
+          [monitor_validated_blocks] RPC. *)
   heads_pipe : (Block_hash.t * Block_header.t) Lwt_pipe.Unbounded.t;
-      (** [heads_pipe] is used to implement the [monitor_heads] RPC. *)
-  operations_pipe :
-    (Operation_hash.t * Mockup.M.Protocol.operation) option Lwt_pipe.Unbounded.t;
+      (** [heads_pipe] is used to implement the [monitor_heads]
+          RPC. *)
+  mutable operations_stream :
+    (Operation_hash.t * Mockup.M.Protocol.operation) list Lwt_stream.t;
+  mutable operations_stream_push :
+    (Operation_hash.t * Mockup.M.Protocol.operation) list option -> unit;
       (** [operations_pipe] is used to implement the [operations_pipe] RPC. *)
   mutable streaming_operations : bool;
       (** A helper flag used to implement the monitor operations RPC. *)
@@ -107,6 +114,12 @@ module type Hooks = sig
     (Operation_hash.t * Alpha_context.packed_operation * propagation_vector)
     tzresult
     Lwt.t
+
+  val on_new_validated_block :
+    block_hash:Block_hash.t ->
+    block_header:Block_header.t ->
+    operations:Operation.t list list ->
+    (Block_hash.t * Block_header.t * Operation.t list list) option Lwt.t
 
   val on_new_head :
     block_hash:Block_hash.t ->
@@ -238,11 +251,32 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
   let module Impl : Faked_services.Mocked_services_hooks = struct
     type mempool = Mockup.M.Block_services.Mempool.t
 
+    let monitor_validated_blocks () =
+      let next () =
+        let rec pop_until_ok () =
+          Lwt_pipe.Unbounded.pop state.validated_blocks_pipe
+          >>= fun (block_hash, block_header, operations) ->
+          User_hooks.on_new_validated_block
+            ~block_hash
+            ~block_header
+            ~operations
+          >>= function
+          | None -> pop_until_ok ()
+          | Some (hash, head, operations) ->
+              Lwt.return_some (chain_id, hash, head, operations)
+        in
+        pop_until_ok ()
+      in
+      let shutdown () = () in
+      Tezos_rpc.Answer.{next; shutdown}
+
     let monitor_heads () =
       let next () =
         let rec pop_until_ok () =
           Lwt_pipe.Unbounded.pop state.heads_pipe
           >>= fun (block_hash, block_header) ->
+          (* Sleep a 0.1s to simulate a block application delay *)
+          Lwt_unix.sleep 0.1 >>= fun () ->
           User_hooks.on_new_head ~block_hash ~block_header >>= function
           | None -> pop_until_ok ()
           | Some head -> Lwt.return_some head
@@ -295,14 +329,55 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
               else Protocol.hash);
           }
 
+    let may_lie_on_proto_level block x =
+      (* As for ../protocols, the baker distinguishes activation
+         blocks from "normal" blocks by comparing the [proto_level] of
+         the shell header and its predecessor. If the predecessor's
+         one is different, it must mean that we are considering an
+         activation block and must not endorse. Here, we do a bit of
+         hacking in order to return a different proto_level for the
+         predecessor of the genesis block which is considered as the
+         current protocol activation block. To perfectly mimic what is
+         supposed to happen, the first mocked up block created should
+         be made in the genesis protocol, however, it is not what's
+         done in the mockup mode. *)
+      let is_predecessor_of_genesis =
+        match block with
+        | `Hash (requested_hash, rel) ->
+            Int.equal rel 0
+            && Block_hash.equal requested_hash genesis_predecessor_block_hash
+        | _ -> false
+      in
+      if is_predecessor_of_genesis then
+        {
+          x.rpc_context.block_header with
+          proto_level = pred x.rpc_context.block_header.proto_level;
+        }
+      else x.rpc_context.block_header
+
+    let raw_header (block : Tezos_shell_services.Block_services.block) :
+        bytes tzresult Lwt.t =
+      locate_block state block >>=? fun x ->
+      let shell = may_lie_on_proto_level block x in
+      let protocol_data =
+        Data_encoding.Binary.to_bytes_exn
+          Protocol.block_header_data_encoding
+          x.protocol_data
+      in
+      return
+        (Data_encoding.Binary.to_bytes_exn
+           Tezos_base.Block_header.encoding
+           {shell; protocol_data})
+
     let header (block : Tezos_shell_services.Block_services.block) :
         Mockup.M.Block_services.block_header tzresult Lwt.t =
       locate_block state block >>=? fun x ->
+      let shell = may_lie_on_proto_level block x in
       return
         {
           Mockup.M.Block_services.hash = x.rpc_context.block_hash;
           chain_id;
-          shell = x.rpc_context.block_header;
+          shell;
           protocol_data = x.protocol_data;
         }
 
@@ -408,23 +483,18 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
       let streamed = ref false in
       state.streaming_operations <- true ;
       let next () =
-        let rec pop_until_ok () =
-          Lwt_pipe.Unbounded.pop state.operations_pipe >>= function
+        let rec loop () =
+          Lwt_stream.get state.operations_stream >>= function
           | None when !streamed -> Lwt.return None
           | None ->
               streamed := true ;
               Lwt.return (Some [])
-          | Some op -> (
-              User_hooks.on_new_operation op >>= function
-              | None when !streamed -> pop_until_ok ()
-              | None ->
-                  streamed := true ;
-                  Lwt.return (Some [])
-              | Some (oph, op) ->
-                  streamed := true ;
-                  Lwt.return (Some [((oph, op), None)]))
+          | Some ops -> (
+              List.filter_map_s User_hooks.on_new_operation ops >>= function
+              | [] -> loop ()
+              | l -> Lwt.return_some (List.map (fun x -> (x, None)) l))
         in
-        pop_until_ok ()
+        loop ()
       in
       let shutdown () = () in
       Tezos_rpc.Answer.{next; shutdown}
@@ -672,22 +742,15 @@ let rec process_block state block_hash (block_header : Block_header.t)
       then (
         state.chain <- new_chain ;
         clear_mempool state >>=? fun () ->
-        (* The head has changed, the messages in the operations pipe are no
-             good anymore. *)
-        ignore (Lwt_pipe.Unbounded.pop_all_now state.operations_pipe) ;
-        (if state.streaming_operations then (
-         state.streaming_operations <- false ;
-         Lwt_pipe.Unbounded.push state.operations_pipe None ;
-         Lwt.return ())
-        else Lwt.return ())
-        >>= fun () ->
-        (* Put back in the pipe operations that are still alive. *)
-        List.iter_s
-          (fun op ->
-            Lwt_pipe.Unbounded.push state.operations_pipe (Some op) ;
-            Lwt.return ())
-          state.mempool
-        >>= fun () -> return_unit)
+        (* The head changed: notify that the stream ended. *)
+        state.operations_stream_push None ;
+        state.streaming_operations <- false ;
+        (* Instanciate a new stream *)
+        let operations_stream, operations_stream_push = Lwt_stream.create () in
+        state.operations_stream <- operations_stream ;
+        state.operations_stream_push <- operations_stream_push ;
+        state.operations_stream_push (Some state.mempool) ;
+        return_unit)
       else return_unit
 
 (** This process listens to broadcast block and operations and incorporates
@@ -696,11 +759,13 @@ let rec listener ~(user_hooks : (module Hooks)) ~state ~broadcast_pipe =
   let module User_hooks = (val user_hooks : Hooks) in
   Lwt_pipe.Unbounded.pop broadcast_pipe >>= function
   | Broadcast_op (operation_hash, packed_operation) ->
-      state.mempool <- (operation_hash, packed_operation) :: state.mempool ;
-      Lwt_pipe.Unbounded.push
-        state.operations_pipe
-        (Some (operation_hash, packed_operation)) ;
-      User_hooks.check_mempool_after_processing ~mempool:state.mempool
+      (if
+       List.mem_assoc ~equal:Operation_hash.equal operation_hash state.mempool
+      then return_unit
+      else (
+        state.mempool <- (operation_hash, packed_operation) :: state.mempool ;
+        state.operations_stream_push (Some [(operation_hash, packed_operation)]) ;
+        User_hooks.check_mempool_after_processing ~mempool:state.mempool))
       >>=? fun () -> listener ~user_hooks ~state ~broadcast_pipe
   | Broadcast_block (block_hash, block_header, operations) ->
       get_block_level block_header >>=? fun level ->
@@ -716,6 +781,9 @@ let rec listener ~(user_hooks : (module Hooks)) ~state ~broadcast_pipe =
       process_block state block_hash block_header operations >>=? fun () ->
       User_hooks.check_chain_after_processing ~level ~round ~chain:state.chain
       >>=? fun () ->
+      Lwt_pipe.Unbounded.push
+        state.validated_blocks_pipe
+        (block_hash, block_header, operations) ;
       Lwt_pipe.Unbounded.push state.heads_pipe (block_hash, block_header) ;
       listener ~user_hooks ~state ~broadcast_pipe
 
@@ -735,8 +803,9 @@ let create_fake_node_state ~i ~live_depth
     }
   in
   let chain0 = [genesis0] in
+  let validated_blocks_pipe = Lwt_pipe.Unbounded.create () in
   let heads_pipe = Lwt_pipe.Unbounded.create () in
-  let operations_pipe = Lwt_pipe.Unbounded.create () in
+  let operations_stream, operations_stream_push = Lwt_stream.create () in
   let genesis_block_true_hash =
     Block_header.hash
       {
@@ -744,6 +813,8 @@ let create_fake_node_state ~i ~live_depth
         protocol_data = block_header0.protocol_data;
       }
   in
+  (* Only push genesis block as a new head, not a valid block: it is
+     the shell's semantics to not advertise "transition" blocks. *)
   Lwt_pipe.Unbounded.push heads_pipe (rpc_context0.block_hash, block_header0) ;
   return
     {
@@ -768,8 +839,10 @@ let create_fake_node_state ~i ~live_depth
                    .Block_header.context,
                  rpc_context0 );
              ]);
+      validated_blocks_pipe;
       heads_pipe;
-      operations_pipe;
+      operations_stream;
+      operations_stream_push;
       streaming_operations = false;
       broadcast_pipes;
       genesis_block_true_hash;
@@ -1026,7 +1099,6 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
     in
     return (block_header, rpc_context)
   in
-
   let level0_round0_duration =
     Protocol.Alpha_context.Round.round_duration
       round_durations
@@ -1051,6 +1123,9 @@ module Default_hooks : Hooks = struct
 
   let on_inject_operation ~op_hash ~op =
     return (op_hash, op, default_propagation_vector)
+
+  let on_new_validated_block ~block_hash ~block_header ~operations =
+    Lwt.return (Some (block_hash, block_header, operations))
 
   let on_new_head ~block_hash ~block_header =
     Lwt.return (Some (block_hash, block_header))

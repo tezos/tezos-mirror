@@ -51,7 +51,7 @@ type 'a state = {
 }
 
 let init_block_stream_with_stopper cctxt chain =
-  Client_baking_blocks.monitor_valid_blocks
+  Client_baking_blocks.monitor_applied_blocks
     ~next_protocols:(Some [Protocol.hash])
     cctxt
     ~chains:[chain]

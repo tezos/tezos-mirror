@@ -51,7 +51,7 @@ type 'a state = {
 }
 
 let init_block_stream_with_stopper cctxt chain =
-  Client_baking_blocks.monitor_valid_blocks
+  Client_baking_blocks.monitor_applied_blocks
     ~next_protocols:(Some [Protocol.hash])
     cctxt
     ~chains:[chain]
@@ -156,7 +156,7 @@ let inject_vdf_revelation cctxt hash chain_id solution =
       ~solution
       ()
   in
-  let bytes = Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero in
+  let bytes = Signature.concat bytes Signature.zero in
   Shell_services.Injection.operation cctxt ~chain bytes
 
 (* Checks if the VDF setup saved in the state is equal to the one computed

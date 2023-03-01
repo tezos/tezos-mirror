@@ -239,9 +239,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             ~nonce
             ()
           >>=? fun bytes ->
-          let bytes =
-            Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero
-          in
+          let bytes = Signature.concat bytes Signature.zero in
           Shell_services.Injection.operation ~async:true cctxt ~chain bytes
           >>=? fun oph ->
           Events.(
@@ -257,7 +255,7 @@ let reveal_potential_nonces state new_proposal =
   let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
   if
     Block_hash.(last_predecessor <> new_predecessor_hash)
-    && Protocol_hash.(new_proposal.predecessor.protocol = Protocol.hash)
+    && not (Baking_state.is_first_block_in_protocol new_proposal)
   then (
     (* only try revealing nonces when the proposal's predecessor is a new one *)
     state.last_predecessor <- new_predecessor_hash ;

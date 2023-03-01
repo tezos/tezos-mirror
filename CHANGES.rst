@@ -143,6 +143,15 @@ Node
 - **Breaking Change**: disabled snapshot export support for storage
   that was created with Octez v13 (or earlier).
 
+- Deprecated the RPC ``GET /monitor/valid_blocks`` and introduced
+  ``GET /monitor/validated_blocks`` and ``GET /monitor/applied_blocks``
+  which respectively returns validated blocks, which are not yet applied
+  nor stored, and applied blocks which are fully applied and stored by
+  the node. (MR :gl: `!7513`)
+
+- Replaced some "precheck" occurrences with "validate" in event and
+  error identifiers and messages. (MR :gl: `!7513`)
+
 Client
 ------
 
@@ -167,6 +176,33 @@ Baker
 - Fixed an issue where the baker would keep files opened longer than
   necessary causing unexpected out of space errors making the baker
   crash.
+
+- Changed the baker default semantics so that it performs a light
+  validation of operations to classify them instead of fully applying
+  them. Hence, the block production is now more
+  time/cpu/disk-efficient. In this mode, application-dependent checks
+  are disabled. Setting the ``--force-apply`` flag on the command line
+  restores the previous behavior. (MR :gl:`!7490`)
+
+- **Breaking Change**: Disabled the verification of signature of
+  operations in the baker when baking a block. The baker must always
+  be provided operations with a valid signature, otherwise produced
+  blocks will be invalid and rejected by local nodes during their
+  injection. Default setups are not affected but external mempools
+  should make sure that their operations' signatures are correct.
+  (MR :gl:`!7490`)
+
+- Made the baker discard legacy or corrupted Tenderbake's saved
+  states in order to avoid unexpected crashes when the baker gets
+  updated, or when a new protocol's baker starts. (MR :gl:`!7640`)
+
+- Restored previous behaviour from :gl:`!7490` for blocks at round
+  greater than 0. Application-dependent checks are re-enabled for
+  re-proposal and fresh blocks at round greater than 0.
+
+- Reduced the preendorsement injection delay by making the baker
+  preendorse as soon as the node considers a block as valid instead of
+  waiting for the node to fully apply it. (MR :gl:`!7516`)
 
 Accuser
 -------

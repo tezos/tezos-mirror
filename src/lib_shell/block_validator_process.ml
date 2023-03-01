@@ -1014,12 +1014,12 @@ let apply_block ?(simulate = false) ?(should_precheck = true)
   let block_hash = Block_header.hash header in
   let* () =
     when_ (not should_precheck) (fun () ->
-        let*! is_prechecked =
-          Store.Block.is_known_prechecked chain_store block_hash
+        let*! is_validated =
+          Store.Block.is_known_validated chain_store block_hash
         in
         fail_unless
-          is_prechecked
-          (Block_validator_errors.Applying_non_prechecked_block block_hash))
+          is_validated
+          (Block_validator_errors.Applying_non_validated_block block_hash))
   in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in

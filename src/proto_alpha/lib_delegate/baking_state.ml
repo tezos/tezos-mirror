@@ -103,16 +103,12 @@ type prequorum = {
 type block_info = {
   hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
 }
 
 type cache = {
@@ -167,68 +163,48 @@ let block_info_encoding =
     (fun {
            hash;
            shell;
-           resulting_context_hash;
            payload_hash;
            payload_round;
            round;
-           protocol;
-           next_protocol;
            prequorum;
            quorum;
            payload;
-           live_blocks;
          } ->
-      ( ( hash,
-          shell,
-          resulting_context_hash,
-          payload_hash,
-          payload_round,
-          round,
-          protocol,
-          next_protocol,
-          prequorum,
-          List.map Operation.pack quorum ),
-        (payload, live_blocks) ))
-    (fun ( ( hash,
-             shell,
-             resulting_context_hash,
-             payload_hash,
-             payload_round,
-             round,
-             protocol,
-             next_protocol,
-             prequorum,
-             quorum ),
-           (payload, live_blocks) ) ->
+      ( hash,
+        shell,
+        payload_hash,
+        payload_round,
+        round,
+        prequorum,
+        List.map Operation.pack quorum,
+        payload ))
+    (fun ( hash,
+           shell,
+           payload_hash,
+           payload_round,
+           round,
+           prequorum,
+           quorum,
+           payload ) ->
       {
         hash;
         shell;
-        resulting_context_hash;
         payload_hash;
         payload_round;
         round;
-        protocol;
-        next_protocol;
         prequorum;
         quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
         payload;
-        live_blocks;
       })
-    (merge_objs
-       (obj10
-          (req "hash" Block_hash.encoding)
-          (req "shell" Block_header.shell_header_encoding)
-          (req "resulting_context_hash" Context_hash.encoding)
-          (req "payload_hash" Block_payload_hash.encoding)
-          (req "payload_round" Round.encoding)
-          (req "round" Round.encoding)
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding)
-          (req "prequorum" (option prequorum_encoding))
-          (req "quorum" (list (dynamic_size Operation.encoding))))
-       (obj2
-          (req "payload" Operation_pool.payload_encoding)
-          (req "live_blocks" Block_hash.Set.encoding)))
+    (obj8
+       (req "hash" Block_hash.encoding)
+       (req "shell" Block_header.shell_header_encoding)
+       (req "payload_hash" Block_payload_hash.encoding)
+       (req "payload_round" Round.encoding)
+       (req "round" Round.encoding)
+       (req "prequorum" (option prequorum_encoding))
+       (req "quorum" (list (dynamic_size Operation.encoding)))
+       (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult
@@ -241,7 +217,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
     list of slots (i.e., a list of position indexes in the slot map, in
     other words the list of rounds when it will be the proposer), and
     its endorsing power. *)
-type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
+type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
 (* FIXME: determine if the slot map should contain all slots or just
    the first one *)
@@ -265,6 +241,9 @@ let proposal_encoding =
     (obj2
        (req "block" block_info_encoding)
        (req "predecessor" block_info_encoding))
+
+let is_first_block_in_protocol {block; predecessor; _} =
+  Compare.Int.(block.shell.proto_level <> predecessor.shell.proto_level)
 
 type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
 
@@ -300,6 +279,10 @@ type elected_block = {
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
+  is_latest_proposal_applied : bool;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+  injected_preendorsements : packed_operation list option;
   (* Last proposal received where we injected an endorsement (thus we
      have seen 2f+1 preendorsements) *)
   locked_round : locked_round option;
@@ -312,7 +295,11 @@ type level_state = {
   next_level_proposed_round : Round.t option;
 }
 
-type phase = Idle | Awaiting_preendorsements | Awaiting_endorsements
+type phase =
+  | Idle
+  | Awaiting_preendorsements
+  | Awaiting_application
+  | Awaiting_endorsements
 
 let phase_encoding =
   let open Data_encoding in
@@ -332,8 +319,14 @@ let phase_encoding =
         (function Awaiting_preendorsements -> Some () | _ -> None)
         (fun () -> Awaiting_preendorsements);
       case
-        ~title:"Awaiting_endorsements"
+        ~title:"Awaiting_application"
         (Tag 2)
+        unit
+        (function Awaiting_application -> Some () | _ -> None)
+        (fun () -> Awaiting_application);
+      case
+        ~title:"Awaiting_endorsements"
+        (Tag 3)
         unit
         (function Awaiting_endorsements -> Some () | _ -> None)
         (fun () -> Awaiting_endorsements);
@@ -376,18 +369,13 @@ let timeout_kind_encoding =
         (fun at_round -> Time_to_bake_next_level {at_round});
     ]
 
-type voting_power = int
-
 type event =
-  | New_proposal of proposal
+  | New_valid_proposal of proposal
+  | New_head_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.preendorsement operation list
+      Operation_worker.candidate * Kind.preendorsement operation list
   | Quorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.endorsement operation list
+      Operation_worker.candidate * Kind.endorsement operation list
   | Timeout of timeout_kind
 
 let event_encoding =
@@ -396,203 +384,70 @@ let event_encoding =
     [
       case
         (Tag 0)
-        ~title:"New_proposal"
+        ~title:"New_valid_proposal"
         proposal_encoding
-        (function New_proposal p -> Some p | _ -> None)
-        (fun p -> New_proposal p);
+        (function New_valid_proposal p -> Some p | _ -> None)
+        (fun p -> New_valid_proposal p);
       case
         (Tag 1)
-        ~title:"Prequorum_reached"
-        (tup3
-           Operation_worker.candidate_encoding
-           Data_encoding.int31
-           (Data_encoding.list (dynamic_size Operation.encoding)))
-        (function
-          | Prequorum_reached (candidate, voting_power, ops) ->
-              Some (candidate, voting_power, List.map Operation.pack ops)
-          | _ -> None)
-        (fun (candidate, voting_power, ops) ->
-          Prequorum_reached
-            (candidate, voting_power, Operation_pool.filter_preendorsements ops));
+        ~title:"New_head_proposal"
+        proposal_encoding
+        (function New_head_proposal p -> Some p | _ -> None)
+        (fun p -> New_head_proposal p);
       case
         (Tag 2)
-        ~title:"Quorum_reached"
-        (tup3
+        ~title:"Prequorum_reached"
+        (tup2
            Operation_worker.candidate_encoding
-           Data_encoding.int31
            (Data_encoding.list (dynamic_size Operation.encoding)))
         (function
-          | Quorum_reached (candidate, voting_power, ops) ->
-              Some (candidate, voting_power, List.map Operation.pack ops)
+          | Prequorum_reached (candidate, ops) ->
+              Some (candidate, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, voting_power, ops) ->
-          Quorum_reached
-            (candidate, voting_power, Operation_pool.filter_endorsements ops));
+        (fun (candidate, ops) ->
+          Prequorum_reached
+            (candidate, Operation_pool.filter_preendorsements ops));
       case
         (Tag 3)
+        ~title:"Quorum_reached"
+        (tup2
+           Operation_worker.candidate_encoding
+           (Data_encoding.list (dynamic_size Operation.encoding)))
+        (function
+          | Quorum_reached (candidate, ops) ->
+              Some (candidate, List.map Operation.pack ops)
+          | _ -> None)
+        (fun (candidate, ops) ->
+          Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
+      case
+        (Tag 4)
         ~title:"Timeout"
         timeout_kind_encoding
         (function Timeout tk -> Some tk | _ -> None)
         (fun tk -> Timeout tk);
     ]
 
-(* Legacy disk state support: this will only be used when migrating
-   from a baker using the previous format to the new one and will
-   happen once. *)
+(* Disk state *)
 
-type legacy_block_info = {
-  legacy_hash : Block_hash.t;
-  legacy_shell : Block_header.shell_header;
-  legacy_payload_hash : Block_payload_hash.t;
-  legacy_payload_round : Round.t;
-  legacy_round : Round.t;
-  legacy_protocol : Protocol_hash.t;
-  legacy_next_protocol : Protocol_hash.t;
-  legacy_prequorum : prequorum option;
-  legacy_quorum : Kind.endorsement operation list;
-  legacy_payload : Operation_pool.payload;
-  legacy_live_blocks : Block_hash.Set.t;
-}
+module Events = struct
+  include Internal_event.Simple
 
-let legacy_block_info_encoding : legacy_block_info Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun ({
-            legacy_hash;
-            legacy_shell;
-            legacy_payload_hash;
-            legacy_payload_round;
-            legacy_round;
-            legacy_protocol;
-            legacy_next_protocol;
-            legacy_prequorum;
-            legacy_quorum;
-            legacy_payload;
-            legacy_live_blocks;
-          } :
-           legacy_block_info) ->
-      ( ( legacy_hash,
-          legacy_shell,
-          legacy_payload_hash,
-          legacy_payload_round,
-          legacy_round,
-          legacy_protocol,
-          legacy_next_protocol,
-          legacy_prequorum,
-          List.map Operation.pack legacy_quorum,
-          legacy_payload ),
-        legacy_live_blocks ))
-    (fun ( ( legacy_hash,
-             legacy_shell,
-             legacy_payload_hash,
-             legacy_payload_round,
-             legacy_round,
-             legacy_protocol,
-             legacy_next_protocol,
-             legacy_prequorum,
-             legacy_quorum,
-             legacy_payload ),
-           legacy_live_blocks ) ->
-      {
-        legacy_hash;
-        legacy_shell;
-        legacy_payload_hash;
-        legacy_payload_round;
-        legacy_round;
-        legacy_protocol;
-        legacy_next_protocol;
-        legacy_prequorum;
-        legacy_quorum =
-          List.filter_map Operation_pool.unpack_endorsement legacy_quorum;
-        legacy_payload;
-        legacy_live_blocks;
-      })
-    (merge_objs
-       (obj10
-          (req "hash" Block_hash.encoding)
-          (req "shell" Block_header.shell_header_encoding)
-          (req "payload_hash" Block_payload_hash.encoding)
-          (req "payload_round" Round.encoding)
-          (req "round" Round.encoding)
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding)
-          (req "prequorum" (option prequorum_encoding))
-          (req "quorum" (list (dynamic_size Operation.encoding)))
-          (req "payload" Operation_pool.payload_encoding))
-       (obj1 (req "live_blocks" Block_hash.Set.encoding)))
+  let section = [Protocol.name; "baker"; "disk"]
 
-type legacy_proposal = {
-  legacy_block : legacy_block_info;
-  legacy_predecessor : legacy_block_info;
-}
-
-let legacy_proposal_encoding =
-  let open Data_encoding in
-  conv
-    (fun {legacy_block; legacy_predecessor} ->
-      (legacy_block, legacy_predecessor))
-    (fun (legacy_block, legacy_predecessor) ->
-      {legacy_block; legacy_predecessor})
-    (obj2
-       (req "block" legacy_block_info_encoding)
-       (req "predecessor" legacy_block_info_encoding))
-
-type legacy_endorsable_payload = {
-  legacy_proposal : legacy_proposal;
-  prequorum : prequorum;
-}
-
-let legacy_endorsable_payload_encoding =
-  let open Data_encoding in
-  conv
-    (fun {legacy_proposal; prequorum} -> (legacy_proposal, prequorum))
-    (fun (legacy_proposal, prequorum) -> {legacy_proposal; prequorum})
-    (obj2
-       (req "proposal" legacy_proposal_encoding)
-       (req "prequorum" prequorum_encoding))
-
-type legacy_state_data = {
-  level_data : int32;
-  locked_round_data : locked_round option;
-  legacy_endorsable_payload_data : legacy_endorsable_payload option;
-}
-
-let legacy_state_data_encoding =
-  let open Data_encoding in
-  conv
-    (fun {level_data; locked_round_data; legacy_endorsable_payload_data} ->
-      (level_data, locked_round_data, legacy_endorsable_payload_data))
-    (fun (level_data, locked_round_data, legacy_endorsable_payload_data) ->
-      {level_data; locked_round_data; legacy_endorsable_payload_data})
-    (obj3
-       (req "level" int32)
-       (req "locked_round" (option locked_round_encoding))
-       (req "endorsable_payload" (option legacy_endorsable_payload_encoding)))
+  let incompatible_stored_state =
+    declare_0
+      ~section
+      ~name:"incompatible_stored_state"
+      ~level:Warning
+      ~msg:"found an outdated or corrupted baking state: discarding it"
+      ()
+end
 
 type state_data = {
   level_data : int32;
   locked_round_data : locked_round option;
   endorsable_payload_data : endorsable_payload option;
 }
-
-let update_legacy_state_data raw_data =
-  (* "Upgrade" the file format by dumping the legacy
-     endorsable data. It is sound as the new baker
-     cannot start (i.e. load the preexisting state)
-     until the new protocol activates.
-
-     Note: the new encoding is not backward compatible
-     (unless the endorsable_payload_data is [None]). *)
-  let legacy_state_data =
-    Data_encoding.Binary.of_string_exn legacy_state_data_encoding raw_data
-  in
-  {
-    level_data = legacy_state_data.level_data;
-    locked_round_data = None;
-    endorsable_payload_data = None;
-  }
-
-(* Disk state *)
 
 let state_data_encoding =
   let open Data_encoding in
@@ -723,9 +578,11 @@ let load_endorsable_data cctxt location =
               match
                 Data_encoding.Binary.of_string_opt state_data_encoding str
               with
-              | Some state_data -> Lwt.return state_data
-              | None -> Lwt.return (update_legacy_state_data str))
-          >>= return_some)
+              | Some state_data -> return_some state_data
+              | None ->
+                  (* The stored state format is incompatible: discard it. *)
+                  Events.(emit incompatible_stored_state ()) >>= fun () ->
+                  return_none))
 
 let may_load_endorsable_data state =
   let cctxt = state.global_state.cctxt in
@@ -782,7 +639,12 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
     List.fold_left
       (fun (own_map, all_map) slot ->
         let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
-        let endorsing_slot = {endorsing_power = List.length slots; slots} in
+        let endorsing_slot =
+          {
+            endorsing_power = List.length slots;
+            first_slot = Stdlib.List.hd slots;
+          }
+        in
         let all_map =
           List.fold_left
             (fun all_map slot -> SlotMap.add slot endorsing_slot all_map)
@@ -859,18 +721,15 @@ let pp_block_info fmt
       shell;
       payload_hash;
       round;
-      protocol;
-      next_protocol;
       prequorum;
       quorum;
       payload;
-      _;
+      payload_round;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d endorsements@ \
-     payload: %a@]"
+     prequorum: %a@ quorum: %d endorsements@ payload: %a@ payload round: %a@]"
     Block_hash.pp
     hash
     Block_payload_hash.pp_short
@@ -878,15 +737,13 @@ let pp_block_info fmt
     shell.level
     Round.pp
     round
-    Protocol_hash.pp_short
-    protocol
-    Protocol_hash.pp_short
-    next_protocol
     (pp_option pp_prequorum)
     prequorum
     (List.length quorum)
     Operation_pool.pp_payload
     payload
+    Round.pp
+    payload_round
 
 let pp_proposal fmt {block; _} = pp_block_info fmt block
 
@@ -916,13 +773,13 @@ let pp_elected_block fmt {proposal; endorsement_qc} =
     proposal.block
     (List.length endorsement_qc)
 
-let pp_endorsing_slot fmt (consensus_key_and_delegate, {slots; endorsing_power})
-    =
+let pp_endorsing_slot fmt
+    (consensus_key_and_delegate, {first_slot; endorsing_power}) =
   Format.fprintf
     fmt
-    "slots: @[<h>[%a]@],@ delegate: %a,@ endorsing_power: %d"
-    Format.(pp_print_list ~pp_sep:pp_print_space Slot.pp)
-    slots
+    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ endorsing_power: %d"
+    Slot.pp
+    first_slot
     pp_consensus_key_and_delegate
     consensus_key_and_delegate
     endorsing_power
@@ -946,6 +803,9 @@ let pp_level_state fmt
     {
       current_level;
       latest_proposal;
+      is_latest_proposal_applied;
+      delayed_prequorum;
+      injected_preendorsements;
       locked_round;
       endorsable_payload;
       elected_block;
@@ -955,11 +815,15 @@ let pp_level_state fmt
     } =
   Format.fprintf
     fmt
-    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal:@ %a@]@ locked \
-     round: %a@ endorsable payload: %a@ elected block: %a@ @[<v 2>own delegate \
+    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b, \
+     delayed prequorum:%b, injected preendorsements: %d):@ %a@]@ locked round: \
+     %a@ endorsable payload: %a@ elected block: %a@ @[<v 2>own delegate \
      slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ next level \
      proposed round: %a@]"
     current_level
+    is_latest_proposal_applied
+    (Option.is_some delayed_prequorum)
+    (match injected_preendorsements with None -> 0 | Some l -> List.length l)
     pp_proposal
     latest_proposal
     (pp_option pp_locked_round)
@@ -978,6 +842,7 @@ let pp_level_state fmt
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"
   | Awaiting_preendorsements -> Format.fprintf fmt "awaiting preendorsements"
+  | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_endorsements -> Format.fprintf fmt "awaiting endorsements"
 
 let pp_round_state fmt {current_round; current_phase} =
@@ -1007,29 +872,32 @@ let pp_timeout_kind fmt = function
       Format.fprintf fmt "time to bake next level at round %a" Round.pp at_round
 
 let pp_event fmt = function
-  | New_proposal proposal ->
+  | New_valid_proposal proposal ->
       Format.fprintf
         fmt
-        "new proposal received: %a"
+        "new valid proposal received: %a"
         pp_block_info
         proposal.block
-  | Prequorum_reached (candidate, voting_power, preendos) ->
+  | New_head_proposal proposal ->
       Format.fprintf
         fmt
-        "pre-quorum reached with %d preendorsements (power: %d) for %a at \
-         round %a"
+        "new head proposal received: %a"
+        pp_block_info
+        proposal.block
+  | Prequorum_reached (candidate, preendos) ->
+      Format.fprintf
+        fmt
+        "prequorum reached with %d preendorsements for %a at round %a"
         (List.length preendos)
-        voting_power
         Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
-  | Quorum_reached (candidate, voting_power, endos) ->
+  | Quorum_reached (candidate, endos) ->
       Format.fprintf
         fmt
-        "quorum reached with %d endorsements (power: %d) for %a at round %a"
+        "quorum reached with %d endorsements for %a at round %a"
         (List.length endos)
-        voting_power
         Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp

@@ -74,6 +74,15 @@ module type Hooks = sig
     tzresult
     Lwt.t
 
+  (** This is called when a new validated block is going to be sent as
+      the response to a "monitor validated blocks" RPC call. Returning
+      [None] here terminates the process for the baker. *)
+  val on_new_validated_block :
+    block_hash:Block_hash.t ->
+    block_header:Block_header.t ->
+    operations:Operation.t list list ->
+    (Block_hash.t * Block_header.t * Operation.t list list) option Lwt.t
+
   (** This is called when a new head is going to be sent as the response to
      a "monitor heads" RPC call. Returning [None] here terminates the
      process for the baker. *)
@@ -139,8 +148,7 @@ type config = {
       (** Maximal duration of the test. If the test takes
                      longer to terminate it'll be aborted with an
                      error. *)
-  delegate_selection :
-    (int32 * (int32 * Tezos_crypto.Signature.public_key_hash) list) list;
+  delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
       (** Desired selection of delegates per level/round *)
   initial_seed : State_hash.t option;
       (** Optional initial seed for protocol (used to control delegate selection) *)
@@ -172,21 +180,21 @@ val default_config : config
    to the final result. *)
 val run : ?config:config -> (int * (module Hooks)) list -> unit tzresult Lwt.t
 
-val bootstrap1 : Tezos_crypto.Signature.public_key
+val bootstrap1 : Signature.public_key
 
-val bootstrap2 : Tezos_crypto.Signature.public_key
+val bootstrap2 : Signature.public_key
 
-val bootstrap3 : Tezos_crypto.Signature.public_key
+val bootstrap3 : Signature.public_key
 
-val bootstrap4 : Tezos_crypto.Signature.public_key
+val bootstrap4 : Signature.public_key
 
-val bootstrap5 : Tezos_crypto.Signature.public_key
+val bootstrap5 : Signature.public_key
 
 (** Check if a block header is signed by a given delegate. *)
 val check_block_signature :
   block_hash:Block_hash.t ->
   block_header:Block_header.t ->
-  public_key:Tezos_crypto.Signature.public_key ->
+  public_key:Signature.public_key ->
   unit tzresult Lwt.t
 
 (** A shortcut type for predicates on operations. *)
@@ -216,8 +224,7 @@ val mempool_has_op_ref :
   unit tzresult Lwt.t
 
 (** Check if an operation is signed by the given delegate. *)
-val op_is_signed_by :
-  public_key:Tezos_crypto.Signature.public_key -> op_predicate
+val op_is_signed_by : public_key:Signature.public_key -> op_predicate
 
 (** Check that an operation is a preendorsement. *)
 val op_is_preendorsement : ?level:int32 -> ?round:int32 -> op_predicate

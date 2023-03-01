@@ -1,14 +1,14 @@
 open Mockup_simulator
 
-let bootstrap1 = Tezos_crypto.Signature.Public_key.hash bootstrap1
+let bootstrap1 = Signature.Public_key.hash bootstrap1
 
-let bootstrap2 = Tezos_crypto.Signature.Public_key.hash bootstrap2
+let bootstrap2 = Signature.Public_key.hash bootstrap2
 
-let bootstrap3 = Tezos_crypto.Signature.Public_key.hash bootstrap3
+let bootstrap3 = Signature.Public_key.hash bootstrap3
 
-let bootstrap4 = Tezos_crypto.Signature.Public_key.hash bootstrap4
+let bootstrap4 = Signature.Public_key.hash bootstrap4
 
-let bootstrap5 = Tezos_crypto.Signature.Public_key.hash bootstrap5
+let bootstrap5 = Signature.Public_key.hash bootstrap5
 
 let some_seed s = Some (Protocol.State_hash.of_b58check_exn s)
 
@@ -24,7 +24,7 @@ let test_level_5 () =
     include Default_hooks
 
     let stop_on_event = function
-      | Baking_state.New_proposal {block; _} ->
+      | Baking_state.New_head_proposal {block; _} ->
           (* Stop the node as soon as we receive a proposal with a level
              higher than [level_to_reach]. *)
           block.shell.level > level_to_reach
@@ -53,6 +53,65 @@ let test_level_5 () =
     }
   in
   run ~config [(3, (module Hooks)); (2, (module Hooks))]
+
+let test_preendorse_on_valid () =
+  let level_to_reach = 2l in
+  let round_to_reach = 1l in
+  let module Hooks : Hooks = struct
+    include Default_hooks
+
+    let on_new_head ~block_hash ~block_header =
+      (* Stop notifying heads on the level to reach, only notify that
+         it has been validated *)
+      if block_header.Block_header.shell.level < level_to_reach then
+        Lwt.return_some (block_hash, block_header)
+      else Lwt.return_none
+
+    let seen_candidate = ref None
+
+    let pqc_noticed = ref false
+
+    let stop_on_event = function
+      | Baking_state.Prequorum_reached (candidate, _) ->
+          (* Register the PQC notice. *)
+          (match !seen_candidate with
+          | Some seen_candidate
+            when Block_hash.(candidate.hash = seen_candidate) ->
+              pqc_noticed := true
+          | _ -> ()) ;
+          false
+      | Baking_state.Quorum_reached (candidate, _) ->
+          (* Ensure that we never see a QC on the seen candidate. *)
+          (match !seen_candidate with
+          | Some seen_candidate
+            when Block_hash.(candidate.hash = seen_candidate) ->
+              Stdlib.failwith "Quorum occured on the seen candidate"
+          | _ -> ()) ;
+          false
+      | New_head_proposal {block; _} ->
+          (* Ensure that we never notice a new head at the level where
+             we are not supposed to. *)
+          if block.shell.level = level_to_reach then
+            Stdlib.failwith "Unexpected new head event"
+          else false
+      | New_valid_proposal {block; _} ->
+          (* Register the seen valid proposal candidate. *)
+          if
+            block.shell.level = level_to_reach
+            && Protocol.Alpha_context.Round.to_int32 block.round = 0l
+          then seen_candidate := Some block.hash ;
+          (* Stop the node when we reach level 2 / round 2. *)
+          block.shell.level = level_to_reach
+          && Protocol.Alpha_context.Round.to_int32 block.round >= round_to_reach
+      | _ -> false
+
+    let check_chain_on_success ~chain:_ =
+      assert (!seen_candidate <> None) ;
+      assert !pqc_noticed ;
+      return_unit
+  end in
+  let config = {default_config with timeout = 10} in
+  run ~config [(1, (module Hooks))]
 
 (*
 
@@ -401,6 +460,14 @@ let test_scenario_f1 () =
   let d_proposed_l1_r1 = ref false in
   let a_proposed_l2_r0 = ref false in
   let stop_on_event0 _ = !a_proposed_l2_r0 in
+  let pass =
+    (* This is to be sure that the proposal for round r arrives while
+       the baker is in round r, and not in round r-1. (See related
+       issue:
+       https://gitlab.com/tezos/tezos/-/issues/4143). Otherwise, the
+       test does not perform as expected. *)
+    Delay 0.5
+  in
   let module Node_a_hooks : Hooks = struct
     include Default_hooks
 
@@ -416,7 +483,7 @@ let test_scenario_f1 () =
           (a_proposed_l2_r0 := true ;
            return_unit)
           >>=? fun () ->
-          return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
+          return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
             "unexpected injection on the node A, level = %ld / round = %ld"
@@ -455,7 +522,7 @@ let test_scenario_f1 () =
           (c_proposed_l1_r0 := true ;
            return_unit)
           >>=? fun () ->
-          return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
+          return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
             "unexpected injection on the node C, level = %ld / round = %ld"
@@ -484,7 +551,7 @@ let test_scenario_f1 () =
           (d_proposed_l1_r1 := true ;
            return_unit)
           >>=? fun () ->
-          return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
+          return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
             "unexpected injection on the node D, level = %ld / round = %ld"
@@ -641,7 +708,7 @@ let test_scenario_m1 () =
       return (op_hash, op, propagation_vector)
 
     let stop_on_event = function
-      | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+      | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
       | _ -> false
   end in
   let config = {default_config with timeout = 60} in
@@ -671,7 +738,7 @@ let test_scenario_m2 () =
     include Default_hooks
 
     let stop_on_event = function
-      | Baking_state.New_proposal {block; _} -> block.shell.level > 5l
+      | Baking_state.New_head_proposal {block; _} -> block.shell.level > 5l
       | _ -> false
   end in
   let module Missing_node : Hooks = struct
@@ -726,7 +793,7 @@ Scenario M3
    from other nodes only go to A.
 3. The chain should not make progress. Since we have both bootstrap1 and
    bootstrap2 in delegate selection they have equal voting power. Therefore
-   it is necessary to have 2 votes for pre-quorums (which is achieved when A
+   it is necessary to have 2 votes for prequorums (which is achieved when A
    is proposing) and 2 votes for quorums (impossible because B has no way to
    obtain PQC and thus cannot send endorsements).
 
@@ -734,7 +801,7 @@ Scenario M3
 
 let test_scenario_m3 () =
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} ->
+    | Baking_state.New_head_proposal {block; _} ->
         block.shell.level = 1l
         && Protocol.Alpha_context.Round.to_int32 block.round = 6l
     | _ -> false
@@ -909,7 +976,7 @@ Scenario M5
 
 let test_scenario_m5 () =
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level >= 2l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level >= 2l
     | _ -> false
   in
   let module Node_a_hooks : Hooks = struct
@@ -996,7 +1063,7 @@ Scenario M6
 let test_scenario_m6 () =
   let b_proposal_2_1 = ref None in
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let module Node_a_hooks : Hooks = struct
@@ -1126,7 +1193,7 @@ let test_scenario_m7 () =
   let c_received_2_1 = ref false in
   let d_received_2_1 = ref false in
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let check_chain_on_success0 node_label ~chain =
@@ -1330,7 +1397,7 @@ Scenario M8
 let test_scenario_m8 () =
   let b_proposal_2_0 = ref None in
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let on_inject_operation0 ~op_hash ~op =
@@ -1462,11 +1529,11 @@ let tests =
   let open Tezos_base_test_helpers.Tztest in
   [
     tztest "reaches level 5" `Quick test_level_5;
+    tztest "cannot progress without new head" `Quick test_preendorse_on_valid;
     tztest "scenario t1" `Quick test_scenario_t1;
     tztest "scenario t2" `Quick test_scenario_t2;
     tztest "scenario t3" `Quick test_scenario_t3;
-    (* See issue https://gitlab.com/nomadic-labs/tezos/-/issues/518 *)
-    (* tztest "scenario f1" `Quick test_scenario_f1; *)
+    tztest "scenario f1" `Quick test_scenario_f1;
     tztest "scenario f2" `Quick test_scenario_f2;
     tztest "scenario m1" `Quick test_scenario_m1;
     tztest "scenario m2" `Quick test_scenario_m2;

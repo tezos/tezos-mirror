@@ -28,8 +28,8 @@ open Alpha_context
 
 type consensus_key = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.public_key;
-  public_key_hash : Tezos_crypto.Signature.public_key_hash;
+  public_key : Signature.public_key;
+  public_key_hash : Signature.public_key_hash;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -37,8 +37,7 @@ val consensus_key_encoding : consensus_key Data_encoding.t
 
 val pp_consensus_key : Format.formatter -> consensus_key -> unit
 
-type consensus_key_and_delegate =
-  consensus_key * Tezos_crypto.Signature.Public_key_hash.t
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
 
 val consensus_key_and_delegate_encoding :
   consensus_key_and_delegate Data_encoding.t
@@ -58,18 +57,12 @@ type prequorum = {
 type block_info = {
   hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
-      (** Set of live blocks for this block that is used to filter
-          old or too recent operations. *)
 }
 
 type cache = {
@@ -97,7 +90,7 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 
 module SlotMap : Map.S with type key = Slot.t
 
-type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
+type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
 type delegate_slots = {
   own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
@@ -108,6 +101,15 @@ type delegate_slots = {
 type proposal = {block : block_info; predecessor : block_info}
 
 val proposal_encoding : proposal Data_encoding.t
+
+(** Identify the first block of the protocol, ie. the block that
+    activates the current protocol.
+
+    This block should be baked by the baker of the previous protocol
+    (that's why this same block is also referred to as the last block
+    of the previous protocol). It is always considered final and
+    therefore is not endorsed.*)
+val is_first_block_in_protocol : proposal -> bool
 
 type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
 
@@ -125,6 +127,10 @@ type elected_block = {
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
+  is_latest_proposal_applied : bool;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+  injected_preendorsements : packed_operation list option;
   locked_round : locked_round option;
   endorsable_payload : endorsable_payload option;
   elected_block : elected_block option;
@@ -133,7 +139,11 @@ type level_state = {
   next_level_proposed_round : Round.t option;
 }
 
-type phase = Idle | Awaiting_preendorsements | Awaiting_endorsements
+type phase =
+  | Idle
+  | Awaiting_preendorsements
+  | Awaiting_application
+  | Awaiting_endorsements
 
 val phase_encoding : phase Data_encoding.t
 
@@ -147,24 +157,21 @@ type state = {
 
 type t = state
 
+val update_current_phase : t -> phase -> t
+
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_bake_next_level of {at_round : Round.t}
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 
-type voting_power = int
-
 type event =
-  | New_proposal of proposal
+  | New_valid_proposal of proposal
+  | New_head_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.preendorsement operation list
+      Operation_worker.candidate * Kind.preendorsement operation list
   | Quorum_reached of
-      Operation_worker.candidate
-      * voting_power
-      * Kind.endorsement operation list
+      Operation_worker.candidate * Kind.endorsement operation list
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t

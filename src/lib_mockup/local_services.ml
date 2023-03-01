@@ -855,6 +855,26 @@ module Make (E : MENV) = struct
                 write_context_callback
                 operation_bytes)
 
+  let monitor_validated_blocks () =
+    Directory.register
+      Directory.empty
+      Tezos_shell_services.Monitor_services.S.validated_blocks
+      (fun () q () ->
+        let chain =
+          match List.hd q#chains with None -> `Main | Some chain -> chain
+        in
+        with_chain ~caller_name:"monitor validated blocks" chain (fun () ->
+            let block_header =
+              Block_header.
+                {
+                  shell = E.rpc_context.block_header;
+                  protocol_data = E.protocol_data;
+                }
+            in
+            let block_hash = E.rpc_context.block_hash in
+            Tezos_rpc.Answer.return
+              (E.chain_id, block_hash, block_header, [[]; []; []; []])))
+
   let monitor_heads () =
     Directory.register
       Directory.empty
@@ -870,6 +890,24 @@ module Make (E : MENV) = struct
             in
             let block_hash = E.rpc_context.block_hash in
             Tezos_rpc.Answer.return (block_hash, block_header)))
+
+  let raw_header () =
+    Directory.prefix
+      (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
+      (Directory.register
+         Directory.empty
+         E.Block_services.S.raw_header
+         (fun (((), chain), _block) () () ->
+           with_chain ~caller_name:"raw header" chain (fun () ->
+               let block_header_b =
+                 Data_encoding.Binary.to_bytes_exn
+                   Tezos_base.Block_header.encoding
+                   {
+                     shell = E.rpc_context.block_header;
+                     protocol_data = E.protocol_data;
+                   }
+               in
+               Tezos_rpc.Answer.return block_header_b)))
 
   let header () =
     Directory.prefix
@@ -962,7 +1000,9 @@ module Make (E : MENV) = struct
     |> merge (inject_block write_context_callback)
     |> merge (live_blocks ())
     |> merge (preapply_block ())
+    |> merge (monitor_validated_blocks ())
     |> merge (monitor_heads ())
+    |> merge (raw_header ())
     |> merge (header ())
     |> merge (operations ())
     |> merge (resulting_context_hash ())

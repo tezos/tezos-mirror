@@ -41,6 +41,11 @@ type block_to_bake = {
   round : Round.t;
   delegate : consensus_key_and_delegate;
   kind : block_kind;
+  force_apply : bool;
+      (** if true, while baking the block, try and apply the block and its
+          operations instead of only validating them. this can be permanently
+          set using the [--force-apply] flag (see [force_apply_switch_arg] in
+          [baking_commands.ml]). *)
 }
 
 type action =
@@ -49,6 +54,7 @@ type action =
   | Inject_preendorsements of {
       preendorsements : (consensus_key_and_delegate * consensus_content) list;
     }
+  | Reinject_preendorsements of {preendorsements : packed_operation list}
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
     }
@@ -88,7 +94,7 @@ val inject_block :
 val inject_preendorsements :
   state ->
   preendorsements:(consensus_key_and_delegate * consensus_content) list ->
-  unit tzresult Lwt.t
+  state tzresult Lwt.t
 
 val sign_endorsements :
   state ->

@@ -77,6 +77,7 @@ and chain_store = {
   (* Genesis is only on-disk: read-only except at creation *)
   genesis_block_data : block Stored_data.t;
   block_watcher : block Lwt_watcher.input;
+  validated_block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
     (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
     Protocol_hash.Table.t;
@@ -103,7 +104,7 @@ and chain_state = {
   live_operations : Operation_hash.Set.t;
   mutable live_data_cache :
     (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
-  prechecked_blocks : Block_repr.t Block_lru_cache.t;
+  validated_blocks : Block_repr.t Block_lru_cache.t;
 }
 
 and testchain = {forked_block : Block_hash.t; testchain_store : chain_store}
@@ -268,10 +269,10 @@ module Block = struct
     Shared.use chain_state (fun chain_state ->
         locked_is_known_invalid chain_state hash)
 
-  let is_known_prechecked {chain_state; _} hash =
-    Shared.use chain_state (fun {prechecked_blocks; _} ->
+  let is_known_validated {chain_state; _} hash =
+    Shared.use chain_state (fun {validated_blocks; _} ->
         Option.value ~default:Lwt.return_false
-        @@ Block_lru_cache.bind prechecked_blocks hash (function
+        @@ Block_lru_cache.bind validated_blocks hash (function
                | None -> Lwt.return_false
                | Some _ -> Lwt.return_true))
 
@@ -403,14 +404,14 @@ module Block = struct
     let* current_head = current_head chain_store in
     locked_read_block_by_level_opt chain_store current_head level
 
-  let read_prechecked_block_opt {chain_state; _} hash =
-    Shared.use chain_state (fun {prechecked_blocks; _} ->
+  let read_validated_block_opt {chain_state; _} hash =
+    Shared.use chain_state (fun {validated_blocks; _} ->
         Option.value ~default:Lwt.return_none
-        @@ Block_lru_cache.bind prechecked_blocks hash Lwt.return)
+        @@ Block_lru_cache.bind validated_blocks hash Lwt.return)
 
-  let read_prechecked_block chain_store hash =
+  let read_validated_block chain_store hash =
     let open Lwt_result_syntax in
-    let*! o = read_prechecked_block_opt chain_store hash in
+    let*! o = read_validated_block_opt chain_store hash in
     match o with
     | Some b -> return b
     | None -> tzfail (Block_not_found {hash; distance = 0})
@@ -580,8 +581,8 @@ module Block = struct
           Store_events.(emit store_block) (hash, block_header.shell.level)
         in
         let*! () =
-          Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
-              Block_lru_cache.remove prechecked_blocks hash ;
+          Shared.use chain_store.chain_state (fun {validated_blocks; _} ->
+              Block_lru_cache.remove validated_blocks hash ;
               Lwt.return_unit)
         in
         Lwt_watcher.notify chain_store.block_watcher block ;
@@ -590,7 +591,7 @@ module Block = struct
           (chain_store, block) ;
         return_some block
 
-  let store_prechecked_block chain_store ~hash ~block_header ~operations =
+  let store_validated_block chain_store ~hash ~block_header ~operations =
     let open Lwt_result_syntax in
     let operations_length = List.length operations in
     let validation_passes = block_header.Block_header.shell.validation_passes in
@@ -616,13 +617,14 @@ module Block = struct
       }
     in
     let*! () =
-      Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
-          Block_lru_cache.put prechecked_blocks hash (Lwt.return_some block) ;
+      Shared.use chain_store.chain_state (fun {validated_blocks; _} ->
+          Block_lru_cache.put validated_blocks hash (Lwt.return_some block) ;
           Lwt.return_unit)
     in
     let*! () =
-      Store_events.(emit store_prechecked_block) (hash, block_header.shell.level)
+      Store_events.(emit store_validated_block) (hash, block_header.shell.level)
     in
+    Lwt_watcher.notify chain_store.validated_block_watcher block ;
     return_unit
 
   let resulting_context_hash chain_store block =
@@ -1768,7 +1770,7 @@ module Chain = struct
     let live_blocks = Block_hash.Set.singleton genesis_block.hash in
     let live_operations = Operation_hash.Set.empty in
     let live_data_cache = None in
-    let prechecked_blocks = Block_lru_cache.create 10 in
+    let validated_blocks = Block_lru_cache.create 10 in
     return
       {
         current_head_data;
@@ -1784,7 +1786,7 @@ module Chain = struct
         live_blocks;
         live_operations;
         live_data_cache;
-        prechecked_blocks;
+        validated_blocks;
       }
 
   (* In some case, when a merge was interrupted, the highest cemented
@@ -1864,7 +1866,7 @@ module Chain = struct
         let live_blocks = Block_hash.Set.empty in
         let live_operations = Operation_hash.Set.empty in
         let live_data_cache = None in
-        let prechecked_blocks = Block_lru_cache.create 10 in
+        let validated_blocks = Block_lru_cache.create 10 in
         return
           {
             current_head_data;
@@ -1880,7 +1882,7 @@ module Chain = struct
             live_blocks;
             live_operations;
             live_data_cache;
-            prechecked_blocks;
+            validated_blocks;
           }
 
   let create_chain_store ?block_cache_limit global_store chain_dir ?target
@@ -1915,6 +1917,7 @@ module Chain = struct
     in
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
+    let validated_block_watcher = Lwt_watcher.create_input () in
     let block_rpc_directories = Protocol_hash.Table.create 7 in
     let* lockfile = create_lockfile chain_dir in
     let chain_store : chain_store =
@@ -1927,6 +1930,7 @@ module Chain = struct
         genesis_block_data;
         block_store;
         block_watcher;
+        validated_block_watcher;
         block_rpc_directories;
         lockfile;
       }
@@ -1950,6 +1954,7 @@ module Chain = struct
     let* chain_state = load_chain_state chain_dir block_store in
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
+    let validated_block_watcher = Lwt_watcher.create_input () in
     let block_rpc_directories = Protocol_hash.Table.create 7 in
     let* lockfile = create_lockfile chain_dir in
     let chain_store =
@@ -1963,6 +1968,7 @@ module Chain = struct
         chain_state;
         genesis_block_data;
         block_watcher;
+        validated_block_watcher;
         block_rpc_directories;
         lockfile;
       }
@@ -2296,6 +2302,9 @@ module Chain = struct
   let all_protocol_levels chain_store =
     Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
         Stored_data.get protocol_levels_data)
+
+  let validated_watcher chain_store =
+    Lwt_watcher.create_stream chain_store.validated_block_watcher
 
   let watcher chain_store = Lwt_watcher.create_stream chain_store.block_watcher
 

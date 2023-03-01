@@ -712,10 +712,31 @@ let test_operation_pool_ordering
   check_hashes op_hashes hashes ;
   Lwt.return_unit
 
+(** This test activates a protocol with a timestamps [Now]. It then bakes a
+    block with the given [minimal_timestamp] flag. *)
+let baking_with_given_minimal_timestamp ~minimal_timestamp =
+  Protocol.register_test
+    ~supports:Protocol.(From_protocol (number Mumbai + 1))
+    ~__FILE__
+    ~title:(sf "Baking minimal timestamp (%b)" minimal_timestamp)
+    ~tags:["baking"; "timestamp"]
+  @@ fun protocol ->
+  let* _node, client =
+    Client.init_with_protocol
+      ~timestamp:(Ago (Tezos_base.Time.System.Span.of_seconds_exn 60.))
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  Client.bake_for_and_wait ~minimal_timestamp client
+
 let register ~protocols =
   test_ordering protocols ;
   wrong_branch_operation_dismissal protocols ;
-  baking_operation_exception protocols
+  baking_operation_exception protocols ;
+  baking_with_given_minimal_timestamp ~minimal_timestamp:false protocols ;
+  baking_with_given_minimal_timestamp ~minimal_timestamp:true protocols
 
 let register_operations_pool ~protocols =
   List.iter

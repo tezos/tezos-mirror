@@ -37,6 +37,19 @@ module State_transitions = struct
 
   let section = section @ ["transitions"]
 
+  let new_valid_proposal =
+    declare_3
+      ~section
+      ~name:"new_valid_proposal"
+      ~level:Notice
+      ~msg:"received new proposal {block} at level {level}, round {round}"
+      ~pp1:Block_hash.pp
+      ("block", Block_hash.encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
+
   let new_head =
     declare_3
       ~section
@@ -97,6 +110,63 @@ module State_transitions = struct
       ~level:Info
       ~msg:"received new head while waiting for a quorum"
       ()
+
+  let applied_expected_proposal_received =
+    declare_1
+      ~section
+      ~name:"applied_expected_proposal_received"
+      ~level:Info
+      ~msg:"received the expected application notice for {proposal}"
+      ~pp1:Block_hash.pp
+      ("proposal", Block_hash.encoding)
+
+  let unexpected_new_head_while_waiting_for_application =
+    declare_0
+      ~section
+      ~name:"unexpected_new_head_while_waiting_for_application"
+      ~level:Info
+      ~msg:"received new head while waiting for another proposal's application"
+      ()
+
+  let new_valid_proposal_while_waiting_for_qc =
+    declare_0
+      ~section
+      ~name:"new_valid_proposal_while_waiting_for_qc"
+      ~level:Info
+      ~msg:"received new valid proposal while waiting for a quorum"
+      ()
+
+  let valid_proposal_received_after_application =
+    declare_0
+      ~section
+      ~name:"valid_proposal_received_after_application"
+      ~level:Info
+      ~msg:"received valid proposal for a block already applied"
+      ()
+
+  let unexpected_pqc_while_waiting_for_application =
+    declare_2
+      ~section
+      ~name:"unexpected_pqc_while_waiting_for_application"
+      ~level:Info
+      ~msg:
+        "received an unexpected prequorum for {prequorum} while waiting for \
+         the proposal's {proposal} application"
+      ~pp1:Block_hash.pp
+      ("prequorum", Block_hash.encoding)
+      ~pp2:Block_hash.pp
+      ("proposal", Block_hash.encoding)
+
+  let pqc_while_waiting_for_application =
+    declare_1
+      ~section
+      ~name:"pqc_while_waiting_for_application"
+      ~level:Info
+      ~msg:
+        "received expected prequorum for {prequorum} while waiting for the \
+         proposal's application"
+      ~pp1:Block_hash.pp
+      ("prequorum", Block_hash.encoding)
 
   let unexpected_proposal_round =
     declare_2
@@ -289,6 +359,14 @@ module State_transitions = struct
       ~pp2:Block_hash.pp
       ("expected_hash", Block_hash.encoding)
 
+  let handling_prequorum_on_non_applied_proposal =
+    declare_0
+      ~section
+      ~name:"handling_prequorum_on_non_applied_proposal"
+      ~level:Error
+      ~msg:"Handling prequorum on a non-applied proposal"
+      ()
+
   let step_current_phase =
     declare_2
       ~section
@@ -315,16 +393,14 @@ module Node_rpc = struct
       ~pp1:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let raw_info =
-    declare_2
+  let error_while_monitoring_valid_proposals =
+    declare_1
       ~section
-      ~name:"raw_info"
-      ~level:Debug
-      ~msg:"raw info for {block_hash} at level {level}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
+      ~name:"error_while_monitoring_valid_proposals"
+      ~level:Error
+      ~msg:"error while monitoring valid proposals {trace}"
+      ~pp1:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
 end
 
 module Scheduling = struct
@@ -521,6 +597,17 @@ module Actions = struct
       ~name:"failed_to_inject_preendorsement"
       ~level:Error
       ~msg:"failed to inject preendorsement for {delegate} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let failed_to_inject_endorsement =
+    declare_2
+      ~section
+      ~name:"failed_to_inject_endorsement"
+      ~level:Error
+      ~msg:"failed to inject endorsement for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace

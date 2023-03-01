@@ -114,6 +114,12 @@ let context_path_arg =
        'preapply' RPC."
     string_parameter
 
+let force_apply_switch_arg =
+  Tezos_clic.switch
+    ~long:"force-apply"
+    ~doc:"Force the baker to not only validate but also apply operations."
+    ()
+
 let endorsement_force_switch_arg =
   Tezos_clic.switch
     ~long:"force"
@@ -166,7 +172,7 @@ let liquidity_baking_toggle_vote_arg =
     liquidity_baking_toggle_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
-    (pkhs : Tezos_crypto.Signature.public_key_hash list) =
+    (pkhs : Signature.public_key_hash list) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
     {
       Baking_state.alias = Some alias;
@@ -218,11 +224,12 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Forge and inject block using the delegates' rights."
-      (args8
+      (args9
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
          minimal_timestamp_switch
+         force_apply_switch_arg
          force_switch
          operations_arg
          context_path_arg
@@ -232,6 +239,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              minimal_timestamp,
+             force_apply,
              force,
              extra_operations,
              context_path,
@@ -245,6 +253,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~minimal_timestamp
           ~minimal_nanotez_per_byte
           ~minimal_fees
+          ~force_apply
           ~force
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
@@ -269,11 +278,12 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Send a Tenderbake proposal"
-      (args7
+      (args8
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
          minimal_timestamp_switch
+         force_apply_switch_arg
          force_switch
          operations_arg
          context_path_arg)
@@ -282,6 +292,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              minimal_timestamp,
+             force_apply,
              force,
              extra_operations,
              context_path )
@@ -294,6 +305,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~minimal_timestamp
           ~minimal_nanotez_per_byte
           ~minimal_fees
+          ~force_apply
           ~force
           ?extra_operations
           ?context_path
@@ -326,11 +338,12 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
     command
       ~group
       ~desc:"Launch the baker daemon."
-      (args8
+      (args9
          pidfile_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
+         force_apply_switch_arg
          keep_alive_arg
          liquidity_baking_toggle_vote_arg
          per_block_vote_file_arg
@@ -345,6 +358,7 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
              minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
+             force_apply,
              keep_alive,
              liquidity_baking_toggle_vote,
              per_block_vote_file,
@@ -378,6 +392,7 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
           ~liquidity_baking_toggle_vote
           ?per_block_vote_file
           ?extra_operations
+          ~force_apply
           ~chain:cctxt#chain
           ~context_path
           ~keep_alive
