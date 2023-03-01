@@ -308,6 +308,9 @@ module Inner = struct
 
   let is_power_of_two n = n <> 0 && n land (n - 1) = 0
 
+  (* [slot_as_polynomial_length ~slot_size] returns the length of the
+     polynomial of maximal degree that can represent a slot of size
+     [slot_size]. *)
   let slot_as_polynomial_length ~slot_size =
     1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
