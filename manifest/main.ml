@@ -266,14 +266,9 @@ let ptime_clock_os = external_sublib ~js_compatible:true ptime "ptime.clock.os"
 let pure_splitmix =
   external_lib ~js_compatible:true "pure-splitmix" V.(exactly "0.3")
 
-let prbnmcn_cgrph = external_lib "prbnmcn-cgrph" V.(exactly "0.0.2")
+let prbnmcn_linalg = external_lib "prbnmcn-linalg" V.(exactly "0.0.1")
 
-let prbnmcn_dagger = external_lib "prbnmcn-dagger" V.(exactly "0.0.2")
-
-let prbnmcn_dagger_stats =
-  external_lib "prbnmcn-dagger-stats" V.(exactly "0.0.2")
-
-let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.4")
+let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.6")
 
 let pringo = external_lib "pringo" V.(at_least "1.3" && less_than "1.4")
 
@@ -3150,9 +3145,7 @@ let octez_benchmark =
         octez_micheline;
         octez_clic;
         data_encoding;
-        prbnmcn_cgrph;
-        prbnmcn_dagger;
-        prbnmcn_dagger_stats;
+        prbnmcn_linalg;
         prbnmcn_stats;
         pringo;
         pyml;
