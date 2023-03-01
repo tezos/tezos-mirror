@@ -93,3 +93,12 @@ val get_tezos_reorg_for_new_head :
   [`Head of Block_hash.t * int32 | `Level of int32] ->
   Block_hash.t * int32 ->
   (Block_hash.t * int32) Reorg.t tzresult Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Create a dummy Layer 1 object that does not follow any L1 chain. This
+      function is only to be used as a placeholder for unit tests (that do not
+      exercise the Layer 1 connection). *)
+  val dummy : #Client_context.full -> t
+end
