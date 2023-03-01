@@ -25,6 +25,8 @@
 
 exception Status_already_ready
 
+let store_path_prefix = "store"
+
 type dac_plugin_module = (module Dac_plugin.T)
 
 type ready_ctxt = {
@@ -52,15 +54,23 @@ type t = {
          Eventually, once the legacy mode is removed we should revisit the
          need for this fieeld.*)
   page_store : Page_store.Filesystem.t;
+  node_store : Store_sigs.rw Store.Irmin_store.t;
 }
 
 let init config cctxt coordinator_opt =
+  let open Lwt_result_syntax in
+  let+ node_store =
+    Store.Irmin_store.load
+      Store_sigs.Read_write
+      (Configuration.data_dir_path config store_path_prefix)
+  in
   {
     status = Starting;
     config;
     tezos_node_cctxt = cctxt;
     coordinator_opt;
     page_store = Page_store.Filesystem.init config.reveal_data_dir;
+    node_store;
   }
 
 let set_ready ctxt dac_plugin =
@@ -108,3 +118,9 @@ let get_dac_plugin ctxt =
   | Starting -> tzfail Node_not_ready
 
 let get_page_store ctxt = ctxt.page_store
+
+let get_node_store (type a) ctxt (access_mode : a Store_sigs.mode) :
+    a Store.Irmin_store.t =
+  match access_mode with
+  | Store_sigs.Read_only -> Store.Irmin_store.readonly ctxt.node_store
+  | Store_sigs.Read_write -> ctxt.node_store

@@ -26,18 +26,6 @@
 
 (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
    encoding over b58check encoding for JSON. *)
-let root_hash_encoding ((module P) : Dac_plugin.t) =
-  let binary = P.encoding in
-  Data_encoding.(
-    splitted
-      ~binary
-      ~json:
-        (conv_with_guard
-           P.to_hex
-           (fun str ->
-             Result.of_option ~error:"Not a valid hash" (P.of_hex str))
-           (string' Plain)))
-
 let store_preimage_request_encoding =
   let pagination_scheme_encoding = Pagination_scheme.encoding in
   Data_encoding.(
@@ -45,11 +33,9 @@ let store_preimage_request_encoding =
       (req "payload" Data_encoding.(bytes' Hex))
       (req "pagination_scheme" pagination_scheme_encoding))
 
-let store_preimage_response_encoding ctx =
+let store_preimage_response_encoding ((module P) : Dac_plugin.t) =
   Data_encoding.(
-    obj2
-      (req "root_hash" (root_hash_encoding ctx))
-      (req "external_message" (bytes' Hex)))
+    obj2 (req "root_hash" P.encoding) (req "external_message" (bytes' Hex)))
 
 let external_message_query =
   let open Tezos_rpc.Query in
@@ -81,3 +67,12 @@ let retrieve_preimage ((module P) : Dac_plugin.t) =
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
     Tezos_rpc.Path.(open_root / "preimage" /: P.hash_rpc_arg)
+
+let store_dac_member_signature dac_plugin =
+  Tezos_rpc.Service.put_service
+    ~description:
+      "Verifies and stores the Dac member signature of a root page hash"
+    ~query:Tezos_rpc.Query.empty
+    ~input:(Signature_repr.encoding dac_plugin)
+    ~output:Data_encoding.empty
+    Tezos_rpc.Path.(open_root / "dac_member_signature")

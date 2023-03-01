@@ -50,3 +50,27 @@ val verify :
   Tezos_crypto.Aggregate_signature.signature ->
   Z.t ->
   (bool, tztrace) result Lwt.t
+
+(** Module that exposes signature operations necsesary when running in
+    [Configuration.Coordinator] mode.*)
+module Coordinator : sig
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
+     Verify that root hash is one that the coordinator has *)
+
+  (** [handle_store_dac_member_signature ctxt cctxt dac_members_pkh dac_member_signature]
+      does the following procedure:
+      1. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
+      2. Checks that the dac member has not yet signed. If already signed, then noop
+         and return.
+      3. Otherwise:
+        1. Verify the signature against the root hash and signer's public key.
+        2. Add signature to [Signature_store]
+        3. Update the aggregate signature in [Aggregate_signature_store]
+  *)
+  val handle_store_dac_member_signature :
+    Node_context.t ->
+    #Client_context.wallet ->
+    Tezos_crypto.Aggregate_signature.public_key option list ->
+    Signature_repr.t ->
+    unit tzresult Lwt.t
+end

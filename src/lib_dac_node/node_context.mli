@@ -47,7 +47,10 @@ type t
     another dac node [dac_node_cctxt], which can be used for writting
     tests with two dac nodes running the legacy mode. *)
 val init :
-  Configuration.t -> Client_context.full -> Dac_node_client.cctxt option -> t
+  Configuration.t ->
+  Client_context.full ->
+  Dac_node_client.cctxt option ->
+  t tzresult Lwt.t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
@@ -82,3 +85,7 @@ val get_dac_plugin : t -> Dac_plugin.t tzresult
 (** [get_page_store ctxt] returns the filesystem backed page store used by
     the Dac node to save and load pages. *)
 val get_page_store : t -> Page_store.Filesystem.t
+
+(** [get_node_store ctxt access_mode] returns the [Store.Irmin_store.t] with
+    [access_mode] used by Dac components. *)
+val get_node_store : t -> 'a Store_sigs.mode -> 'a Store.Irmin_store.t

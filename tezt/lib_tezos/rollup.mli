@@ -430,5 +430,14 @@ module Dac : sig
     (** [dac_retrieve_preimage page_hash] retrieves a [payload] in the 
         dac/store_preimage from the base58 provided encoded page_hash *)
     val dac_retrieve_preimage : string -> (Dac_node.t, string) RPC_core.t
+
+    (** [dac_store_dac_member_signature hex_root_hash dac_member_pkh signature] 
+        stores the [signature] generated from signing [hex_root_hash] by
+        [dac_member_pkh]. *)
+    val dac_store_dac_member_signature :
+      hex_root_hash:string ->
+      dac_member_pkh:string ->
+      signature:Tezos_crypto.Aggregate_signature.t ->
+      (Dac_node.t, unit) RPC_core.t
   end
 end

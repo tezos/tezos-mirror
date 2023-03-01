@@ -927,5 +927,20 @@ module Dac = struct
 
     let dac_retrieve_preimage page_hash =
       make GET ["preimage"; page_hash] JSON.as_string
+
+    let dac_store_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature
+        =
+      let payload =
+        `O
+          [
+            ("root_hash", `String hex_root_hash);
+            ("signer_pkh", `String dac_member_pkh);
+            ( "signature",
+              `String (Tezos_crypto.Aggregate_signature.to_b58check signature)
+            );
+          ]
+      in
+      let data : RPC_core.data = Data payload in
+      make ~data PUT ["dac_member_signature"] @@ fun _resp -> ()
   end
 end

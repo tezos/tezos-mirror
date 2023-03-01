@@ -119,6 +119,14 @@ let test_dac_hash_hash_string_with_reveal_hash () =
     reveal_hash
     dac_hash
 
+let test_json_encoding_is_hexified () =
+  let payload = Bytes.of_string "Hello world" in
+  let dac_hash = P.hash_bytes ~scheme:Blake2B [payload] in
+  let dac_hash_json = Data_encoding.Json.construct P.encoding dac_hash in
+  let dac_hash_json_string = Data_encoding.Json.to_string dac_hash_json in
+  let dac_hash_hex_string = P.to_hex dac_hash in
+  Assert.equal_string ~loc:__LOC__ dac_hash_hex_string dac_hash_json_string
+
 let tests =
   [
     Tztest.tztest
@@ -134,7 +142,11 @@ let tests =
       `Quick
       test_dac_hash_hash_bytes_with_reveal_hash;
     Tztest.tztest
-      "Hash string  should be equal between Dac hash and reveal hash"
+      "Hash string should be equal between Dac hash and reveal hash"
+      `Quick
+      test_dac_hash_hash_string_with_reveal_hash;
+    Tztest.tztest
+      "Json encoded hash string should be a hex string"
       `Quick
       test_dac_hash_hash_string_with_reveal_hash;
   ]
