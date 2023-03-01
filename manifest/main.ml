@@ -5287,6 +5287,47 @@ module Protocol = Protocol
             octez_node_config |> if_ N.(number >= 016);
           ]
     in
+    let _octez_sc_rollup_node_test =
+      only_if N.(number >= 017) @@ fun () ->
+      let helpers =
+        private_lib
+          (sf "octez_smart_rollup_node_%s_test_helpers" short_hash)
+          ~path:(path // "lib_sc_rollup_node/test/helpers")
+          ~opam:"tezos-sc-rollup-node-test"
+          ~deps:
+            [
+              octez_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              main |> open_;
+              parameters |> if_some |> open_;
+              client |> if_some |> open_;
+              octez_test_helpers |> open_;
+              qcheck_alcotest;
+              qcheck_core;
+              logs_lwt;
+              octez_sc_rollup_layer2 |> if_some |> open_;
+              octez_sc_rollup_node |> if_some |> open_;
+              alcotezt;
+            ]
+      in
+      tezt
+        ["canary"]
+        ~path:(path // "lib_sc_rollup_node/test")
+        ~opam:"tezos-sc-rollup-node-test"
+        ~synopsis:"Tests for the smart rollup node library"
+        ~with_macos_security_framework:true
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            main |> open_;
+            octez_test_helpers |> open_;
+            octez_sc_rollup_layer2 |> if_some |> open_;
+            octez_sc_rollup_node |> if_some |> open_;
+            alcotezt;
+            helpers |> open_;
+          ]
+    in
     let octez_sc_rollup_client =
       only_if (active && N.(number >= 016)) @@ fun () ->
       private_lib

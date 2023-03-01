@@ -16,6 +16,7 @@
   tezos-stdlib-unix
   tezos-protocol-alpha
   tezt_self_tests_tezt_lib
+  src_proto_alpha_lib_sc_rollup_node_test_tezt_lib
   src_proto_alpha_lib_protocol_test_unit_tezt_lib
   src_proto_alpha_lib_protocol_test_regression_tezt_lib
   src_proto_alpha_lib_protocol_test_pbt_tezt_lib
