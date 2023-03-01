@@ -4947,8 +4947,8 @@ module Protocol = Protocol
             ]
           ~bisect_ppx:false
       in
-      test
-        "main"
+      tezt
+        ["test_scenario"]
         ~path:(path // "lib_delegate/test")
         ~with_macos_security_framework:true
         ~opam:(sf "tezos-baking-%s" name_dash)
@@ -4968,7 +4968,7 @@ module Protocol = Protocol
             baking |> open_;
             parameters |> if_some |> if_ N.(number >= 012);
             octez_crypto |> if_ N.(number >= 012);
-            alcotest_lwt;
+            alcotezt;
             uri;
           ]
     in

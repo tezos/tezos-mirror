@@ -65,8 +65,6 @@ unit:015_PtLimaPt:
         @src/proto_015_PtLimaPt/lib_protocol/test/pbt/runtest2
     proto_015_PtLimaPt__lib_protocol__pbt3: >
         @src/proto_015_PtLimaPt/lib_protocol/test/pbt/runtest3
-    proto_015_PtLimaPt: >
-        @src/proto_015_PtLimaPt/lib_delegate/runtest
   parallel:
     matrix:
       - TEST_TARGETS:
@@ -76,7 +74,6 @@ unit:015_PtLimaPt:
           - proto_015_PtLimaPt__lib_protocol__pbt1
           - proto_015_PtLimaPt__lib_protocol__pbt2
           - proto_015_PtLimaPt__lib_protocol__pbt3
-          - proto_015_PtLimaPt
   script:
     - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
     - ./scripts/ci/merge_coverage.sh
@@ -106,7 +103,6 @@ unit:016_PtMumbai:
     proto_016_PtMumbai__lib_protocol__pbt3: >
         @src/proto_016_PtMumbai/lib_protocol/test/pbt/runtest3
     proto_016_PtMumbai: >
-        @src/proto_016_PtMumbai/lib_delegate/runtest
         @src/proto_016_PtMumbai/lib_dal/runtest
   parallel:
     matrix:
@@ -147,7 +143,6 @@ unit:alpha:
     proto_alpha__lib_protocol__pbt3: >
         @src/proto_alpha/lib_protocol/test/pbt/runtest3
     proto_alpha: >
-        @src/proto_alpha/lib_delegate/runtest
         @src/proto_alpha/lib_dal/runtest
   parallel:
     matrix:
