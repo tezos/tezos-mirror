@@ -28,11 +28,17 @@ open Alpha_context
 
 type mode = Application | Construction | Mempool
 
+let show_mode = function
+  | Application -> "Application"
+  | Construction -> "Construction"
+  | Mempool -> "Mempool"
+
 type kind = Preendorsement | Endorsement
 
 (** Craft an endorsement or preendorsement, and bake a block
     containing it (in application or construction modes) or inject it
-    into a mempool. Check that it fails as specified by [error].
+    into a mempool. When [error] is [None], check that it succeeds,
+    otherwise check that it fails as specified by [error].
 
     By default, the (pre)endorsement is for the first slot and is
     signed by the delegate that owns this slot. Moreover, the operation
@@ -43,31 +49,69 @@ type kind = Preendorsement | Endorsement
 
     The [endorsed_block] is also used as the predecessor of the baked
     block, or as the head of the mempool. *)
-let test_consensus_operation ?slot ?level ?round ?block_payload_hash
-    ~endorsed_block ~error ~loc kind mode =
+let test_consensus_operation ?slot ?level ?round ?block_payload_hash ?branch
+    ~endorsed_block ?error ~loc kind mode =
   let open Lwt_result_syntax in
   let* operation =
     match kind with
     | Preendorsement ->
-        Op.preendorsement ?slot ?level ?round ?block_payload_hash endorsed_block
+        Op.preendorsement
+          ?slot
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          endorsed_block
     | Endorsement ->
-        Op.endorsement ?slot ?level ?round ?block_payload_hash endorsed_block
+        Op.endorsement
+          ?slot
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          endorsed_block
   in
-  let assert_error res = Assert.proto_error ~loc res error in
+  let check_error res =
+    match error with
+    | Some error -> Assert.proto_error ~loc res error
+    | None ->
+        let*? _ = res in
+        return_unit
+  in
   match mode with
   | Application ->
       Block.bake ~baking_mode:Application ~operation endorsed_block
-      >>= assert_error
+      >>= check_error
   | Construction ->
-      Block.bake ~baking_mode:Baking ~operation endorsed_block >>= assert_error
+      Block.bake ~baking_mode:Baking ~operation endorsed_block >>= check_error
   | Mempool ->
       let*! res =
         let* inc =
           Incremental.begin_construction ~mempool_mode:true endorsed_block
         in
-        Incremental.validate_operation inc operation
+        let* inc = Incremental.add_operation inc operation in
+        (* Finalization doesn't do much in mempool mode, but some RPCs
+           still call it, so we check that it doesn't fail unexpectedly. *)
+        Incremental.finalize_block inc
       in
-      assert_error res
+      check_error res
+
+let test_consensus_operation_all_modes ?slot ?level ?round ?block_payload_hash
+    ?branch ~endorsed_block ?error ~loc kind =
+  List.iter_es
+    (fun mode ->
+      test_consensus_operation
+        ?slot
+        ?level
+        ?round
+        ?block_payload_hash
+        ?branch
+        ~endorsed_block
+        ?error
+        ~loc:(Format.sprintf "%s (%s mode)" loc (show_mode mode))
+        kind
+        mode)
+    [Application; Construction; Mempool]
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in

@@ -41,31 +41,55 @@ let init_genesis ?policy () =
   Context.init_n ~consensus_threshold:0 5 () >>=? fun (genesis, _contracts) ->
   Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
 
-(** inject an endorsement and return the block with the endorsement and its
-   parent. *)
-let inject_the_first_endorsement () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Op.endorsement b >>=? fun operation ->
-  Block.bake ~operation b >>=? fun b' -> return (b', b)
+(** {1 Positive tests} *)
 
-(****************************************************************)
-(*                      Tests                                   *)
-(****************************************************************)
-
-(** Apply a single endorsement from the slot 0 endorser. *)
+(** Correct endorsement from the slot 0 endorser. *)
 let test_simple_endorsement () =
-  inject_the_first_endorsement () >>=? fun (_, _) -> return_unit
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    Endorsement
 
 (** Test that the endorsement's branch does not affect its
     validity. *)
-let test_endorsement_with_arbitrary_branch () =
-  init_genesis () >>=? fun (_genesis, blk) ->
-  Op.endorsement ~branch:Block_hash.zero blk >>=? fun operation ->
-  Block.bake ~operation blk >>=? fun _blk -> return_unit
+let test_arbitrary_branch () =
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    ~branch:Block_hash.zero
+    Endorsement
 
-(****************************************************************)
-(*  The following test scenarios are supposed to raise errors.  *)
-(****************************************************************)
+(** Fitness gap: this is a straightforward update from Emmy to Tenderbake,
+    that is, check that the level is incremented in a child block. *)
+let test_fitness_gap () =
+  let open Lwt_result_syntax in
+  let* _genesis, pred_b = init_genesis () in
+  let* operation = Op.endorsement pred_b in
+  let* b = Block.bake ~operation pred_b in
+  let fitness =
+    match Fitness.from_raw b.header.shell.fitness with
+    | Ok fitness -> fitness
+    | _ -> assert false
+  in
+  let pred_fitness =
+    match Fitness.from_raw pred_b.header.shell.fitness with
+    | Ok fitness -> fitness
+    | _ -> assert false
+  in
+  let level = Fitness.level fitness in
+  let pred_level = Fitness.level pred_fitness in
+  let level_diff =
+    Int32.sub (Raw_level.to_int32 level) (Raw_level.to_int32 pred_level)
+  in
+  Assert.equal_int32 ~loc:__LOC__ level_diff 1l
+
+(** {1 Negative tests}
+
+    The following test scenarios are supposed to raise errors. *)
 
 (** Apply an endorsement with a negative slot. *)
 let test_negative_slot () =
@@ -357,27 +381,6 @@ let test_endorsement_threshold ~sufficient_threshold () =
   if sufficient_threshold then return_unit
   else Assert.proto_error_with_info ~loc:__LOC__ b "Not enough endorsements"
 
-(** Fitness gap: this is a straightforward update from Emmy to Tenderbake, that
-    is, check that the level is incremented in a child block. *)
-let test_fitness_gap () =
-  inject_the_first_endorsement () >>=? fun (b, pred_b) ->
-  let fitness =
-    match Fitness.from_raw b.header.shell.fitness with
-    | Ok fitness -> fitness
-    | _ -> assert false
-  in
-  let pred_fitness =
-    match Fitness.from_raw pred_b.header.shell.fitness with
-    | Ok fitness -> fitness
-    | _ -> assert false
-  in
-  let level = Fitness.level fitness in
-  let pred_level = Fitness.level pred_fitness in
-  let level_diff =
-    Int32.sub (Raw_level.to_int32 level) (Raw_level.to_int32 pred_level)
-  in
-  Assert.equal_int32 ~loc:__LOC__ level_diff 1l
-
 let test_preendorsement_endorsement_same_level () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b1 ->
@@ -507,18 +510,16 @@ let test_endorsement_grandparent_full_construction () =
 
 let tests =
   [
+    (* Positive tests *)
     Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
-    Tztest.tztest
-      "Endorsement with arbitrary branch"
-      `Quick
-      test_endorsement_with_arbitrary_branch;
+    Tztest.tztest "Arbitrary branch" `Quick test_arbitrary_branch;
+    Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
+    (* Negative tests *)
     Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
     Tztest.tztest
       "Endorsement wrapped with non-normalized slot"
       `Quick
       test_non_normalized_slot;
-    Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
-    (* Fail scenarios *)
     Tztest.tztest
       "Invalid endorsement level"
       `Quick
