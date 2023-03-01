@@ -131,8 +131,6 @@ module Inner = struct
 
   type commitment_proof = Bls12_381.G1.t
 
-  type _proof_single = Bls12_381.G1.t
-
   type page_proof = Bls12_381.G1.t
 
   type page = bytes
@@ -160,10 +158,6 @@ module Inner = struct
         Bls12_381.G1.to_compressed_bytes
         Bls12_381.G1.of_compressed_bytes_exn
         bytes
-
-    let _proof_shards_encoding = g1_encoding
-
-    let _proof_single_encoding = g1_encoding
 
     let page_proof_encoding = g1_encoding
 
