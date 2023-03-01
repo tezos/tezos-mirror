@@ -44,6 +44,7 @@ type full_evm_setup = {
   dac_node : Dac_node.t;
   originator_key : string;
   rollup_operator_key : string;
+  evm_proxy_server : Evm_proxy_server.t;
 }
 
 let hex_encode (input : string) : string =
@@ -106,6 +107,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       sc_rollup_node
       (Node.get_level node)
   in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   return
     {
       node;
@@ -116,6 +118,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       dac_node;
       originator_key;
       rollup_operator_key;
+      evm_proxy_server;
     }
 
 let test_evm_proxy_server_connection =
@@ -198,7 +201,9 @@ let test_rpc_getBalance =
     ~tags:["evm"; "get_balance"]
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
+    setup_evm_kernel protocol
+  in
   let* () = Client.bake_for_and_wait client in
   let first_evm_run_level = Node.get_level node in
   let* _level =
@@ -207,7 +212,6 @@ let test_rpc_getBalance =
       sc_rollup_node
       first_evm_run_level
   in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   let evm_proxy_server_endoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
