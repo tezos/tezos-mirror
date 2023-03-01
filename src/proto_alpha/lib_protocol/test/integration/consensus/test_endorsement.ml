@@ -221,6 +221,40 @@ let test_two_levels_too_old () =
     ~error:error_old_level
     Endorsement
 
+let error_future_level = function
+  | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one level in the future (pointing to the same
+    level as the block/mempool containing the endorsement instead of
+    its predecessor/head). It should fail in all modes. *)
+let test_one_level_in_the_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* next_level_block = Block.bake predecessor in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:next_level_block
+    ~predecessor
+    ~error:error_future_level
+    Endorsement
+
+(** Endorsement that is two levels in the future. It should fail in
+    all modes. *)
+let test_two_levels_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* next_level_block = Block.bake predecessor in
+  let* after_next_level_block = Block.bake next_level_block in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:after_next_level_block
+    ~predecessor
+    ~error:error_future_level
+    Endorsement
+
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
   init_genesis () >>=? fun (_genesis, b) ->
@@ -234,23 +268,6 @@ let test_duplicate_endorsement () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-
-(** Consensus operation for future level : apply an endorsement with a level in the future *)
-let test_consensus_operation_endorsement_for_future_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~endorsed_block:pred
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    Endorsement
-    Mempool
 
 (** Consensus operation for future round : apply an endorsement with a round in the future *)
 let test_consensus_operation_endorsement_for_future_round () =
@@ -375,14 +392,6 @@ let test_preendorsement_endorsement_same_level () =
   Incremental.add_operation i op_preendo >>=? fun (_i : Incremental.t) ->
   return_unit
 
-(** Endorsement for next level *)
-let test_endorsement_for_next_level () =
-  init_genesis () >>=? fun (genesis, _) ->
-  Consensus_helpers.test_consensus_op_for_next
-    ~genesis
-    ~kind:`Endorsement
-    ~next:`Level
-
 (** Endorsement for next round *)
 let test_endorsement_for_next_round () =
   init_genesis () >>=? fun (genesis, _) ->
@@ -443,11 +452,9 @@ let tests =
     (* Wrong level *)
     Tztest.tztest "One level too old" `Quick test_one_level_too_old;
     Tztest.tztest "Two levels too old" `Quick test_two_levels_too_old;
+    Tztest.tztest "One level in the future" `Quick test_one_level_in_the_future;
+    Tztest.tztest "Two levels in the future" `Quick test_two_levels_future;
     Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
-    Tztest.tztest
-      "Endorsement for future level"
-      `Quick
-      test_consensus_operation_endorsement_for_future_level;
     Tztest.tztest
       "Endorsement for future round"
       `Quick
@@ -477,10 +484,6 @@ let tests =
       "Endorsement/Preendorsement at same level"
       `Quick
       test_preendorsement_endorsement_same_level;
-    Tztest.tztest
-      "Endorsement for next level"
-      `Quick
-      test_endorsement_for_next_level;
     Tztest.tztest
       "Endorsement for next round"
       `Quick
