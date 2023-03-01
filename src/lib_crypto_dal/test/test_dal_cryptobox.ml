@@ -61,10 +61,10 @@ module Test = struct
     let* page_size_log2 = int_range 0 (slot_size_log2 - size_offset_log2) in
     let* number_of_shards_log2 = int_range 0 max_number_of_shards_log2 in
     let slot_size = 1 lsl slot_size_log2 in
-    let* msg = bytes_size (int_range 0 slot_size) in
-    let padding_threshold = Bytes.length msg in
+    let* data = bytes_size (int_range 0 slot_size) in
+    let padding_threshold = Bytes.length data in
     let slot = Bytes.make slot_size '0' in
-    Bytes.blit msg 0 slot 0 padding_threshold ;
+    Bytes.blit data 0 slot 0 padding_threshold ;
     map
       (fun ( slot_size,
              page_size,
@@ -130,20 +130,26 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let c_indices =
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let random_shard_indices =
           random_indices
             (params.number_of_shards - 1)
             (params.number_of_shards / params.redundancy_factor)
         in
-        let c =
+        let random_shards =
           Seq.filter
-            (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
-            enc_shards
+            (fun ({index; _} : Cryptobox.shard) ->
+              Array.mem index random_shard_indices)
+            shards
         in
-        let* decoded_p = Cryptobox.polynomial_from_shards t c in
-        return (Cryptobox.Internal_for_tests.polynomials_equal decoded_p p))
+        let* decoded_polynomial =
+          Cryptobox.polynomial_from_shards t random_shards
+        in
+        return
+          (Cryptobox.Internal_for_tests.polynomials_equal
+             decoded_polynomial
+             polynomial))
         |> function
         | Ok check -> check
         | Error _ -> false)
@@ -161,27 +167,28 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let c_indices =
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let random_shard_indices =
           random_indices
             (params.number_of_shards - 1)
             (params.number_of_shards / params.redundancy_factor)
         in
-        let c =
+        let random_shards =
           Seq.filter
-            (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
-            enc_shards
+            (fun ({index; _} : Cryptobox.shard) ->
+              Array.mem index random_shard_indices)
+            shards
         in
-        let* decoded_slot = Cryptobox.polynomial_from_shards t c in
-        let decoded_msg =
+        let* decoded_slot = Cryptobox.polynomial_from_shards t random_shards in
+        let decoded_data =
           Bytes.sub
             (Cryptobox.polynomial_to_slot t decoded_slot)
             0
             params.padding_threshold
         in
-        let msg = Bytes.sub params.slot 0 params.padding_threshold in
-        return (Bytes.equal msg decoded_msg))
+        let data = Bytes.sub params.slot 0 params.padding_threshold in
+        return (Bytes.equal data decoded_data))
         |> function
         | Ok check -> check
         | _ -> false)
@@ -197,19 +204,20 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let c_indices =
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let random_shard_indices =
           random_indices
             (params.number_of_shards - 1)
             ((params.number_of_shards / params.redundancy_factor) - 1)
         in
-        let c =
+        let random_shards =
           Seq.filter
-            (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
-            enc_shards
+            (fun ({index; _} : Cryptobox.shard) ->
+              Array.mem index random_shard_indices)
+            shards
         in
-        Cryptobox.polynomial_from_shards t c)
+        Cryptobox.polynomial_from_shards t random_shards)
         |> function
         | Error (`Not_enough_shards _) -> true
         | _ -> false)
@@ -225,17 +233,15 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let c =
-          Seq.take
-            (params.number_of_shards / params.redundancy_factor)
-            enc_shards
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let random_shards =
+          Seq.take (params.number_of_shards / params.redundancy_factor) shards
           |> Seq.map
                (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
                  {index = index + 1000; share})
         in
-        Cryptobox.polynomial_from_shards t c)
+        Cryptobox.polynomial_from_shards t random_shards)
         |> function
         | Error (`Shard_index_out_of_range _) -> true
         | _ -> false)
@@ -262,8 +268,8 @@ module Test = struct
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t1 = Cryptobox.make (get_cryptobox_parameters params1) in
         let* t2 = Cryptobox.make (get_cryptobox_parameters params2) in
-        let enc_shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
-        Cryptobox.polynomial_from_shards t2 enc_shards)
+        let shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
+        Cryptobox.polynomial_from_shards t2 shards)
         |> function
         | Error (`Invalid_shard_length _) -> true
         | _ -> false)
@@ -281,9 +287,9 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let slot_res = Cryptobox.(polynomial_to_slot t p) in
-        Ok (Bytes.equal slot_res params.slot))
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let slot = Cryptobox.(polynomial_to_slot t polynomial) in
+        Ok (Bytes.equal slot params.slot))
         |> function
         | Ok check -> check
         | _ -> false)
@@ -300,15 +306,15 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let* cm = Cryptobox.commit t p in
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
         let page_index = Random.int number_of_pages in
-        let* pi = Cryptobox.prove_page t p page_index in
+        let* page_proof = Cryptobox.prove_page t polynomial page_index in
         let page =
           Bytes.sub params.slot (page_index * params.page_size) params.page_size
         in
-        Cryptobox.verify_page t cm ~page_index page pi)
+        Cryptobox.verify_page t commitment ~page_index page page_proof)
         |> function
         | Ok () -> true
         | _ -> false)
@@ -325,14 +331,16 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let* cm = Cryptobox.commit t p in
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
         let page_index_prove = Random.int number_of_pages in
         let page_index_verify = Random.int number_of_pages in
         assume (page_index_prove <> page_index_verify) ;
-        let* proof = Cryptobox.prove_page t p page_index_prove in
-        let* proof_verify = Cryptobox.prove_page t p page_index_verify in
+        let* proof = Cryptobox.prove_page t polynomial page_index_prove in
+        let* proof_verify =
+          Cryptobox.prove_page t polynomial page_index_verify
+        in
         let page_prove =
           Bytes.sub
             params.slot
@@ -355,7 +363,7 @@ module Test = struct
              (Cryptobox.Internal_for_tests.page_proof_equal proof proof_verify)) ;
         Cryptobox.verify_page
           t
-          cm
+          commitment
           ~page_index:page_index_verify
           page_verify
           proof)
@@ -375,22 +383,22 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let* cm = Cryptobox.commit t p in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let shard_proofs = Cryptobox.prove_shards t p in
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let* commitment = Cryptobox.commit t polynomial in
+        let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let shard_proofs = Cryptobox.prove_shards t polynomial in
         let shard_index = Random.int params.number_of_shards in
         match
           Seq.find
             (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
-            enc_shards
+            shards
         with
         | None ->
             (* The shard index was sampled within the bounds, so this case
                (the queried index is out of bounds) doesn't happen. *)
             assert false
         | Some shard ->
-            Cryptobox.verify_shard t cm shard shard_proofs.(shard_index))
+            Cryptobox.verify_shard t commitment shard shard_proofs.(shard_index))
         |> function
         | Ok () -> true
         | _ -> false)
@@ -408,10 +416,10 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let* p = Cryptobox.polynomial_from_slot t params.slot in
-        let* cm = Cryptobox.commit t p in
-        let* pi = Cryptobox.prove_commitment t p in
-        return (Cryptobox.verify_commitment t cm pi))
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let* commitment = Cryptobox.commit t polynomial in
+        let* commitment_proof = Cryptobox.prove_commitment t polynomial in
+        return (Cryptobox.verify_commitment t commitment commitment_proof))
         |> function
         | Ok true -> true
         | _ -> false)
@@ -454,9 +462,9 @@ module Test = struct
      let* p1 = Cryptobox.polynomial_from_slot t1 slot1 in
      let* p2 = Cryptobox.polynomial_from_slot t2 slot2 in
 
-     let* cm1 = Cryptobox.commit t1 p1 in
-     let* cm2 = Cryptobox.commit t2 p2 in
-     Ok (Cryptobox.Commitment.equal cm1 cm2))
+     let* commitment1 = Cryptobox.commit t1 p1 in
+     let* commitment2 = Cryptobox.commit t2 p2 in
+     Ok (Cryptobox.Commitment.equal commitment1 commitment2))
     |> function
     | Ok check -> assert check
     | _ -> assert false
