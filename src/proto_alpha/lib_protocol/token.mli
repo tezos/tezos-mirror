@@ -34,49 +34,83 @@
     to a destination, and the sink [`Burned] is used to express the action of
     burning a given amount of tokens taken from a source. Thanks to uniformity,
     it is easier to track transfers of tokens throughout the protocol by running
-    [grep -R "Token.transfer" src/proto_alpha]. *)
+    [grep -R "Token.transfer" src/proto_alpha].
+
+    For backward compatibility purpose, an ANTI-PATTERN is used to redistribute
+    slashing to denunciator; this redistribution technic should not be mimicked
+    if it can be avoided (see https://gitlab.com/tezos/tezos/-/issues/4787).
+    The anti-pattern works as follows:
+    The part of slashed amounts that goes to the author of the denunciation are
+    not directly distributed to him. Tokens are transferred to a burning sink,
+    then minted from an infinite source ( see `Double_signing_punishments,
+    `Tx_rollup_rejection_rewards and `Sc_rollup_refutation_rewards ).
+    Again, this is an ANTI-PATTERN that should not be mimicked.
+*)
 
 (** [container] is the type of token holders with finite capacity, and whose assets
-    are contained in the context. Let [d] be a delegate. Be aware that transferring
+    are contained in the context. An account may have several token holders,
+    that can serve as sources and/or sinks.
+    For example, an implicit account [d] serving as a delegate has a token holder
+    for its own spendable balance, and another token holder for its frozen deposits.
+    Be aware that transferring
     to/from [`Delegate_balance d] will not update [d]'s stake, while transferring
     to/from [`Contract (Contract_repr.Implicit d)] will update [d]'s
     stake. *)
 
 type container =
   [ `Contract of Contract_repr.t
+    (** Implicit account's or Originated contract's spendable balance *)
   | `Collected_commitments of Blinded_public_key_hash.t
-  | `Delegate_balance of Signature.Public_key_hash.t
+    (** Pre-funded account waiting for the commited pkh and activation code to
+        be revealed to unlock the funds *)
+  | `Delegate_balance of
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4899
+                this constructor is no longer needed, Contract should be used
+                instead. *)
+    Signature.Public_key_hash.t
+    (** Delegate's implicit account spendable balance *)
   | `Frozen_deposits of Signature.Public_key_hash.t
-  | `Block_fees
-  | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
+    (** Frozen tokens of a delegate for consensus security deposits *)
+  | `Block_fees  (** Current block's fees collection *)
+  | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t
+    (** Frozen tokens of a contract for bond deposits (currently used by rollups) *)
+  ]
 
 (** [infinite_source] defines types of tokens provides which are considered to be
  ** of infinite capacity. *)
 type infinite_source =
   [ `Invoice
-  | `Bootstrap
+    (** Tokens minted during a protocol upgrade,
+        typically to fund the development of some part of the amendment. *)
+  | `Bootstrap  (** Bootstrap accounts funding *)
   | `Initial_commitments
-  | `Revelation_rewards
+    (** Funding of Genesis' prefunded accounts requiring an activation *)
+  | `Revelation_rewards  (** Seed nonce revelation rewards *)
   | `Double_signing_evidence_rewards
-  | `Endorsing_rewards
-  | `Baking_rewards
-  | `Baking_bonuses
-  | `Minted
-  | `Liquidity_baking_subsidies
+    (** Double signing denunciation rewards (consensus slashing redistribution) *)
+  | `Endorsing_rewards  (** Consensus endorsing rewards *)
+  | `Baking_rewards  (** Consensus baking fixed rewards *)
+  | `Baking_bonuses  (** Consensus baking variable bonus *)
+  | `Minted  (** Generic source for test purpose *)
+  | `Liquidity_baking_subsidies  (** Subsidy for liquidity-baking contract *)
   | `Tx_rollup_rejection_rewards
-  | `Sc_rollup_refutation_rewards ]
+    (** Tx_rollup rejection rewards (slashing redistribution) *)
+  | `Sc_rollup_refutation_rewards
+    (** Sc_rollup refutation rewards (slashing redistribution) *) ]
 
 (** [source] is the type of token providers. Token providers that are not
     containers are considered to have infinite capacity. *)
 type source = [infinite_source | container]
 
 type infinite_sink =
-  [ `Storage_fees
-  | `Double_signing_punishments
+  [ `Storage_fees  (** Fees burnt to compensate storage usage *)
+  | `Double_signing_punishments  (** Consensus slashing *)
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+    (** Consensus rewards not distributed because the participation of the delegate was too low. *)
   | `Tx_rollup_rejection_punishments
-  | `Sc_rollup_refutation_punishments
-  | `Burned ]
+    (** Transactional rollups rejection slashing *)
+  | `Sc_rollup_refutation_punishments  (** Smart rollups refutation slashing *)
+  | `Burned  (** Generic sink mainly for test purpose *) ]
 
 (** [sink] is the type of token receivers. Token receivers that are not
     containers are considered to have infinite capacity. *)
