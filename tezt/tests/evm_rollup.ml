@@ -55,8 +55,24 @@ let evm_proxy_server_version proxy_server =
   let get_version_url = endpoint ^ "/version" in
   RPC.Curl.get get_version_url
 
-(** Prefunded account in the kernel, has a balance of 9999. *)
-let prefunded_account = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE"
+module Account = struct
+  type t = {public_key : string; private_key : string}
+
+  (** Prefunded account public key in the kernel, has a balance of 9999. *)
+  let prefunded_account_pk = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE"
+
+  let accounts =
+    [|
+      {
+        public_key = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        private_key = "0x9bfc9fbe6296c8fef8eb8d6ce2ed5f772a011898";
+      };
+      {
+        public_key = "0x0b52D4D3bE5D18a7aB5E4476a2F5382bBf2B38d8";
+        private_key = "0x672c4a81a943f2bf450869a135bd27fd43d90e9a";
+      };
+    |]
+end
 
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
@@ -215,12 +231,14 @@ let test_rpc_getBalance =
   let evm_proxy_server_endoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
-      ~account:prefunded_account
+      ~account:Account.prefunded_account_pk
       ~endpoint:evm_proxy_server_endoint
   in
   Check.((balance = 9999) int)
     ~error_msg:
-      (sf "Expected balance of %s should be %%R, but got %%L" prefunded_account) ;
+      (sf
+         "Expected balance of %s should be %%R, but got %%L"
+         Account.prefunded_account_pk) ;
   unit
 
 let register_evm_proxy_server ~protocols =
