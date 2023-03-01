@@ -128,11 +128,16 @@ module Internal_validator_process = struct
         ~section
         ~level:Notice
         ~name:"seq_initialized"
-        ~msg:"initialized"
+        ~msg:"internal validation initialized"
         ()
 
     let close =
-      declare_0 ~section ~level:Notice ~name:"seq_close" ~msg:"shutting down" ()
+      declare_0
+        ~section
+        ~level:Notice
+        ~name:"seq_close"
+        ~msg:"shutting down internal validation"
+        ()
 
     let validation_request =
       declare_2
@@ -419,7 +424,7 @@ module External_validator_process = struct
         ~section
         ~level:Notice
         ~name:"proc_initialized"
-        ~msg:"initialized"
+        ~msg:"external validation initialized"
         ()
 
     let close =
@@ -427,7 +432,7 @@ module External_validator_process = struct
         ~section
         ~level:Notice
         ~name:"proc_close"
-        ~msg:"shutting down"
+        ~msg:"shutting down external validation"
         ()
 
     let process_exited_abnormally =

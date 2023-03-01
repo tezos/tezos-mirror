@@ -113,7 +113,7 @@ let init_p2p chain_name p2p_params disable_mempool =
           conn_metadata_cfg
           message_cfg
       in
-      let*! () = Node_event.(emit p2p_event) "p2p_maintain_started" in
+      let*! () = Node_event.(emit p2p_event) "p2p_maintenance_started" in
       return p2p |> trace Failed_to_init_P2P
 
 type config = {
