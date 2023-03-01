@@ -2277,7 +2277,7 @@ let octez_context_ops =
       ]
 
 let _octez_protocol_shell_context_tests =
-  tests
+  tezt
     ["test_proxy_context"]
     ~path:"src/lib_protocol_environment/test_shell_context"
     ~opam:"tezos-shell-context-test"
@@ -2285,7 +2285,7 @@ let _octez_protocol_shell_context_tests =
     ~deps:
       [
         octez_shell_context;
-        alcotest_lwt;
+        alcotezt;
         octez_test_helpers |> open_;
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_environment |> open_;
