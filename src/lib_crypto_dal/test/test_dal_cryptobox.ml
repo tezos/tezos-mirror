@@ -11,10 +11,29 @@ module Test = struct
     done ;
     indices
 
+  let max_slot_size_log2 = 11
+
+  let max_page_size_log2 = 15
+
+  let max_redundancy_factor_log2 = 4
+
+  let max_number_of_shards_log2 = 19
+
+  (* The set of parameters maximizing the SRS length, and which
+     is in the codomain of [generate_parameters]. *)
+  let max_parameters =
+    let max_parameters : Cryptobox.parameters =
+      {
+        slot_size = 1 lsl max_slot_size_log2;
+        page_size = 1 lsl max_page_size_log2;
+        redundancy_factor = 1 lsl max_redundancy_factor_log2;
+        number_of_shards = 1;
+      }
+    in
+    Cryptobox.Internal_for_tests.parameters_initialisation max_parameters
+
   (* Initializes the DAL parameters *)
-  let init parameters =
-    Cryptobox.Internal_for_tests.parameters_initialisation parameters
-    |> Cryptobox.Internal_for_tests.load_parameters
+  let init () = Cryptobox.Internal_for_tests.load_parameters max_parameters
 
   type parameters = {
     slot_size : int;
@@ -35,10 +54,10 @@ module Test = struct
 
   let generate_parameters =
     let open QCheck2.Gen in
-    let* redundancy_factor_log2 = int_range 1 4 in
-    let* slot_size_log2 = int_range 0 11 in
-    let* page_size_log2 = int_range 0 15 in
-    let* number_of_shards_log2 = int_range 0 19 in
+    let* redundancy_factor_log2 = int_range 1 max_redundancy_factor_log2 in
+    let* slot_size_log2 = int_range 0 max_slot_size_log2 in
+    let* page_size_log2 = int_range 0 max_page_size_log2 in
+    let* number_of_shards_log2 = int_range 0 max_number_of_shards_log2 in
     let slot_size = 1 lsl slot_size_log2 in
     let* msg = bytes_size (int_range 0 slot_size) in
     let padding_threshold = Bytes.length msg in
@@ -96,8 +115,6 @@ module Test = struct
     Cryptobox.Internal_for_tests.ensure_validity
       (get_cryptobox_parameters params)
 
-  let init params = init (get_cryptobox_parameters params)
-
   (* Tests that with a fraction 1/redundancy_factor of the shards
      the decoding succeeds. Checks equality of polynomials. *)
   let test_erasure_code =
@@ -107,7 +124,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -138,7 +155,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -174,7 +191,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -202,7 +219,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -236,7 +253,7 @@ module Test = struct
       ~print:print_parameters_tup2
       generate_parameters_tup2
       (fun (params1, params2) ->
-        init params1 ;
+        init () ;
         assume (ensure_validity params1) ;
         assume (ensure_validity params2) ;
         assume (params1.number_of_shards <> params2.number_of_shards) ;
@@ -258,7 +275,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -277,7 +294,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -302,7 +319,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -352,7 +369,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -385,7 +402,7 @@ module Test = struct
       ~print:print_parameters
       generate_parameters
       (fun params ->
-        init params ;
+        init () ;
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
@@ -403,15 +420,7 @@ module Test = struct
      This test should be adapted with the new constraints on the DAL parameters. *)
   let _test_collision_page_size () =
     let slot_size = 1 lsl 6 in
-    init
-      {
-        slot_size;
-        page_size = 2;
-        redundancy_factor = 2;
-        number_of_shards = 1 lsl 6;
-        slot = Bytes.make 1 '\000';
-        padding_threshold = 0;
-      } ;
+    init () ;
     let open Tezos_error_monad.Error_monad.Result_syntax in
     (let* t1 =
        Cryptobox.make
