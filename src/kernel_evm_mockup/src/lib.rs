@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use debug::debug_msg;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
+use debug::debug_msg;
 use kernel::kernel_entry;
 
 use crate::account::Account;
@@ -28,7 +28,7 @@ pub fn stage_one<Host: Runtime + RawRollupCore>(host: &mut Host) -> Queue {
 pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
     let hash = ("6471a723296395cf1dcc568941affd7a390f94ce").to_ascii_lowercase();
 
-    let balance: Wei = from_eth(1000);
+    let balance: Wei = from_eth(9999);
 
     let mock_account = Account::default_account(Vec::from(hash), balance);
 

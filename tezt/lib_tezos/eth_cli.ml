@@ -23,20 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** List of services supported to communicate with a rollup node. *)
-module type S = sig
-  (** [assert_connected] sends a random RPC to the rollup node to check
-      if the rollup node answers. *)
-  val assert_connected : unit tzresult Lwt.t
+let path = "eth"
 
-  (** [balance address] returns the [address]'s balance. *)
-  val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
-end
+let spawn_command command =
+  Process.spawn path command |> Process.check_and_read_stdout
 
-(** Instantiate a module of type {!S} that communicates with a rollup
-    node endpoint given by [Base.base]. *)
-module Make : functor
-  (Base : sig
-     val base : Uri.t
-   end)
-  -> S
+let balance ~account ~endpoint =
+  let* answer =
+    spawn_command ["address:balance"; account; "--network"; endpoint]
+  in
+  return (int_of_string (String.trim answer))

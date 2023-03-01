@@ -23,13 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Strip the [0x] prefix of a string. *)
+let strip_0x s =
+  let n = String.length s in
+  String.sub s 2 (n - 2)
+
 (** Ethereum address (20 bytes) *)
 type address = Address of string [@@ocaml.unboxed]
 
 let address_of_string s = Address s
 
 let address_encoding =
-  Data_encoding.(conv (fun (Address a) -> a) (fun a -> Address a) string)
+  Data_encoding.(
+    conv (fun (Address a) -> a) (fun a -> Address (strip_0x a)) string)
 
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]

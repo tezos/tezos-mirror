@@ -42,6 +42,15 @@ val create :
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
+(** [init ?runner ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server
+    with {!create} and runs it with {!run}. *)
+val init :
+  ?runner:Runner.t ->
+  ?rpc_addr:string ->
+  ?rpc_port:int ->
+  Sc_rollup_node.t ->
+  t Lwt.t
+
 (** [spawn_run proxy_server] same as {!run} but spawns a process. *)
 val spawn_run : t -> Process.t
 

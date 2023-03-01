@@ -13,6 +13,8 @@ use crate::account::*;
 use crate::error::Error;
 use crate::wei::Wei;
 
+use primitive_types::U256;
+
 const EVM_ACCOUNTS: RefPath = RefPath::assert_from(b"/eth_accounts");
 
 const EVM_ACCOUNT_BALANCE: RefPath = RefPath::assert_from(b"/balance");
@@ -20,6 +22,21 @@ const EVM_ACCOUNT_NONCE: RefPath = RefPath::assert_from(b"/nonce");
 const EVM_ACCOUNT_CODE_HASH: RefPath = RefPath::assert_from(b"/code_hash");
 
 const CODE_HASH_SIZE: usize = 32;
+
+/// The size of one 256 bit word. Size in bytes
+pub const WORD_SIZE: usize = 32usize;
+
+/// Read a single unsigned 256 bit value from storage at the path given.
+fn read_u256(host: &impl Runtime, path: &OwnedPath) -> U256 {
+    let bytes = host.store_read(path, 0, WORD_SIZE).unwrap();
+    Wei::from_little_endian(&bytes)
+}
+
+fn write_u256(host: &mut impl Runtime, path: &OwnedPath, value: U256) -> Result<(), Error> {
+    let mut bytes: [u8; WORD_SIZE] = value.into();
+    value.to_little_endian(&mut bytes);
+    host.store_write(path, &bytes, 0).map_err(Error::from)
+}
 
 pub fn address_path(address: Hash) -> Result<OwnedPath, Error> {
     let address: &str = from_utf8(address)?;
@@ -50,12 +67,7 @@ pub fn read_account_balance<Host: Runtime + RawRollupCore>(
     account_path: &OwnedPath,
 ) -> Result<Wei, Error> {
     let path = concat(account_path, &EVM_ACCOUNT_BALANCE)?;
-    let mut buffer: Vec<u8> = Vec::new();
-
-    match load_value_slice(host, &path, &mut buffer) {
-        Ok(_) => Ok(Wei::from_bytes_le(&buffer)),
-        _ => Err(Error::Generic),
-    }
+    Ok(read_u256(host, &path))
 }
 
 pub fn read_account_code_hash<Host: Runtime>(
@@ -100,8 +112,7 @@ pub fn store_balance<Host: Runtime + RawRollupCore>(
     balance: Wei,
 ) -> Result<(), Error> {
     let path = concat(account_path, &EVM_ACCOUNT_BALANCE)?;
-    host.store_write(&path, &balance.to_bytes_le(), 0)
-        .map_err(Error::from)
+    write_u256(host, &path, balance)
 }
 
 pub fn store_code_hash<Host: Runtime + RawRollupCore>(
