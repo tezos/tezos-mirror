@@ -297,7 +297,6 @@ module Inner = struct
     (* Number of slot pages. *)
     page_length : int;
     remaining_bytes : int;
-    evaluations_log : int;
     (* Log of the number of evaluations that constitute an erasure encoded
        polynomial. *)
     shard_length_log : int;
@@ -499,7 +498,9 @@ module Inner = struct
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
-    let evaluations_log = Z.(log2 (of_int erasure_encoded_polynomial_length)) in
+    let erasure_encoded_length_log =
+      Z.(log2 (of_int erasure_encoded_polynomial_length))
+    in
     let shard_length_log =
       shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards
     in
@@ -530,9 +531,8 @@ module Inner = struct
         pages_per_slot = pages_per_slot parameters;
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
-        evaluations_log;
         shard_length_log;
-        shard_proofs_log = evaluations_log - shard_length_log;
+        shard_proofs_log = erasure_encoded_length_log - shard_length_log;
         srs;
       }
 
