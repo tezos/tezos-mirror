@@ -24,6 +24,7 @@ depends: [
   "odoc" { with-doc }
   "md2mld" { with-test } # not technically a test dep; modify when https://github.com/ocurrent/ocaml-ci/issues/264 is fixed
   "js_of_ocaml-compiler" { with-test }
+  "conf-npm" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

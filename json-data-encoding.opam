@@ -22,4 +22,6 @@ depends: [
   "alcotest" { with-test }
   "ocamlformat" { = "0.24.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
   "odoc" { with-doc }
+  "js_of_ocaml-compiler" { with-test }
+  "conf-npm" { with-test }
 ]
