@@ -348,7 +348,7 @@ module Description = struct
     Tabs.pp ppf prefix service
 end
 
-let pp_document ppf descriptions version =
+let pp_document ppf _name intro prefix rpc_dir version =
   (* Style : hack *)
   Format.fprintf ppf "%a@." Rst.pp_raw_html Rst.style ;
   (* Script : hack *)
@@ -358,24 +358,17 @@ let pp_document ppf descriptions version =
   Format.pp_set_max_indent ppf 9000 ;
   let version_suffix = if version = "" then "" else "_" ^ version in
   Format.fprintf ppf "%a" Rst.pp_ref ("rpc_index" ^ version_suffix) ;
-  Rst.pp_h1 ppf "RPCs - Reference" ;
-  List.iter
-    (fun (name, intro, prefix, rpc_dir) ->
-      (* If provided, insert the introductory include *)
-      Option.iter (Format.fprintf ppf ".. include:: %s@\n@\n") intro ;
-      Rst.pp_h3 ppf name ;
-      Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir)
-    descriptions ;
+  Rst.pp_h1 ppf (String.capitalize_ascii version ^ " RPCs - Reference") ;
+  (* If provided, insert the introductory include *)
+  Option.iter (Format.fprintf ppf ".. include:: %s@\n@\n") intro ;
+  Rst.pp_h2 ppf "Index" ;
+  Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir ;
   (* Full description *)
-  Rst.pp_h2 ppf "RPCs - Full description" ;
+  Rst.pp_h2 ppf "Full description" ;
   Format.pp_print_flush ppf () ;
   Format.pp_set_margin ppf 80 ;
   Format.pp_set_max_indent ppf 76 ;
-  List.iter
-    (fun (name, _, prefix, rpc_dir) ->
-      Rst.pp_h3 ppf name ;
-      Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir)
-    descriptions
+  Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir
 
 let make_index node required_version =
   let open Lwt_syntax in
@@ -417,7 +410,7 @@ let make_index node required_version =
   in
   let* dir = Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() dir in
   let ppf = Format.std_formatter in
-  pp_document ppf [(name, intro, path, dir)] required_version ;
+  pp_document ppf name intro path dir required_version ;
   return_ok ()
 
 let make_default_acl _node =
