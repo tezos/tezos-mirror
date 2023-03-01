@@ -1,9 +1,15 @@
 (tests
- (names test_generated test_legacy_compatibility test_json_stream
-   test_json_stream_sizes test_classifiers test_sub_string
-   json_roundtrip_in_binary)
+ (names
+  test_generated
+  test_legacy_compatibility
+  test_json_stream
+  test_json_stream_sizes
+  test_classifiers
+  test_sub_string
+  json_roundtrip_in_binary)
  (modes native js)
  (js_of_ocaml)
+ (package data-encoding)
  (libraries data_encoding zarith zarith_stubs_js crowbar bigstringaf))
 
 ; We need to increase the stack size

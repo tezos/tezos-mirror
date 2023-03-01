@@ -2,6 +2,7 @@
  (names test)
  (modes native js)
  (js_of_ocaml)
+ (package data-encoding)
  (libraries data_encoding zarith zarith_stubs_js alcotest))
 
 (rule
