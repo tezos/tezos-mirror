@@ -241,9 +241,39 @@ let test_rpc_getBalance =
          Account.prefunded_account_pk) ;
   unit
 
+let test_rpc_sendRawTransaction =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "send_raw_transaction"]
+    ~title:"RPC method eth_sendRawTransaction"
+  @@ fun protocol ->
+  let* {sc_rollup_client; evm_proxy_server; _} = setup_evm_kernel protocol in
+  let* tx_hash =
+    Eth_cli.transaction_send
+      ~source_private_key:Account.accounts.(0).private_key
+      ~to_public_key:Account.accounts.(1).public_key
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
+            Introduce a eth/wei module. *)
+      ~value:Z.(of_int 42 * (of_int 10 ** 18))
+      ~endpoint:(Evm_proxy_server.endpoint evm_proxy_server)
+  in
+  Log.info "Sent %s to the proxy server." tx_hash ;
+  let*! batcher_queue = Sc_rollup_client.batcher_queue sc_rollup_client in
+  let () =
+    match batcher_queue with
+    | [(_hash, binary_msg)] -> Log.info "binary_msg: %s" binary_msg
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Expected exactly one element to the batcher queue, got %d"
+          (List.length batcher_queue)
+  in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
-  test_rpc_getBalance protocols
+  test_rpc_getBalance protocols ;
+  test_rpc_sendRawTransaction protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
