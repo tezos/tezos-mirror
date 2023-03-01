@@ -208,7 +208,7 @@ let run ~data_dir cctxt =
         Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
       coordinator_config_opt
   in
-  let ctxt = Node_context.init config cctxt coordinator_cctxt_opt in
+  let* ctxt = Node_context.init config cctxt coordinator_cctxt_opt in
   let* rpc_server =
     RPC_server.(
       start_legacy

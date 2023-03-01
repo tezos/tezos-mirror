@@ -878,6 +878,39 @@ module Legacy = struct
     check_downloaded_preimage coordinator observer expected_rh
 end
 
+let test_stores_dac_member_signature_stub _protocol _node client
+    coordinator_node _committee_size _keys =
+  let* member1 = Client.bls_gen_keys ~alias:"dac_member_1" client in
+  let* member1_key = Client.bls_show_address ~alias:member1 client in
+  let payload = "hello test message" in
+  let* hex_root_hash, _l1_op =
+    RPC.call
+      coordinator_node
+      (Rollup.Dac.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Merkle_tree_V0")
+  in
+  let signature1 =
+    let sk =
+      match member1_key.aggregate_secret_key with
+      | Unencrypted sk -> sk
+      | Encrypted encsk -> raise (Invalid_argument encsk)
+    in
+    let sk = Tezos_crypto.Aggregate_signature.Secret_key.of_b58check_exn sk in
+    Tezos_crypto.Aggregate_signature.sign sk (Hex.to_bytes (`Hex hex_root_hash))
+  in
+  let* () =
+    let dac_member_pkh = member1_key.aggregate_public_key_hash in
+    let signature = signature1 in
+    RPC.call
+      coordinator_node
+      (Rollup.Dac.RPC.dac_store_dac_member_signature
+         ~hex_root_hash
+         ~dac_member_pkh
+         ~signature)
+  in
+  unit
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   test_dac_node_startup protocols ;
@@ -931,4 +964,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "committee member downloads pages from coordinator"
     Legacy.test_observer_downloads_pages
+    protocols ;
+  scenario_with_layer1_and_legacy_dac_nodes
+    ~threshold:0
+    ~dac_members:0
+    ~tags:["dac"; "dac_node"]
+    "dac_store_member_signature"
+    test_stores_dac_member_signature_stub
     protocols

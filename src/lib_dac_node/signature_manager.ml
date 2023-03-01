@@ -164,3 +164,9 @@ let verify ((module P) : Dac_plugin.t) ~public_keys_opt root_page_hash signature
       in
       return
       @@ Tezos_crypto.Aggregate_signature.aggregate_check pk_msg_list signature
+
+module Coordinator = struct
+  let handle_store_dac_member_signature _ctx _cctxt _dac_members_pkh
+      _dac_member_signature =
+    Lwt_result_syntax.return_unit
+end

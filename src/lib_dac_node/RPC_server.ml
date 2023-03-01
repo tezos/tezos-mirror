@@ -135,14 +135,15 @@ let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
            hash_streamer
            input)
 
-let register_verify_external_message_signature ctx public_keys_opt directory =
+let register_verify_external_message_signature dac_plugin public_keys_opt
+    directory =
   directory
   |> add_service
        Tezos_rpc.Directory.register0
        RPC_services.verify_external_message_signature
        (fun external_message () ->
          handle_verify_external_message_signature
-           ctx
+           dac_plugin
            public_keys_opt
            external_message)
 
@@ -171,6 +172,18 @@ let register_monitor_root_hashes dac_plugin hash_streamer dir =
     (Monitor_services.S.root_hashes dac_plugin)
     (fun () () () -> handle_monitor_root_hashes)
 
+let register_store_dac_member_signature ctx dac_plugin cctxt dac_public_keys_opt
+    =
+  add_service
+    Tezos_rpc.Directory.register0
+    (RPC_services.store_dac_member_signature dac_plugin)
+    (fun () dac_member_signature ->
+      Signature_manager.Coordinator.handle_store_dac_member_signature
+        ctx
+        cctxt
+        dac_public_keys_opt
+        dac_member_signature)
+
 let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
     hash_streamer =
   let page_store = Node_context.get_page_store node_context in
@@ -184,6 +197,11 @@ let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
   |> register_verify_external_message_signature dac_plugin dac_public_keys_opt
   |> register_retrieve_preimage dac_plugin page_store
   |> register_monitor_root_hashes dac_plugin hash_streamer
+  |> register_store_dac_member_signature
+       node_context
+       dac_plugin
+       cctxt
+       dac_public_keys_opt
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
    Move this to RPC_server.Legacy once all operating modes are supported. *)

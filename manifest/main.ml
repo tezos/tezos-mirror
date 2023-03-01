@@ -3396,6 +3396,7 @@ let octez_dac_node_lib =
         octez_protocol_updater |> open_;
         octez_client_base_unix |> open_;
         octez_stdlib_unix |> open_;
+        octez_layer2_store |> open_;
         octez_rpc_http_server;
       ]
 

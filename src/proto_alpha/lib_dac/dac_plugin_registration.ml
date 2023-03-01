@@ -38,11 +38,28 @@ end) : Dac_plugin.T = struct
     |> Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
     |> Mapper.of_bytes
 
+  let of_hex hex =
+    Protocol.Sc_rollup_reveal_hash.of_hex hex |> Option.map of_reveal_hash
+
+  let to_hex hash = to_reveal_hash hash |> Protocol.Sc_rollup_reveal_hash.to_hex
+
   let encoding =
-    Data_encoding.conv
-      to_reveal_hash
-      of_reveal_hash
-      Protocol.Sc_rollup_reveal_hash.encoding
+    let binary =
+      Data_encoding.conv
+        to_reveal_hash
+        of_reveal_hash
+        Protocol.Sc_rollup_reveal_hash.encoding
+    in
+    Data_encoding.(
+      (* Hexifies the hash when encoding in json. *)
+      splitted
+        ~binary
+        ~json:
+          (conv_with_guard
+             to_hex
+             (fun str ->
+               Result.of_option ~error:"Not a valid hash" (of_hex str))
+             (string' Plain)))
 
   let dac_hash_to_proto_supported_hashes = function
     | Dac_plugin.Blake2B -> Protocol.Sc_rollup_reveal_hash.Blake2B
@@ -67,11 +84,6 @@ end) : Dac_plugin.T = struct
   let scheme_of_hash hash =
     to_reveal_hash hash |> Protocol.Sc_rollup_reveal_hash.scheme_of_hash
     |> proto_to_dac_hash_supported_hashes
-
-  let of_hex hex =
-    Protocol.Sc_rollup_reveal_hash.of_hex hex |> Option.map of_reveal_hash
-
-  let to_hex hash = to_reveal_hash hash |> Protocol.Sc_rollup_reveal_hash.to_hex
 
   let size ~scheme =
     Protocol.Sc_rollup_reveal_hash.size

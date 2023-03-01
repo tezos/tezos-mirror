@@ -12,6 +12,7 @@
   tezos-protocol-updater
   tezos-client-base-unix
   tezos-stdlib-unix
+  tezos_layer2_store
   tezos-rpc-http-server)
  (flags
   (:standard)
@@ -19,4 +20,5 @@
   -open Tezos_client_base
   -open Tezos_protocol_updater
   -open Tezos_client_base_unix
-  -open Tezos_stdlib_unix))
+  -open Tezos_stdlib_unix
+  -open Tezos_layer2_store))

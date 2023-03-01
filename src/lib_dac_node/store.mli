@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,47 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Module that implements Dac related functionalities. *)
+(** [Irmin_store] representation for Dac node *)
+module Irmin_store : sig
+  include Store_sigs.Store
 
-type error +=
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
-
-module Keys : sig
-  (** [get_keys ~addresses ~threshold cctxt config] returns the aliases and keys associated with the
-      aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)
-  val get_keys :
-    addresses:Tezos_crypto.Aggregate_signature.public_key_hash trace ->
-    threshold:int ->
-    #Client_context.wallet ->
-    (Tezos_crypto.Aggregate_signature.public_key_hash
-    * Tezos_crypto.Aggregate_signature.public_key option
-    * Client_keys.aggregate_sk_uri)
-    option
-    list
-    tzresult
-    Lwt.t
+  include Store_sigs.BACKEND
 end
-
-module Storage : sig
-  (** [ensure_reveal_data_dir_exists reveal_data_dir] checks that the
-      path at [reveal_data_dir] exists and is a directory. If
-      the path does not exist, it is created as a directory.
-      Parent directories are recursively created when they do not
-      exist.
-
-      This function may fail with
-      {ul
-        {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
-          path exists and is not a directory,
-
-        {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
-            creation of the directory fails.}}
-      }
-  *)
-  val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t
-end
-
-val resolve_plugin :
-  Tezos_shell_services.Chain_services.Blocks.protocols ->
-  (module Dac_plugin.T) option Lwt.t
