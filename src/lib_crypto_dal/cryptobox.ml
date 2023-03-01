@@ -64,7 +64,7 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 
-let initialisation_parameters_from_files ~g1_path ~g2_path =
+let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path =
   let open Lwt_result_syntax in
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
 
@@ -85,8 +85,8 @@ let initialisation_parameters_from_files ~g1_path ~g2_path =
              ()))
       (fun () -> Lwt_unix.close fd)
   in
-  let*! srs_g1_bigstring = to_bigstring g1_path in
-  let*! srs_g2_bigstring = to_bigstring g2_path in
+  let*! srs_g1_bigstring = to_bigstring srs_g1_path in
+  let*! srs_g2_bigstring = to_bigstring srs_g2_path in
   match
     let open Result_syntax in
     let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring in
@@ -1637,8 +1637,8 @@ module Config = struct
         | Some parameters ->
             return (Internal_for_tests.parameters_initialisation parameters)
         | None ->
-            let*? g1_path, g2_path = find_srs_files () in
-            initialisation_parameters_from_files ~g1_path ~g2_path
+            let*? srs_g1_path, srs_g2_path = find_srs_files () in
+            initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit
