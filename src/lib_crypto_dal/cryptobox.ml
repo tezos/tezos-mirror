@@ -544,7 +544,12 @@ module Inner = struct
 
   let polynomial_evaluate = Polynomials.evaluate
 
-  let fft_mul d ps =
+  (* [polynomials_multiplication d ps] computes the product of the
+     polynomials [ps]. The degree of the resulting product must
+     be strictly less than the size of the domain [d].
+
+     Runtime is [O(n log n)] where [n = Domains.length d]. *)
+  let polynomials_product d ps =
     let open Evaluations in
     let evaluations = List.map (evaluation_fft d) ps in
     interpolation_fft d (mul_c ~evaluations ())
@@ -872,7 +877,9 @@ module Inner = struct
          It is the most costly operation of this function. *)
       let p1, p2 = partition_products shards in
       (* A(x) is the product of [p1] and [p2]. *)
-      let a_poly = fft_mul t.domain_2_times_polynomial_length [p1; p2] in
+      let a_poly =
+        polynomials_product t.domain_2_times_polynomial_length [p1; p2]
+      in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
@@ -960,7 +967,9 @@ module Inner = struct
          The product is given by the convolution theorem:
          P = A * B = IFFT_{2k}(FFT_{2k}(A) o FFT_{2k}(B))
          where o is the pairwise product. *)
-      let p = fft_mul t.domain_2_times_polynomial_length [a_poly; b] in
+      let p =
+        polynomials_product t.domain_2_times_polynomial_length [a_poly; b]
+      in
       let len =
         if Polynomials.is_zero p then 1
         else min t.max_polynomial_length (Polynomials.degree p + 1)
