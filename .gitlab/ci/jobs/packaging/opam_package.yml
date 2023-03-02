@@ -1551,8 +1551,18 @@ opam:tezos-workers:
   variables:
     package: tezos-workers
 
-# Ignoring unreleased package tezt-performance-regression.
+opam:tezt-performance-regression:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezt-performance-regression
 
 # Ignoring unreleased package tezt-self-tests.
 
-# Ignoring unreleased package tezt-tezos.
+opam:tezt-tezos:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezt-tezos

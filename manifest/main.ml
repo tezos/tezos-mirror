@@ -1590,6 +1590,7 @@ let tezt_tezos =
         cohttp_lwt_unix;
       ]
     ~cram:true
+    ~release_status:Released
 
 let _tezt_self_tests =
   public_exe
@@ -1683,6 +1684,7 @@ let _octez_p2p_tests =
         octez_event_logging_test_helpers |> open_;
         octez_p2p_test_common |> open_;
         octez_p2p_services |> open_;
+        tezt_tezos;
         alcotest_lwt;
         astring;
       ]
