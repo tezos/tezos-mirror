@@ -718,79 +718,22 @@ end
 
 let () = Random.self_init ()
 
-let addr = ref Ipaddr.V6.localhost
-
-let port = ref None
-
-let clients = ref 10
-
-let repeat_connections = ref 5
-
-let log_config = ref None
-
-let spec =
-  Arg.
-    [
-      ( "--port",
-        Int (fun p -> port := Some p),
-        " Listening port of the first peer." );
-      ( "--addr",
-        String (fun p -> addr := Ipaddr.V6.of_string_exn p),
-        " Listening addr" );
-      ("--clients", Set_int clients, " Number of concurrent clients.");
-      ( "--repeat",
-        Set_int repeat_connections,
-        " Number of connections/disconnections." );
-      ( "-v",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> info; p2p.connection-pool -> \
-                      info"
-                   ())),
-        " Log up to info msgs" );
-      ( "-vv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> debug; p2p.connection-pool \
-                      -> debug"
-                   ())),
-        " Log up to debug msgs" );
-      ( "-vvv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> debug;p2p.connection-pool -> \
-                      debug;p2p.connection -> debug"
-                   ())),
-        " Log up to debug msgs, socket included" );
-    ]
-
 let init_logs =
-  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
+  let lwt_log_sink =
+    Lwt_log_sink_unix.create_cfg
+      ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
+      ()
+  in
+  lazy (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
 
 let points = ref []
 
-let gen_points () =
-  let clients = !clients in
-  let addr = !addr in
-  let port =
-    Option.value_f ~default:(fun () -> 49152 + Random.int 16384) !port
+let wrap ?addr ?port ?(clients = 10) n f =
+  let gen_points addr = points := Node.gen_points ?port clients addr in
+  let addr =
+    Option.value ~default:(Ipaddr.V6.of_string_exn "::ffff:127.0.0.1") addr
   in
-  let ports = port -- (port + clients - 1) in
-  points := List.map (fun port -> (addr, port)) ports
-
-let wrap n f =
+  gen_points addr ;
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let* () = Lazy.force init_logs in
@@ -801,7 +744,7 @@ let wrap n f =
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
           ->
             warn "Conflict on ports, retry the test." ;
-            gen_points () ;
+            gen_points addr ;
             aux n f
         | Error error ->
             Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
@@ -809,20 +752,16 @@ let wrap n f =
       aux n f)
 
 let main () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
-  gen_points () ;
+  let repeat_connections = 5 in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p"
        [
          ( "p2p-connection-pool",
            [
              wrap "simple" (fun _ -> Simple.run !points);
              wrap "random" (fun _ ->
-                 Random_connections.run !points !repeat_connections);
+                 Random_connections.run !points repeat_connections);
              wrap "garbled" (fun _ -> Garbled.run !points);
              wrap "overcrowded" (fun _ -> Overcrowded.run !points);
              wrap "overcrowded-mixed" (fun _ ->
