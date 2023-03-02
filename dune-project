@@ -116,6 +116,8 @@
 (package (name tezos-event-logging))
 (package (name tezos-event-logging-test-helpers))
 (package (name tezos-expect-helper))
+(package (name tezos-gossipsub))
+(package (name tezos-gossipsub-test)(allow_empty))
 (package (name tezos-hacl))
 (package (name tezos-injector-015-PtLimaPt))
 (package (name tezos-layer2-store)(allow_empty))
