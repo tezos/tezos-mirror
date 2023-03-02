@@ -411,7 +411,7 @@ build-tps-deps:
 	@./scripts/install_build_deps.sh --tps
 
 .PHONY: build-tps
-build-tps: lift-protocol-limits-patch build build-tezt
+build-tps: lift-protocol-limits-patch all build-tezt
 	@dune build ./src/bin_tps_evaluation
 	@cp -f ./_build/default/src/bin_tps_evaluation/main_tps_evaluation.exe tezos-tps-evaluation
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-benchmark-tps .

@@ -4,7 +4,7 @@ index b226dc5417..cef4feef6e 100644
 +++ b/src/proto_alpha/lib_protocol/main.ml
 @@ -64,10 +64,9 @@ type operation = Alpha_context.packed_operation = {
  
- let acceptable_passes = Alpha_context.Operation.acceptable_passes
+ let acceptable_pass = Alpha_context.Operation.acceptable_pass
  
 -let max_block_length = Alpha_context.Block_header.max_header_length
 +let max_block_length = max_int
