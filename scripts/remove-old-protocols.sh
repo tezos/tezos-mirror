@@ -8,6 +8,23 @@ set -euo pipefail
 # - Docker images (for master and releases)
 # - static binaries (only for releases)
 
+
+usage() {
+    echo "Usage: $0 [<protocol-trashbin>]"
+    echo "Removes old protocols. If <protocol-trashbin> is given, they are put there"
+    echo "and the effect of this script can be reversed by: "
+    echo "'scripts/restore-old-protocols.sh <protocol-trashbin>'"
+    exit 1
+}
+
+trash_bin=""
+if [ -n "${1:-}" ] && [ "${1:-}" != "--help" ]; then
+    trash_bin=$1
+    mkdir -p "$trash_bin"
+elif [ "${1:-}" = "--help" ]; then
+    usage
+fi
+
 all_protocols=$(find src -maxdepth 1 -type d -regex 'src/proto.*' | \
                 cut -d '_' -f2- | \
                 sed -r 's/_/-/g')
@@ -18,6 +35,11 @@ to_be_removed=$(echo "$all_protocols" | \
                 sed -r 's/-/_/g')
 
 for proto in $to_be_removed; do
-  echo rm -r src/proto_"${proto}"
-  rm -r src/proto_"${proto}"
+    if [ -z "$trash_bin" ]; then
+        echo rm -r src/proto_"${proto}"
+        rm -r src/proto_"${proto}"
+    else
+        echo mv src/proto_"${proto}" "$trash_bin"
+        mv src/proto_"${proto}" "$trash_bin"
+    fi
 done

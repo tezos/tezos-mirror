@@ -5,7 +5,8 @@ if [ -z "${build_deps_image_name}" ]; then echo "build_deps_image_name is unset"
 if [ -z "${build_deps_image_version}" ]; then echo "build_deps_image_version is unset" && exit 3; fi
 
 # We remove protocols not needed for tests in order to speed up the CI.
-./scripts/remove-old-protocols.sh
+old_protocol_store=$(mktemp -d)
+./scripts/remove-old-protocols.sh "$old_protocol_store"
 . ./scripts/version.sh
 
 # 1. Some basic, fast sanity checks
@@ -26,6 +27,13 @@ make
 #    build artifacts.
 # shellcheck disable=SC2086
 dune build ${COVERAGE_OPTIONS} src/bin_tps_evaluation
+
+# 4. Also build the tezt main entrypoint for integration tests. As
+#    above, we add $COVERAGE_OPTIONS. Tezt depends on the old
+#    protocols removed above, so we restore them first.
+./scripts/restore-old-protocols.sh "$old_protocol_store"
+# shellcheck disable=SC2086
+dune build ${COVERAGE_OPTIONS} tezt/tests/main.exe
 
 # 4. clean-up caches before uploading the cache
 opam clean
