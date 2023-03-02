@@ -35,7 +35,7 @@
 open P2p_test_utils
 
 include Internal_event.Legacy_logging.Make (struct
-  let name = "test.p2p.connection"
+  let name = "test.p2p.socket"
 end)
 
 let tzassert b pos =
@@ -44,8 +44,6 @@ let tzassert b pos =
   if b then return_unit else fail_with_exn (Assert_failure (p pos))
 
 let high_pow_target = Tezos_crypto.Crypto_box.make_pow_target 100.
-
-let port = ref None
 
 let sync ch =
   let open Lwt_result_syntax in
@@ -214,7 +212,7 @@ module Pow_check = struct
     let* conn = connect sched addr port id in
     tzassert (is_connection_closed conn) __POS__
 
-  let run _dir = run_nodes ?port:!port client server
+  let run _dir = run_nodes client server
 end
 
 (** Spawns a client and a server. After the client getting connected to
@@ -514,51 +512,13 @@ module Garbled_data = struct
   let run _dir = run_nodes client server
 end
 
-let log_config = ref None
-
-let spec =
-  Arg.
-    [
-      ( "--addr",
-        String (fun p -> addr := Ipaddr.V6.of_string_exn p),
-        " Listening addr" );
-      ( "-v",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:"test.p2p.connection -> info; p2p.connection -> info"
-                   ())),
-        " Log up to info msgs" );
-      ( "-vv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection -> debug; p2p.connection -> debug"
-                   ())),
-        " Log up to debug msgs" );
-      ( "-vvv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection -> debug; p2p.connection ->  debug; \
-                      p2p.io-scheduler ->  debug "
-                   ())),
-        " Log up to debug msgs even in io_scheduler" );
-      ( "--port",
-        Int (fun p -> port := Some p),
-        " Listening port of the first peer." );
-    ]
-
 let init_logs =
-  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
+  let lwt_log_sink =
+    Lwt_log_sink_unix.create_cfg
+      ~rules:"test.p2p.connection -> info; p2p.connection -> info"
+      ()
+  in
+  lazy (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
 
 let wrap n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
@@ -571,15 +531,12 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let main () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
+  P2p_test_utils.addr := Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" ;
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p"
        [
-         ( "p2p-connection.",
+         ( "p2p-socket.",
            [
              wrap "low-level" Low_level.run;
              wrap "pow" Pow_check.run;
