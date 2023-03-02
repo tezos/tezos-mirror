@@ -15,6 +15,6 @@ build_kernels:
   artifacts:
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:
-      - evm_mockup_kernel.wasm
+      - evm_kernel.wasm
     expire_in: 1 day
     when: on_success

@@ -82,7 +82,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
   (* Start a rollup node *)
   (* Prepare DAL/DAC: put reveal data in rollup node directory. *)
   let* installer_kernel =
-    prepare_installer_kernel ~base_installee:"./" ~dac_node "evm_mockup_kernel"
+    prepare_installer_kernel ~base_installee:"./" ~dac_node "evm_kernel"
   in
   let boot_sector = hex_encode installer_kernel in
   let* sc_rollup_address =
