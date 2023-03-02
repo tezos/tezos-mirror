@@ -137,12 +137,12 @@ let test_different_branch () =
   Block.bake genesis >>=? fun blk ->
   Context.get_endorser (B blk) >>=? fun (endorser, _slots) ->
   Op.raw_endorsement ~delegate:endorser blk >>=? fun endorsement_a ->
-  Op.raw_endorsement ~pred_branch:Block_hash.zero ~delegate:endorser blk
+  Op.raw_endorsement ~branch:Block_hash.zero ~delegate:endorser blk
   >>=? fun endorsement_b ->
   let operation = double_endorsement (B blk) endorsement_a endorsement_b in
   Block.bake ~operation blk >>=? fun _blk ->
   Op.raw_preendorsement ~delegate:endorser blk >>=? fun preendorsement_a ->
-  Op.raw_preendorsement ~pred_branch:Block_hash.zero ~delegate:endorser blk
+  Op.raw_preendorsement ~branch:Block_hash.zero ~delegate:endorser blk
   >>=? fun preendorsement_b ->
   let operation =
     double_preendorsement (B blk) preendorsement_a preendorsement_b

@@ -26,25 +26,119 @@
 open Protocol
 open Alpha_context
 
-let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
-    ?round ~endorsed_block ~error ~is_preendorsement ~loc () =
-  (if is_preendorsement then
-   Op.preendorsement ?block_payload_hash ?level ?slot ?round endorsed_block
-  else Op.endorsement ?block_payload_hash ?level ?slot ?round endorsed_block)
-  >>=? fun operation ->
-  let assert_error res = Assert.proto_error ~loc res error in
-  match construction_mode with
-  | None ->
-      (* meaning Application mode *)
-      Block.bake ~operation endorsed_block >>= assert_error
-  | Some (pred, protocol_data) ->
-      (* meaning partial construction or full construction mode, depending on
-         [protocol_data] *)
-      Block.get_construction_vstate ~protocol_data pred
-      >>=? fun (validation_state, _application_state) ->
-      let oph = Operation.hash_packed operation in
-      validate_operation validation_state oph operation
-      >|= Environment.wrap_tzresult >>= assert_error
+type mode = Application | Construction | Mempool
+
+let show_mode = function
+  | Application -> "Application"
+  | Construction -> "Construction"
+  | Mempool -> "Mempool"
+
+type kind = Preendorsement | Endorsement
+
+(** Craft an endorsement or preendorsement, and bake a block
+    containing it (in application or construction modes) or inject it
+    into a mempool. When [error] is [None], check that it succeeds,
+    otherwise check that it fails as specified by [error].
+
+    By default, the (pre)endorsement is for the first slot and is
+    signed by the delegate that owns this slot. Moreover, the operation
+    points to the given [endorsed_block]: in other words, it has that
+    block's level, round, payload hash, and its branch is the
+    predecessor of that block. Optional arguments allow to override
+    these default parameters.
+
+    The [predecessor] is used as the predecessor of the baked block or
+    the head of the mempool. When it is not provided, we use the
+    [endorsed_block] for this. *)
+let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
+    ?branch ~endorsed_block ?(predecessor = endorsed_block) ?error ~loc kind
+    mode =
+  let open Lwt_result_syntax in
+  let* operation =
+    match kind with
+    | Preendorsement ->
+        Op.preendorsement
+          ?delegate
+          ?slot
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          endorsed_block
+    | Endorsement ->
+        Op.endorsement
+          ?delegate
+          ?slot
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          endorsed_block
+  in
+  let check_error res =
+    match error with
+    | Some error -> Assert.proto_error ~loc res error
+    | None ->
+        let*? _ = res in
+        return_unit
+  in
+  match mode with
+  | Application ->
+      Block.bake ~baking_mode:Application ~operation predecessor >>= check_error
+  | Construction ->
+      Block.bake ~baking_mode:Baking ~operation predecessor >>= check_error
+  | Mempool ->
+      let*! res =
+        let* inc =
+          Incremental.begin_construction ~mempool_mode:true predecessor
+        in
+        let* inc = Incremental.add_operation inc operation in
+        (* Finalization doesn't do much in mempool mode, but some RPCs
+           still call it, so we check that it doesn't fail unexpectedly. *)
+        Incremental.finalize_block inc
+      in
+      check_error res
+
+let test_consensus_operation_all_modes_different_outcomes ?delegate ?slot ?level
+    ?round ?block_payload_hash ?branch ~endorsed_block ?predecessor ~loc
+    ?application_error ?construction_error ?mempool_error kind =
+  List.iter_es
+    (fun (mode, error) ->
+      test_consensus_operation
+        ?delegate
+        ?slot
+        ?level
+        ?round
+        ?block_payload_hash
+        ?branch
+        ~endorsed_block
+        ?predecessor
+        ?error
+        ~loc:(Format.sprintf "%s (%s mode)" loc (show_mode mode))
+        kind
+        mode)
+    [
+      (Application, application_error);
+      (Construction, construction_error);
+      (Mempool, mempool_error);
+    ]
+
+let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
+    ?block_payload_hash ?branch ~endorsed_block ?predecessor ?error ~loc kind =
+  test_consensus_operation_all_modes_different_outcomes
+    ?delegate
+    ?slot
+    ?level
+    ?round
+    ?block_payload_hash
+    ?branch
+    ~endorsed_block
+    ?predecessor
+    ~loc
+    ?application_error:error
+    ?construction_error:error
+    ?mempool_error:error
+    kind
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in

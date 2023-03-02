@@ -51,7 +51,6 @@ end = struct
   let aux_simple_preendorsement_inclusion ?(payload_round = Some Round.zero)
       ?(locked_round = Some Round.zero) ?(block_round = 1)
       ?(preend_round = Round.zero)
-      ?(preend_branch = fun _predpred pred _curr -> pred)
       ?(preendorsed_block = fun _predpred _pred curr -> curr)
       ?(mk_ops = fun op -> [op])
       ?(get_delegate_and_slot =
@@ -61,17 +60,9 @@ end = struct
     bake genesis >>=? fun b1 ->
     Op.endorsement b1 >>=? fun endo ->
     bake b1 ~operations:[endo] >>=? fun b2 ->
-    let pred_branch =
-      Some (Context.branch (Context.B (preend_branch genesis b1 b2)))
-    in
     let endorsed_block = preendorsed_block genesis b1 b2 in
     get_delegate_and_slot genesis b1 b2 >>=? fun (delegate, slot) ->
-    Op.preendorsement
-      ?delegate
-      ?slot
-      ?pred_branch
-      ~round:preend_round
-      endorsed_block
+    Op.preendorsement ?delegate ?slot ~round:preend_round endorsed_block
     >>=? fun p ->
     let operations = endo :: (mk_ops @@ p) in
     bake

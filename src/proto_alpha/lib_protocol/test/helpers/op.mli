@@ -56,17 +56,18 @@ val sign :
     Optional parameters allow to specify the endorsed values: [level],
     [round] and/or [block_payload_hash].
 
-    They also allow to specify the endorser, [delegate], and/or the
-    [slot].
+    They also allow to specify the endorser ([delegate]), and/or the
+    [slot]. These default to the first slot and its delegate.
 
-    Finally, the predecessor branch, [pred_branch] can be specified.*)
+    Finally, the operation [branch] can be specified. It defaults to the
+    predecessor of the endorsed block. *)
 val raw_endorsement :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  ?pred_branch:Block_hash.t ->
+  ?branch:Block_hash.t ->
   Block.t ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
@@ -80,7 +81,7 @@ val raw_preendorsement :
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  ?pred_branch:Block_hash.t ->
+  ?branch:Block_hash.t ->
   Block.t ->
   Kind.preendorsement Operation.t tzresult Lwt.t
 
@@ -92,7 +93,7 @@ val endorsement :
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  ?pred_branch:Block_hash.t ->
+  ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
 
@@ -104,7 +105,7 @@ val preendorsement :
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  ?pred_branch:Block_hash.t ->
+  ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
 

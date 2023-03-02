@@ -54,11 +54,11 @@ let mk_block_payload_hash payload_round (b : Block.t) =
     ~payload_round
     hashes
 
-let mk_consensus_content_signer_and_pred_branch ?delegate ?slot ?level ?round
-    ?block_payload_hash ?pred_branch endorsed_block =
+let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
+    ?block_payload_hash ?branch endorsed_block =
   let open Lwt_result_syntax in
-  let pred_branch =
-    match pred_branch with
+  let branch =
+    match branch with
     | None -> endorsed_block.Block.header.shell.predecessor
     | Some branch -> branch
   in
@@ -95,19 +95,19 @@ let mk_consensus_content_signer_and_pred_branch ?delegate ?slot ?level ?round
   in
   let consensus_content = {slot; level; round; block_payload_hash} in
   let* signer = Account.find delegate_pkh in
-  return (consensus_content, signer.sk, pred_branch)
+  return (consensus_content, signer.sk, branch)
 
-let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash
-    ?pred_branch endorsed_block =
+let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    endorsed_block =
   let open Lwt_result_syntax in
-  let* consensus_content, signer, pred_branch =
-    mk_consensus_content_signer_and_pred_branch
+  let* consensus_content, signer, branch =
+    mk_consensus_content_signer_and_branch
       ?delegate
       ?slot
       ?level
       ?round
       ?block_payload_hash
-      ?pred_branch
+      ?branch
       endorsed_block
   in
   let op = Single (Endorsement consensus_content) in
@@ -115,10 +115,10 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash
     (sign
        ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
        signer
-       pred_branch
+       branch
        op)
 
-let endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?pred_branch
+let endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     endorsed_block =
   let open Lwt_result_syntax in
   let* op =
@@ -128,22 +128,22 @@ let endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?pred_branch
       ?level
       ?round
       ?block_payload_hash
-      ?pred_branch
+      ?branch
       endorsed_block
   in
   return (Operation.pack op)
 
-let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
-    ?pred_branch endorsed_block =
+let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    endorsed_block =
   let open Lwt_result_syntax in
-  let* consensus_content, signer, pred_branch =
-    mk_consensus_content_signer_and_pred_branch
+  let* consensus_content, signer, branch =
+    mk_consensus_content_signer_and_branch
       ?delegate
       ?slot
       ?level
       ?round
       ?block_payload_hash
-      ?pred_branch
+      ?branch
       endorsed_block
   in
   let op = Single (Preendorsement consensus_content) in
@@ -151,11 +151,11 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
     (sign
        ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
        signer
-       pred_branch
+       branch
        op)
 
-let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
-    ?pred_branch endorsed_block =
+let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    endorsed_block =
   let open Lwt_result_syntax in
   let* op =
     raw_preendorsement
@@ -164,7 +164,7 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
       ?level
       ?round
       ?block_payload_hash
-      ?pred_branch
+      ?branch
       endorsed_block
   in
   return (Operation.pack op)
