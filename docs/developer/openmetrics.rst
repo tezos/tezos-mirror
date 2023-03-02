@@ -25,7 +25,7 @@ For more information check the openmetrics specification: https://openmetrics.io
 Usage
 -----
 
-In the following, we indicate a typical monitoring setup for core developers.
+In the following, we indicate a typical monitoring setup for Octez developers.
 For more details on setting up the node for monitoring see :doc:`../user/node-monitoring`.
 
 To instruct the Octez node to produce metrics, the user needs to pass the option

@@ -1,7 +1,7 @@
 Contributing
 ============
 
-Octez is an open source software developed and maintained by a wide constellation of teams and contributors within a larger Tezos ecosystem.
+Octez is an open source software developed and maintained by a wide constellation of teams and contributors (collectively called platform developers) within a larger Tezos ecosystem.
 Hence, it is open by nature and provides many interesting challenges for existing and new contributions.
 
 Here you can find information about:
