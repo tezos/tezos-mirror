@@ -372,7 +372,11 @@ let assert_conflict_error ~loc res =
 
 (** Test that endorsements conflict with:
     - an identical endorsement, and
-    - an endorsement on the same block with a different branch. *)
+    - an endorsement on the same block with a different branch.
+
+    In mempool mode, also test that they conflict with an endorsement
+    on the same level and round but with a different payload hash
+    (such an endorsement is invalid in application and construction modes). *)
 let test_conflict () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
@@ -395,11 +399,16 @@ let test_conflict () =
   in
   let* () = assert_mempool_conflict __LOC__ op in
   let* () = assert_mempool_conflict __LOC__ op_different_branch in
+  let* op_different_payload_hash =
+    Op.endorsement ~block_payload_hash:Block_payload_hash.zero b
+  in
+  let* () = assert_mempool_conflict __LOC__ op_different_payload_hash in
   return_unit
 
 (** In mempool mode, test that grandparent endorsements conflict with:
-    - an identical endorsement, and
-    - an endorsement on the same block with a different branch.
+    - an identical endorsement,
+    - an endorsement on the same block with a different branch, and
+    - an endorsement on the same block with a different payload hash.
 
     This test would make no sense in application or construction modes,
     since grandparent endorsements fail anyway (as can be observed in
@@ -412,6 +421,9 @@ let test_grandparent_conflict () =
   let* op_different_branch =
     Op.endorsement ~branch:Block_hash.zero grandparent
   in
+  let* op_different_payload_hash =
+    Op.endorsement ~block_payload_hash:Block_payload_hash.zero grandparent
+  in
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
   let* inc = Incremental.validate_operation inc op in
   let assert_conflict loc tested_op =
@@ -419,6 +431,31 @@ let test_grandparent_conflict () =
   in
   let* () = assert_conflict __LOC__ op in
   let* () = assert_conflict __LOC__ op_different_branch in
+  let* () = assert_conflict __LOC__ op_different_payload_hash in
+  return_unit
+
+(** In mempool mode, test that endorsements with the same future level
+    and same non-zero round conflict. This is not tested in application
+    and construction modes since such endorsements would be invalid. *)
+let test_future_level_conflict () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* future_block = Block.bake ~policy:(By_round 10) predecessor in
+  let* op = Op.endorsement future_block in
+  let* op_different_branch =
+    Op.endorsement ~branch:Block_hash.zero future_block
+  in
+  let* op_different_payload_hash =
+    Op.endorsement ~block_payload_hash:Block_payload_hash.zero future_block
+  in
+  let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
+  let* inc = Incremental.validate_operation inc op in
+  let assert_conflict loc tested_op =
+    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+  in
+  let* () = assert_conflict __LOC__ op in
+  let* () = assert_conflict __LOC__ op_different_branch in
+  let* () = assert_conflict __LOC__ op_different_payload_hash in
   return_unit
 
 (** In mempool mode, test that there is no conflict between an
@@ -539,6 +576,7 @@ let tests =
     (* Conflict tests (some negative, some positive) *)
     Tztest.tztest "Conflict" `Quick test_conflict;
     Tztest.tztest "Grandparent conflict" `Quick test_grandparent_conflict;
+    Tztest.tztest "Future level conflict" `Quick test_future_level_conflict;
     Tztest.tztest
       "No conflict with preendorsement (mempool)"
       `Quick
