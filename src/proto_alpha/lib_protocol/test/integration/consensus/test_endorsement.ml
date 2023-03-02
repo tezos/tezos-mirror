@@ -496,20 +496,41 @@ let test_no_conflict_with_preendorsement_block () =
   let* (_ : Block.t) = bake_both_ops Baking in
   return_unit
 
-(** In mempool mode, test that there is no conflict between a normal
-    endorsement (for the predecessor) and a grandparent endorsement,
-    both for the same slot (here the first slot). There is no similar
-    test in application and construction modes because grandparent
-    endorsements are not valid then. *)
-let test_no_conflict_with_grandparent () =
+(** In mempool mode, test that there is no conflict between
+    endorsements for the same slot (here the first slot) with various
+    allowed levels and rounds.
+
+    There are no similar tests in application and construction modes
+    because valid endorsements always have the same level and round. *)
+let test_no_conflict_various_levels_and_rounds () =
   let open Lwt_result_syntax in
-  let* _genesis, grandparent = init_genesis () in
+  let* genesis, grandparent = init_genesis () in
   let* predecessor = Block.bake grandparent in
-  let* op_normal = Op.endorsement predecessor in
-  let* op_grandparent = Op.endorsement grandparent in
+  let* future_block = Block.bake predecessor in
+  let* alt_grandparent = Block.bake ~policy:(By_round 1) genesis in
+  let* alt_predecessor = Block.bake ~policy:(By_round 1) grandparent in
+  let* alt_future = Block.bake ~policy:(By_round 10) alt_predecessor in
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
-  let* inc = Incremental.add_operation inc op_normal in
-  let* inc = Incremental.add_operation inc op_grandparent in
+  let add_endorsement inc endorsed_block =
+    let* (op : packed_operation) = Op.endorsement endorsed_block in
+    let (Operation_data protocol_data) = op.protocol_data in
+    let content =
+      match protocol_data.contents with
+      | Single (Endorsement content) -> content
+      | _ -> assert false
+    in
+    Format.eprintf
+      "level: %ld, round: %ld@."
+      (Raw_level.to_int32 content.level)
+      (Round.to_int32 content.round) ;
+    Incremental.add_operation inc op
+  in
+  let* inc = add_endorsement inc grandparent in
+  let* inc = add_endorsement inc predecessor in
+  let* inc = add_endorsement inc future_block in
+  let* inc = add_endorsement inc alt_grandparent in
+  let* inc = add_endorsement inc alt_predecessor in
+  let* inc = add_endorsement inc alt_future in
   let* _inc = Incremental.finalize_block inc in
   return_unit
 
@@ -586,9 +607,9 @@ let tests =
       `Quick
       test_no_conflict_with_preendorsement_block;
     Tztest.tztest
-      "No conflict with grandparent endorsement"
+      "No conflict with various levels and rounds"
       `Quick
-      test_no_conflict_with_grandparent;
+      test_no_conflict_various_levels_and_rounds;
     (* Consensus threshold tests (one positive and one negative) *)
     Tztest.tztest
       "sufficient endorsement threshold"
