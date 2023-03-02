@@ -129,11 +129,21 @@ let handle_coordinator_preimage_endpoint dac_plugin page_store hash_streamer
       ~page_store
       payload
   in
-  let* () = Data_streamer.publish hash_streamer root_hash in
+  let () = Data_streamer.publish hash_streamer root_hash in
   let*! () =
     Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
   in
   return root_hash
+
+(* Handler for subscribing to the streaming of root hashes via
+   GET monitor/root_hashes RPC call. *)
+let handle_monitor_root_hashes hash_streamer =
+  let open Lwt_syntax in
+  let stream, stopper = Data_streamer.handle_subscribe hash_streamer in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let next () = Lwt_stream.get stream in
+  let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
+  Tezos_rpc.Answer.return_stream {next; shutdown}
 
 let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
     hash_streamer directory =
@@ -169,20 +179,10 @@ let register_retrieve_preimage dac_plugin page_store =
     (fun hash () () -> handle_retrieve_preimage dac_plugin page_store hash)
 
 let register_monitor_root_hashes dac_plugin hash_streamer dir =
-  (* Handler for subscribing to the streaming of root hashes via
-     GET monitor/root_hashes RPC call. *)
-  let handle_monitor_root_hashes =
-    let open Lwt_syntax in
-    let stream, stopper = Data_streamer.handle_subscribe hash_streamer in
-    let shutdown () = Lwt_watcher.shutdown stopper in
-    let next () = Lwt_stream.get stream in
-    let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
-    Tezos_rpc.Answer.return_stream {next; shutdown}
-  in
   Tezos_rpc.Directory.gen_register
     dir
     (Monitor_services.S.root_hashes dac_plugin)
-    (fun () () () -> handle_monitor_root_hashes)
+    (fun () () () -> handle_monitor_root_hashes hash_streamer)
 
 let register_store_dac_member_signature ctx dac_plugin cctxt dac_public_keys_opt
     =
