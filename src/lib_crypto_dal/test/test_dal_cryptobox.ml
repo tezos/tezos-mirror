@@ -13,7 +13,9 @@ module Test = struct
 
   let max_slot_size_log2 = 11
 
-  let max_page_size_log2 = 15
+  let size_offset_log2 = 3
+
+  let max_page_size_log2 = max_slot_size_log2 - size_offset_log2
 
   let max_redundancy_factor_log2 = 4
 
@@ -55,8 +57,8 @@ module Test = struct
   let generate_parameters =
     let open QCheck2.Gen in
     let* redundancy_factor_log2 = int_range 1 max_redundancy_factor_log2 in
-    let* slot_size_log2 = int_range 0 max_slot_size_log2 in
-    let* page_size_log2 = int_range 0 max_page_size_log2 in
+    let* slot_size_log2 = int_range size_offset_log2 max_slot_size_log2 in
+    let* page_size_log2 = int_range 0 (slot_size_log2 - size_offset_log2) in
     let* number_of_shards_log2 = int_range 0 max_number_of_shards_log2 in
     let slot_size = 1 lsl slot_size_log2 in
     let* msg = bytes_size (int_range 0 slot_size) in
