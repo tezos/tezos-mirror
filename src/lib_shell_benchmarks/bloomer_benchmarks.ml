@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Benchmarks_shell
 
 let ns = Namespace.make Shell_namespace.ns "bloomer"
 
