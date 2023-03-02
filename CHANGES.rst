@@ -152,6 +152,9 @@ Node
 - Replaced some "precheck" occurrences with "validate" in event and
   error identifiers and messages. (MR :gl: `!7513`)
 
+- Fixed a issue that may trigger unknown keys errors while reading the
+  context on a read-only instance.
+
 Client
 ------
 
