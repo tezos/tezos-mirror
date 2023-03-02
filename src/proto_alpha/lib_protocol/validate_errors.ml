@@ -72,7 +72,6 @@ module Consensus = struct
   type consensus_operation_kind =
     | Preendorsement
     | Endorsement
-    | Grandparent_endorsement
     | Dal_attestation
 
   let consensus_operation_kind_encoding =
@@ -80,14 +79,12 @@ module Consensus = struct
       [
         ("Preendorsement", Preendorsement);
         ("Endorsement", Endorsement);
-        ("Grandparent_endorsement", Grandparent_endorsement);
         ("Dal_attestation", Dal_attestation);
       ]
 
   let consensus_operation_kind_pp fmt = function
     | Preendorsement -> Format.fprintf fmt "Preendorsement"
     | Endorsement -> Format.fprintf fmt "Endorsement"
-    | Grandparent_endorsement -> Format.fprintf fmt "Grandparent endorsement"
     | Dal_attestation -> Format.fprintf fmt "Dal_attestation"
 
   (** Errors for preendorsements and endorsements. *)

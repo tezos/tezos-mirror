@@ -571,7 +571,7 @@ module Consensus = struct
         match kind with
         | Preendorsement -> consensus_info.preendorsement_slot_map
         | Endorsement -> consensus_info.endorsement_slot_map
-        | Grandparent_endorsement | Dal_attestation -> assert false
+        | Dal_attestation -> assert false
       in
       Lwt.return (get_delegate_details slot_map kind slot)
     else
@@ -699,40 +699,6 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
 
-  (** Retrieve the expected branch and payload_hash for endorsements
-      from the context.
-
-      [Consensus.endorsement_branch] only returns [None] when the
-      predecessor is the protocol activation block, which is always
-      considered final and should not be endorsed. In that case, return
-      an error depending on the mode. *)
-  let expected_payload_hash vi (consensus_info : consensus_info) op_level =
-    match Consensus.endorsement_branch vi.ctxt with
-    | Some ((_branch : Block_hash.t), payload_hash) -> ok payload_hash
-    | None ->
-        error
-          (match vi.mode with
-          | Application _ | Partial_validation _ | Construction _ ->
-              (* The block should not contain any endorsements. The
-                 validation of the endorsement fails, and so will the
-                 validation of the whole block. *)
-              Unexpected_endorsement_in_block
-          | Mempool ->
-              (* The block that will be built on top on the mempool head
-                 should contain no endorsements, and this is not a
-                 grandparent endorsement (otherwise
-                 [check_normal_endorsement] would not have been called). It
-                 is probably an early endorsement for the next level, hence
-                 the error (and even if this is not the case, hopefully the
-                 levels recorded in the error will provide a hint to what
-                 happened). *)
-              Consensus_operation_for_future_level
-                {
-                  kind = Endorsement;
-                  expected = consensus_info.predecessor_level;
-                  provided = op_level;
-                })
-
   (** Endorsement checks for all modes that involve a block:
       Application, Partial_validation, and Construction.
 
@@ -741,7 +707,15 @@ module Consensus = struct
       {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
-      expected_payload_hash vi consensus_info level
+      match Consensus.endorsement_branch vi.ctxt with
+      | Some ((_branch : Block_hash.t), payload_hash) -> ok payload_hash
+      | None ->
+          (* [Consensus.endorsement_branch] only returns [None] when the
+             predecessor is the block that activates the first protocol
+             of the Tenderbake family; this block should not be
+             endorsed. This can only happen in tests and test
+             networks. *)
+          error Unexpected_endorsement_in_block
     in
     let kind = Endorsement in
     let*? () = check_level kind consensus_info.predecessor_level level in

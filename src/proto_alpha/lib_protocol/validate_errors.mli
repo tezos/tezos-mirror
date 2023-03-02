@@ -37,7 +37,6 @@ module Consensus : sig
   type consensus_operation_kind =
     | Preendorsement
     | Endorsement
-    | Grandparent_endorsement
     | Dal_attestation
 
   (** Errors for preendorsements and endorsements. *)
