@@ -139,7 +139,6 @@ let () =
         f ())
   in
   Alcotest_lwt.run
-    ~argv:[|""|]
     "tezos-p2p"
     [
       ( "p2p.peerset",
