@@ -63,6 +63,17 @@ let test_arbitrary_branch () =
     ~branch:Block_hash.zero
     Endorsement
 
+(** Correct endorsement with a level and a round that are both
+    different from {!test_simple_endorsement}. *)
+let test_non_zero_round () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* endorsed_block = Block.bake ~policy:(By_round 10) b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    Endorsement
+
 (** Fitness gap: this is a straightforward update from Emmy to Tenderbake,
     that is, check that the level is incremented in a child block. *)
 let test_fitness_gap () =
@@ -513,6 +524,7 @@ let tests =
     (* Positive tests *)
     Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
     Tztest.tztest "Arbitrary branch" `Quick test_arbitrary_branch;
+    Tztest.tztest "Non-zero round" `Quick test_non_zero_round;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Negative tests *)
     Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
