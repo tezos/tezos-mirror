@@ -23,21 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [balance ~account ~endpoint] asks the balance of [account] to the
-    JSON-RPC API server listening at [endpoint]. *)
-val balance : account:string -> endpoint:string -> int Lwt.t
+module Block : sig
+  (** Simplified Ethereum block representation. *)
+  type t = {
+    number : int32;
+    hash : string option;
+    parent : string;
+    nonce : string;
+    sha3Uncles : string;
+    logsBloom : string option;
+    transactionRoot : string;
+    stateRoot : string;
+    receiptRoot : string;
+    miner : string;
+    difficulty : int64;
+    totalDifficulty : int64;
+    extraData : string;
+    size : int32;
+    gasLimit : int32;
+    gasUsed : int32;
+    timestamp : int32;
+    transactions : string list;
+    uncles : string list;
+  }
 
-(** [transaction_send ~source_private_key ~to_public_key ~value
-    ~endpoint] crafts and signs a transaction transferring [value] (as
-    Wei) from [source_private_key] to [to_public_key], sends the raw
-    transaction to the JSON-RPI API server listening at [endpoint]. *)
-val transaction_send :
-  source_private_key:string ->
-  to_public_key:string ->
-  value:Z.t ->
-  endpoint:string ->
-  string Lwt.t
-
-(** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
-    hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
-val get_block : block_id:string -> endpoint:string -> Eth.Block.t Lwt.t
+  (** Simplified Ethereum block's encoding. *)
+  val encoding : t Data_encoding.t
+end

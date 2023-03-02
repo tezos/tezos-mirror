@@ -50,3 +50,13 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
       ]
   in
   return (String.trim answer)
+
+let get_block ~block_id ~endpoint =
+  let exception Could_not_parse_block of string in
+  let* answer = spawn_command ["block:get"; block_id; "--network"; endpoint] in
+  let block_as_json =
+    match Data_encoding.Json.from_string answer with
+    | Ok json -> json
+    | Error msg -> raise @@ Could_not_parse_block msg
+  in
+  return @@ Data_encoding.Json.destruct Eth.Block.encoding block_as_json
