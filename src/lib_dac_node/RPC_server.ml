@@ -75,7 +75,7 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
             ~page_store
             data
         in
-        let* () = Data_streamer.publish hash_streamer root_hash in
+        let () = Data_streamer.publish hash_streamer root_hash in
         let*! () =
           Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
         in
@@ -173,14 +173,11 @@ let register_monitor_root_hashes dac_plugin hash_streamer dir =
      GET monitor/root_hashes RPC call. *)
   let handle_monitor_root_hashes =
     let open Lwt_syntax in
-    let* handle = Data_streamer.handle_subscribe hash_streamer in
-    match handle with
-    | Ok (stream, stopper) ->
-        let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
-        let shutdown () = Lwt_watcher.shutdown stopper in
-        let next () = Lwt_stream.get stream in
-        Tezos_rpc.Answer.return_stream {next; shutdown}
-    | Error error -> Tezos_rpc.Answer.fail error
+    let stream, stopper = Data_streamer.handle_subscribe hash_streamer in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    let next () = Lwt_stream.get stream in
+    let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
+    Tezos_rpc.Answer.return_stream {next; shutdown}
   in
   Tezos_rpc.Directory.gen_register
     dir
