@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
   "tezos-base"
-  "irmin-pack" { >= "3.5.1" & < "3.6.0" }
-  "irmin" { >= "3.5.1" & < "3.6.0" }
+  "irmin-pack" { >= "3.5.2" & < "3.6.0" }
+  "irmin" { >= "3.5.2" & < "3.6.0" }
   "aches-lwt" { >= "1.0.0" }
   "tezos-stdlib-unix"
   "tezos-context"
