@@ -226,8 +226,9 @@ Platform developers are also provided reference materials for internal APIs of O
    :caption: Tezos developer doc
    :hidden:
 
-   developer/michelson_anti_patterns
    developer/rpc
+   developer/michelson_anti_patterns
+   developer/openmetrics
    api/errors
    api/openapi
 
@@ -244,7 +245,6 @@ Platform developers are also provided reference materials for internal APIs of O
    developer/tools
    developer/encodings
    developer/merkle-proof-encoding-formats
-   developer/openmetrics
    api/api-inline
 
 .. toctree::
