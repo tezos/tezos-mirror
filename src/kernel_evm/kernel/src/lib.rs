@@ -9,20 +9,17 @@ use host::runtime::Runtime;
 use debug::debug_msg;
 use kernel::kernel_entry;
 
-use crate::account::Account;
 use crate::blueprint::{fetch, Queue};
 use crate::error::Error;
 use crate::storage::store_account;
-use crate::wei::{from_eth, Wei};
+use tezos_ethereum::account::Account;
+use tezos_ethereum::wei::{from_eth, Wei};
 
-mod account;
 mod block;
 mod blueprint;
 mod error;
-mod eth_gen;
 mod inbox;
 mod storage;
-mod wei;
 
 pub fn stage_one<Host: Runtime + RawRollupCore>(host: &mut Host) -> Queue {
     let queue = fetch(host);

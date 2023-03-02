@@ -9,7 +9,7 @@ use host::input::Message;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
-use crate::eth_gen::RawTransaction;
+use tezos_ethereum::eth_gen::RawTransaction;
 
 pub struct Transaction {
     pub level: i32,

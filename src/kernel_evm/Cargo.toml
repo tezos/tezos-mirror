@@ -1,20 +1,10 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
-[package]
-name = 'evm_kernel'
-version = '0.1.0'
-edition = '2021'
+[workspace]
 
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-kernel = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
-host = { git = "https://gitlab.com/tezos/kernel", branch = "main"  }
-debug = { git = "https://gitlab.com/tezos/kernel", branch = "main" }
-mock_runtime = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
-
-primitive-types = { version = "0.11.1", default-features = false }
+members = [
+  "ethereum",
+  "kernel"
+]
