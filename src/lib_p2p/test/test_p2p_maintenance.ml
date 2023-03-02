@@ -499,99 +499,45 @@ module Triggers = struct
   end
 end
 
-let points = ref []
+let gen_points ?(clients = 42) addr = Node.gen_points clients addr
 
-let gen_points () =
-  let clients = 42 in
-  (*let addr = Ipaddr.V6.localhost in*)
-  let addr = Ipaddr.v6_of_v4 @@ Ipaddr.V4.make 127 0 0 3 in
-  let port = 29152 + Random.int 16384 in
-  let ports = port -- (port + clients - 1) in
-  points :=
-    List.map
-      (fun port ->
-        (* to each node, we add one topic to its state. *)
-        (addr, port))
-      ports
-
-let wrap n f =
+let wrap addr n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let rec aux n f =
-        let* r = f () in
+        let* r = f (gen_points addr) in
         match r with
         | Ok () -> Lwt.return_unit
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
           ->
-            gen_points () ;
-            (*warn "Conflict on ports, retry the test." ;*)
             aux n f
         | Error error ->
             Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
       in
       aux n f)
 
-let log_config = ref None
-
-let spec =
-  Arg.
-    [
-      ( "-v",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.maintenance -> debug; p2p.maintenance -> debug"
-                   ())),
-        " Log up to info msgs" );
-      ( "-vv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.maintenance -> debug; p2p.maintenance -> debug; \
-                      p2p.connect_handler -> debug; test.p2p.node -> debug"
-                   ())),
-        " Log up to debug msgs" );
-      ( "-vvv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.maintenance -> debug; p2p.maintenance -> debug; \
-                      p2p.socket -> debug; p2p.io_scheduler -> debug;p2p.fd -> \
-                      debug;p2p.connect_handler -> debug; test.p2p.node -> \
-                      debug"
-                   ())),
-        " Log up to debug msgs, socket included" );
-    ]
-
 let main () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
-  let () =
-    Lwt_main.run
-      (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
+  let lwt_log_sink =
+    Lwt_log_sink_unix.create_cfg
+      ~rules:
+        "test.p2p.maintenance -> debug; p2p.maintenance -> debug; \
+         p2p.connect_handler -> debug; test.p2p.node -> debug"
+      ()
   in
-  gen_points () ;
+  let () =
+    Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
+  in
+  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p"
        [
          ( "p2p-maintenance",
            [
-             wrap "triggers.too-few-connections" (fun _ ->
-                 Triggers.Too_few_connections.run !points);
-             wrap "triggers.too-many-connections" (fun _ ->
-                 Triggers.Too_many_connections.run !points);
+             wrap addr "triggers.too-few-connections" (fun points ->
+                 Triggers.Too_few_connections.run points);
+             wrap addr "triggers.too-many-connections" (fun points ->
+                 Triggers.Too_many_connections.run points);
            ] );
        ]
 
