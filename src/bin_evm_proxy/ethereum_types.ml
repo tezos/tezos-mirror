@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Append the [0x] prefix to a string. *)
+let append_0x s = "0x" ^ s
+
 (** Strip the [0x] prefix of a string. *)
 let strip_0x s =
   let n = String.length s in
@@ -106,13 +109,24 @@ let block_hash_of_string s = Block_hash s
 let block_hash_encoding =
   Data_encoding.(conv (fun (Block_hash h) -> h) (fun h -> Block_hash h) string)
 
-(** Ethereum any hash *)
+(** Ethereum any hash. *)
 type hash = Hash of string [@@ocaml.unboxed]
 
-let hash_of_string h = Hash h
+(** [hash_of_string s] takes a string [s] representing a hash in
+    hexadecimal format, e.g. [0xFFFFFFF]. Strips the prefix and keeps the
+    hash value, e.g. [FFFFFFF]. *)
+let hash_of_string s =
+  if s = "" then
+    (* Empty hash, tools can choose to send [""] instead of
+       omitting the field, e.g. ["data" : ""]. *)
+    Hash ""
+  else Hash (strip_0x s)
 
-let hash_encoding =
-  Data_encoding.(conv (fun (Hash h) -> h) (fun h -> Hash h) string)
+(** [hash_to_string h] constructs a valid hash encoded in hexadecimal format,
+    e.g. [0xFFFFFFF]. *)
+let hash_to_string (Hash h) = append_0x h
+
+let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 (** Ethereum block hash representation from RPCs. *)
 type block = {

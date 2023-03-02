@@ -85,8 +85,7 @@ module Mock = struct
   (* Transaction's hash must be an alphanumeric 66 utf8 byte
      hex (chars: a-fA-F) string *)
   let transaction_hash =
-    hash_f
-    @@ "0xf837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
+    hash_f @@ "f837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
 
   let block_hash =
     "0xd28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
@@ -128,7 +127,7 @@ module Mock = struct
       gasUsed = gas_price;
       logs = [];
       logsBloom = hash_f @@ String.make 256 'a';
-      type_ = hash_f "0x00";
+      type_ = hash_f "00";
       status = qty_f Z.one;
       root = hash_f @@ String.make 32 'a';
     }
