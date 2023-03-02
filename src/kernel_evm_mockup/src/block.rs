@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Queue;
+use crate::error::Error;
 use crate::eth_gen::{L2Level, OwnedHash, Quantity, RawTransactions};
 use crate::inbox;
 use crate::storage;
@@ -71,6 +72,11 @@ impl L2Block {
     }
 }
 
+fn validate(block: L2Block) -> Result<L2Block, Error> {
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/4749
+    Ok(block)
+}
+
 pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
     for proposal in queue.proposals.iter() {
         let current_level = storage::read_current_block_number(host);
@@ -83,9 +89,11 @@ pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
             .iter()
             .map(inbox::Transaction::to_raw_transaction)
             .collect();
-        let next_block = L2Block::new(next_level, raw_transactions);
-        storage::store_current_block(host, next_block).unwrap_or_else(|_| {
-            panic!("Error while storing the current block: stopping the daemon.")
-        })
+        let candidate_block = L2Block::new(next_level, raw_transactions);
+        if let Ok(valid_block) = validate(candidate_block) {
+            storage::store_current_block(host, valid_block).unwrap_or_else(|_| {
+                panic!("Error while storing the current block: stopping the daemon.")
+            })
+        }
     }
 }
