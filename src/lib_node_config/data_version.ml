@@ -228,7 +228,8 @@ let () =
     ~pp:(fun ppf path ->
       Format.fprintf
         ppf
-        "Tried to read version file at '%s', but the file could not be parsed."
+        "Tried to read version file at '%s', but the file could not be found \
+         or parsed."
         path)
     (function Could_not_read_data_dir_version path -> Some path | _ -> None)
     (fun path -> Could_not_read_data_dir_version path) ;
@@ -373,13 +374,11 @@ let read_version_file version_file =
   try return (Data_encoding.Json.destruct Version.encoding json)
   with _ -> tzfail (Could_not_read_data_dir_version version_file)
 
-let check_data_dir_version files data_dir =
+let check_data_dir_version data_dir =
   let open Lwt_result_syntax in
   let version_file = version_file data_dir in
   let*! file_exists = Lwt_unix.file_exists version_file in
-  if not file_exists then
-    let msg = Some (clean_directory files) in
-    tzfail (Invalid_data_dir {data_dir; msg})
+  if not file_exists then tzfail (Could_not_read_data_dir_version version_file)
   else
     let* version = read_version_file version_file in
     if Version.(equal version current_version) then return_none
@@ -421,7 +420,7 @@ let ensure_data_dir ~mode data_dir =
         | files, Is_bare ->
             let msg = Some (clean_directory files) in
             tzfail (Invalid_data_dir {data_dir; msg})
-        | files, Is_compatible -> check_data_dir_version files data_dir
+        | _, Is_compatible -> check_data_dir_version data_dir
         | _files, Exists -> return_none
       else
         let*! () = Lwt_utils_unix.create_dir ~perm:0o700 data_dir in
