@@ -126,8 +126,10 @@ rm -rf "$OUTPUT_CSV_DIR"
 mkdir -p "$OUTPUT_CSV_DIR"
 
 ALERT_FILE="$OCTEZ_DIR/alerts"
+SELECTION_FILE="$OCTEZ_DIR/selected.csv"
 
 rm -f "$ALERT_FILE"
+rm -f "$SELECTION_FILE"
 
 # All the directories before FIRST_DIR will be ignored.
 export FIRST_DIR
@@ -231,6 +233,11 @@ then
     slack_send_file "$ALERT_FILE" "Some regressions were found :sadparrot:"
 else
     slack "No regression :tada:"
+fi
+
+if [ -s "$SELECTION_FILE" ]
+then
+    slack_send_file "$SELECTION_FILE" "CSV comparing all runs on parameters with an alert"
 fi
 
 slack_send_file "$OUTPUT_CSV_DIR/all.csv" "CSV comparing all runs"
