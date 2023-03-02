@@ -239,7 +239,6 @@ val begin_partial_construction :
   Chain_id.t ->
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
-  grandparent_round:Round.t ->
   validation_state
 
 (** Similar to [begin_partial_construction] but do not require

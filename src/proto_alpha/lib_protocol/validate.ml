@@ -312,14 +312,6 @@ type construction_info = {
   header_contents : Block_header.contents;
 }
 
-(** Information needed to validate grandparent endorsements in
-    [Mempool] mode. *)
-type grandparent = {
-  round : Round.t;
-  hash : Block_hash.t;
-  payload_hash : Block_payload_hash.t;
-}
-
 (** Circumstances in which operations are validated, and corresponding
     specific information.
 
@@ -337,13 +329,10 @@ type mode =
           consensus operations are validated in this mode. *)
   | Construction of construction_info
       (** Used for the construction of a new block. *)
-  | Mempool of grandparent option
+  | Mempool
       (** Used by the mempool ({!module:Mempool_validation}) and by the
           [Partial_construction] mode in {!module:Main}, which may itself be
-          used by RPCs or by another mempool implementation.
-
-          If the option is [None], it means that there cannot be any
-          grandparent endorsements. *)
+          used by RPCs or by another mempool implementation. *)
 
 (** {2 Definition and initialization of [info] and [state]} *)
 
@@ -627,7 +616,7 @@ module Consensus = struct
             consensus_info
             construction_info
             consensus_content
-      | Mempool _ ->
+      | Mempool ->
           check_mempool_consensus
             vi
             consensus_info
@@ -681,7 +670,7 @@ module Consensus = struct
       (consensus_content : consensus_content) voting_power =
     let locked_round_evidence =
       match mode with
-      | Mempool _ -> (* The block_state is not relevant in this mode. *) None
+      | Mempool -> (* The block_state is not relevant in this mode. *) None
       | Application _ | Partial_validation _ | Construction _ -> (
           match block_state.locked_round_evidence with
           | None -> Some (consensus_content.round, voting_power)
@@ -728,7 +717,7 @@ module Consensus = struct
                  validation of the endorsement fails, and so will the
                  validation of the whole block. *)
               Unexpected_endorsement_in_block
-          | Mempool _ ->
+          | Mempool ->
               (* The block that will be built on top on the mempool head
                  should contain no endorsements, and this is not a
                  grandparent endorsement (otherwise
@@ -781,7 +770,7 @@ module Consensus = struct
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ ->
           check_block_endorsement vi consensus_info consensus_content
-      | Mempool _ ->
+      | Mempool ->
           check_mempool_consensus
             vi
             consensus_info
@@ -833,7 +822,7 @@ module Consensus = struct
 
   let may_update_endorsement_power vi block_state voting_power =
     match vi.mode with
-    | Mempool _ -> (* The block_state is not relevant. *) block_state
+    | Mempool -> (* The block_state is not relevant. *) block_state
     | Application _ | Partial_validation _ | Construction _ ->
         {
           block_state with
@@ -944,7 +933,7 @@ module Consensus = struct
             (* Other preendorsements have already been validated: we check
                that the current operation has the same round as them. *)
             check_round Preendorsement expected consensus_content.round)
-    | Application _ | Partial_validation _ | Mempool _ -> return_unit
+    | Application _ | Partial_validation _ | Mempool -> return_unit
 
   let validate_preendorsement ~check_signature info operation_state block_state
       oph (operation : Kind.preendorsement operation) =
@@ -2149,7 +2138,7 @@ module Manager = struct
   let may_trace_gas_limit_too_high info =
     match info.mode with
     | Application _ | Partial_validation _ | Construction _ -> fun x -> x
-    | Mempool _ ->
+    | Mempool ->
         (* [Gas.check_limit] will only
            raise a "temporary" error, however when
            {!validate_operation} is called on a batch in isolation
@@ -2366,7 +2355,7 @@ module Manager = struct
           Gas.Arith.(sub block_state.remaining_block_gas operation_gas_used)
         in
         {block_state with remaining_block_gas}
-    | Mempool _ -> block_state
+    | Mempool -> block_state
 
   let remove_manager_operation (type kind) vs
       (operation : kind Kind.manager operation) =
@@ -2539,17 +2528,11 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
   return validation_state
 
 let begin_partial_construction ctxt chain_id ~predecessor_level
-    ~predecessor_round ~grandparent_round =
-  let grandparent =
-    Option.map
-      (fun (hash, payload_hash) ->
-        {round = grandparent_round; hash; payload_hash})
-      (Alpha_context.Consensus.grand_parent_branch ctxt)
-  in
+    ~predecessor_round =
   let validation_state =
     init_validation_state
       ctxt
-      (Mempool grandparent)
+      Mempool
       chain_id
       ~predecessor_level_and_round:
         (Some (predecessor_level.Level.level, predecessor_round))
@@ -2557,11 +2540,7 @@ let begin_partial_construction ctxt chain_id ~predecessor_level
   validation_state
 
 let begin_no_predecessor_info ctxt chain_id =
-  init_validation_state
-    ctxt
-    (Mempool None)
-    chain_id
-    ~predecessor_level_and_round:None
+  init_validation_state ctxt Mempool chain_id ~predecessor_level_and_round:None
 
 let check_operation ?(check_signature = true) info (type kind)
     (operation : kind operation) : unit tzresult Lwt.t =
@@ -2770,7 +2749,7 @@ let remove_operation operation_conflict_state (type kind)
 let check_validation_pass_consistency vi vs validation_pass =
   let open Lwt_result_syntax in
   match vi.mode with
-  | Mempool _ | Construction _ -> return vs
+  | Mempool | Construction _ -> return vs
   | Application _ | Partial_validation _ -> (
       match (vs.last_op_validation_pass, validation_pass) with
       | None, validation_pass ->
@@ -2818,7 +2797,7 @@ let validate_operation ?(check_signature = true)
       (* Do not validate non-consensus operations in
          [Partial_validation] mode. *)
       return {info; operation_state; block_state}
-  | (Application _ | Partial_validation _ | Construction _ | Mempool _), _ -> (
+  | (Application _ | Partial_validation _ | Construction _ | Mempool), _ -> (
       match operation.protocol_data.contents with
       | Single (Preendorsement _) ->
           Consensus.validate_preendorsement
@@ -3072,6 +3051,6 @@ let finalize_block {info; block_state; _} =
           ~fitness_locked_round:(Option.map fst locked_round_evidence)
       in
       return_unit
-  | Mempool _ ->
+  | Mempool ->
       (* There is no block to finalize in mempool mode. *)
       return_unit

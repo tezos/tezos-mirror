@@ -230,16 +230,12 @@ let begin_validation ctxt chain_id mode ~predecessor =
         block_header_data.contents
   | Partial_construction _ ->
       let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
-      let*? grandparent_round =
-        Fitness.predecessor_round_from_raw predecessor_fitness
-      in
       return
         (Validate.begin_partial_construction
            ctxt
            chain_id
            ~predecessor_level
-           ~predecessor_round
-           ~grandparent_round)
+           ~predecessor_round)
 
 let validate_operation = Validate.validate_operation
 
@@ -411,15 +407,13 @@ module Mempool = struct
         ~predecessor:head
     in
     let*? predecessor_round = Fitness.round_from_raw head.fitness in
-    let*? grandparent_round = Fitness.predecessor_round_from_raw head.fitness in
     return
       (init
          ctxt
          chain_id
          ~predecessor_level:head_level
          ~predecessor_round
-         ~predecessor_hash:head_hash
-         ~grandparent_round)
+         ~predecessor_hash:head_hash)
 end
 
 (* Vanity nonce: TBD *)
