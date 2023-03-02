@@ -1,10 +1,13 @@
 module Test = struct
+  (* [randrange n] returns a random integer in the range [0, n - 1]. *)
+  let randrange n = QCheck2.Gen.(generate1 (int_bound (n - 1)))
+
   (* Samples k random integers within the range [0, bound[. *)
   let random_indices bound k =
     let indices = Array.init k (fun _ -> -1) in
     for i = 0 to k - 1 do
       let rec loop () =
-        let n = Random.int bound in
+        let n = randrange bound in
         if Array.mem n indices then loop () else n
       in
       indices.(i) <- loop ()
@@ -301,7 +304,7 @@ module Test = struct
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
-        let page_index = Random.int number_of_pages in
+        let page_index = randrange number_of_pages in
         let* page_proof = Cryptobox.prove_page t polynomial page_index in
         let page =
           Bytes.sub params.slot (page_index * params.page_size) params.page_size
@@ -326,7 +329,7 @@ module Test = struct
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
-        let page_index = Random.int number_of_pages in
+        let page_index = randrange number_of_pages in
         let* proof = Cryptobox.prove_page t polynomial page_index in
         let altered_proof =
           Cryptobox.Internal_for_tests.alter_page_proof proof
@@ -355,7 +358,7 @@ module Test = struct
         let* commitment = Cryptobox.commit t polynomial in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
         let shard_proofs = Cryptobox.prove_shards t polynomial in
-        let shard_index = Random.int params.number_of_shards in
+        let shard_index = randrange params.number_of_shards in
         match
           Seq.find
             (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
