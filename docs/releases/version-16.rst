@@ -1,4 +1,4 @@
-Version 16.0~rc2
+Version 16.0~rc3
 ================
 
 Version 16.0 contains a new version (V8) of the protocol environment,
@@ -29,18 +29,28 @@ The second release candidate (16.0~rc2) fixes an issue where old contexts (v13 o
 The docker images no longer cause a "permission denied" error on ``entrypoint.sh``, hence can now be used properly.
 This new release candidate also includes an improvement of the ``octez-smart-rollup-node`` that drastically reduces disk consumption.
 
+The third release candidate (16.0~rc3) contains a new version of the Mumbai protocol, ``PtMumbai2`` that replaces the current protocol proposal ``PtMumbaii``.
+In addition, this release candidate fixes the issues encountered building the Octez suite on MacOS systems, and an issue that caused the launch of binaries to takes several seconds (because of ``zcash`` initialization).
+This release candidate includes the following baker improvements:
+
+- More efficient block production thanks to a lighter operation validation mechanism. The previous validation mechanism can be restored by passing the ``--force-apply`` option when starting the baker binary.
+- The baker no longer verifies the signature of operations when baking a new block. It should be done by the (external) mempool.
+- Reduced delay of preendorsement injection.
+  The baker now preendorses block proposals as soons as the node considers the block as valid.
+
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v16.0-rc2
+  git checkout v16.0-rc3
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v16.0-rc2`` Docker images of Octez.
+If you are using Docker instead, use the ``v16.0-rc3`` Docker images of Octez.
 
 If you are installing Octez using Opam, note that the minimal required
 OCaml version is now 4.14.1. This means that you might need to create a
@@ -50,5 +60,6 @@ new switch with ``opam switch create 4.14.1`` before you run ``opam install tezo
 Changelog
 ---------
 
+- `Version 16.0~rc3 <../CHANGES.html#version-16-0-rc3>`_
 - `Version 16.0~rc2 <../CHANGES.html#version-16-0-rc2>`_
 - `Version 16.0~rc1 <../CHANGES.html#version-16-0-rc1>`_
