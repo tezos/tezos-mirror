@@ -41,76 +41,27 @@ type error += Read | Wrong_message_received | Wrong_message_count
 
 let () = Random.self_init ()
 
-let addr = ref Ipaddr.V6.localhost
+(* options that are hardcoded here *)
+let repeat = 5
 
-let port = ref None
+let nb_oph = 1000
 
-let clients = ref 10
-
-let repeat = ref 5
-
-let log_config = ref None
-
-let nb_oph = ref 1000
-
-let no_check = ref false
+let no_check = false
 
 let init_logs =
-  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
+  let lwt_log_sink =
+    Some
+      (Lwt_log_sink_unix.create_cfg
+         ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
+         ())
+  in
+  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink ())
 
 let points = ref []
 
-let gen_points () = points := Node.gen_points ?port:!port !clients !addr
-
-let spec =
-  Arg.
-    [
-      ( "--port",
-        Int (fun p -> port := Some p),
-        " Listening port of the first peer." );
-      ( "--addr",
-        String (fun p -> addr := Ipaddr.V6.of_string_exn p),
-        " Listening addr" );
-      ("--clients", Set_int clients, " Number of concurrent clients.");
-      ("--repeat", Set_int repeat, "Number of iterations of broadcasting.");
-      ("--oph", Set_int nb_oph, " Number of Operation hashes broadcasted.");
-      ( "--no-check",
-        Set no_check,
-        " Do not check message consistency (can be heavy on RAM)." );
-      ( "-v",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> info; p2p.connection-pool -> \
-                      info"
-                   ())),
-        " Log up to info msgs" );
-      ( "-vv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> debug; p2p.connection-pool \
-                      -> debug"
-                   ())),
-        " Log up to debug msgs" );
-      ( "-vvv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.broadcast -> debug;p2p.pool -> \
-                      debug;p2p.connection -> debug"
-                   ())),
-        " Log up to debug msgs, socket included" );
-    ]
+let gen_points addr =
+  let clients = 3 in
+  points := Node.gen_points clients addr
 
 (** Detaches [!client] nodes. Each of them will send a [BigPing] to each
     other node, then await for reading one from each other node.
@@ -121,12 +72,12 @@ module Simple = struct
       (fun _ ->
         List.map
           (fun _ -> Operation_hash.of_bytes_exn (Bytes.create 32))
-          (1 -- !nb_oph))
-      (if !no_check then 0 -- 1 else 0 -- !repeat)
+          (1 -- nb_oph))
+      (if no_check then 0 -- 1 else 0 -- repeat)
 
   let message_is_ok m1 m2 : (unit, error trace) result =
     let open Result_syntax in
-    if !no_check then return_unit
+    if no_check then return_unit
     else
       List.fold_left2_e
         ~when_different_lengths:(Error_monad.TzTrace.make Wrong_message_count)
@@ -293,9 +244,9 @@ module Simple = struct
               (n - 1)
               (span :: acc)
               (gspan :: gacc)
-              (if !no_check then next @ [ref_msg] else next)
+              (if no_check then next @ [ref_msg] else next)
     in
-    let* times, gtimes = loop !repeat [] [] msgs in
+    let* times, gtimes = loop repeat [] [] msgs in
     let print_stat times name =
       let ftimes = List.map Ptime.Span.to_float_s times in
       lwt_log_notice
@@ -330,9 +281,9 @@ module Simple = struct
             let* _msgs = read_all node.pool ref_msg in
             let*! () = lwt_log_info "Read message.@." in
             let* () = Node.sync node in
-            loop (n - 1) (if !no_check then next @ [ref_msg] else next)
+            loop (n - 1) (if no_check then next @ [ref_msg] else next)
     in
-    loop !repeat msgs
+    loop repeat msgs
 
   let run points =
     (* Messages are precomputed for every iteration and shared between
@@ -344,7 +295,8 @@ module Simple = struct
       points
 end
 
-let wrap n f =
+let wrap addr n f =
+  gen_points addr ;
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let* () = Lazy.force init_logs in
@@ -355,7 +307,7 @@ let wrap n f =
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
           ->
             warn "Conflict on ports, retry the test." ;
-            gen_points () ;
+            gen_points addr ;
             aux n f
         | Error error ->
             Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
@@ -363,15 +315,11 @@ let wrap n f =
       aux n f)
 
 let main () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
-  gen_points () ;
+  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p-broadcast"
-       [("p2p-broadcast", [wrap "simple" (fun _ -> Simple.run !points)])]
+       [("p2p-broadcast", [wrap addr "simple" (fun _ -> Simple.run !points)])]
 
 let () =
   Sys.catch_break true ;
