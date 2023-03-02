@@ -32,4 +32,4 @@ let encoding = "encoding"
 
 let cache = "cache"
 
-let common = ["proto"; Protocol.name]
+let common = Protocol.name

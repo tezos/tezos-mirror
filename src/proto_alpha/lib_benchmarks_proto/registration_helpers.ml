@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,6 +30,6 @@ let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark.S = struct
     include Bench
 
-    let tags = Protocol.name :: tags
+    let tags = Tags.common :: tags
   end in
   Registration.register (module B)
