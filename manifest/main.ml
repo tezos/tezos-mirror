@@ -4049,19 +4049,7 @@ end = struct
           ]
           |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
         in
-        let dune =
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1265
-             Once those tests are ported to Tezt we can remove those aliases
-             and just use Tezt's auto-balancing. But this requires making QCheck
-             work with Tezt first. *)
-          let make_alias (index, test) =
-            Dune.alias_rule
-              ~action:(Dune.run_exe test [])
-              (sf "runtest%d" index)
-          in
-          Dune.of_list (List.map make_alias list)
-        in
-        tests
+        tezt
           (List.map snd list)
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
           ~path:(path // "lib_protocol/test/pbt")
@@ -4080,7 +4068,7 @@ end = struct
               octez_merkle_proof_encoding;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
-              alcotest;
+              alcotezt;
               qcheck_alcotest;
               octez_client_base |> if_ N.(number <= 012);
               octez_benchmark;
@@ -4091,7 +4079,6 @@ end = struct
               octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
               parameters |> if_some |> if_ N.(number >= 016) |> open_;
             ]
-          ~dune
       in
       let _unit =
         test

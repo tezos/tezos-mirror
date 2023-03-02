@@ -113,13 +113,13 @@ let () =
   Alcotest.run
     "Merkle list"
     [
-      ( "scons_equiv",
+      ( Protocol.name ^ ": scons_equiv",
         qcheck_wrap
           [
             test_scons_scons_tr_equiv ~count:1000;
             test_scons_compute_equiv ~count:1000;
           ] );
-      ( "check_path",
+      ( Protocol.name ^ ": check_path",
         qcheck_wrap
           [test_check_path ~count:1000; test_check_path_wrong ~count:1000] );
     ]

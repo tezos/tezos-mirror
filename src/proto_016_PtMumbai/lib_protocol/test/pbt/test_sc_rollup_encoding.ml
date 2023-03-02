@@ -288,4 +288,7 @@ let tests =
     test_inbox_message;
   ]
 
-let () = Alcotest.run "SC rollup encoding" [("roundtrip", qcheck_wrap tests)]
+let () =
+  Alcotest.run
+    "SC rollup encoding"
+    [(Protocol.name ^ ": roundtrip", qcheck_wrap tests)]

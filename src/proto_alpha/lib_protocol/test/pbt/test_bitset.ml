@@ -96,7 +96,7 @@ let () =
   Alcotest.run
     "bits"
     [
-      ( "quantity",
+      ( Protocol.name ^ ": quantity",
         qcheck_wrap
           [
             QCheck2.Test.make

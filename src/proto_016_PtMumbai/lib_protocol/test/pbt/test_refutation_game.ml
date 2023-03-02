@@ -1823,4 +1823,4 @@ let tests =
 
 let tests = [tests; Dissection.tests]
 
-let () = Alcotest.run "Refutation_game" tests
+let () = Alcotest.run (Protocol.name ^ ": Refutation_game") tests

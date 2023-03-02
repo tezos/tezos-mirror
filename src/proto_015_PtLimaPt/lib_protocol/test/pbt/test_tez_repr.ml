@@ -133,4 +133,4 @@ let tests =
 let () =
   Alcotest.run
     "protocol > pbt > tez_repr"
-    [("Tez_repr", Qcheck2_helpers.qcheck_wrap tests)]
+    [(Protocol.name ^ ": Tez_repr", Qcheck2_helpers.qcheck_wrap tests)]

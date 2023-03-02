@@ -1,8 +1,38 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
+(library
+ (name src_proto_015_PtLimaPt_lib_protocol_test_pbt_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezos-micheline
+  tezos-client-015-PtLimaPt
+  tezos-protocol-015-PtLimaPt
+  tezos-context.merkle_proof_encoding
+  tezos-test-helpers
+  tezos-015-PtLimaPt-test-helpers
+  octez-alcotezt
+  qcheck-alcotest
+  tezos-benchmark
+  tezos-benchmark-015-PtLimaPt
+  tezos-benchmark-type-inference-015-PtLimaPt)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_micheline
+  -open Tezos_client_015_PtLimaPt
+  -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_test_helpers
+  -open Tezos_015_PtLimaPt_test_helpers
+  -open Octez_alcotezt
+  -open Tezos_benchmark_015_PtLimaPt
+  -open Tezos_benchmark_type_inference_015_PtLimaPt)
+ (modules
   liquidity_baking_pbt
   saturation_fuzzing
   test_merkle_list
@@ -16,128 +46,23 @@
   test_sc_rollup_encoding
   test_carbonated_map
   test_zk_rollup_encoding
-  test_compare_operations)
+  test_compare_operations))
+
+(executable
+ (name main)
  (libraries
-  tezos-base
-  tezos-micheline
-  tezos-client-015-PtLimaPt
-  tezos-protocol-015-PtLimaPt
-  tezos-context.merkle_proof_encoding
-  tezos-test-helpers
-  tezos-015-PtLimaPt-test-helpers
-  alcotest
-  qcheck-alcotest
-  tezos-benchmark
-  tezos-benchmark-015-PtLimaPt
-  tezos-benchmark-type-inference-015-PtLimaPt)
+  src_proto_015_PtLimaPt_lib_protocol_test_pbt_tezt_lib
+  tezt)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_base.TzPervasives
-  -open Tezos_micheline
-  -open Tezos_client_015_PtLimaPt
-  -open Tezos_protocol_015_PtLimaPt
-  -open Tezos_test_helpers
-  -open Tezos_015_PtLimaPt_test_helpers
-  -open Tezos_benchmark_015_PtLimaPt
-  -open Tezos_benchmark_type_inference_015_PtLimaPt))
+ (modules main))
 
 (rule
- (alias runtest)
+ (alias runtezt)
  (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./liquidity_baking_pbt.exe})))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./saturation_fuzzing.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_merkle_list.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_gas_properties.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_sampler.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_script_comparison.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_tez_repr.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_tx_rollup_l2_encoding.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_bitset.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_sc_rollup_tick_repr.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_sc_rollup_encoding.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_carbonated_map.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_zk_rollup_encoding.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-015-PtLimaPt-tests)
- (action (run %{dep:./test_compare_operations.exe})))
-
-(rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
-
-(rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
-
-(rule (alias runtest1) (action (run %{exe:test_merkle_list.exe})))
-
-(rule (alias runtest1) (action (run %{exe:test_gas_properties.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_sampler.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_script_comparison.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_tez_repr.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_tx_rollup_l2_encoding.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_bitset.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_sc_rollup_tick_repr.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_sc_rollup_encoding.exe})))
-
-(rule (alias runtest3) (action (run %{exe:test_carbonated_map.exe})))
-
-(rule (alias runtest3) (action (run %{exe:test_zk_rollup_encoding.exe})))
-
-(rule (alias runtest3) (action (run %{exe:test_compare_operations.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

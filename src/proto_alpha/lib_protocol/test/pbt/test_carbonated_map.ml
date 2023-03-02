@@ -547,4 +547,4 @@ let () =
   let rand = Random.State.make [|0x1337533D; 71287309; 397060904|] in
   Alcotest.run
     "protocol > pbt > carbonated map"
-    [("Carbonated map", tests ~rand)]
+    [(Protocol.name ^ ": Carbonated map", tests ~rand)]

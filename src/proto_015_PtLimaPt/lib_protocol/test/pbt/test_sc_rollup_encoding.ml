@@ -212,4 +212,7 @@ let test_conflict =
 let tests =
   [test_commitment; test_versioned_commitment; test_game; test_conflict]
 
-let () = Alcotest.run "SC rollup encoding" [("roundtrip", qcheck_wrap tests)]
+let () =
+  Alcotest.run
+    "SC rollup encoding"
+    [(Protocol.name ^ ": roundtrip", qcheck_wrap tests)]

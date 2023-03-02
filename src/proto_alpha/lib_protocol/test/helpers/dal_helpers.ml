@@ -38,7 +38,7 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"test_failure"
+    ~id:(Protocol.name ^ "_test_failure")
     ~title:"Test failure"
     ~description:"Test failure."
     ~pp:(fun ppf e -> Format.fprintf ppf "Test failure: %s" e)
