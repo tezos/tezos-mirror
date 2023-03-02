@@ -219,9 +219,28 @@ do
                 echo "Warning while comparing $b between $LAST_DIR and the $current version $CURRENT_DIR"
                 cat tmp2
             } >> "$ALERT_FILE"
+            # Save the parameters with alerts in a file. They are in the lines
+            # with a '%'.
+            grep "%" tmp2 | sed 's/\.//g' | cut -d ' ' -f 4  >> tmp_selection
         fi
         rm -f tmp tmp2
     done
+
+    # Output the lines of parameters with alerts to a dedicated file.
+    if [ -s tmp_selection ]
+    then
+        # Get the header.
+        head -n 1 "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
+        # Get the line of each parameter.
+        # A parameter can appear twice in the alerts, once when comparing with
+        # the reference, and another time when comparing with the previous run.
+        # That's why we're sorting and uniq-ing.
+        for p in $(sort tmp_selection | uniq)
+        do
+            grep "^$p," "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
+        done
+    fi
+    rm -f tmp_selection
 done
 
 cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
