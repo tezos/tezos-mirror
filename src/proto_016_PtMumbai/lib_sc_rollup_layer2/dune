@@ -2,16 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_smart_rollup_016_PtMumbai)
- (public_name tezos-smart-rollup-016-PtMumbai)
+ (name tezos_smart_rollup_layer2_016_PtMumbai)
+ (public_name tezos-smart-rollup-layer2-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-016-PtMumbai)
+  tezos-protocol-016-PtMumbai
+  tezos-injector-016-PtMumbai)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_016_PtMumbai))
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_injector_016_PtMumbai))

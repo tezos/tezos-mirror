@@ -155,6 +155,12 @@ Node
 - Fixed a issue that may trigger unknown keys errors while reading the
   context on a read-only instance.
 
+- Added an RPC ``POST
+  /chains/main/blocks/head/context/smart_rollups/all/origination_proof``
+  with input ``{"kind":"<smart rollup kind>", "kernel"="<smart rollup
+  kernel>"}`` to produce the origination proof needed to originate a
+  smart rollup.
+
 Client
 ------
 

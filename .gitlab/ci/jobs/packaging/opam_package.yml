@@ -621,7 +621,7 @@ opam:tezos-dal-node-lib:
 opam:tezos-dal-node-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-dal-node-services
 
@@ -917,7 +917,7 @@ opam:tezos-p2p:
 opam:tezos-p2p-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-p2p-services
 
@@ -1043,7 +1043,7 @@ opam:tezos-protocol-014-PtKathma:
 opam:tezos-protocol-015-PtLimaPt:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-015-PtLimaPt
 
@@ -1052,7 +1052,7 @@ opam:tezos-protocol-015-PtLimaPt:
 opam:tezos-protocol-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-016-PtMumbai
 
@@ -1403,11 +1403,25 @@ opam:tezos-signer-services:
 opam:tezos-smart-rollup-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-smart-rollup-016-PtMumbai
 
-# Ignoring unreleased package tezos-smart-rollup-alpha.
+opam:tezos-smart-rollup-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_5
+  variables:
+    package: tezos-smart-rollup-alpha
+
+opam:tezos-smart-rollup-layer2-016-PtMumbai:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: tezos-smart-rollup-layer2-016-PtMumbai
+
+# Ignoring unreleased package tezos-smart-rollup-layer2-alpha.
 
 opam:tezos-stdlib:
   extends:

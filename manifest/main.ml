@@ -3694,7 +3694,7 @@ end = struct
     type t = {main : target; embedded : target}
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
-        ?benchmark_type_inference ?sc_rollup ~main ~name () =
+        ?benchmark_type_inference ?octez_sc_rollup ~main ~name () =
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
@@ -3894,7 +3894,7 @@ end = struct
               octez_benchmark;
               benchmark |> if_some |> open_;
               benchmark_type_inference |> if_some |> open_;
-              sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
+              octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
               parameters |> if_some |> if_ N.(number >= 016) |> open_;
@@ -4414,6 +4414,18 @@ module Protocol = Protocol
             ])
         ~bisect_ppx:false
     in
+    let octez_sc_rollup =
+      only_if N.(number >= 016) @@ fun () ->
+      public_lib
+        (sf "tezos-smart-rollup-%s" name_dash)
+        ~path:(path // "lib_sc_rollup")
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library of helpers for \
+           `tezos-smart-rollup`"
+        ~deps:[octez_base |> open_ ~m:"TzPervasives"; main |> open_]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
     let plugin =
       only_if (N.(number >= 007) && not_overridden) @@ fun () ->
       public_lib
@@ -4425,6 +4437,7 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             main |> open_;
+            octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
           ]
         ~all_modules_except:["Plugin_registerer"]
         ~bisect_ppx:N.(number >= 008)
@@ -4470,6 +4483,7 @@ module Protocol = Protocol
             octez_rpc;
             octez_client_commands |> if_ N.(number == 000) |> open_;
             octez_stdlib_unix |> if_ N.(number == 000);
+            octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
             uri |> if_ N.(number >= 001);
           ]
         ~bisect_ppx:N.(number >= 008)
@@ -4896,20 +4910,17 @@ module Protocol = Protocol
         ~inline_tests:ppx_expect
         ~linkall:true
     in
-    let sc_rollup =
+    let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
       public_lib
-        (sf "tezos-smart-rollup-%s" name_dash)
-        ~path:(path // "lib_sc_rollup")
+        (sf "tezos-smart-rollup-layer2-%s" name_dash)
+        ~path:(path // "lib_sc_rollup_layer2")
         ~synopsis:
           "Tezos/Protocol: protocol specific library for `tezos-smart-rollup`"
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives";
             main |> open_;
-            plugin |> if_some |> open_;
-            parameters |> if_some |> open_;
-            octez_rpc;
             injector |> if_some |> open_;
           ]
         ~inline_tests:ppx_expect
@@ -4938,7 +4949,8 @@ module Protocol = Protocol
             octez_rpc_http;
             octez_rpc_http_client_unix |> open_;
             main |> open_;
-            sc_rollup |> if_some |> open_;
+            octez_sc_rollup |> if_some |> open_;
+            octez_sc_rollup_layer2 |> if_some |> open_;
             uri;
           ]
     in
@@ -4973,7 +4985,8 @@ module Protocol = Protocol
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
             octez_shell_services |> open_;
-            sc_rollup |> if_some |> open_;
+            octez_sc_rollup |> if_some |> open_;
+            octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
             data_encoding;
@@ -5305,7 +5318,7 @@ module Protocol = Protocol
           ?client
           ?benchmark:(Option.bind benchmark Fun.id)
           ?benchmark_type_inference
-          ?sc_rollup
+          ?octez_sc_rollup
           ~main
           ~name
           ()

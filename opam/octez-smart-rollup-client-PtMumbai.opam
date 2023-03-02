@@ -20,6 +20,7 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-protocol-016-PtMumbai"
   "tezos-smart-rollup-016-PtMumbai"
+  "tezos-smart-rollup-layer2-016-PtMumbai"
   "uri" { >= "3.1.0" }
 ]
 build: [

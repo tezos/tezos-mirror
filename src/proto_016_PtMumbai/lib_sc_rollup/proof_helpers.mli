@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Protocol.Alpha_context
 
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
-
-module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
-
-module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
+(** [origination_proof ~boot_sector kind] instantiate a [kind] PVM
+    with an in memory context and produce the origination_proof for
+    [boot_sector] *)
+val origination_proof :
+  boot_sector:string ->
+  Sc_rollup.Kind.t ->
+  Sc_rollup.Proof.serialized Environment.Error_monad.tzresult Lwt.t

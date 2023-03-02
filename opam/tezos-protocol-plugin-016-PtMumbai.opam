@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-protocol-016-PtMumbai"
+  "tezos-smart-rollup-016-PtMumbai"
 ]
 build: [
   ["rm" "-r" "vendors"]

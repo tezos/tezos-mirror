@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Protocol.Alpha_context
 
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
-
-module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
-
-module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
+let origination_proof ~boot_sector kind =
+  let aux = function
+    | Sc_rollup.Kind.Example_arith ->
+        let open Lwt_result_syntax in
+        let context = Context_helpers.In_memory.make_empty_context () in
+        let* proof =
+          Pvm.Arith_pvm_in_memory.produce_origination_proof context boot_sector
+        in
+        let*? proof =
+          Sc_rollup.Proof.serialize_pvm_step
+            ~pvm:(module Pvm.Arith_pvm_in_memory)
+            proof
+        in
+        return proof
+    | Sc_rollup.Kind.Wasm_2_0_0 ->
+        let open Lwt_result_syntax in
+        let context = Context_helpers.In_memory.make_empty_context () in
+        let* proof =
+          Pvm.Wasm_pvm_in_memory.produce_origination_proof context boot_sector
+        in
+        let*? proof =
+          Sc_rollup.Proof.serialize_pvm_step
+            ~pvm:(module Pvm.Wasm_pvm_in_memory)
+            proof
+        in
+        return proof
+  in
+  aux kind

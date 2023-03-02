@@ -27,6 +27,7 @@
   tezos_dal_node_lib
   tezos-shell-services
   tezos-smart-rollup-alpha
+  tezos-smart-rollup-layer2-alpha
   tezos-layer2-utils-alpha
   tezos_layer2_store
   data-encoding
@@ -61,6 +62,7 @@
   -open Tezos_dal_node_lib
   -open Tezos_shell_services
   -open Tezos_smart_rollup_alpha
+  -open Tezos_smart_rollup_layer2_alpha
   -open Tezos_layer2_utils_alpha
   -open Tezos_layer2_store
   -open Tezos_injector_alpha
