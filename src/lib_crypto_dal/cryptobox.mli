@@ -376,6 +376,18 @@ module Internal_for_tests : sig
      and [proof2] represent the same proof. *)
   val page_proof_equal : page_proof -> page_proof -> bool
 
+  (* [alter_page_proof page_proof] returns a different page proof than the
+     input. *)
+  val alter_page_proof : page_proof -> page_proof
+
+  (* [alter_shard_proof shard_proof] returns a different shard proof than
+     the input. *)
+  val alter_shard_proof : shard_proof -> shard_proof
+
+  (* [alter_commitment_proof commitment_proof] returns a different commitment
+     proof than the input. *)
+  val alter_commitment_proof : commitment_proof -> commitment_proof
+
   (* [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool

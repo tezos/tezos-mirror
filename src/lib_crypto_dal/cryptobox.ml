@@ -1580,6 +1580,14 @@ module Internal_for_tests = struct
 
   let page_proof_equal = Bls12_381.G1.eq
 
+  let alter_proof proof = Bls12_381.G1.(add proof one)
+
+  let alter_page_proof (proof : page_proof) = alter_proof proof
+
+  let alter_shard_proof (proof : shard_proof) = alter_proof proof
+
+  let alter_commitment_proof (proof : commitment_proof) = alter_proof proof
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let max_polynomial_length = slot_as_polynomial_length ~slot_size in

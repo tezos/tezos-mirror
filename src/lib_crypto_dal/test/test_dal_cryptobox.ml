@@ -334,39 +334,15 @@ module Test = struct
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
-        let page_index_prove = Random.int number_of_pages in
-        let page_index_verify = Random.int number_of_pages in
-        assume (page_index_prove <> page_index_verify) ;
-        let* proof = Cryptobox.prove_page t polynomial page_index_prove in
-        let* proof_verify =
-          Cryptobox.prove_page t polynomial page_index_verify
+        let page_index = Random.int number_of_pages in
+        let* proof = Cryptobox.prove_page t polynomial page_index in
+        let altered_proof =
+          Cryptobox.Internal_for_tests.alter_page_proof proof
         in
-        let page_prove =
-          Bytes.sub
-            params.slot
-            (page_index_prove * params.page_size)
-            params.page_size
+        let page =
+          Bytes.sub params.slot (page_index * params.page_size) params.page_size
         in
-        let page_verify =
-          Bytes.sub
-            params.slot
-            (page_index_verify * params.page_size)
-            params.page_size
-        in
-        (* We need [page_prove] and [page_verify] to be distinct, otherwise
-           [Cryptobox.verify_page] will return [Ok ()] (we want to input an
-           incorrect page to trigger the [`Invalid_page] error). *)
-        assume (Bytes.compare page_prove page_verify <> 0) ;
-        (* We need [proof] and [proof_verify] to be distinct. *)
-        assume
-          (not
-             (Cryptobox.Internal_for_tests.page_proof_equal proof proof_verify)) ;
-        Cryptobox.verify_page
-          t
-          commitment
-          ~page_index:page_index_verify
-          page_verify
-          proof)
+        Cryptobox.verify_page t commitment ~page_index page altered_proof)
         |> function
         | Error `Invalid_page -> true
         | _ -> false)
