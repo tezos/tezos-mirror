@@ -48,10 +48,12 @@
 # If regressions are detected during the diffs, they are sent to a Slack
 # channel.
 
-# The results of all comparisons are 3 CSV tables:
+# The results of all comparisons are in up to 4 CSV tables:
 # - all.csv comparing all the runs since FIRST_DIR (included)
 # - reference.csv comparing the reference and last runs
-# - prev.csv comparing the previous and last runs.
+# - previous.csv comparing the previous and last runs.
+# - selected.csv that filters all.csv with the parameters on which a
+#   regression was found.
 # These tables are also sent to the Slack channel
 
 # This is the Slack channel messages will be sent to (gas-benchmarks-reports).
