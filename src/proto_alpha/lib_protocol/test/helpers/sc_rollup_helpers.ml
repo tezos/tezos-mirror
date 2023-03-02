@@ -618,13 +618,12 @@ let dumb_init level =
     level
 
 let dumb_init_repr level =
-  WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Sc_rollup_inbox_repr.genesis
-       ~protocol_migration_message:
-         Raw_context.protocol_migration_internal_message
-       ~predecessor_timestamp:Time.Protocol.epoch
-       ~predecessor:Block_hash.zero
-       level
+  Sc_rollup_inbox_repr.genesis
+    ~protocol_migration_message:
+      Raw_context.protocol_migration_serialized_message
+    ~predecessor_timestamp:Time.Protocol.epoch
+    ~predecessor:Block_hash.zero
+    level
 
 let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?origination_proof ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src
@@ -665,12 +664,11 @@ module Node_inbox = struct
       ?(genesis_predecessor = Block_hash.zero)
       ?(inbox_creation_level = Raw_level.root) () =
     let open Result_syntax in
-    let* inbox =
-      Environment.wrap_tzresult
-      @@ Sc_rollup.Inbox.genesis
-           ~predecessor_timestamp:genesis_predecessor_timestamp
-           ~predecessor:genesis_predecessor
-           inbox_creation_level
+    let inbox =
+      Sc_rollup.Inbox.genesis
+        ~predecessor_timestamp:genesis_predecessor_timestamp
+        ~predecessor:genesis_predecessor
+        inbox_creation_level
     in
     let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
     let payloads_histories = Payloads_histories.empty in
@@ -787,15 +785,10 @@ module Protocol_inbox = struct
   let new_inbox ?(genesis_predecessor_timestamp = Time.Protocol.epoch)
       ?(genesis_predecessor = Block_hash.zero)
       ?(inbox_creation_level = Raw_level.root) () =
-    let open Result_syntax in
-    let* inbox =
-      Environment.wrap_tzresult
-      @@ Sc_rollup.Inbox.genesis
-           ~predecessor_timestamp:genesis_predecessor_timestamp
-           ~predecessor:genesis_predecessor
-           inbox_creation_level
-    in
-    return inbox
+    Sc_rollup.Inbox.genesis
+      ~predecessor_timestamp:genesis_predecessor_timestamp
+      ~predecessor:genesis_predecessor
+      inbox_creation_level
 
   let fill_inbox inbox payloads_per_levels =
     let open Result_syntax in
@@ -850,8 +843,7 @@ module Protocol_inbox = struct
 
   let construct_inbox ?inbox_creation_level ?genesis_predecessor_timestamp
       ?genesis_predecessor payloads_per_levels =
-    let open Result_syntax in
-    let* inbox =
+    let inbox =
       new_inbox
         ?genesis_predecessor_timestamp
         ?genesis_predecessor

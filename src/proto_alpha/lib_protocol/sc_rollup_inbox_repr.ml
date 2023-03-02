@@ -821,14 +821,10 @@ let add_all_messages ~protocol_migration_message ~predecessor_timestamp
 
 let genesis ~protocol_migration_message ~predecessor_timestamp ~predecessor
     level =
-  let open Result_syntax in
   (* 1. Add [SOL], [Protocol_migration], and [Info_per_level]. *)
   let witness = init_witness_no_history in
-  let+ protocol_migration =
-    Sc_rollup_inbox_message_repr.serialize (Internal protocol_migration_message)
-  in
   let witness =
-    add_protocol_internal_message_no_history protocol_migration witness
+    add_protocol_internal_message_no_history protocol_migration_message witness
   in
   let witness =
     add_info_per_level_no_history ~predecessor_timestamp ~predecessor witness

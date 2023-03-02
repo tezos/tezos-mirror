@@ -346,11 +346,11 @@ val finalize_inbox_level_no_history :
     The expected value of [protocol_migration_message] is
     [Raw_context.protocol_migration_internal_message]. *)
 val genesis :
-  protocol_migration_message:Sc_rollup_inbox_message_repr.internal_inbox_message ->
+  protocol_migration_message:Sc_rollup_inbox_message_repr.serialized ->
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Raw_level_repr.t ->
-  t tzresult
+  t
 
 module Internal_for_tests : sig
   (** Given a inbox [A] at some level [L] and another inbox [B] at some level

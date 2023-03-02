@@ -648,6 +648,20 @@ let version = "v1"
 let protocol_migration_internal_message =
   Sc_rollup_inbox_message_repr.Protocol_migration version_value
 
+let protocol_migration_serialized_message =
+  match
+    Sc_rollup_inbox_message_repr.serialize
+      (Internal protocol_migration_internal_message)
+  with
+  | Ok msg -> msg
+  | Error trace ->
+      Format.kasprintf
+        failwith
+        "%s: Could not serialize protocol message : %a"
+        __LOC__
+        pp_trace
+        trace
+
 let cycle_eras_key = [version; "cycle_eras"]
 
 let constants_key = [version; "constants"]

@@ -67,6 +67,9 @@ module Sc_rollup = struct
 
     let protocol_migration_internal_message =
       Raw_context.protocol_migration_internal_message
+
+    let protocol_migration_serialized_message =
+      Raw_context.protocol_migration_serialized_message
   end
 
   module Inbox_merkelized_payload_hashes =
@@ -84,7 +87,7 @@ module Sc_rollup = struct
     let genesis =
       genesis
         ~protocol_migration_message:
-          Inbox_message.protocol_migration_internal_message
+          Inbox_message.protocol_migration_serialized_message
 
     let add_all_messages ~first_block =
       add_all_messages

@@ -78,6 +78,10 @@ type root = t
 val protocol_migration_internal_message :
   Sc_rollup_inbox_message_repr.internal_inbox_message
 
+(** Serialized version of {!protocol_migration_internal_message}. *)
+val protocol_migration_serialized_message :
+  Sc_rollup_inbox_message_repr.serialized
+
 (** Retrieves the state of the database and gives its abstract view.
     It also returns wether this is the first block validated
     with this version of the protocol. *)

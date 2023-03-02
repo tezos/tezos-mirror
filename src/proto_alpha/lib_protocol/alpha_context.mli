@@ -3272,6 +3272,8 @@ module Sc_rollup : sig
 
     type serialized = private string
 
+    val protocol_migration_serialized_message : serialized
+
     val encoding : t Data_encoding.t
 
     val unsafe_of_string : string -> serialized
@@ -3488,7 +3490,7 @@ module Sc_rollup : sig
       predecessor_timestamp:Time.t ->
       predecessor:Block_hash.t ->
       Raw_level.t ->
-      t tzresult
+      t
 
     module Internal_for_tests : sig
       type inclusion_proof = history_proof list

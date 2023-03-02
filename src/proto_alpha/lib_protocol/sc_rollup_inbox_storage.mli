@@ -53,7 +53,7 @@ val init_inbox :
   predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** Adds the [Protocol_migration] in the in-memory inbox level witness. *)
-val add_protocol_migration : Raw_context.t -> Raw_context.t Lwt.t
+val add_protocol_migration : Raw_context.t -> Raw_context.t
 
 (** Adds the [Info_per_level] in the in-memory inbox level witness. *)
 val add_info_per_level :
