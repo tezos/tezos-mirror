@@ -88,9 +88,6 @@ module Test = struct
          (return padding_threshold)
          (return slot))
 
-  let generate_parameters_tup2 =
-    QCheck2.Gen.tup2 generate_parameters generate_parameters
-
   let print_parameters =
     QCheck2.Print.(
       contramap
@@ -109,9 +106,6 @@ module Test = struct
             padding_threshold,
             slot ))
         (tup6 int int int int int bytes))
-
-  let print_parameters_tup2 =
-    QCheck2.Print.tup2 print_parameters print_parameters
 
   let ensure_validity params =
     Cryptobox.Internal_for_tests.ensure_validity
@@ -250,26 +244,24 @@ module Test = struct
      The function [polynomial_from_shards] returns an error if the shards
      don't have the expected length. This could happen if the shards were
      produced with a different set of parameters than the ones used by
-     [polynomial_from_shards].
-
-     Here, the number of shards for the first set of parameters t1
-     second set of parameters t2 are different. *)
+     [polynomial_from_shards]. *)
   let test_erasure_code_failure_invalid_shard_length =
     let open QCheck2 in
     Test.make
       ~name:"DAL cryptobox: test erasure code shard invalid shard length"
-      ~print:print_parameters_tup2
-      generate_parameters_tup2
-      (fun (params1, params2) ->
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
         init () ;
-        assume (ensure_validity params1) ;
-        assume (ensure_validity params2) ;
-        assume (params1.number_of_shards <> params2.number_of_shards) ;
+        assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
-        let* t1 = Cryptobox.make (get_cryptobox_parameters params1) in
-        let* t2 = Cryptobox.make (get_cryptobox_parameters params2) in
-        let shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
-        Cryptobox.polynomial_from_shards t2 shards)
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let shards =
+          Cryptobox.Internal_for_tests.make_dummy_shards
+            t
+            ~share_length:(Cryptobox.Internal_for_tests.length_of_share t + 1)
+        in
+        Cryptobox.polynomial_from_shards t shards)
         |> function
         | Error (`Invalid_shard_length _) -> true
         | _ -> false)
