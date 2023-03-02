@@ -3942,15 +3942,34 @@ end = struct
             ]
       in
       let _integration_operations =
-        test
-          "main"
+        let modules =
+          [
+            ("test_main", true);
+            ("test_activation", true);
+            ("test_combined_operations", true);
+            ("test_failing_noop", true);
+            ("test_origination", true);
+            ("test_paid_storage_increase", true);
+            ("test_reveal", true);
+            ("test_sc_rollup_transfer", true);
+            ("test_sc_rollup", true);
+            ("test_transfer", true);
+            ("test_voting", true);
+            ("test_zk_rollup", true);
+            ("test_transfer_ticket", N.(number >= 016));
+            ("test_tx_rollup", N.(number <= 016));
+          ]
+          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+        in
+        tezt
+          modules
           ~path:(path // "lib_protocol/test/integration/operations")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true
           ~dep_globs:(conditional_list [("contracts/*", N.(number >= 013))])
           ~deps:
             [
-              alcotest_lwt;
+              alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;

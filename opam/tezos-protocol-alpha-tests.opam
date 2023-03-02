@@ -35,6 +35,7 @@ depends: [
   "tezos-stdlib" {with-test}
   "tezos-scoru-wasm" {with-test}
   "tezos-webassembly-interpreter-extra" {with-test}
+  "octez-alcotezt" {with-test}
   "tezt-tezos" {with-test}
 ]
 build: [
