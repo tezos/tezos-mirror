@@ -167,7 +167,11 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
          if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
-      >>=? fun ctxt -> return (ctxt, []))
+      >>=? fun ctxt ->
+      (* This needs to be kept in the migration code for every
+         protocol, except Genesis. *)
+      Sc_rollup_inbox_storage.add_protocol_migration ctxt >>= fun ctxt ->
+      return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
   >>=? fun ctxt ->

@@ -793,6 +793,7 @@ let test_messages_are_correctly_added_in_history
   let*? payloads_history, _history, _inbox, witness, messages =
     Environment.wrap_tzresult
     @@ Inbox.add_all_messages
+         ~first_block:false
          ~predecessor_timestamp
          ~predecessor
          (Inbox.History.empty ~capacity:0L)
