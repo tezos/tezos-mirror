@@ -27,7 +27,7 @@
 
 // IMPROVEME: can be improve it with lookups?
 // FIXME: bitreverse is also exported by ocaml-bls12-381. Must be removed.
-int polynomial_bitreverse_(int n, int l) {
+int bls12_381_polynomial_internal_bitreverse_(int n, int l) {
   int r = 0;
   while (l-- > 0) {
     r = (r << 1) | (n & 1);
@@ -36,11 +36,11 @@ int polynomial_bitreverse_(int n, int l) {
   return r;
 }
 
-void polynomial_reorg_fr_array_coefficients(blst_fr *coefficients, int n,
-                                            int logn) {
+void bls12_381_polynomial_internal_reorg_fr_array_coefficients(
+    blst_fr *coefficients, int n, int logn) {
   blst_fr tmp;
   for (int i = 0; i < n; i++) {
-    int reverse_i = polynomial_bitreverse_(i, logn);
+    int reverse_i = bls12_381_polynomial_internal_bitreverse_(i, logn);
     if (i < reverse_i) {
       memcpy(&tmp, coefficients + i, sizeof(blst_fr));
       memcpy(coefficients + i, coefficients + reverse_i, sizeof(blst_fr));
@@ -50,9 +50,11 @@ void polynomial_reorg_fr_array_coefficients(blst_fr *coefficients, int n,
 }
 
 // Fr
-void polynomial_fft_inplace_aux(blst_fr *coefficients, blst_fr *domain,
-                                int log_domain_size, int log_diff,
-                                int inverse_domain) {
+void bls12_381_polynomial_internal_fft_inplace_aux(blst_fr *coefficients,
+                                                   blst_fr *domain,
+                                                   int log_domain_size,
+                                                   int log_diff,
+                                                   int inverse_domain) {
   int domain_size = 1 << log_domain_size;
   int m = 1 << log_diff;
   blst_fr tmp;
@@ -78,16 +80,18 @@ void polynomial_fft_inplace_aux(blst_fr *coefficients, blst_fr *domain,
   }
 }
 
-void polynomial_fft_inplace(blst_fr *coefficients, blst_fr *domain,
-                            int log_domain_size, int log_degree) {
+void bls12_381_polynomial_internal_fft_inplace(blst_fr *coefficients,
+                                               blst_fr *domain,
+                                               int log_domain_size,
+                                               int log_degree) {
   int domain_size = 1 << log_domain_size;
   int degree_next_pow_of_2 = 1 << log_degree;
 
   int log_diff = log_domain_size - log_degree;
 
   if (log_diff > 0) {
-    polynomial_reorg_fr_array_coefficients(coefficients, degree_next_pow_of_2,
-                                           log_degree);
+    bls12_381_polynomial_internal_reorg_fr_array_coefficients(
+        coefficients, degree_next_pow_of_2, log_degree);
     int ratio = 1 << log_diff;
     for (int i = degree_next_pow_of_2 - 1; i >= 0; i--) {
       for (int j = 0; j < ratio; j++) {
@@ -96,22 +100,24 @@ void polynomial_fft_inplace(blst_fr *coefficients, blst_fr *domain,
       }
     }
   } else {
-    polynomial_reorg_fr_array_coefficients(coefficients, domain_size,
-                                           log_domain_size);
+    bls12_381_polynomial_internal_reorg_fr_array_coefficients(
+        coefficients, domain_size, log_domain_size);
   }
-  polynomial_fft_inplace_aux(coefficients, domain, log_domain_size, log_diff,
-                             0);
+  bls12_381_polynomial_internal_fft_inplace_aux(coefficients, domain,
+                                                log_domain_size, log_diff, 0);
 }
 
-void polynomial_ifft_inplace(blst_fr *coefficients, blst_fr *domain,
-                             int log_domain_size) {
+void bls12_381_polynomial_internal_ifft_inplace(blst_fr *coefficients,
+                                                blst_fr *domain,
+                                                int log_domain_size) {
   int domain_size = 1 << log_domain_size;
   uint64_t n[4] = {domain_size, 0, 0, 0};
   blst_fr inverse_n;
 
-  polynomial_reorg_fr_array_coefficients(coefficients, domain_size,
-                                         log_domain_size);
-  polynomial_fft_inplace_aux(coefficients, domain, log_domain_size, 0, 1);
+  bls12_381_polynomial_internal_reorg_fr_array_coefficients(
+      coefficients, domain_size, log_domain_size);
+  bls12_381_polynomial_internal_fft_inplace_aux(coefficients, domain,
+                                                log_domain_size, 0, 1);
 
   blst_fr_from_uint64(&inverse_n, n);
   blst_fr_inverse(&inverse_n, &inverse_n);
@@ -120,8 +126,9 @@ void polynomial_ifft_inplace(blst_fr *coefficients, blst_fr *domain,
   }
 }
 
-void polynomial_dft_inplace(blst_fr *coefficients, blst_fr *domain,
-                            blst_fr *buffer, int length, int inverse) {
+void bls12_381_polynomial_internal_dft_inplace(blst_fr *coefficients,
+                                               blst_fr *domain, blst_fr *buffer,
+                                               int length, int inverse) {
   // We copy the coefficients to the buffer to modify the coefficients
   // in-place
   memcpy(buffer, coefficients, length * sizeof(blst_fr));
@@ -147,9 +154,11 @@ void polynomial_dft_inplace(blst_fr *coefficients, blst_fr *domain,
   }
 }
 
-int polynomial_is_power_of_two(int n) { return (n & (n - 1)) == 0; }
+int bls12_381_polynomial_internal_is_power_of_two(int n) {
+  return (n & (n - 1)) == 0;
+}
 
-int polynomial_log2(int n) {
+int bls12_381_polynomial_internal_log2(int n) {
   int l = 0;
   while (n >>= 1) {
     ++l;
@@ -157,7 +166,8 @@ int polynomial_log2(int n) {
   return l;
 }
 
-void polynomial_transpose(blst_fr *rows, blst_fr *columns, int n1, int n2) {
+void bls12_381_polynomial_internal_transpose(blst_fr *rows, blst_fr *columns,
+                                             int n1, int n2) {
   for (int i = 0; i < n1; i++) {
     for (int j = 0; j < n2; j++) {
       rows[j * n1 + i] = columns[j + i * n2];
@@ -165,40 +175,42 @@ void polynomial_transpose(blst_fr *rows, blst_fr *columns, int n1, int n2) {
   }
 }
 
-int polynomial_max(int a, int b) { return a >= b ? a : b; }
+int bls12_381_polynomial_internal_max(int a, int b) { return a >= b ? a : b; }
 
-void polynomial_fft_round(blst_fr *buffer, blst_fr *domain2, int length1,
-                          int length2, blst_fr *buffer_dft, int inverse) {
-  if (polynomial_is_power_of_two(length2)) {
-    int length2_log = polynomial_log2(length2);
+void bls12_381_polynomial_internal_fft_round(blst_fr *buffer, blst_fr *domain2,
+                                             int length1, int length2,
+                                             blst_fr *buffer_dft, int inverse) {
+  if (bls12_381_polynomial_internal_is_power_of_two(length2)) {
+    int length2_log = bls12_381_polynomial_internal_log2(length2);
     if (inverse) {
       for (int i = 0; i < length1; i++) {
-        polynomial_ifft_inplace(buffer + (i * length2), domain2, length2_log);
+        bls12_381_polynomial_internal_ifft_inplace(buffer + (i * length2),
+                                                   domain2, length2_log);
       }
     } else {
       for (int i = 0; i < length1; i++) {
-        polynomial_fft_inplace(buffer + (i * length2), domain2, length2_log,
-                               length2_log);
+        bls12_381_polynomial_internal_fft_inplace(
+            buffer + (i * length2), domain2, length2_log, length2_log);
       }
     }
   } else {
     for (int i = 0; i < length1; i++) {
-      polynomial_dft_inplace(buffer + (i * length2), domain2, buffer_dft,
-                             length2, inverse);
+      bls12_381_polynomial_internal_dft_inplace(buffer + (i * length2), domain2,
+                                                buffer_dft, length2, inverse);
     }
   }
 }
 
 // The buffer must have size at least 2 * |domain1| * |domain2|
-void polynomial_prime_factor_algorithm_fft(blst_fr *coefficients,
-                                           blst_fr *domain1, blst_fr *domain2,
-                                           int length1, int length2,
-                                           int inverse) {
+void bls12_381_polynomial_internal_prime_factor_algorithm_fft(
+    blst_fr *coefficients, blst_fr *domain1, blst_fr *domain2, int length1,
+    int length2, int inverse) {
   int dft_length =
-      (!polynomial_is_power_of_two(length1) &&
-       !polynomial_is_power_of_two(length2))
-          ? polynomial_max(length1, length2)
-          : (polynomial_is_power_of_two(length1) ? length2 : length1);
+      (!bls12_381_polynomial_internal_is_power_of_two(length1) &&
+       !bls12_381_polynomial_internal_is_power_of_two(length2))
+          ? bls12_381_polynomial_internal_max(length1, length2)
+          : (bls12_381_polynomial_internal_is_power_of_two(length1) ? length2
+                                                                    : length1);
   // We allocate buffer_dft on the stack because dft_length is <= 2^10 at most
   // in our use case
   blst_fr buffer_dft[dft_length];
@@ -213,14 +225,15 @@ void polynomial_prime_factor_algorithm_fft(blst_fr *coefficients,
     buffer[(i % length1) * length2 + (i % length2)] = coefficients[i];
   }
 
-  polynomial_fft_round(buffer, domain2, length1, length2, buffer_dft, inverse);
+  bls12_381_polynomial_internal_fft_round(buffer, domain2, length1, length2,
+                                          buffer_dft, inverse);
 
   blst_fr *new_buffer = buffer + length;
 
-  polynomial_transpose(new_buffer, buffer, length1, length2);
+  bls12_381_polynomial_internal_transpose(new_buffer, buffer, length1, length2);
 
-  polynomial_fft_round(new_buffer, domain1, length2, length1, buffer_dft,
-                       inverse);
+  bls12_381_polynomial_internal_fft_round(new_buffer, domain1, length2, length1,
+                                          buffer_dft, inverse);
 
   for (int i = 0; i < length1; i++) {
     for (int j = 0; j < length2; j++) {
@@ -233,11 +246,11 @@ void polynomial_prime_factor_algorithm_fft(blst_fr *coefficients,
 }
 
 // G1
-void polynomial_reorg_g1_array_coefficients(int n, int logn,
-                                            blst_p1 *coefficients) {
+void bls12_381_polynomial_internal_reorg_g1_array_coefficients(
+    int n, int logn, blst_p1 *coefficients) {
   blst_p1 buffer;
   for (int i = 0; i < n; i++) {
-    int reverse_i = polynomial_bitreverse_(i, logn);
+    int reverse_i = bls12_381_polynomial_internal_bitreverse_(i, logn);
     if (i < reverse_i) {
       memcpy(&buffer, coefficients + i, sizeof(blst_p1));
       memcpy(coefficients + i, coefficients + reverse_i, sizeof(blst_p1));
@@ -246,9 +259,11 @@ void polynomial_reorg_g1_array_coefficients(int n, int logn,
   }
 }
 
-void polynomial_fft_g1_inplace_aux(blst_p1 *coefficients, blst_fr *domain,
-                                   int log_domain_size, int log_diff,
-                                   int inverse_domain) {
+void bls12_381_polynomial_internal_fft_g1_inplace_aux(blst_p1 *coefficients,
+                                                      blst_fr *domain,
+                                                      int log_domain_size,
+                                                      int log_diff,
+                                                      int inverse_domain) {
   blst_p1 buffer;
   blst_p1 buffer_neg;
   blst_scalar scalar;
@@ -286,16 +301,18 @@ void polynomial_fft_g1_inplace_aux(blst_p1 *coefficients, blst_fr *domain,
   }
 }
 
-void polynomial_fft_g1_inplace(blst_p1 *coefficients, blst_fr *domain,
-                               int log_domain_size, int log_degree) {
+void bls12_381_polynomial_internal_fft_g1_inplace(blst_p1 *coefficients,
+                                                  blst_fr *domain,
+                                                  int log_domain_size,
+                                                  int log_degree) {
   int domain_size = 1 << log_domain_size;
   int degree_next_pow_of_2 = 1 << log_degree;
 
   int log_diff = log_domain_size - log_degree;
 
   if (log_diff > 0) {
-    polynomial_reorg_g1_array_coefficients(degree_next_pow_of_2, log_degree,
-                                           coefficients);
+    bls12_381_polynomial_internal_reorg_g1_array_coefficients(
+        degree_next_pow_of_2, log_degree, coefficients);
     int ratio = 1 << log_diff;
     for (int i = degree_next_pow_of_2 - 1; i >= 0; i--) {
       for (int j = 0; j < ratio; j++) {
@@ -304,21 +321,23 @@ void polynomial_fft_g1_inplace(blst_p1 *coefficients, blst_fr *domain,
       }
     }
   } else {
-    polynomial_reorg_g1_array_coefficients(domain_size, log_domain_size,
-                                           coefficients);
+    bls12_381_polynomial_internal_reorg_g1_array_coefficients(
+        domain_size, log_domain_size, coefficients);
   }
 
-  polynomial_fft_g1_inplace_aux(coefficients, domain, log_domain_size, log_diff,
-                                0);
+  bls12_381_polynomial_internal_fft_g1_inplace_aux(
+      coefficients, domain, log_domain_size, log_diff, 0);
 }
 
-void polynomial_ifft_g1_inplace(blst_p1 *coefficients, blst_fr *domain,
-                                int log_domain_size) {
+void bls12_381_polynomial_internal_ifft_g1_inplace(blst_p1 *coefficients,
+                                                   blst_fr *domain,
+                                                   int log_domain_size) {
 
   int domain_size = 1 << log_domain_size;
-  polynomial_reorg_g1_array_coefficients(domain_size, log_domain_size,
-                                         coefficients);
-  polynomial_fft_g1_inplace_aux(coefficients, domain, log_domain_size, 0, 1);
+  bls12_381_polynomial_internal_reorg_g1_array_coefficients(
+      domain_size, log_domain_size, coefficients);
+  bls12_381_polynomial_internal_fft_g1_inplace_aux(coefficients, domain,
+                                                   log_domain_size, 0, 1);
 
   uint64_t n[4] = {domain_size, 0, 0, 0};
   blst_fr inverse_n;
@@ -337,11 +356,11 @@ void polynomial_ifft_g1_inplace(blst_p1 *coefficients, blst_fr *domain,
 }
 
 // G2
-void polynomial_reorg_g2_array_coefficients(int n, int logn,
-                                            blst_p2 *coefficients) {
+void bls12_381_polynomial_internal_reorg_g2_array_coefficients(
+    int n, int logn, blst_p2 *coefficients) {
   blst_p2 buffer;
   for (int i = 0; i < n; i++) {
-    int reverse_i = polynomial_bitreverse_(i, logn);
+    int reverse_i = bls12_381_polynomial_internal_bitreverse_(i, logn);
     if (i < reverse_i) {
       memcpy(&buffer, coefficients + i, sizeof(blst_p2));
       memcpy(coefficients + i, coefficients + reverse_i, sizeof(blst_p2));
@@ -350,9 +369,11 @@ void polynomial_reorg_g2_array_coefficients(int n, int logn,
   }
 }
 
-void polynomial_fft_g2_inplace_aux(blst_p2 *coefficients, blst_fr *domain,
-                                   int log_domain_size, int log_diff,
-                                   int inverse_domain) {
+void bls12_381_polynomial_internal_fft_g2_inplace_aux(blst_p2 *coefficients,
+                                                      blst_fr *domain,
+                                                      int log_domain_size,
+                                                      int log_diff,
+                                                      int inverse_domain) {
   blst_p2 buffer;
   blst_p2 buffer_neg;
   blst_scalar scalar;
@@ -390,16 +411,18 @@ void polynomial_fft_g2_inplace_aux(blst_p2 *coefficients, blst_fr *domain,
   }
 }
 
-void polynomial_fft_g2_inplace(blst_p2 *coefficients, blst_fr *domain,
-                               int log_domain_size, int log_degree) {
+void bls12_381_polynomial_internal_fft_g2_inplace(blst_p2 *coefficients,
+                                                  blst_fr *domain,
+                                                  int log_domain_size,
+                                                  int log_degree) {
   int domain_size = 1 << log_domain_size;
   int degree_next_pow_of_2 = 1 << log_degree;
 
   int log_diff = log_domain_size - log_degree;
 
   if (log_diff > 0) {
-    polynomial_reorg_g2_array_coefficients(degree_next_pow_of_2, log_degree,
-                                           coefficients);
+    bls12_381_polynomial_internal_reorg_g2_array_coefficients(
+        degree_next_pow_of_2, log_degree, coefficients);
     int ratio = 1 << log_diff;
     for (int i = degree_next_pow_of_2 - 1; i >= 0; i--) {
       for (int j = 0; j < ratio; j++) {
@@ -408,20 +431,22 @@ void polynomial_fft_g2_inplace(blst_p2 *coefficients, blst_fr *domain,
       }
     }
   } else {
-    polynomial_reorg_g2_array_coefficients(domain_size, log_domain_size,
-                                           coefficients);
+    bls12_381_polynomial_internal_reorg_g2_array_coefficients(
+        domain_size, log_domain_size, coefficients);
   }
 
-  polynomial_fft_g2_inplace_aux(coefficients, domain, log_domain_size, log_diff,
-                                0);
+  bls12_381_polynomial_internal_fft_g2_inplace_aux(
+      coefficients, domain, log_domain_size, log_diff, 0);
 }
 
-void polynomial_ifft_g2_inplace(blst_p2 *coefficients, blst_fr *domain,
-                                int log_domain_size) {
+void bls12_381_polynomial_internal_ifft_g2_inplace(blst_p2 *coefficients,
+                                                   blst_fr *domain,
+                                                   int log_domain_size) {
   int domain_size = 1 << log_domain_size;
-  polynomial_reorg_g2_array_coefficients(domain_size, log_domain_size,
-                                         coefficients);
-  polynomial_fft_g2_inplace_aux(coefficients, domain, log_domain_size, 0, 1);
+  bls12_381_polynomial_internal_reorg_g2_array_coefficients(
+      domain_size, log_domain_size, coefficients);
+  bls12_381_polynomial_internal_fft_g2_inplace_aux(coefficients, domain,
+                                                   log_domain_size, 0, 1);
 
   uint64_t n[4] = {domain_size, 0, 0, 0};
   blst_fr inverse_n;
