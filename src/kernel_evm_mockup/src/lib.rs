@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use block::L2Block;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
@@ -24,7 +25,31 @@ mod storage;
 mod wei;
 
 pub fn stage_one<Host: Runtime + RawRollupCore>(host: &mut Host) -> Queue {
-    fetch(host)
+    let queue = fetch(host);
+
+    for (i, blueprint) in queue.proposals.iter().enumerate() {
+        debug_msg!(host; "Blueprint {} contains {} transactions.\n", i, blueprint.transactions.len());
+    }
+
+    queue
+}
+
+pub fn stage_two<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
+    block::produce(host, queue);
+
+    if let Ok(L2Block {
+        number,
+        hash,
+        transactions,
+        ..
+    }) = storage::read_current_block(host)
+    {
+        debug_msg!(host; "Block {} at number {} contains {} transaction(s).\n",
+            String::from_utf8(hash).expect("INVALID HASH"),
+            number,
+            transactions.len()
+        )
+    }
 }
 
 pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
@@ -43,11 +68,9 @@ pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
         Err(_) => panic!("The account should be writable"),
     }
 
-    // Stage 1.
-    let Queue { proposals } = stage_one(host);
-    for (i, blueprint) in proposals.iter().enumerate() {
-        debug_msg!(host; "Blueprint {} contains {} transactions.\n", i, blueprint.transactions.len());
-    }
+    let queue = stage_one(host);
+
+    stage_two(host, queue)
 }
 
 kernel_entry!(main);

@@ -12,7 +12,7 @@ use std::str::from_utf8;
 use crate::account::*;
 use crate::block::L2Block;
 use crate::error::Error;
-use crate::eth_gen::{Hash, L2Level, RawTransactions};
+use crate::eth_gen::{Hash, L2Level, RawTransaction, RawTransactions};
 use crate::wei::Wei;
 
 use primitive_types::U256;
@@ -29,7 +29,7 @@ const EVM_BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
 const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
-const CODE_HASH_SIZE: usize = 32;
+const HASH_MAX_SIZE: usize = 32;
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
@@ -90,7 +90,7 @@ pub fn read_account_code_hash<Host: Runtime>(
     account_path: &OwnedPath,
 ) -> Result<Vec<u8>, Error> {
     let path = concat(account_path, &EVM_ACCOUNT_CODE_HASH)?;
-    host.store_read(&path, 0, CODE_HASH_SIZE)
+    host.store_read(&path, 0, HASH_MAX_SIZE)
         .map_err(Error::from)
 }
 
@@ -147,6 +147,35 @@ pub fn store_account<Host: Runtime + RawRollupCore>(
     store_nonce(host, &account_path, account.nonce)?;
     store_balance(host, &account_path, account.balance)?;
     store_code_hash(host, &account_path, &account.code_hash)
+}
+
+pub fn read_current_block_number<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+) -> Result<u64, Error> {
+    let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_NUMBER)?;
+    let mut buffer = [0_u8; 8];
+
+    match load_value_slice(host, &path, &mut buffer) {
+        Ok(8) => Ok(u64::from_le_bytes(buffer)),
+        _ => Err(Error::Generic),
+    }
+}
+
+fn read_current_block_transactions<Host: Runtime>(
+    host: &mut Host,
+) -> Result<RawTransaction, Error> {
+    let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_TRANSACTIONS)?;
+    host.store_read(&path, 0, HASH_MAX_SIZE)
+        .map_err(Error::from)
+}
+
+pub fn read_current_block<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+) -> Result<L2Block, Error> {
+    let number = read_current_block_number(host)?;
+    let transactions = vec![read_current_block_transactions(host)?];
+
+    Ok(L2Block::new(number, transactions))
 }
 
 fn store_block_number<Host: Runtime + RawRollupCore>(
