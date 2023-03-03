@@ -1037,6 +1037,9 @@ module Inner = struct
     Array.init n (fun i ->
         if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
 
+  (* This is a hack to obtain an array from a Domain.t. *)
+  let domain_to_array d = inverse (Domains.inverse d)
+
   let diff_next_power_of_two x =
     let logx = Z.log2 (Z.of_int x) in
     if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
@@ -1239,8 +1242,7 @@ module Inner = struct
        [l = t.shard_length] here). *)
     assert (t.max_polynomial_length mod t.shard_length = 0) ;
     let domain_length = 2 * t.max_polynomial_length / t.shard_length in
-    (* This is a hack to obtain an array from a Domain.t. *)
-    let domain = Domains.build domain_length |> Domains.inverse |> inverse in
+    let domain = domain_to_array (Domains.build domain_length) in
     let srs = t.srs.raw.srs_g1 in
     (* Computes
        points = srs_{m-j-l} srs_{m-j-2l} srs_{m-j-3l} ... srs_{m-j-ql=r}
@@ -1331,10 +1333,8 @@ module Inner = struct
     (* Keep first n / l coefficients *)
     let points = Array.sub sum 0 (Array.length domain / 2) in
     (* Step 4. *)
-    (* This is a hack to convert a Domain.t to an array. *)
     let domain =
-      Domains.build_power_of_two t.shard_proofs_log
-      |> Domains.inverse |> inverse
+      domain_to_array (Domains.build_power_of_two t.shard_proofs_log)
     in
     Bls12_381.G1.fft ~domain ~points
 
