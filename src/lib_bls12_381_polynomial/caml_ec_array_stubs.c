@@ -26,9 +26,8 @@
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
 
-CAMLprim value caml_polynomial_carray_g1_add_inplace_stubs(value carray_g1_1,
-                                                           value carray_g1_2,
-                                                           value size) {
+CAMLprim value caml_bls12_381_polynomial_internal_carray_g1_add_inplace_stubs(
+    value carray_g1_1, value carray_g1_2, value size) {
   CAMLparam3(carray_g1_1, carray_g1_2, size);
   blst_p1 *carray_g1_1_c = Caml_ba_data_val(carray_g1_1);
   blst_p1 *carray_g1_2_c = Caml_ba_data_val(carray_g1_2);
@@ -41,9 +40,8 @@ CAMLprim value caml_polynomial_carray_g1_add_inplace_stubs(value carray_g1_1,
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_polynomial_carray_g2_add_inplace_stubs(value carray_g2_1,
-                                                           value carray_g2_2,
-                                                           value size) {
+CAMLprim value caml_bls12_381_polynomial_internal_carray_g2_add_inplace_stubs(
+    value carray_g2_1, value carray_g2_2, value size) {
   CAMLparam3(carray_g2_1, carray_g2_2, size);
   blst_p2 *carray_g2_1_c = Caml_ba_data_val(carray_g2_1);
   blst_p2 *carray_g2_2_c = Caml_ba_data_val(carray_g2_2);
@@ -56,7 +54,8 @@ CAMLprim value caml_polynomial_carray_g2_add_inplace_stubs(value carray_g2_1,
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_polynomial_evaluations_mul_arrays_g1_stubs(
+CAMLprim value
+caml_bls12_381_polynomial_internal_evaluations_mul_arrays_g1_stubs(
     value res, value evaluations, value g1_arrays, value array_dimensions) {
   CAMLparam4(res, evaluations, array_dimensions, g1_arrays);
   int size_arrays_c = Int_val(Field(array_dimensions, 0));
@@ -79,7 +78,8 @@ CAMLprim value caml_polynomial_evaluations_mul_arrays_g1_stubs(
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_polynomial_evaluations_mul_arrays_g2_stubs(
+CAMLprim value
+caml_bls12_381_polynomial_internal_evaluations_mul_arrays_g2_stubs(
     value res, value evaluations, value g2_arrays, value array_dimensions) {
   CAMLparam4(res, evaluations, array_dimensions, g2_arrays);
   int size_arrays_c = Int_val(Field(array_dimensions, 0));
