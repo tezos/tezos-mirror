@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
+(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -4989,6 +4989,7 @@ module Protocol = Protocol
             octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
+            tree_encoding;
             data_encoding;
             irmin_pack;
             irmin_pack_unix;
@@ -4996,6 +4997,7 @@ module Protocol = Protocol
             aches;
             aches_lwt;
             injector |> if_some |> open_;
+            octez_scoru_wasm;
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             prometheus_app |> if_ N.(number >= 016);

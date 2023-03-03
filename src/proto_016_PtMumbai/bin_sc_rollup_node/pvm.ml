@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -68,6 +68,11 @@ module type S = sig
     start_chunk:Sc_rollup.Dissection_chunk.t ->
     our_stop_chunk:Sc_rollup.Dissection_chunk.t ->
     Sc_rollup.Tick.t list
+
+  module RPC : sig
+    (** Build RPC directory of the PVM *)
+    val build_directory : Node_context.rw -> unit Environment.RPC_directory.t
+  end
 
   (** State storage for this PVM. *)
   module State : sig

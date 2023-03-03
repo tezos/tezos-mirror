@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,18 +49,57 @@ module type TreeS =
     with type key = string list
      and type value = bytes
 
-module Make_backend (Tree : TreeS) = struct
+module Make_wrapped_tree (Tree : TreeS) :
+  Tezos_tree_encoding.TREE with type tree = Tree.tree = struct
   type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
 
-  include Tezos_scoru_wasm_fast.Pvm.Make (struct
-    include Tree
+  include Tree
 
-    let select = function
-      | PVM_tree t -> t
-      | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
+  let select = function
+    | PVM_tree t -> t
+    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
-    let wrap t = PVM_tree t
-  end)
+  let wrap t = PVM_tree t
+end
+
+module Make_backend (Tree : TreeS) =
+  Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+
+module Make_durable_state
+    (T : Tezos_tree_encoding.TREE with type tree = Context.tree) :
+  Wasm_2_0_0_rpc.Durable_state with type state = T.tree = struct
+  module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
+
+  type state = T.tree
+
+  let decode_durable tree =
+    Tree_encoding_runner.decode
+      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
+      tree
+
+  let value_length tree key_str =
+    let open Lwt_syntax in
+    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+    let* durable = decode_durable tree in
+    let+ res_opt = Tezos_scoru_wasm.Durable.find_value durable key in
+    Option.map Tezos_lazy_containers.Chunked_byte_vector.length res_opt
+
+  let lookup tree key_str =
+    let open Lwt_syntax in
+    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+    let* durable = decode_durable tree in
+    let* res_opt = Tezos_scoru_wasm.Durable.find_value durable key in
+    match res_opt with
+    | None -> return_none
+    | Some v ->
+        let+ bts = Tezos_lazy_containers.Chunked_byte_vector.to_bytes v in
+        Some bts
+
+  let list tree key_str =
+    let open Lwt_syntax in
+    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+    let* durable = decode_durable tree in
+    Tezos_scoru_wasm.Durable.list durable key
 end
 
 module Impl : Pvm.S = struct
@@ -73,6 +112,9 @@ module Impl : Pvm.S = struct
   let new_dissection = Game_helpers.Wasm.new_dissection
 
   module State = Context.PVMState
+  module Durable_state =
+    Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
+  module RPC = Wasm_2_0_0_rpc.Make_RPC (Durable_state)
 
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"
