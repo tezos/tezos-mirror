@@ -28,8 +28,6 @@ type 'a t = 'a Lwt_watcher.input
 
 let init () = Lwt_watcher.create_input ()
 
-let publish streamer hash =
-  Lwt_result_syntax.return @@ Lwt_watcher.notify streamer hash
+let publish streamer hash = Lwt_watcher.notify streamer hash
 
-let handle_subscribe streamer =
-  Lwt_result_syntax.return @@ Lwt_watcher.create_stream streamer
+let handle_subscribe streamer = Lwt_watcher.create_stream streamer

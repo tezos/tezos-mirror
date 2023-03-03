@@ -47,8 +47,8 @@ let test_simple_pub_sub () =
   let open Lwt_result_syntax in
   let open Data_streamer in
   let streamer = init () in
-  let* stream, stopper = handle_subscribe streamer in
-  let* () = publish streamer dac_hash_1 in
+  let stream, stopper = handle_subscribe streamer in
+  let () = publish streamer dac_hash_1 in
   let*! next = Lwt_stream.next stream in
   let () = Lwt_watcher.shutdown stopper in
   let*! is_empty = Lwt_stream.is_empty stream in
@@ -72,10 +72,10 @@ let test_subscription_time () =
   let open Lwt_result_syntax in
   let open Data_streamer in
   let streamer = init () in
-  let* stream_1, _stopper_1 = handle_subscribe streamer in
-  let* () = publish streamer dac_hash_1 in
-  let* stream_2, _stopper_2 = handle_subscribe streamer in
-  let* () = publish streamer dac_hash_2 in
+  let stream_1, _stopper_1 = handle_subscribe streamer in
+  let () = publish streamer dac_hash_1 in
+  let stream_2, _stopper_2 = handle_subscribe streamer in
+  let () = publish streamer dac_hash_2 in
   let*! subscriber_1_first = Lwt_stream.next stream_1 in
   let () = assert_equal_string dac_hash_1 subscriber_1_first in
   let*! subscriber_1_second = Lwt_stream.next stream_1 in
@@ -96,10 +96,10 @@ let test_closing_subscriber_stream () =
   let open Lwt_result_syntax in
   let open Data_streamer in
   let streamer = init () in
-  let* stream_1, stopper_1 = handle_subscribe streamer in
-  let* stream_2, _stopper_2 = handle_subscribe streamer in
+  let stream_1, stopper_1 = handle_subscribe streamer in
+  let stream_2, _stopper_2 = handle_subscribe streamer in
   let () = Lwt_watcher.shutdown stopper_1 in
-  let* () = publish streamer dac_hash_1 in
+  let () = publish streamer dac_hash_1 in
   let*! is_empty = Lwt_stream.is_empty stream_1 in
   let () = Assert.assert_true "[stream_1]: expected empty stream." is_empty in
   let*! subscriber_2_first = Lwt_stream.next stream_2 in

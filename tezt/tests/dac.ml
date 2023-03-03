@@ -975,13 +975,13 @@ let register ~protocols =
     ~threshold:1
     ~dac_members:1
     protocols ;
-  (* scenario_with_layer1_and_legacy_dac_nodes
-     ~threshold:0
-     ~dac_members:0
-     ~tags:["dac"; "dac_node"]
-     "dac_streaming_of_root_hashes_in_legacy_mode"
-     Legacy.test_streaming_of_root_hashes
-     protocols ; *)
+  scenario_with_layer1_and_legacy_dac_nodes
+    ~threshold:0
+    ~dac_members:0
+    ~tags:["dac"; "dac_node"]
+    "dac_streaming_of_root_hashes_in_legacy_mode"
+    Legacy.test_streaming_of_root_hashes
+    protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
     ~dac_members:0
