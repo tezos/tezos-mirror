@@ -56,6 +56,18 @@ let () =
     (fun path -> Cannot_create_reveal_data_dir path)
 
 module Keys = struct
+  type t = {
+    public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
+    public_key_opt : Tezos_crypto.Aggregate_signature.public_key option;
+    aggregate_sk_uris : Client_keys.aggregate_sk_uri;
+  }
+
+  let get_public_key_hash t = t.public_key_hash
+
+  let get_public_key_opt t = t.public_key_opt
+
+  let get_aggregate_sk_uris t = t.aggregate_sk_uris
+
   let get_address_keys cctxt address =
     let open Lwt_result_syntax in
     let open Tezos_client_base.Client_keys in
@@ -76,12 +88,18 @@ module Keys = struct
             | None ->
                 let*! () = Event.(emit dac_account_cannot_sign address) in
                 return_none
-            | Some sk_uri -> return_some (pkh, pk, sk_uri)))
+            | Some sk_uri ->
+                return_some
+                  {
+                    public_key_hash = pkh;
+                    public_key_opt = pk;
+                    aggregate_sk_uris = sk_uri;
+                  }))
 
   let get_public_key cctxt address =
     let open Lwt_result_syntax in
     let+ address_keys_opt = get_address_keys cctxt address in
-    Option.bind address_keys_opt (fun (_pkh, pk_opt, _sk_uri) -> pk_opt)
+    Option.bind address_keys_opt (fun t -> get_public_key_opt t)
 
   let get_keys ~addresses ~threshold cctxt =
     let open Lwt_result_syntax in

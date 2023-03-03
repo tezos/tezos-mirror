@@ -206,8 +206,10 @@ let run ~data_dir cctxt =
     dac_accounts
     |> List.map (fun account_opt ->
            match account_opt with
-           | None -> (None, None)
-           | Some (_pkh, pk_opt, sk_uri) -> (pk_opt, Some sk_uri))
+           | Some account ->
+               ( Dac_manager.Keys.get_public_key_opt account,
+                 Some (Dac_manager.Keys.get_aggregate_sk_uris account) )
+           | None -> (None, None))
     |> List.split
   in
   let coordinator_cctxt_opt =

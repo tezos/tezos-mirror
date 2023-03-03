@@ -32,17 +32,26 @@ type error +=
 module Keys : sig
   (** [get_keys ~addresses ~threshold cctxt] returns the aliases and keys associated with the
       aggregate signature addresses in the tezos wallet of [cctxt]. *)
+  type t
+
+  (** [get_public_key_hash] returns the [Tezos_crypto.Aggregate_signature.public_key_hash] given a [t]. *)
+  val get_public_key_hash :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash
+
+  (** [aggregate_sk_uris] returns the [Tezos_crypto.Aggregate_signature.public_key option] given a [t]. *)
+  val get_public_key_opt :
+    t -> Tezos_crypto.Aggregate_signature.public_key option
+
+  (** [aggregate_sk_uris] returns the [Client_keys.aggregate_sk_uri] given a [t]. *)
+  val get_aggregate_sk_uris : t -> Client_keys.aggregate_sk_uri
+
+  (** [get_keys ~addresses ~threshold cctxt config] returns the aliases and keys associated with the
+      aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)
   val get_keys :
     addresses:Tezos_crypto.Aggregate_signature.public_key_hash trace ->
     threshold:int ->
     #Client_context.wallet ->
-    (Tezos_crypto.Aggregate_signature.public_key_hash
-    * Tezos_crypto.Aggregate_signature.public_key option
-    * Client_keys.aggregate_sk_uri)
-    option
-    list
-    tzresult
-    Lwt.t
+    t option list tzresult Lwt.t
 
   (** [get_public_key cctxt pkh] returns the public key associated with the given [pkh] if it can 
       be found in [cctxt].
