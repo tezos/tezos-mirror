@@ -15,5 +15,8 @@
   (names
    caml_bls12_381_polynomial_internal_polynomial_stubs
    caml_bls12_381_polynomial_internal_srs_stubs
-   bls12_381_polynomial_internal_polynomial))
+   caml_bls12_381_polynomial_internal_ec_array_stubs
+   caml_bls12_381_polynomial_internal_fft_stubs
+   bls12_381_polynomial_internal_polynomial
+   bls12_381_polynomial_internal_fft))
  (c_library_flags (-Wall -Wextra :standard)))
