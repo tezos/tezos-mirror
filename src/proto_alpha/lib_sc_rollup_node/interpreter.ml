@@ -200,16 +200,18 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         Layer1.{hash = block.header.predecessor; level = pred_level}
     in
     let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
-    let* {predecessor; predecessor_timestamp; messages} =
+    let* {is_migration_block; predecessor; predecessor_timestamp; messages} =
       Node_context.get_messages node_ctxt block.header.inbox_witness
     in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4918 Inject
-       [Protocol_migration (Proto_017)] when migrating to proto_alpha
-       (N after next snapshot). *)
     let messages =
-      Sc_rollup.Inbox_message.Internal Start_of_level
-      :: Internal (Info_per_level {predecessor; predecessor_timestamp})
-      :: messages
+      let open Sc_rollup.Inbox_message in
+      Internal Start_of_level
+      ::
+      (if is_migration_block then
+       [Internal Sc_rollup.Inbox_message.protocol_migration_internal_message]
+      else [])
+      @ Internal (Info_per_level {predecessor; predecessor_timestamp})
+        :: messages
       @ [Internal End_of_level]
     in
     let>* state, _counter, _level, _fuel =

@@ -40,7 +40,7 @@ module Messages :
   INDEXED_FILE
     with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
      and type value := Sc_rollup.Inbox_message.t list
-     and type header := Block_hash.t * Timestamp.t * int
+     and type header := bool * Block_hash.t * Timestamp.t * int
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :

@@ -79,10 +79,21 @@ let get_messages Node_context.{l1_ctxt; _} head =
         {apply; apply_internal})
   in
   let ({predecessor; _} : Block_header.shell_header) = block.header.shell in
-  let* {timestamp = predecessor_timestamp; _} =
+  let* {
+         timestamp = predecessor_timestamp;
+         proto_level = predecessor_proto_level;
+         _;
+       } =
     Layer1.fetch_tezos_shell_header l1_ctxt predecessor
   in
-  return (List.rev rev_messages, predecessor_timestamp, predecessor)
+  let is_migration_block =
+    block.header.shell.proto_level <> predecessor_proto_level
+  in
+  return
+    ( is_migration_block,
+      List.rev rev_messages,
+      predecessor_timestamp,
+      predecessor )
 
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
@@ -95,7 +106,8 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages ~predecessor_timestamp ~predecessor inbox messages =
+let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
+    messages =
   let open Lwt_result_syntax in
   let no_history = Sc_rollup.Inbox.History.empty ~capacity:0L in
   lift
@@ -104,11 +116,8 @@ let add_messages ~predecessor_timestamp ~predecessor inbox messages =
              inbox,
              witness,
              messages_with_protocol_internal_messages ) =
-       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4918 Inject
-          [Protocol_migration (Proto_017)] when migrating to proto_alpha
-          (N after next snapshot). *)
        Sc_rollup.Inbox.add_all_messages
-         ~first_block:false
+         ~first_block:is_migration_block
          ~predecessor_timestamp
          ~predecessor
          no_history
@@ -150,7 +159,10 @@ let process_head (node_ctxt : _ Node_context.t)
         return (Context.empty node_ctxt.context)
       else Node_context.checkout_context node_ctxt predecessor.hash
     in
-    let* collected_messages, predecessor_timestamp, predecessor_hash =
+    let* ( is_migration_block,
+           collected_messages,
+           predecessor_timestamp,
+           predecessor_hash ) =
       get_messages node_ctxt head_hash
     in
     let*! () =
@@ -164,6 +176,7 @@ let process_head (node_ctxt : _ Node_context.t)
            inbox,
            messages_with_protocol_internal_messages ) =
       add_messages
+        ~is_migration_block
         ~predecessor_timestamp
         ~predecessor:predecessor_hash
         inbox
@@ -176,6 +189,7 @@ let process_head (node_ctxt : _ Node_context.t)
         node_ctxt
         witness_hash
         {
+          is_migration_block;
           predecessor = predecessor_hash;
           predecessor_timestamp;
           messages = collected_messages;
@@ -200,7 +214,8 @@ let process_head (node_ctxt : _ Node_context.t)
 
 let start () = Inbox_event.starting ()
 
-let payloads_history_of_messages ~predecessor ~predecessor_timestamp messages =
+let payloads_history_of_messages ~is_migration_block ~predecessor
+    ~predecessor_timestamp messages =
   let open Result_syntax in
   Environment.wrap_tzresult
   @@ let* dummy_inbox =
@@ -215,11 +230,8 @@ let payloads_history_of_messages ~predecessor ~predecessor_timestamp messages =
             _inbox,
             _witness,
             _messages_with_protocol_internal_messages ) =
-       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4918 Inject
-          [Protocol_migration (Proto_017)] when migrating to proto_alpha
-          (N after next snapshot). *)
        Sc_rollup.Inbox.add_all_messages
-         ~first_block:false
+         ~first_block:is_migration_block
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)
