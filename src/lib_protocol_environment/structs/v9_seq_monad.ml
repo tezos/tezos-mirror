@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,37 +23,78 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Bare_functor_outputs.Set.S
+include Tezos_error_monad.TzLwtreslib.Seq
 
-module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t = struct
-  open Seq
-  include Stdlib.Set.Make (Ord)
+let first s = find (fun _ -> true) s
 
-  let iter_e f t = E.iter f (to_seq t)
+let fold_left_e = E.fold_left
 
-  let iter_s f t = S.iter f (to_seq t)
+let fold_left_s = S.fold_left
 
-  let iter_p f t = iter_p f (to_seq t)
+let fold_left_es = ES.fold_left
 
-  let iter_es f t = ES.iter f (to_seq t)
+let iter_e = E.iter
 
-  let iter_ep f t = iter_ep f (to_seq t)
+let iter_s = S.iter
 
-  let fold_e f t init = E.fold_left (fun acc e -> f e acc) init (to_seq t)
+let iter_es = ES.iter
 
-  let fold_s f t init = S.fold_left (fun acc e -> f e acc) init (to_seq t)
+let iteri_e = E.iteri
 
-  let fold_es f t init = ES.fold_left (fun acc e -> f e acc) init (to_seq t)
+let iteri_s = S.iteri
 
-  let min_elt = min_elt_opt
+let iteri_es = ES.iteri
 
-  let max_elt = max_elt_opt
+let fold_lefti_e = E.fold_lefti
 
-  let choose = choose_opt
+let fold_lefti_s = S.fold_lefti
 
-  let find = find_opt
+let fold_lefti_es = ES.fold_lefti
 
-  let find_first = find_first_opt
+let for_all_e = E.for_all
 
-  let find_last = find_last_opt
-end
+let for_all_s = S.for_all
+
+let for_all_es = ES.for_all
+
+let exists_e = E.exists
+
+let exists_s = S.exists
+
+let exists_es = ES.exists
+
+let find_e = E.find
+
+let find_s = S.find
+
+let find_es = ES.find
+
+let find_map_e = E.find_map
+
+let find_map_s = S.find_map
+
+let find_map_es = ES.find_map
+
+let iter2_e = E.iter2
+
+let iter2_s = S.iter2
+
+let iter2_es = ES.iter2
+
+let fold_left2_e = E.fold_left2
+
+let fold_left2_s = S.fold_left2
+
+let fold_left2_es = ES.fold_left2
+
+let for_all2_e = E.for_all2
+
+let for_all2_s = S.for_all2
+
+let for_all2_es = ES.for_all2
+
+let exists2_e = E.exists2
+
+let exists2_s = S.exists2
+
+let exists2_es = ES.exists2

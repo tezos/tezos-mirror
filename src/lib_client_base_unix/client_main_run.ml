@@ -38,7 +38,7 @@ let builtin_commands =
       (fixed ["list"; "understood"; "protocols"])
       (fun () (cctxt : #Client_context.full) ->
         let* () =
-          Seq.iter_s
+          Seq.S.iter
             (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
             (Client_commands.get_versions ())
         in

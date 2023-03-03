@@ -180,7 +180,7 @@ struct
 
   module Compare = Compare
   module Either = Either
-  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module Seq = Tezos_protocol_environment_structs.V5.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
   module Char = Char
   module Bytes = Bytes

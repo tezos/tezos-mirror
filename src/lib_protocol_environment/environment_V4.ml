@@ -172,7 +172,7 @@ struct
   end
 
   module Compare = Compare
-  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module Seq = Tezos_protocol_environment_structs.V4.Seq
 
   module List = struct
     include Tezos_error_monad.TzLwtreslib.List

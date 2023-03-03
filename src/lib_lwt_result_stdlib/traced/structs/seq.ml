@@ -34,4 +34,29 @@ module Make (Monad : Traced_sigs.Monad.S) :
       | Cons (item, seq) -> iter_ep f seq (Lwt.apply f item :: acc)
     in
     iter_ep f seq []
+
+  let iteri_ep f seq =
+    let rec iteri_ep f i seq (acc : (unit, 'error) result Lwt.t list) =
+      match seq () with
+      | Nil -> Monad.Lwt_traced_result_syntax.join acc
+      | Cons (item, seq) ->
+          iteri_ep f (i + 1) seq (Bare_structs.Monad.lwt_apply2 f i item :: acc)
+    in
+    iteri_ep f 0 seq []
+
+  let iter2_ep f seqa seqb =
+    let rec iter2_ep f seqa seqb (acc : (unit, 'error) result Lwt.t list) =
+      let a = seqa () in
+      let b = seqb () in
+      match (a, b) with
+      | Nil, Nil | Nil, Cons _ | Cons _, Nil ->
+          Monad.Lwt_traced_result_syntax.join acc
+      | Cons (itema, seqa), Cons (itemb, seqb) ->
+          iter2_ep
+            f
+            seqa
+            seqb
+            (Bare_structs.Monad.lwt_apply2 f itema itemb :: acc)
+    in
+    iter2_ep f seqa seqb []
 end

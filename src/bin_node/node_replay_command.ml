@@ -429,7 +429,7 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
                   validator_process
                   (`Level starts)
               else
-                Seq.iter_es
+                Seq.ES.iter
                   (replay_one_block strict main_chain_store validator_process)
                   (Seq.unfold
                      (fun l ->

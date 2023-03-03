@@ -95,7 +95,7 @@ module R : S = struct
   let read_values t seq =
     let open Lwt_syntax in
     seq |> Seq_s.of_seq
-    |> Seq_s.map_s (fun key ->
+    |> Seq_s.S.map (fun key ->
            let* value = read_value t key in
            Lwt.return (key, value))
 end
@@ -396,28 +396,29 @@ let run_scenario {pool_size; values; overwritten; number_of_keys; _} scenario =
       | Read_values seq ->
           let left_promise =
             let seq_s = L.read_values left seq in
-            Seq_s.iter_e (fun _ -> Ok ()) seq_s
+            Seq_s.E.iter (fun _ -> Ok ()) seq_s
           in
           let right_promise =
             let seq_s = R.read_values right seq in
-            Seq_s.iter_e (fun _ -> Ok ()) seq_s
+            Seq_s.E.iter (fun _ -> Ok ()) seq_s
           in
           tzjoin [left_promise; right_promise]
     in
     let finalize () =
       let left = L.init ?pool ~lru_size:number_of_keys file_of_key in
-      Seq.iter_es
+      Seq.ES.iter
         (fun key ->
           let*! left_result = L.read_value left key in
           let*! right_result = R.read_value right key in
           compare_result key left_result right_result)
-        (Seq.init number_of_keys (fun i -> i))
+        (WithExceptions.Result.get_ok ~loc:__LOC__
+        @@ Seq.init ~when_negative_length:() number_of_keys (fun i -> i))
     in
     match next_actions with
     | [] ->
         let* () = promise in
         let* () =
-          Seq_s.iter_es
+          Seq_s.ES.iter
             (function Ok () -> return_unit | Error err -> fail err)
             promises_running_seq
         in
@@ -426,7 +427,7 @@ let run_scenario {pool_size; values; overwritten; number_of_keys; _} scenario =
     | (Sequential, action) :: next_actions ->
         let* () = promise in
         let* () =
-          Seq_s.iter_es
+          Seq_s.ES.iter
             (function Ok () -> return_unit | Error err -> fail err)
             promises_running_seq
         in

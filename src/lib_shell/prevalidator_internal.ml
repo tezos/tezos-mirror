@@ -720,7 +720,7 @@ module Make_s
       let open Lwt_syntax in
       let may_fetch_operation = may_fetch_operation shell (Some peer) in
       let* () = List.iter_s may_fetch_operation mempool.Mempool.known_valid in
-      Seq.iter_s
+      Seq.S.iter
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
@@ -1378,7 +1378,7 @@ module Make
         }
       in
       let*! () =
-        Seq.iter_s
+        Seq.S.iter
           (may_fetch_operation pv.shell None)
           (Operation_hash.Set.to_seq fetching)
       in

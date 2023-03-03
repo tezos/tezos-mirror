@@ -80,7 +80,9 @@
 
     Functions with the [_s] suffix traverse their underlying collection
     sequentially, waiting for the promise associated to one element to resolve
-    before processing to the next element.
+    before processing to the next element. Note that for the [Seq*] modules (see
+    below) the sequential traversors are bundled under an [S] submodules rather
+    than suffixed with [_s].
 
     Functions with the [_p] suffix traverse their underlying collection
     concurrently, creating promises for all the elements and then waiting for
@@ -100,8 +102,10 @@
 
     Functions with the [_e] suffix traverse their underlying collection whilst
     wrapping the accumulator/result in a [result]. These functions have a
-    fail-early semantic: if one of the step returns an [Error _], then the whole
-    traversal is interrupted and returns the same [Error _].
+    fail-early semantic: if one of the steps returns an [Error _], then the whole
+    traversal is interrupted and returns the same [Error _]. Note that for the
+    [Seq*] modules (see below) the result-aware traversors are bundled under an
+    [E] submodules rather than suffixed with [_e].
 
     {3 Semantic of Lwt-result-aware functions}
 
@@ -114,7 +118,9 @@
     a [result] (like [_e] functions). These functions have a fail-early
     semantic: if one of the step returns a promise that resolves to an
     [Error _], then the whole traversal is interrupted and the returned promise
-    resolves to the same [Error _].
+    resolves to the same [Error _]. Note that for the [Seq*] modules (see below)
+    the Lwt-result-aware traversors are bundled under an [ES] submodules rather
+    than suffixed with [_es].
 
     Functions with the [_ep] suffix traverse their underlying collection
     concurrently (like [_p] functions) whilst wrapping the accumulator/result in
@@ -134,15 +140,20 @@
     the returned promise forces the whole sequence (and never resolves on
     infinite sequences).
 
-    In Lwtreslib, [Seq] does not provide these additional traversors that would
+    In Lwtreslib, [Seq] does not provide these additional transformers that would
     force the sequence simply due to the bad interaction of the Monads and the
-    type of sequences. Instead, Lwtreslib provides variants of [Seq] called
-    [Seq_e], [Seq_s], and [Seq_es] where the combination with the monad is baked
-    into the sequence type itself.
+    type of sequences. Instead, Lwtreslib provides
+
+    - A subset of traversors where the laziness and the monad mix well (e.g.,
+    [iter] but not [map]). These are exported under the modules [S], [E] and
+    [ES].
+
+    - Variants of [Seq] called [Seq_e], [Seq_s], and [Seq_es] where the
+    combination with the monad is baked into the sequence type itself.
 
     If you want to map a sequnence using an Lwt-returning function, you should
     first convert the sequence to an Lwt-aware sequence using [Seq_s.of_seq],
-    and then map this converted function using [Seq_s.map_s].
+    and then map this converted function using [Seq_s.S.map].
     Note that this returns a [Seq_s.t] sequence so further transformations will
     be within [Seq_s] and not within [Seq]. Once in a monad, you stay in the
     monad.

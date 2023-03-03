@@ -26,7 +26,7 @@
 (** The [S] signature is similar to {!Seq.S} except that suspended nodes are
     wrapped in a result-Lwt.
 
-    This allows some additional traversors ([map_ep], etc.) to be applied
+    This allows some additional traversors ([ES.map], etc.) to be applied
     lazily.
 
     The functions [of_seq] and [of_seq_*] allow conversion from vanilla
@@ -47,21 +47,34 @@ module type S = sig
 
   and ('a, 'e) t = unit -> (('a, 'e) node, 'e) result Lwt.t
 
-  val empty : ('a, 'e) t
+  include
+    Seqes.Sigs.SEQMON2ALL
+      with type ('a, 'e) mon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) t := ('a, 'e) t
 
-  val nil : ('a, 'e) node
+  module E :
+    Seqes.Sigs.SEQMON2TRANSFORMERS
+      with type ('a, 'e) mon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) callermon := ('a, 'e) result
+      with type ('a, 'e) t := ('a, 'e) t
 
-  val cons : 'a -> ('a, 'e) t -> ('a, 'e) t
+  module S :
+    Seqes.Sigs.SEQMON2TRANSFORMERS
+      with type ('a, 'e) mon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) callermon := 'a Lwt.t
+      with type ('a, 'e) t := ('a, 'e) t
+
+  module ES :
+    Seqes.Sigs.SEQMON2TRANSFORMERS
+      with type ('a, 'e) mon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) callermon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) t := ('a, 'e) t
 
   val cons_s : 'a Lwt.t -> ('a, 'e) t -> ('a, 'e) t
 
   val cons_e : ('a, 'e) result -> ('a, 'e) t -> ('a, 'e) t
 
   val cons_es : ('a, 'e) result Lwt.t -> ('a, 'e) t -> ('a, 'e) t
-
-  val append : ('a, 'e) t -> ('a, 'e) t -> ('a, 'e) t
-
-  val return : 'a -> ('a, 'e) t
 
   val return_e : ('a, 'e) result -> ('a, 'e) t
 
@@ -73,91 +86,15 @@ module type S = sig
 
   val interrupted_s : 'e Lwt.t -> ('a, 'e) t
 
-  val first : ('a, 'e) t -> ('a, 'e) result option Lwt.t
-
-  val fold_left : ('a -> 'b -> 'a) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
-
-  val fold_left_e :
-    ('a -> 'b -> ('a, 'e) result) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
-
-  val fold_left_e_discriminated :
-    ('a -> 'b -> ('a, 'f) result) ->
-    'a ->
-    ('b, 'e) t ->
-    ('a, ('e, 'f) Either.t) result Lwt.t
-
-  val fold_left_s :
-    ('a -> 'b -> 'a Lwt.t) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
-
-  val fold_left_es :
-    ('a -> 'b -> ('a, 'e) result Lwt.t) ->
-    'a ->
-    ('b, 'e) t ->
-    ('a, 'e) result Lwt.t
-
-  val fold_left_es_discriminated :
-    ('a -> 'b -> ('a, 'f) result Lwt.t) ->
-    'a ->
-    ('b, 'e) t ->
-    ('a, ('e, 'f) Either.t) result Lwt.t
-
-  val iter : ('a -> unit) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
-
-  val iter_e :
-    ('a -> (unit, 'e) result) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
-
-  val iter_e_discriminated :
-    ('a -> (unit, 'f) result) ->
-    ('a, 'e) t ->
-    (unit, ('e, 'f) Either.t) result Lwt.t
-
-  val iter_s : ('a -> unit Lwt.t) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
-
-  val iter_es :
-    ('a -> (unit, 'e) result Lwt.t) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
-
-  val iter_es_discriminated :
-    ('a -> (unit, 'f) result Lwt.t) ->
-    ('a, 'e) t ->
-    (unit, ('e, 'f) Either.t) result Lwt.t
-
-  val map : ('a -> 'b) -> ('a, 'e) t -> ('b, 'e) t
-
-  val map_e : ('a -> ('b, 'e) result) -> ('a, 'e) t -> ('b, 'e) t
-
-  val map_s : ('a -> 'b Lwt.t) -> ('a, 'e) t -> ('b, 'e) t
-
-  val map_es : ('a -> ('b, 'e) result Lwt.t) -> ('a, 'e) t -> ('b, 'e) t
-
   val map_error : ('e -> 'f) -> ('a, 'e) t -> ('a, 'f) t
 
   val map_error_s : ('e -> 'f Lwt.t) -> ('a, 'e) t -> ('a, 'f) t
 
-  val filter : ('a -> bool) -> ('a, 'e) t -> ('a, 'e) t
+  val take :
+    when_negative_length:'err -> int -> ('a, 'e) t -> (('a, 'e) t, 'err) result
 
-  val filter_e : ('a -> (bool, 'e) result) -> ('a, 'e) t -> ('a, 'e) t
-
-  val filter_s : ('a -> bool Lwt.t) -> ('a, 'e) t -> ('a, 'e) t
-
-  val filter_es : ('a -> (bool, 'e) result Lwt.t) -> ('a, 'e) t -> ('a, 'e) t
-
-  val filter_map : ('a -> 'b option) -> ('a, 'e) t -> ('b, 'e) t
-
-  val filter_map_e : ('a -> ('b option, 'e) result) -> ('a, 'e) t -> ('b, 'e) t
-
-  val filter_map_s : ('a -> 'b option Lwt.t) -> ('a, 'e) t -> ('b, 'e) t
-
-  val filter_map_es :
-    ('a -> ('b option, 'e) result Lwt.t) -> ('a, 'e) t -> ('b, 'e) t
-
-  val unfold : ('b -> ('a * 'b) option) -> 'b -> ('a, 'e) t
-
-  val unfold_s : ('b -> ('a * 'b) option Lwt.t) -> 'b -> ('a, 'e) t
-
-  val unfold_e : ('b -> (('a * 'b) option, 'e) result) -> 'b -> ('a, 'e) t
-
-  val unfold_es :
-    ('b -> (('a * 'b) option, 'e) result Lwt.t) -> 'b -> ('a, 'e) t
+  val drop :
+    when_negative_length:'err -> int -> ('a, 'e) t -> (('a, 'e) t, 'err) result
 
   val of_seq : 'a Stdlib.Seq.t -> ('a, 'e) t
 

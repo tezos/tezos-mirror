@@ -107,7 +107,7 @@ let write_shards store commitment shards =
   let commitment_dir = commitment_dir store commitment in
   let*! () = mkdir_if_not_exists commitment_dir in
   shards
-  |> Seq.iter_es (fun ({index; share} : Cryptobox.shard) ->
+  |> Seq.ES.iter (fun ({index; share} : Cryptobox.shard) ->
          let filepath = Filename.concat commitment_dir (string_of_int index) in
          if Mutexes.mem store.mutexes filepath then return_unit
          else

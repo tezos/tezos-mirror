@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,37 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Bare_functor_outputs.Set.S
+include Tezos_error_monad.TzLwtreslib.Seq
 
-module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t = struct
-  open Seq
-  include Stdlib.Set.Make (Ord)
+let first s = find (fun _ -> true) s
 
-  let iter_e f t = E.iter f (to_seq t)
+let fold_left_e = E.fold_left
 
-  let iter_s f t = S.iter f (to_seq t)
+let fold_left_s = S.fold_left
 
-  let iter_p f t = iter_p f (to_seq t)
+let fold_left_es = ES.fold_left
 
-  let iter_es f t = ES.iter f (to_seq t)
+let iter_e = E.iter
 
-  let iter_ep f t = iter_ep f (to_seq t)
+let iter_s = S.iter
 
-  let fold_e f t init = E.fold_left (fun acc e -> f e acc) init (to_seq t)
-
-  let fold_s f t init = S.fold_left (fun acc e -> f e acc) init (to_seq t)
-
-  let fold_es f t init = ES.fold_left (fun acc e -> f e acc) init (to_seq t)
-
-  let min_elt = min_elt_opt
-
-  let max_elt = max_elt_opt
-
-  let choose = choose_opt
-
-  let find = find_opt
-
-  let find_first = find_first_opt
-
-  let find_last = find_last_opt
-end
+let iter_es = ES.iter
