@@ -2622,8 +2622,8 @@ let octez_requester =
       ]
 
 let _octez_requester_tests =
-  tests
-    ["test_requester"; "test_fuzzing_requester"]
+  tezt
+    ["test_requester"; "test_fuzzing_requester"; "shared"]
     ~path:"src/lib_requester/test"
     ~opam:"tezos-requester"
     ~deps:
@@ -2635,7 +2635,7 @@ let _octez_requester_tests =
         octez_stdlib |> open_;
         octez_stdlib_unix;
         octez_requester |> open_;
-        alcotest_lwt;
+        alcotezt;
         qcheck_alcotest;
       ]
 
