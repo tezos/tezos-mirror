@@ -5,6 +5,7 @@ homepage: "https://gitlab.com/nomadic-labs/data-encoding"
 bug-reports: "https://gitlab.com/nomadic-labs/data-encoding/issues"
 dev-repo: "git+https://gitlab.com/nomadic-labs/data-encoding.git"
 license: "MIT"
+version: "1.0.0"
 depends: [
   "ocaml" { >= "4.10" }
   "dune" { >= "3.0" }

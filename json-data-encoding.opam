@@ -6,6 +6,7 @@ authors: [ "Nomadic Labs" "Ocamlpro" ]
 homepage: "https://gitlab.com/nomadic-labs/json-data-encoding"
 bug-reports: "https://gitlab.com/nomadic-labs/json-data-encoding/issues"
 license: "MIT"
+version: "1.0.0"
 dev-repo: "git+https://gitlab.com/nomadic-labs/json-data-encoding"
 
 build: [
