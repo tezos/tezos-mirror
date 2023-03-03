@@ -24,7 +24,6 @@
 #define BLS12_381_POLYNOMIAL_INTERNAL_FFT_H
 
 #include "blst.h"
-#include <caml/mlvalues.h>
 
 // H: domain_size = polynomial degree
 // Implementation with side effect. The FFT will be inplace, i.e. the array is
