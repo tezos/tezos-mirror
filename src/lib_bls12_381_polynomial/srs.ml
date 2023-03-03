@@ -122,7 +122,7 @@ module Make (Elt : GElt_sig) = struct
   let of_array caml_array =
     Carray.of_array (Array.map G.affine_of_jacobian caml_array)
 
-  let empty = Bigstringaf.empty
+  let empty = Carray.empty
 
   let generate_insecure d x =
     let xi = ref G.one in
@@ -184,7 +184,9 @@ module Make (Elt : GElt_sig) = struct
                 offset
                 poly_length) ;
       let res = G.(copy zero) in
-      let return_code = Elt.pippenger res srs poly offset len in
+      let return_code =
+        Elt.pippenger res (Carray.to_bigstring srs) poly offset len
+      in
       assert (return_code = 0) ;
       res
 end
@@ -197,6 +199,10 @@ module Elt_g1 = struct
   let size = G.size_in_bytes
 
   let allocate () = G.(affine_of_jacobian zero)
+
+  let zero = G.(affine_of_jacobian zero)
+
+  let eq a b = G.eq (G.jacobian_of_affine a) (G.jacobian_of_affine b)
 
   external uncompress : t -> bytes -> int = "caml_blst_p1_uncompress_stubs"
     [@@noalloc]
@@ -214,6 +220,10 @@ module Elt_g2 = struct
   let size = G.size_in_bytes
 
   let allocate () = G.(affine_of_jacobian zero)
+
+  let zero = G.(affine_of_jacobian zero)
+
+  let eq a b = G.eq (G.jacobian_of_affine a) (G.jacobian_of_affine b)
 
   external uncompress : G.affine -> bytes -> int
     = "caml_blst_p2_uncompress_stubs"

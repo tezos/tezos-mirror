@@ -28,9 +28,13 @@ module Scalar = Bls12_381.Fr
 module Elt = struct
   type t = Scalar.t
 
-  let size = Bls12_381.Fr.size_in_bytes
+  let size = Scalar.size_in_bytes
 
-  let allocate () = Bls12_381.Fr.(copy zero)
+  let zero = Scalar.zero
+
+  let allocate () = Scalar.(copy zero)
+
+  let eq = Scalar.eq
 end
 
 include Carray.Make (Elt)
