@@ -3911,14 +3911,30 @@ end = struct
       let number = Name.number name in
       let path = Name.base_path name in
       let _integration_consensus =
-        test
-          "main"
+        tezt
+          [
+            "test_main";
+            "test_baking";
+            "test_consensus_key";
+            "test_deactivation";
+            "test_delegation";
+            "test_double_baking";
+            "test_double_endorsement";
+            "test_double_preendorsement";
+            "test_endorsement";
+            "test_frozen_deposits";
+            "test_helpers_rpcs";
+            "test_participation";
+            "test_preendorsement_functor";
+            "test_preendorsement";
+            "test_seed";
+          ]
           ~path:(path // "lib_protocol/test/integration/consensus")
           ~with_macos_security_framework:true
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
-              alcotest_lwt;
+              alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;

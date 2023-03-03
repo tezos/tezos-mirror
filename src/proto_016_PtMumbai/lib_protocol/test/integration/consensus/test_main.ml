@@ -34,18 +34,19 @@ let () =
   Alcotest_lwt.run
     "protocol > integration > consensus"
     [
-      ("endorsement", Test_endorsement.tests);
-      ("preendorsement", Test_preendorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double preendorsement", Test_double_preendorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("deactivation", Test_deactivation.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("participation monitoring", Test_participation.tests);
-      ("frozen deposits", Test_frozen_deposits.tests);
-      ("consensus key", Test_consensus_key.tests);
+      (Protocol.name ^ ": endorsement", Test_endorsement.tests);
+      (Protocol.name ^ ": preendorsement", Test_preendorsement.tests);
+      (Protocol.name ^ ": double endorsement", Test_double_endorsement.tests);
+      ( Protocol.name ^ ": double preendorsement",
+        Test_double_preendorsement.tests );
+      (Protocol.name ^ ": double baking", Test_double_baking.tests);
+      (Protocol.name ^ ": seed", Test_seed.tests);
+      (Protocol.name ^ ": baking", Test_baking.tests);
+      (Protocol.name ^ ": delegation", Test_delegation.tests);
+      (Protocol.name ^ ": deactivation", Test_deactivation.tests);
+      (Protocol.name ^ ": helpers rpcs", Test_helpers_rpcs.tests);
+      (Protocol.name ^ ": participation monitoring", Test_participation.tests);
+      (Protocol.name ^ ": frozen deposits", Test_frozen_deposits.tests);
+      (Protocol.name ^ ": consensus key", Test_consensus_key.tests);
     ]
   |> Lwt_main.run
