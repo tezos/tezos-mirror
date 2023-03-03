@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-#include "fft.h"
+#include "bls12_381_polynomial_internal_fft.h"
 #include "caml_bls12_381_stubs.h"
 #include <caml/fail.h>
 #include <string.h>
