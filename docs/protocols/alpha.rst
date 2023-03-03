@@ -75,6 +75,14 @@ Minor Changes
 - Relax (pre)endorsements branch condition and allow denunciations of
   a same endorsement on different branches. (MR :gl:`!7828`)
 
+- Relax (pre)endorsement checks during mempool validation. The mempool
+  is now able to propagate (pre)endorsements for blocks in the near
+  past or future, and from close cousin branches. Notably, the
+  preendorsements that the baker is able to inject as soon as a block
+  has been validated (without waiting for its full application) can
+  now be immediately propagated by the mempool, allowing for a much
+  faster PQC. (MR :gl:`!7815`)
+
 Internal
 --------
 
