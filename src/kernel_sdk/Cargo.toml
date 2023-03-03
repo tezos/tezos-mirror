@@ -6,5 +6,6 @@
 
 members = [
   "tezos_smart_rollup_core",
-  "tezos_smart_rollup_host"
+  "tezos_smart_rollup_host",
+  "installer_kernel"
 ]
