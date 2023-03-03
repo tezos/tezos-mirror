@@ -876,10 +876,15 @@ module Inner = struct
          = O(t.max_polynomial_length * t.number_of_shards / t.redundancy_factor)].
          It is the most costly operation of this function. *)
       let p1, p2 = partition_products shards in
-      (* A(x) is the product of [p1] and [p2]. *)
+      (* A(x) is the product of [p1] and [p2], and has degree [polynomial_length] *)
+      assert (
+        Polynomials.degree p1 + Polynomials.degree p2 = t.max_polynomial_length) ;
+
       let a_poly =
         polynomials_product t.domain_2_times_polynomial_length [p1; p2]
       in
+
+      assert (Polynomials.degree a_poly = t.max_polynomial_length) ;
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
@@ -946,18 +951,23 @@ module Inner = struct
       in
       let n_poly = compute_n t eval_a' shards in
 
+      let len p =
+        if Polynomials.is_zero p then 1
+        else min t.max_polynomial_length (Polynomials.degree p + 1)
+      in
+
       (* 5. Computing B(x).
          B(x) = P(x) / A(x) = -sum_{i=0}^{k-1} N(w^{-i}) x^i.
 
          B(x) is thus given by the first k components
          of -n * IFFT_n(N). *)
       let b =
-        Polynomials.copy
-          ~len:t.max_polynomial_length
-          (Evaluations.interpolation_fft2
-             t.domain_erasure_encoded_polynomial_length
-             n_poly)
+        Evaluations.interpolation_fft2
+          t.domain_erasure_encoded_polynomial_length
+          n_poly
       in
+      let b = Polynomials.copy ~len:(len b) b in
+
       Polynomials.mul_by_scalar_inplace
         b
         Scalar.(negate (of_int t.erasure_encoded_polynomial_length))
@@ -970,11 +980,9 @@ module Inner = struct
       let p =
         polynomials_product t.domain_2_times_polynomial_length [a_poly; b]
       in
-      let len =
-        if Polynomials.is_zero p then 1
-        else min t.max_polynomial_length (Polynomials.degree p + 1)
-      in
-      Ok (Polynomials.copy ~len p)
+      (* P has degree [<= max_polynomial_length - 1] so [<= max_polynomial_length]
+         coefficients. *)
+      Ok (Polynomials.copy ~len:(len p) p)
 
   let commit t p =
     let degree = Polynomials.degree p in
