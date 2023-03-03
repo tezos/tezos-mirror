@@ -215,8 +215,10 @@ and infer_cmd_full_auto model_name workload_data solver
     | _ -> infer_opts.display
   in
   let solver = solver_of_string solver infer_opts in
-  let graph, measurements = Dep_graph.load_files model_name workload_files in
-  if Dep_graph.G.is_empty graph then (
+  let graph, measurements =
+    Dep_graph.load_workload_files model_name workload_files
+  in
+  if Dep_graph.Graph.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
     exit 1) ;
   Format.eprintf "Performing topological run@." ;
@@ -227,26 +229,24 @@ and infer_cmd_full_auto model_name workload_data solver
   in
   let scores_list = [] in
   Option.iter
-    (fun filename ->
-      let oc = open_out filename in
-      Dep_graph.D.output_graph oc graph ;
-      close_out oc)
+    (fun filename -> Dep_graph.Graph.save_graphviz graph filename)
     infer_opts.dot_file ;
   let map, scores_list, report =
-    Dep_graph.T.fold
-      (fun workload_file (overrides_map, scores_list, report) ->
-        Format.eprintf "Processing: %s@." workload_file ;
-        let measure = Hashtbl.find measurements workload_file in
+    Dep_graph.Graph.fold
+      (fun solved (overrides_map, scores_list, report) ->
+        Format.eprintf "Processing: %a@." Namespace.pp solved.name ;
+        let measure = Hashtbl.find measurements solved.name in
         let overrides var = Free_variable.Map.find var overrides_map in
         let (Measure.Measurement ((module Bench), m)) = measure in
         let model =
           match Dep_graph.find_model_or_generic model_name Bench.models with
           | None ->
               Format.eprintf
-                "No valid model (%s or generic) found in file %s. Availble \
-                 models:.@."
+                "No valid model (%s or generic) found in the workload %a. \
+                 Availble models:.@."
                 model_name
-                workload_file ;
+                Namespace.pp
+                solved.name ;
               list_all_models Format.err_formatter ;
               exit 1
           | Some model -> model
