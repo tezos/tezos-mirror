@@ -73,7 +73,7 @@ We can follow the instructions and then confirm the addition by listing known ad
 Optional: we can check that our Ledger signs correctly using the
 following command and confirming on the device::
 
-   octez-client show ledger ledger://XXXXXXXXXX
+   octez-client show ledger ledger://XXXXXXXXXX --test-sign
 
 The address can now be used as any other with the exception that
 during an operation the device will prompt you to confirm when it's
