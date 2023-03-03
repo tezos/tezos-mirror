@@ -1048,9 +1048,7 @@ module Inner = struct
   (* This is a hack to obtain an array from a Domain.t. *)
   let domain_to_array d = inverse (Domains.inverse d)
 
-  let diff_next_power_of_two x =
-    let logx = Z.log2 (Z.of_int x) in
-    if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
+  let diff_next_power_of_two x = (1 lsl Z.log2up (Z.of_int x)) - x
 
   (* Notations
      =========
