@@ -74,6 +74,15 @@ module Account = struct
     |]
 end
 
+(** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
+    the [node]'s next level. *)
+let next_evm_level ~sc_rollup_node ~node ~client =
+  let* () = Client.bake_for_and_wait client in
+  Sc_rollup_node.wait_for_level
+    ~timeout:30.
+    sc_rollup_node
+    (Node.get_level node)
+
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
@@ -298,11 +307,34 @@ let test_rpc_getBlockByNumber =
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
 
+let test_l2_blocks_progression =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_blocks_progression"]
+    ~title:"Check L2 blocks progression"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let check_block_progression ~expected_block_level =
+    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+    let* block_number =
+      Eth_cli.block_number ~endpoint:evm_proxy_server_endpoint
+    in
+    return
+    @@ Check.((block_number = expected_block_level) int)
+         ~error_msg:"Unexpected block number, should be %%R, but got %%L"
+  in
+  let* () = check_block_progression ~expected_block_level:0 in
+  let* () = check_block_progression ~expected_block_level:1 in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
   test_rpc_getBalance protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_rpc_getBlockByNumber protocols
+  test_rpc_getBlockByNumber protocols ;
+  test_l2_blocks_progression protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
