@@ -50,6 +50,11 @@ module Solver : sig
   }
 end
 
+(** Visualization of solutions using Graphviz *)
+module Graphviz : sig
+  val save : string -> Solver.solved list -> unit
+end
+
 (** Dependency graph of benchmarks using dependencies/provides *)
 module Graph : sig
   type t
