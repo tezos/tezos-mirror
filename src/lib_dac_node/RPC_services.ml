@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4933
+   Add .mli file for RPC_services.ml. *)
+
 (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
    encoding over b58check encoding for JSON. *)
 let store_preimage_request_encoding =
@@ -76,3 +79,22 @@ let store_dac_member_signature dac_plugin =
     ~input:(Signature_repr.encoding dac_plugin)
     ~output:Data_encoding.empty
     Tezos_rpc.Path.(open_root / "dac_member_signature")
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4935
+   Coordinator's "POST /preimage" endpoint should in addition to root page hash
+   also return expiration level. Additionally, when it pushes a new root hash to
+   all attached subscribers, it should push it together with expiration level. *)
+
+(** [Coordinator]'s endpoint for serializing dac payload. In addition to
+    returning a root page hash, it also pushes it to the subscribed [Observer]s
+    and [Dac_member]s. *)
+let coordinator_post_preimage ((module P) : Dac_plugin.t) =
+  Tezos_rpc.Service.post_service
+    ~description:
+      "Stores the preimage in a sequence of pages. Returns a root page hash \
+       representing the stored preimage. Additionally, it triggers streaming \
+       of root page hash to subscribed committee members and observers. "
+    ~query:Tezos_rpc.Query.empty
+    ~input:Data_encoding.bytes
+    ~output:P.encoding
+    Tezos_rpc.Path.(open_root / "preimage")

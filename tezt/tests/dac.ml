@@ -876,6 +876,30 @@ module Legacy = struct
     (* Assert [observer] emitted event of received [expected_rh]. *)
     let* () = fetch_root_hash_promise in
     check_downloaded_preimage coordinator observer expected_rh
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4934
+       Once profiles are implemented this should be moved out of the
+       `Legacy` module. Additionally, the test should be run using dac
+       node running in the coordinator and not legacy mode. *)
+  let test_coordinator_post_preimage_endpoint _protocol _node _client
+      coordinator _threshold _dac_members =
+    (* 1. Send the [payload] to coordinator.
+       2. Assert that it returns [expected_rh].
+       3. Assert event that root hash has been pushed to data streamer
+          was emitted. *)
+    let payload = "test_1" in
+    let expected_rh =
+      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+    in
+    let root_hash_pushed_to_data_streamer_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
+    in
+    let* actual_rh =
+      RPC.call coordinator (Rollup.Dac.RPC.coordinator_store_preimage ~payload)
+    in
+    let () = check_valid_root_hash expected_rh actual_rh in
+    let* () = root_hash_pushed_to_data_streamer_promise in
+    Lwt.return_unit
 end
 
 let test_stores_dac_member_signature_stub _protocol _node client
@@ -971,4 +995,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_store_member_signature"
     test_stores_dac_member_signature_stub
+    protocols ;
+  scenario_with_layer1_and_legacy_dac_nodes
+    ~threshold:0
+    ~dac_members:0
+    ~tags:["dac"; "dac_node"]
+    "dac_coordinator_post_preimage_endpoint"
+    Legacy.test_coordinator_post_preimage_endpoint
     protocols

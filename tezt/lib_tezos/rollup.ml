@@ -942,5 +942,14 @@ module Dac = struct
       in
       let data : RPC_core.data = Data payload in
       make ~data PUT ["dac_member_signature"] @@ fun _resp -> ()
+
+    let coordinator_store_preimage ~payload =
+      let preimage =
+        JSON.parse
+          ~origin:"Rollup.DAC.RPC.coordinator_post_preimage"
+          (encode_bytes_to_hex_string payload)
+      in
+      let data : RPC_core.data = Data (JSON.unannotate preimage) in
+      make ~data POST ["preimage"] JSON.as_string
   end
 end

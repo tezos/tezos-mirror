@@ -120,6 +120,21 @@ let handle_verify_external_message_signature dac_plugin public_keys_opt
 let handle_retrieve_preimage dac_plugin page_store hash =
   Page_store.Filesystem.load dac_plugin page_store hash
 
+let handle_coordinator_preimage_endpoint dac_plugin page_store hash_streamer
+    payload =
+  let open Lwt_result_syntax in
+  let* root_hash =
+    Pages_encoding.Merkle_tree.V0.Filesystem.serialize_payload
+      dac_plugin
+      ~page_store
+      payload
+  in
+  let* () = Data_streamer.publish hash_streamer root_hash in
+  let*! () =
+    Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
+  in
+  return root_hash
+
 let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
     hash_streamer directory =
   directory
@@ -184,6 +199,17 @@ let register_store_dac_member_signature ctx dac_plugin cctxt dac_public_keys_opt
         dac_public_keys_opt
         dac_member_signature)
 
+let register_coordinator_preimage_endpoint dac_plugin hash_streamer page_store =
+  add_service
+    Tezos_rpc.Directory.register0
+    (RPC_services.coordinator_post_preimage dac_plugin)
+    (fun () payload ->
+      handle_coordinator_preimage_endpoint
+        dac_plugin
+        page_store
+        hash_streamer
+        payload)
+
 let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
     hash_streamer =
   let page_store = Node_context.get_page_store node_context in
@@ -202,6 +228,10 @@ let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
        dac_plugin
        cctxt
        dac_public_keys_opt
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4934
+     Once profiles are implemented, registration of the coordinator's
+     "/preimage" endpoint should be moved out of the [start_legacy]. *)
+  |> register_coordinator_preimage_endpoint dac_plugin hash_streamer page_store
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
    Move this to RPC_server.Legacy once all operating modes are supported. *)
