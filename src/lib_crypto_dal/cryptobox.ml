@@ -300,7 +300,7 @@ module Inner = struct
     evaluations_log : int;
     (* Log of the number of evaluations that constitute an erasure encoded
        polynomial. *)
-    evaluations_per_proof_log : int;
+    shard_length_log : int;
     (* Log of the number of evaluations contained in a shard. *)
     proofs_log : int; (* Log of th number of shards proofs. *)
     srs : srs;
@@ -314,8 +314,9 @@ module Inner = struct
   let slot_as_polynomial_length ~slot_size =
     1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
-  let evaluations_per_proof_log ~erasure_encoded_polynomial_length
-      ~number_of_shards =
+  (* [shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards]
+     returns the log2 of the length of a shard. *)
+  let shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards =
     (* [erasure_encoded_polynomial_length / number_of_shard] is an integer if [erasure_encoded_polynomial_length] and [number_of_shards]
        were validated by [ensure_validity]. *)
     Z.log2up (Z.of_int (erasure_encoded_polynomial_length / number_of_shards))
@@ -436,9 +437,7 @@ module Inner = struct
     in
     assert_result
       (let evaluations_per_proof_log =
-         evaluations_per_proof_log
-           ~erasure_encoded_polynomial_length
-           ~number_of_shards
+         shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards
        in
        let srs_g2_expected_length =
          max max_polynomial_length (1 lsl evaluations_per_proof_log) + 1
@@ -501,17 +500,15 @@ module Inner = struct
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
     let evaluations_log = Z.(log2 (of_int erasure_encoded_polynomial_length)) in
-    let evaluations_per_proof_log =
-      evaluations_per_proof_log
-        ~erasure_encoded_polynomial_length
-        ~number_of_shards
+    let shard_length_log =
+      shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards
     in
     let page_length = page_length ~page_size in
     let srs =
       {
         raw;
         kate_amortized_srs_g2_shards =
-          Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
+          Srs_g2.get raw.srs_g2 (1 lsl shard_length_log);
         kate_amortized_srs_g2_pages =
           Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
       }
@@ -534,8 +531,8 @@ module Inner = struct
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
         evaluations_log;
-        evaluations_per_proof_log;
-        proofs_log = evaluations_log - evaluations_per_proof_log;
+        shard_length_log;
+        proofs_log = evaluations_log - shard_length_log;
         srs;
       }
 
@@ -1270,12 +1267,12 @@ module Inner = struct
       shard_proof array =
     (* The length [t.erasure_encoded_polynomial_length] of the domain [t.domain_erasure_encoded_polynomial_length] is equal to
        [2^t.evaluations_per_proof_log * 2^t.proofs_log]. *)
-    let n = t.evaluations_per_proof_log + t.proofs_log in
+    let n = t.shard_length_log + t.proofs_log in
     assert (t.erasure_encoded_polynomial_length = 1 lsl n) ;
     (* The log2 of the number of proofs [t.proofs_log] is > 0
        because [2^t.proofs_log = t.number_of_shards > 0]. *)
     assert (t.proofs_log > 0 && t.number_of_shards = 1 lsl t.proofs_log) ;
-    assert (t.shard_length = 1 lsl t.evaluations_per_proof_log) ;
+    assert (t.shard_length = 1 lsl t.shard_length_log) ;
     (* [t.max_polynomial_length > l] where [l = t.shard_length]. *)
     assert (t.shard_length < t.max_polynomial_length) ;
     (* Step 2. *)
@@ -1536,7 +1533,7 @@ module Internal_for_tests = struct
     in
     let evaluations_per_proof_log =
       match
-        evaluations_per_proof_log
+        shard_length_log
           ~erasure_encoded_polynomial_length
           ~number_of_shards:parameters.number_of_shards
       with
