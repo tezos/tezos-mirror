@@ -26,8 +26,7 @@
 #include <string.h>
 
 // IMPROVEME: can be improve it with lookups?
-// FIXME: bitreverse is also exported by ocaml-bls12-381. Must be removed.
-int bls12_381_polynomial_internal_bitreverse_(int n, int l) {
+int bls12_381_polynomial_internal_bitreverse(int n, int l) {
   int r = 0;
   while (l-- > 0) {
     r = (r << 1) | (n & 1);
@@ -40,7 +39,7 @@ void bls12_381_polynomial_internal_reorg_fr_array_coefficients(
     blst_fr *coefficients, int n, int logn) {
   blst_fr tmp;
   for (int i = 0; i < n; i++) {
-    int reverse_i = bls12_381_polynomial_internal_bitreverse_(i, logn);
+    int reverse_i = bls12_381_polynomial_internal_bitreverse(i, logn);
     if (i < reverse_i) {
       memcpy(&tmp, coefficients + i, sizeof(blst_fr));
       memcpy(coefficients + i, coefficients + reverse_i, sizeof(blst_fr));
@@ -250,7 +249,7 @@ void bls12_381_polynomial_internal_reorg_g1_array_coefficients(
     int n, int logn, blst_p1 *coefficients) {
   blst_p1 buffer;
   for (int i = 0; i < n; i++) {
-    int reverse_i = bls12_381_polynomial_internal_bitreverse_(i, logn);
+    int reverse_i = bls12_381_polynomial_internal_bitreverse(i, logn);
     if (i < reverse_i) {
       memcpy(&buffer, coefficients + i, sizeof(blst_p1));
       memcpy(coefficients + i, coefficients + reverse_i, sizeof(blst_p1));
@@ -360,7 +359,7 @@ void bls12_381_polynomial_internal_reorg_g2_array_coefficients(
     int n, int logn, blst_p2 *coefficients) {
   blst_p2 buffer;
   for (int i = 0; i < n; i++) {
-    int reverse_i = bls12_381_polynomial_internal_bitreverse_(i, logn);
+    int reverse_i = bls12_381_polynomial_internal_bitreverse(i, logn);
     if (i < reverse_i) {
       memcpy(&buffer, coefficients + i, sizeof(blst_p2));
       memcpy(coefficients + i, coefficients + reverse_i, sizeof(blst_p2));
