@@ -32,11 +32,12 @@ let model_next ~length =
   let length = S.safe_z length in
   S.safe_int 20 * log2 (S.safe_int 1 + length)
 
-(* Inferred from model model_hash_cell in file skip_list_benchmarks.ml *)
-(* fun size -> (0. + (93.5015799571 * size)) *)
+(* Inferred from model proto/alpha/skip_list/hash_cell in file
+   skip_list_benchmarks.ml *)
+(* fun size -> (242.202299543 + (56.9693504823 * size)) *)
 let model_hash_cell backpointers_count =
   let open S.Syntax in
-  S.safe_int 95 * backpointers_count
+  S.safe_int 250 + (S.safe_int 57 * backpointers_count)
 
 let model_hash_cell_computed_backpointers_count ~index =
   model_hash_cell (S.Syntax.log2 (S.safe_z index))

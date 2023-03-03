@@ -1865,6 +1865,16 @@ let parse_toplevel :
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
           ({code_field = c; arg_type; views; storage_type = s}, ctxt))
 
+(* Normalize lambdas during parsing *)
+
+let normalized_lam ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
+  unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) Optimized code_field
+  >|=? fun (code_field, ctxt) -> (Lam (kdescr, code_field), ctxt)
+
+let normalized_lam_rec ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
+  unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) Optimized code_field
+  >|=? fun (code_field, ctxt) -> (LamRec (kdescr, code_field), ctxt)
+
 (* -- parse data of any type -- *)
 
 (*
@@ -1882,6 +1892,7 @@ let parse_toplevel :
 
 let rec parse_data :
     type a ac.
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
     context ->
@@ -1889,13 +1900,14 @@ let rec parse_data :
     (a, ac) ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
- fun ~elab_conf ~stack_depth ctxt ~allow_forged ty script_data ->
+ fun ~unparse_code_rec ~elab_conf ~stack_depth ctxt ~allow_forged ty script_data ->
   Gas.consume ctxt Typecheck_costs.parse_data_cycle >>?= fun ctxt ->
   let non_terminal_recursion ctxt ty script_data =
     if Compare.Int.(stack_depth > 10_000) then
       tzfail Typechecking_too_many_recursive_calls
     else
       parse_data
+        ~unparse_code_rec
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
         ctxt
@@ -2071,6 +2083,7 @@ let rec parse_data :
   | Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr) ->
       traced
       @@ parse_kdescr
+           ~unparse_code_rec
            Tc_context.data
            ~elab_conf
            ~stack_depth:(stack_depth + 1)
@@ -2078,12 +2091,19 @@ let rec parse_data :
            ta
            tr
            script_instr
-      >|=? fun (kdescr, ctxt) -> (Lam (kdescr, script_instr), ctxt)
+      >>=? fun (kdescr, ctxt) ->
+      (normalized_lam [@ocaml.tailcall])
+        ~unparse_code_rec
+        ctxt
+        ~stack_depth
+        kdescr
+        script_instr
   | ( Lambda_t (ta, tr, _ty_name),
       Prim (loc, D_Lambda_rec, [(Seq (_loc, _) as script_instr)], []) ) ->
       traced
       @@ ( lambda_t loc ta tr >>?= fun lambda_rec_ty ->
            parse_lam_rec
+             ~unparse_code_rec
              Tc_context.(add_lambda data)
              ~elab_conf
              ~stack_depth:(stack_depth + 1)
@@ -2325,12 +2345,17 @@ let rec parse_data :
 
 and parse_view :
     type storage storagec.
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
     (storage, storagec) ty ->
     view ->
     (storage typed_view * context) tzresult Lwt.t =
- fun ~elab_conf ctxt storage_type {input_ty; output_ty; view_code} ->
+ fun ~unparse_code_rec
+     ~elab_conf
+     ctxt
+     storage_type
+     {input_ty; output_ty; view_code} ->
   let legacy = elab_conf.legacy in
   let input_ty_loc = location input_ty in
   record_trace_eval
@@ -2348,6 +2373,7 @@ and parse_view :
   >>?= fun (Ex_ty output_ty, ctxt) ->
   pair_t input_ty_loc input_ty storage_type >>?= fun (Ty_ex_c pair_ty) ->
   parse_instr
+    ~unparse_code_rec
     ~elab_conf
     ~stack_depth:0
     Tc_context.view
@@ -2388,22 +2414,25 @@ and parse_view :
 
 and parse_views :
     type storage storagec.
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
     (storage, storagec) ty ->
     view_map ->
     (storage typed_view_map * context) tzresult Lwt.t =
- fun ~elab_conf ctxt storage_type views ->
+ fun ~unparse_code_rec ~elab_conf ctxt storage_type views ->
   let aux ctxt name cur_view =
     Gas.consume
       ctxt
       (Michelson_v1_gas.Cost_of.Interpreter.view_update name views)
-    >>?= fun ctxt -> parse_view ~elab_conf ctxt storage_type cur_view
+    >>?= fun ctxt ->
+    parse_view ~unparse_code_rec ~elab_conf ctxt storage_type cur_view
   in
   Script_map.map_es_in_context aux ctxt views
 
 and parse_kdescr :
     type arg argc ret retc.
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
     tc_context ->
@@ -2412,8 +2441,16 @@ and parse_kdescr :
     (ret, retc) ty ->
     Script.node ->
     ((arg, end_of_stack, ret, end_of_stack) kdescr * context) tzresult Lwt.t =
- fun ~elab_conf ~stack_depth tc_context ctxt arg ret script_instr ->
+ fun ~unparse_code_rec
+     ~elab_conf
+     ~stack_depth
+     tc_context
+     ctxt
+     arg
+     ret
+     script_instr ->
   parse_instr
+    ~unparse_code_rec
     ~elab_conf
     tc_context
     ctxt
@@ -2446,6 +2483,7 @@ and parse_kdescr :
 
 and parse_lam_rec :
     type arg argc ret retc.
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
     tc_context ->
@@ -2455,8 +2493,17 @@ and parse_lam_rec :
     ((arg, ret) lambda, _) ty ->
     Script.node ->
     ((arg, ret) lambda * context) tzresult Lwt.t =
- fun ~elab_conf ~stack_depth tc_context ctxt arg ret lambda_rec_ty script_instr ->
+ fun ~unparse_code_rec
+     ~elab_conf
+     ~stack_depth
+     tc_context
+     ctxt
+     arg
+     ret
+     lambda_rec_ty
+     script_instr ->
   parse_instr
+    ~unparse_code_rec
     ~elab_conf
     tc_context
     ctxt
@@ -2475,19 +2522,31 @@ and parse_lam_rec :
          @@ ty_eq ~error_details ty ret
          >>? fun (eq, ctxt) ->
          eq >|? fun Eq ->
-         ((LamRec (close_descr descr, script_instr) : (arg, ret) lambda), ctxt))
+         ( (close_descr descr
+             : (arg, (arg, ret) lambda * end_of_stack, ret, end_of_stack) kdescr),
+           ctxt ))
+      >>=? fun (closed_descr, ctxt) ->
+      (normalized_lam_rec [@ocaml.tailcall])
+        ~unparse_code_rec
+        ~stack_depth
+        ctxt
+        closed_descr
+        script_instr
   | Typed {loc; aft = stack_ty; _}, ctxt ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
       tzfail @@ Bad_return (loc, stack_ty, ret)
   | Failed {descr}, ctxt ->
-      return
-        ( (LamRec (close_descr (descr (Item_t (ret, Bot_t))), script_instr)
-            : (arg, ret) lambda),
-          ctxt )
+      (normalized_lam_rec [@ocaml.tailcall])
+        ~unparse_code_rec
+        ~stack_depth
+        ctxt
+        (close_descr (descr (Item_t (ret, Bot_t))))
+        script_instr
 
 and parse_instr :
     type a s.
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
     tc_context ->
@@ -2495,7 +2554,13 @@ and parse_instr :
     Script.node ->
     (a, s) stack_ty ->
     ((a, s) judgement * context) tzresult Lwt.t =
- fun ~elab_conf ~stack_depth tc_context ctxt script_instr stack_ty ->
+ fun ~unparse_code_rec
+     ~elab_conf
+     ~stack_depth
+     tc_context
+     ctxt
+     script_instr
+     stack_ty ->
   let for_logging_only x =
     if elab_conf.keep_extra_types_for_interpreter_logging then Some x else None
   in
@@ -2534,6 +2599,7 @@ and parse_instr :
       tzfail Typechecking_too_many_recursive_calls
     else
       parse_instr
+        ~unparse_code_rec
         ~elab_conf
         tc_context
         ctxt
@@ -2668,6 +2734,7 @@ and parse_instr :
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       parse_data
+        ~unparse_code_rec
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
         ctxt
@@ -3365,6 +3432,7 @@ and parse_instr :
       check_kind [Seq_kind] code >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
       parse_kdescr
+        ~unparse_code_rec
         (Tc_context.add_lambda tc_context)
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
@@ -3373,6 +3441,8 @@ and parse_instr :
         ret
         code
       >>=? fun (kdescr, ctxt) ->
+      (* No need to normalize the unparsed component to Optimized mode here
+         because the script is already normalized in Optimized mode. *)
       let instr = {apply = (fun k -> ILambda (loc, Lam (kdescr, code), k))} in
       lambda_t loc arg ret >>?= fun ty ->
       let stack = Item_t (ty, stack) in
@@ -3387,6 +3457,10 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       lambda_t loc arg ret >>?= fun lambda_rec_ty ->
       parse_lam_rec
+        ~unparse_code_rec:(fun ctxt ~stack_depth:_ _unparsing_mode node ->
+          return (node, ctxt))
+        (* No need to normalize the unparsed component to Optimized mode here
+           because the script is already normalized in Optimized mode. *)
         Tc_context.(add_lambda tc_context)
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
@@ -3982,6 +4056,7 @@ and parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_kdescr
+           ~unparse_code_rec
            (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
            ctxt
            ~elab_conf
@@ -3991,7 +4066,9 @@ and parse_instr :
            code_field)
       >>=? function
       | {kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _}, ctxt ->
-          let views_result = parse_views ctxt ~elab_conf storage_type views in
+          let views_result =
+            parse_views ~unparse_code_rec ctxt ~elab_conf storage_type views
+          in
           trace (Ill_typed_contract (canonical_code, [])) views_result
           >>=? fun (_typed_views, ctxt) ->
           (let error_details = Informative loc in
@@ -4726,11 +4803,12 @@ let code_size ctxt code views =
   >|? fun ctxt -> (code_size, ctxt)
 
 let parse_code :
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
     code:lazy_expr ->
     (ex_code * context) tzresult Lwt.t =
- fun ~elab_conf ctxt ~code ->
+ fun ~unparse_code_rec ~elab_conf ctxt ~code ->
   Script.force_decode_in_context
     ~consume_deserialization_gas:When_needed
     ctxt
@@ -4757,6 +4835,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_kdescr
+       ~unparse_code_rec
        Tc_context.(toplevel ~storage_type ~param_type:arg_type ~entrypoints)
        ~elab_conf
        ctxt
@@ -4774,13 +4853,14 @@ let parse_code :
           ctxt ) )
 
 let parse_storage :
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
     allow_forged:bool ->
     ('storage, _) ty ->
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
- fun ~elab_conf ctxt ~allow_forged storage_type ~storage ->
+ fun ~unparse_code_rec ~elab_conf ctxt ~allow_forged storage_type ~storage ->
   Script.force_decode_in_context
     ~consume_deserialization_gas:When_needed
     ctxt
@@ -4791,6 +4871,7 @@ let parse_storage :
       let storage_type = serialize_ty_for_error storage_type in
       Ill_typed_data (None, storage, storage_type))
     (parse_data
+       ~unparse_code_rec
        ~elab_conf
        ~stack_depth:0
        ctxt
@@ -4799,18 +4880,20 @@ let parse_storage :
        (root storage))
 
 let parse_script :
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
     allow_forged_in_storage:bool ->
     Script.t ->
     (ex_script * context) tzresult Lwt.t =
- fun ~elab_conf ctxt ~allow_forged_in_storage {code; storage} ->
-  parse_code ~elab_conf ctxt ~code
+ fun ~unparse_code_rec ~elab_conf ctxt ~allow_forged_in_storage {code; storage} ->
+  parse_code ~unparse_code_rec ~elab_conf ctxt ~code
   >>=? fun ( Ex_code
                (Code
                  {code; arg_type; storage_type; views; entrypoints; code_size}),
              ctxt ) ->
   parse_storage
+    ~unparse_code_rec
     ~elab_conf
     ctxt
     ~allow_forged:allow_forged_in_storage
@@ -4834,12 +4917,13 @@ type typechecked_code_internal =
       -> typechecked_code_internal
 
 let typecheck_code :
+    unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     legacy:bool ->
     show_types:bool ->
     context ->
     Script.expr ->
     (typechecked_code_internal * context) tzresult Lwt.t =
- fun ~legacy ~show_types ctxt code ->
+ fun ~unparse_code_rec ~legacy ~show_types ctxt code ->
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code >>?= fun (toplevel, ctxt) ->
@@ -4867,6 +4951,7 @@ let typecheck_code :
   let elab_conf = Script_ir_translator_config.make ~legacy ?type_logger () in
   let result =
     parse_kdescr
+      ~unparse_code_rec
       (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
       ctxt
       ~elab_conf
@@ -4877,7 +4962,9 @@ let typecheck_code :
   in
   trace (Ill_typed_contract (code, !type_map)) result
   >>=? fun ((_ : (_, _, _, _) kdescr), ctxt) ->
-  let views_result = parse_views ctxt ~elab_conf storage_type views in
+  let views_result =
+    parse_views ~unparse_code_rec ctxt ~elab_conf storage_type views
+  in
   trace (Ill_typed_contract (code, !type_map)) views_result
   >|=? fun (typed_views, ctxt) ->
   ( Typechecked_code_internal
@@ -4946,6 +5033,11 @@ include Data_unparser (struct
   let parse_data = parse_data
 end)
 
+let unparse_code_rec : unparse_code_rec =
+ fun ctxt ~stack_depth mode node ->
+  unparse_code ctxt ~stack_depth mode node >>=? fun (code, ctxt) ->
+  return (Micheline.root code, ctxt)
+
 let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
     mode ~normalize_types {code; storage} =
   Script.force_decode_in_context
@@ -4953,7 +5045,7 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
     ctxt
     code
   >>?= fun (code, ctxt) ->
-  typecheck_code ~legacy ~show_types:false ctxt code
+  typecheck_code ~unparse_code_rec ~legacy ~show_types:false ctxt code
   >>=? fun ( Typechecked_code_internal
                {
                  toplevel =
@@ -4971,6 +5063,7 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
                },
              ctxt ) ->
   parse_storage
+    ~unparse_code_rec
     ~elab_conf:(Script_ir_translator_config.make ~legacy ())
     ctxt
     ~allow_forged:allow_forged_in_storage
@@ -5414,12 +5507,31 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v
 let list_of_big_map_ids ids =
   Lazy_storage.IdSet.fold Big_map (fun id acc -> id :: acc) ids []
 
-let parse_data = parse_data ~stack_depth:0
+let parse_data ~elab_conf ctxt ~allow_forged ty t =
+  parse_data ~unparse_code_rec ~elab_conf ~allow_forged ~stack_depth:0 ctxt ty t
 
-let parse_comparable_data ?type_logger =
+let parse_view ~elab_conf ctxt ty view =
+  parse_view ~unparse_code_rec ~elab_conf ctxt ty view
+
+let parse_views ~elab_conf ctxt ty views =
+  parse_views ~unparse_code_rec ~elab_conf ctxt ty views
+
+let parse_code ~elab_conf ctxt ~code =
+  parse_code ~unparse_code_rec ~elab_conf ctxt ~code
+
+let parse_storage ~elab_conf ctxt ~allow_forged ty ~storage =
+  parse_storage ~unparse_code_rec ~elab_conf ctxt ~allow_forged ty ~storage
+
+let parse_script ~elab_conf ctxt ~allow_forged_in_storage script =
+  parse_script ~unparse_code_rec ~elab_conf ctxt ~allow_forged_in_storage script
+
+let parse_comparable_data ?type_logger ctxt ty t =
   parse_data
     ~elab_conf:Script_ir_translator_config.(make ~legacy:false ?type_logger ())
     ~allow_forged:false
+    ctxt
+    ty
+    t
 
 let parse_instr :
     type a s.
@@ -5430,7 +5542,14 @@ let parse_instr :
     (a, s) stack_ty ->
     ((a, s) judgement * context) tzresult Lwt.t =
  fun ~elab_conf tc_context ctxt script_instr stack_ty ->
-  parse_instr ~elab_conf ~stack_depth:0 tc_context ctxt script_instr stack_ty
+  parse_instr
+    ~unparse_code_rec
+    ~elab_conf
+    ~stack_depth:0
+    tc_context
+    ctxt
+    script_instr
+    stack_ty
 
 let unparse_data = unparse_data ~stack_depth:0
 
@@ -5526,5 +5645,5 @@ let script_size
   (Saturation_repr.(add code_size storage_size |> to_int), cost)
 
 let typecheck_code ~legacy ~show_types ctxt code =
-  typecheck_code ~legacy ~show_types ctxt code
+  typecheck_code ~unparse_code_rec ~legacy ~show_types ctxt code
   >|=? fun (Typechecked_code_internal {type_map; _}, ctxt) -> (type_map, ctxt)
