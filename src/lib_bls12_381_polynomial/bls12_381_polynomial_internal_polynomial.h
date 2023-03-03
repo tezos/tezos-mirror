@@ -25,30 +25,10 @@
 
 #include "blst.h"
 #include "blst_misc.h"
+#include "caml_bls12_381_stubs.h"
+#include <caml/mlvalues.h>
 #include <stdlib.h>
 #include <string.h>
-
-// H: domain_size = polynomial degree
-// Implementation with side effect. The FFT will be inplace, i.e. the array is
-// going to be modified.
-void bls12_381_polynomial_internal_polynomial_fft_inplace(blst_fr *coefficients,
-                                                          blst_fr *domain,
-                                                          int log_domain_size,
-                                                          int degree,
-                                                          int log_degree);
-
-void bls12_381_polynomial_internal_polynomial_ifft_inplace(
-    blst_fr *coefficients, blst_fr *domain, int log_domain_size);
-
-void bls12_381_polynomial_internal_polynomial_dft_inplace(blst_fr *coefficients,
-                                                          blst_fr *domain,
-                                                          blst_fr *buffer,
-                                                          int length,
-                                                          int inverse);
-
-void bls12_381_polynomial_internal_polynomial_prime_factor_algorithm_fft(
-    blst_fr *coefficients, blst_fr *domain1, blst_fr *domain2, int length1,
-    int length2, int inverse);
 
 int bls12_381_polynomial_internal_polynomial_degree(blst_fr *arg, const int n);
 
