@@ -553,7 +553,7 @@ module Inner = struct
      are arranged in cosets to produce batched KZG proofs
      [https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf]
      using the technique described in https://eprint.iacr.org/2023/033. *)
-  let polynomial_from_bytes' (t : t) slot =
+  let polynomial_from_slot (t : t) slot =
     (* Expects the length of the byte sequence to equal the slot size.
        This can be achieved by adding some padding with null bytes to the
        byte sequence if the length is strictly less than the slot size, or
@@ -564,7 +564,7 @@ module Inner = struct
           (Printf.sprintf "message must be %d bytes long" t.slot_size))
     else
       let offset = ref 0 in
-      let res =
+      let coefficients =
         Array.init t.max_polynomial_length (fun _ -> Scalar.(copy zero))
       in
       (* A slot is subdivided into contiguous segments, called pages.
@@ -621,29 +621,26 @@ module Inner = struct
             let dst = Bytes.create scalar_bytes_amount in
             Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
             offset := !offset + scalar_bytes_amount ;
-            (* Apply the permutation *)
-            res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst
+            (* Apply the permutation. *)
+            coefficients.((elt * t.pages_per_slot) + page) <-
+              Scalar.of_bytes_exn dst
         done ;
         let dst = Bytes.create t.remaining_bytes in
         Bytes.blit slot !offset dst 0 t.remaining_bytes ;
         offset := !offset + t.remaining_bytes ;
-        (* Apply the permutation *)
-        res.(((t.page_length - 1) * t.pages_per_slot) + page) <-
+        (* Apply the permutation. *)
+        coefficients.(((t.page_length - 1) * t.pages_per_slot) + page) <-
           Scalar.of_bytes_exn dst
       done ;
-      Ok res
+      (* The resulting vector is then interpolated. Polynomial
+         interpolation is a linear bijection (as a ring isomorphism)
+         between k-tuples of scalar elements and polynomials of degree < k
+         with coefficients in the scalar field.
 
-  let polynomial_from_slot t slot =
-    let open Result_syntax in
-    let* data = polynomial_from_bytes' t slot in
-    (* The resulting vector is then interpolated. Polynomial
-       interpolation is a linear bijection (as a ring isomorphism)
-       between k-tuples of scalar elements and polynomials of degree < k
-       with coefficients in the scalar field.
-
-       Thus [polynomial_from_slot] is an injection from slots to
-       polynomials (as composition preserves injectivity). *)
-    Ok (Evaluations.interpolation_fft2 t.domain_polynomial_length data)
+         Thus [polynomial_from_slot] is an injection from slots to
+         polynomials (as composition preserves injectivity). *)
+      Ok
+        (Evaluations.interpolation_fft2 t.domain_polynomial_length coefficients)
 
   (* [polynomial_to_slot] is the left-inverse function of
      [polynomial_from_slot]. *)
