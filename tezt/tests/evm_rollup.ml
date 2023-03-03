@@ -270,10 +270,39 @@ let test_rpc_sendRawTransaction =
   in
   unit
 
+let test_rpc_getBlockByNumber =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_block_by_number"]
+    ~title:"RPC method eth_getBlockByNumber"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* () = Client.bake_for_and_wait client in
+  let first_evm_run_level = Node.get_level node in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:30.
+      sc_rollup_node
+      first_evm_run_level
+  in
+  let* block =
+    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
+  in
+  (* For our needs, we just test these two relevant fields for now: *)
+  Check.((block.number = 0l) int32)
+    ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
+  Check.(block.transactions = ["0x100"])
+    (Check.list Check.string)
+    ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
   test_rpc_getBalance protocols ;
-  test_rpc_sendRawTransaction protocols
+  test_rpc_sendRawTransaction protocols ;
+  test_rpc_getBlockByNumber protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
