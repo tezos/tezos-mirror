@@ -316,8 +316,8 @@ that must return:
 
 ::
 
-   { "protocol": "PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc",
-     "next_protocol": "PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc" }
+   { "protocol": "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1",
+     "next_protocol": "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" }
 
 Finally, you need to check that your balance is greater than 10,000
 tez to make sure that staking is possible. In case your balance is not
