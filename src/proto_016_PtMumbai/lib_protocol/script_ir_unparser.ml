@@ -451,7 +451,12 @@ let account_for_future_serialization_cost unparsed_data ctxt =
   Gas.consume ctxt (Script.micheline_serialization_cost unparsed_data)
   >|? fun ctxt -> (unparsed_data, ctxt)
 
-(* -- Unparsing data of any type -- *)
+type unparse_code_rec =
+  t ->
+  stack_depth:int ->
+  unparsing_mode ->
+  Script.node ->
+  ((canonical_location, prim) node * t, error trace) result Lwt.t
 
 module type MICHELSON_PARSER = sig
   val opened_ticket_type :
@@ -468,6 +473,7 @@ module type MICHELSON_PARSER = sig
     (ex_ty * context) tzresult
 
   val parse_data :
+    unparse_code_rec:unparse_code_rec ->
     elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
@@ -480,6 +486,7 @@ end
 module Data_unparser (P : MICHELSON_PARSER) = struct
   open Script_tc_errors
 
+  (* -- Unparsing data of any type -- *)
   let rec unparse_data_rec :
       type a ac.
       context ->
@@ -714,6 +721,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
              as all packable values are also forgeable. *)
         in
         P.parse_data
+          ~unparse_code_rec
           ~elab_conf
           ctxt
           ~stack_depth:(stack_depth + 1)
