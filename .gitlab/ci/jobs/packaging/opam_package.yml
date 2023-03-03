@@ -1417,13 +1417,6 @@ opam:tezos-shell-services:
   variables:
     package: tezos-shell-services
 
-opam:tezos-shell-services-test-helpers:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_6
-  variables:
-    package: tezos-shell-services-test-helpers
-
 opam:tezos-signer-backends:
   extends:
     - .opam_template
@@ -1554,7 +1547,7 @@ opam:tezos-webassembly-interpreter-extra:
 opam:tezos-workers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-workers
 

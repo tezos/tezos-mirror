@@ -38,7 +38,7 @@ module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 open Qcheck2_helpers
 
-open Tezos_shell_services_test_helpers.Shell_services_test_helpers
+open Tezos_proxy_test_helpers_shell_services.Test_helpers_shell_services
 
 module Consensus = struct
   let chain, block = (`Main, `Head 0)

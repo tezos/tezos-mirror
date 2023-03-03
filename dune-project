@@ -212,7 +212,6 @@
 (package (name tezos-shell-context))
 (package (name tezos-shell-context-test)(allow_empty))
 (package (name tezos-shell-services))
-(package (name tezos-shell-services-test-helpers))
 (package (name tezos-signer-backends))
 (package (name tezos-signer-services))
 (package (name tezos-smart-rollup-016-PtMumbai))

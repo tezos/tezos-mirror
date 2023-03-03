@@ -2,8 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_shell_services_test_helpers)
- (public_name tezos-shell-services-test-helpers)
+ (name tezos_proxy_test_helpers_shell_services)
  (libraries
   tezos-base
   tezos-shell-services
