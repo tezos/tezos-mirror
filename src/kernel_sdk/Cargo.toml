@@ -5,7 +5,10 @@
 [workspace]
 
 members = [
+  # Kernel Dev
   "tezos_smart_rollup_core",
   "tezos_smart_rollup_host",
-  "installer_kernel"
+  # UX
+  "installer_kernel",
+  "installer_client"
 ]
