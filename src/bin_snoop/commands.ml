@@ -843,6 +843,15 @@ module List_cmd = struct
            Lwt.return_ok res)
          (fun _ str -> Lwt.return_ok str))
 
+  let local_model_param () =
+    Tezos_clic.param
+      ~name:"LOCAL-MODEL-NAME"
+      ~desc:"Name of the local model"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           Registration.all_local_model_names () |> Lwt.return_ok)
+         (fun _ str -> Lwt.return_ok str))
+
   let parameter_param () =
     Tezos_clic.param
       ~name:"PARAM-NAME"
@@ -1403,6 +1412,14 @@ module Display_info_cmd = struct
       (Format.pp_print_list pp_local)
       l
 
+  let pp_fancy_local_model fmt (local_model_name, benchmark_names) =
+    bold_block fmt "Name" Format.pp_print_string local_model_name ;
+    bold_block
+      fmt
+      "Benchmarks"
+      (Format.pp_print_list (fun fmt name -> Format.fprintf fmt "%s" name))
+      benchmark_names
+
   let pp_fancy_parameter fmt (s, l) =
     bold_block fmt "Name" Free_variable.pp s ;
     bold_block fmt "In models" (Format.pp_print_list Namespace.pp) l
@@ -1421,6 +1438,29 @@ module Display_info_cmd = struct
     Format.printf "@.%a@." pp_fancy_model (m, l) ;
     Lwt.return_ok ()
 
+  let display_local_model_handler () local_model_name () =
+    let local_models = Registration.all_local_model_names () in
+    let () =
+      if not (List.mem ~equal:String.equal local_model_name local_models) then (
+        Format.eprintf "No local model named %s found.@." local_model_name ;
+        exit 1)
+    in
+    let all_benchmarks =
+      Registration.all_models ()
+      |> List.concat_map (fun (_, {Registration.from; model = _}) -> from)
+      |> List.filter_map
+           (fun {Registration.bench_name; local_model_name = name} ->
+             if String.equal local_model_name name then
+               Some (Namespace.to_string bench_name)
+             else None)
+      |> List.sort_uniq String.compare
+    in
+    Format.printf
+      "@.%a@."
+      pp_fancy_local_model
+      (local_model_name, all_benchmarks) ;
+    Lwt.return_ok ()
+
   let display_parameter_handler () s () =
     let s = Free_variable.of_string s in
     let l = Registration.find_parameter_exn s in
@@ -1434,6 +1474,12 @@ module Display_info_cmd = struct
   let display_model_params =
     Tezos_clic.(
       params_prefix @@ prefix "model" @@ List_cmd.model_param () @@ stop)
+
+  let display_local_model_params =
+    Tezos_clic.(
+      params_prefix @@ prefix "local" @@ prefix "model"
+      @@ List_cmd.local_model_param ()
+      @@ stop)
 
   let display_parameter_params =
     Tezos_clic.(
@@ -1455,6 +1501,14 @@ module Display_info_cmd = struct
       display_model_params
       display_model_handler
 
+  let command_local_model =
+    Tezos_clic.command
+      ~group
+      ~desc:"Display detailed information on the given local model"
+      options
+      display_local_model_params
+      display_local_model_handler
+
   let command_parameter =
     Tezos_clic.command
       ~group
@@ -1463,7 +1517,8 @@ module Display_info_cmd = struct
       display_parameter_params
       display_parameter_handler
 
-  let commands = [command_benchmark; command_model; command_parameter]
+  let commands =
+    [command_benchmark; command_model; command_parameter; command_local_model]
 end
 
 let all_commands =
