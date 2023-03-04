@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -526,10 +527,10 @@ module Infer_cmd = struct
       plot_raw_workload_arg
       empirical_plot_arg
 
-  let model_param =
+  let local_model_param =
     Tezos_clic.param
-      ~name:"MODEL-NAME"
-      ~desc:"Name of the model for which to infer parameter"
+      ~name:"LOCAL-MODEL-NAME"
+      ~desc:"Name of the local model for which to infer parameter"
       (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
            Lwt.return_ok (Registration.all_local_model_names ()))
@@ -546,7 +547,7 @@ module Infer_cmd = struct
   let params =
     Tezos_clic.(
       prefixes ["infer"; "parameters"; "for"; "model"]
-      @@ model_param
+      @@ local_model_param
       @@ prefixes ["on"; "data"]
       @@ string
            ~name:"WORKLOAD-DATA"
@@ -617,10 +618,10 @@ module Codegen_cmd = struct
 
   let options = Tezos_clic.args1 fixed_point_arg
 
-  let model_param =
+  let codegen_model_param =
     Tezos_clic.param
-      ~name:"MODEL-NAME"
-      ~desc:"Name of the model for which to generate code"
+      ~name:"CODEGEN-MODEL-NAME"
+      ~desc:"Name of the codegen model for which to generate code"
       (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
            let res =
@@ -640,7 +641,7 @@ module Codegen_cmd = struct
              "File containing solution, as obtained using the --save-solution \
               switch"
       @@ prefixes ["and"; "model"]
-      @@ model_param @@ stop)
+      @@ codegen_model_param @@ stop)
 
   let group =
     {Tezos_clic.name = "codegen"; title = "Command for generating code"}
