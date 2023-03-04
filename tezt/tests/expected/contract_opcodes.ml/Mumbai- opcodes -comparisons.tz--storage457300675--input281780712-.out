@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/comparisons.tz on storage '{}' and input '{ -9999999; -1 ; 0 ; 1 ; 9999999 }' --level 1 --trace-stack
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/comparisons.tz on storage '{}' and input '{ -9999999; -1 ; 0 ; 1 ; 9999999 }' --level 1 --trace-stack
 storage
   { { False ; False ; False ; True ; True } ;
     { False ; False ; True ; True ; True } ;

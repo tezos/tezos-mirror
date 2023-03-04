@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/comb-set.tz on storage '(Pair 1 4 2 Unit)' and input Unit --level 1 --trace-stack
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/comb-set.tz on storage '(Pair 1 4 2 Unit)' and input Unit --level 1 --trace-stack
 storage
   (Pair 2 12 8 Unit)
 emitted operations
