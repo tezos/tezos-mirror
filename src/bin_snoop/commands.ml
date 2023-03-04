@@ -962,6 +962,16 @@ module List_cmd = struct
       (Registration.all_models ()) ;
     Lwt_result_syntax.return_unit
 
+  let params_all_local_models =
+    Tezos_clic.fixed ["list"; "all"; "local"; "models"]
+
+  let handler_all_local_models () () =
+    let module S = String.Set in
+    S.iter
+      (fun name -> Format.fprintf Format.std_formatter "%s\n" name)
+      (Registration.all_local_model_names () |> S.of_list) ;
+    Lwt_result_syntax.return_unit
+
   let group =
     {Tezos_clic.name = "list"; title = "Commands for displaying lists"}
 
@@ -1029,6 +1039,14 @@ module List_cmd = struct
       params_all_models
       handler_all_models
 
+  let command_all_local_models =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all local models"
+      Tezos_clic.no_options
+      params_all_local_models
+      handler_all_local_models
+
   let commands =
     [
       command_all_bench;
@@ -1039,6 +1057,7 @@ module List_cmd = struct
       command_bench_match;
       command_all_param;
       command_all_models;
+      command_all_local_models;
     ]
 end
 
