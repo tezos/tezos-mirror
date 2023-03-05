@@ -50,8 +50,6 @@ let () =
       executable_name
   else ()
 
-module Hashtbl = Stdlib.Hashtbl
-
 (* ------------------------------------------------------------------------- *)
 (* Listing available models, solvers, benchmarks *)
 
@@ -228,14 +226,14 @@ and infer_cmd_full_auto model_name workload_data solver
     | _ -> Some (Report.create_empty ~name:"Report")
   in
   let scores_list = [] in
-  Option.iter
-    (fun filename -> Dep_graph.Graph.save_graphviz graph filename)
-    infer_opts.dot_file ;
+  Option.iter (Dep_graph.Graph.save_graphviz graph) infer_opts.dot_file ;
   let map, scores_list, report =
     Dep_graph.Graph.fold
       (fun solved (overrides_map, scores_list, report) ->
         Format.eprintf "Processing: %a@." Namespace.pp solved.name ;
-        let measure = Hashtbl.find measurements solved.name in
+        let measure =
+          Stdlib.Option.get @@ Namespace.Hashtbl.find measurements solved.name
+        in
         let overrides var = Free_variable.Map.find var overrides_map in
         let (Measure.Measurement ((module Bench), m)) = measure in
         let model =
@@ -275,12 +273,22 @@ and infer_cmd_full_auto model_name workload_data solver
         let overrides_map =
           List.fold_left
             (fun map (variable, solution) ->
-              Format.eprintf
-                "Adding solution %a := %f@."
-                Free_variable.pp
-                variable
-                solution ;
-              Free_variable.Map.add variable solution map)
+              if Free_variable.Set.mem variable solved.provides then (
+                Format.eprintf
+                  "Adding solution %a := %f@."
+                  Free_variable.pp
+                  variable
+                  solution ;
+                Free_variable.Map.add variable solution map)
+              else (
+                (* Ambiguity. It should be already resolved by [Dep_graph].
+                   We do not fail here but print a big warning. *)
+                Format.eprintf
+                  "WARNING: ignored another solution for %a = %f@."
+                  Free_variable.pp
+                  variable
+                  solution ;
+                map))
             overrides_map
             solution.mapping
         in
