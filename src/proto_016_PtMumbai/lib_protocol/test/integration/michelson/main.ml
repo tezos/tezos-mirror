@@ -55,5 +55,6 @@ let () =
       ("annotations", Test_annotations.tests);
       ("event logging", Test_contract_event.tests);
       ("patched contracts", Test_patched_contracts.tests);
+      ("lambda normalization", Test_lambda_normalization.tests);
     ]
   |> Lwt_main.run
