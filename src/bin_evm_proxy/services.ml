@@ -175,7 +175,13 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
             in
             return (Get_balance.Output (Ok balance))
         | Block_number.Input _ ->
-            return (Block_number.Output (Ok (Mock.block_height ())))
+            let* block_number =
+              match rollup_node_config with
+              | Some ((module Rollup_node_rpc), _smart_rollup_address) ->
+                  Rollup_node_rpc.current_block_number ()
+              | None -> return @@ Mock.block_height ()
+            in
+            return (Block_number.Output (Ok block_number))
         | Get_block_by_number.Input
             (Some (block_param, _full_transaction_object)) ->
             let* block =
