@@ -322,12 +322,6 @@ module type CONSENSUS = sig
     allowed_preendorsements:(consensus_pk * int) slot_map ->
     t
 
-  (** [record_grand_parent_endorsement ctx pkh] records an
-      grand_parent_endorsement for the current block. This is only
-      useful for the partial construction mode. *)
-  val record_grand_parent_endorsement :
-    t -> Signature.Public_key_hash.t -> t tzresult
-
   (** [record_endorsement ctx ~initial_slot ~power] records an
      endorsement for the current block.
 

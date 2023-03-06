@@ -97,9 +97,6 @@ module Raw_consensus = struct
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
             slot with its power. *)
-    grand_parent_endorsements_seen : Signature.Public_key_hash.Set.t;
-        (** Record the endorsements already seen for the grand
-            parent. This only useful for the partial construction mode. *)
     endorsements_seen : Slot_repr.Set.t;
         (** Record the endorsements already seen. Only initial slots are indexed. *)
     preendorsements_seen : Slot_repr.Set.t;
@@ -129,7 +126,6 @@ module Raw_consensus = struct
       current_endorsement_power = 0;
       allowed_endorsements = Slot_repr.Map.empty;
       allowed_preendorsements = Slot_repr.Map.empty;
-      grand_parent_endorsements_seen = Signature.Public_key_hash.Set.empty;
       endorsements_seen = Slot_repr.Set.empty;
       preendorsements_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
@@ -152,17 +148,6 @@ module Raw_consensus = struct
       (function
         | Double_inclusion_of_consensus_operation -> Some () | _ -> None)
       (fun () -> Double_inclusion_of_consensus_operation)
-
-  let record_grand_parent_endorsement t pkh =
-    error_when
-      (Signature.Public_key_hash.Set.mem pkh t.grand_parent_endorsements_seen)
-      Double_inclusion_of_consensus_operation
-    >|? fun () ->
-    {
-      t with
-      grand_parent_endorsements_seen =
-        Signature.Public_key_hash.Set.add pkh t.grand_parent_endorsements_seen;
-    }
 
   let record_endorsement t ~initial_slot ~power =
     error_when
@@ -1348,9 +1333,6 @@ module type CONSENSUS = sig
     allowed_preendorsements:(consensus_pk * int) slot_map ->
     t
 
-  val record_grand_parent_endorsement :
-    t -> Signature.Public_key_hash.t -> t tzresult
-
   val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
 
   val record_preendorsement :
@@ -1410,10 +1392,6 @@ module Consensus :
       (Raw_consensus.initialize_with_endorsements_and_preendorsements
          ~allowed_endorsements
          ~allowed_preendorsements)
-
-  let[@inline] record_grand_parent_endorsement ctxt pkh =
-    update_consensus_with_tzresult ctxt (fun ctxt ->
-        Raw_consensus.record_grand_parent_endorsement ctxt pkh)
 
   let[@inline] record_preendorsement ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult
