@@ -404,20 +404,20 @@ module Inner = struct
     in
     let* () =
       assert_result
-        (2 * shard_length < k)
+        (shard_length < k)
         (* Since shard_length = n / number_of_shards, we obtain
            (all quantities are positive integers):
-           2 * shard_length < k
-           => 2 (n / number_of_shards) < k
-           => 2 * n / k < number_of_shards
-           => 2 * redundancy_factor < number_of_shards
+           shard_length < k
+           => n / number_of_shards < k
+           => n / k < number_of_shards
+           => redundancy_factor < number_of_shards
            since number_of_shards is a power of 2 the minimum value for
-           number_of_shards is 4 * redundancy_factor *)
-          (fun () ->
+           number_of_shards is 2 * redundancy_factor. *)
+        (fun () ->
           Format.asprintf
             "For the given parameters, the minimum number of shards is %d. Got \
              %d."
-            (redundancy_factor * 4)
+            (redundancy_factor * 2)
             number_of_shards)
     in
     let* () =
@@ -1085,19 +1085,12 @@ module Inner = struct
             = sum_{k=0}^{m/l-1} floor(P(x)/(x^{(k+1)*l})) z^{i*k}.
 
      So:
-     - if d >= 2l then
      q_i(x) = sum_{k=0}^{m/l-1} (P_m x^{m-(k+1)*l} + P_{m-1}x^{m-(k+1)*l-1}
               + ... + P_{(k+1)*l+1}x + P_{(k+1)*l}) z^{ik}.
-     - if l <= d < 2l then
-     q_i(x) = P_m x^{m-l} + ... + P_d x^{d-l} + ... + P_{l+1} x + P_l.
 
-     There is a subtle condition which is not stated in the original paper
-     (but is more apparent with the above derivation) which is d >= 2l.
-     Indeed, if l <= d < 2l, then the powers of z are absent of the quotient:
+     If l <= d < 2l, then the powers of z are absent of the quotient:
      q_i(x) = P_l + P_{l+1} x + ... + P_d x^{d-l}.
-     For this reason, we assume d >= 2l (thus m > 2l).
-     We could support the other case (l <= d < 2l) but it is a bit cumbersome,
-     and is sort of an edge case for which there are too few shards.
+     In this case, all proofs are equal since their value doesn't depend on [i].
 
      Thus,
      π_i = [q_i(x)]_1
@@ -1247,8 +1240,8 @@ module Inner = struct
        because [2^t.proofs_log = t.number_of_shards > 0]. *)
     assert (t.proofs_log > 0 && t.number_of_shards = 1 lsl t.proofs_log) ;
     assert (t.shard_length = 1 lsl t.evaluations_per_proof_log) ;
-    (* [d >= 2 * l] where [d = t.k - 1] and [l = t.shard_length]. *)
-    assert (2 * t.shard_length < t.k) ;
+    (* [t.k > l] where [l = t.shard_length]. *)
+    assert (t.shard_length < t.k) ;
     (* Step 2. *)
     let domain_length = Array.length domain in
     let h_j j =
@@ -1260,12 +1253,21 @@ module Inner = struct
                  where [q = floor ((m-j)/l) = quotient]. *)
       let points =
         Array.init domain_length (fun i ->
-            if i <= quotient + (2 * padding) then Scalar.(copy zero)
-            else
-              Scalar.copy
-                coefficients.(remainder
-                              + (i - (quotient + (2 * padding)))
-                                * t.shard_length))
+            let idx =
+              remainder + ((i - (quotient + (2 * padding))) * t.shard_length)
+            in
+            if
+              i <= quotient + (2 * padding) || idx > t.k
+              (* The second inequality is here in the case
+                 [t.k = 2*t.shard_length]
+                 thus [domain_length = 2*t.k/t.shard_length=4]
+                 and [padding=0].
+                 In this case, either
+                 [quotient = 2] thus [points = P_{m-j} 0 0 P_{r+l=m-j-l}],
+                 or [quotient = 1] thus
+                 [points] = P_{m-j} 0 P_{m-j} 0. *)
+            then Scalar.(copy zero)
+            else Scalar.copy coefficients.(idx))
       in
       (* Set P_{m-j}. *)
       points.(0) <- Scalar.copy coefficients.(t.k - j) ;
