@@ -50,8 +50,6 @@
 
 /scripts                     @romain.nl
 
-/tests_python                @arvidnl
-
 /tezt/lib*                   @romain.nl
 /tezt/records                @romain.nl
 

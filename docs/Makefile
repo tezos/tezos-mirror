@@ -192,6 +192,8 @@ PYCODESTYLE_OPTIONS=\
 
 TYPECHECK=poetry run mypy
 
+BLACK=poetry run black
+
 PYTHON_SRCS?=conf.py _extensions/*.py scripts/*.py
 
 pylint:
@@ -201,7 +203,7 @@ pylint:
 
 lint_black:
 	@echo "Running black formatter as style checker"
-	poetry run black --check $(PYTHON_SRCS)
+	$(BLACK) --check $(PYTHON_SRCS)
 
 pycodestyle:
 	@echo "Linting with pycodestyle version `poetry run pycodestyle --version` (`poetry run which pycodestyle`)"
@@ -212,6 +214,13 @@ typecheck:
 	$(TYPECHECK) $(PYTHON_SRCS)
 
 lint: pylint pycodestyle lint_black typecheck
+
+# black options are set in pyproject.toml
+black:
+	@echo "Running black formatter"
+	$(BLACK) $(PYTHON_SRCS)
+
+fmt: black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck

@@ -4,7 +4,6 @@
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
-# This script is mimicked by tests_python/tests/test_openapi.py
 # When the python tests framework becomes a standalone library, this script
 # should be removed and replaced by a python script calling the test's core
 # logic.

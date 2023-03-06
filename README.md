@@ -22,9 +22,7 @@ Octez provides a node, a client, a baker, an accuser, and other tools, distribut
 
 In more detail, this git repository contains:
 - the source code, in directory src/
-- tests (mainly system tests):
-  * in a Python testing and execution framework, under tests_python/
-  * in an OCaml system testing framework for Tezos called Tezt, under tezt/
+- tests (mainly system tests) in an OCaml system testing framework for Tezos called Tezt, under tezt/
 - the developer documentation of the Tezos software, under docs/
 - a few third-party libraries, adapted for Tezos, under vendors/
 

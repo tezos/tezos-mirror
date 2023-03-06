@@ -222,7 +222,6 @@ linkcheck_allowed_redirects = dict(
             r'https://www\.sphinx-doc\.org/.*',
             r'https://www\.sphinx-doc\.org/en/master/.*',
         ),
-        (r'https://docs\.pytest\.org/', r'https://docs\.pytest\.org/en/.*'),
         (
             r'https://tools\.ietf\.org/html/.*',
             r'https://datatracker\.ietf\.org/doc/.*',

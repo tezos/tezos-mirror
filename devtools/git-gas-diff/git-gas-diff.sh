@@ -74,7 +74,7 @@ MSG="-- LINE NUMBERS REFER TO TEMPORARY FILE ${DIFF_FILE}. --"
 echo -e "$MSG\n"
 
 git diff --diff-filter=ad -U0 --output="$DIFF_FILE" "$OLD" "$NEW" \
-  ../../tests_python/tests_alpha/_regtest_outputs/ ../../tezt/tests/expected/
+  ../../tezt/tests/expected/
 dune exec git-gas-diff "$DIFF_FILE"
 
 echo -e "\n$MSG"
