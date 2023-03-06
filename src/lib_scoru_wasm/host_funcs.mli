@@ -37,13 +37,16 @@ val lookup_opt :
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
-(** [all] represents all registered host functions that are important for the
-      SCORU WASM PVM. *)
-val all : Tezos_webassembly_interpreter.Host_funcs.registry
+(** [all ~version] represents all registered host functions that are
+    supported for the [version] of the WASM PVM. *)
+val all :
+  version:Wasm_pvm_state.version ->
+  Tezos_webassembly_interpreter.Host_funcs.registry
 
-(** [all_debug] contains the same functions as [all], with the alternative
-    implementation of [write_debug]. *)
+(** [all_debug ~version] contains the same functions as
+    [all ~version], with the alternative implementation of [write_debug]. *)
 val all_debug :
+  version:Wasm_pvm_state.version ->
   write_debug:Builtins.write_debug ->
   Tezos_webassembly_interpreter.Host_funcs.registry
 

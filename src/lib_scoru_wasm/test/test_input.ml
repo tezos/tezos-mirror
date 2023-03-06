@@ -126,7 +126,7 @@ let read_input_no_messages () =
   assert (result = 0l) ;
   Lwt.return @@ Result.return_unit
 
-let test_host_fun () =
+let test_host_fun ~version () =
   let open Lwt.Syntax in
   let input = Input_buffer.alloc () in
   let* () =
@@ -155,7 +155,7 @@ let test_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.all ~version)
       ~input
       Host_funcs.Internal_for_tests.read_input
       values
@@ -296,33 +296,35 @@ let test_read_input_max_size_above_limit () =
   return_ok_unit
 
 let tests =
-  [
-    tztest "Write input" `Quick write_input;
-    tztest "Read input" `Quick read_input;
-    tztest "Read input no messages" `Quick read_input_no_messages;
-    tztest "Host read input" `Quick test_host_fun;
-    tztest
-      "Write input info at invalid address doesn't dequeue the input"
-      `Quick
-      test_write_input_info_invalid_address;
-    tztest
-      "Write input info beyond memory bounds doesn't dequeue the input"
-      `Quick
-      test_write_input_info_beyond_memory_bounds;
-    tztest
-      "Write input at invalid address doesn't dequeue the input"
-      `Quick
-      test_write_input_invalid_address;
-    tztest
-      "Write input beyond memory bounds doesn't dequeue the input"
-      `Quick
-      test_write_input_beyond_memory_bounds;
-    tztest
-      "Payload bigger than max size constant are truncated"
-      `Quick
-      test_read_input_too_big_payload;
-    tztest
-      "Payload bigger and expected max size constant are truncated"
-      `Quick
-      test_read_input_max_size_above_limit;
-  ]
+  Tztest_helper.tztests_with_pvm
+    ~versions:[V0; V1]
+    [("Host read input", `Quick, test_host_fun)]
+  @ [
+      tztest "Write input" `Quick write_input;
+      tztest "Read input" `Quick read_input;
+      tztest "Read input no messages" `Quick read_input_no_messages;
+      tztest
+        "Write input info at invalid address doesn't dequeue the input"
+        `Quick
+        test_write_input_info_invalid_address;
+      tztest
+        "Write input info beyond memory bounds doesn't dequeue the input"
+        `Quick
+        test_write_input_info_beyond_memory_bounds;
+      tztest
+        "Write input at invalid address doesn't dequeue the input"
+        `Quick
+        test_write_input_invalid_address;
+      tztest
+        "Write input beyond memory bounds doesn't dequeue the input"
+        `Quick
+        test_write_input_beyond_memory_bounds;
+      tztest
+        "Payload bigger than max size constant are truncated"
+        `Quick
+        test_read_input_too_big_payload;
+      tztest
+        "Payload bigger and expected max size constant are truncated"
+        `Quick
+        test_read_input_max_size_above_limit;
+    ]

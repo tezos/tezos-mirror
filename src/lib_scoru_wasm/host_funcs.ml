@@ -1205,12 +1205,21 @@ let with_write_debug ~write_debug:implem builder =
     ~implem:(write_debug ~implem)
     builder
 
-let all = Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
+let all_V0 =
+  Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
+
+let all_V1 =
+  Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
+
+let all ~version =
+  match version with Wasm_pvm_state.V0 -> all_V0 | Wasm_pvm_state.V1 -> all_V1
 
 (* We build the registry at toplevel of the module to prevent recomputing it at
    each initialization tick. *)
-let all_debug ~write_debug =
-  Host_funcs.(base |> with_write_debug ~write_debug |> construct)
+let all_debug ~version ~write_debug =
+  match version with
+  | Wasm_pvm_state.V0 | Wasm_pvm_state.V1 ->
+      Host_funcs.(base |> with_write_debug ~write_debug |> construct)
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size

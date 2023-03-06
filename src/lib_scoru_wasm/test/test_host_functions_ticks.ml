@@ -39,7 +39,7 @@ open Tztest_helper
 (* This function return a function to modifiy `write_debug` in the registry, and
    a function to revert the change. Due to how the registry works right now (a
    mutable global), this in necessary otherwise the next tests might fail. *)
-let register_new_write_debug added_ticks =
+let register_new_write_debug ~version added_ticks =
   let open Lwt_syntax in
   let name =
     match Host_funcs.Internal_for_tests.write_debug with
@@ -49,7 +49,7 @@ let register_new_write_debug added_ticks =
   let current_write_debug =
     Tezos_webassembly_interpreter.Host_funcs.lookup
       ~global_name:name
-      Host_funcs.all
+      (Host_funcs.all ~version)
   in
   let alternative_write_debug =
     match current_write_debug with
@@ -65,7 +65,7 @@ let register_new_write_debug added_ticks =
     Tezos_webassembly_interpreter.Host_funcs.register
       ~global_name:name
       impl
-      Host_funcs.all
+      (Host_funcs.all ~version)
   in
   (register alternative_write_debug, register current_write_debug)
 
@@ -102,7 +102,9 @@ let test_tickified_host_function ~version () =
     return elapsed_ticks
   in
   let* elapsed_tick_before = run_until_result () in
-  let update_registry, revert_registry = register_new_write_debug 100 in
+  let update_registry, revert_registry =
+    register_new_write_debug ~version 100
+  in
   update_registry () ;
   let* elapsed_tick_with_alt_write_debug = run_until_result () in
   assert (Int64.add elapsed_tick_before 100L = elapsed_tick_with_alt_write_debug) ;

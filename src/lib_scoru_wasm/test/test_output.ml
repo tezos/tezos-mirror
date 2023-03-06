@@ -107,7 +107,7 @@ let test_aux_write_output () =
 
   Lwt.return_ok ()
 
-let test_write_host_fun () =
+let test_write_host_fun ~version () =
   let open Lwt.Syntax in
   let input = Input_buffer.alloc () in
   let output = Eval.default_output_buffer () in
@@ -137,7 +137,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.all ~version)
       ~input
       ~output
       Host_funcs.Internal_for_tests.read_input
@@ -149,7 +149,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.all ~version)
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -178,7 +178,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.all ~version)
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -250,7 +250,7 @@ let test_messages_above_limit () =
 
 (* Same as {test_outbox_limit_gen} but uses directly the host function and tests
    the error code. *)
-let test_write_output_above_limit () =
+let test_write_output_above_limit ~version () =
   let open Lwt_syntax in
   let input = Input_buffer.alloc () in
   let message_limit = Z.of_int 5 in
@@ -278,7 +278,7 @@ let test_write_output_above_limit () =
       Eval.invoke
         ~module_reg
         ~caller:module_key
-        Host_funcs.all
+        (Host_funcs.all ~version)
         ~input
         ~output
         Host_funcs.Internal_for_tests.write_output
@@ -336,19 +336,22 @@ let test_push_output_bigger_than_max_size () =
   return_ok_unit
 
 let tests =
-  [
-    tztest "Output buffer" `Quick test_output_buffer;
-    tztest "Aux_write_output" `Quick test_aux_write_output;
-    tztest "Host write" `Quick test_write_host_fun;
-    tztest "Push message below the limit" `Quick test_messages_below_limit;
-    tztest "Push message at the limit" `Quick test_messages_at_limit;
-    tztest "Push message above the limit" `Quick test_messages_above_limit;
-    tztest
-      "Write_output: Push message above the limit"
-      `Quick
-      test_write_output_above_limit;
-    tztest
-      "Write_output: push messages bigger than the protocol limit"
-      `Quick
-      test_push_output_bigger_than_max_size;
-  ]
+  Tztest_helper.tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("Host write", `Quick, test_write_host_fun);
+      ( "Write_output: Push message above the limit",
+        `Quick,
+        test_write_output_above_limit );
+    ]
+  @ [
+      tztest "Output buffer" `Quick test_output_buffer;
+      tztest "Aux_write_output" `Quick test_aux_write_output;
+      tztest "Push message below the limit" `Quick test_messages_below_limit;
+      tztest "Push message at the limit" `Quick test_messages_at_limit;
+      tztest "Push message above the limit" `Quick test_messages_above_limit;
+      tztest
+        "Write_output: push messages bigger than the protocol limit"
+        `Quick
+        test_push_output_bigger_than_max_size;
+    ]

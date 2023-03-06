@@ -47,13 +47,13 @@ let equal_chunks c1 c2 =
   Lwt.return @@ assert (String.equal c1 c2)
 
 (* Test checking that if [key] is missing, [store_has key] returns [false] *)
-let test_store_has_missing_key () =
+let test_store_has_missing_key ~version () =
   let open Lwt.Syntax in
   let* durable = make_durable [] in
   let key = "/test/path" in
   let src = 10l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] src
+    make_module_inst ~version [key] src
   in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
@@ -83,14 +83,14 @@ let assert_invalid_key run =
       | x -> raise x)
 
 (* Test checking that if [key] is too large, [store_has key] traps. *)
-let test_store_has_key_too_long () =
+let test_store_has_key_too_long ~version () =
   let open Lwt_syntax in
   let* durable = make_durable [] in
   (* Together with the '/durable' prefix, and '/_' this key is too long *)
   let src = 10l in
   let key = List.repeat 240 "a" |> String.concat "" |> ( ^ ) "/" in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] 10l
+    make_module_inst ~version [key] 10l
   in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
@@ -123,7 +123,7 @@ let test_store_has_key_too_long () =
 
 (* Test checking that [store_list_size key] returns the number of immediate
    subtrees. *)
-let test_store_list_size () =
+let test_store_list_size ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -147,7 +147,7 @@ let test_store_list_size () =
   let key = "/a/short/path" in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] src
+    make_module_inst ~version [key] src
   in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
@@ -166,7 +166,7 @@ let test_store_list_size () =
 
 (* Test checking that [store_get_nth_key key index dst max_size] returns the size
    of the name of the immediate subtree at [index]. *)
-let test_store_get_nth_key () =
+let test_store_get_nth_key ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -190,7 +190,7 @@ let test_store_get_nth_key () =
   let key = "/a/short/path" in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] src
+    make_module_inst ~version [key] src
   in
   let key_length = Int32.of_int @@ String.length key in
   let dst_zero = 20l in
@@ -319,7 +319,7 @@ let test_store_get_nth_key () =
 
 (* Test checking that [store_delete key] deletes the subtree at [key] from the
    durable storage. *)
-let test_store_delete () =
+let test_store_delete ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -340,7 +340,7 @@ let test_store_delete () =
   let key = "/a/short/path" in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] src
+    make_module_inst ~version [key] src
   in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
@@ -372,7 +372,7 @@ let test_store_delete () =
 
 (* Test checking that if [key] has value/subtree, [store_has key] returns
    the correct enum value. *)
-let test_store_has_existing_key () =
+let test_store_has_existing_key ~version () =
   let open Lwt_syntax in
   let root =
     "/thequickbrownfoxjumpedoverthelazydog/THEQUICKBROWNFOXJUMPEDOVERTHELAZYDOG/0123456789."
@@ -388,7 +388,7 @@ let test_store_has_existing_key () =
   let src_two = Int32.add src_one @@ Int32.of_int @@ String.length key_one in
   let key_two = key ^ "/two" in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key; key_one; key_two] src
+    make_module_inst ~version [key; key_one; key_two] src
   in
   let check src key expected =
     let values =
@@ -491,7 +491,7 @@ let test_durable_count_subtrees_and_list () =
 (* Test checking that [store_copy from_key to_key] copies the subtree at
    [from_key] to [to_key] in the durable storage.  This should overwrite
    the tree that existed previously at [to_key] *)
-let test_store_copy () =
+let test_store_copy ~version () =
   let open Lwt_syntax in
   let value () = Chunked_byte_vector.of_string "a very long value" in
   (*
@@ -514,7 +514,7 @@ let test_store_copy () =
   let wrong_key = "/a/long/path/two" in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [from_key; to_key; wrong_key] src
+    make_module_inst ~version [from_key; to_key; wrong_key] src
   in
   let from_offset = src in
   let from_length = Int32.of_int @@ String.length from_key in
@@ -564,7 +564,7 @@ let test_store_copy () =
   let* () = equal_chunks old_value_from_key new_value_from_key in
   Lwt.return_ok ()
 
-let test_store_copy_missing_path () =
+let test_store_copy_missing_path ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -578,7 +578,7 @@ let test_store_copy_missing_path () =
   let to_key = "/a/long/path" in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [from_key; to_key] src
+    make_module_inst ~version [from_key; to_key] src
   in
 
   let from_offset = src in
@@ -606,7 +606,7 @@ let test_store_copy_missing_path () =
   assert (result = [Values.(Num (I32 Host_funcs.Error.(code Store_not_a_node)))]) ;
   Lwt.return_ok ()
 
-let test_store_move () =
+let test_store_move ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -635,7 +635,7 @@ let test_store_move () =
   in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [from_key; to_key; bad_key] src
+    make_module_inst ~version [from_key; to_key; bad_key] src
   in
 
   let from_offset = src in
@@ -677,7 +677,7 @@ let test_store_move () =
   let* () = equal_chunks from_tree to_tree in
   Lwt.return_ok ()
 
-let test_store_move_missing_path () =
+let test_store_move_missing_path ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -691,7 +691,7 @@ let test_store_move_missing_path () =
   let to_key = "/a/long/path" in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [from_key; to_key] src
+    make_module_inst ~version [from_key; to_key] src
   in
 
   let from_offset = src in
@@ -719,7 +719,7 @@ let test_store_move_missing_path () =
   assert (result = [Values.(Num (I32 Host_funcs.Error.(code Store_not_a_node)))]) ;
   Lwt.return_ok ()
 
-let test_store_read () =
+let test_store_read ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -732,7 +732,7 @@ let test_store_read () =
   let* durable = make_durable [(key, contents)] in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] src
+    make_module_inst ~version [key] src
   in
 
   let length = Int32.of_int @@ String.length key in
@@ -768,7 +768,7 @@ let test_store_read () =
   assert (value = expected_read_bytes) ;
   return_ok_unit
 
-let test_store_read_non_value () =
+let test_store_read_non_value ~version () =
   let open Lwt_syntax in
   (*
   Empty durable
@@ -780,7 +780,7 @@ let test_store_read_non_value () =
   let* durable = make_durable [] in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key] src
+    make_module_inst ~version [key] src
   in
 
   let length = Int32.of_int @@ String.length key in
@@ -808,7 +808,7 @@ let test_store_read_non_value () =
   assert (result = [Values.Num (I32 Host_funcs.Error.(code Store_not_a_value))]) ;
   return_ok_unit
 
-let test_store_value_size () =
+let test_store_value_size ~version () =
   let open Lwt_syntax in
   let to_res x = [Values.(Num (I32 x))] in
   let invoke_store_value_size ~module_reg ~caller ~durable host_funcs_reg values
@@ -833,7 +833,7 @@ let test_store_value_size () =
   let* durable = make_durable [(key, contents)] in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [key; invalid_key; missing_key; contents] src
+    make_module_inst ~version [key; invalid_key; missing_key; contents] src
   in
   let key_src, key_len = (src, Int32.of_int (String.length key)) in
   let invalid_key_src, invalid_key_len =
@@ -872,7 +872,7 @@ let test_store_value_size () =
   assert (result = to_res Host_funcs.Error.(code Store_not_a_value)) ;
   Lwt_result_syntax.return_unit
 
-let test_store_write () =
+let test_store_write ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -887,7 +887,7 @@ let test_store_write () =
   let* durable = make_durable [(existing_key, contents)] in
   let src = 20l in
   let module_reg, module_key, host_funcs_registry =
-    make_module_inst [existing_key; new_key; contents] src
+    make_module_inst ~version [existing_key; new_key; contents] src
   in
   let existing_key_src = src in
   let new_key_src =
@@ -1022,26 +1022,30 @@ let test_readonly_key () =
   Lwt.return_ok ()
 
 let tests =
-  [
-    tztest "store_has missing key" `Quick test_store_has_missing_key;
-    tztest "store_has existing key" `Quick test_store_has_existing_key;
-    tztest "store_has key too long key" `Quick test_store_has_key_too_long;
-    tztest "store_list_size counts subtrees" `Quick test_store_list_size;
-    tztest "store_get_nth_key produces subtrees" `Quick test_store_get_nth_key;
-    tztest "store_delete removes subtree" `Quick test_store_delete;
-    tztest "store_copy" `Quick test_store_copy;
-    tztest "store_copy missing node" `Quick test_store_copy_missing_path;
-    tztest "store_move" `Quick test_store_move;
-    tztest "store_move missing node" `Quick test_store_move_missing_path;
-    tztest "store_read" `Quick test_store_read;
-    tztest "store_read on non-value" `Quick test_store_read_non_value;
-    tztest "store_write" `Quick test_store_write;
-    tztest "store_value_size" `Quick test_store_value_size;
-    tztest "Durable: find value" `Quick test_durable_find_value;
-    tztest
-      "Durable: count subtrees and list"
-      `Quick
-      test_durable_count_subtrees_and_list;
-    tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
-    tztest "Durable: readonly keys" `Quick test_readonly_key;
-  ]
+  Tztest_helper.tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("store_has missing key", `Quick, test_store_has_missing_key);
+      ("store_has existing key", `Quick, test_store_has_existing_key);
+      ("store_has key too long key", `Quick, test_store_has_key_too_long);
+      ("store_list_size counts subtrees", `Quick, test_store_list_size);
+      ("store_get_nth_key produces subtrees", `Quick, test_store_get_nth_key);
+      ("store_delete removes subtree", `Quick, test_store_delete);
+      ("store_copy", `Quick, test_store_copy);
+      ("store_copy missing node", `Quick, test_store_copy_missing_path);
+      ("store_move", `Quick, test_store_move);
+      ("store_move missing node", `Quick, test_store_move_missing_path);
+      ("store_read", `Quick, test_store_read);
+      ("store_read on non-value", `Quick, test_store_read_non_value);
+      ("store_write", `Quick, test_store_write);
+      ("store_value_size", `Quick, test_store_value_size);
+    ]
+  @ [
+      tztest "Durable: find value" `Quick test_durable_find_value;
+      tztest
+        "Durable: count subtrees and list"
+        `Quick
+        test_durable_count_subtrees_and_list;
+      tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
+      tztest "Durable: readonly keys" `Quick test_readonly_key;
+    ]
