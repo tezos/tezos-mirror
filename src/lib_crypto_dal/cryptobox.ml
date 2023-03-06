@@ -1257,7 +1257,7 @@ module Inner = struct
                  ... P_{r+(q-1)l=m-j-l} || 0^{2m/l-2 floor((m-j)/l)}. *)
       let points =
         Array.init domain_length (fun i ->
-            if i <= quotient + (padding / 2) then Scalar.(copy zero)
+            if i <= quotient + padding then Scalar.(copy zero)
             else
               Scalar.copy
                 coefficients.(remainder
