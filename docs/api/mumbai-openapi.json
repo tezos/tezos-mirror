@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "16.0~rc2"
+    "version": "16.0~rc3"
   },
   "paths": {
     "/": {
@@ -4170,6 +4170,60 @@
         }
       }
     },
+    "/context/smart_rollups/all/origination_proof": {
+      "post": {
+        "description": "Proof for a smart rollup origination",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "wasm_2_0_0",
+                      "arith"
+                    ]
+                  },
+                  "kernel": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "kernel"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/commitment/{Smart_rollup_commitment_hash}": {
       "get": {
         "description": "Commitment for a smart rollup from its hash",
@@ -4286,6 +4340,56 @@
         }
       }
     },
+    "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/commitment/{Smart_rollup_commitment_hash}/stakers_indexes": {
+      "get": {
+        "description": "List of stakers indexes staking on a given commitment",
+        "parameters": [
+          {
+            "name": "Smart_rollup_hash",
+            "in": "path",
+            "description": "Smart_rollup_hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Smart_rollup_commitment_hash",
+            "in": "path",
+            "description": "Smart_rollup_commitment_hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/positive_bignum"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/genesis_info": {
       "get": {
         "description": "Genesis information (level and commitment hash) for a smart rollup",
@@ -4320,6 +4424,62 @@
                   "required": [
                     "level",
                     "commitment_hash"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/inbox_level/{block_level}/commitments": {
+      "get": {
+        "description": "List of commitments associated to a rollup for a given inbox level",
+        "parameters": [
+          {
+            "name": "Smart_rollup_hash",
+            "in": "path",
+            "description": "Smart_rollup_hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "block_level",
+            "in": "path",
+            "description": "A level integer",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Smart_rollup_commitment_hash"
+                      }
+                    }
                   ]
                 }
               }
@@ -4859,6 +5019,55 @@
         }
       }
     },
+    "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/staker/{pkh}/index": {
+      "get": {
+        "description": "Staker index associated to a public key hash for a given rollup",
+        "parameters": [
+          {
+            "name": "Smart_rollup_hash",
+            "in": "path",
+            "description": "Smart_rollup_hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Positive big number",
+                  "description": "Decimal representation of a positive big number",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/staker/{pkh}/staked_on_commitment": {
       "get": {
         "description": "The newest commitment on which the operator has staked on for a smart rollup. Note that is can return a commitment that is before the last cemented one.",
@@ -5138,9 +5347,9 @@
         }
       }
     },
-    "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/stakers_commitments": {
+    "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/stakers": {
       "get": {
-        "description": "List of stakers for a given rollup, associated to the commitment hash they are staked on. The hash can be absent if the staked commitment is before the last cemented commitment, and therefore the hash no longer exists in the context.",
+        "description": "List of active stakers' public key hashes of a rollup",
         "parameters": [
           {
             "name": "Smart_rollup_hash",
@@ -5160,18 +5369,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "properties": {
-                      "staker": {
-                        "$ref": "#/components/schemas/Signature.Public_key_hash"
-                      },
-                      "commitment": {
-                        "$ref": "#/components/schemas/Smart_rollup_commitment_hash"
-                      }
-                    },
-                    "required": [
-                      "staker"
-                    ]
+                    "$ref": "#/components/schemas/Signature.Public_key_hash"
                   }
                 }
               }
@@ -7437,7 +7635,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                          "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                         ]
                       },
                       "payload_hash": {
@@ -9251,7 +9449,7 @@
                     "next_protocol": {
                       "type": "string",
                       "enum": [
-                        "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                        "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                       ]
                     },
                     "test_chain_status": {
@@ -23009,7 +23207,7 @@
           "next_protocol": {
             "type": "string",
             "enum": [
-              "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+              "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
             ]
           },
           "test_chain_status": {
@@ -23404,7 +23602,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+              "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
             ]
           },
           "branch": {

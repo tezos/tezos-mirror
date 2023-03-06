@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "16.0~rc2"
+    "version": "16.0~rc3"
   },
   "paths": {
     "/ban_operation": {
@@ -187,7 +187,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                          "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                         ]
                       },
                       "branch": {
@@ -349,7 +349,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                  "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                 ]
                               },
                               "branch": {
@@ -389,7 +389,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                  "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                 ]
                               },
                               "branch": {
@@ -429,7 +429,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                  "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                 ]
                               },
                               "branch": {
@@ -469,7 +469,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                  "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                 ]
                               },
                               "branch": {
@@ -509,7 +509,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                  "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                 ]
                               },
                               "branch": {
@@ -592,7 +592,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                        "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                       ]
                                     },
                                     "branch": {
@@ -638,7 +638,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                        "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                       ]
                                     },
                                     "branch": {
@@ -684,7 +684,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                        "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                       ]
                                     },
                                     "branch": {
@@ -730,7 +730,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+                                        "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
                                       ]
                                     },
                                     "branch": {
@@ -3994,7 +3994,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj"
+              "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
             ]
           },
           "branch": {
