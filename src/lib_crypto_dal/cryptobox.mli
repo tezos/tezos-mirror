@@ -366,7 +366,7 @@ module Internal_for_tests : sig
   val load_parameters : initialisation_parameters -> unit
 
   (* Returns a default valid sequence of shards for the given parameters. *)
-  val make_dummy_shards : t -> shard Seq.t
+  val make_dummy_shards : t -> share_length:int -> shard Seq.t
 
   (* [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
      represent the same polynomial. *)
@@ -375,6 +375,25 @@ module Internal_for_tests : sig
   (* [page_proof_equal proof1 proof2] returns true if and only if [proof1]
      and [proof2] represent the same proof. *)
   val page_proof_equal : page_proof -> page_proof -> bool
+
+  (* [alter_page_proof page_proof] returns a different page proof than the
+     input. *)
+  val alter_page_proof : page_proof -> page_proof
+
+  (* [alter_shard_proof shard_proof] returns a different shard proof than
+     the input. *)
+  val alter_shard_proof : shard_proof -> shard_proof
+
+  (* [alter_commitment_proof commitment_proof] returns a different commitment
+     proof than the input. *)
+  val alter_commitment_proof : commitment_proof -> commitment_proof
+
+  (* [length_of_share t] returns the shard_length for the given parameters [t]. *)
+  val length_of_share : t -> int
+
+  (* [minimum_number_of_shards_to_reconstruct_slot t] returns the minimum
+     number of shards to reconstruct a slot using [polynomial_from_shards]. *)
+  val minimum_number_of_shards_to_reconstruct_slot : t -> int
 
   (* [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)

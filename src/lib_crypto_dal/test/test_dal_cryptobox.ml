@@ -1,10 +1,13 @@
 module Test = struct
+  (* [randrange n] returns a random integer in the range [0, n - 1]. *)
+  let randrange n = QCheck2.Gen.(generate1 (int_bound (n - 1)))
+
   (* Samples k random integers within the range [0, bound[. *)
   let random_indices bound k =
     let indices = Array.init k (fun _ -> -1) in
     for i = 0 to k - 1 do
       let rec loop () =
-        let n = Random.int bound in
+        let n = randrange bound in
         if Array.mem n indices then loop () else n
       in
       indices.(i) <- loop ()
@@ -88,9 +91,6 @@ module Test = struct
          (return padding_threshold)
          (return slot))
 
-  let generate_parameters_tup2 =
-    QCheck2.Gen.tup2 generate_parameters generate_parameters
-
   let print_parameters =
     QCheck2.Print.(
       contramap
@@ -109,9 +109,6 @@ module Test = struct
             padding_threshold,
             slot ))
         (tup6 int int int int int bytes))
-
-  let print_parameters_tup2 =
-    QCheck2.Print.tup2 print_parameters print_parameters
 
   let ensure_validity params =
     Cryptobox.Internal_for_tests.ensure_validity
@@ -250,26 +247,24 @@ module Test = struct
      The function [polynomial_from_shards] returns an error if the shards
      don't have the expected length. This could happen if the shards were
      produced with a different set of parameters than the ones used by
-     [polynomial_from_shards].
-
-     Here, the number of shards for the first set of parameters t1
-     second set of parameters t2 are different. *)
+     [polynomial_from_shards]. *)
   let test_erasure_code_failure_invalid_shard_length =
     let open QCheck2 in
     Test.make
       ~name:"DAL cryptobox: test erasure code shard invalid shard length"
-      ~print:print_parameters_tup2
-      generate_parameters_tup2
-      (fun (params1, params2) ->
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
         init () ;
-        assume (ensure_validity params1) ;
-        assume (ensure_validity params2) ;
-        assume (params1.number_of_shards <> params2.number_of_shards) ;
+        assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
-        let* t1 = Cryptobox.make (get_cryptobox_parameters params1) in
-        let* t2 = Cryptobox.make (get_cryptobox_parameters params2) in
-        let shards = Cryptobox.Internal_for_tests.make_dummy_shards t1 in
-        Cryptobox.polynomial_from_shards t2 shards)
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let shards =
+          Cryptobox.Internal_for_tests.make_dummy_shards
+            t
+            ~share_length:(Cryptobox.Internal_for_tests.length_of_share t + 1)
+        in
+        Cryptobox.polynomial_from_shards t shards)
         |> function
         | Error (`Invalid_shard_length _) -> true
         | _ -> false)
@@ -309,7 +304,7 @@ module Test = struct
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
-        let page_index = Random.int number_of_pages in
+        let page_index = randrange number_of_pages in
         let* page_proof = Cryptobox.prove_page t polynomial page_index in
         let page =
           Bytes.sub params.slot (page_index * params.page_size) params.page_size
@@ -334,39 +329,15 @@ module Test = struct
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
         let number_of_pages = params.slot_size / params.page_size in
-        let page_index_prove = Random.int number_of_pages in
-        let page_index_verify = Random.int number_of_pages in
-        assume (page_index_prove <> page_index_verify) ;
-        let* proof = Cryptobox.prove_page t polynomial page_index_prove in
-        let* proof_verify =
-          Cryptobox.prove_page t polynomial page_index_verify
+        let page_index = randrange number_of_pages in
+        let* proof = Cryptobox.prove_page t polynomial page_index in
+        let altered_proof =
+          Cryptobox.Internal_for_tests.alter_page_proof proof
         in
-        let page_prove =
-          Bytes.sub
-            params.slot
-            (page_index_prove * params.page_size)
-            params.page_size
+        let page =
+          Bytes.sub params.slot (page_index * params.page_size) params.page_size
         in
-        let page_verify =
-          Bytes.sub
-            params.slot
-            (page_index_verify * params.page_size)
-            params.page_size
-        in
-        (* We need [page_prove] and [page_verify] to be distinct, otherwise
-           [Cryptobox.verify_page] will return [Ok ()] (we want to input an
-           incorrect page to trigger the [`Invalid_page] error). *)
-        assume (Bytes.compare page_prove page_verify <> 0) ;
-        (* We need [proof] and [proof_verify] to be distinct. *)
-        assume
-          (not
-             (Cryptobox.Internal_for_tests.page_proof_equal proof proof_verify)) ;
-        Cryptobox.verify_page
-          t
-          commitment
-          ~page_index:page_index_verify
-          page_verify
-          proof)
+        Cryptobox.verify_page t commitment ~page_index page altered_proof)
         |> function
         | Error `Invalid_page -> true
         | _ -> false)
@@ -387,7 +358,7 @@ module Test = struct
         let* commitment = Cryptobox.commit t polynomial in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
         let shard_proofs = Cryptobox.prove_shards t polynomial in
-        let shard_index = Random.int params.number_of_shards in
+        let shard_index = randrange params.number_of_shards in
         match
           Seq.find
             (fun ({index; _} : Cryptobox.shard) -> index = shard_index)

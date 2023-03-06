@@ -1566,12 +1566,11 @@ module Internal_for_tests = struct
 
   let load_parameters parameters = initialisation_parameters := Some parameters
 
-  let make_dummy_shards t =
-    let len_shard = t.erasure_encoded_polynomial_length / t.number_of_shards in
+  let make_dummy_shards (t : t) ~share_length =
     let rec loop index seq =
       if index = t.number_of_shards then seq
       else
-        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        let share = Array.init share_length (fun _ -> Scalar.(copy zero)) in
         loop (index + 1) (Seq.cons {index; share} seq)
     in
     loop 0 Seq.empty
@@ -1579,6 +1578,19 @@ module Internal_for_tests = struct
   let polynomials_equal = Polynomials.equal
 
   let page_proof_equal = Bls12_381.G1.eq
+
+  let alter_proof proof = Bls12_381.G1.(add proof one)
+
+  let alter_page_proof (proof : page_proof) = alter_proof proof
+
+  let alter_shard_proof (proof : shard_proof) = alter_proof proof
+
+  let alter_commitment_proof (proof : commitment_proof) = alter_proof proof
+
+  let length_of_share (t : t) = t.shard_length
+
+  let minimum_number_of_shards_to_reconstruct_slot (t : t) =
+    t.max_polynomial_length / t.number_of_shards
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
