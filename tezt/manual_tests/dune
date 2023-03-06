@@ -2,7 +2,10 @@
  (name main)
  (libraries
    tezt-tezos
-   yes_wallet_lib)
+   yes_wallet_lib
+   src_proto_alpha_lib_client_test_tezt_lib
+   src_proto_016_PtMumbai_lib_client_test_tezt_lib
+)
  (flags (:standard
           (:include %{workspace_root}/macos-link-flags.sexp)
           -open Tezt -open Tezt_tezos -open Tezt.Base)))
