@@ -1157,8 +1157,10 @@ module Inner = struct
 
      2. Compute l FFTs over the [Scalar] field: forall j=0, ..., l-1:
 
-     P'_j = FFT_{2m/l}(P_{m-j} || 0^{floor((m-j)/l)} || P_{r+l} P_{r+2*l}
-            ... P_{r+(q-1)*l=m-j-l} || 0^{2m/l-2 floor((m-j)/l)}).
+     P'_j = FFT_{2m/l}(P_{m-j} || 0^{q+2*padding+1} || P_{r+l} P_{r+2l}
+                 ... P_{r+(q-1)l=m-j-l} || 0^{2m/l- (2*q+2*padding+1)})
+     where [q = floor ((m-j)/l) = quotient] and [padding] is the difference
+     between [quotient] and the next power of two of [quotient].
 
      3. Then compute {h}=(h_k)_{k in ⟦1, n/l⟧} with circulant matrix-vector
      multiplication via FFT:
@@ -1252,16 +1254,18 @@ module Inner = struct
     let h_j j =
       let remainder = (t.k - j) mod t.shard_length in
       let quotient = (t.k - j) / t.shard_length in
-      let padding = diff_next_power_of_two (2 * quotient) in
-      (* points = P_{m-j} || 0^{floor((m-j)/l)} || P_{r+l} P_{r+2l}
-                 ... P_{r+(q-1)l=m-j-l} || 0^{2m/l-2 floor((m-j)/l)}. *)
+      let padding = diff_next_power_of_two quotient in
+      (* points = P_{m-j} || 0^{q+2*padding+1} || P_{r+l} P_{r+2l}
+                 ... P_{r+(q-1)l=m-j-l} || 0^{2m/l- (2*q+2*padding+1)}
+                 where [q = floor ((m-j)/l) = quotient]. *)
       let points =
         Array.init domain_length (fun i ->
-            if i <= quotient + padding then Scalar.(copy zero)
+            if i <= quotient + (2 * padding) then Scalar.(copy zero)
             else
               Scalar.copy
                 coefficients.(remainder
-                              + ((i - (quotient + padding)) * t.shard_length)))
+                              + (i - (quotient + (2 * padding)))
+                                * t.shard_length))
       in
       (* Set P_{m-j}. *)
       points.(0) <- Scalar.copy coefficients.(t.k - j) ;
