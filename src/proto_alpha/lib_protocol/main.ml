@@ -177,8 +177,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
     ( ctxt,
       migration_balance_updates,
       migration_operation_results,
-      predecessor_level,
-      predecessor_raw_level )
+      predecessor_level )
 
 let begin_validation ctxt chain_id mode ~predecessor =
   let open Lwt_result_syntax in
@@ -186,8 +185,7 @@ let begin_validation ctxt chain_id mode ~predecessor =
   let* ( ctxt,
          _migration_balance_updates,
          _migration_operation_results,
-         predecessor_level,
-         _predecessor_raw_level ) =
+         predecessor_level ) =
     prepare_ctxt ctxt ~predecessor mode
   in
   let predecessor_timestamp = predecessor.timestamp in
@@ -267,8 +265,7 @@ let begin_application ctxt chain_id mode ~predecessor =
   let* ( ctxt,
          migration_balance_updates,
          migration_operation_results,
-         predecessor_level,
-         predecessor_raw_level ) =
+         predecessor_level ) =
     prepare_ctxt ctxt ~predecessor mode
   in
   let predecessor_timestamp = predecessor.timestamp in
@@ -302,7 +299,6 @@ let begin_application ctxt chain_id mode ~predecessor =
         chain_id
         ~migration_balance_updates
         ~migration_operation_results
-        ~predecessor_level:predecessor_raw_level
         ~predecessor_hash
         ~predecessor_fitness
 
@@ -398,8 +394,7 @@ module Mempool = struct
     let* ( ctxt,
            _migration_balance_updates,
            _migration_operation_results,
-           head_level,
-           _head_raw_level ) =
+           head_level ) =
       (* We use Partial_construction to factorize the [prepare_ctxt]. *)
       prepare_ctxt
         ctxt

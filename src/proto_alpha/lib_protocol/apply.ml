@@ -1801,10 +1801,7 @@ type mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
-  | Partial_construction of {
-      predecessor_level : Raw_level.t;
-      predecessor_fitness : Fitness.raw;
-    }
+  | Partial_construction of {predecessor_fitness : Fitness.raw}
 
 type application_state = {
   ctxt : t;
@@ -1849,7 +1846,7 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
         | Some _ -> ctxt)
     | Application _ | Partial_construction _ -> ctxt
   in
-  let mk_preendorsement_result {Consensus_key.delegate; consensus_pkh; _}
+  let mk_preendorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       preendorsement_power =
     Single_result
       (Preendorsement_result
@@ -1872,9 +1869,8 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
           ~power
           content.round
       in
-      return
-        (ctxt, mk_preendorsement_result (Consensus_key.pkh consensus_key) power)
-  | Partial_construction {predecessor_level; _} ->
+      return (ctxt, mk_preendorsement_result consensus_key power)
+  | Partial_construction _ ->
       (* In mempool mode, preendorsements are allowed for various levels
          and rounds. We do not record preendorsements because we could get
          false-positive conflicts for preendorsements with the same slot
@@ -1882,31 +1878,16 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
          for the mempool head's level and round (the most usual
          preendorsements), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
-      let* ctxt, consensus_key, power =
-        if Raw_level.(content.level = predecessor_level) then
-          (* We can use the pre-computed slot map, which contains the
-             consensus rights at the predecessor level. *)
-          let* consensus_key, power =
-            find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
-          in
-          return (ctxt, consensus_key, power)
-        else
-          (* We retrieve the key directly, and return a fake voting
-             power of 0 because it doesn't matter for a past or future
-             preendorsement.*)
-          let level = Level.from_raw ctxt content.level in
-          let* ctxt, consensus_key =
-            Stake_distribution.slot_owner ctxt level content.slot
-          in
-          return (ctxt, consensus_key, 0)
+      let* ctxt, consensus_key =
+        let level = Level.from_raw ctxt content.level in
+        Stake_distribution.slot_owner ctxt level content.slot
       in
-      return
-        (ctxt, mk_preendorsement_result (Consensus_key.pkh consensus_key) power)
+      return (ctxt, mk_preendorsement_result consensus_key 0 (* Fake power. *))
 
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let mk_endorsement_result {Consensus_key.delegate; consensus_pkh}
+  let mk_endorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       endorsement_power =
     Single_result
       (Endorsement_result
@@ -1925,9 +1906,8 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
       let*? ctxt =
         Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
       in
-      return
-        (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) power)
-  | Partial_construction {predecessor_level; _} ->
+      return (ctxt, mk_endorsement_result consensus_key power)
+  | Partial_construction _ ->
       (* In mempool mode, endorsements are allowed for various levels
          and rounds. We do not record endorsements because we could get
          false-positive conflicts for endorsements with the same slot
@@ -1935,26 +1915,11 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
          for the predecessor's level and round (the most usual
          endorsements), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
-      let* ctxt, consensus_key, power =
-        if Raw_level.(content.level = predecessor_level) then
-          (* We can use the pre-computed slot map, which contains the
-             consensus rights at the predecessor level. *)
-          let* consensus_key, power =
-            find_in_slot_map content (Consensus.allowed_endorsements ctxt)
-          in
-          return (ctxt, consensus_key, power)
-        else
-          (* We retrieve the key directly, and return a fake voting
-             power of 0 because it doesn't matter for a past or future
-             endorsement.*)
-          let level = Level.from_raw ctxt content.level in
-          let* ctxt, consensus_key =
-            Stake_distribution.slot_owner ctxt level content.slot
-          in
-          return (ctxt, consensus_key, 0)
+      let* ctxt, consensus_key =
+        let level = Level.from_raw ctxt content.level in
+        Stake_distribution.slot_owner ctxt level content.slot
       in
-      return
-        (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) power)
+      return (ctxt, mk_endorsement_result consensus_key 0 (* Fake power. *))
 
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
@@ -2491,7 +2456,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     }
 
 let begin_partial_construction ctxt chain_id ~migration_balance_updates
-    ~migration_operation_results ~predecessor_level ~predecessor_hash
+    ~migration_operation_results ~predecessor_hash
     ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
   let open Lwt_result_syntax in
   let toggle_vote = Liquidity_baking.LB_pass in
@@ -2507,7 +2472,7 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     let predecessor = predecessor_hash in
     Sc_rollup.Inbox.add_info_per_level ~predecessor ctxt
   in
-  let mode = Partial_construction {predecessor_level; predecessor_fitness} in
+  let mode = Partial_construction {predecessor_fitness} in
   return
     {
       mode;

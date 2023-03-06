@@ -121,7 +121,9 @@ let test_negative_slot () =
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
 
 (** Endorsement with a non-normalized slot (that is, a slot that
-    belongs to the delegate but is not the delegate's smallest slot). *)
+    belongs to the delegate but is not the delegate's smallest slot).
+    It should fail in application and construction modes, but be
+    accepted in mempool mode. *)
 let test_not_smallest_slot () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
@@ -145,17 +147,21 @@ let test_not_smallest_slot () =
   let slot =
     match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
   in
-  Consensus_helpers.test_consensus_operation_all_modes
+  let error_wrong_slot = function
+    | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+        {kind; _}
+      when kind = Validate_errors.Consensus.Endorsement ->
+        true
+    | _ -> false
+  in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~endorsed_block:b
     ~delegate
     ~slot
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
+    ~application_error:error_wrong_slot
+    ~construction_error:error_wrong_slot
+    ?mempool_error:None
     Endorsement
 
 (** Endorsement with a slot that does not belong to the delegate. *)

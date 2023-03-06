@@ -61,10 +61,8 @@ type mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
-  | Partial_construction of {
-      predecessor_level : Raw_level.t;
-      predecessor_fitness : Fitness.raw;
-    }  (** This mode is mainly intended to be used by a mempool. *)
+  | Partial_construction of {predecessor_fitness : Fitness.raw}
+      (** This mode is mainly intended to be used by a mempool. *)
 
 type application_state = {
   ctxt : context;
@@ -111,7 +109,6 @@ val begin_partial_construction :
   Chain_id.t ->
   migration_balance_updates:Receipt.balance_updates ->
   migration_operation_results:Migration.origination_result list ->
-  predecessor_level:Raw_level.t ->
   predecessor_hash:Block_hash.t ->
   predecessor_fitness:Fitness.raw ->
   application_state tzresult Lwt.t
