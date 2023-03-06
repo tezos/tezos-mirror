@@ -221,10 +221,10 @@ val encoded_share_size : t -> int
 .
 
     Ensures:
-    - For any [p], let shards = shards_from_polynomial p,
-    for any subset S of shards of k / shard length elements,
+    - For any [p], let [shards = shards_from_polynomial p],
+    for any subset S of shards of [polynomial_length / shard_length] elements,
     [polynomial_from_shards S = p].
-    Here, k and shard length are parameters declared in [t].
+    Here, [polynomial_length] and [shard_length] are parameters declared in [t].
 
     Fails with:
     - [Error (`Not_enough_shards msg)] if there aren't at least
@@ -245,10 +245,10 @@ val polynomial_from_shards :
     encoding the original [polynomial].
 
     Ensures:
-    - For any [p], let shards = shards_from_polynomial p,
-    for any subset S of shards of k / shard length elements,
+    - For any [p], let [shards = shards_from_polynomial p],
+    for any subset S of shards of [polynomial_length / shard_length] elements,
     [polynomial_from_shards S = p].
-    Here, k and shard length are parameters declared in [t]. *)
+    Here, [polynomial_length] and [shard_length] are parameters declared in [t]. *)
 val shards_from_polynomial : t -> polynomial -> shard Seq.t
 
 (** A proof that a shard belongs to some commitment. *)

@@ -286,13 +286,16 @@ module Inner = struct
     slot_size : int;
     page_size : int;
     number_of_shards : int;
-    k : int;
-    n : int;
-    (* k and n are the parameters of the erasure code. *)
-    domain_k : Domains.t;
+    (* Maximum length of the polynomial representation of a slot, also called [polynomial_length]
+       in the comments. *)
+    max_polynomial_length : int;
+    (* Length of the erasure-encoded polynomial representation of a slot,
+       also called [erasure_encoded_polynomial_length] in the comments. *)
+    erasure_encoded_polynomial_length : int;
+    domain_polynomial_length : Domains.t;
     (* Domain for the FFT on slots as polynomials to be erasure encoded. *)
-    domain_2k : Domains.t;
-    domain_n : Domains.t;
+    domain_2_times_polynomial_length : Domains.t;
+    domain_erasure_encoded_polynomial_length : Domains.t;
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
     shard_length : int;
     (* Length of a shard in terms of scalar elements. *)
@@ -314,17 +317,19 @@ module Inner = struct
   let slot_as_polynomial_length ~slot_size =
     1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
-  let evaluations_per_proof_log ~n ~number_of_shards =
-    (* [n / number_of_shard] is an integer if [n] and [number_of_shards]
+  let evaluations_per_proof_log ~erasure_encoded_polynomial_length
+      ~number_of_shards =
+    (* [erasure_encoded_polynomial_length / number_of_shard] is an integer if [erasure_encoded_polynomial_length] and [number_of_shards]
        were validated by [ensure_validity]. *)
-    Z.log2up (Z.of_int (n / number_of_shards))
+    Z.log2up (Z.of_int (erasure_encoded_polynomial_length / number_of_shards))
 
   (* The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
      hence the + 1 to account for the remainder of the division. *)
   let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
 
-  let ensure_validity ~slot_size ~page_size ~n ~k ~redundancy_factor
-      ~number_of_shards ~shard_length ~srs_g1_length ~srs_g2_length =
+  let ensure_validity ~slot_size ~page_size ~erasure_encoded_polynomial_length
+      ~max_polynomial_length ~redundancy_factor ~number_of_shards ~shard_length
+      ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
     let assert_result condition error_message =
       if not condition then fail (`Fail (error_message ())) else return_unit
@@ -351,7 +356,7 @@ module Inner = struct
       assert_result
         (is_power_of_two redundancy_factor && redundancy_factor >= 2)
         (* The redundancy factor should be a power of 2 so that n is a power of 2
-           for proper FFT sizing. The variable [k] is assumed to be a power of 2
+           for proper FFT sizing. The variable [polynomial_length] is assumed to be a power of 2
            as the output of [slot_as_polynomial_length]. *)
           (fun () ->
           Format.asprintf
@@ -360,7 +365,7 @@ module Inner = struct
             redundancy_factor)
     in
 
-    (* At this point [n] is a power of 2, and [n > k]. *)
+    (* At this point [erasure_encoded_polynomial_length] is a power of 2, and [erasure_encoded_polynomial_length > max_polynomial_length]. *)
     let* () =
       assert_result
         (page_size >= 32 && page_size < slot_size)
@@ -376,7 +381,7 @@ module Inner = struct
     in
     let* () =
       assert_result
-        (Z.(log2 (of_int n)) <= 32)
+        (Z.(log2 (of_int erasure_encoded_polynomial_length)) <= 32)
         (* n must be at most 2^32, the cardinal of the biggest subgroup of 2^i
            roots of unity in the multiplicative group of Fr, because the FFTs
            operate on such groups. *)
@@ -388,23 +393,24 @@ module Inner = struct
     in
     let* () =
       assert_result
-        (n mod number_of_shards == 0 && number_of_shards < n)
-        (* The number of shards must divide n, so [number_of_shards <= n].
-           Moreover, the inequality is strict because if [number_of_shards = n],
+        (erasure_encoded_polynomial_length mod number_of_shards == 0
+        && number_of_shards < erasure_encoded_polynomial_length)
+        (* The number of shards must divide n, so [number_of_shards <= erasure_encoded_polynomial_length].
+           Moreover, the inequality is strict because if [number_of_shards = erasure_encoded_polynomial_length],
            the domains for the FFT contain only one element and we cannot build
-           FFT domains with only one element. Given that [n] is a power of two,
-           it follows that the maximum number of shards is [n/2]. *)
+           FFT domains with only one element. Given that [erasure_encoded_polynomial_length] is a power of two,
+           it follows that the maximum number of shards is [erasure_encoded_polynomial_length/2]. *)
           (fun () ->
           Format.asprintf
             "The number of shards must divide, and not be equal to %d. For the \
              given parameter, the maximum number of shards is %d. Got: %d."
-            n
-            (n / 2)
+            erasure_encoded_polynomial_length
+            (erasure_encoded_polynomial_length / 2)
             number_of_shards)
     in
     let* () =
       assert_result
-        (shard_length < k)
+        (shard_length < max_polynomial_length)
         (* Since shard_length = n / number_of_shards, we obtain
            (all quantities are positive integers):
            shard_length < k
@@ -422,27 +428,29 @@ module Inner = struct
     in
     let* () =
       assert_result
-        (k <= srs_g1_length)
-        (* The committed polynomials have degree t.k - 1 at most,
-           so t.k coefficients. *)
+        (max_polynomial_length <= srs_g1_length)
+        (* The committed polynomials have degree t.max_polynomial_length - 1 at most,
+           so t.max_polynomial_length coefficients. *)
         (fun () ->
           Format.asprintf
             "SRS on G1 size is too small. Expected more than %d. Got %d"
-            k
+            max_polynomial_length
             srs_g1_length)
     in
     assert_result
       (let evaluations_per_proof_log =
-         evaluations_per_proof_log ~n ~number_of_shards
+         evaluations_per_proof_log
+           ~erasure_encoded_polynomial_length
+           ~number_of_shards
        in
        let srs_g2_expected_length =
-         max k (1 lsl evaluations_per_proof_log) + 1
+         max max_polynomial_length (1 lsl evaluations_per_proof_log) + 1
        in
        srs_g2_expected_length <= srs_g2_length)
       (fun () ->
         Format.asprintf
           "SRS on G2 size is too small. Expected more than %d. Got %d"
-          k
+          max_polynomial_length
           srs_g2_length)
 
   type parameters = {
@@ -473,9 +481,11 @@ module Inner = struct
       ({redundancy_factor; slot_size; page_size; number_of_shards} as
       parameters) =
     let open Result_syntax in
-    let k = slot_as_polynomial_length ~slot_size in
-    let n = redundancy_factor * k in
-    let shard_length = n / number_of_shards in
+    let max_polynomial_length = slot_as_polynomial_length ~slot_size in
+    let erasure_encoded_polynomial_length =
+      redundancy_factor * max_polynomial_length
+    in
+    let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let* raw =
       match !initialisation_parameters with
       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
@@ -485,17 +495,19 @@ module Inner = struct
       ensure_validity
         ~slot_size
         ~page_size
-        ~n
-        ~k
+        ~erasure_encoded_polynomial_length
+        ~max_polynomial_length
         ~redundancy_factor
         ~number_of_shards
         ~shard_length
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
-    let evaluations_log = Z.(log2 (of_int n)) in
+    let evaluations_log = Z.(log2 (of_int erasure_encoded_polynomial_length)) in
     let evaluations_per_proof_log =
-      evaluations_per_proof_log ~n ~number_of_shards
+      evaluations_per_proof_log
+        ~erasure_encoded_polynomial_length
+        ~number_of_shards
     in
     let page_length = page_length ~page_size in
     let srs =
@@ -513,11 +525,13 @@ module Inner = struct
         slot_size;
         page_size;
         number_of_shards;
-        k;
-        n;
-        domain_k = make_domain k;
-        domain_2k = make_domain (2 * k);
-        domain_n = make_domain n;
+        max_polynomial_length;
+        erasure_encoded_polynomial_length;
+        domain_polynomial_length = make_domain max_polynomial_length;
+        domain_2_times_polynomial_length =
+          make_domain (2 * max_polynomial_length);
+        domain_erasure_encoded_polynomial_length =
+          make_domain erasure_encoded_polynomial_length;
         shard_length;
         pages_per_slot = pages_per_slot parameters;
         page_length;
@@ -556,7 +570,9 @@ module Inner = struct
           (Printf.sprintf "message must be %d bytes long" t.slot_size))
     else
       let offset = ref 0 in
-      let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
+      let res =
+        Array.init t.max_polynomial_length (fun _ -> Scalar.(copy zero))
+      in
       (* A slot is subdivided into contiguous segments, called pages.
          The length of a page divides the slot size, that is:
          [t.page_size * t.pages_per_slot = t.slot_size]
@@ -577,7 +593,7 @@ module Inner = struct
            page by page by chunks of [scalar_bytes_amount], or [t.remaining_bytes]
            for the last page chunk.
 
-           to obtain the vector of length [k = t.page_length * t.pages_per_slot]
+           to obtain the vector of length [polynomial_length = t.page_length * t.pages_per_slot]
            (chunk p_i^j standing for i-th chunk of page j):
 
            [ p_0^0 p_1^0 ... p_{page_length-1}^0
@@ -633,15 +649,16 @@ module Inner = struct
 
        Thus [polynomial_from_slot] is an injection from slots to
        polynomials (as composition preserves injectivity). *)
-    Ok (Evaluations.interpolation_fft2 t.domain_k data)
+    Ok (Evaluations.interpolation_fft2 t.domain_polynomial_length data)
 
   (* [polynomial_to_slot] is the left-inverse function of
      [polynomial_from_slot]. *)
   let polynomial_to_slot t p =
     (* The last operation of [polynomial_from_slot] is the interpolation,
-       so we undo it with an evaluation on the same domain [t.domain_k]. *)
+       so we undo it with an evaluation on the same domain [t.domain_polynomial_length]. *)
     let eval =
-      Evaluations.evaluation_fft t.domain_k p |> Evaluations.to_array
+      Evaluations.evaluation_fft t.domain_polynomial_length p
+      |> Evaluations.to_array
     in
     let slot = Bytes.make t.slot_size '0' in
     let offset = ref 0 in
@@ -662,12 +679,13 @@ module Inner = struct
 
   (* Encoding a message P = (P_0, ... ,P_{k-1}) amounts to evaluate
      its associated polynomial P(x)=sum_{i=0}^{k-1} P_i x^i at the
-     evaluation points [t.domain_n].
+     evaluation points [t.domain_erasure_encoded_polynomial_length].
 
      This can be achieved with an n-points discrete Fourier transform
      supported by the [Scalar] field in time O(n log n). *)
   let encode t p =
-    Evaluations.to_array (Evaluations.evaluation_fft t.domain_n p)
+    Evaluations.to_array
+      (Evaluations.evaluation_fft t.domain_erasure_encoded_polynomial_length p)
 
   (* The shards are arranged in cosets to produce batches of KZG proofs
      for the shards efficiently.
@@ -702,11 +720,13 @@ module Inner = struct
   let encoded_share_size t =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
        Improve shard size computation *)
-    let share_scalar_len = t.n / t.number_of_shards in
+    let share_scalar_len =
+      t.erasure_encoded_polynomial_length / t.number_of_shards
+    in
     (share_scalar_len * Scalar.size_in_bytes) + 4
 
-  (* Let w be a primitive [t.n]-th root of unity, where
-     [t.k] and [t.n = t.redundancy_factor * t.k] divide
+  (* Let w be a primitive [t.erasure_encoded_polynomial_length]-th root of unity, where
+     [t.max_polynomial_length] and [t.erasure_encoded_polynomial_length = t.redundancy_factor * t.max_polynomial_length] divide
      [Scalar.order - 1]. Let F be a finite field, and in this
      context we use the prime field [Scalar].
      We can decode a codeword c from
@@ -733,27 +753,28 @@ module Inner = struct
     let shards =
       (* We always consider the first k codeword vector components,
          the ShardSet allows collecting distinct indices.
-         [Seq.take] doesn't raise any exceptions as t.k / t.shard_length
+         [Seq.take] doesn't raise any exceptions as t.max_polynomial_length / t.shard_length
          is (strictly) positive.
 
-         [t.k / t.shard_length] is strictly less than [t.number_of_shards].
+         [t.max_polynomial_length / t.shard_length] is strictly less than [t.number_of_shards].
 
-         Indeed, [t.shard_length = t.n / t.number_of_shards] where
-         [t.n = t.k * t.redundancy_factor] and [t.redundancy_factor > 1].
+         Indeed, [t.shard_length = t.erasure_encoded_polynomial_length / t.number_of_shards] where
+         [t.erasure_encoded_polynomial_length = t.max_polynomial_length * t.redundancy_factor] and [t.redundancy_factor > 1].
          Thus,
-         [t.k / t.shard_length = t.number_of_shards / t.redundancy_factor < t.number_of_shards].
+         [t.max_polynomial_length / t.shard_length = t.number_of_shards / t.redundancy_factor < t.number_of_shards].
 
          Here, all variables are positive integers, and [t.redundancy_factor]
-         divides [t.number_of_shards], [t.number_of_shards] divides [t.n]. *)
-      Seq.take (t.k / t.shard_length) shards |> ShardSet.of_seq
+         divides [t.number_of_shards], [t.number_of_shards] divides [t.erasure_encoded_polynomial_length]. *)
+      Seq.take (t.max_polynomial_length / t.shard_length) shards
+      |> ShardSet.of_seq
     in
-    (* There should be [t.k / t.shard_length] distinct shard indices. *)
-    if t.k / t.shard_length > ShardSet.cardinal shards then
+    (* There should be [t.max_polynomial_length / t.shard_length] distinct shard indices. *)
+    if t.max_polynomial_length / t.shard_length > ShardSet.cardinal shards then
       Error
         (`Not_enough_shards
           (Printf.sprintf
              "there must be at least %d shards to decode"
-             (t.k / t.shard_length)))
+             (t.max_polynomial_length / t.shard_length)))
     else if
       ShardSet.exists
         (fun {share; _} -> Array.length share <> t.shard_length)
@@ -803,11 +824,11 @@ module Inner = struct
          where W_0 = {w^{t.number_of_shards * j}}_{j in ⟦0, t.shard_length-1⟧}
          and W_i = w^i W_0 (|W_0|=t.shard_length).
 
-         For a set of [t.k / shard_length] shard indices
+         For a set of [t.max_polynomial_length / shard_length] shard indices
          Z subseteq {0, t.number_of_shards-1}, we reorganize the product
          A(x)=prod_{i=0}^{k-1} (x-x_i) into
 
-         A(x) = prod_{i in Z, |Z|=t.k/t.shard_length} Z_i
+         A(x) = prod_{i in Z, |Z|=t.max_polynomial_length/t.shard_length} Z_i
          where Z_i = prod_{w' in W_i} (x - w').
 
          We notice that Z_0(x)=x^{|W_0|}-1 (as its roots
@@ -841,7 +862,10 @@ module Inner = struct
         Polynomials.mul_xn
           acc
           t.shard_length
-          (Scalar.negate (Domains.get t.domain_n (i * t.shard_length)))
+          (Scalar.negate
+             (Domains.get
+                t.domain_erasure_encoded_polynomial_length
+                (i * t.shard_length)))
       in
       (* [partition_products seq] builds two polynomials whose
          product is A(x) from the input shards [seq]. *)
@@ -852,12 +876,12 @@ module Inner = struct
           (Polynomials.one, Polynomials.one)
       in
       (* The computation of [p1], [p2] has asymptotic complexity
-         [O((t.k + t.shard_length) * (t.k / t.shard_length))
-         = O(t.k * t.number_of_shards / t.redundancy_factor)].
+         [O((t.max_polynomial_length + t.shard_length) * (t.max_polynomial_length / t.shard_length))
+         = O(t.max_polynomial_length * t.number_of_shards / t.redundancy_factor)].
          It is the most costly operation of this function. *)
       let p1, p2 = partition_products shards in
       (* A(x) is the product of [p1] and [p2]. *)
-      let a_poly = fft_mul t.domain_2k [p1; p2] in
+      let a_poly = fft_mul t.domain_2_times_polynomial_length [p1; p2] in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
@@ -877,7 +901,9 @@ module Inner = struct
 
          So A'(x_i) = sum_{j=0}^{k-1} A_j(x_i) = A_i(x_i) as the other
          polynomials A_j(x) have x_i as root. *)
-      let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
+      let eval_a' =
+        Evaluations.evaluation_fft t.domain_erasure_encoded_polynomial_length a'
+      in
 
       (* 4. Computing N(x) ≔ sum_{i=0}^{k-1} n_i / x_i x^i
          where n_i ≔ c_i/A_i(x_i)
@@ -893,13 +919,18 @@ module Inner = struct
 
          where N(x) ≔ sum_{i=0}^{k-1} n_i / x_i x^i. *)
       let compute_n t eval_a' shards =
-        let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
+        let n_poly =
+          Array.init t.erasure_encoded_polynomial_length (fun _ ->
+              Scalar.(copy zero))
+        in
         ShardSet.iter
           (fun {index; share} ->
             for j = 0 to Array.length share - 1 do
               let c_i = share.(j) in
               let i = (t.number_of_shards * j) + index in
-              let x_i = Domains.get t.domain_n i in
+              let x_i =
+                Domains.get t.domain_erasure_encoded_polynomial_length i
+              in
               let tmp = Evaluations.get eval_a' i in
               Scalar.mul_inplace tmp tmp x_i ;
               (* The call below never fails, so we don't
@@ -924,18 +955,24 @@ module Inner = struct
          of -n * IFFT_n(N). *)
       let b =
         Polynomials.copy
-          ~len:t.k
-          (Evaluations.interpolation_fft2 t.domain_n n_poly)
+          ~len:t.max_polynomial_length
+          (Evaluations.interpolation_fft2
+             t.domain_erasure_encoded_polynomial_length
+             n_poly)
       in
-      Polynomials.mul_by_scalar_inplace b Scalar.(negate (of_int t.n)) b ;
+      Polynomials.mul_by_scalar_inplace
+        b
+        Scalar.(negate (of_int t.erasure_encoded_polynomial_length))
+        b ;
 
       (* 6. Computing Lagrange interpolation polynomial P(x).
          The product is given by the convolution theorem:
          P = A * B = IFFT_{2k}(FFT_{2k}(A) o FFT_{2k}(B))
          where o is the pairwise product. *)
-      let p = fft_mul t.domain_2k [a_poly; b] in
+      let p = fft_mul t.domain_2_times_polynomial_length [a_poly; b] in
       let len =
-        if Polynomials.is_zero p then 1 else min t.k (Polynomials.degree p + 1)
+        if Polynomials.is_zero p then 1
+        else min t.max_polynomial_length (Polynomials.degree p + 1)
       in
       Ok (Polynomials.copy ~len p)
 
@@ -949,7 +986,7 @@ module Inner = struct
     else Ok (Srs_g1.pippenger t.srs.raw.srs_g1 p)
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
-     SRS's length - 1. We take d = t.k - 1 since we don't want to commit
+     SRS's length - 1. We take d = t.max_polynomial_length - 1 since we don't want to commit
      polynomials with degree greater than polynomials to be erasure-encoded.
 
      We consider the bilinear groups (G_1, G_2, G_T) with G_1=<g> and G_2=<h>.
@@ -959,12 +996,12 @@ module Inner = struct
      using the commitments for p and p X^{d-n}, and computing the commitment for
      X^{d-n} on G_2. *)
 
-  (* Proves that degree(p) < t.k *)
+  (* Proves that degree(p) < t.max_polynomial_length *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4192
 
      Generalize this function to pass the slot_size in parameter. *)
   let prove_commitment (t : t) p =
-    let max_allowed_committed_poly_degree = t.k - 1 in
+    let max_allowed_committed_poly_degree = t.max_polynomial_length - 1 in
     let max_committable_degree = Srs_g1.size t.srs.raw.srs_g1 - 1 in
     let offset_monomial_degree =
       max_committable_degree - max_allowed_committed_poly_degree
@@ -975,19 +1012,19 @@ module Inner = struct
     let p_with_offset =
       Polynomials.mul_xn p offset_monomial_degree Scalar.(copy zero)
     in
-    (* proof = commit(p X^offset_monomial_degree), with deg p < t.k *)
+    (* proof = commit(p X^offset_monomial_degree), with deg p < t.max_polynomial_length *)
     commit t p_with_offset
 
-  (* Verifies that the degree of the committed polynomial is < t.k *)
+  (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
-    let max_allowed_committed_poly_degree = t.k - 1 in
+    let max_allowed_committed_poly_degree = t.max_polynomial_length - 1 in
     let max_committable_degree = Srs_g1.size t.srs.raw.srs_g1 - 1 in
     let offset_monomial_degree =
       max_committable_degree - max_allowed_committed_poly_degree
     in
     let committed_offset_monomial =
       (* This [get] cannot raise since
-         [offset_monomial_degree <= t.k <= Srs_g2.size t.srs.raw.srs_g2]. *)
+         [offset_monomial_degree <= t.max_polynomial_length <= Srs_g2.size t.srs.raw.srs_g2]. *)
       Srs_g2.get t.srs.raw.srs_g2 offset_monomial_degree
     in
     let open Bls12_381 in
@@ -1194,14 +1231,14 @@ module Inner = struct
      scalar multiplication in G_1. *)
 
   (* Step 1, returns the pair made of the vectors s_j and the [domain] of length
-     [2 * m / l = 2 * t.k / t.shard_size] used for the computation of the s_j. *)
+     [2 * m / l = 2 * t.max_polynomial_length / t.shard_size] used for the computation of the s_j. *)
   let preprocess_multiple_multi_reveals t =
-    (* The length of a coset [t.shard_length] divides the domain length [t.k].
-       This is because [t.shard_length] divides [t.n], [t.k] divides [t.n]
-       and [t.k > t.shard_length] (see why [m > 2l] above, where [m = t.k] and
+    (* The length of a coset [t.shard_length] divides the domain length [t.max_polynomial_length].
+       This is because [t.shard_length] divides [t.erasure_encoded_polynomial_length], [t.max_polynomial_length] divides [t.erasure_encoded_polynomial_length]
+       and [t.max_polynomial_length > t.shard_length] (see why [m > 2l] above, where [m = t.max_polynomial_length] and
        [l = t.shard_length] here). *)
-    assert (t.k mod t.shard_length = 0) ;
-    let domain_length = 2 * t.k / t.shard_length in
+    assert (t.max_polynomial_length mod t.shard_length = 0) ;
+    let domain_length = 2 * t.max_polynomial_length / t.shard_length in
     (* This is a hack to obtain an array from a Domain.t. *)
     let domain = Domains.build domain_length |> Domains.inverse |> inverse in
     let srs = t.srs.raw.srs_g1 in
@@ -1213,12 +1250,14 @@ module Inner = struct
       (* According to the documentation of [( / )], "x / y is the greatest
          integer less than or equal to the real quotient of x by y". Thus it
          equals [floor (x /. y)]. *)
-      let quotient = (t.k - j) / t.shard_length in
+      let quotient = (t.max_polynomial_length - j) / t.shard_length in
       let points =
         Array.init domain_length (fun i ->
             if i < quotient then
               Bls12_381.G1.copy
-                (Srs_g1.get srs (t.k - j - ((i + 1) * t.shard_length)))
+                (Srs_g1.get
+                   srs
+                   (t.max_polynomial_length - j - ((i + 1) * t.shard_length)))
             else Bls12_381.G1.(copy zero))
       in
       Bls12_381.G1.fft_inplace ~domain ~points ;
@@ -1232,21 +1271,21 @@ module Inner = struct
      Implements the "Multiple multi-reveals" section above. *)
   let multiple_multi_reveals t ~preprocess:(domain, sj) ~coefficients :
       shard_proof array =
-    (* The length [t.n] of the domain [t.domain_n] is equal to
+    (* The length [t.erasure_encoded_polynomial_length] of the domain [t.domain_erasure_encoded_polynomial_length] is equal to
        [2^t.evaluations_per_proof_log * 2^t.proofs_log]. *)
     let n = t.evaluations_per_proof_log + t.proofs_log in
-    assert (t.n = 1 lsl n) ;
+    assert (t.erasure_encoded_polynomial_length = 1 lsl n) ;
     (* The log2 of the number of proofs [t.proofs_log] is > 0
        because [2^t.proofs_log = t.number_of_shards > 0]. *)
     assert (t.proofs_log > 0 && t.number_of_shards = 1 lsl t.proofs_log) ;
     assert (t.shard_length = 1 lsl t.evaluations_per_proof_log) ;
-    (* [t.k > l] where [l = t.shard_length]. *)
-    assert (t.shard_length < t.k) ;
+    (* [t.max_polynomial_length > l] where [l = t.shard_length]. *)
+    assert (t.shard_length < t.max_polynomial_length) ;
     (* Step 2. *)
     let domain_length = Array.length domain in
     let h_j j =
-      let remainder = (t.k - j) mod t.shard_length in
-      let quotient = (t.k - j) / t.shard_length in
+      let remainder = (t.max_polynomial_length - j) mod t.shard_length in
+      let quotient = (t.max_polynomial_length - j) / t.shard_length in
       let padding = diff_next_power_of_two quotient in
       (* points = P_{m-j} || 0^{q+2*padding+1} || P_{r+l} P_{r+2l}
                  ... P_{r+(q-1)l=m-j-l} || 0^{2m/l- (2*q+2*padding+1)}
@@ -1257,10 +1296,10 @@ module Inner = struct
               remainder + ((i - (quotient + (2 * padding))) * t.shard_length)
             in
             if
-              i <= quotient + (2 * padding) || idx > t.k
+              i <= quotient + (2 * padding) || idx > t.max_polynomial_length
               (* The second inequality is here in the case
-                 [t.k = 2*t.shard_length]
-                 thus [domain_length = 2*t.k/t.shard_length=4]
+                 [t.max_polynomial_length = 2*t.shard_length]
+                 thus [domain_length = 2*t.max_polynomial_length/t.shard_length=4]
                  and [padding=0].
                  In this case, either
                  [quotient = 2] thus [points = P_{m-j} 0 0 P_{r+l=m-j-l}],
@@ -1270,7 +1309,7 @@ module Inner = struct
             else Scalar.copy coefficients.(idx))
       in
       (* Set P_{m-j}. *)
-      points.(0) <- Scalar.copy coefficients.(t.k - j) ;
+      points.(0) <- Scalar.copy coefficients.(t.max_polynomial_length - j) ;
       (* FFT of step 2. *)
       Scalar.fft_inplace ~domain ~points ;
       (* Pairwise product of step 3. *)
@@ -1324,7 +1363,7 @@ module Inner = struct
      - [P = commit t s] for some slot [s]
      - [l := Array.length evaluations = Domains.length domain]
      - [srs_point = Srs_g2.get t.srs.raw.srs_g2 l]
-     - [root = w^i] where [w] is a primitive [n]-th root of unity for [l] dividing [n]
+     - [root = w^i] where [w] is a primitive [erasure_encoded_polynomial_length]-th root of unity for [l] dividing [erasure_encoded_polynomial_length]
      - [domain = (1, z, z^2, ..., z^{l - 1})] where [z = w^{n/l}] is a primitive
      [l]-th root of unity
 
@@ -1381,8 +1420,10 @@ module Inner = struct
   let prove_shards t p =
     (* Precomputes step. 1 of multiple multi-reveals. *)
     let preprocess = preprocess_multiple_multi_reveals t in
-    (* Resizing input polynomial [p] to obtain an array of length [t.k + 1]. *)
-    let coefficients = Array.init (t.k + 1) (fun _ -> Scalar.(copy zero)) in
+    (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)
+    let coefficients =
+      Array.init (t.max_polynomial_length + 1) (fun _ -> Scalar.(copy zero))
+    in
     let p_length = Polynomials.degree p + 1 in
     let p = Polynomials.to_dense_coefficients p in
     Array.blit p 0 coefficients 0 p_length ;
@@ -1400,7 +1441,9 @@ module Inner = struct
              0
              (t.number_of_shards - 1)))
     else
-      let root = Domains.get t.domain_n shard_index in
+      let root =
+        Domains.get t.domain_erasure_encoded_polynomial_length shard_index
+      in
       let domain = Domains.build t.shard_length in
       let srs_point = t.srs.kate_amortized_srs_g2_shards in
       match
@@ -1415,7 +1458,7 @@ module Inner = struct
       Error `Segment_index_out_of_range
     else
       let l = 1 lsl Z.(log2up (of_int t.page_length)) in
-      let wi = Domains.get t.domain_k page_index in
+      let wi = Domains.get t.domain_polynomial_length page_index in
       let quotient, _ =
         Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
       in
@@ -1463,7 +1506,7 @@ module Inner = struct
                   Scalar.of_bytes_exn dst
               | _ -> Scalar.(copy zero))
         in
-        let root = Domains.get t.domain_k page_index in
+        let root = Domains.get t.domain_polynomial_length page_index in
         match
           verify
             t
@@ -1491,10 +1534,13 @@ module Internal_for_tests = struct
     in
     let srs_g1 = Srs_g1.generate_insecure length secret in
     (* The error is caught during the instantiation through [make]. *)
+    let erasure_encoded_polynomial_length =
+      parameters.redundancy_factor * length
+    in
     let evaluations_per_proof_log =
       match
         evaluations_per_proof_log
-          ~n:(parameters.redundancy_factor * length)
+          ~erasure_encoded_polynomial_length
           ~number_of_shards:parameters.number_of_shards
       with
       | exception Invalid_argument _ -> 0
@@ -1513,7 +1559,7 @@ module Internal_for_tests = struct
   let load_parameters parameters = initialisation_parameters := Some parameters
 
   let make_dummy_shards t =
-    let len_shard = t.n / t.number_of_shards in
+    let len_shard = t.erasure_encoded_polynomial_length / t.number_of_shards in
     let rec loop index seq =
       if index = t.number_of_shards then seq
       else
@@ -1528,9 +1574,11 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let k = slot_as_polynomial_length ~slot_size in
-    let n = redundancy_factor * k in
-    let shard_length = n / number_of_shards in
+    let max_polynomial_length = slot_as_polynomial_length ~slot_size in
+    let erasure_encoded_polynomial_length =
+      redundancy_factor * max_polynomial_length
+    in
+    let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let open Result_syntax in
     (let* raw =
        match !initialisation_parameters with
@@ -1540,8 +1588,8 @@ module Internal_for_tests = struct
      ensure_validity
        ~slot_size
        ~page_size
-       ~n
-       ~k
+       ~erasure_encoded_polynomial_length
+       ~max_polynomial_length
        ~redundancy_factor
        ~number_of_shards
        ~shard_length
