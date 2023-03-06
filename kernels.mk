@@ -12,5 +12,9 @@ build-deps:
 	@make -C src/kernel_sdk build-deps
 	@make -C src/kernel_evm build-deps
 
+test-kernels:
+	@make -C src/kernel_sdk test
+	@make -C src/kernel_evm_mockup tests
+
 .PHONY: build-kernels
 build-kernels: ${KERNELS}

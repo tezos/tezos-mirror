@@ -7,7 +7,7 @@ all: build test doc
 
 build:
 	@cargo fmt --check
-	@cargo clippy -- --deny warnings
+	@cargo clippy --all-targets -- --deny warnings
 	@cargo build --target wasm32-unknown-unknown --release
 
 test:
