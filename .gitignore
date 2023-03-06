@@ -93,4 +93,4 @@ opam_repo.patch
 # Rust
 target
 
-evm_mockup_kernel.wasm
+evm_kernel.wasm

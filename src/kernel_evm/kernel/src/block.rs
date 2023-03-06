@@ -4,11 +4,11 @@
 
 use crate::blueprint::Queue;
 use crate::error::Error;
-use crate::eth_gen::{L2Level, OwnedHash, Quantity, RawTransactions};
 use crate::inbox;
 use crate::storage;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
+use tezos_ethereum::eth_gen::{L2Level, OwnedHash, Quantity, RawTransactions};
 
 pub struct L2Block {
     // This choice of a L2 block representation is totally

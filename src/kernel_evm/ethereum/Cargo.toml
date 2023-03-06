@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_ethereum"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+primitive-types = { version = "0.11.1", default-features = false }

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = 'evm_mockup_kernel'
+name = 'evm_kernel'
 version = '0.1.0'
 edition = '2021'
 
@@ -16,5 +16,6 @@ kernel = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-fea
 host = { git = "https://gitlab.com/tezos/kernel", branch = "main"  }
 debug = { git = "https://gitlab.com/tezos/kernel", branch = "main" }
 mock_runtime = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
+tezos_ethereum = { path = "../ethereum" }
 
 primitive-types = { version = "0.11.1", default-features = false }

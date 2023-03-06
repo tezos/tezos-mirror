@@ -2,7 +2,7 @@ build_kernels:
   extends:
     - .default_settings_template
   stage: build
-  image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.2"
+  image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.3"
   needs: [trigger]
   script:
     - make -f kernels.mk build-deps
@@ -15,6 +15,6 @@ build_kernels:
   artifacts:
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:
-      - evm_mockup_kernel.wasm
+      - evm_kernel.wasm
     expire_in: 1 day
     when: on_success
