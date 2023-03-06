@@ -1179,10 +1179,9 @@ let lookup name =
   match lookup_opt name with Some f -> f | None -> raise Not_found
 
 let register_host_funcs ~write_debug:implem registry =
-  List.fold_left
-    (fun _acc (global_name, host_function) ->
+  List.iter
+    (fun (global_name, host_function) ->
       Host_funcs.register ~global_name host_function registry)
-    ()
     [
       (read_input_name, read_input);
       (write_output_name, write_output);
