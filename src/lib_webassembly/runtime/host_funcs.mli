@@ -25,6 +25,19 @@ type host_func =
       (Durable_storage.t * Values.value list * ticks) Lwt.t)
   | Reveal_func of reveal_func
 
+(** An (immutable) host function registry builder that can be turned
+    into a registry using {!construct}. *)
+type builder
+
+(** A registry builder without any host functions. *)
+val empty_builder : builder
+
+(** [with_host_function ~global_name ~implem] adds the implementation
+    of a named host function in the builder. Will erase a previous
+    implementation for the given name. *)
+val with_host_function :
+  global_name:string -> implem:host_func -> builder -> builder
+
 (** A (mutable) host function registry *)
 type registry
 
@@ -39,3 +52,7 @@ val register : global_name:string -> host_func -> registry -> unit
 (** [lookup ~func_name] looks for the implementation of a named host
     function in the global symbol table. May raise [Not_found].*)
 val lookup : global_name:string -> registry -> host_func
+
+(** [construct builder] creates a new registry from the blueprint
+    encoded in [builder]. *)
+val construct : builder -> registry
