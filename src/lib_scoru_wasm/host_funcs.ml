@@ -1178,14 +1178,14 @@ let lookup_opt name =
 let lookup name =
   match lookup_opt name with Some f -> f | None -> raise Not_found
 
-let register_host_funcs ~write_debug:implem registry =
-  List.iter
-    (fun (global_name, host_function) ->
-      Host_funcs.register ~global_name host_function registry)
+let base =
+  List.fold_left
+    (fun registry (global_name, implem) ->
+      Host_funcs.with_host_function ~global_name ~implem registry)
+    Host_funcs.empty_builder
     [
       (read_input_name, read_input);
       (write_output_name, write_output);
-      (write_debug_name, write_debug ~implem);
       (store_has_name, store_has);
       (store_list_size_name, store_list_size);
       (store_get_nth_key_name, store_get_nth_key);
@@ -1199,17 +1199,18 @@ let register_host_funcs ~write_debug:implem registry =
       (store_write_name, store_write);
     ]
 
-let all =
-  let registry = Host_funcs.empty () in
-  register_host_funcs ~write_debug:Noop registry ;
-  registry
+let with_write_debug ~write_debug:implem builder =
+  Host_funcs.with_host_function
+    ~global_name:write_debug_name
+    ~implem:(write_debug ~implem)
+    builder
+
+let all = Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
 
 (* We build the registry at toplevel of the module to prevent recomputing it at
    each initialization tick. *)
 let all_debug ~write_debug =
-  let registry = Host_funcs.empty () in
-  register_host_funcs ~write_debug registry ;
-  registry
+  Host_funcs.(base |> with_write_debug ~write_debug |> construct)
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size

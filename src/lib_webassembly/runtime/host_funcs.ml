@@ -25,11 +25,20 @@ type host_func =
 
 module Registry = Map.Make (String)
 
-type registry = host_func Registry.t ref
+type builder = host_func Registry.t
 
-let empty () = ref Registry.empty
+let empty_builder = Registry.empty
+
+let construct = ref
+
+let with_host_function ~global_name ~implem builder =
+  Registry.add global_name implem builder
+
+type registry = builder ref
+
+let empty () = construct empty_builder
 
 let register ~global_name implem registry =
-  registry := Registry.add global_name implem !registry
+  registry := with_host_function ~global_name ~implem !registry
 
 let lookup ~global_name registry = Registry.find global_name !registry
