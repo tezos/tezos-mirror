@@ -762,7 +762,7 @@ module Scripts = struct
       | IDrop _ -> pp_print_string fmt "DROP"
       | IDup _ -> pp_print_string fmt "DUP"
       | ISwap _ -> pp_print_string fmt "SWAP"
-      | IConst _ -> pp_print_string fmt "CONST"
+      | IConst _ -> pp_print_string fmt "PUSH"
       | ICons_pair _ -> pp_print_string fmt "PAIR"
       | ICar _ -> pp_print_string fmt "CAR"
       | ICdr _ -> pp_print_string fmt "CDR"
