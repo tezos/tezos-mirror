@@ -1231,11 +1231,10 @@ let output_buffer_encoding =
        (value ["validity_period"] Data_encoding.int32)
        (value ["message_limit"] Data_encoding.z))
 
-let config_encoding ~host_funcs =
+let config_encoding =
   conv
-    (fun (step_kont, stack_size_limit) ->
-      Eval.{step_kont; host_funcs; stack_size_limit})
-    (fun Eval.{step_kont; stack_size_limit; _} -> (step_kont, stack_size_limit))
+    (fun (step_kont, stack_size_limit) -> Eval.{step_kont; stack_size_limit})
+    (fun Eval.{step_kont; stack_size_limit} -> (step_kont, stack_size_limit))
     (tup2
        ~flatten:true
        (scope ["step_kont"] step_kont_encoding)

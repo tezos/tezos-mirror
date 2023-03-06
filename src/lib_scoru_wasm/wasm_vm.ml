@@ -127,7 +127,7 @@ let save_fallback_kernel durable =
       Constants.kernel_fallback_key
   else Lwt.return durable
 
-let unsafe_next_tick_state ~stack_size_limit host_function_registry
+let unsafe_next_tick_state ~stack_size_limit host_funcs
     ({buffers; durable; tick_state; _} as pvm_state) =
   let open Lwt_syntax in
   let return ?(status = Running) ?(durable = durable) state =
@@ -247,7 +247,6 @@ let unsafe_next_tick_state ~stack_size_limit host_function_registry
           let config =
             Wasm.Eval.config
               ~stack_size_limit
-              host_function_registry
               self
               (Tezos_lazy_containers.Lazy_vector.Int32Vector.empty ())
               (Tezos_lazy_containers.Lazy_vector.Int32Vector.singleton
@@ -276,7 +275,7 @@ let unsafe_next_tick_state ~stack_size_limit host_function_registry
           ~module_reg
           ~self
           buffers
-          host_function_registry
+          host_funcs
           ast_module
           init_kont
       in
@@ -300,7 +299,7 @@ let unsafe_next_tick_state ~stack_size_limit host_function_registry
       (* Continue execution. *)
       let store = Durable.to_storage durable in
       let* store', config =
-        Wasm.Eval.step ~durable:store module_reg config buffers
+        Wasm.Eval.step ~host_funcs ~durable:store module_reg config buffers
       in
       let durable' = Durable.of_storage ~default:durable store' in
       return ~durable:durable' (Eval {config; module_reg})

@@ -154,11 +154,7 @@ type step_kont =
 
 type buffers = {input : input_inst; output : output_inst}
 
-type config = {
-  step_kont : step_kont;
-  host_funcs : Host_funcs.registry;
-  stack_size_limit : int;
-}
+type config = {step_kont : step_kont; stack_size_limit : int}
 
 type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
@@ -276,6 +272,7 @@ val invoke :
 val step :
   ?init:bool ->
   ?durable:Durable_storage.t ->
+  host_funcs:Host_funcs.registry ->
   module_reg ->
   config ->
   buffers ->
@@ -317,7 +314,6 @@ val reveal_step :
 
 val config :
   stack_size_limit:int ->
-  Host_funcs.registry ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
   value Vector.t ->
