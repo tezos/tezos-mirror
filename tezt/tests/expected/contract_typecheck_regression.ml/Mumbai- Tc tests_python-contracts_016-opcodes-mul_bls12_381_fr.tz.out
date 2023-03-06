@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/mul_bls12_381_fr.tz --details
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/mul_bls12_381_fr.tz --details
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_fr bls12_381_fr) ;

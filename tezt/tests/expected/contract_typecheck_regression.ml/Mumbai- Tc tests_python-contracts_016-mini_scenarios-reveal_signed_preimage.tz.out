@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/mini_scenarios/reveal_signed_preimage.tz --details
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/mini_scenarios/reveal_signed_preimage.tz --details
 Well typed
 Gas remaining: 1039978.896 units remaining
 { parameter (pair bytes signature) ;
