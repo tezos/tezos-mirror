@@ -209,8 +209,8 @@ let get_predecessor =
               (predecessors_of_blocks ancestors) ;
             match HM.find_opt cache ancestor with
             | None ->
-                (* We have just updated the cache with that information. *)
-                assert false
+                (* This could happen if ancestors was empty, but it shouldn't be. *)
+                return_none
             | Some predecessor -> return_some predecessor)
         | _ -> return_none)
 
