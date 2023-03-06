@@ -94,35 +94,6 @@ type validation_state = Validate.validation_state
 
 type application_state = Apply.application_state
 
-let init_allowed_consensus_operations ctxt ~endorsement_level
-    ~preendorsement_level =
-  let open Lwt_result_syntax in
-  let open Alpha_context in
-  let* ctxt = Delegate.prepare_stake_distribution ctxt in
-  let* ctxt, allowed_endorsements, allowed_preendorsements =
-    if Level.(endorsement_level = preendorsement_level) then
-      let* ctxt, slots =
-        Baking.endorsing_rights_by_first_slot ctxt endorsement_level
-      in
-      let consensus_operations = slots in
-      return (ctxt, consensus_operations, consensus_operations)
-    else
-      let* ctxt, endorsements =
-        Baking.endorsing_rights_by_first_slot ctxt endorsement_level
-      in
-      let* ctxt, preendorsements =
-        Baking.endorsing_rights_by_first_slot ctxt preendorsement_level
-      in
-      return (ctxt, endorsements, preendorsements)
-  in
-  let ctxt =
-    Consensus.initialize_consensus_operation
-      ctxt
-      ~allowed_endorsements
-      ~allowed_preendorsements
-  in
-  return ctxt
-
 (** Circumstances and relevant information for [begin_validation] and
     [begin_application] below. *)
 type mode =
@@ -137,6 +108,54 @@ type mode =
       predecessor_hash : Block_hash.t;
       timestamp : Time.t;
     }
+
+(** Initialize the consensus rights by first slot for modes that are
+    about the validation/application of a block: application, partial
+    validation, and full construction.
+
+    In these modes, endorsements must point to the predecessor's level
+    and preendorsements, if any, to the block's level. *)
+let init_consensus_rights_for_block ctxt ~predecessor_level =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  let* ctxt, endorsements_map =
+    Baking.endorsing_rights_by_first_slot ctxt predecessor_level
+  in
+  let* ctxt, preendorsements_map =
+    Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
+  in
+  let ctxt =
+    Consensus.initialize_consensus_operation
+      ctxt
+      ~allowed_endorsements:(Some endorsements_map)
+      ~allowed_preendorsements:(Some preendorsements_map)
+  in
+  return ctxt
+
+(** Initialize the consensus rights for a mempool (partial
+    construction mode).
+
+    In the mempool, there are three allowed levels for both
+    endorsements and preendorsements: [predecessor_level - 1] (aka the
+    grandparent's level), [predecessor_level] (that is, the level of
+    the mempool's head), and [predecessor_level + 1] (aka the current
+    level in ctxt). We don't want to compute the tables by first slot
+    for all three possible levels because it is
+    time-consuming. However, we want to ensure that the cycle rights
+    are loaded in the context, so that {!Stake_distribution.slot_owner}
+    doesn't have to initialize them each time it is called (we do this
+    now because the context is discarded at the end of the validation
+    of each operation, so we can't rely on the caching done by
+    [slot_owner] itself). *)
+let init_consensus_rights_for_mempool ctxt =
+  (* Cycle rights loading is coming in the next commit. *)
+  let ctxt =
+    Alpha_context.Consensus.initialize_consensus_operation
+      ctxt
+      ~allowed_endorsements:None
+      ~allowed_preendorsements:None
+  in
+  return ctxt
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let open Lwt_result_syntax in
@@ -153,24 +172,12 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   in
   let*? predecessor_raw_level = Raw_level.of_int32 predecessor.level in
   let predecessor_level = Level.from_raw ctxt predecessor_raw_level in
-  (* During block (full or partial) application or full construction,
-     endorsements must be for [predecessor_level] and preendorsements,
-     if any, for the block's level. In the mempool (partial
-     construction), both endorsements and preendorsements are expected
-     to be for [predecessor_level] (that is, head's level) most of the
-     time, although operations that are one level before or after
-     [predecessor_level] are also accepted. *)
-  let preendorsement_level =
+  let* ctxt = Delegate.prepare_stake_distribution ctxt in
+  let* ctxt =
     match mode with
     | Application _ | Partial_validation _ | Construction _ ->
-        Level.current ctxt
-    | Partial_construction _ -> predecessor_level
-  in
-  let* ctxt =
-    init_allowed_consensus_operations
-      ctxt
-      ~endorsement_level:predecessor_level
-      ~preendorsement_level
+        init_consensus_rights_for_block ctxt ~predecessor_level
+    | Partial_construction _ -> init_consensus_rights_for_mempool ctxt
   in
   Dal_apply.initialisation ~level:predecessor_level ctxt >>=? fun ctxt ->
   return

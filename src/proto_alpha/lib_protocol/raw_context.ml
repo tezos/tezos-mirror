@@ -87,16 +87,16 @@ module Raw_consensus = struct
   type t = {
     current_endorsement_power : int;
         (** Number of endorsement slots recorded for the current block. *)
-    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t;
+    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t option;
         (** Endorsements rights for the current block. Only an endorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
-            slot with its power. *)
-    allowed_preendorsements : (consensus_pk * int) Slot_repr.Map.t;
+            slot with its power. This is [None] only in mempool mode. *)
+    allowed_preendorsements : (consensus_pk * int) Slot_repr.Map.t option;
         (** Preendorsements rights for the current block. Only a preendorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
-            slot with its power. *)
+            slot with its power. This is [None] only in mempool mode. *)
     endorsements_seen : Slot_repr.Set.t;
         (** Record the endorsements already seen. Only initial slots are indexed. *)
     preendorsements_seen : Slot_repr.Set.t;
@@ -123,8 +123,8 @@ module Raw_consensus = struct
   let empty : t =
     {
       current_endorsement_power = 0;
-      allowed_endorsements = Slot_repr.Map.empty;
-      allowed_preendorsements = Slot_repr.Map.empty;
+      allowed_endorsements = Some Slot_repr.Map.empty;
+      allowed_preendorsements = Some Slot_repr.Map.empty;
       endorsements_seen = Slot_repr.Set.empty;
       preendorsements_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
@@ -1328,16 +1328,18 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map
+  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
 
-  val allowed_preendorsements : t -> (consensus_pk * int) slot_map
+  val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
+
+  type error += Slot_map_not_found of {loc : string}
 
   val current_endorsement_power : t -> int
 
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map ->
-    allowed_preendorsements:(consensus_pk * int) slot_map ->
+    allowed_endorsements:(consensus_pk * int) slot_map option ->
+    allowed_preendorsements:(consensus_pk * int) slot_map option ->
     t
 
   val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
@@ -1419,6 +1421,18 @@ module Consensus :
   let[@inline] set_endorsement_branch ctxt branch =
     update_consensus_with ctxt (fun ctxt ->
         Raw_consensus.set_endorsement_branch ctxt branch)
+
+  type error += Slot_map_not_found of {loc : string}
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"raw_context.consensus.slot_map_not_found"
+      ~title:"Slot map not found"
+      ~description:"Pre-computed map by first slot not found."
+      Data_encoding.(obj1 (req "loc" (string Plain)))
+      (function Slot_map_not_found {loc} -> Some loc | _ -> None)
+      (fun loc -> Slot_map_not_found {loc})
 end
 
 module Tx_rollup = struct

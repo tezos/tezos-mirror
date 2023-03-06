@@ -29,8 +29,8 @@ open Alpha_context
 type consensus_info = {
   predecessor_level : Raw_level.t;
   predecessor_round : Round.t;
-  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
-  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
+  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
+  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
 }
 
 let init_consensus_info ctxt (predecessor_level, predecessor_round) =
@@ -440,9 +440,12 @@ module Consensus = struct
       (Zero_frozen_deposits delegate_pkh)
 
   let get_delegate_details slot_map kind slot =
-    Result.of_option
-      (Slot.Map.find slot slot_map)
-      ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
+    match slot_map with
+    | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
+    | Some slot_map -> (
+        match Slot.Map.find slot slot_map with
+        | None -> error (Wrong_slot_used_for_consensus_operation {kind})
+        | Some x -> ok x)
 
   (** When validating a block (ie. in [Application],
       [Partial_validation], and [Construction] modes), any

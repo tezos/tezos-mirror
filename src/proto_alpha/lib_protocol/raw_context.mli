@@ -306,12 +306,15 @@ module type CONSENSUS = sig
   (** Returns a map where each endorser's pkh is associated to the
      list of its endorsing slots (in decreasing order) for a given
      level. *)
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map
+  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
 
   (** Returns a map where each endorser's pkh is associated to the
      list of its endorsing slots (in decreasing order) for a given
      level. *)
-  val allowed_preendorsements : t -> (consensus_pk * int) slot_map
+  val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
+
+  (** Missing pre-computed map by first slot. This error should not happen. *)
+  type error += Slot_map_not_found of {loc : string}
 
   (** [endorsement power ctx] returns the endorsement power of the
      current block. *)
@@ -322,8 +325,8 @@ module type CONSENSUS = sig
      any consensus operation.  *)
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map ->
-    allowed_preendorsements:(consensus_pk * int) slot_map ->
+    allowed_endorsements:(consensus_pk * int) slot_map option ->
+    allowed_preendorsements:(consensus_pk * int) slot_map option ->
     t
 
   (** [record_endorsement ctx ~initial_slot ~power] records an

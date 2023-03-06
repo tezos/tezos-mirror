@@ -1829,11 +1829,14 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
       record_non_consensus_operation_hash ctxt hash
 
 let find_in_slot_map consensus_content slot_map =
-  match Slot.Map.find consensus_content.slot slot_map with
-  | Some (consensus_key, power) -> return (consensus_key, power)
-  | None ->
-      (* This should not happen: operation validation should have failed. *)
-      tzfail Faulty_validation_wrong_slot
+  match slot_map with
+  | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
+  | Some slot_map -> (
+      match Slot.Map.find consensus_content.slot slot_map with
+      | None ->
+          (* This should not happen: operation validation should have failed. *)
+          error Faulty_validation_wrong_slot
+      | Some (consensus_key, power) -> ok (consensus_key, power))
 
 let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preendorsement contents_result_list) tzresult Lwt.t =
@@ -1859,7 +1862,7 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let* consensus_key, power =
+      let*? consensus_key, power =
         find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
       in
       let*? ctxt =
@@ -1900,7 +1903,7 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let* consensus_key, power =
+      let*? consensus_key, power =
         find_in_slot_map content (Consensus.allowed_endorsements ctxt)
       in
       let*? ctxt =
@@ -2324,7 +2327,12 @@ let are_endorsements_required ctxt ~level =
   Compare.Int32.(level_position_in_protocol > 1l)
 
 let record_endorsing_participation ctxt =
-  let validators = Consensus.allowed_endorsements ctxt in
+  let open Lwt_result_syntax in
+  let*? validators =
+    match Consensus.allowed_endorsements ctxt with
+    | Some x -> ok x
+    | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
+  in
   Slot.Map.fold_es
     (fun initial_slot ((consensus_pk : Consensus_key.pk), power) ctxt ->
       let participation =
