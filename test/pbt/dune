@@ -17,70 +17,84 @@
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./test_generated.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./test_legacy_compatibility.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./test_json_stream.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./test_json_stream_sizes.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./test_classifiers.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./test_sub_string.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run %{dep:./json_roundtrip_in_binary.exe})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node --stack-size=50000 %{dep:./test_generated.bc.js})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./test_legacy_compatibility.bc.js})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node --stack-size=50000 %{dep:./test_json_stream.bc.js})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node --stack-size=50000 %{dep:./test_json_stream_sizes.bc.js})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./test_classifiers.bc.js})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./test_sub_string.bc.js})))
 
 (rule
  (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./json_roundtrip_in_binary.bc.js})))
