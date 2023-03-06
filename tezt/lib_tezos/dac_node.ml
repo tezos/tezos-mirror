@@ -24,7 +24,11 @@
 (*****************************************************************************)
 
 module Parameters = struct
-  type legacy_mode_settings = {threshold : int; committee_members : string list}
+  type legacy_mode_settings = {
+    threshold : int;
+    committee_members : string list;
+    node_pkh : string option;
+  }
 
   type coordinator_mode_settings = {
     threshold : int;
@@ -132,6 +136,11 @@ let spawn_config_init dac_node =
           "with";
           "threshold";
           Int.to_string legacy_params.threshold;
+          "and";
+          "public";
+          "key";
+          "hash";
+          legacy_params.node_pkh;
           "and";
           "data";
           "availability";
@@ -275,8 +284,8 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
 
 let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
-    ~committee_members ~node ~client () =
-  let mode = Legacy {threshold; committee_members} in
+    ~committee_members ?node_pkh ~node ~client () =
+  let mode = Legacy {threshold; committee_members; node_pkh} in
   create
     ~path
     ?name

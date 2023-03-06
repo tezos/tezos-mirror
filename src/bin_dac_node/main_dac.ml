@@ -155,11 +155,14 @@ module Config_init = struct
       (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
       (prefixes ["configure"; "as"; "legacy"; "with"; "threshold"]
       @@ threshold_param
+      @@ prefixes ["and"; "public"; "key"; "hash"]
+      @@ tz4_address_param
       @@ prefixes ["and"; "data"; "availability"; "committee"; "members"]
       @@ seq_of_param @@ tz4_address_param)
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
            threshold
            committee_members_addresses
+           _dac_node_pkh
            cctxt ->
         create_configuration
           ~data_dir

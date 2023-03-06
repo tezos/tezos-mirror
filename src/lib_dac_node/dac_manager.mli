@@ -45,6 +45,11 @@ module Keys : sig
   (** [aggregate_sk_uris] returns the [Client_keys.aggregate_sk_uri] given a [t]. *)
   val get_aggregate_sk_uris : t -> Client_keys.aggregate_sk_uri
 
+  val get_address_keys :
+    #Client_context.wallet ->
+    Tezos_crypto.Aggregate_signature.public_key_hash ->
+    (t option, tztrace) result Lwt.t
+
   (** [get_keys ~addresses ~threshold cctxt config] returns the aliases and keys associated with the
       aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)
   val get_keys :

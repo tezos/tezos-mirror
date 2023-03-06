@@ -163,7 +163,7 @@ let with_layer1 ?additional_bootstrap_accounts ?commitment_period
   f node client bootstrap1_key
 
 let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~threshold ~committee_members tezos_client f =
+    ?(wait_ready = true) ~threshold ~committee_members ?node_pkh tezos_client f =
   let range i = List.init i Fun.id in
   let reveal_data_dir =
     Option.map
@@ -190,6 +190,7 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
       ~client:tezos_client
       ?reveal_data_dir
       ~threshold
+      ?node_pkh
       ~committee_members:
         (List.map
            (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
@@ -364,7 +365,12 @@ let test_dac_node_startup =
       ()
   in
   let dac_node =
-    Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    Dac_node.create_legacy
+      ~node
+      ~client
+      ~threshold:0
+      ~committee_members:[]
+      ()
   in
   let* _dir = Dac_node.init_config dac_node in
   let* () = run_dac dac_node in

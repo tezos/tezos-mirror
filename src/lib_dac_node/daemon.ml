@@ -118,7 +118,7 @@ module Handler = struct
       in the DAC node configuration. The DAC node tries to subscribes to the
       stream of root hashes via the streamed GET /monitor/root_hashes RPC call
       to the dac node corresponding to [coordinator_cctxt]. *)
-  let new_root_hash ctxt coordinator_cctxt =
+  let new_root_hash ctxt coordinator_cctxt pkh_opt =
     let open Lwt_result_syntax in
     let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
@@ -129,11 +129,37 @@ module Handler = struct
           root_hash
       in
       match payload_result with
-      | Ok _ ->
+      | Ok _ -> (
           let*! () =
             Event.emit_received_root_hash_processed dac_plugin root_hash
           in
-          return ()
+          match pkh_opt with
+          | Some pkh -> (
+              let wallet = Node_context.get_tezos_node_cctxt ctxt in
+              let* keys_opt = Dac_manager.Keys.get_address_keys wallet pkh in
+              match keys_opt with
+              | Some keys ->
+                  let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
+                  let* signature =
+                    Tezos_client_base.Client_keys.aggregate_sign
+                      wallet
+                      (Dac_manager.Keys.get_aggregate_sk_uris keys)
+                      bytes_to_sign
+                  in
+                  let signature_repr =
+                    Signature_repr.{root_hash; signature; signer_pkh = pkh}
+                  in
+                  let* () =
+                    Dac_node_client.call
+                      coordinator_cctxt
+                      (RPC_services.store_dac_member_signature dac_plugin)
+                      ()
+                      ()
+                      signature_repr
+                  in
+                  return ()
+              | _ -> tzfail @@ Mode_not_supported "member")
+          | _ -> tzfail @@ Mode_not_supported "member")
       | Error errs ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
              Improve handling of errors. *)
@@ -242,5 +268,5 @@ let run ~data_dir cctxt =
       daemonize
         [
           Handler.new_head ctxt cctxt;
-          Handler.new_root_hash ctxt coordinator_cctxt;
+          Handler.new_root_hash ctxt coordinator_cctxt pkh_opt;
         ]

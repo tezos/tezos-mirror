@@ -34,10 +34,10 @@ type t = {
 let encoding ((module P) : Dac_plugin.t) =
   Data_encoding.(
     conv
-      (fun {root_hash; signer_pkh; signature} ->
+      (fun {root_hash; signature; signer_pkh} ->
         (root_hash, signature, signer_pkh))
       (fun (root_hash, signature, signer_pkh) ->
-        {root_hash; signer_pkh; signature})
+        {root_hash; signature; signer_pkh})
       (obj3
          (req "root_hash" P.encoding)
          (req "signature" Tezos_crypto.Aggregate_signature.encoding)

@@ -41,6 +41,7 @@ val create_legacy :
   ?reveal_data_dir:string ->
   threshold:int ->
   committee_members:string list ->
+  ?node_pkh:string ->
   node:Node.t ->
   client:Client.t ->
   unit ->
