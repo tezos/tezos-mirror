@@ -114,6 +114,26 @@ module Make (X : PARAMETERS) = struct
         Process.terminate ~timeout process ;
         event_loop_promise
 
+  let stop daemon =
+    match daemon.status with
+    | Not_running -> unit
+    | Running {event_loop_promise = None; _} ->
+        invalid_arg "you cannot call Daemon.stop before Daemon.run returns"
+    | Running {process; _} ->
+        let pid = Process.pid process in
+        Unix.kill pid Sys.sigstop ;
+        unit
+
+  let continue daemon =
+    match daemon.status with
+    | Not_running -> unit
+    | Running {event_loop_promise = None; _} ->
+        invalid_arg "you cannot call Daemon.continue before Daemon.run returns"
+    | Running {process; _} ->
+        let pid = Process.pid process in
+        Unix.kill pid Sys.sigcont ;
+        unit
+
   let kill daemon =
     match daemon.status with
     | Not_running -> unit
