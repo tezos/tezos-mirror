@@ -28,7 +28,7 @@ module Fr = Bls12_381.Fr
 module Stubs = struct
   type fr = Fr.t
 
-  type fr_array = Fr_carray.t [@@deriving repr]
+  type fr_array = Fr_carray.t
 
   (** [add res a b size_a size_b] writes the result of polynomial addition
       of [a] and [b] using the evaluation representation in [res], where
@@ -94,7 +94,7 @@ module Stubs = struct
     = "caml_bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays_stubs"
     [@@noalloc]
 
-  (** [fft_inplace p domain log] computes Fast Fourier Transform.
+  (** [fft_inplace p domain log log_degree] computes Fast Fourier Transform.
   It converts the coefficient representation of a polynomial [p] to
   the evaluation representation
 
@@ -104,13 +104,8 @@ module Stubs = struct
   - [domain = [one; g; ..; g^{n-1}]] where [g] is a primitive
   [n]-th root of unity and [n = 2^log] (as done by {!Domain.Stubs.compute_domain}) *)
   external fft_inplace :
-    fr_array ->
-    domain:fr_array ->
-    log:int ->
-    degree:int ->
-    log_degree:int ->
-    unit = "caml_bls12_381_polynomial_internal_polynomial_fft_inplace_on_stubs"
-    [@@noalloc]
+    fr_array -> domain:fr_array -> log:int -> log_degree:int -> unit
+    = "caml_bls12_381_polynomial_internal_fft_inplace_on_stubs"
 
   (** [ifft_inplace p domain log] computes Inverse Fast Fourier Transform.
   It converts the evaluation representation of a polynomial [p] to
@@ -122,7 +117,7 @@ module Stubs = struct
   - [domain = [one; g; ..; g^{n-1}]] where [g] is a primitive
   [n]-th root of unity and [n = 2^log] (as done by {!Domain.Stubs.compute_domain}) *)
   external ifft_inplace : fr_array -> domain:fr_array -> log:int -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_ifft_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_internal_ifft_inplace_on_stubs"
     [@@noalloc]
 
   (** [dft_inplace coefficients domain inverse length] computes the Fourier Transform.
@@ -135,7 +130,7 @@ module Stubs = struct
   - [domain = [one; g; ..; g^{n-1}]] where [g] is a primitive
   [n]-th root of unity (as done by {!Domain.Stubs.compute_domain}) *)
   external dft_inplace : fr_array -> fr_array -> bool -> int -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_dft_stubs"
+    = "caml_bls12_381_polynomial_internal_dft_stubs"
     [@@noalloc]
 
   (** [fft_prime_factor_algorithm_inplace coefficient (domain1, domain1_length) (domain2, domain2_length) inverse]
@@ -154,7 +149,7 @@ module Stubs = struct
   [n]-th root of unity (as done by {!Domain.Stubs.compute_domain}) *)
   external fft_prime_factor_algorithm_inplace :
     fr_array -> fr_array * int -> fr_array * int -> bool -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_prime_factor_algorithm_fft_stubs"
+    = "caml_bls12_381_polynomial_internal_prime_factor_algorithm_fft_stubs"
     [@@noalloc]
 end
 
@@ -164,6 +159,10 @@ module type Evaluations_sig = sig
   type polynomial
 
   type t [@@deriving repr]
+
+  (** [init size f degree] initializes an evaluation of a polynomial of the given
+      [degree]. *)
+  val init : int -> (int -> scalar) -> degree:int -> t
 
   (** [of_array (d, e)] creates a value of type [t] from the evaluation
    representation of a polynomial [e] of degree [d], i.e, it converts an OCaml
@@ -210,6 +209,9 @@ module type Evaluations_sig = sig
 
   (** [get p i] returns the [i]-th element of a given array [p] *)
   val get : t -> int -> scalar
+
+  (** [get_inplace p i res] copies the [i]-th element of a given array [p] in res *)
+  val get_inplace : t -> int -> scalar -> unit
 
   (** [mul_by_scalar] computes muliplication of a polynomial by a blst_fr element *)
   val mul_by_scalar : scalar -> t -> t
@@ -291,7 +293,10 @@ module type Evaluations_sig = sig
 
   (** [dft domain polynomial] converts the coefficient representation of
   a polynomial [p] to the evaluation representation. [domain] can be obtained
-  using {!Domain.build}
+  using {!Domain.build}.
+
+  Computes the discrete Fourier transform in time O(n^2)
+  where [n = size domain].
 
   requires:
   - [size domain] to divide Bls12_381.Fr.order - 1
@@ -301,7 +306,10 @@ module type Evaluations_sig = sig
 
   (** [idft_inplace domain t] converts the evaluation representation of
   a polynomial [p] to the coefficient representation. [domain] can be obtained
-  using {!Domain.build}
+  using {!Domain.build}.
+
+  Computes the inverse discrete Fourier transform in time O(n^2)
+  where [n = size domain].
 
   requires:
   - [size domain] to divide Bls12_381.Fr.order - 1
@@ -341,8 +349,7 @@ end
 module Evaluations_impl = struct
   module Domain_c = Domain.Stubs
   module Domain = Domain.Domain_unsafe
-  module Polynomial_stubs = Polynomial.Stubs (* TODO remove *)
-  module Polynomial_impl = Polynomial.Polynomial_impl (* TODO remove *)
+  module Polynomial_c = Polynomial.Stubs (* TODO remove *)
   module Polynomial = Polynomial.Polynomial_unsafe
 
   type scalar = Fr.t
@@ -350,9 +357,11 @@ module Evaluations_impl = struct
   type polynomial = Polynomial.t
 
   (* degree & evaluations *)
-  type t = int * Stubs.fr_array [@@deriving repr]
+  type t = int * Fr_carray.t [@@deriving repr]
 
   type domain = Domain.t
+
+  let init size f ~degree = (degree, Fr_carray.init size f)
 
   let of_array (d, p) =
     if d < -1 then
@@ -365,14 +374,16 @@ module Evaluations_impl = struct
 
   let to_array (_d, e) = Fr_carray.to_array e
 
+  let to_carray (_, e) = e
+
   let string_of_eval (d, e) =
-    Printf.sprintf "%d : [%s]" d (Polynomial_impl.to_string e)
+    Printf.sprintf "%d : [%s]" d Polynomial.(to_string (of_carray e))
 
   let of_domain domain =
     let d = Domain.to_carray domain in
     (1, d)
 
-  let allocate = Polynomial_impl.allocate
+  let allocate = Fr_carray.allocate
 
   let to_domain (_, eval) = Domain.of_carray eval
 
@@ -402,10 +413,12 @@ module Evaluations_impl = struct
 
   let get (_, eval) i = Fr_carray.get eval i
 
+  let get_inplace (_, eval) i res = Fr_carray.get_inplace eval i res
+
   let mul_by_scalar lambda (d, e) =
     let len = Fr_carray.length e in
     let res = allocate len in
-    Polynomial_stubs.mul_by_scalar res lambda e len ;
+    Polynomial_c.mul_by_scalar res lambda e len ;
     (d, res)
 
   (* multiplies evaluations of all polynomials with name in poly_names,
@@ -426,7 +439,7 @@ module Evaluations_impl = struct
     let res = allocate_for_res res length_result in
 
     if List.exists is_zero evaluations then (
-      Polynomial_impl.erase res ;
+      Fr_carray.erase res length_result ;
       (-1, res))
     else
       let degree_result =
@@ -470,7 +483,8 @@ module Evaluations_impl = struct
      /!\ the degree may not be always accurate,
          the resulting degree may not be the max of the 2 polynomials degrees *)
   let linear_c ?res ~evaluations
-      ?(linear_coeffs = List.init (List.length evaluations) (fun _ -> Fr.one))
+      ?(linear_coeffs =
+        List.init (List.length evaluations) (fun _ -> Fr.(copy one)))
       ?(composition_gx = (List.init (List.length evaluations) (fun _ -> 0), 1))
       ?(add_constant = Fr.zero) () =
     let domain_len = snd composition_gx in
@@ -563,7 +577,7 @@ module Evaluations_impl = struct
           List.map (fun (_, e) -> (e, Fr_carray.length e)) evals
           |> Array.of_list
         in
-        Polynomial_stubs.linear_with_powers res coeff evals nb_evals ;
+        Polynomial_c.linear_with_powers res coeff evals nb_evals ;
         (degree_result, res))
     else
       let coeffs = Fr_carray.powers nb_evals coeff |> Array.to_list in
@@ -573,7 +587,7 @@ module Evaluations_impl = struct
     on different domains are said to be different*)
   let equal (deg1, eval1) (deg2, eval2) =
     if deg1 <> deg2 || Fr_carray.(length eval1 <> length eval2) then false
-    else Polynomial_impl.equal eval1 eval2
+    else Polynomial.(equal (of_carray eval1) (of_carray eval2))
 
   let evaluation_fft_internal : Domain.t -> polynomial -> Fr_carray.t =
    fun domain poly ->
@@ -583,16 +597,15 @@ module Evaluations_impl = struct
     let n_domain = Fr_carray.length domain in
     let poly = Polynomial.to_carray poly in
     let log = Z.(log2up @@ of_int n_domain) in
-    if not Z.(log = log2 @@ of_int n_domain) then
+    if not (Helpers.is_power_of_two n_domain) then
       raise @@ Invalid_argument "Size of domain should be a power of 2." ;
-    (* See MR from Marc for padding *)
     if not (degree < n_domain) then
       raise
       @@ Invalid_argument
            "Degree of poly should be strictly less than domain size." ;
     let res = allocate n_domain in
     Fr_carray.blit poly ~src_off:0 res ~dst_off:0 ~len:(degree + 1) ;
-    Stubs.fft_inplace res ~domain ~log ~degree ~log_degree ;
+    Stubs.fft_inplace res ~domain ~log ~log_degree ;
     res
 
   let evaluation_fft : domain -> polynomial -> t =
@@ -609,7 +622,7 @@ module Evaluations_impl = struct
     let domain = Domain.to_carray domain in
     let n_domain = Fr_carray.length domain in
     let log = Z.(log2up @@ of_int n_domain) in
-    if not Z.(log = log2 @@ of_int n_domain) then
+    if not (Helpers.is_power_of_two n_domain) then
       raise @@ Invalid_argument "Size of domain should be a power of 2." ;
     let n_coefficients = Fr_carray.length coefficients in
     if not (n_coefficients = n_domain) then
@@ -634,13 +647,11 @@ module Evaluations_impl = struct
    fun domain coefficients ->
     interpolation_fft_internal domain (Fr_carray.of_array coefficients)
 
-  let is_power_of_two n = n land (n - 1) = 0
-
   let dft domain polynomial =
     let length = Domain.length domain in
     if length > 1 lsl 10 then
       raise @@ Invalid_argument "Domain size must be <= 2^10." ;
-    if is_power_of_two length then
+    if Helpers.is_power_of_two length then
       raise @@ Invalid_argument "Domain size must not be a power of two" ;
     let d = Polynomial.degree polynomial in
     let polynomial = Polynomial.to_carray polynomial in
@@ -657,7 +668,7 @@ module Evaluations_impl = struct
     let length = Domain.length domain in
     if length > 1 lsl 10 then
       raise @@ Invalid_argument "Domain size must be <= 2^10." ;
-    if is_power_of_two length then
+    if Helpers.is_power_of_two length then
       raise @@ Invalid_argument "Domain size must not be a power of two" ;
     if not (length = Fr_carray.length evaluations) then
       raise @@ Invalid_argument "Size of coefficients should be same as domain." ;
@@ -667,10 +678,16 @@ module Evaluations_impl = struct
   let evaluation_fft_prime_factor_algorithm ~domain1 ~domain2 polynomial =
     let domain1_length = Domain.length domain1 in
     let domain2_length = Domain.length domain2 in
-    if (not (is_power_of_two domain1_length)) && domain1_length > 1 lsl 10 then
+    if
+      (not (Helpers.is_power_of_two domain1_length))
+      && domain1_length > 1 lsl 10
+    then
       raise
       @@ Invalid_argument "Domain of non power of 2 length must be <= 2^10." ;
-    if (not (is_power_of_two domain2_length)) && domain2_length > 1 lsl 10 then
+    if
+      (not (Helpers.is_power_of_two domain2_length))
+      && domain2_length > 1 lsl 10
+    then
       raise
       @@ Invalid_argument "Domain of non power of 2 length must be <= 2^10." ;
     if not Z.(gcd (of_int domain1_length) (of_int domain2_length) = one) then
@@ -699,10 +716,16 @@ module Evaluations_impl = struct
       (d, evaluations) =
     let domain1_length = Domain.length domain1 in
     let domain2_length = Domain.length domain2 in
-    if (not (is_power_of_two domain1_length)) && domain1_length > 1 lsl 10 then
+    if
+      (not (Helpers.is_power_of_two domain1_length))
+      && domain1_length > 1 lsl 10
+    then
       raise
       @@ Invalid_argument "Domain of non power of 2 length must be <= 2^10." ;
-    if (not (is_power_of_two domain2_length)) && domain2_length > 1 lsl 10 then
+    if
+      (not (Helpers.is_power_of_two domain2_length))
+      && domain2_length > 1 lsl 10
+    then
       raise
       @@ Invalid_argument "Domain of non power of 2 length must be <= 2^10." ;
     if not Z.(gcd (of_int domain1_length) (of_int domain2_length) = one) then
@@ -725,9 +748,26 @@ module Evaluations_impl = struct
       Polynomial.of_carray evaluations
 end
 
+module type Evaluations_unsafe_sig = sig
+  include Evaluations_sig
+
+  (** [to_carray t] converts [t] from type {!t} to type {!Fr_carray.t}
+
+      Note: [to_carray t] doesn't create a copy of [t] *)
+  val to_carray : t -> Fr_carray.t
+end
+
+module Evaluations_unsafe :
+  Evaluations_unsafe_sig
+    with type scalar = Bls12_381.Fr.t
+     and type domain = Domain.t
+     and type polynomial = Polynomial.t =
+  Evaluations_impl
+
 include (
-  Evaluations_impl :
+  Evaluations_unsafe :
     Evaluations_sig
-      with type scalar = Bls12_381.Fr.t
-       and type domain = Domain.t
-       and type polynomial = Polynomial.t)
+      with type t = Evaluations_unsafe.t
+       and type scalar = Evaluations_unsafe.scalar
+       and type domain = Evaluations_unsafe.domain
+       and type polynomial = Evaluations_unsafe.polynomial)

@@ -20,9 +20,9 @@
  * SOFTWARE.
  */
 
+#include "bls12_381_polynomial_internal_polynomial.h"
 #include "caml_bls12_381_stubs.h"
 #include "ocaml_integers.h"
-#include "bls12_381_polynomial_internal_polynomial.h"
 #include <caml/alloc.h>
 #include <caml/bigarray.h>
 #include <caml/fail.h>
@@ -35,7 +35,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_carray_get_stubs(
     value elt, value carray, value idx, value size) {
   CAMLparam4(elt, carray, idx, size);
   void *elt_c = Data_custom_val(elt);
-  void *carray_c = Caml_ba_data_val(carray);
+  char *carray_c = Caml_ba_data_val(carray);
 
   int idx_c = Int_val(idx);
   int size_c = Int_val(size);
@@ -48,7 +48,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_carray_set_stubs(
     value carray, value elt, value idx, value size) {
   CAMLparam4(elt, carray, idx, size);
   void *elt_c = Data_custom_val(elt);
-  void *carray_c = Caml_ba_data_val(carray);
+  char *carray_c = Caml_ba_data_val(carray);
 
   int idx_c = Int_val(idx);
   int size_c = Int_val(size);
@@ -86,63 +86,6 @@ caml_bls12_381_polynomial_internal_polynomial_compute_domain_stubs(
     blst_fr_mul(buffer_c + n_c - 1, buffer_c + n_c - 2, root_of_unity_c);
   }
 
-  CAMLreturn(Val_unit);
-}
-
-CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_fft_inplace_on_stubs(
-    value coefficients, value domain, value log_domain_size, value degree,
-    value log_degree) {
-  CAMLparam5(coefficients, domain, log_domain_size, degree, log_degree);
-
-  int log_domain_size_c = Int_val(log_domain_size);
-  int degree_c = Int_val(degree);
-  int log_degree_c = Int_val(log_degree);
-  blst_fr *domain_c = Blst_fr_array_val(domain);
-  blst_fr *coefficients_c = Blst_fr_array_val(coefficients);
-  bls12_381_polynomial_internal_polynomial_fft_inplace(
-      coefficients_c, domain_c, log_domain_size_c, degree_c, log_degree_c);
-  CAMLreturn(Val_unit);
-}
-
-CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_ifft_inplace_on_stubs(
-    value coefficients, value domain, value log_domain_size) {
-  CAMLparam3(coefficients, domain, log_domain_size);
-
-  int log_domain_size_c = Int_val(log_domain_size);
-  blst_fr *domain_c = Blst_fr_array_val(domain);
-  blst_fr *coefficients_c = Blst_fr_array_val(coefficients);
-  bls12_381_polynomial_internal_polynomial_ifft_inplace(
-      coefficients_c, domain_c, log_domain_size_c);
-  CAMLreturn(Val_unit);
-}
-
-CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_prime_factor_algorithm_fft_stubs(
-    value coefficients, value domain1_length1, value domain2_length2,
-    value inverse) {
-  CAMLparam4(inverse, domain1_length1, domain2_length2, coefficients);
-  blst_fr *domain1_c = Blst_fr_array_val(Field(domain1_length1, 0));
-  int length1_c = Int_val(Field(domain1_length1, 1));
-  blst_fr *domain2_c = Blst_fr_array_val(Field(domain2_length2, 0));
-  int length2_c = Int_val(Field(domain2_length2, 1));
-  bool inverse_c = Bool_val(inverse);
-  blst_fr *coefficients_c = Blst_fr_array_val(coefficients);
-
-  bls12_381_polynomial_internal_polynomial_prime_factor_algorithm_fft(
-      coefficients_c, domain1_c, domain2_c, length1_c, length2_c, inverse_c);
-  CAMLreturn(Val_unit);
-}
-
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_dft_stubs(
-    value coefficients, value domain, value inverse, value length) {
-  CAMLparam4(coefficients, domain, length, inverse);
-  blst_fr *coefficients_c = Blst_fr_array_val(coefficients);
-  blst_fr *domain_c = Blst_fr_array_val(domain);
-  blst_fr buffer_dft[length];
-  bls12_381_polynomial_internal_polynomial_dft_inplace(
-      coefficients_c, domain_c, buffer_dft, Int_val(length), Bool_val(inverse));
   CAMLreturn(Val_unit);
 }
 

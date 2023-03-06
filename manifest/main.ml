@@ -917,7 +917,10 @@ let octez_bls12_381_polynomial_internal =
           [
             "caml_bls12_381_polynomial_internal_polynomial_stubs";
             "caml_bls12_381_polynomial_internal_srs_stubs";
+            "caml_bls12_381_polynomial_internal_ec_array_stubs";
+            "caml_bls12_381_polynomial_internal_fft_stubs";
             "bls12_381_polynomial_internal_polynomial";
+            "bls12_381_polynomial_internal_fft";
           ];
       }
 

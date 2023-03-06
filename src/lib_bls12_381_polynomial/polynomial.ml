@@ -184,11 +184,9 @@ module Polynomial_impl = struct
 
   let get = Fr_carray.get
 
-  let degree p =
-    let rec aux i =
-      if i = -1 then -1 else if Fr.eq (get p i) Fr.zero then aux (i - 1) else i
-    in
-    aux (length p - 1)
+  let degree = Fr_carray.degree
+
+  let init = Fr_carray.init
 
   let equal p1 p2 =
     let n1 = length p1 in
@@ -196,7 +194,7 @@ module Polynomial_impl = struct
     let short_n, long_p, long_n =
       if n1 <= n2 then (n1, p2, n2) else (n2, p1, n1)
     in
-    if Bigstringaf.(memcmp p1 0 p2 0 (short_n * Fr.size_in_bytes)) = 0 then
+    if Fr_carray.equal p1 ~offset1:0 p2 ~offset2:0 ~len:short_n then
       let rec stop_at_first_non_zero i =
         if i = long_n then true
         else if Fr.eq (get long_p i) Fr.zero then stop_at_first_non_zero (i + 1)
@@ -429,6 +427,10 @@ module type Polynomial_sig = sig
   type scalar
 
   type t [@@deriving repr]
+
+  (** [init n f] returns a fresh polynomial of length [n], with element number [i]
+      initialized to the result of [f i]. *)
+  val init : int -> (int -> scalar) -> t
 
   (** [allocate len] creates a zero polynomial of size [len] *)
   val allocate : int -> t

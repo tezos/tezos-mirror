@@ -47,6 +47,18 @@ module type S = sig
 
     val check : t -> unit
   end
+
+  module G1_carray :
+    Ec_carray.EC_carray_sig
+      with type elt = Bls12_381.G1.t
+       and type domain = Domain.t
+       and type evaluations = Evaluations.t
+
+  module G2_carray :
+    Ec_carray.EC_carray_sig
+      with type elt = Bls12_381.G2.t
+       and type domain = Domain.t
+       and type evaluations = Evaluations.t
 end
 
 type scalar = Bls12_381.Fr.t
@@ -55,3 +67,5 @@ module Domain = Domain
 module Polynomial = Polynomial
 module Evaluations = Evaluations
 module Srs = Srs.Srs
+module G1_carray = Ec_carray.G1_carray
+module G2_carray = Ec_carray.G2_carray

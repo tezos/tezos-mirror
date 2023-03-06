@@ -23,56 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Scalar = Bls12_381.Fr
+module type S = sig
+  type scalar
 
-module Elt = struct
-  type t = Scalar.t
+  module Domain : Domain.Domain_sig with type scalar = scalar
 
-  let size = Scalar.size_in_bytes
+  module Polynomial : Polynomial.Polynomial_sig with type scalar = scalar
 
-  let zero = Scalar.zero
+  module Evaluations :
+    Evaluations.Evaluations_sig
+      with type scalar = scalar
+       and type domain = Domain.t
+       and type polynomial = Polynomial.t
 
-  let allocate () = Scalar.(copy zero)
+  module Srs : sig
+    module Srs_g1 : Srs.S with type polynomial = Polynomial.t
 
-  let eq = Scalar.eq
+    module Srs_g2 : Srs.S with type polynomial = Polynomial.t
+
+    type t = Srs_g1.t * Srs_g2.t
+
+    val generate_insecure : int -> int -> t
+
+    val check : t -> unit
+  end
+
+  module G1_carray :
+    Ec_carray.EC_carray_sig
+      with type elt = Bls12_381.G1.t
+       and type domain = Domain.t
+       and type evaluations = Evaluations.t
+
+  module G2_carray :
+    Ec_carray.EC_carray_sig
+      with type elt = Bls12_381.G2.t
+       and type domain = Domain.t
+       and type evaluations = Evaluations.t
 end
 
-include Carray.Make (Elt)
-
-(* Generator of the multiplicative group Fr^* *)
-let generator = Scalar.of_int 7
-
-(* Samples a primitive [n]-th root of unity. *)
-let primitive_root_of_unity n =
-  let n = Z.of_int n in
-  let multiplicative_group_order = Z.(Scalar.order - one) in
-  if not (Z.divisible multiplicative_group_order n) then
-    raise
-      (Invalid_argument
-         (Format.sprintf
-            "There do not exist %s-th roots of unity"
-            (Z.to_string n)))
-  else
-    let exponent = Z.divexact multiplicative_group_order n in
-    Scalar.pow generator exponent
-
-(* Samples a 2^i-th root of unity, assuming that it exists *)
-let primitive_root_of_unity_power_of_two ~log =
-  primitive_root_of_unity (1 lsl log)
-
-let build_array init next len =
-  let xi = ref init in
-  Array.init len (fun _ ->
-      let i = !xi in
-      xi := next !xi ;
-      i)
-
-(* TODO return carray instead of array ? *)
-(* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
-let powers d x = build_array Scalar.one Scalar.(mul x) d
-
-let build_domain n = powers n (primitive_root_of_unity n)
-
-let build_domain_power_of_two ~log =
-  let g = primitive_root_of_unity_power_of_two ~log in
-  powers (1 lsl log) g
+include
+  S
+    with type scalar = Bls12_381.Fr.t
+     and type Srs.Srs_g1.elt = Bls12_381.G1.t
+     and type Srs.Srs_g2.elt = Bls12_381.G2.t
+     and type Evaluations.t = Evaluations.t
