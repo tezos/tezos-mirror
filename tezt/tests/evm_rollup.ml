@@ -228,11 +228,11 @@ let test_rpc_getBalance =
       sc_rollup_node
       first_evm_run_level
   in
-  let evm_proxy_server_endoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
       ~account:Account.prefunded_account_pk
-      ~endpoint:evm_proxy_server_endoint
+      ~endpoint:evm_proxy_server_endpoint
   in
   Check.((balance = 9999) int)
     ~error_msg:
