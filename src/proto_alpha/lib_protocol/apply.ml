@@ -2897,12 +2897,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
      accessible. This will not be present before the first two blocks
      of tenderbake. *)
   let level = Level.current ctxt in
-  let*! ctxt =
-    match Consensus.endorsement_branch ctxt with
-    | Some predecessor_branch ->
-        Consensus.store_grand_parent_branch ctxt predecessor_branch
-    | None -> Lwt.return ctxt
-  in
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =

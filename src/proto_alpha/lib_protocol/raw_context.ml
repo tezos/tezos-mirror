@@ -108,7 +108,6 @@ module Raw_consensus = struct
         (** in block construction mode, record the round of preendorsements
             included in a block. *)
     endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
-    grand_parent_branch : (Block_hash.t * Block_payload_hash.t) option;
   }
 
   (** Invariant:
@@ -131,7 +130,6 @@ module Raw_consensus = struct
       locked_round_evidence = None;
       preendorsements_quorum_round = None;
       endorsement_branch = None;
-      grand_parent_branch = None;
     }
 
   type error += Double_inclusion_of_consensus_operation
@@ -199,13 +197,8 @@ module Raw_consensus = struct
 
   let endorsement_branch t = t.endorsement_branch
 
-  let grand_parent_branch t = t.grand_parent_branch
-
   let set_endorsement_branch t endorsement_branch =
     {t with endorsement_branch = Some endorsement_branch}
-
-  let set_grand_parent_branch t grand_parent_branch =
-    {t with grand_parent_branch = Some grand_parent_branch}
 end
 
 type dal_committee = {
@@ -1349,10 +1342,6 @@ module type CONSENSUS = sig
   val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
   val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
-
-  val set_grand_parent_branch : t -> Block_hash.t * Block_payload_hash.t -> t
-
-  val grand_parent_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :
@@ -1416,13 +1405,6 @@ module Consensus :
   let[@inline] set_endorsement_branch ctxt branch =
     update_consensus_with ctxt (fun ctxt ->
         Raw_consensus.set_endorsement_branch ctxt branch)
-
-  let[@inline] grand_parent_branch ctxt =
-    Raw_consensus.grand_parent_branch ctxt.back.consensus
-
-  let[@inline] set_grand_parent_branch ctxt branch =
-    update_consensus_with ctxt (fun ctxt ->
-        Raw_consensus.set_grand_parent_branch ctxt branch)
 end
 
 module Tx_rollup = struct

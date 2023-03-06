@@ -362,10 +362,6 @@ module type CONSENSUS = sig
   val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
   val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
-
-  val set_grand_parent_branch : t -> Block_hash.t * Block_payload_hash.t -> t
-
-  val grand_parent_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :

@@ -129,13 +129,6 @@ module Tenderbake = struct
         let name = ["endorsement_branch"]
       end)
       (Branch)
-
-  module Grand_parent_branch =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["grand_parent_branch"]
-      end)
-      (Branch)
 end
 
 (** Contracts handling *)
@@ -2094,4 +2087,13 @@ module Zk_rollup = struct
               Zk_rollup_operation_repr.encoding
               (option Ticket_hash_repr.encoding))
       end)
+end
+
+module Legacy = struct
+  module Grand_parent_branch =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["grand_parent_branch"]
+      end)
+      (Tenderbake.Branch)
 end
