@@ -41,3 +41,7 @@ val transaction_send :
 (** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
     hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
 val get_block : block_id:string -> endpoint:string -> Eth.Block.t Lwt.t
+
+(** [block_number ~endpoint] asks the current block number to the
+    JSON-RPC API server listening at [endpoint]. *)
+val block_number : endpoint:string -> int Lwt.t

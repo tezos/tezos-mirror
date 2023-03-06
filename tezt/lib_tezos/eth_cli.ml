@@ -60,3 +60,7 @@ let get_block ~block_id ~endpoint =
     | Error msg -> raise @@ Could_not_parse_block msg
   in
   return @@ Data_encoding.Json.destruct Eth.Block.encoding block_as_json
+
+let block_number ~endpoint =
+  let* answer = spawn_command ["block:number"; "--network"; endpoint] in
+  return (int_of_string (String.trim answer))
