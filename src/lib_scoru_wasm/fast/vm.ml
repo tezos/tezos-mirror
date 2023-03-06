@@ -153,6 +153,8 @@ let compute_step_many = compute_step_many 0L
 
 module Internal_for_tests = struct
   let compute_step_many_with_hooks = compute_step_many
+
+  let get_wasm_version = Wasm_vm.Internal_for_tests.get_wasm_version
 end
 
 let compute_step_many = compute_step_many ?after_fast_exec:None

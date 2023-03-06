@@ -37,6 +37,8 @@ module type Internal_for_tests = sig
     max_steps:int64 ->
     state ->
     (state * int64) Lwt.t
+
+  val get_wasm_version : state -> version Lwt.t
 end
 
 module type Generic = sig
