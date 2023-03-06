@@ -4383,24 +4383,6 @@ module Block_header : sig
     proof_of_work_threshold:int64 ->
     expected_commitment:bool ->
     unit tzresult
-
-  type locked_round_evidence = {
-    preendorsement_round : Round.t;
-    preendorsement_count : int;
-  }
-
-  type checkable_payload_hash =
-    | No_check
-    | Expected_payload_hash of Block_payload_hash.t
-
-  val finalize_validate_block_header :
-    block_header_contents:contents ->
-    round:Round.t ->
-    fitness_locked_round:Round.t option ->
-    checkable_payload_hash:checkable_payload_hash ->
-    locked_round_evidence:locked_round_evidence option ->
-    consensus_threshold:int ->
-    unit tzresult
 end
 
 (** This module re-exports definitions from {!Cache_repr}. *)

@@ -2873,22 +2873,45 @@ let check_endorsement_power vi bs =
       (Not_enough_endorsements {required; provided})
   else return_unit
 
+type checkable_payload_hash =
+  | No_check
+  | Expected_payload_hash of Block_payload_hash.t
+
 let finalize_validate_block_header vi vs checkable_payload_hash
     (block_header_contents : Block_header.contents) round ~fitness_locked_round
     =
-  let locked_round_evidence =
-    Option.map
-      (fun (preendorsement_round, preendorsement_count) ->
-        Block_header.{preendorsement_round; preendorsement_count})
-      vs.locked_round_evidence
+  let open Result_syntax in
+  let* () =
+    match checkable_payload_hash with
+    | No_check -> ok_unit
+    | Expected_payload_hash bph ->
+        let actual_payload_hash = block_header_contents.payload_hash in
+        error_unless
+          (Block_payload_hash.equal actual_payload_hash bph)
+          (Invalid_payload_hash {expected = bph; provided = actual_payload_hash})
   in
-  Block_header.finalize_validate_block_header
-    ~block_header_contents
-    ~round
-    ~fitness_locked_round
-    ~checkable_payload_hash
-    ~locked_round_evidence
-    ~consensus_threshold:(Constants.consensus_threshold vi.ctxt)
+  let* observed_locked_round =
+    match vs.locked_round_evidence with
+    | None -> ok None
+    | Some (preendorsement_round, preendorsement_count) ->
+        let* () =
+          error_when
+            Round.(preendorsement_round >= round)
+            (Locked_round_after_block_round
+               {locked_round = preendorsement_round; round})
+        in
+        let* () =
+          let consensus_threshold = Constants.consensus_threshold vi.ctxt in
+          error_when
+            Compare.Int.(preendorsement_count < consensus_threshold)
+            (Insufficient_locked_round_evidence
+               {voting_power = preendorsement_count; consensus_threshold})
+        in
+        ok (Some preendorsement_round)
+  in
+  error_unless
+    (Option.equal Round.equal observed_locked_round fitness_locked_round)
+    Fitness.Wrong_fitness
 
 let compute_payload_hash block_state
     (block_header_contents : Block_header.contents) ~predecessor_hash =
@@ -2909,7 +2932,7 @@ let finalize_block {info; block_state; _} =
         finalize_validate_block_header
           info
           block_state
-          (Block_header.Expected_payload_hash block_payload_hash)
+          (Expected_payload_hash block_payload_hash)
           header_contents
           round
           ~fitness_locked_round:locked_round
@@ -2925,7 +2948,7 @@ let finalize_block {info; block_state; _} =
       let locked_round_evidence = block_state.locked_round_evidence in
       let checkable_payload_hash =
         match locked_round_evidence with
-        | Some _ -> Block_header.Expected_payload_hash block_payload_hash
+        | Some _ -> Expected_payload_hash block_payload_hash
         | None ->
             (* In full construction, when there is no locked round
                evidence (and thus no preendorsements), the baker cannot
@@ -2934,7 +2957,7 @@ let finalize_block {info; block_state; _} =
                payload_hash. However, to be valid, the baker must patch
                the resulting block header with the actual payload
                hash. *)
-            Block_header.No_check
+            No_check
       in
       let* () = check_endorsement_power info block_state in
       let*? () =

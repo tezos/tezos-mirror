@@ -1275,11 +1275,24 @@ let () =
     (fun () -> Failing_noop_error)
 
 module Block = struct
+  (* All block errors are permanent. *)
   type error +=
     | Not_enough_endorsements of {required : int; provided : int}
     | Inconsistent_validation_passes_in_block of {
         expected : int;
         provided : int;
+      }
+    | Invalid_payload_hash of {
+        expected : Block_payload_hash.t;
+        provided : Block_payload_hash.t;
+      }
+    | Locked_round_after_block_round of {
+        locked_round : Round.t;
+        round : Round.t;
+      }
+    | Insufficient_locked_round_evidence of {
+        voting_power : int;
+        consensus_threshold : int;
       }
 
   let () =
@@ -1323,5 +1336,70 @@ module Block = struct
             Some (expected, provided)
         | _ -> None)
       (fun (expected, provided) ->
-        Inconsistent_validation_passes_in_block {expected; provided})
+        Inconsistent_validation_passes_in_block {expected; provided}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.invalid_payload_hash"
+      ~title:"Invalid payload hash"
+      ~description:"Invalid payload hash."
+      ~pp:(fun ppf (expected, provided) ->
+        Format.fprintf
+          ppf
+          "Invalid payload hash (expected: %a, provided: %a)."
+          Block_payload_hash.pp_short
+          expected
+          Block_payload_hash.pp_short
+          provided)
+      Data_encoding.(
+        obj2
+          (req "expected" Block_payload_hash.encoding)
+          (req "provided" Block_payload_hash.encoding))
+      (function
+        | Invalid_payload_hash {expected; provided} -> Some (expected, provided)
+        | _ -> None)
+      (fun (expected, provided) -> Invalid_payload_hash {expected; provided}) ;
+    () ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.locked_round_after_block_round"
+      ~title:"Locked round after block round"
+      ~description:"Locked round after block round."
+      ~pp:(fun ppf (locked_round, round) ->
+        Format.fprintf
+          ppf
+          "Locked round (%a) is after the block round (%a)."
+          Round.pp
+          locked_round
+          Round.pp
+          round)
+      Data_encoding.(
+        obj2 (req "locked_round" Round.encoding) (req "round" Round.encoding))
+      (function
+        | Locked_round_after_block_round {locked_round; round} ->
+            Some (locked_round, round)
+        | _ -> None)
+      (fun (locked_round, round) ->
+        Locked_round_after_block_round {locked_round; round}) ;
+    () ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.insufficient_locked_round_evidence"
+      ~title:"Insufficient locked round evidence"
+      ~description:"Insufficient locked round evidence."
+      ~pp:(fun ppf (voting_power, consensus_threshold) ->
+        Format.fprintf
+          ppf
+          "The provided locked round evidence is not sufficient: provided %d \
+           voting power but was expecting at least %d."
+          voting_power
+          consensus_threshold)
+      Data_encoding.(
+        obj2 (req "voting_power" int31) (req "consensus_threshold" int31))
+      (function
+        | Insufficient_locked_round_evidence {voting_power; consensus_threshold}
+          ->
+            Some (voting_power, consensus_threshold)
+        | _ -> None)
+      (fun (voting_power, consensus_threshold) ->
+        Insufficient_locked_round_evidence {voting_power; consensus_threshold})
 end

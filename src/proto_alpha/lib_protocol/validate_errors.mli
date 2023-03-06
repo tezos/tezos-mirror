@@ -205,4 +205,16 @@ module Block : sig
         expected : int;
         provided : int;
       }
+    | Invalid_payload_hash of {
+        expected : Block_payload_hash.t;
+        provided : Block_payload_hash.t;
+      }
+    | Locked_round_after_block_round of {
+        locked_round : Round.t;
+        round : Round.t;
+      }
+    | Insufficient_locked_round_evidence of {
+        voting_power : int;
+        consensus_threshold : int;
+      }
 end

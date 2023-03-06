@@ -79,13 +79,6 @@ val locked_round_from_raw : Fitness.t -> Round_repr.t option tzresult
 val check_except_locked_round :
   t -> level:Raw_level_repr.t -> predecessor_round:Round_repr.t -> unit tzresult
 
-(** Validate the locked_round component of the fitness, which could
-    not be validated during begin_application. *)
-val check_locked_round :
-  fitness_locked_round:Round_repr.t option ->
-  locked_round:Round_repr.t option ->
-  unit tzresult
-
 val level : t -> Raw_level_repr.t
 
 val round : t -> Round_repr.t
