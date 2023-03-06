@@ -93,7 +93,7 @@
         "Tx_rollup_state_repr",
 
         "Dal_errors_repr",
-        "Dal_operations_repr",	
+        "Dal_operations_repr",
 
         "Zk_rollup_scalar",
         "Zk_rollup_repr",
