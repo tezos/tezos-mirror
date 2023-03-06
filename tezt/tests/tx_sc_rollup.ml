@@ -284,8 +284,8 @@ let test_deposit ~client ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address
 
 let test_tx_kernel_e2e protocol =
   let commitment_period = 2 and challenge_window = 5 in
-  Dac.with_layer1 ~protocol ~commitment_period ~challenge_window
-  @@ fun node client bootstrap1_key ->
+  let* node, client = setup_l1 ~commitment_period ~challenge_window protocol in
+  let bootstrap1_key = Constant.bootstrap1.alias in
   let sc_rollup_node =
     Sc_rollup_node.create
       ~protocol
@@ -294,26 +294,15 @@ let test_tx_kernel_e2e protocol =
       ~base_dir:(Client.base_dir client)
       ~default_operator:bootstrap1_key
   in
-  Dac.with_legacy_dac_node
-    ~threshold:0
-    ~dac_members:1
-    ~sc_rollup_node
-    ~pvm_name:"wasm_2_0_0"
-    node
-    client
-  @@ fun dac_node _dac_members ->
-  (* Start a rollup node *)
-  (* Prepare DAL/DAC: put reveal data in rollup node directory. *)
-  let* () = Dac_node.terminate dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready:true in
-  let* _dir = Dac_node.init_config dac_node in
-  (* We can now produce our installer *)
-  let* installer_kernel = prepare_installer_kernel ~dac_node "tx-kernel" in
-  let boot_sector = hex_encode installer_kernel in
+  let* boot_sector =
+    prepare_installer_kernel
+      ~preimages_dir:
+        (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
+      "tx-kernel"
+  in
   (* Initialise the sc rollup *)
   let* sc_rollup_address =
     Client.Sc_rollup.originate
-      ~hooks
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
       ~kind:"wasm_2_0_0"

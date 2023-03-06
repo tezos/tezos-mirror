@@ -6,7 +6,7 @@ build_kernels:
   needs: [trigger]
   script:
     - make -f kernels.mk build-deps
-    - make -f kernels.mk build-kernels
+    - CC=clang make -f kernels.mk build-kernels
   variables:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
   cache:
@@ -16,5 +16,6 @@ build_kernels:
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:
       - evm_kernel.wasm
+      - smart-rollup-installer
     expire_in: 1 day
     when: on_success

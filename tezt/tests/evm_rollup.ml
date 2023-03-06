@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 TriliTech <contact@trili.tech>                        *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,6 +28,7 @@
    -------
    Component:    Smart Optimistic Rollups: EVM Kernel
    Requirement:  make -f kernels.mk build-kernels
+                 npm install eth-cli
    Invocation:   dune exec tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 
@@ -41,7 +42,6 @@ type full_evm_setup = {
   sc_rollup_node : Sc_rollup_node.t;
   sc_rollup_client : Sc_rollup_client.t;
   sc_rollup_address : string;
-  dac_node : Dac_node.t;
   originator_key : string;
   rollup_operator_key : string;
   evm_proxy_server : Evm_proxy_server.t;
@@ -147,23 +147,14 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       ~base_dir:(Client.base_dir client)
       ~default_operator:rollup_operator_key
   in
-  let with_dac_node node client f =
-    Dac.with_legacy_dac_node
-      ~sc_rollup_node
-      node
-      client
-      f
-      ~pvm_name:pvm_kind
-      ~threshold:0
-      ~dac_members:0
-  in
-  with_dac_node node client @@ fun dac_node _dac_members ->
   (* Start a rollup node *)
-  (* Prepare DAL/DAC: put reveal data in rollup node directory. *)
-  let* installer_kernel =
-    prepare_installer_kernel ~base_installee:"./" ~dac_node "evm_kernel"
+  let* boot_sector =
+    prepare_installer_kernel
+      ~base_installee:"./"
+      ~preimages_dir:
+        (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
+      "evm_kernel"
   in
-  let boot_sector = hex_encode installer_kernel in
   let* sc_rollup_address =
     originate_sc_rollup
       ~kind:pvm_kind
@@ -193,7 +184,6 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       sc_rollup_node;
       sc_rollup_client;
       sc_rollup_address;
-      dac_node;
       originator_key;
       rollup_operator_key;
       evm_proxy_server;

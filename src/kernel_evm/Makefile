@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+CC=$(which clang)
+
 .PHONY: all
 all: build test
 

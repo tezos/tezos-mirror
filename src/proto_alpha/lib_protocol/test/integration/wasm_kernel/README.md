@@ -55,27 +55,6 @@ This simple kernel writes the external messages it receives in its outbox.
 To achieve that, it needs to take the encoding of the inputs into
 account to extract the payload to push into the outbox.
 
-# reveal_installer
-
-The `reveal_installer` is a kernel that can be used to originate a rollup, and install a larger kernel leveraging the *DAC* mechanism.
-
-To build, run the following from the checked-out `tezos/kernel` repo:
-```shell
-git checkout 69f69144764dcd59dcc1fd144bf6e8f707f0431e
-
-# Load the required rust toolchain dockerfile
-source scripts/cargo-docker.sh
-
-cargo make wasm-preimage-installer
-
-cp target/wasm32-unknown-unknown/release/tezos_rollup_installer_kernel.wasm reveal_installer.wasm
-wasm-strip reveal_installer.wasm
-```
-
-You then need to replace the value `1acaa995ef84bc24cc8bb545dd986082fbbec071ed1c3e9954abea5edc441ccd3a` in the installer binary, with the root reveal hash, of the kernel you'd like to install.
-
-See `prepare_installer_kernel` in [sc_rollup.ml](../../../../../../tezt/tests/sc_rollup.ml) for an example installation of a kernel.
-
 # tx-kernel.wasm
 The `tx-kernel` is a TORU-like program for transacting in a wasm rollup.
 
@@ -92,5 +71,3 @@ cp target/wasm32-unknown-unknown/release/kernel_core.wasm tx-kernel.wasm
 
 wasm-strip tx-kernel.wasm
 ```
-
-This can be installed using the *reveal_installer* described above.
