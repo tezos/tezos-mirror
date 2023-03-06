@@ -66,5 +66,3 @@ let reboot_counter_key =
   Durable.key_of_string_exn "/readonly/kernel/env/reboot_counter"
 
 let version_key = Durable.key_of_string_exn "/readonly/wasm_version"
-
-let stack_size_limit = 300
