@@ -23,17 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [balance ~account ~endpoint] asks the balance of [account] to the
-    JSON-RPC API server listening at [endpoint]. *)
-val balance : account:string -> endpoint:string -> int Lwt.t
+(** The transaction hash is supposed to be the hash of rlp encoded transaction
+    as described in the yellow paper.
 
-(** [transaction_send ~source_private_key ~to_public_key ~value
-    ~endpoint] crafts and signs a transaction transferring [value] (as
-    Wei) from [source_private_key] to [to_public_key], sends the raw
-    transaction to the JSON-RPI API server listening at [endpoint]. *)
-val transaction_send :
-  source_private_key:string ->
-  to_public_key:string ->
-  value:Z.t ->
-  endpoint:string ->
-  string Lwt.t
+    It is not necessary for our needs to implement the same hashing scheme in
+    the proxy server. We need to have a transaction hash that allows to follow
+    the transaction's status in the block receipts. MetaMask supposedly does
+    not care if the hash makes sense, we just need a 32 bytes hash.    
+*)
+
+(** 32 bytes base58 hash. *)
+type t
+
+val hash_string : ?key:string -> string trace -> t
+
+(** Hashes any value encoded in a string and encodes the hash to a binary
+    representation in a string. *)
+val hash_to_string : string -> string

@@ -85,8 +85,7 @@ module Mock = struct
   (* Transaction's hash must be an alphanumeric 66 utf8 byte
      hex (chars: a-fA-F) string *)
   let transaction_hash =
-    hash_f
-    @@ "0xf837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
+    hash_f @@ "f837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
 
   let block_hash =
     "0xd28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
@@ -128,7 +127,7 @@ module Mock = struct
       gasUsed = gas_price;
       logs = [];
       logsBloom = hash_f @@ String.make 256 'a';
-      type_ = hash_f "0x00";
+      type_ = hash_f "00";
       status = qty_f Z.one;
       root = hash_f @@ String.make 32 'a';
     }
@@ -136,7 +135,24 @@ module Mock = struct
   let call = hash_f "0x"
 end
 
-let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
+(** [inject_raw_transaction rollup_node_rpc ~smart_rollup_address tx_raw]
+    crafts the hash of [tx_raw] and sends to the injector a message consisting
+    of:
+    - First 20 bytes: [smart_rollup_address].
+    - Following 32 bytes: crafted transaction hash.
+    - Remaining bytes: [tx_raw] in binary format.
+*)
+let inject_raw_transaction (module Rollup_node_rpc : Rollup_node.S)
+    ~smart_rollup_address tx_raw =
+  let open Lwt_result_syntax in
+  let tx_hash = Tx_hash.hash_to_string (Ethereum_types.hash_to_string tx_raw) in
+  let tx_raw = Ethereum_types.hash_to_bytes tx_raw in
+  let tx = smart_rollup_address ^ tx_hash ^ tx_raw in
+  let* () = Rollup_node_rpc.inject_raw_transaction tx in
+  return (Mock.hash_f Hex.(of_string tx_hash |> show))
+
+let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
+    =
   Directory.register0 dir dispatch_service (fun () (input, id) ->
       let open Lwt_result_syntax in
       let* output =
@@ -146,8 +162,8 @@ let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
         | Chain_id.Input _ -> return (Chain_id.Output (Ok Mock.chain_id))
         | Get_balance.Input (Some (address, _block_param)) ->
             let* balance =
-              match rollup_node_rpc with
-              | Some (module Rollup_node_rpc) ->
+              match rollup_node_config with
+              | Some ((module Rollup_node_rpc), _smart_rollup_address) ->
                   let* balance = Rollup_node_rpc.balance address in
                   return balance
               | None -> return Mock.balance
@@ -167,10 +183,21 @@ let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
         | Get_transaction_receipt.Input _ ->
             return
               (Get_transaction_receipt.Output (Ok (Mock.transaction_receipt ())))
-        | Send_raw_transaction.Input _ ->
-            incr Mock.block_height_counter ;
-            incr Mock.transaction_counter ;
-            return (Send_raw_transaction.Output (Ok Mock.transaction_hash))
+        | Send_raw_transaction.Input (Some tx_raw) ->
+            let* tx_hash =
+              match rollup_node_config with
+              | Some (rollup_node_rpc, smart_rollup_address) ->
+                  inject_raw_transaction
+                    rollup_node_rpc
+                    ~smart_rollup_address
+                    tx_raw
+              | None ->
+                  incr Mock.block_height_counter ;
+                  incr Mock.transaction_counter ;
+
+                  return Mock.transaction_hash
+            in
+            return (Send_raw_transaction.Output (Ok tx_hash))
         | Send_transaction.Input _ ->
             return (Send_transaction.Output (Ok Mock.transaction_hash))
         | Eth_call.Input _ -> return (Eth_call.Output (Ok Mock.call))
@@ -180,5 +207,5 @@ let dispatch (rollup_node_rpc : (module Rollup_node.S) option) dir =
       in
       return (output, id))
 
-let directory (rollup_node_rpc : (module Rollup_node.S) option) =
-  Directory.empty |> version |> dispatch rollup_node_rpc
+let directory (rollup_node_config : ((module Rollup_node.S) * string) option) =
+  Directory.empty |> version |> dispatch rollup_node_config

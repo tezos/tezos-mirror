@@ -44,6 +44,7 @@ type full_evm_setup = {
   dac_node : Dac_node.t;
   originator_key : string;
   rollup_operator_key : string;
+  evm_proxy_server : Evm_proxy_server.t;
 }
 
 let hex_encode (input : string) : string =
@@ -54,8 +55,24 @@ let evm_proxy_server_version proxy_server =
   let get_version_url = endpoint ^ "/version" in
   RPC.Curl.get get_version_url
 
-(** Prefunded account in the kernel, has a balance of 9999. *)
-let prefunded_account = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE"
+module Account = struct
+  type t = {public_key : string; private_key : string}
+
+  (** Prefunded account public key in the kernel, has a balance of 9999. *)
+  let prefunded_account_pk = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE"
+
+  let accounts =
+    [|
+      {
+        public_key = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        private_key = "0x9bfc9fbe6296c8fef8eb8d6ce2ed5f772a011898";
+      };
+      {
+        public_key = "0x0b52D4D3bE5D18a7aB5E4476a2F5382bBf2B38d8";
+        private_key = "0x672c4a81a943f2bf450869a135bd27fd43d90e9a";
+      };
+    |]
+end
 
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
@@ -106,6 +123,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       sc_rollup_node
       (Node.get_level node)
   in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   return
     {
       node;
@@ -116,6 +134,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       dac_node;
       originator_key;
       rollup_operator_key;
+      evm_proxy_server;
     }
 
 let test_evm_proxy_server_connection =
@@ -198,7 +217,9 @@ let test_rpc_getBalance =
     ~tags:["evm"; "get_balance"]
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
+    setup_evm_kernel protocol
+  in
   let* () = Client.bake_for_and_wait client in
   let first_evm_run_level = Node.get_level node in
   let* _level =
@@ -207,21 +228,52 @@ let test_rpc_getBalance =
       sc_rollup_node
       first_evm_run_level
   in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   let evm_proxy_server_endoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
-      ~account:prefunded_account
+      ~account:Account.prefunded_account_pk
       ~endpoint:evm_proxy_server_endoint
   in
   Check.((balance = 9999) int)
     ~error_msg:
-      (sf "Expected balance of %s should be %%R, but got %%L" prefunded_account) ;
+      (sf
+         "Expected balance of %s should be %%R, but got %%L"
+         Account.prefunded_account_pk) ;
+  unit
+
+let test_rpc_sendRawTransaction =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "send_raw_transaction"]
+    ~title:"RPC method eth_sendRawTransaction"
+  @@ fun protocol ->
+  let* {sc_rollup_client; evm_proxy_server; _} = setup_evm_kernel protocol in
+  let* tx_hash =
+    Eth_cli.transaction_send
+      ~source_private_key:Account.accounts.(0).private_key
+      ~to_public_key:Account.accounts.(1).public_key
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
+            Introduce a eth/wei module. *)
+      ~value:Z.(of_int 42 * (of_int 10 ** 18))
+      ~endpoint:(Evm_proxy_server.endpoint evm_proxy_server)
+  in
+  Log.info "Sent %s to the proxy server." tx_hash ;
+  let*! batcher_queue = Sc_rollup_client.batcher_queue sc_rollup_client in
+  let () =
+    match batcher_queue with
+    | [(_hash, binary_msg)] -> Log.info "binary_msg: %s" binary_msg
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Expected exactly one element to the batcher queue, got %d"
+          (List.length batcher_queue)
+  in
   unit
 
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
-  test_rpc_getBalance protocols
+  test_rpc_getBalance protocols ;
+  test_rpc_sendRawTransaction protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

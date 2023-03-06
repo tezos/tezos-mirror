@@ -23,17 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [balance ~account ~endpoint] asks the balance of [account] to the
-    JSON-RPC API server listening at [endpoint]. *)
-val balance : account:string -> endpoint:string -> int Lwt.t
+module Hash =
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
+    (struct
+      let name = "tx_hash"
 
-(** [transaction_send ~source_private_key ~to_public_key ~value
-    ~endpoint] crafts and signs a transaction transferring [value] (as
-    Wei) from [source_private_key] to [to_public_key], sends the raw
-    transaction to the JSON-RPI API server listening at [endpoint]. *)
-val transaction_send :
-  source_private_key:string ->
-  to_public_key:string ->
-  value:Z.t ->
-  endpoint:string ->
-  string Lwt.t
+      let title = "A transaction hash"
+
+      let b58check_prefix = "\001\095\045" (* tx(52) *)
+
+      let size = Some 32
+    end)
+
+let () = Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "tx" 52
+
+include Hash
+
+let to_string = Data_encoding.Binary.to_string_exn encoding
+
+let hash_to_string s = hash_string [s] |> to_string

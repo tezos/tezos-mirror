@@ -6478,6 +6478,7 @@ let _evm_proxy =
         octez_rpc_http_server;
         octez_rpc_http_client_unix;
         octez_stdlib_unix |> open_;
+        octez_crypto |> open_;
         octez_stdlib |> open_;
         octez_version;
         lwt_exit;

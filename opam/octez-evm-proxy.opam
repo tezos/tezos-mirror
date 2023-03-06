@@ -17,6 +17,7 @@ depends: [
   "tezos-rpc-http-server"
   "tezos-rpc-http-client-unix"
   "tezos-stdlib-unix"
+  "tezos-crypto"
   "tezos-stdlib"
   "tezos-version"
   "lwt-exit"
