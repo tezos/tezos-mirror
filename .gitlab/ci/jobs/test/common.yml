@@ -32,6 +32,7 @@
 .integration_template:
   extends:
     - .test_template
+    - .image_template__runtime_build_e2etest_dependencies_template
     - .template__coverage_files
   dependencies: ["build_x86_64"]
   # Start immediately after 'build_x86_64' and don't wait for

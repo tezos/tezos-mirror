@@ -221,14 +221,7 @@ let test_rpc_getBalance =
 
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
-  test_evm_proxy_server_connection protocols
-(*
-  The following tests cannot be registered yet, because they rely on
-  the external tool eth not yet available in the CI.
-
-  To test a merge request touching the EVM proxy-server/kernel. Please
-  run these tests manually for now.
-*)
-(* test_rpc_getBalance protocols *)
+  test_evm_proxy_server_connection protocols ;
+  test_rpc_getBalance protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
