@@ -33,6 +33,20 @@ module Durable_storage_path = struct
   let account_path (Address s) = accounts ^ "/" ^ s
 
   let balance_path address = account_path address ^ balance
+
+  let number = "/number"
+
+  module Block = struct
+    let blocks = "/evm/blocks"
+
+    type number = Current | Nth of Z.t
+
+    let number_to_string = function
+      | Current -> "current"
+      | Nth i -> Z.to_string i
+
+    let current_number = blocks ^ "/current" ^ number
+  end
 end
 
 module RPC = struct
@@ -122,6 +136,29 @@ module RPC = struct
        the resulted hash. *)
     let* _answer = call_service ~base batcher_injection () () [tx] in
     return_unit
+
+  exception Invalid_block_structure of string
+
+  let block_number base n =
+    let open Lwt_result_syntax in
+    match n with
+    (* This avoids an unecessary service call in case we ask a block's number
+       with an already expected/known block number [n]. *)
+    | Durable_storage_path.Block.Nth i ->
+        return @@ Ethereum_types.Block_height i
+    | Durable_storage_path.Block.Current -> (
+        let key = Durable_storage_path.Block.current_number in
+        let+ answer = call_service ~base durable_state_value () {key} () in
+        match answer with
+        | Some bytes ->
+            Ethereum_types.Block_height (Bytes.to_string bytes |> Z.of_bits)
+        | None ->
+            raise
+            @@ Invalid_block_structure
+                 "Unexpected [None] value for [current_number]'s [answer]")
+
+  let current_block_number base () =
+    block_number base Durable_storage_path.Block.Current
 end
 
 module type S = sig
@@ -130,6 +167,8 @@ module type S = sig
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
   val inject_raw_transaction : string -> unit tzresult Lwt.t
+
+  val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -140,4 +179,6 @@ end) : S = struct
   let balance = RPC.balance Base.base
 
   let inject_raw_transaction = RPC.inject_raw_transaction Base.base
+
+  let current_block_number = RPC.current_block_number Base.base
 end

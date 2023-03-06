@@ -34,6 +34,10 @@ module type S = sig
   (** [inject_raw_transaction tx] injects [tx] in the rollup node's
       batcher queue. *)
   val inject_raw_transaction : string -> unit tzresult Lwt.t
+
+  (** [current_block_number ()] returns the most recent processed and stored block
+      number. *)
+  val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup
