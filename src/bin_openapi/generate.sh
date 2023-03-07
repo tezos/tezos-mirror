@@ -16,7 +16,7 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj
+protocol_hash=PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1
 protocol_parameters=src/proto_016_PtMumbai/parameters/sandbox-parameters.json
 protocol_name=mumbai
 
