@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -118,13 +119,17 @@ module Legacy = struct
     committee_members_addresses :
       Tezos_crypto.Aggregate_signature.public_key_hash list;
     dac_cctxt_config : host_and_port option;
+    committee_member_address_opt :
+      Tezos_crypto.Aggregate_signature.public_key_hash option;
   }
 
-  let make ?coordinator_host_and_port threshold committee_members_addresses =
+  let make ?coordinator_host_and_port threshold committee_members_addresses
+      committee_member_address_opt =
     {
       threshold;
       committee_members_addresses;
       dac_cctxt_config = coordinator_host_and_port;
+      committee_member_address_opt;
     }
 
   let committee_members_addresses t = t.committee_members_addresses
@@ -132,6 +137,8 @@ module Legacy = struct
   let threshold t = t.threshold
 
   let dac_cctxt_config t = t.dac_cctxt_config
+
+  let committee_member_address_opt t = t.committee_member_address_opt
 
   let host_and_port_encoding =
     let open Data_encoding in
@@ -143,17 +150,36 @@ module Legacy = struct
   let encoding =
     Data_encoding.(
       conv
-        (fun {threshold; committee_members_addresses; dac_cctxt_config} ->
-          (threshold, committee_members_addresses, dac_cctxt_config))
-        (fun (threshold, committee_members_addresses, dac_cctxt_config) ->
-          {threshold; committee_members_addresses; dac_cctxt_config})
-        (obj3
+        (fun {
+               threshold;
+               committee_members_addresses;
+               dac_cctxt_config;
+               committee_member_address_opt;
+             } ->
+          ( threshold,
+            committee_members_addresses,
+            dac_cctxt_config,
+            committee_member_address_opt ))
+        (fun ( threshold,
+               committee_members_addresses,
+               dac_cctxt_config,
+               committee_member_address_opt ) ->
+          {
+            threshold;
+            committee_members_addresses;
+            dac_cctxt_config;
+            committee_member_address_opt;
+          })
+        (obj4
            (dft "threshold" uint8 default_dac_threshold)
            (dft
               "committee_members"
               (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
               default_dac_addresses)
-           (opt "dac_cctxt_config" host_and_port_encoding)))
+           (opt "dac_cctxt_config" host_and_port_encoding)
+           (opt
+              "committee_member_address_opt"
+              Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
 end
 
 type mode =
@@ -177,12 +203,13 @@ let make_observer coordinator_rpc_address coordinator_rpc_port =
   Observer (Observer.make coordinator_rpc_address coordinator_rpc_port)
 
 let make_legacy ?coordinator_host_and_port threshold committee_members_addresses
-    =
+    committee_member_address_opt =
   Legacy
     (Legacy.make
        ?coordinator_host_and_port
        threshold
-       committee_members_addresses)
+       committee_members_addresses
+       committee_member_address_opt)
 
 type t = {
   data_dir : string;  (** The path to the DAC node data directory. *)

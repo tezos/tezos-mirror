@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Mode_not_supported of string
+type error += Mode_not_supported of string | Cannot_retrieve_node_keys of string
 
 let () =
   register_error_kind
@@ -36,6 +37,20 @@ let () =
     Data_encoding.(obj1 (req "mode" string))
     (function Mode_not_supported mode -> Some mode | _ -> None)
     (fun mode -> Mode_not_supported mode)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dac.node.cannot_retrieve_node_keys"
+    ~title:"Cannot retrieve node keys"
+    ~description:"Cannot retrieve node keys"
+    ~pp:(fun ppf public_key_hash ->
+      Format.fprintf ppf "Cannot retrieve node keys from %s" public_key_hash)
+    Data_encoding.(obj1 (req "public_key_hash" string))
+    (function
+      | Cannot_retrieve_node_keys public_key_hash -> Some public_key_hash
+      | _ -> None)
+    (fun public_key_hash -> Cannot_retrieve_node_keys public_key_hash)
 
 module Handler = struct
   (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
@@ -114,11 +129,53 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
+  (** This function will be called by [new_root_hash] 
+      only when payload corresponding to provided [root_hash] 
+      had been well dezerialized.
+      Once it is done, call PUT /dac_member_signature to submit member signature *)
+  let push_payload_signature dac_plugin ctxt coordinator_cctxt public_key_hash
+      root_hash =
+    let open Lwt_result_syntax in
+    let wallet = Node_context.get_tezos_node_cctxt ctxt in
+    let* keys_opt = Dac_manager.Keys.get_wallet_info wallet public_key_hash in
+    match keys_opt with
+    | Some keys ->
+        let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
+        let* signature =
+          Tezos_client_base.Client_keys.aggregate_sign
+            wallet
+            (Dac_manager.Keys.aggregate_sk_uris keys)
+            bytes_to_sign
+        in
+        let signature_repr =
+          Signature_repr.
+            {
+              root_hash;
+              signature;
+              signer_pkh = Dac_manager.Keys.public_key_hash keys;
+            }
+        in
+        let* () =
+          Dac_node_client.call
+            coordinator_cctxt
+            (RPC_services.store_dac_member_signature dac_plugin)
+            ()
+            ()
+            signature_repr
+        in
+        let*! () = Event.emit_signature_pushed_to_coordinator signature in
+        return_unit
+    | None ->
+        tzfail
+        @@ Cannot_retrieve_node_keys
+             (Tezos_crypto.Aggregate_signature.Public_key_hash.to_string
+                public_key_hash)
+
   (** This handler will be invoked only when a [coordinator_cctxt] is specified
       in the DAC node configuration. The DAC node tries to subscribes to the
       stream of root hashes via the streamed GET /monitor/root_hashes RPC call
       to the dac node corresponding to [coordinator_cctxt]. *)
-  let new_root_hash ctxt coordinator_cctxt pkh_opt =
+  let new_root_hash ctxt coordinator_cctxt committee_member_address_opt =
     let open Lwt_result_syntax in
     let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
@@ -133,33 +190,21 @@ module Handler = struct
           let*! () =
             Event.emit_received_root_hash_processed dac_plugin root_hash
           in
-          match pkh_opt with
-          | Some pkh -> (
-              let wallet = Node_context.get_tezos_node_cctxt ctxt in
-              let* keys_opt = Dac_manager.Keys.get_address_keys wallet pkh in
-              match keys_opt with
-              | Some keys ->
-                  let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
-                  let* signature =
-                    Tezos_client_base.Client_keys.aggregate_sign
-                      wallet
-                      (Dac_manager.Keys.get_aggregate_sk_uris keys)
-                      bytes_to_sign
-                  in
-                  let signature_repr =
-                    Signature_repr.{root_hash; signature; signer_pkh = pkh}
-                  in
-                  let* () =
-                    Dac_node_client.call
-                      coordinator_cctxt
-                      (RPC_services.store_dac_member_signature dac_plugin)
-                      ()
-                      ()
-                      signature_repr
-                  in
-                  return ()
-              | _ -> tzfail @@ Mode_not_supported "member")
-          | _ -> tzfail @@ Mode_not_supported "member")
+          (* If there is a [public_key_hash], it means the node is run as a member,
+              so we must sign the payload and post the signature to the coordinator
+             If there is no [public_key_hash] provided, it means the node is run as an observer
+               then we simply [return ()] *)
+          match committee_member_address_opt with
+          | Some committee_member_address ->
+              push_payload_signature
+                dac_plugin
+                ctxt
+                coordinator_cctxt
+                committee_member_address
+                root_hash
+          | None ->
+              let*! () = Event.emit_no_committee_member_address () in
+              return ())
       | Error errs ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
              Improve handling of errors. *)
@@ -210,7 +255,8 @@ let run ~data_dir cctxt =
     Configuration.load ~data_dir
   in
   let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
-  let* addresses, threshold, coordinator_cctxt_opt =
+  let* addresses, threshold, coordinator_cctxt_opt, committee_member_address_opt
+      =
     match mode with
     | Legacy configuration ->
         let committee_members_addresses =
@@ -220,7 +266,10 @@ let run ~data_dir cctxt =
         let dac_cctxt_config =
           Configuration.Legacy.dac_cctxt_config configuration
         in
-        return (committee_members_addresses, threshold, dac_cctxt_config)
+        let committee_member_address_opt =
+          Configuration.Legacy.committee_member_address_opt configuration
+        in
+        return (committee_members_addresses, threshold, dac_cctxt_config, committee_member_address_opt)
     | Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
     | Committee_member _ -> tzfail @@ Mode_not_supported "committee_member"
     | Observer _ -> tzfail @@ Mode_not_supported "observer"
@@ -233,8 +282,8 @@ let run ~data_dir cctxt =
     |> List.map (fun account_opt ->
            match account_opt with
            | Some account ->
-               ( Dac_manager.Keys.get_public_key_opt account,
-                 Some (Dac_manager.Keys.get_aggregate_sk_uris account) )
+               ( Dac_manager.Keys.public_key_opt account,
+                 Some (Dac_manager.Keys.aggregate_sk_uris account) )
            | None -> (None, None))
     |> List.split
   in
@@ -268,5 +317,8 @@ let run ~data_dir cctxt =
       daemonize
         [
           Handler.new_head ctxt cctxt;
-          Handler.new_root_hash ctxt coordinator_cctxt pkh_opt;
+          Handler.new_root_hash
+            ctxt
+            coordinator_cctxt
+            committee_member_address_opt;
         ]

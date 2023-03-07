@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,16 +60,16 @@ module Keys = struct
   type t = {
     public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
     public_key_opt : Tezos_crypto.Aggregate_signature.public_key option;
-    aggregate_sk_uris : Client_keys.aggregate_sk_uri;
+    aggregate_sk_uri : Client_keys.aggregate_sk_uri;
   }
 
-  let get_public_key_hash t = t.public_key_hash
+  let public_key_hash t = t.public_key_hash
 
-  let get_public_key_opt t = t.public_key_opt
+  let public_key_opt t = t.public_key_opt
 
-  let get_aggregate_sk_uris t = t.aggregate_sk_uris
+  let aggregate_sk_uris t = t.aggregate_sk_uri
 
-  let get_address_keys cctxt address =
+  let get_wallet_info cctxt address =
     let open Lwt_result_syntax in
     let open Tezos_client_base.Client_keys in
     let* alias = Aggregate_alias.Public_key_hash.rev_find cctxt address in
@@ -83,27 +84,23 @@ module Keys = struct
                multiple dac nodes.*)
             let*! () = Event.(emit dac_account_not_available address) in
             return_none
-        | Some (pkh, pk, sk_uri_opt) -> (
-            match sk_uri_opt with
+        | Some (public_key_hash, public_key_opt, aggregate_sk_uri_opt) -> (
+            match aggregate_sk_uri_opt with
             | None ->
                 let*! () = Event.(emit dac_account_cannot_sign address) in
                 return_none
-            | Some sk_uri ->
-                return_some
-                  {
-                    public_key_hash = pkh;
-                    public_key_opt = pk;
-                    aggregate_sk_uris = sk_uri;
-                  }))
+            | Some aggregate_sk_uri ->
+                return_some {public_key_hash; public_key_opt; aggregate_sk_uri})
+        )
 
   let get_public_key cctxt address =
     let open Lwt_result_syntax in
-    let+ address_keys_opt = get_address_keys cctxt address in
-    Option.bind address_keys_opt (fun t -> get_public_key_opt t)
+    let+ address_keys_opt = get_wallet_info cctxt address in
+    Option.bind address_keys_opt (fun t -> public_key_opt t)
 
   let get_keys ~addresses ~threshold cctxt =
     let open Lwt_result_syntax in
-    let* keys = List.map_es (get_address_keys cctxt) addresses in
+    let* keys = List.map_es (get_wallet_info cctxt) addresses in
     let recovered_keys = List.length @@ List.filter Option.is_some keys in
     let*! () =
       (* We emit a warning if the threshold of dac accounts needed to sign a

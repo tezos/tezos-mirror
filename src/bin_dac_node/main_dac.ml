@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -79,6 +80,15 @@ let tz4_address_param ?(name = "public key hash")
   let desc = String.concat "\n" [desc; "A tz4 address"] in
   Tezos_clic.param ~name ~desc tz4_address_parameter
 
+let committee_member_address_arg =
+  Tezos_clic.arg
+    ~long:"committee-member-address"
+    ~placeholder:"committee-member-address"
+    ~doc:
+      (Format.sprintf
+         "The commitee member address, mandatory when node is a Member.")
+    tz4_address_parameter
+
 let positive_int_parameter =
   Tezos_clic.parameter (fun _cctxt p ->
       let open Lwt_result_syntax in
@@ -152,24 +162,42 @@ module Config_init = struct
     command
       ~group
       ~desc:"Configure DAC node in legacy mode."
-      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
-      (prefixes ["configure"; "as"; "legacy"; "with"; "threshold"]
-      @@ threshold_param
-      @@ prefixes ["and"; "public"; "key"; "hash"]
-      @@ tz4_address_param
-      @@ prefixes ["and"; "data"; "availability"; "committee"; "members"]
-      @@ seq_of_param @@ tz4_address_param)
-      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
-           threshold
+      (args5
+         data_dir_arg
+         rpc_address_arg
+         rpc_port_arg
+         committee_member_address_arg
+         reveal_data_dir_arg)
+      (prefixes
+         [
+           "configure";
+           "as";
+           "legacy";
+           "with";
+           "data";
+           "availability";
+           "committee";
+           "members";
+         ]
+      @@ non_terminal_seq ~suffix:["and"; "threshold"] tz4_address_param
+      @@ threshold_param @@ stop)
+      (fun ( data_dir,
+             rpc_address,
+             rpc_port,
+             committee_member_address_opt,
+             reveal_data_dir )
            committee_members_addresses
-           _dac_node_pkh
+           threshold
            cctxt ->
         create_configuration
           ~data_dir
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
-          (Configuration.make_legacy threshold committee_members_addresses)
+          (Configuration.make_legacy
+             threshold
+             committee_members_addresses
+             committee_member_address_opt)
           cctxt)
 
   let coordinator_command =

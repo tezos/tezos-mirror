@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,25 +31,23 @@ type error +=
   | Cannot_create_reveal_data_dir of string
 
 module Keys : sig
-  (** [get_keys ~addresses ~threshold cctxt] returns the aliases and keys associated with the
-      aggregate signature addresses in the tezos wallet of [cctxt]. *)
   type t
 
-  (** [get_public_key_hash] returns the [Tezos_crypto.Aggregate_signature.public_key_hash] given a [t]. *)
-  val get_public_key_hash :
-    t -> Tezos_crypto.Aggregate_signature.public_key_hash
+  (** [public_key_hash] returns the [Tezos_crypto.Aggregate_signature.public_key_hash] given a [t]. *)
+  val public_key_hash : t -> Tezos_crypto.Aggregate_signature.public_key_hash
 
-  (** [aggregate_sk_uris] returns the [Tezos_crypto.Aggregate_signature.public_key option] given a [t]. *)
-  val get_public_key_opt :
-    t -> Tezos_crypto.Aggregate_signature.public_key option
+  (** [public_key_opt] returns the [Tezos_crypto.Aggregate_signature.public_key option] given a [t]. *)
+  val public_key_opt : t -> Tezos_crypto.Aggregate_signature.public_key option
 
   (** [aggregate_sk_uris] returns the [Client_keys.aggregate_sk_uri] given a [t]. *)
-  val get_aggregate_sk_uris : t -> Client_keys.aggregate_sk_uri
+  val aggregate_sk_uris : t -> Client_keys.aggregate_sk_uri
 
-  val get_address_keys :
+  (** Retrieve [Keys.t] from the provided [#Client_context.wallet] 
+      and [Tezos_crypto.Aggregate_signature.public_key_hash] *)
+  val get_wallet_info :
     #Client_context.wallet ->
     Tezos_crypto.Aggregate_signature.public_key_hash ->
-    (t option, tztrace) result Lwt.t
+    t option tzresult Lwt.t
 
   (** [get_keys ~addresses ~threshold cctxt config] returns the aliases and keys associated with the
       aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)

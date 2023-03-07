@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -216,6 +217,24 @@ let processing_root_hash_failed =
     ("root_hash", Data_encoding.string)
     ("errors", Error_monad.trace_encoding)
 
+let new_signature_pushed_to_coordinator =
+  declare_1
+    ~section
+    ~name:"new_signature_pushed_to_coordinator"
+    ~msg:"New signature from member pushed to the coordinator: {signature}"
+    ~level:Notice
+    ("signature", Tezos_crypto.Aggregate_signature.encoding)
+
+let no_committee_member_address =
+  declare_0
+    ~section
+    ~name:"no_committee_member_address"
+    ~msg:
+      "No committee member address provided, node will only deserialize \
+       payload, not signing it"
+    ~level:Notice
+    ()
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -239,3 +258,8 @@ let emit_received_root_hash_processed ((module P) : Dac_plugin.t) hash =
 
 let emit_processing_root_hash_failed ((module P) : Dac_plugin.t) hash errors =
   emit processing_root_hash_failed (P.to_hex hash, errors)
+
+let emit_signature_pushed_to_coordinator signature =
+  emit new_signature_pushed_to_coordinator signature
+
+let emit_no_committee_member_address = emit no_committee_member_address
