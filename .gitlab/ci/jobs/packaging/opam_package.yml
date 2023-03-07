@@ -238,6 +238,13 @@ opam:octez-baker-PtMumbai:
 
 # Ignoring unreleased package octez-baker-alpha.
 
+opam:octez-bls12-381-hash:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: octez-bls12-381-hash
+
 opam:octez-client:
   extends:
     - .opam_template

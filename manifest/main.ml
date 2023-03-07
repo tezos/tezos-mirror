@@ -914,6 +914,43 @@ let _octez_crypto_tests_unix =
         octez_test_helpers |> open_;
       ]
 
+let octez_bls12_381_hash =
+  public_lib
+    "octez-bls12-381-hash"
+    ~path:"src/lib_bls12_381_hash"
+    ~internal_name:"bls12_381_hash"
+    ~synopsis:
+      "Implementation of some cryptographic hash primitives using the scalar \
+       field of BLS12-381"
+    ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
+    ~deps:[bls12_381; bisect_ppx]
+    ~js_compatible:false
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = [];
+        names =
+          [
+            "caml_rescue_stubs";
+            "caml_anemoi_stubs";
+            "caml_poseidon_stubs";
+            "caml_griffin_stubs";
+            "rescue";
+            "anemoi";
+            "poseidon";
+            "griffin";
+          ];
+      }
+    ~linkall:true
+
+let _octez_bls12_381_hash_tests =
+  tests
+    ["test_poseidon"; "test_rescue"; "test_anemoi"; "test_griffin"; "test_jive"]
+    ~path:"src/lib_bls12_381_hash/test"
+    ~opam:"octez-bls12-381-hash"
+    ~deps:[alcotest; bls12_381; octez_bls12_381_hash]
+    ~flags:(Flags.standard ~disable_warnings:[3] ())
+
 let octez_bls12_381_polynomial_internal =
   public_lib
     "tezos-bls12-381-polynomial-internal"
