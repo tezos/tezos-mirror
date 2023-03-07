@@ -3929,14 +3929,14 @@ end = struct
             ]
       in
       let _integration_gas =
-        test
-          "main"
+        tezt
+          ["test_main"; "test_gas_costs"; "test_gas_levels"]
           ~path:(path // "lib_protocol/test/integration/gas")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true
           ~deps:
             [
-              alcotest_lwt;
+              alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;
