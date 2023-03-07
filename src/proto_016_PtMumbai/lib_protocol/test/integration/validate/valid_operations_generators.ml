@@ -155,6 +155,9 @@ let init nb_accounts descrs =
   let* initial_block, bootstraps =
     Context.init_with_parameters_n setup.params nb_accounts
   in
+  let*? _cryptobox =
+    Dal_helpers.mk_cryptobox setup.params.constants.dal.cryptobox_parameters
+  in
   let* voters = Context.Vote.get_listings (B initial_block) in
   let* initial_voters =
     List.map_es (fun (c, _) -> return (Contract.Implicit c)) voters
