@@ -111,6 +111,11 @@ module Make (PVM : Pvm.S) = struct
                 Some (Raw_level.of_int32_exn head.Layer1.level);
             }
         in
+        let*! () =
+          Commitment_event.last_published_commitment_updated
+            commitment_hash
+            (Raw_level.of_int32_exn head.Layer1.level)
+        in
         return_unit
     | ( Sc_rollup_publish {commitment = their_commitment; rollup},
         Sc_rollup_publish_result
