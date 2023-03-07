@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_coordinator = Refutation_coordinator.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
-end
+module Request = struct
+  type ('a, 'b) t = Process : Layer1.head -> (unit, error trace) t
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+  type view = View : _ t -> view
+
+  let view req = View req
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Process"
+          (obj2
+             (req "request" (constant "process"))
+             (req "block" Layer1.head_encoding))
+          (function View (Process b) -> Some ((), b))
+          (fun ((), b) -> View (Process b));
+      ]
+
+  let pp ppf (View r) =
+    match r with
+    | Process {Layer1.hash; level} ->
+        Format.fprintf
+          ppf
+          "Processing new L1 head %a at level %ld"
+          Block_hash.pp
+          hash
+          level
+end
