@@ -643,9 +643,8 @@ module Inner = struct
 
      Runtime is [O(n log n)] where [n = Domains.length d]. *)
   let polynomials_product d ps =
-    let open Evaluations in
-    let evaluations = List.map (evaluation_fft d) ps in
-    interpolation_fft d (mul_c ~evaluations ())
+    let evaluations = List.map (fft d) ps in
+    ifft_inplace d (Evaluations.mul_c ~evaluations ())
 
   (* We encode by pages of [page_size] bytes each. The pages
      are arranged in cosets to produce batched KZG proofs
@@ -738,29 +737,28 @@ module Inner = struct
          Thus [polynomial_from_slot] is an injection from slots to
          polynomials (as composition preserves injectivity). *)
       Ok
-        (Evaluations.interpolation_fft2 t.domain_polynomial_length coefficients)
+        (ifft_inplace
+           t.max_polynomial_length
+           (Evaluations.of_array (t.max_polynomial_length - 1, coefficients)))
 
   (* [polynomial_to_slot] is the left-inverse function of
      [polynomial_from_slot]. *)
   let polynomial_to_slot t p =
     (* The last operation of [polynomial_from_slot] is the interpolation,
        so we undo it with an evaluation on the same domain [t.domain_polynomial_length]. *)
-    let evaluations =
-      Evaluations.to_array
-        (Evaluations.evaluation_fft t.domain_polynomial_length p)
-    in
+    let evaluations = fft t.max_polynomial_length p in
     let slot = Bytes.make t.slot_size '0' in
     let offset = ref 0 in
     (* Reverse permutation from [polynomial_from_slot]. *)
     for page = 0 to t.pages_per_slot - 1 do
       for elt = 0 to t.page_length - 2 do
         let idx = (elt * t.pages_per_slot) + page in
-        let coeff = Scalar.to_bytes (Array.get evaluations idx) in
+        let coeff = Scalar.to_bytes (Evaluations.get evaluations idx) in
         Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
         offset := !offset + scalar_bytes_amount
       done ;
       let idx = ((t.page_length - 1) * t.pages_per_slot) + page in
-      let coeff = Scalar.to_bytes (Array.get evaluations idx) in
+      let coeff = Scalar.to_bytes (Evaluations.get evaluations idx) in
       Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
       offset := !offset + t.remaining_bytes
     done ;
@@ -773,8 +771,7 @@ module Inner = struct
      This can be achieved with an n-points discrete Fourier transform
      supported by the [Scalar] field in time O(n log n). *)
   let encode t p =
-    Evaluations.to_array
-      (Evaluations.evaluation_fft t.domain_erasure_encoded_polynomial_length p)
+    Evaluations.to_array (fft t.erasure_encoded_polynomial_length p)
 
   (* The shards are arranged in cosets to produce batches of KZG proofs
      for the shards efficiently.
@@ -973,9 +970,7 @@ module Inner = struct
       assert (
         Polynomials.degree p1 + Polynomials.degree p2 = t.max_polynomial_length) ;
 
-      let a_poly =
-        polynomials_product t.domain_2_times_polynomial_length [p1; p2]
-      in
+      let a_poly = polynomials_product (2 * t.max_polynomial_length) [p1; p2] in
 
       assert (Polynomials.degree a_poly = t.max_polynomial_length) ;
 
@@ -997,9 +992,7 @@ module Inner = struct
 
          So A'(x_i) = sum_{j=0}^{k-1} A_j(x_i) = A_i(x_i) as the other
          polynomials A_j(x) have x_i as root. *)
-      let eval_a' =
-        Evaluations.evaluation_fft t.domain_erasure_encoded_polynomial_length a'
-      in
+      let eval_a' = fft t.erasure_encoded_polynomial_length a' in
 
       (* 4. Computing N(x) ≔ sum_{i=0}^{k-1} n_i / x_i x^i
          where n_i ≔ c_i/A_i(x_i)
@@ -1040,7 +1033,7 @@ module Inner = struct
               n_poly.(i) <- tmp
             done)
           shards ;
-        n_poly
+        Evaluations.of_array (t.erasure_encoded_polynomial_length - 1, n_poly)
       in
       let n_poly = compute_n t eval_a' shards in
 
@@ -1054,11 +1047,7 @@ module Inner = struct
 
          B(x) is thus given by the first k components
          of -n * IFFT_n(N). *)
-      let b =
-        Evaluations.interpolation_fft2
-          t.domain_erasure_encoded_polynomial_length
-          n_poly
-      in
+      let b = ifft_inplace t.erasure_encoded_polynomial_length n_poly in
       let b = Polynomials.copy ~len:(len b) b in
 
       Polynomials.mul_by_scalar_inplace
@@ -1070,9 +1059,7 @@ module Inner = struct
          The product is given by the convolution theorem:
          P = A * B = IFFT_{2k}(FFT_{2k}(A) o FFT_{2k}(B))
          where o is the pairwise product. *)
-      let p =
-        polynomials_product t.domain_2_times_polynomial_length [a_poly; b]
-      in
+      let p = polynomials_product (2 * t.max_polynomial_length) [a_poly; b] in
       (* P has degree [<= max_polynomial_length - 1] so [<= max_polynomial_length]
          coefficients. *)
       Ok (Polynomials.copy ~len:(len p) p)
@@ -1439,9 +1426,10 @@ module Inner = struct
      - [(Array.length evaluations = Domains.length domain)] *)
   let interpolation_poly ~root ~domain ~evaluations =
     assert (Array.length evaluations = Domains.length domain) ;
+    let size = Domains.length domain in
     let evaluations =
       Polynomials.to_dense_coefficients
-        (Evaluations.interpolation_fft2 domain evaluations)
+        (ifft_inplace size (Evaluations.of_array (size - 1, evaluations)))
     in
     (* Computes root_inverse = 1/root. *)
     let root_inverse = Scalar.inverse_exn root in
