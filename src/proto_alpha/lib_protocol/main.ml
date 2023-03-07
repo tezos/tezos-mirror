@@ -156,9 +156,10 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   (* During block (full or partial) application or full construction,
      endorsements must be for [predecessor_level] and preendorsements,
      if any, for the block's level. In the mempool (partial
-     construction), only consensus operations for [predecessor_level]
-     (that is, head's level) are allowed (except for grandparent
-     endorsements, which are handled differently). *)
+     construction), both endorsements and preendorsements are expected
+     to be for [predecessor_level] (that is, head's level) most of the
+     time, although operations that are one level before or after
+     [predecessor_level] are also accepted. *)
   let preendorsement_level =
     match mode with
     | Application _ | Partial_validation _ | Construction _ ->
@@ -230,16 +231,12 @@ let begin_validation ctxt chain_id mode ~predecessor =
         block_header_data.contents
   | Partial_construction _ ->
       let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
-      let*? grandparent_round =
-        Fitness.predecessor_round_from_raw predecessor_fitness
-      in
       return
         (Validate.begin_partial_construction
            ctxt
            chain_id
            ~predecessor_level
-           ~predecessor_round
-           ~grandparent_round)
+           ~predecessor_round)
 
 let validate_operation = Validate.validate_operation
 
@@ -411,15 +408,13 @@ module Mempool = struct
         ~predecessor:head
     in
     let*? predecessor_round = Fitness.round_from_raw head.fitness in
-    let*? grandparent_round = Fitness.predecessor_round_from_raw head.fitness in
     return
       (init
          ctxt
          chain_id
          ~predecessor_level:head_level
          ~predecessor_round
-         ~predecessor_hash:head_hash
-         ~grandparent_round)
+         ~predecessor_hash:head_hash)
 end
 
 (* Vanity nonce: TBD *)

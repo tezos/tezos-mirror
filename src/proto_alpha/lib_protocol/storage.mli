@@ -654,13 +654,6 @@ module Tenderbake : sig
     Single_data_storage
       with type value = Block_hash.t * Block_payload_hash.t
        and type t := Raw_context.t
-
-  (** [Grand_parent_branch] stores a single value composed of the
-      great-grand parent hash and the grand parent's payload *)
-  module Grand_parent_branch :
-    Single_data_storage
-      with type value = Block_hash.t * Block_payload_hash.t
-       and type t := Raw_context.t
 end
 
 module Tx_rollup : sig
@@ -920,4 +913,13 @@ module Zk_rollup : sig
       with type t := Raw_context.t * Zk_rollup_repr.t
        and type key = int64
        and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+end
+
+module Legacy : sig
+  (** [Grand_parent_branch] stores a single value composed of the
+      great-grand parent hash and the grand parent's payload *)
+  module Grand_parent_branch :
+    Single_data_storage
+      with type value = Block_hash.t * Block_payload_hash.t
+       and type t := Raw_context.t
 end

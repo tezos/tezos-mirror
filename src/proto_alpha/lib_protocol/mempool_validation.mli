@@ -131,7 +131,6 @@ val init :
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
   predecessor_hash:Block_hash.t ->
-  grandparent_round:Round.t ->
   validation_info * t
 
 (** Adds an operation to a [mempool] if and only if it is valid and

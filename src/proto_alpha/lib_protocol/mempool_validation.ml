@@ -64,15 +64,14 @@ let encoding : t Data_encoding.t =
           (Operation_hash.Map.encoding
              (dynamic_size ~kind:`Uint30 Operation.encoding)))
 
-let init ctxt chain_id ~predecessor_level ~predecessor_round ~predecessor_hash
-    ~grandparent_round : validation_info * t =
+let init ctxt chain_id ~predecessor_level ~predecessor_round ~predecessor_hash :
+    validation_info * t =
   let {info; operation_state; _} =
     begin_partial_construction
       ctxt
       chain_id
       ~predecessor_level
       ~predecessor_round
-      ~grandparent_round
   in
   ( info,
     {predecessor_hash; operation_state; operations = Operation_hash.Map.empty}

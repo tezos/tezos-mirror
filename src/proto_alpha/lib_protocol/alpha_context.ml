@@ -592,17 +592,6 @@ module Consensus = struct
   let store_endorsement_branch ctxt branch =
     let ctxt = set_endorsement_branch ctxt branch in
     Storage.Tenderbake.Endorsement_branch.add ctxt branch
-
-  let load_grand_parent_branch ctxt =
-    Storage.Tenderbake.Grand_parent_branch.find ctxt >>=? function
-    | Some grand_parent_branch ->
-        Raw_context.Consensus.set_grand_parent_branch ctxt grand_parent_branch
-        |> return
-    | None -> return ctxt
-
-  let store_grand_parent_branch ctxt branch =
-    let ctxt = set_grand_parent_branch ctxt branch in
-    Storage.Tenderbake.Grand_parent_branch.add ctxt branch
 end
 
 let prepare_first_block = Init_storage.prepare_first_block
@@ -611,7 +600,6 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, balance_updates, origination_results) ->
   Consensus.load_endorsement_branch ctxt >>=? fun ctxt ->
-  Consensus.load_grand_parent_branch ctxt >>=? fun ctxt ->
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =
