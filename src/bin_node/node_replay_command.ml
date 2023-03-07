@@ -397,6 +397,11 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
                process_path = Sys.executable_name;
                sandbox_parameters = None;
                dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
+               log_config =
+                 {
+                   lwt_log_sink_unix = config.log;
+                   internal_events = config.internal_events;
+                 };
              })
       in
       let commit_genesis =

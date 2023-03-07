@@ -54,6 +54,7 @@ type validator_kind =
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
       dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
+      log_config : External_validation.log_config;
     }
       -> validator_kind
 

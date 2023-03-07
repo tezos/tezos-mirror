@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type log_config = {
+  lwt_log_sink_unix : Lwt_log_sink_unix.cfg;
+  internal_events : Tezos_base.Internal_event_config.t;
+}
+
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -33,6 +38,7 @@ type parameters = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
+  log_config : log_config;
 }
 
 type request =
@@ -134,6 +140,17 @@ let request_pp ppf = function
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
+let log_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {internal_events; lwt_log_sink_unix} ->
+      (internal_events, lwt_log_sink_unix))
+    (fun (internal_events, lwt_log_sink_unix) ->
+      {internal_events; lwt_log_sink_unix})
+    (obj2
+       (req "internal_events" Tezos_base.Internal_event_config.encoding)
+       (req "lwt_log_sink_unix" Lwt_log_sink_unix.cfg_encoding))
+
 let parameters_encoding =
   let open Data_encoding in
   conv
@@ -146,6 +163,7 @@ let parameters_encoding =
            operation_metadata_size_limit;
            sandbox_parameters;
            dal_config;
+           log_config;
          } ->
       ( context_root,
         protocol_root,
@@ -154,7 +172,8 @@ let parameters_encoding =
         user_activated_protocol_overrides,
         operation_metadata_size_limit,
         sandbox_parameters,
-        dal_config ))
+        dal_config,
+        log_config ))
     (fun ( context_root,
            protocol_root,
            genesis,
@@ -162,7 +181,8 @@ let parameters_encoding =
            user_activated_protocol_overrides,
            operation_metadata_size_limit,
            sandbox_parameters,
-           dal_config ) ->
+           dal_config,
+           log_config ) ->
       {
         context_root;
         protocol_root;
@@ -172,8 +192,9 @@ let parameters_encoding =
         operation_metadata_size_limit;
         sandbox_parameters;
         dal_config;
+        log_config;
       })
-    (obj8
+    (obj9
        (req "context_root" string)
        (req "protocol_root" string)
        (req "genesis" Genesis.encoding)
@@ -185,7 +206,8 @@ let parameters_encoding =
           "operation_metadata_size_limit"
           Shell_limits.operation_metadata_size_limit_encoding)
        (opt "sandbox_parameters" json)
-       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding))
+       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
+       (req "log_config" log_config_encoding))
 
 let case_validate tag =
   let open Data_encoding in

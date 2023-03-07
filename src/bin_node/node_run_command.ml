@@ -235,7 +235,8 @@ let init_identity_file (config : Config_file.t) =
     return identity
 
 let init_node ?sandbox ?target ~identity ~singleprocess
-    ~force_history_mode_switch (config : Config_file.t) =
+    ~external_validator_log_config ~force_history_mode_switch
+    (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* TODO "WARN" when pow is below our expectation. *)
   let*! () =
@@ -328,6 +329,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         config.shell.block_validator_limits.operation_metadata_size_limit;
       patch_context;
       data_dir = config.data_dir;
+      external_validator_log_config;
       store_root = Data_version.store_dir config.data_dir;
       context_root = Data_version.context_dir config.data_dir;
       protocol_root = Data_version.protocol_dir config.data_dir;
@@ -505,12 +507,21 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* Main loop *)
-  let*! () =
-    Log_config.init_internal_events_with_defaults
+  let lwt_log_sink_unix, internal_events =
+    Log_config.make_internal_events_with_defaults
       ~internal_events:(config.internal_events, config.data_dir)
       ?verbosity
       ~log_cfg:config.log
       ()
+  in
+  let*! () =
+    Tezos_base_unix.Internal_event_unix.init
+      ~lwt_log_sink:lwt_log_sink_unix
+      ~configuration:internal_events
+      ()
+  in
+  let external_validator_log_config =
+    External_validation.{internal_events; lwt_log_sink_unix}
   in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
@@ -539,6 +550,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     init_node
       ?sandbox
       ?target
+      ~external_validator_log_config
       ~identity
       ~singleprocess
       ~force_history_mode_switch
