@@ -101,3 +101,7 @@ val start_of_level_serialized : serialized
 
 (** {!serialized} representation of [Internal [End_of_level]]. *)
 val end_of_level_serialized : serialized
+
+(** {!info_per_level_serialized ~predecessor_timestamp ~predecessor} is the serialized representation of the internal message for {!Info_per_level}. *)
+val info_per_level_serialized :
+  predecessor_timestamp:Time.t -> predecessor:Block_hash.t -> serialized

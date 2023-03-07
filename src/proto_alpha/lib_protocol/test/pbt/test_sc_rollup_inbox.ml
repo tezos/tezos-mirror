@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,41 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [get_inbox context] returns the current state of the inbox,
-    if it exists. *)
-val get_inbox :
-  Raw_context.t -> (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
-
-(** [add_external_messages context messages] adds [messages] to the smart
-    rollups internal inbox level witness. *)
-val add_external_messages :
-  Raw_context.t -> string list -> Raw_context.t tzresult Lwt.t
-
-(** [add_deposit ~payload ~sender ~source ~destination ctxt] adds the
-    internal deposit message of [payload], [sender], and [source] to
-    the smart-contract rollups' inbox.
-
-    See [add_external_messages] for returned values and failures.
+(** Testing
+    -------
+    Component:    Protocol Library
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- -f 'Smart rollup inbox'
+    Subject:      Smart rollup inbox
 *)
-val add_deposit :
-  Raw_context.t ->
-  payload:Script_repr.expr ->
-  sender:Contract_hash.t ->
-  source:Signature.public_key_hash ->
-  destination:Sc_rollup_repr.Address.t ->
-  Raw_context.t tzresult Lwt.t
 
-(** Initialize the inbox in the storage at protocol initialization. *)
-val init_inbox :
-  predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
+open Protocol
+open Qcheck2_helpers
 
-(** Adds the [Protocol_migration] in the in-memory inbox level witness. *)
-val add_protocol_migration : Raw_context.t -> Raw_context.t
+let gen_block_hash =
+  let open QCheck2.Gen in
+  let gen =
+    let+ b = bytes_fixed_gen Block_hash.size in
+    Block_hash.of_bytes_exn b
+  in
+  (* This is not beautiful, but there is currently no other way to
+     remove the shrinker. *)
+  make_primitive
+    ~gen:(fun rand -> generate1 ~rand gen)
+    ~shrink:(fun _ -> Seq.empty)
 
-(** Adds the [Info_per_level] in the in-memory inbox level witness. *)
-val add_info_per_level :
-  predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t
+let gen_time =
+  let open QCheck2.Gen in
+  let+ s = int64 in
+  Time.Protocol.of_seconds s
 
-(** [finalize_inbox_level ctxt] ends the internal representation for the block.
-*)
-val finalize_inbox_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
+let gen_add_info_per_level =
+  let open QCheck2.Gen in
+  let* predecessor_timestamp = gen_time in
+  let* predecessor = gen_block_hash in
+  return (predecessor_timestamp, predecessor)
+
+let test_add_info_per_level =
+  QCheck2.Test.make
+    ~count:10_000
+    ~name:"test_add_info_per_level"
+    gen_add_info_per_level
+  @@ fun (predecessor_timestamp, predecessor) ->
+  (* Test that we can indeed serialize the [Info_per_level] message for these
+     inputs *)
+  let _bytes =
+    Sc_rollup_inbox_message_repr.info_per_level_serialized
+      ~predecessor_timestamp
+      ~predecessor
+  in
+  true
+
+let tests = [test_add_info_per_level]
+
+let () =
+  Alcotest.run
+    "Smart rollup inbox"
+    [(Protocol.name ^ ": safety", qcheck_wrap tests)]

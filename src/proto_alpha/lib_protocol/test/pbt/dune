@@ -51,6 +51,7 @@
   test_bitset
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding
+  test_sc_rollup_inbox
   test_refutation_game
   test_carbonated_map
   test_zk_rollup_encoding

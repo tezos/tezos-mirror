@@ -155,7 +155,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
-      Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>= fun ctxt ->
+      Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>=? fun ctxt ->
       return
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
@@ -171,7 +171,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Storage.Legacy.Grand_parent_branch.remove ctxt >>= fun ctxt ->
       (* This needs to be kept in the migration code for every
          protocol, except Genesis. *)
-      Sc_rollup_inbox_storage.add_protocol_migration ctxt >>= fun ctxt ->
+      let ctxt = Sc_rollup_inbox_storage.add_protocol_migration ctxt in
       return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt

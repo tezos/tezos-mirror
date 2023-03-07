@@ -217,25 +217,25 @@ let start () = Inbox_event.starting ()
 let payloads_history_of_messages ~is_migration_block ~predecessor
     ~predecessor_timestamp messages =
   let open Result_syntax in
-  Environment.wrap_tzresult
-  @@ let* dummy_inbox =
-       (* The inbox is not necessary to compute the payloads *)
-       Sc_rollup.Inbox.genesis
-         ~predecessor_timestamp
-         ~predecessor
-         Raw_level.root
-     in
-     let+ ( payloads_history,
-            _history,
-            _inbox,
-            _witness,
-            _messages_with_protocol_internal_messages ) =
-       Sc_rollup.Inbox.add_all_messages
+  let dummy_inbox =
+    (* The inbox is not necessary to compute the payloads *)
+    Sc_rollup.Inbox.genesis ~predecessor_timestamp ~predecessor Raw_level.root
+  in
+  let+ ( payloads_history,
+         _history,
+         _inbox,
+         _witness,
+         _messages_with_protocol_internal_messages ) =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4918 Inject
+       [Protocol_migration (Proto_017)] when migrating to proto_alpha
+       (N after next snapshot). *)
+    Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.add_all_messages
          ~first_block:is_migration_block
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)
          dummy_inbox
          messages
-     in
-     payloads_history
+  in
+  payloads_history

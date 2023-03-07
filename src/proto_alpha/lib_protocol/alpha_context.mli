@@ -3272,6 +3272,8 @@ module Sc_rollup : sig
 
     type serialized = private string
 
+    val protocol_migration_serialized_message : serialized
+
     val encoding : t Data_encoding.t
 
     val unsafe_of_string : string -> serialized
@@ -3317,6 +3319,8 @@ module Sc_rollup : sig
 
       val no_history : t
     end
+
+    val genesis_no_history : Inbox_message.serialized -> t
 
     val genesis :
       History.t -> Inbox_message.serialized -> (History.t * t) tzresult
@@ -3472,7 +3476,7 @@ module Sc_rollup : sig
       (proof * inbox_message option) tzresult Lwt.t
 
     val finalize_inbox_level_no_history :
-      t -> Inbox_merkelized_payload_hashes.t -> t tzresult
+      t -> Inbox_merkelized_payload_hashes.t -> t
 
     val init_witness_no_history : Inbox_merkelized_payload_hashes.t
 
@@ -3480,13 +3484,13 @@ module Sc_rollup : sig
       predecessor_timestamp:Time.t ->
       predecessor:Block_hash.t ->
       Inbox_merkelized_payload_hashes.t ->
-      Inbox_merkelized_payload_hashes.t tzresult
+      Inbox_merkelized_payload_hashes.t
 
     val genesis :
       predecessor_timestamp:Time.t ->
       predecessor:Block_hash.t ->
       Raw_level.t ->
-      t tzresult
+      t
 
     module Internal_for_tests : sig
       type inclusion_proof = history_proof list
@@ -3546,10 +3550,9 @@ module Sc_rollup : sig
       destination:rollup ->
       context tzresult Lwt.t
 
-    val finalize_inbox_level : context -> context Lwt.t
+    val finalize_inbox_level : context -> context tzresult Lwt.t
 
-    val add_info_per_level :
-      predecessor:Block_hash.t -> context -> context Lwt.t
+    val add_info_per_level : predecessor:Block_hash.t -> context -> context
 
     val get_inbox : context -> (t * context) tzresult Lwt.t
   end

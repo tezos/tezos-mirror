@@ -4077,6 +4077,7 @@ end = struct
             (2, "test_bitset", N.(number >= 013));
             (2, "test_sc_rollup_tick_repr", N.(number >= 013));
             (2, "test_sc_rollup_encoding", N.(number >= 015));
+            (2, "test_sc_rollup_inbox", N.(number >= 017));
             (3, "refutation_game_pbt", N.(number == 013));
             (3, "test_refutation_game", N.(number >= 016));
             (3, "test_carbonated_map", N.(number >= 013));
