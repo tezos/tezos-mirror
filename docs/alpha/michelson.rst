@@ -651,130 +651,16 @@ A detailed description of the following instructions can be found in the `intera
 Operations on maps
 ~~~~~~~~~~~~~~~~~~
 
--  ``EMPTY_MAP 'key 'val``: Build a new, empty map from keys of a
-   given type to values of another given type.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-   The ``'key`` type must be comparable (the ``COMPARE`` primitive must
-   be defined over it).
-
-::
-
-    :: 'S -> map 'key 'val : 'S
-
-    > EMPTY_MAP _ _ / S  =>  {} : S
-
-
--  ``GET``: Access an element in a map, returns an optional value to be
-   checked with ``IF_SOME``.
-
-::
-
-    :: 'key : map 'key 'val : 'S   ->   option 'val : 'S
-
-    > GET / x : {} : S  =>  None : S
-    > GET / x : { Elt k v ; <tl> } : S  =>  opt_y : S
-        iff COMPARE / x : k : []  =>  1 : []
-        where GET / x : { <tl> } : S  =>  opt_y : S
-    > GET / x : { Elt k v ; <tl> } : S  =>  Some v : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > GET / x : { Elt k v ; <tl> } : S  =>  None : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``MEM``: Check for the presence of a binding for a key in a map.
-
-::
-
-    :: 'key : map 'key 'val : 'S   ->  bool : 'S
-
-    > MEM / x : {} : S  =>  false : S
-    > MEM / x : { Elt k v ; <tl> } : S  =>  r : S
-        iff COMPARE / x : k : []  =>  1 : []
-        where MEM / x : { <tl> } : S  =>  r : S
-    > MEM / x : { Elt k v ; <tl> } : S  =>  true : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > MEM / x : { Elt k v ; <tl> } : S  =>  false : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``UPDATE``: Assign or remove an element in a map.
-
-::
-
-    :: 'key : option 'val : map 'key 'val : 'S   ->   map 'key 'val : 'S
-
-    > UPDATE / x : None : {} : S  =>  {} : S
-    > UPDATE / x : Some y : {} : S  =>  { Elt x y } : S
-    > UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl'> } : S
-        iff COMPARE / x : k : []  =>  1 : []
-          where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
-    > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt k y ; <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-    > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt x y ; Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions.
-
-::
-
-    :: 'key : option 'val : map 'key 'val : 'S   ->   option 'val : map 'key 'val : 'S
-
-This instruction is similar to ``UPDATE`` but it also returns the
-value that was previously stored in the ``map`` at the same key as
-``GET`` would.
-
-::
-
-    > GET_AND_UPDATE / x : None : {} : S  =>  None : {} : S
-    > GET_AND_UPDATE / x : Some y : {} : S  =>  None : { Elt x y } : S
-    > GET_AND_UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  opt_y' : { Elt k v ; <tl'> } : S
-        iff COMPARE / x : k : []  =>  1 : []
-          where GET_AND_UPDATE / x : opt_y : { <tl> } : S  =>  opt_y' : { <tl'> } : S
-    > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  Some v : { <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  Some v : { Elt k y ; <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  None : { Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-    > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  None : { Elt x y ; Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``MAP body``: Apply the body expression to each element of a map. The
-   body sequence has access to the stack.
-
-::
-
-    :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
-       iff   body :: [ (pair 'key 'val) : 'A -> 'b : 'A ]
-
-    > MAP body / {} : S  =>  {} : S
-    > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k v' ; <tl'> } : S''
-        where body / Pair k v : S  =>  v' : S'
-        and MAP body / { <tl> } : S'  =>  { <tl'> } : S''
-
--  ``ITER body``: Apply the body expression to each element of a map.
-   The body sequence has access to the stack.
-
-::
-
-    :: (map 'elt 'val) : 'A   ->  'A
-       iff   body :: [ (pair 'elt 'val : 'A) -> 'A ]
-
-    > ITER body / {} : S  =>  S
-    > ITER body / { Elt k v ; <tl> } : S  =>  ITER body / { <tl> } : S'
-       iff body / (Pair k v) : S  =>  S'
-
--  ``SIZE``: Get the cardinality of the map.
-
-::
-
-    :: map 'key 'val : 'S -> nat : 'S
-
-    > SIZE / {} : S  =>  0 : S
-    > SIZE / { _ ; <tl> } : S  =>  1 + s : S
-        where  SIZE / { <tl> } : S  =>  s : S
+-  ``EMPTY_MAP 'key 'val``: Build a new, empty map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_MAP>`__).
+-  ``GET``: Access an element in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET>`__).
+-  ``MEM``: Check for the presence of a binding for a key in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
+-  ``UPDATE``: Add, update, or remove an element in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
+-  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET_AND_UPDATE>`__).
+-  ``MAP body``: Apply the body expression to each element of a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
+-  ``ITER body``: Apply the body expression to each element of a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
+-  ``SIZE``: Get the cardinality of the map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
 
 
 Operations on ``big_maps``
