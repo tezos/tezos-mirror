@@ -1,0 +1,21 @@
+# Fetch records for Tezt generated on the last merge request pipeline
+# on the most recently merged MR and makes them available in artifacts
+# for future merge request pipelines.
+tezt:fetch-records:
+  extends:
+    - .build_template
+  stage: build
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-fetch-records
+  # Allow failure of this job, since Tezt can use the records stored
+  # in the repo as backup for balancing.
+  allow_failure: true
+  artifacts:
+    paths:
+      - tezt-fetch-records.log
+      - tezt/records/*.json
+    # Always store artifacts to have the logs for debugging
+    when: always
+    # These artifacts are only used within this pipeline, so they
+    # don't need a long expiration time.
+    expire_in: 4 hours

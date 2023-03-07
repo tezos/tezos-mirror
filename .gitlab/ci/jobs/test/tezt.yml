@@ -20,6 +20,12 @@ include: .gitlab/ci/jobs/test/common.yml
       - tezt-results-$CI_NODE_INDEX.json
       - $BISECT_FILE
       - $JUNIT
+    # These record artifacts (tezt-results-$CI_NODE_INDEX.json) should
+    # be stored for as long as a given commit on master is expected to
+    # be HEAD in order to support auto-balancing. At the time of
+    # writing, we have approximately 6 merges per day, so 1 day should
+    # more than enough. The tezt artifacts (including records and
+    # coverage) take up roughly 1MB.
     expire_in: 1 day
     # certain tests can be blacklisted by adding it to this variable
     when: always
@@ -39,9 +45,11 @@ tezt:
   dependencies:
     - "build_x86_64"
     - "build_kernels"
+    - "tezt:fetch-records"
   needs:
     - "build_x86_64"
     - "build_kernels"
+    - "tezt:fetch-records"
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 40
@@ -58,9 +66,11 @@ tezt:static-binaries:
     - build_x86_64
     # And fetch the static executables from build:static
     - build:static-x86_64-linux-binaries
+    - tezt:fetch-records
   needs:
     - build_x86_64
     - build:static-x86_64-linux-binaries
+    - tezt:fetch-records
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 2
