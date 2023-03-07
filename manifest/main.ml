@@ -1487,15 +1487,15 @@ let octez_test_helpers_extra =
     ~modules:["assert_lib"]
 
 let _octez_shell_services_tests =
-  test
-    "test_block_services"
+  tezt
+    ["test_block_services"]
     ~path:"src/lib_shell_services/test"
     ~opam:"tezos-shell-services"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services |> open_;
-        alcotest;
+        alcotezt;
       ]
     ~modes:[Native; JS]
     ~js_compatible:true
