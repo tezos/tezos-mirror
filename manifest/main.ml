@@ -3106,8 +3106,8 @@ let octez_proxy_server_config =
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix; uri]
 
 let _octez_proxy_server_config_tests =
-  test
-    "test_proxy_server_config"
+  tezt
+    ["test_proxy_server_config"]
     ~path:"src/lib_proxy_server_config/test"
     ~opam:"tezos-proxy-server-config"
     ~deps:
@@ -3117,7 +3117,7 @@ let _octez_proxy_server_config_tests =
         octez_proxy_server_config;
         octez_test_helpers |> open_;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
         uri;
       ]
 
