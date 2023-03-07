@@ -67,65 +67,80 @@ let make_internal_transfer ctxt ty ~payload ~sender ~source ~destination =
       (Transfer {payload; sender; source; destination}),
     ctxt )
 
-let transactions_batch_of_internal ctxt transactions =
+let make_transaction ctxt ~parameters_ty ~unparsed_parameters ~destination
+    ~entrypoint =
   let open Lwt_result_syntax in
-  let or_internal_transaction ctxt
-      {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint} =
-    (* Lookup the contract-hash. *)
-    (* Load the type and entrypoints of the script. *)
-    let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
-           ctxt ) =
-      let* ctxt, _cache_key, cached = Script_cache.find ctxt destination in
-      match cached with
-      | Some (_script, ex_script) -> return (ex_script, ctxt)
-      | None -> tzfail Sc_rollup_invalid_destination
-    in
-    (* Find the entrypoint type for the given entrypoint. *)
-    let*? res, ctxt =
-      Gas_monad.run
-        ctxt
-        (Script_ir_translator.find_entrypoint
-           ~error_details:(Informative ())
-           arg_type
-           entrypoints
-           entrypoint)
-    in
-    let*? (Ex_ty_cstr {ty = parameters_ty; _}) = res in
-    (* Parse the parameters according to the entrypoint type. *)
-    let* parameters, ctxt =
-      Script_ir_translator.parse_data
-        ctxt
-        ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-        ~allow_forged:true
-        parameters_ty
-        (Micheline.root unparsed_parameters)
-    in
-    return
-      ( Transaction
-          {
-            destination;
-            entrypoint;
-            parameters_ty;
-            parameters;
-            unparsed_parameters;
-          },
-        ctxt )
-  in
-  let+ ctxt, transactions =
-    List.fold_left_map_es
-      (fun ctxt msg ->
-        let+ t, ctxt = or_internal_transaction ctxt msg in
-        (ctxt, t))
+  (* Parse the parameters according to the given type. *)
+  let+ parameters, ctxt =
+    Script_ir_translator.parse_data
       ctxt
-      transactions
+      ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+      ~allow_forged:true
+      parameters_ty
+      (Micheline.root unparsed_parameters)
   in
-  ({transactions}, ctxt)
+  ( ctxt,
+    Transaction
+      {destination; entrypoint; parameters_ty; parameters; unparsed_parameters}
+  )
 
-let outbox_message_of_outbox_message_repr ctxt
-    (Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}) =
+let internal_untyped_transaction ctxt
+    ({unparsed_parameters; destination; entrypoint} :
+      Sc_rollup.Outbox.Message.transaction) =
   let open Lwt_result_syntax in
-  let+ ts, ctxt = transactions_batch_of_internal ctxt transactions in
-  (Atomic_transaction_batch ts, ctxt)
+  let* Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}), ctxt
+      =
+    let* ctxt, _cache_key, cached = Script_cache.find ctxt destination in
+    match cached with
+    | Some (_script, ex_script) -> return (ex_script, ctxt)
+    | None -> tzfail Sc_rollup_invalid_destination
+  in
+  (* Find the entrypoint type for the given entrypoint. *)
+  let*? res, ctxt =
+    Gas_monad.run
+      ctxt
+      (Script_ir_translator.find_entrypoint
+         ~error_details:(Informative ())
+         arg_type
+         entrypoints
+         entrypoint)
+  in
+  let*? (Ex_ty_cstr {ty = parameters_ty; _}) = res in
+  make_transaction
+    ctxt
+    ~parameters_ty
+    ~unparsed_parameters
+    ~destination
+    ~entrypoint
+
+let internal_typed_transaction ctxt
+    ({unparsed_parameters; unparsed_ty; destination; entrypoint} :
+      Sc_rollup.Outbox.Message.typed_transaction) =
+  let open Lwt_result_syntax in
+  (* Parse the parameters type according to the type. *)
+  let*? Ex_ty parameters_ty, ctxt =
+    Script_ir_translator.parse_any_ty
+      ctxt
+      ~legacy:false
+      (Micheline.root unparsed_ty)
+  in
+  make_transaction
+    ctxt
+    ~parameters_ty
+    ~unparsed_parameters
+    ~destination
+    ~entrypoint
+
+let outbox_message_of_outbox_message_repr ctxt transactions =
+  let open Lwt_result_syntax in
+  let* ctxt, transactions =
+    match transactions with
+    | Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions} ->
+        List.fold_left_map_es internal_untyped_transaction ctxt transactions
+    | Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed {transactions} ->
+        List.fold_left_map_es internal_typed_transaction ctxt transactions
+  in
+  return (Atomic_transaction_batch {transactions}, ctxt)
 
 module Internal_for_tests = struct
   let make_transaction ctxt parameters_ty ~parameters ~destination ~entrypoint =
