@@ -306,7 +306,10 @@ module Inner = struct
     srs : srs;
   }
 
-  let is_power_of_two n = n <> 0 && n land (n - 1) = 0
+  (* The input is expected to be a positive integer. *)
+  let is_power_of_two n =
+    assert (n >= 0) ;
+    n <> 0 && n land (n - 1) = 0
 
   (* Return the powerset of {3,11,19}. *)
   let combinations_factors =
@@ -1325,10 +1328,9 @@ module Inner = struct
       let points =
         G1_array.init domain_length (fun i ->
             if i < quotient then
-              Bls12_381.G1.copy
-                (Srs_g1.get
-                   srs
-                   (t.max_polynomial_length - j - ((i + 1) * t.shard_length)))
+              Srs_g1.get
+                srs
+                (t.max_polynomial_length - j - ((i + 1) * t.shard_length))
             else Bls12_381.G1.(copy zero))
       in
       G1_array.evaluation_ecfft_inplace ~domain ~points ;
@@ -1342,15 +1344,10 @@ module Inner = struct
      Implements the "Multiple multi-reveals" section above. *)
   let multiple_multi_reveals t ~preprocess:(domain, sj) ~coefficients :
       shard_proof array =
-    (* The length [t.erasure_encoded_polynomial_length] of the domain [t.domain_erasure_encoded_polynomial_length] is equal to
-       [2^t.evaluations_per_proof_log * 2^t.shard_proofs_log]. *)
-    let n = t.shard_length_log + t.shard_proofs_log in
-    assert (t.erasure_encoded_polynomial_length = 1 lsl n) ;
     (* The log2 of the number of proofs [t.shard_proofs_log] is > 0
        because [2^t.shard_proofs_log = t.number_of_shards > 0]. *)
     assert (
       t.shard_proofs_log > 0 && t.number_of_shards = 1 lsl t.shard_proofs_log) ;
-    assert (t.shard_length = 1 lsl t.shard_length_log) ;
     (* [t.max_polynomial_length > l] where [l = t.shard_length]. *)
     assert (t.shard_length < t.max_polynomial_length) ;
     (* Step 2. *)
