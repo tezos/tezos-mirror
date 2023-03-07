@@ -298,11 +298,10 @@ module Inner = struct
     pages_per_slot : int;
     (* Number of slot pages. *)
     page_length : int;
+    page_length_domain : int;
     remaining_bytes : int;
     (* Log of the number of evaluations that constitute an erasure encoded
        polynomial. *)
-    shard_length_log : int;
-    (* Log of the number of evaluations contained in a shard. *)
     shard_proofs_log : int; (* Log of the number of shards proofs. *)
     srs : srs;
   }
@@ -410,7 +409,7 @@ module Inner = struct
      of pages. *)
   let slot_as_polynomial_length ~slot_size ~page_size =
     let page_length = page_length ~page_size in
-    let page_length_domain, _ = select_fft_domain page_length in
+    let page_length_domain, _, _ = select_fft_domain page_length in
     slot_size / page_size * page_length_domain
 
   let ensure_validity ~slot_size ~page_size ~erasure_encoded_polynomial_length
@@ -525,11 +524,11 @@ module Inner = struct
             srs_g1_length)
     in
     assert_result
-      (let evaluations_per_proof_log =
-         shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards
+      (let shard_length =
+         erasure_encoded_polynomial_length / number_of_shards
        in
        let srs_g2_expected_length =
-         max max_polynomial_length (1 lsl evaluations_per_proof_log) + 1
+         max max_polynomial_length shard_length + 1
        in
        srs_g2_expected_length <= srs_g2_length)
       (fun () ->
@@ -590,20 +589,13 @@ module Inner = struct
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
-    let erasure_encoded_length_log =
-      Z.(log2 (of_int erasure_encoded_polynomial_length))
-    in
-    let shard_length_log =
-      shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards
-    in
     let page_length = page_length ~page_size in
+    let page_length_domain, _, _ = select_fft_domain page_length in
     let srs =
       {
         raw;
-        kate_amortized_srs_g2_shards =
-          Srs_g2.get raw.srs_g2 (1 lsl shard_length_log);
-        kate_amortized_srs_g2_pages =
-          Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
+        kate_amortized_srs_g2_shards = Srs_g2.get raw.srs_g2 shard_length;
+        kate_amortized_srs_g2_pages = Srs_g2.get raw.srs_g2 page_length_domain;
       }
     in
     return
@@ -622,9 +614,9 @@ module Inner = struct
         shard_length;
         pages_per_slot = pages_per_slot parameters;
         page_length;
+        page_length_domain;
         remaining_bytes = page_size mod scalar_bytes_amount;
-        shard_length_log;
-        shard_proofs_log = erasure_encoded_length_log - shard_length_log;
+        shard_proofs_log = Z.(log2 (of_int number_of_shards));
         srs;
       }
 
@@ -1542,10 +1534,12 @@ module Inner = struct
     if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
-      let l = 1 lsl Z.(log2up (of_int t.page_length)) in
       let wi = Domains.get t.domain_polynomial_length page_index in
       let quotient, _ =
-        Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
+        Polynomials.division_xn
+          p
+          t.page_length_domain
+          Scalar.(negate (pow wi (Z.of_int t.page_length_domain)))
       in
       commit t quotient
 
@@ -1560,12 +1554,9 @@ module Inner = struct
       if expected_page_length <> got_page_length then
         Error `Page_length_mismatch
       else
-        (* The [page_length] is not necessarily a power of two,
-           so we take the next power of two. *)
-        let length = 1 lsl Z.(log2up (of_int t.page_length)) in
-        let domain = Domains.build length in
+        let domain = Domains.build t.page_length_domain in
         let evaluations =
-          Array.init length (function
+          Array.init t.page_length_domain (function
               | i when i < t.page_length - 1 ->
                   (* Parse the [page] by chunks of [scalar_bytes_amount] bytes.
                      These chunks are interpreted as [Scalar.t] elements and stored
@@ -1630,9 +1621,7 @@ module Internal_for_tests = struct
        and `page_length` so we take the max + 1. Since `page_length < size`, we
        can remove the `page_length from the max. *)
     let srs_g2 =
-      Srs_g2.generate_insecure
-        (max length (1 lsl evaluations_per_proof_log) + 1)
-        secret
+      Srs_g2.generate_insecure (max length evaluations_per_proof + 1) secret
     in
     {srs_g1; srs_g2}
 
