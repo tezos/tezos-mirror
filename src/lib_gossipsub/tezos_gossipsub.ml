@@ -366,6 +366,8 @@ module Make (C : CONFIGURATION) :
 
     let accept_px_threshold state = state.limits.accept_px_threshold
 
+    let prune_backoff state = state.limits.prune_backoff
+
     let unsubscribe_backoff state = state.limits.unsubscribe_backoff
 
     let graft_flood_backoff state = state.limits.graft_flood_backoff
@@ -714,15 +716,15 @@ module Make (C : CONFIGURATION) :
 
     let check_score peer topic {score; _} =
       let open Monad.Syntax in
-      let*! unsubscribe_backoff in
+      let*! prune_backoff in
       if Score.(score >= zero) then unit
       else
-        let* () = add_backoff unsubscribe_backoff topic peer in
+        let* () = add_backoff prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
 
     let check_backoff peer topic {backoff; score; _} =
       let open Monad.Syntax in
-      let*! unsubscribe_backoff in
+      let*! prune_backoff in
       match C.Topic.Map.find topic backoff with
       | None -> unit
       | Some backoff ->
@@ -736,7 +738,7 @@ module Make (C : CONFIGURATION) :
                 Score.penality score 1
               else score
             in
-            let* () = add_backoff unsubscribe_backoff topic peer in
+            let* () = add_backoff prune_backoff topic peer in
             let* () = add_score peer score in
             fail Peer_backed_off
 
