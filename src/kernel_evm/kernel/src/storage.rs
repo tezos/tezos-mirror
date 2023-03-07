@@ -17,6 +17,8 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::U256;
 
+const SMART_ROLLUP_ADDRESS: RefPath = RefPath::assert_from(b"/metadata/smart_rollup_address");
+
 const EVM_ACCOUNTS: RefPath = RefPath::assert_from(b"/eth_accounts");
 
 const EVM_ACCOUNT_BALANCE: RefPath = RefPath::assert_from(b"/balance");
@@ -30,6 +32,25 @@ const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
 const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
 const HASH_MAX_SIZE: usize = 32;
+
+pub fn read_smart_rollup_address<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+) -> Result<[u8; 20], Error> {
+    let mut buffer = [0u8; 20];
+
+    match load_value_slice(host, &SMART_ROLLUP_ADDRESS, &mut buffer) {
+        Ok(20) => Ok(buffer),
+        _ => Err(Error::Generic),
+    }
+}
+
+pub fn store_smart_rollup_address<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Result<(), Error> {
+    host.store_write(&SMART_ROLLUP_ADDRESS, &smart_rollup_address, 0)
+        .map_err(Error::from)
+}
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;

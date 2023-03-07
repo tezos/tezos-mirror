@@ -6,6 +6,7 @@ use host::path::PathError;
 use host::runtime::RuntimeError;
 use std::str::Utf8Error;
 
+#[derive(Debug)]
 pub enum Error {
     Path(PathError),
     Runtime(RuntimeError),
