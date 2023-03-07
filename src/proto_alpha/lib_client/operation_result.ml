@@ -215,79 +215,6 @@ let pp_manager_operation_content (type kind) source ppf
         "Update_consensus_key:@,Public key hash: %a"
         Signature.Public_key_hash.pp
         (Signature.Public_key.hash pk)
-  | Tx_rollup_origination ->
-      Format.fprintf
-        ppf
-        "Transaction rollup origination:@,From: %a"
-        Contract.pp
-        source
-  | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup transaction:@,\
-         Address:%a@,\
-         Message length: %d bytes@,\
-         From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        (String.length content)
-        Contract.pp
-        source
-  | Tx_rollup_commit {tx_rollup; commitment} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup commitment:@,\
-         Address: %a@,\
-         @[<v 2>Commitment:@,\
-         %a@]@,\
-         From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Tx_rollup_commitment.Full.pp
-        commitment
-        Contract.pp
-        source
-  | Tx_rollup_return_bond {tx_rollup} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup recover commitment bond:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_finalize_commitment {tx_rollup} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup finalize commitment:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_remove_commitment {tx_rollup; _} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup remove commitment:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_rejection {tx_rollup; _} ->
-      (* FIXME/TORU *)
-      Format.fprintf
-        ppf
-        "Transaction rollup rejection:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup dispatch tickets:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
       Format.fprintf
         ppf
@@ -678,60 +605,6 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
-  let pp_tx_rollup_origination_result
-      (Tx_rollup_origination_result
-        {balance_updates; consumed_gas; originated_tx_rollup}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf
-      ppf
-      "@,Originated tx rollup: %a"
-      Tx_rollup.pp
-      originated_tx_rollup
-  in
-  let pp_tx_rollup_submit_batch_result
-      (Tx_rollup_submit_batch_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    pp_paid_storage_size_diff ppf paid_storage_size_diff
-  in
-  let pp_tx_rollup_commit_result
-      (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas
-  in
-  let pp_tx_rollup_return_bond_result
-      (Tx_rollup_return_bond_result {balance_updates; consumed_gas}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas
-  in
-  let pp_tx_rollup_finalize_commitment_result
-      (Tx_rollup_finalize_commitment_result
-        {balance_updates; consumed_gas; level}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
-  in
-  let pp_tx_rollup_remove_commitment_result
-      (Tx_rollup_remove_commitment_result
-        {balance_updates; consumed_gas; level}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
-  in
-  let pp_tx_rollup_rejection_result
-      (Tx_rollup_rejection_result {balance_updates; consumed_gas}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas
-  in
-  let pp_tx_rollup_dispatch_tickets_result
-      (Tx_rollup_dispatch_tickets_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
-    pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates ppf balance_updates
-  in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
         {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
@@ -853,17 +726,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Set_deposits_limit_result _ -> "deposits limit modification"
     | Update_consensus_key_result _ -> "consensus key update"
     | Increase_paid_storage_result _ -> "paid storage increase"
-    | Tx_rollup_origination_result _ -> "transaction rollup origination"
-    | Tx_rollup_submit_batch_result _ -> "transaction rollup batch submission"
-    | Tx_rollup_commit_result _ -> "transaction rollup commitment"
-    | Tx_rollup_return_bond_result _ -> "transaction rollup bond retrieval"
-    | Tx_rollup_finalize_commitment_result _ ->
-        "transaction rollup commitment finalization"
-    | Tx_rollup_remove_commitment_result _ ->
-        "transaction rollup commitment removal"
-    | Tx_rollup_rejection_result _ -> "transaction rollup commitment rejection"
-    | Tx_rollup_dispatch_tickets_result _ ->
-        "transaction rollup tickets dispatch"
     | Transfer_ticket_result _ -> "tickets transfer"
     | Sc_rollup_originate_result _ -> "smart rollup origination"
     | Sc_rollup_add_messages_result _ -> "smart rollup messages submission"
@@ -894,18 +756,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Register_global_constant_result _ as op ->
         pp_register_global_constant_result op
     | Increase_paid_storage_result _ as op -> pp_increase_paid_storage_result op
-    | Tx_rollup_origination_result _ as op -> pp_tx_rollup_origination_result op
-    | Tx_rollup_submit_batch_result _ as op ->
-        pp_tx_rollup_submit_batch_result op
-    | Tx_rollup_commit_result _ as op -> pp_tx_rollup_commit_result op
-    | Tx_rollup_return_bond_result _ as op -> pp_tx_rollup_return_bond_result op
-    | Tx_rollup_finalize_commitment_result _ as op ->
-        pp_tx_rollup_finalize_commitment_result op
-    | Tx_rollup_remove_commitment_result _ as op ->
-        pp_tx_rollup_remove_commitment_result op
-    | Tx_rollup_rejection_result _ as op -> pp_tx_rollup_rejection_result op
-    | Tx_rollup_dispatch_tickets_result _ as op ->
-        pp_tx_rollup_dispatch_tickets_result op
     | Transfer_ticket_result _ as op -> pp_transfer_ticket_result op
     | Sc_rollup_originate_result _ as op -> pp_sc_rollup_originate_result op
     | Sc_rollup_add_messages_result _ as op ->

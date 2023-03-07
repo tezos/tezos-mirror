@@ -4530,22 +4530,6 @@ module Kind : sig
 
   type register_global_constant = Register_global_constant_kind
 
-  type tx_rollup_origination = Tx_rollup_origination_kind
-
-  type tx_rollup_submit_batch = Tx_rollup_submit_batch_kind
-
-  type tx_rollup_commit = Tx_rollup_commit_kind
-
-  type tx_rollup_return_bond = Tx_rollup_return_bond_kind
-
-  type tx_rollup_finalize_commitment = Tx_rollup_finalize_commitment_kind
-
-  type tx_rollup_remove_commitment = Tx_rollup_remove_commitment_kind
-
-  type tx_rollup_rejection = Tx_rollup_rejection_kind
-
-  type tx_rollup_dispatch_tickets = Tx_rollup_dispatch_tickets_kind
-
   type transfer_ticket = Transfer_ticket_kind
 
   type dal_publish_slot_header = Dal_publish_slot_header_kind
@@ -4583,17 +4567,6 @@ module Kind : sig
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
-    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
-    | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
-    | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
-    | Tx_rollup_return_bond_manager_kind : tx_rollup_return_bond manager
-    | Tx_rollup_finalize_commitment_manager_kind
-        : tx_rollup_finalize_commitment manager
-    | Tx_rollup_remove_commitment_manager_kind
-        : tx_rollup_remove_commitment manager
-    | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
-    | Tx_rollup_dispatch_tickets_manager_kind
-        : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
     | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
@@ -4743,52 +4716,6 @@ and _ manager_operation =
   | Update_consensus_key :
       Signature.Public_key.t
       -> Kind.update_consensus_key manager_operation
-  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
-  | Tx_rollup_submit_batch : {
-      tx_rollup : Tx_rollup.t;
-      content : string;
-      burn_limit : Tez.tez option;
-    }
-      -> Kind.tx_rollup_submit_batch manager_operation
-  | Tx_rollup_commit : {
-      tx_rollup : Tx_rollup.t;
-      commitment : Tx_rollup_commitment.Full.t;
-    }
-      -> Kind.tx_rollup_commit manager_operation
-  | Tx_rollup_return_bond : {
-      tx_rollup : Tx_rollup.t;
-    }
-      -> Kind.tx_rollup_return_bond manager_operation
-  | Tx_rollup_finalize_commitment : {
-      tx_rollup : Tx_rollup.t;
-    }
-      -> Kind.tx_rollup_finalize_commitment manager_operation
-  | Tx_rollup_remove_commitment : {
-      tx_rollup : Tx_rollup.t;
-    }
-      -> Kind.tx_rollup_remove_commitment manager_operation
-  | Tx_rollup_rejection : {
-      tx_rollup : Tx_rollup.t;
-      level : Tx_rollup_level.t;
-      message : Tx_rollup_message.t;
-      message_position : int;
-      message_path : Tx_rollup_inbox.Merkle.path;
-      message_result_hash : Tx_rollup_message_result_hash.t;
-      message_result_path : Tx_rollup_commitment.Merkle.path;
-      previous_message_result : Tx_rollup_message_result.t;
-      previous_message_result_path : Tx_rollup_commitment.Merkle.path;
-      proof : Tx_rollup_l2_proof.serialized;
-    }
-      -> Kind.tx_rollup_rejection manager_operation
-  | Tx_rollup_dispatch_tickets : {
-      tx_rollup : Tx_rollup.t;
-      level : Tx_rollup_level.t;
-      context_hash : Context_hash.t;
-      message_index : int;
-      message_result_path : Tx_rollup_commitment.Merkle.path;
-      tickets_info : Tx_rollup_reveal.t list;
-    }
-      -> Kind.tx_rollup_dispatch_tickets manager_operation
   | Transfer_ticket : {
       contents : Script.lazy_expr;
       ty : Script.lazy_expr;
@@ -4999,28 +4926,6 @@ module Operation : sig
 
     val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
-    val tx_rollup_origination_case :
-      Kind.tx_rollup_origination Kind.manager case
-
-    val tx_rollup_submit_batch_case :
-      Kind.tx_rollup_submit_batch Kind.manager case
-
-    val tx_rollup_commit_case : Kind.tx_rollup_commit Kind.manager case
-
-    val tx_rollup_return_bond_case :
-      Kind.tx_rollup_return_bond Kind.manager case
-
-    val tx_rollup_finalize_commitment_case :
-      Kind.tx_rollup_finalize_commitment Kind.manager case
-
-    val tx_rollup_remove_commitment_case :
-      Kind.tx_rollup_remove_commitment Kind.manager case
-
-    val tx_rollup_rejection_case : Kind.tx_rollup_rejection Kind.manager case
-
-    val tx_rollup_dispatch_tickets_case :
-      Kind.tx_rollup_dispatch_tickets Kind.manager case
-
     val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
     val dal_publish_slot_header_case :
@@ -5089,24 +4994,6 @@ module Operation : sig
       val set_deposits_limit_case : Kind.set_deposits_limit case
 
       val increase_paid_storage_case : Kind.increase_paid_storage case
-
-      val tx_rollup_origination_case : Kind.tx_rollup_origination case
-
-      val tx_rollup_submit_batch_case : Kind.tx_rollup_submit_batch case
-
-      val tx_rollup_commit_case : Kind.tx_rollup_commit case
-
-      val tx_rollup_return_bond_case : Kind.tx_rollup_return_bond case
-
-      val tx_rollup_finalize_commitment_case :
-        Kind.tx_rollup_finalize_commitment case
-
-      val tx_rollup_remove_commitment_case :
-        Kind.tx_rollup_remove_commitment case
-
-      val tx_rollup_rejection_case : Kind.tx_rollup_rejection case
-
-      val tx_rollup_dispatch_tickets_case : Kind.tx_rollup_dispatch_tickets case
 
       val transfer_ticket_case : Kind.transfer_ticket case
 

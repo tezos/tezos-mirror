@@ -882,16 +882,10 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Transaction_result (Transaction_to_sc_rollup_result _)
               | Reveal_result _ | Delegation_result _
               | Update_consensus_key_result _ | Set_deposits_limit_result _
-              | Tx_rollup_origination_result _ | Tx_rollup_submit_batch_result _
-              | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
-              | Tx_rollup_finalize_commitment_result _
-              | Tx_rollup_remove_commitment_result _
-              | Tx_rollup_rejection_result _ | Transfer_ticket_result _
-              | Tx_rollup_dispatch_tickets_result _
-              | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
-              | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
-              | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
-              | Sc_rollup_timeout_result _
+              | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+              | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+              | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
               | Sc_rollup_execute_outbox_message_result _
               | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
               | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
@@ -928,14 +922,6 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)
             | Successful_manager_result (Increase_paid_storage_result _)
-            | Successful_manager_result (Tx_rollup_origination_result _)
-            | Successful_manager_result (Tx_rollup_submit_batch_result _)
-            | Successful_manager_result (Tx_rollup_commit_result _)
-            | Successful_manager_result (Tx_rollup_return_bond_result _)
-            | Successful_manager_result (Tx_rollup_finalize_commitment_result _)
-            | Successful_manager_result (Tx_rollup_remove_commitment_result _)
-            | Successful_manager_result (Tx_rollup_rejection_result _)
-            | Successful_manager_result (Tx_rollup_dispatch_tickets_result _)
             | Successful_manager_result (Transfer_ticket_result _)
             | Successful_manager_result (Dal_publish_slot_header_result _)
             | Successful_manager_result (Sc_rollup_originate_result _)
