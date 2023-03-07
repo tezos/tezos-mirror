@@ -24,4 +24,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "SCORU WASM benchmark executable"
+synopsis: "Smart Rollup WASM benchmark library"

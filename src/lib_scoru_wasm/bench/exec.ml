@@ -68,19 +68,19 @@ let should_continue phase (pvm_state : pvm_state) =
 let finish_top_level_call_on_state pvm_state =
   Wasm_vm.compute_step_many ~max_steps:Int64.max_int ~write_debug:Noop pvm_state
 
-let execute_fast pvm_state =
+let execute_fast ~reveal_builtins pvm_state =
   Wasm_fast_vm.compute_step_many
-    ~reveal_builtins:builtins
+    ~reveal_builtins
     ~max_steps:Int64.max_int
     ~write_debug:Noop
     pvm_state
 
-let execute_on_state phase state =
+let execute_on_state ~reveal_builtins phase state =
   match state.tick_state with
   | Stuck _ -> Lwt.return (state, 0L)
   | _ ->
       Wasm_vm.compute_step_many_until
-        ~write_debug:Noop
+        ~reveal_builtins
         ~max_steps:Int64.max_int
         (should_continue phase)
         state

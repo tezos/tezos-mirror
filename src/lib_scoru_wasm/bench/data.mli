@@ -62,3 +62,5 @@ module Csv : sig
   (** [print_benchmark filename benchmark] Output benchmark data in CSV format *)
   val pp_benchmark : out_channel -> benchmark -> unit
 end
+
+val pp_analysis : Format.formatter -> benchmark -> unit

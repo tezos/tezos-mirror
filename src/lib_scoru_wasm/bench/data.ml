@@ -124,3 +124,26 @@ module Csv = struct
     List.iter (pp_datum oc) (List.rev benchmark.data) ;
     close_out oc
 end
+
+let cycle_infos benchmark =
+  let folder (cycles, acc_ticks, acc_time) datum =
+    match datum.label with
+    | "Padding" -> ((acc_ticks, acc_time) :: cycles, Z.zero, 0.0)
+    | "Decoding" | "Linking" | "Initialising" | "Evaluating" ->
+        ( cycles,
+          Z.add acc_ticks datum.ticks,
+          acc_time +. Measure.to_seconds datum.time )
+    | _ -> (cycles, acc_ticks, acc_time)
+  in
+  let cycles, _, _ =
+    List.fold_left folder ([], Z.zero, 0.0) (List.rev benchmark.data)
+  in
+  List.rev cycles
+
+let pp_analysis fmt benchmark =
+  let cycles = cycle_infos benchmark in
+  Format.fprintf fmt "Ran for %d kernel_run calls:" (List.length cycles) ;
+  let pp_cycle (ticks, time) =
+    Format.fprintf fmt "\n%s ticks in %f seconds" (Z.to_string ticks) time
+  in
+  List.iter pp_cycle cycles

@@ -1459,6 +1459,24 @@ take care of the possible reboots asked by the kernel (through the usage of the
   Status: Waiting for inputs
   Internal state: Collect
 
+To obtain more information on the execution, the command ``bench`` will also run
+the kernel on a full inbox, consumed all inputs, run until more inputs are
+required, and output some information about the run.
+
+.. code::
+
+  > bench
+  Ran for 5 kernel_run call:
+  3173 ticks in 0.014739 seconds
+  4853 ticks in 0.004381 seconds
+  4914 ticks in 0.003762 seconds
+  23352 ticks in 0.008684 seconds
+  2369 ticks in 0.003198 seconds
+
+Each cycle is a call of the ``kernel_run`` function.
+For each cycle, the number of _effective_ ticks used is shown (ticks corresponding
+to execution, and not used for padding), along with the duration in seconds.
+
 It is also possible to show the outbox for any given level (``show
 outbox at level 0``)
 
