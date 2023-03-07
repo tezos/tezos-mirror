@@ -318,6 +318,15 @@ opam:octez-smart-rollup-node-PtMumbai:
 
 # Ignoring unreleased package octez-smart-rollup-node-alpha.
 
+# Ignoring unreleased package octez-smart-rollup-wasm-benchmark.
+
+opam:octez-smart-rollup-wasm-benchmark-lib:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_4
+  variables:
+    package: octez-smart-rollup-wasm-benchmark-lib
+
 opam:octez-smart-rollup-wasm-debugger:
   extends:
     - .opam_template
@@ -1099,7 +1108,7 @@ opam:tezos-protocol-demo-counter:
 opam:tezos-protocol-demo-noops:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-demo-noops
 
@@ -1354,8 +1363,6 @@ opam:tezos-scoru-wasm:
   variables:
     package: tezos-scoru-wasm
 
-# Ignoring unreleased package tezos-scoru-wasm-benchmark.
-
 # Ignoring unreleased package tezos-scoru-wasm-durable-snapshot.
 
 opam:tezos-scoru-wasm-fast:
@@ -1427,7 +1434,7 @@ opam:tezos-signer-services:
 opam:tezos-smart-rollup-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-smart-rollup-016-PtMumbai
 
@@ -1540,7 +1547,7 @@ opam:tezos-webassembly-interpreter-extra:
 opam:tezos-workers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-workers
 

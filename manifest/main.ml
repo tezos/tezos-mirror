@@ -3541,12 +3541,12 @@ let octez_scoru_wasm_tests_helpers =
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
-let _octez_scoru_wasm_benchmark =
-  private_exe
-    "benchmark_scoru_wasm"
+let octez_scoru_wasm_benchmark =
+  private_lib
+    "octez_smart_rollup_wasm_benchmark_lib"
     ~path:"src/lib_scoru_wasm/bench"
-    ~synopsis:"SCORU WASM benchmark executable"
-    ~opam:"tezos-scoru-wasm-benchmark"
+    ~synopsis:"Smart Rollup WASM benchmark library"
+    ~opam:"octez-smart-rollup-wasm-benchmark-lib"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3558,6 +3558,15 @@ let _octez_scoru_wasm_benchmark =
         lwt_unix;
       ]
     ~preprocess:[pps ppx_deriving_show]
+
+let _octez_scoru_wasm_benchmark_exe =
+  private_exe
+    "octez_smart_rollup_wasm_benchmark"
+    ~path:"src/lib_scoru_wasm/bench/executable"
+    ~synopsis:"Smart rollup WASM benchmark library"
+    ~opam:"octez-smart-rollup-wasm-benchmark"
+    ~preprocess:[pps ppx_deriving_show]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_benchmark]
 
 let _octez_scoru_wasm_tests =
   test
@@ -6452,6 +6461,7 @@ let _octez_scoru_wasm_debugger =
            available. *)
         Protocol.(client_exn alpha);
         octez_scoru_wasm;
+        octez_scoru_wasm_benchmark;
         octez_scoru_wasm_helpers |> open_;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;

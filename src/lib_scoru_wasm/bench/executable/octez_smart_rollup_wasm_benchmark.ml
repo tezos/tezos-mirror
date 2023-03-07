@@ -37,8 +37,11 @@
 
 
 *)
+open Octez_smart_rollup_wasm_benchmark_lib
 
 open Inputs
+
+let reveal_builtins = Pvm_instance.builtins
 
 let scenario_computation_kernel =
   Scenario.make_scenario
@@ -48,7 +51,7 @@ let scenario_computation_kernel =
       Scenario.make_scenario_step
         "Load inbox"
         (Scenario.load_messages 1l [Other (Str "dummy")]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
+      Scenario.make_scenario_step "Loop" (Scenario.exec_slow ~reveal_builtins);
     ]
 
 let scenario_unreachable_kernel =
@@ -59,7 +62,7 @@ let scenario_unreachable_kernel =
       Scenario.make_scenario_step
         "Load inbox"
         (Scenario.load_messages 1l [Other (Str "dummy")]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
+      Scenario.make_scenario_step "Loop" (Scenario.exec_slow ~reveal_builtins);
     ]
 
 let demo_input_step =
@@ -78,13 +81,19 @@ let scenario_tx_kernel_demo =
   Scenario.make_scenario
     "tx_kernel - demo scenario"
     Kernels.tx_kernel_dac
-    [demo_input_step; Scenario.make_scenario_step "Loop" Scenario.exec_slow]
+    [
+      demo_input_step;
+      Scenario.make_scenario_step "Loop" (Scenario.exec_slow ~reveal_builtins);
+    ]
 
 let scenario_tx_kernel_demo_fast =
   Scenario.make_scenario
     "tx_kernel - demo scenario fast"
     Kernels.tx_kernel_dac
-    [demo_input_step; Scenario.make_scenario_step "Loop" Scenario.exec_fast]
+    [
+      demo_input_step;
+      Scenario.make_scenario_step "Loop" (Scenario.exec_fast ~reveal_builtins);
+    ]
 
 let filename () =
   let t = Unix.localtime (Unix.time ()) in

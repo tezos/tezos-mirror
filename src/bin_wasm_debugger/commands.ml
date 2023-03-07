@@ -36,6 +36,7 @@ type eval_step =
 
 (* Possible commands for the REPL. *)
 type commands =
+  | Bench
   | Time of commands
   | Show_inbox
   | Show_outbox of int32
@@ -104,6 +105,7 @@ let parse_commands s =
         Reveal_preimage (Some hex_encoded_preimage)
     | ["reveal"; "metadata"] -> Reveal_metadata
     | ["stop"] -> Stop
+    | ["bench"] -> Bench
     | _ -> Unknown s
   in
   go command
@@ -300,6 +302,27 @@ let step config kind tree =
   let* tree, ticks = eval config kind tree in
   let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
   let*! () = show_status tree in
+  return tree
+
+let bench config tree =
+  let open Lwt_syntax in
+  let action =
+    Octez_smart_rollup_wasm_benchmark_lib.Scenario.exec_slow
+      ~reveal_builtins:(reveal_builtins config)
+  in
+  let step =
+    Octez_smart_rollup_wasm_benchmark_lib.Scenario.make_scenario_step "" action
+  in
+  let eval = Octez_smart_rollup_wasm_benchmark_lib.Scenario.apply_step step in
+  let* benchmark, tree = eval tree in
+  let* () =
+    Lwt_io.printf
+      "%s\n%!"
+      (Format.asprintf
+         "%a"
+         Octez_smart_rollup_wasm_benchmark_lib.Data.pp_analysis
+         benchmark)
+  in
   return tree
 
 (* [show_inbox tree] prints the current input buffer and the number of messages
@@ -513,6 +536,9 @@ let handle_command c config tree inboxes level =
   let command = parse_commands c in
   let return ?(tree = tree) () = return (tree, inboxes, level) in
   let rec go = function
+    | Bench ->
+        let*! tree = bench config tree in
+        return ~tree ()
     | Time cmd ->
         let t = Time.System.now () in
         let* res = go cmd in

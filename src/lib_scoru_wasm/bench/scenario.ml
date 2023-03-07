@@ -146,14 +146,17 @@ let switch_state_type switch switch_label a_state =
   return @@ lift_add_datum (Data.add_tickless_datum switch_label time) b_state
 
 (** Run a [phase] of the execution loop to the VM state *)
-let exec_phase_in_slow_mode run_state phase =
+let exec_phase_in_slow_mode ~reveal_builtins run_state phase =
   run_pvm_action
     (Exec.show_phase phase)
     run_state
-    (lift_action_plus @@ Exec.execute_on_state phase)
+    (lift_action_plus @@ Exec.execute_on_state ~reveal_builtins phase)
 
-let exec_fast_execution_once state =
-  run_pvm_action "Fast execution" state (lift_action_plus @@ Exec.execute_fast)
+let exec_fast_execution_once ~reveal_builtins state =
+  run_pvm_action
+    "Fast execution"
+    state
+    (lift_action_plus @@ Exec.execute_fast ~reveal_builtins)
 
 (** Predicate governing the reboot strategy. *)
 let should_reboot {state; _} =
@@ -180,12 +183,15 @@ let exec_on_pvm_state f tree_run_state =
   in
   return tree_run_state
 
-let exec_slow =
+let exec_slow ~reveal_builtins =
   exec_on_pvm_state
-    (Exec.run_loop ~reboot:(Some should_reboot) exec_phase_in_slow_mode)
+    (Exec.run_loop
+       ~reboot:(Some should_reboot)
+       (exec_phase_in_slow_mode ~reveal_builtins))
 
-let exec_fast =
-  exec_on_pvm_state (Exec.do_while should_reboot exec_fast_execution_once)
+let exec_fast ~reveal_builtins =
+  exec_on_pvm_state
+    (Exec.do_while should_reboot (exec_fast_execution_once ~reveal_builtins))
 
 let load_messages level messages tree_run_state =
   lift_action (Exec.load_messages messages level) tree_run_state
@@ -209,6 +215,15 @@ let run_scenario ?(verbose = false) ~benchmark scenario =
   in
   if not scenario.ignore then Exec.run scenario.kernel apply_scenario
   else return benchmark
+
+let apply_step ?(verbose = false) ?(totals = true) ?(irmin = true) step tree =
+  let open Lwt_syntax in
+  let name = "" in
+  let benchmark = empty_benchmark ~verbose ~totals ~irmin () in
+  let benchmark = init_scenario name benchmark in
+  let run_state = init_run_state benchmark tree in
+  let* run_state = run_step ~verbose run_state step in
+  return (run_state.benchmark, run_state.state)
 
 let run_scenarios ?(verbose = true) ?(totals = true) ?(irmin = true) filename
     scenarios =
