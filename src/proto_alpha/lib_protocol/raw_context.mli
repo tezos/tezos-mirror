@@ -260,7 +260,10 @@ val record_dictator_proposal_seen : t -> t
 val dictator_proposal_seen : t -> bool
 
 (** [init_sampler_for_cycle ctxt cycle seed state] caches the seeded stake
-    sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access. *)
+    sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access.
+
+    @return [Error Sampler_already_set] if the sampler was already
+    cached. *)
 val init_sampler_for_cycle :
   t -> Cycle_repr.t -> Seed_repr.seed -> consensus_pk Sampler.t -> t tzresult
 

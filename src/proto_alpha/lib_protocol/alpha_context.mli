@@ -5048,6 +5048,9 @@ module Stake_distribution : sig
 
   val slot_owner :
     context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
+
+  (** See {!Delegate_sampler.load_sampler_for_cycle}. *)
+  val load_sampler_for_cycle : context -> Cycle.t -> context tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,

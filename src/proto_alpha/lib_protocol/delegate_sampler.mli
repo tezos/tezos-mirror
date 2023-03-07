@@ -53,6 +53,15 @@ val baking_rights_owner :
   round:Round_repr.round ->
   (Raw_context.t * Slot_repr.t * Delegate_consensus_key.pk) tzresult Lwt.t
 
+(** [load_sampler_for_cycle ctxt cycle] caches the seeded stake
+    sampler for [cycle] in [ctxt]. If the sampler was already cached,
+    then [ctxt] is returned unchanged.
+
+    This function has the same effect on [ctxt] as {!slot_owner} and
+    {!baking_rights_owner}. *)
+val load_sampler_for_cycle :
+  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
 (** [compute_snapshot_index ctxt cycle max_snapshot_index] Returns the index of
     the selected snapshot for the [cycle] passed as argument, and for the max
     index of snapshots taken so far, [max_snapshot_index] (see

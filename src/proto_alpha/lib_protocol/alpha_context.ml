@@ -558,6 +558,8 @@ module Stake_distribution = struct
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let slot_owner = Delegate_sampler.slot_owner
+
+  let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
 end
 
 module Nonce = Nonce_storage

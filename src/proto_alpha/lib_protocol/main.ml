@@ -139,23 +139,34 @@ let init_consensus_rights_for_block ctxt ~predecessor_level =
     endorsements and preendorsements: [predecessor_level - 1] (aka the
     grandparent's level), [predecessor_level] (that is, the level of
     the mempool's head), and [predecessor_level + 1] (aka the current
-    level in ctxt). We don't want to compute the tables by first slot
-    for all three possible levels because it is
-    time-consuming. However, we want to ensure that the cycle rights
-    are loaded in the context, so that {!Stake_distribution.slot_owner}
-    doesn't have to initialize them each time it is called (we do this
-    now because the context is discarded at the end of the validation
-    of each operation, so we can't rely on the caching done by
-    [slot_owner] itself). *)
-let init_consensus_rights_for_mempool ctxt =
-  (* Cycle rights loading is coming in the next commit. *)
+    level in ctxt). *)
+let init_consensus_rights_for_mempool ctxt ~predecessor_level =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  (* We don't want to compute the tables by first slot for all three
+     possible levels because it is time-consuming. So we don't compute
+     any [allowed_endorsements] or [allowed_preendorsements] tables. *)
   let ctxt =
-    Alpha_context.Consensus.initialize_consensus_operation
+    Consensus.initialize_consensus_operation
       ctxt
       ~allowed_endorsements:None
       ~allowed_preendorsements:None
   in
-  return ctxt
+  (* However, we want to ensure that the cycle rights are loaded in
+     the context, so that {!Stake_distribution.slot_owner} doesn't
+     have to initialize them each time it is called (we do this now
+     because the context is discarded at the end of the validation of
+     each operation, so we can't rely on the caching done by
+     [slot_owner] itself). *)
+  let cycle = (Level.current ctxt).cycle in
+  let* ctxt = Stake_distribution.load_sampler_for_cycle ctxt cycle in
+  (* If the cycle has changed between the grandparent level and the
+     current level, we also initialize the sampler for that
+     cycle. That way, all three allowed levels are covered. *)
+  match Level.pred ctxt predecessor_level with
+  | Some gp_level when Cycle.(gp_level.cycle <> cycle) ->
+      Stake_distribution.load_sampler_for_cycle ctxt gp_level.cycle
+  | Some _ | None -> return ctxt
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let open Lwt_result_syntax in
@@ -177,7 +188,8 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
     match mode with
     | Application _ | Partial_validation _ | Construction _ ->
         init_consensus_rights_for_block ctxt ~predecessor_level
-    | Partial_construction _ -> init_consensus_rights_for_mempool ctxt
+    | Partial_construction _ ->
+        init_consensus_rights_for_mempool ctxt ~predecessor_level
   in
   Dal_apply.initialisation ~level:predecessor_level ctxt >>=? fun ctxt ->
   return

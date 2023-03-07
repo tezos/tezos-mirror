@@ -144,6 +144,13 @@ let baking_rights_owner c (level : Level_repr.t) ~round =
   Slot_repr.of_int (round mod consensus_committee_size) >>?= fun slot ->
   slot_owner c level slot >>=? fun (ctxt, pk) -> return (ctxt, slot, pk)
 
+let load_sampler_for_cycle ctxt cycle =
+  let open Lwt_result_syntax in
+  let* ctxt, (_ : Seed_repr.seed), (_ : Raw_context.consensus_pk Sampler.t) =
+    Random.sampler_for_cycle ctxt cycle
+  in
+  return ctxt
+
 let get_stakes_for_selected_index ctxt index =
   Stake_storage.fold_snapshot
     ctxt
