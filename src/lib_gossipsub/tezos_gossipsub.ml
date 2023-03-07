@@ -232,9 +232,11 @@ module Make (C : CONFIGURATION) :
 
   type message = Message.t
 
+  type time = Time.t
+
   type span = Time.span
 
-  type nonrec limits = (Peer.t, Message_id.t, C.Time.span) limits
+  type nonrec limits = (Peer.t, Message_id.t, span) limits
 
   type nonrec parameters = (Peer.t, Message_id.t) parameters
 
@@ -283,10 +285,10 @@ module Make (C : CONFIGURATION) :
     outbound : bool;
         (** An outbound connection is a connection we
                           connected to. *)
-    backoff : C.Time.t Topic.Map.t;
+    backoff : time Topic.Map.t;
         (** The backoff times associated to this peer for each topic *)
     score : Score.t;  (** The score associated to this peer. *)
-    expire : C.Time.t option;
+    expire : time option;
         (** The expiring time after having being disconnected from this peer. *)
   }
 
@@ -298,12 +300,12 @@ module Make (C : CONFIGURATION) :
   module Memory_cache = struct
     type value = {message : message; access : int Peer.Map.t}
 
-    type t = {messages : value C.Message_id.Map.t}
+    type t = {messages : value Message_id.Map.t}
 
-    let create () = {messages = C.Message_id.Map.empty}
+    let create () = {messages = Message_id.Map.empty}
 
     let record_message_access peer message_id t =
-      match C.Message_id.Map.find message_id t.messages with
+      match Message_id.Map.find message_id t.messages with
       | None -> None
       | Some {message; access} ->
           let access =
@@ -315,14 +317,14 @@ module Make (C : CONFIGURATION) :
           let t =
             {
               messages =
-                C.Message_id.Map.add message_id {message; access} t.messages;
+                Message_id.Map.add message_id {message; access} t.messages;
             }
           in
           Some (t, message)
 
     let add_message message_id message t =
       let value = {message; access = Peer.Map.empty} in
-      {messages = C.Message_id.Map.add message_id value t.messages}
+      {messages = Message_id.Map.add message_id value t.messages}
   end
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
@@ -336,8 +338,8 @@ module Make (C : CONFIGURATION) :
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
     fanout : Peer.Set.t Topic.Map.t;
-    last_published_time : C.Time.t Topic.Map.t;
-    seen_messages : C.Message_id.Set.t;
+    last_published_time : time Topic.Map.t;
+    seen_messages : Message_id.Set.t;
     memory_cache : Memory_cache.t;
     rng : Random.State.t;
   }
@@ -372,13 +374,13 @@ module Make (C : CONFIGURATION) :
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
       last_published_time = Topic.Map.empty;
-      seen_messages = C.Message_id.Set.empty;
+      seen_messages = Message_id.Set.empty;
       memory_cache = Memory_cache.create ();
       rng;
     }
 
   module Helpers = struct
-    (* Those projections enable let-punning. *)
+    (* These projections enable let-punning. *)
     let max_recv_ihave_per_heartbeat state =
       state.limits.max_recv_ihave_per_heartbeat
 
@@ -552,7 +554,7 @@ module Make (C : CONFIGURATION) :
                   (function
                     | None -> Some expire
                     | Some old_backoff ->
-                        if C.Time.(old_backoff < expire) then Some expire
+                        if Time.(old_backoff < expire) then Some expire
                         else Some old_backoff)
                   connection.backoff
               in
@@ -560,8 +562,8 @@ module Make (C : CONFIGURATION) :
         connections
 
     let add_connections_backoff time topic peer connections =
-      let now = C.Time.now () in
-      let expire = C.Time.add now time in
+      let now = Time.now () in
+      let expire = Time.add now time in
       update_backoff peer topic expire connections
 
     let add_backoff time topic peer =
@@ -628,7 +630,7 @@ module Make (C : CONFIGURATION) :
       let*! peer_filter in
       let*! seen_messages in
       let should_handle_message_id message_id : bool =
-        (not (C.Message_id.Set.mem message_id seen_messages))
+        (not (Message_id.Set.mem message_id seen_messages))
         && peer_filter peer (`IHave message_id)
       in
       List.filter should_handle_message_id message_ids |> return
@@ -684,7 +686,7 @@ module Make (C : CONFIGURATION) :
 
          Score check is missing.
       *)
-      let routed_message_ids = C.Message_id.Map.empty in
+      let routed_message_ids = Message_id.Map.empty in
       let*! memory_cache in
       let*! peer_filter in
       let memory_cache, routed_message_ids =
@@ -698,13 +700,12 @@ module Make (C : CONFIGURATION) :
               Memory_cache.record_message_access peer message_id memory_cache
             with
             | None ->
-                ( memory_cache,
-                  C.Message_id.Map.add message_id `Not_found messages )
+                (memory_cache, Message_id.Map.add message_id `Not_found messages)
             | Some (memory_cache, message) ->
                 let messages =
                   if peer_filter peer (`IWant message_id) then
-                    C.Message_id.Map.add message_id (`Message message) messages
-                  else C.Message_id.Map.add message_id `Ignored messages
+                    Message_id.Map.add message_id (`Message message) messages
+                  else Message_id.Map.add message_id `Ignored messages
                 in
                 (memory_cache, messages))
           (memory_cache, routed_message_ids)
@@ -755,13 +756,13 @@ module Make (C : CONFIGURATION) :
       match Topic.Map.find topic backoff with
       | None -> unit
       | Some backoff ->
-          let current = C.Time.now () in
-          if C.Time.(current >= backoff) then unit
+          let current = Time.now () in
+          if Time.(current >= backoff) then unit
           else
             let score = Score.penalty score 1 in
             let*! graft_flood_backoff in
             let score =
-              if C.Time.(current < add backoff graft_flood_backoff) then
+              if Time.(current < add backoff graft_flood_backoff) then
                 Score.penalty score 1
               else score
             in
@@ -819,7 +820,7 @@ module Make (C : CONFIGURATION) :
       Peer.t ->
       Topic.t ->
       px:Peer.t Seq.t ->
-      backoff:C.Time.span ->
+      backoff:span ->
       [`Prune] output Monad.t =
     Prune.handle
 
@@ -827,7 +828,7 @@ module Make (C : CONFIGURATION) :
     let get_peers_for_unsubscribed_topic topic =
       let open Monad.Syntax in
       let*! fanout_opt = find_fanout topic in
-      let now = C.Time.now () in
+      let now = Time.now () in
       let* () = set_last_published_time topic now in
       let*! gossip_publish_threshold in
       let*! expected_peers_per_topic in
@@ -1032,8 +1033,8 @@ module Make (C : CONFIGURATION) :
           (function
             | None -> None
             | Some connection ->
-                let now = C.Time.now () in
-                let expire = Some (C.Time.add now retain_duration) in
+                let now = Time.now () in
+                let expire = Some (Time.add now retain_duration) in
                 Some {connection with expire})
           connections
       in
