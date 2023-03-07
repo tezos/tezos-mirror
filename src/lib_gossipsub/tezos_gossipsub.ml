@@ -350,6 +350,13 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let gossip_threshold state = state.limits.gossip_threshold
 
+    let opportunistic_graft_ticks state = state.limits.opportunistic_graft_ticks
+
+    let opportunistic_graft_peers state = state.limits.opportunistic_graft_peers
+
+    let opportunistic_graft_threshold state =
+      state.limits.opportunistic_graft_threshold
+
     let mesh state = state.mesh
 
     let fanout state = state.fanout
@@ -1172,22 +1179,26 @@ module Make (C : AUTOMATON_CONFIG) :
       return ()
 
     (* Update mesh for grafted and pruned peers. Note that in the Go
-       implementation this update is done on-the-fly. The semantics is however
-       the same, given that a peer cannot be grafted and then pruned or
-       vice-versa. The reasoning for why that is the case is as follows. There
-       are three blocks of updates in the code above:
+       implementation this update is done on-the-fly. Contrary to the Go
+       implementation, we explicitly ensure that a peer cannot be grafted and
+       then pruned or vice-versa. The reasoning for why that is the case is as
+       follows. There are four blocks of updates in the code above:
+
          1) graft peers if [d_mesh < degree_low]
          2) prune peers if [d_mesh > degree_high]
          3) graft peers if [d_mesh > degree_low] and not enough outbound peers
-       ([d_mesh] denotes [Peer.Set.cardinal peers])
+            ([d_mesh] denotes [Peer.Set.cardinal peers])
+         4) graft peers with opportunistic grafting, and remove them from the
+            previously pruned peers (if they were indeed meant to be pruned).
 
-       Condition 1) is mutually exclusive with the other two.
+       The condition for 1) is mutually exclusive with ones for 2) and 3).
        Now, a peer p cannot be pruned in 2) and then grafted in 3) because in 2):
          A) Either we have enough outbound peers, then we don't execute 3).
          B) Or we don't have enough outbound peers, so p is not outbound and in 3)
-            we only graft outbound peers. *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
-       Revisit this comment if opportunistic grafting is implemented. *)
+            we only graft outbound peers.
+
+       Finally, block 4) ensures the property explicitly.
+    *)
     let update_mesh mesh ~to_graft ~to_prune =
       let update f =
         Peer.Map.fold (fun peer topicset mesh ->
@@ -1249,6 +1260,10 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! degree_high in
       let*! degree_score in
       let*! degree_out in
+      let*! heartbeat_ticks in
+      let*! opportunistic_graft_ticks in
+      let*! opportunistic_graft_peers in
+      let*! opportunistic_graft_threshold in
 
       let has_outbound_connection =
         peer_has_outbound_connection connections ~default:false
@@ -1287,6 +1302,50 @@ module Make (C : AUTOMATON_CONFIG) :
             new_peers
         in
         (to_prune, peers)
+      in
+
+      let opportunistic_grafting topic peers =
+        if Int64.rem heartbeat_ticks opportunistic_graft_ticks = 0L then
+          let num_peers = List.length peers in
+          if num_peers > 1 then
+            (* Opportunistic grafting works as follows: we check the median score
+               of peers in the mesh; if this score is below the
+               [opportunistic_graft_threshold], we select a few peers at random
+               with score over the median.
+
+               The intention is to (slowly) improve an underperforming mesh by
+               introducing good scoring peers that may have been gossiping at
+               us. This allows us to get out of sticky situations where we are
+               stuck with poor peers and also recover from churn of good peers. *)
+
+            (* Compute the median peer score in the mesh. *)
+            let median_score =
+              let sorted_scores =
+                peers |> List.rev_map get_score |> Array.of_list
+              in
+              Array.sort Score.compare sorted_scores ;
+              sorted_scores.(num_peers / 2)
+            in
+            if Score.(median_score < of_float opportunistic_graft_threshold)
+            then
+              let peers_set = Peer.Set.of_list peers in
+              let filter peer connection score =
+                let in_mesh = Peer.Set.mem peer peers_set in
+                let backed_off = exists_backoff topic peer backoff in
+                let above_median = Score.(score > median_score) in
+                (not in_mesh) && (not backed_off) && (not connection.direct)
+                && above_median
+              in
+              select_connections_peers
+                connections
+                scores
+                rng
+                topic
+                ~filter
+                ~max:opportunistic_graft_peers
+            else []
+          else []
+        else []
       in
 
       (* Keep the first [degree_score] peers by score and the remaining up to
@@ -1405,7 +1464,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
         (* Do we have enough outbound peers? *)
         let num_peers = Peer.Set.cardinal peers in
-        let to_graft =
+        let to_graft, peers =
           if num_peers >= degree_low then
             let num_outbound =
               Peer.Set.fold
@@ -1425,14 +1484,44 @@ module Make (C : AUTOMATON_CONFIG) :
                 && Score.(score >= zero)
                 && has_outbound_connection peer
               in
-              select_connections_peers connections scores rng topic ~filter ~max
-              |> add_to_peers_topic_set to_graft topic
-            else to_graft
-          else to_graft
+              let new_peers =
+                select_connections_peers
+                  connections
+                  scores
+                  rng
+                  topic
+                  ~filter
+                  ~max
+              in
+              let to_graft = add_to_peers_topic_set to_graft topic new_peers in
+              (to_graft, new_peers)
+            else (to_graft, Peer.Set.elements peers)
+          else (to_graft, Peer.Set.elements peers)
         in
 
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
-           Try to improve the mesh with opportunistic grafting *)
+        (* Attempt opportunistic grafting. *)
+        let to_graft, to_prune =
+          let peers_to_graft = opportunistic_grafting topic peers in
+          let to_graft = add_to_peers_topic_set to_graft topic peers_to_graft in
+          (* Do not actually prune the [peers_to_graft]. *)
+          let to_prune =
+            List.fold_left
+              (fun to_prune peer_to_graft ->
+                Peer.Map.update
+                  peer_to_graft
+                  (function
+                    | None -> None
+                    | Some topicset ->
+                        let topicset = Topic.Set.remove topic topicset in
+                        if Topic.Set.is_empty topicset then None
+                        else Some topicset)
+                  to_prune)
+              to_prune
+              peers_to_graft
+          in
+          (to_graft, to_prune)
+        in
+
         (`To_prune to_prune, `To_graft to_graft, noPX_peers)
       in
 

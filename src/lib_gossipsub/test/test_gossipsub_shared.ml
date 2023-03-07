@@ -218,6 +218,9 @@ let pp_limits fmtr
     gossip_factor;
     history_length;
     history_gossip_length;
+    opportunistic_graft_ticks;
+    opportunistic_graft_peers;
+    opportunistic_graft_threshold;
     score_parameters;
   } =
     l
@@ -250,6 +253,9 @@ let pp_limits fmtr
      gossip_factor = %f;@;\
      history_length = %d;@;\
      history_gossip_length = %d;@;\
+     opportunistic_graft_ticks = %Ld;@;\
+     opportunistic_graft_peers = %d;@;\
+     opportunistic_graft_threshold = %f;@;\
      score_parameters= %a }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
@@ -282,6 +288,9 @@ let pp_limits fmtr
     gossip_factor
     history_length
     history_gossip_length
+    opportunistic_graft_ticks
+    opportunistic_graft_peers
+    opportunistic_graft_threshold
     pp_score_parameters
     score_parameters
 

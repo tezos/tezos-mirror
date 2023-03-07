@@ -254,6 +254,17 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           avoid advertising messages that will be expired by the time they're
           requested. [history_gossip_length] must be less than or equal to
           [history_length]. *)
+  opportunistic_graft_ticks : int64;
+      (** The number of heartbeat ticks setting the frequency at which to
+          attempt to improve the mesh with opportunistic grafting. Every
+          [opportunistic_graft_ticks], if the median score of the mesh peers
+          falls below the {opportunistic_graft_threshold}, then the local peer
+          will select some high-scoring mesh peers to graft.  *)
+  opportunistic_graft_peers : int;
+      (** The number of peers to opportunistically graft. *)
+  opportunistic_graft_threshold : float;
+      (** The median mesh score threshold before triggering opportunistic
+          grafting; this should have a small positive value. *)
   score_parameters : ('topic, 'span) score_parameters;
       (** score-specific parameters. *)
 }
