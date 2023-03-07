@@ -21,12 +21,25 @@ pub enum Error {
 }
 
 impl Transaction {
-    pub fn of_raw_input(input: Message) -> Self {
-        let tx = Message::as_ref(&input).to_vec();
-        Transaction {
-            level: input.level,
-            tx,
+    fn ensures(cond: bool) -> Option<()> {
+        if cond {
+            Some(())
+        } else {
+            None
         }
+    }
+
+    pub fn parse(input: Message) -> Option<Self> {
+        let bytes = Message::as_ref(&input);
+        let (input_tag, remaining) = bytes.split_first()?;
+        // External messages starts with the tag 1, they are the only
+        // messages we consider.
+        Self::ensures(*input_tag == 1)?;
+
+        Some(Transaction {
+            level: input.level,
+            tx: remaining.to_vec(),
+        })
     }
 
     pub fn to_raw_transaction(&self) -> RawTransaction {
@@ -37,9 +50,9 @@ impl Transaction {
 pub fn read_input<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     max_bytes: usize,
-) -> Result<Transaction, Error> {
+) -> Result<Option<Transaction>, Error> {
     match Runtime::read_input(host, max_bytes) {
-        Ok(Some(input)) => Ok(Transaction::of_raw_input(input)),
+        Ok(Some(input)) => Ok(Transaction::parse(input)),
         _ => Err(Error::ReadInputError),
     }
 }

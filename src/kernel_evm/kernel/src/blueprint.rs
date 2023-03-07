@@ -32,9 +32,16 @@ impl Queue {
     }
 }
 
+// Conditionally push a transaction in the blueprint.
+fn push(blueprint: &mut Blueprint, transaction: Option<Transaction>) {
+    if let Some(transaction) = transaction {
+        blueprint.transactions.push(transaction);
+    }
+}
+
 fn fetch_transactions<Host: Runtime + RawRollupCore>(host: &mut Host, blueprint: &mut Blueprint) {
     if let Ok(transaction) = read_input(host, 4096) {
-        blueprint.transactions.push(transaction);
+        push(blueprint, transaction);
         fetch_transactions(host, blueprint)
     }
 }
