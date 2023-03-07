@@ -983,64 +983,13 @@ A detailed description of the following instructions can be found in the `intera
 Operations on Mutez
 ~~~~~~~~~~~~~~~~~~~
 
-Mutez (micro-Tez) are internally represented by a 64 bit signed
-integers. There are restrictions to prevent creating a negative amount
-of mutez. Operations are limited to prevent overflow and mixing them
-with other numerical types by mistake. They are also mandatory checked
-for under/overflows.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
--  ``ADD``
-
-::
-
-    :: mutez : mutez : 'S   ->   mutez : 'S
-
-    > ADD / x : y : S  =>  [FAILED]   on overflow
-    > ADD / x : y : S  =>  (x + y) : S
-
--  ``SUB_MUTEZ``
-
-::
-
-    :: mutez : mutez : 'S   ->   option mutez : 'S
-
-    > SUB_MUTEZ / x : y : S  =>  None
-        iff   x < y
-    > SUB_MUTEZ / x : y : S  =>  Some (x - y) : S
-
--  ``MUL``
-
-::
-
-    :: mutez : nat : 'S   ->   mutez : 'S
-    :: nat : mutez : 'S   ->   mutez : 'S
-
-    > MUL / x : y : S  =>  [FAILED]   on overflow
-    > MUL / x : y : S  =>  (x * y) : S
-
--  ``EDIV``
-
-::
-
-    :: mutez : nat : 'S   ->   option (pair mutez mutez) : 'S
-    :: mutez : mutez : 'S   ->   option (pair nat mutez) : 'S
-
-    > EDIV / x : 0 : S  =>  None
-    > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
-        iff y <> 0
-
--  ``COMPARE``: Mutez comparison
-
-::
-
-   :: mutez : mutez : 'S -> int : 'S
-
-   > COMPARE / x : y : S  =>  -1 : S
-       iff x < y
-   > COMPARE / x : y : S  =>  0 : S
-       iff x = y
-   > COMPARE / x : y : S  =>  1 : S
-       iff x > y
+-  ``ADD`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``SUB_MUTEZ`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB_MUTEZ>`__).
+-  ``MUL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
+-  ``EDIV`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EDIV>`__).
+-  ``COMPARE``: Mutez comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
