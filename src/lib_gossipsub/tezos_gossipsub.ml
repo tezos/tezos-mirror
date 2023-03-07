@@ -1316,6 +1316,104 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       set_fanout fanout
 
+    let update_fanout fanout ~to_add ~to_remove =
+      let update f topic_peers_list fanout =
+        List.fold_left
+          (fun fanout (topic, peers) -> Topic.Map.update topic (f peers) fanout)
+          fanout
+          topic_peers_list
+      in
+      let add_peers peers_to_add = function
+        | None ->
+            (* impossible: in [maintain_fanout] we only consider topics that are in
+               the domain of the fanout map *)
+            assert false
+        | Some v ->
+            let peers =
+              List.fold_left
+                (fun peers peer -> Peer.Set.add peer peers)
+                v.peers
+                peers_to_add
+            in
+            Some {v with peers}
+      in
+      let remove_peers peers_to_remove = function
+        | None -> (* impossible, as in the previous case *) assert false
+        | Some v ->
+            let peers =
+              List.fold_left
+                (fun peers peer -> Peer.Set.remove peer peers)
+                v.peers
+                peers_to_remove
+            in
+            Some {v with peers}
+      in
+      fanout |> update add_peers to_add
+      |> update remove_peers to_remove
+      |> set_fanout
+
+    let maintain_fanout =
+      let open Monad.Syntax in
+      let*! connections in
+      let*! rng in
+      let*! degree_optimal in
+      let*! gossip_publish_threshold in
+
+      let maintain_topic_fanout topic {peers; _} (to_add, to_remove) =
+        (* Check whether our peers are still in the topic and have a score
+           above the publish threshold *)
+        let peers_to_keep, peers_to_remove =
+          Peer.Set.fold
+            (fun peer acc ->
+              match Peer.Map.find peer connections with
+              | None ->
+                  (* impossible, given the global invariants on the state *)
+                  assert false
+              | Some connection ->
+                  if
+                    Topic.Set.mem topic connection.topics
+                    && Compare.Float.(
+                         connection.score |> Score.float
+                         >= gossip_publish_threshold)
+                  then acc
+                  else
+                    let peers_to_keep, peers_to_remove = acc in
+                    (Peer.Set.remove peer peers_to_keep, peer :: peers_to_remove))
+            peers
+            (peers, [])
+        in
+        let to_remove = (topic, peers_to_remove) :: to_remove in
+
+        (* Do we need more peers? *)
+        let num_peers = Peer.Set.cardinal peers_to_keep in
+        if num_peers < degree_optimal then
+          let ineed = degree_optimal - num_peers in
+          (* Filter our current and direct peers and peers with score above
+             the publish threshold *)
+          let filter peer connection =
+            let in_fanout = Peer.Set.mem peer peers_to_keep in
+            (not in_fanout) && (not connection.direct)
+            && Compare.Float.(
+                 connection.score |> Score.float >= gossip_publish_threshold)
+          in
+          let new_peers =
+            select_connections_peers connections rng topic ~filter ~max:ineed
+          in
+          let to_add = (topic, new_peers) :: to_add in
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5066
+             Prepare gossip messages. *)
+          (to_add, to_remove)
+        else (to_add, to_remove)
+      in
+
+      let*! fanout in
+      let to_add, to_remove =
+        Topic.Map.fold maintain_topic_fanout fanout ([], [])
+      in
+
+      (* Update the fanout map. *)
+      update_fanout fanout ~to_add ~to_remove
+
     let handle =
       let open Monad.Syntax in
       let*! heartbeat_ticks in
@@ -1336,9 +1434,9 @@ module Make (C : AUTOMATON_CONFIG) :
       (* Expire fanout for topics we haven't published to in a while *)
       let* () = expire_fanout in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5066
-         Maintain our fanout for topics we are publishing to, but we have not
+      (* Maintain our fanout for topics we are publishing to, but we have not
          joined. *)
+      let* () = maintain_fanout in
 
       (* Advance the message history sliding window. *)
       let*! message_cache in
