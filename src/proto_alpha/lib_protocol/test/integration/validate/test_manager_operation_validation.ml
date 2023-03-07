@@ -455,13 +455,6 @@ let test_emptying_self_delegate infos kind =
   let* (_ : infos) = validate_diagnostic infos [op] in
   return_unit
 
-(** Minimum gas cost to pass the validation:
-    - cost_of_manager_operation for the generic part
-    - 100 (empiric) for the specific part (script decoding or hash costs) *)
-let empiric_minimal_gas_cost_for_validate =
-  Gas.Arith.integral_of_int_exn
-    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100)
-
 let test_empty_undelegate infos kind =
   let open Lwt_result_syntax in
   let* fee =
@@ -475,7 +468,7 @@ let test_empty_undelegate infos kind =
         (operation_req_default kind) with
         force_reveal = Some true;
         fee = Some fee;
-        gas_limit = Some (Op.Custom_gas empiric_minimal_gas_cost_for_validate);
+        gas_limit = Some Op.High;
       }
       infos
   in
