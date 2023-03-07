@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+pub const TRANSACTION_HASH_SIZE: usize = 32;
+
+pub type TransactionHash = [u8; TRANSACTION_HASH_SIZE];
 pub type RawTransaction = Vec<u8>;
 pub type RawTransactions = Vec<RawTransaction>;
 pub type L2Level = u64;
