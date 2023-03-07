@@ -2981,7 +2981,7 @@ let v_3_0_upgrade ~store_dir genesis =
   in
   protect
     ~on_error:(fun err ->
-      let*! () = Store_events.(emit upgrade_store_failed) err in
+      let*! () = Store_events.(emit upgrade_store_failed) () in
       let*! () = List.iter_s (fun f -> f ()) !cleanups in
       Lwt.return_error err)
     (fun () ->
