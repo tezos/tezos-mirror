@@ -205,29 +205,54 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
 
 type gas_limit = Max | High | Low | Zero | Custom_gas of Gas.Arith.integral
 
-let default_low_gas_limit =
-  Gas.Arith.integral_of_int_exn
-    Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation
+let default_low_gas_limit op pkh =
+  let {shell; protocol_data = Operation_data protocol_data} = op in
+  let op : _ operation = {shell; protocol_data} in
+  let check_sig_gas =
+    Operation_costs.check_signature_cost
+      (Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash pkh)
+      op
+  in
+  let total_cost =
+    Gas.(Michelson_v1_gas.Cost_of.manager_operation +@ check_sig_gas)
+  in
+  (* Some tests need milligas precision to distinguish failures in
+     validation from failures in application but limits in the
+     protocol are statically guaranteed to be integral values so we
+     use Obj.magic to bypass them. *)
+  (Obj.magic total_cost : Gas.Arith.integral)
 
 let default_high_gas_limit =
   Gas.Arith.integral_of_int_exn
     (49_000 + Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
 
-let resolve_gas_limit ctxt = function
+let resolve_gas_limit ?(force_reveal = false) ctxt op source gas_limit =
+  let open Lwt_result_syntax in
+  let pkh = Context.Contract.pkh source in
+  let* revealed = Context.Contract.is_manager_key_revealed ctxt source in
+  match gas_limit with
   | Max ->
       Context.get_constants ctxt >>=? fun c ->
-      return c.parametric.hard_gas_limit_per_operation
-  | High -> return default_high_gas_limit
-  | Low -> return default_low_gas_limit
-  | Zero -> return Gas.Arith.zero
-  | Custom_gas x -> return x
+      return (c.parametric.hard_gas_limit_per_operation, None)
+  | High -> return (default_high_gas_limit, None)
+  | Low when force_reveal && not revealed ->
+      (* If force reveal is set, the operation is a batch where the reveal is
+         the first operation. This operation should have a gas_limit
+         corresponding to the manager_operation constant (Low) + the cost of the
+         signature checking. The second op should only have Low as gas_limit *)
+      let op_gas : Gas.Arith.integral =
+        Obj.magic Michelson_v1_gas.Cost_of.manager_operation
+      in
+      return (op_gas, Some (default_low_gas_limit op pkh))
+  | Low -> return (default_low_gas_limit op pkh, None)
+  | Zero -> return (Gas.Arith.zero, None)
+  | Custom_gas x -> return (x, None)
 
 let pp_gas_limit fmt = function
   | Max -> Format.fprintf fmt "Max"
   | High ->
       Format.fprintf fmt "High: %a" Gas.Arith.pp_integral default_high_gas_limit
-  | Low ->
-      Format.fprintf fmt "Low: %a" Gas.Arith.pp_integral default_low_gas_limit
+  | Low -> Format.fprintf fmt "Low"
   | Zero -> Format.fprintf fmt "Zero: %a" Gas.Arith.pp_integral Gas.Arith.zero
   | Custom_gas x -> Format.fprintf fmt "Custom: %a" Gas.Arith.pp_integral x
 
@@ -317,8 +342,9 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   >>?= fun operations ->
   return @@ sign account.sk (Context.branch ctxt) operations
 
-let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
-    ?(gas_limit = High) ?storage_limit ?public_key ~source ctxt operation =
+let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
+    ~gas_limit ?(reveal_gas_limit = default_high_gas_limit) ?(fee = Tez.zero)
+    ?storage_limit ?public_key ~source ctxt operation =
   (match counter with
   | Some counter -> return counter
   | None -> Context.Contract.counter ctxt source)
@@ -329,7 +355,6 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
       ~default:c.parametric.hard_storage_limit_per_operation
       storage_limit
   in
-  resolve_gas_limit ctxt gas_limit >>=? fun gas_limit ->
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
   let counter = Manager_counter.succ counter in
@@ -360,7 +385,7 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
           fee = Tez.zero;
           counter;
           operation = Reveal public_key;
-          gas_limit = default_high_gas_limit;
+          gas_limit = reveal_gas_limit;
           storage_limit = Z.zero;
         }
     in
@@ -377,8 +402,45 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
     in
     Contents_list (Cons (op_reveal, Single op))
 
-let revelation ?(fee = Tez.zero) ?(gas_limit = High) ?(storage_limit = Z.zero)
-    ?counter ?(forge_pkh = None) ctxt public_key =
+let manager_operation ?force_reveal ?counter ?fee ?(gas_limit = High)
+    ?storage_limit ?public_key ~source ctxt operation =
+  let default_gas_limit = default_high_gas_limit in
+  manager_operation_with_fixed_gas_limit
+    ?force_reveal
+    ?counter
+    ~gas_limit:default_gas_limit
+    ?fee
+    ?storage_limit
+    ?public_key
+    ~source
+    ctxt
+    operation
+  >>=? fun (Contents_list dummy_operation) ->
+  resolve_gas_limit
+    ?force_reveal
+    ctxt
+    {
+      shell = {branch = Context.branch ctxt};
+      protocol_data =
+        Operation_data {contents = dummy_operation; signature = None};
+    }
+    source
+    gas_limit
+  >>=? fun (gas_limit, reveal_gas_limit) ->
+  manager_operation_with_fixed_gas_limit
+    ?force_reveal
+    ?counter
+    ~gas_limit
+    ?reveal_gas_limit
+    ?fee
+    ?storage_limit
+    ?public_key
+    ~source
+    ctxt
+    operation
+
+let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
+    ?(storage_limit = Z.zero) ?counter ?(forge_pkh = None) ctxt public_key =
   (* If Some pkh is provided to ?forge_pkh we take that hash at face
      value, otherwise we honestly compute the hash from
      [public_key]. This is useful to test forging Reveal operations
@@ -388,27 +450,54 @@ let revelation ?(fee = Tez.zero) ?(gas_limit = High) ?(storage_limit = Z.zero)
     | Some pkh -> pkh
     | None -> Signature.Public_key.hash public_key
   in
-  resolve_gas_limit ctxt gas_limit >>=? fun gas_limit ->
   let source = Contract.Implicit pkh in
   (match counter with
   | None -> Context.Contract.counter ctxt source
   | Some ctr -> return ctr)
-  >>=? fun counter ->
-  Context.Contract.manager ctxt source >|=? fun account ->
+  >|=? fun counter ->
   let counter = Manager_counter.succ counter in
-  let sop =
-    Contents_list
-      (Single
-         (Manager_operation
-            {
-              source = pkh;
-              fee;
-              counter;
-              operation = Reveal public_key;
-              gas_limit;
-              storage_limit;
-            }))
-  in
+  Manager_operation
+    {
+      source = pkh;
+      fee;
+      counter;
+      operation = Reveal public_key;
+      gas_limit;
+      storage_limit;
+    }
+
+let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
+    public_key =
+  revelation_with_fixed_gas_limit
+    ?fee
+    ~gas_limit:default_high_gas_limit
+    ?storage_limit
+    ?counter
+    ?forge_pkh
+    ctxt
+    public_key
+  >>=? fun (Manager_operation {source; _} as dummy_operation) ->
+  resolve_gas_limit
+    ctxt
+    {
+      shell = {branch = Context.branch ctxt};
+      protocol_data =
+        Operation_data {contents = Single dummy_operation; signature = None};
+    }
+    (Contract.Implicit source)
+    gas_limit
+  >>=? fun (gas_limit, _) ->
+  revelation_with_fixed_gas_limit
+    ?fee
+    ~gas_limit
+    ?storage_limit
+    ?counter
+    ?forge_pkh
+    ctxt
+    public_key
+  >>=? fun op ->
+  let sop = Contents_list (Single op) in
+  Context.Contract.manager ctxt (Implicit source) >|=? fun account ->
   sign account.sk (Context.branch ctxt) sop
 
 let failing_noop ctxt source arbitrary =
