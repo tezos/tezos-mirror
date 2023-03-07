@@ -49,7 +49,18 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val process : Layer1.head -> Node_context.rw -> unit tzresult Lwt.t
+  val play_opening_move :
+    [< `Read | `Write > `Read] Node_context.t ->
+    public_key_hash ->
+    Sc_rollup.Refutation_storage.conflict ->
+    (unit, tztrace) result Lwt.t
+
+  val play :
+    Node_context.rw ->
+    self:public_key_hash ->
+    Sc_rollup.Game.t ->
+    public_key_hash ->
+    (unit, tztrace) result Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) :
@@ -496,28 +507,21 @@ module Make (Interpreter : Interpreter.S) :
         if is_it_me then return_none else return (Some loser)
     | _ -> return_none
 
-  let play head_block node_ctxt self game staker1 staker2 =
+  let play node_ctxt ~self game opponent =
     let open Lwt_result_syntax in
-    let index = Sc_rollup.Game.Index.make staker1 staker2 in
+    let index = Sc_rollup.Game.Index.make self opponent in
+    let head_block = `Head 0 in
     match turn ~self game index with
     | Our_turn {opponent} -> play_next_move node_ctxt game self opponent
     | Their_turn -> (
         let* timeout_reached =
-          timeout_reached ~self head_block node_ctxt staker1 staker2
+          timeout_reached ~self head_block node_ctxt self opponent
         in
         match timeout_reached with
         | Some opponent ->
             let*! () = Refutation_game_event.timeout_detected opponent in
             play_timeout node_ctxt self index
         | None -> return_unit)
-
-  let ongoing_games head_block node_ctxt self =
-    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    Plugin.RPC.Sc_rollup.ongoing_refutation_games
-      cctxt
-      (cctxt#chain, head_block)
-      rollup_address
-      self
 
   let play_opening_move node_ctxt self conflict =
     let open Lwt_syntax in
@@ -531,43 +535,4 @@ module Make (Interpreter : Interpreter.S) :
     in
     let refutation = Start {player_commitment_hash; opponent_commitment_hash} in
     inject_next_move node_ctxt self ~refutation ~opponent:conflict.other
-
-  let start_game_if_conflict head_block node_ctxt self =
-    let open Lwt_result_syntax in
-    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    let* conflicts =
-      Plugin.RPC.Sc_rollup.conflicts
-        cctxt
-        (cctxt#chain, head_block)
-        rollup_address
-        self
-    in
-    let*! res = List.iter_es (play_opening_move node_ctxt self) conflicts in
-    match res with
-    | Ok r -> return r
-    | Error
-        [
-          Environment.Ecoproto_error
-            Sc_rollup_errors.Sc_rollup_game_already_started;
-        ] ->
-        (* The game may already be starting in the meantime. So we
-           ignore this error. *)
-        return_unit
-    | Error errs -> Lwt.return (Error errs)
-
-  let process Layer1.{hash; _} node_ctxt =
-    let head_block = `Hash (hash, 0) in
-    let open Lwt_result_syntax in
-    let refute_signer = Node_context.get_operator node_ctxt Refute in
-    match refute_signer with
-    | None ->
-        (* Not injecting refutations, don't play refutation games *)
-        return_unit
-    | Some self ->
-        let* () = start_game_if_conflict head_block node_ctxt self in
-        let* res = ongoing_games head_block node_ctxt self in
-        List.iter_es
-          (fun (game, staker1, staker2) ->
-            play head_block node_ctxt self game staker1 staker2)
-          res
 end

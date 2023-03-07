@@ -167,6 +167,10 @@ val config_filename : data_dir:string -> string
     removes the extra ones. *)
 val check_mode : t -> t tzresult
 
+(** Number of levels the refutation player waits until trying to play
+    for a game state it already played before. *)
+val refutation_player_buffer_levels : int
+
 (** [save configuration] overwrites [configuration] file from [data_dir]. *)
 val save : data_dir:string -> t -> unit tzresult Lwt.t
 

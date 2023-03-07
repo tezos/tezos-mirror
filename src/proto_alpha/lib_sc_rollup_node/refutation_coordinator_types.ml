@@ -54,15 +54,3 @@ module Request = struct
           hash
           level
 end
-
-module Name = struct
-  type t = unit
-
-  let encoding = Data_encoding.unit
-
-  let base = ["sc_rollup_refutation_coordinator"]
-
-  let pp _ _ = ()
-
-  let equal () () = true
-end

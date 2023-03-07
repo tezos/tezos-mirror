@@ -619,6 +619,8 @@ let check_mode config =
   | Operator -> narrow_purposes [Publish; Cement; Add_messages; Refute]
   | Custom -> return config
 
+let refutation_player_buffer_levels = 5
+
 let loser_warning_message config =
   if config.loser_mode <> Loser_mode.no_failures then
     Format.printf
