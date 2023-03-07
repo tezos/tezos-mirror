@@ -28,7 +28,7 @@ let pipeline =
 let project = Sys.getenv_opt "PROJECT" |> Option.value ~default:"tezos/tezos"
 
 let rec get_all_pages ?(from = 1) ?(acc = []) url =
-  let full_url = url ^ "?per_page=100&page=" ^ string_of_int from in
+  let full_url = url ^ "?per_page=200&page=" ^ string_of_int from in
   let* response_body = Process.run_and_read_stdout "curl" [full_url] in
   let list = JSON.parse ~origin:url response_body |> JSON.as_list in
   Log.info "Found %d jobs in page %d." (List.length list) from ;
