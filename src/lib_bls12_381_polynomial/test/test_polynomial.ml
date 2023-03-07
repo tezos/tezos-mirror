@@ -767,7 +767,7 @@ let test_fft_pfa_interpolate () =
       let domain2 = Domain.build ~primitive_root:primroot2 3 in
       Evaluations.(
         evaluation_fft_prime_factor_algorithm ~domain1 ~domain2 polynomial
-        |> interpolation_fft_prime_factor_algorithm_inplace ~domain1 ~domain2))
+        |> interpolation_fft_prime_factor_algorithm ~domain1 ~domain2))
 
 let test_dft_interpolate () =
   let module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations in
@@ -777,7 +777,7 @@ let test_dft_interpolate () =
     (11 * 19)
     (fun ~length ~primitive_root ~polynomial ->
       let domain = Domain.build ~primitive_root length in
-      Evaluations.(dft domain polynomial |> idft_inplace domain))
+      Evaluations.(dft domain polynomial |> idft domain))
 
 let test_of_dense () =
   let array = Array.init 10 (fun _ -> Fr.random ()) in
