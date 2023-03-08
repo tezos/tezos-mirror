@@ -143,24 +143,35 @@ let dac_threshold_not_reached =
     ("provided", Data_encoding.int31)
     ("required", Data_encoding.int31)
 
-let dac_account_not_available =
+let committee_member_not_in_wallet =
   declare_1
     ~section
-    ~name:"dac_account_not_available"
+    ~name:"committee_member_not_in_wallet"
     ~msg:
       "There is no account with public key {tz4_account} in the Tezos client \
        wallet. This account won't be used for signing DAC root hash pages."
     ~level:Warning
     ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 
-let dac_account_cannot_sign =
+let committee_member_cannot_sign =
   declare_1
     ~section
-    ~name:"dac_account_cannot_sign"
+    ~name:"committee_member_cannot_sign"
     ~msg:
       "There is an account with public key {tz4_account} in the Tezos client \
        wallet, but its secret key URI is not available. This account won't be \
        used for signing DAC root hash pages."
+    ~level:Warning
+    ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
+
+let commit_member_no_public_key =
+  declare_1
+    ~section
+    ~name:"committee_member_no_public_key"
+    ~msg:
+      "There is an account with public key hash {tz4_account} in the Tezos \
+       client wallet, but its public key is not available. Signatures from \
+       this account cannot be verified and will be ignored."
     ~level:Warning
     ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 

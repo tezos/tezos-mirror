@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,31 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Module that implements Dac related functionalities. *)
+(** Module that implements Account wallet functionalities. *)
 
-type error +=
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
+(** [get_keys cctxt pkh] returns the keys associated with the
+    given public key hash [pkh] in the wallet context [cctxt]. *)
+val get_keys :
+  #Client_context.wallet ->
+  Tezos_crypto.Aggregate_signature.public_key_hash ->
+  (Tezos_crypto.Aggregate_signature.public_key_hash
+  * Tezos_crypto.Aggregate_signature.public_key option
+  * Client_keys.aggregate_sk_uri option)
+  tzresult
+  Lwt.t
 
-module Storage : sig
-  (** [ensure_reveal_data_dir_exists reveal_data_dir] checks that the
-      path at [reveal_data_dir] exists and is a directory. If
-      the path does not exist, it is created as a directory.
-      Parent directories are recursively created when they do not
-      exist.
-
-      This function may fail with
-      {ul
-        {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
-          path exists and is not a directory,
-
-        {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
-            creation of the directory fails.}}
-      }
+(** [get_public_key cctxt pkh] returns the public key associated with the given [pkh] if it can
+      be found in [cctxt].
   *)
-  val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t
-end
+val get_public_key :
+  #Client_context.wallet ->
+  Tezos_crypto.Aggregate_signature.public_key_hash ->
+  Tezos_crypto.Aggregate_signature.public_key option tzresult Lwt.t
 
-val resolve_plugin :
-  Tezos_shell_services.Chain_services.Blocks.protocols ->
-  (module Dac_plugin.T) option Lwt.t
+(** [can_verify (pkh, pk_opt, sk_uri_opt)] checks whether the public key
+    [pk_opt] of an account is defined. *)
+val can_verify :
+  Tezos_crypto.Aggregate_signature.public_key_hash
+  * Tezos_crypto.Aggregate_signature.public_key option
+  * Client_keys.aggregate_sk_uri option ->
+  bool
+
+(** [can_sign (pkh, pk_opt, sk_uri_opt)] checks whether the secret key URI
+    [sk_uri_opt] of an account is defined. *)
+val can_sign :
+  Tezos_crypto.Aggregate_signature.public_key_hash
+  * Tezos_crypto.Aggregate_signature.public_key option tzresult
+  * Client_keys.aggregate_sk_uri option ->
+  bool

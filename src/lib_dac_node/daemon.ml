@@ -115,45 +115,52 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  (** This function will be called by [new_root_hash] 
-      only when payload corresponding to provided [root_hash] 
+  (** This function will be called by [new_root_hash]
+      only when payload corresponding to provided [root_hash]
       had been well dezerialized.
       Once it is done, call PUT /dac_member_signature to submit member signature *)
   let push_payload_signature dac_plugin coordinator_cctxt wallet keys root_hash
       =
     let open Lwt_result_syntax in
-    let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
-    let* signature =
-      Tezos_client_base.Client_keys.aggregate_sign
-        wallet
-        Dac_manager.Keys.(keys.aggregate_sk_uri)
-        bytes_to_sign
-    in
-    let signature_repr =
-      Signature_repr.
-        {
-          root_hash;
-          signature;
-          signer_pkh = Dac_manager.Keys.(keys.public_key_hash);
-        }
-    in
-    let* () =
-      Dac_node_client.call
-        coordinator_cctxt
-        (RPC_services.store_dac_member_signature dac_plugin)
-        ()
-        ()
-        signature_repr
-    in
-    let*! () = Event.emit_signature_pushed_to_coordinator signature in
-    return_unit
+    match keys.Wallet_account.Legacy.secret_key_uri_opt with
+    | Some secret_key_uri ->
+        let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
+        let* signature =
+          Tezos_client_base.Client_keys.aggregate_sign
+            wallet
+            secret_key_uri
+            bytes_to_sign
+        in
+        let signature_repr =
+          Signature_repr.
+            {
+              root_hash;
+              signature;
+              signer_pkh = Wallet_account.Legacy.(keys.public_key_hash);
+            }
+        in
+        let* () =
+          Dac_node_client.call
+            coordinator_cctxt
+            (RPC_services.store_dac_member_signature dac_plugin)
+            ()
+            ()
+            signature_repr
+        in
+        let*! () = Event.emit_signature_pushed_to_coordinator signature in
+        return_unit
+    | None ->
+        let*! () =
+          Event.emit_cannot_retrieve_keys_from_address
+            Wallet_account.Legacy.(keys.public_key_hash)
+        in
+        return ()
 
   (** This handler will be invoked only when a [coordinator_cctxt] is specified
       in the DAC node configuration. The DAC node tries to subscribes to the
       stream of root hashes via the streamed GET /monitor/root_hashes RPC call
       to the dac node corresponding to [coordinator_cctxt]. *)
-  let new_root_hash ctxt coordinator_cctxt ?committee_member_keys
-      ?committee_member_address wallet_cctxt =
+  let new_root_hash ctxt coordinator_cctxt ?committee_member_keys wallet_cctxt =
     let open Lwt_result_syntax in
     let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
@@ -168,8 +175,8 @@ module Handler = struct
           let*! () =
             Event.emit_received_root_hash_processed dac_plugin root_hash
           in
-          match (committee_member_keys, committee_member_address) with
-          | Some committee_member_keys, _ ->
+          match committee_member_keys with
+          | Some committee_member_keys ->
               (* If there is a [committee_member_address], it means the node is run as a member,
                    so we must sign the payload and post the signature to the coordinator
                  If there is no [committee_member_address] provided, it means the node is run as an observer
@@ -180,13 +187,7 @@ module Handler = struct
                 wallet_cctxt
                 committee_member_keys
                 root_hash
-          | _, Some committee_member_address ->
-              let*! () =
-                Event.emit_cannot_retrieve_keys_from_address
-                  committee_member_address
-              in
-              return ()
-          | None, None ->
+          | None ->
               let*! () = Event.emit_no_committee_member_address () in
               return ())
       | Error errs ->
@@ -227,6 +228,38 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
+let get_all_committee_members_keys pkhs ~threshold wallet_cctxt =
+  let open Lwt_result_syntax in
+  let* wallet_accounts =
+    List.map_es
+      (fun pkh ->
+        Wallet_account.Legacy.of_committee_member_address pkh wallet_cctxt)
+      pkhs
+  in
+  let*! valid_wallet_accounts =
+    List.filter_s
+      (fun Wallet_account.Legacy.{public_key_hash; secret_key_uri_opt; _} ->
+        if Option.is_some secret_key_uri_opt then Lwt.return true
+        else
+          let*! () =
+            Event.(emit committee_member_cannot_sign public_key_hash)
+          in
+          Lwt.return false)
+      wallet_accounts
+  in
+  let recovered_keys = List.length valid_wallet_accounts in
+  let*! () =
+    (* We emit a warning if the threshold of dac accounts needed to sign a
+       root page hash is not reached. We also emit a warning for each DAC
+       account whose secret key URI was not recovered.
+       We do not stop the dac node at this stage.
+    *)
+    if recovered_keys < threshold then
+      Event.(emit dac_threshold_not_reached (recovered_keys, threshold))
+    else Event.(emit dac_is_ready) ()
+  in
+  return wallet_accounts
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -264,15 +297,14 @@ let run ~data_dir cctxt =
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
      Stop DAC node when in Legacy mode, if threshold is not reached. *)
-  let* dac_accounts = Dac_manager.Keys.get_keys ~addresses ~threshold cctxt in
+  let* committee_members =
+    get_all_committee_members_keys addresses ~threshold cctxt
+  in
   let dac_pks_opt, dac_sk_uris =
-    dac_accounts
-    |> List.map (fun account_opt ->
-           match account_opt with
-           | Some account ->
-               ( Dac_manager.Keys.(account.public_key_opt),
-                 Some Dac_manager.Keys.(account.aggregate_sk_uri) )
-           | None -> (None, None))
+    committee_members
+    |> List.map
+         (fun Wallet_account.Legacy.{public_key_opt; secret_key_uri_opt; _} ->
+           (public_key_opt, secret_key_uri_opt))
     |> List.split
   in
   let coordinator_cctxt_opt =
@@ -300,11 +332,16 @@ let run ~data_dir cctxt =
   (* Start never-ending monitoring daemons. [coordinator_cctxt] is required to
      monitor new root hashes in legacy mode. *)
   let wallet_cctxt = Node_context.get_tezos_node_cctxt ctxt in
-  match (coordinator_cctxt_opt, committee_member_address_opt) with
-  | Some coordinator_cctxt, Some committee_member_address ->
-      let* committee_member_keys_opt =
-        Dac_manager.Keys.get_wallet_info wallet_cctxt committee_member_address
-      in
+  let* committee_member_keys_opt =
+    Option.map_es
+      (fun committee_member_address ->
+        Wallet_account.Legacy.of_committee_member_address
+          committee_member_address
+          cctxt)
+      committee_member_address_opt
+  in
+  match coordinator_cctxt_opt with
+  | Some coordinator_cctxt ->
       daemonize
         [
           Handler.new_head ctxt cctxt;
@@ -312,13 +349,6 @@ let run ~data_dir cctxt =
             ctxt
             coordinator_cctxt
             ?committee_member_keys:committee_member_keys_opt
-            ?committee_member_address:committee_member_address_opt
             wallet_cctxt;
-        ]
-  | Some coordinator_cctxt, _ ->
-      daemonize
-        [
-          Handler.new_head ctxt cctxt;
-          Handler.new_root_hash ctxt coordinator_cctxt wallet_cctxt;
         ]
   | _ -> daemonize [Handler.new_head ctxt cctxt]
