@@ -146,8 +146,8 @@ module Config_init = struct
   let create_configuration ~data_dir ~reveal_data_dir ~rpc_address ~rpc_port
       mode (cctxt : Client_context.full) =
     let open Lwt_result_syntax in
-    let config : Configuration.t =
-      {data_dir; rpc_address; rpc_port; mode; reveal_data_dir}
+    let config =
+      Configuration.make ~data_dir ~reveal_data_dir rpc_address rpc_port mode
     in
     let* () = Configuration.save config in
     let*! _ =

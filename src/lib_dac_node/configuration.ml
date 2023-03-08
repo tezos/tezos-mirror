@@ -222,6 +222,9 @@ type t = {
           DAC. *)
 }
 
+let make ~data_dir ~reveal_data_dir rpc_address rpc_port mode =
+  {data_dir; reveal_data_dir; rpc_address; rpc_port; mode}
+
 let data_dir_path config subpath = Filename.concat config.data_dir subpath
 
 let filename config = relative_filename config.data_dir

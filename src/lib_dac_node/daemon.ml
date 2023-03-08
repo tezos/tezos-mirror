@@ -265,64 +265,26 @@ let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let* (Configuration.
-          {rpc_address; rpc_port; reveal_data_dir; mode; data_dir = _} as
+          {rpc_address; rpc_port; reveal_data_dir; mode = _; data_dir = _} as
        config) =
     Configuration.load ~data_dir
   in
   let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
-  let* addresses, threshold, coordinator_cctxt_opt, committee_member_address_opt
-      =
-    match mode with
-    | Legacy configuration ->
-        let committee_members_addresses =
-          Configuration.Legacy.committee_members_addresses configuration
-        in
-        let threshold = Configuration.Legacy.threshold configuration in
-        let dac_cctxt_config =
-          Configuration.Legacy.dac_cctxt_config configuration
-        in
-        let committee_member_address_opt =
-          Configuration.Legacy.committee_member_address_opt configuration
-        in
-        return
-          ( committee_members_addresses,
-            threshold,
-            dac_cctxt_config,
-            committee_member_address_opt )
-    | Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
-    | Committee_member _ -> tzfail @@ Mode_not_supported "committee_member"
-    | Observer _ -> tzfail @@ Mode_not_supported "observer"
+  let* ctxt = Node_context.init config cctxt in
+  let coordinator_cctxt_opt =
+    match Node_context.mode ctxt with
+    | Node_context.Coordinator _ -> None
+    | Committee_member committee_member_ctxt ->
+        Some
+          (Node_context.Committee_member.coordinator_cctxt
+             committee_member_ctxt)
+    | Observer observer_ctxt ->
+        Some (Node_context.Observer.coordinator_cctxt observer_ctxt)
+    | Legacy legacy_ctxt -> Node_context.Legacy.coordinator_cctxt legacy_ctxt
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
      Stop DAC node when in Legacy mode, if threshold is not reached. *)
-  let* committee_members =
-    get_all_committee_members_keys addresses ~threshold cctxt
-  in
-  let dac_pks_opt, dac_sk_uris =
-    committee_members
-    |> List.map
-         (fun Wallet_account.Legacy.{public_key_opt; secret_key_uri_opt; _} ->
-           (public_key_opt, secret_key_uri_opt))
-    |> List.split
-  in
-  let coordinator_cctxt_opt =
-    Option.map
-      (fun Configuration.{host; port} ->
-        Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
-      coordinator_cctxt_opt
-  in
-  let* ctxt = Node_context.init config cctxt coordinator_cctxt_opt in
-  let* rpc_server =
-    RPC_server.(
-      start_legacy
-        ~rpc_address
-        ~rpc_port
-        ~threshold
-        cctxt
-        ctxt
-        dac_pks_opt
-        dac_sk_uris)
-  in
+  let* rpc_server = RPC_server.start ~rpc_address ~rpc_port ctxt in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready (rpc_address, rpc_port)) in
   (* Start daemon to resolve current protocol plugin *)
@@ -336,7 +298,7 @@ let run ~data_dir cctxt =
         Wallet_account.Legacy.of_committee_member_address
           committee_member_address
           cctxt)
-      committee_member_address_opt
+      None
   in
   match coordinator_cctxt_opt with
   | Some coordinator_cctxt ->
