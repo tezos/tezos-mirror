@@ -162,13 +162,15 @@ module RPC = struct
             @@ Invalid_block_structure
                  "Unexpected [None] value for [current_number]'s [answer]")
 
-  let block ~number base =
+  let transactions ~full_transaction_object ~number base =
     let open Lwt_result_syntax in
-    let key_transactions = Durable_storage_path.Block.transactions number in
-    let* transactions_answer =
-      call_service ~base durable_state_value () {key = key_transactions} ()
-    in
-    let transactions =
+    if full_transaction_object then
+      failwith "Full transaction objects are not supported yet"
+    else
+      let key_transactions = Durable_storage_path.Block.transactions number in
+      let+ transactions_answer =
+        call_service ~base durable_state_value () {key = key_transactions} ()
+      in
       match transactions_answer with
       | Some bytes ->
           [
@@ -179,7 +181,10 @@ module RPC = struct
           raise
           @@ Invalid_block_structure
                "Unexpected [None] value for [block.transactions]"
-    in
+
+  let block ~full_transaction_object ~number base =
+    let open Lwt_result_syntax in
+    let* transactions = transactions ~full_transaction_object ~number base in
     let* number = block_number base number in
     return
       {
@@ -206,13 +211,20 @@ module RPC = struct
         uncles = [];
       }
 
-  let current_block base () =
-    block ~number:Durable_storage_path.Block.Current base
+  let current_block base ~full_transaction_object =
+    block
+      ~full_transaction_object
+      ~number:Durable_storage_path.Block.Current
+      base
 
   let current_block_number base () =
     block_number base Durable_storage_path.Block.Current
 
-  let nth_block base n = block ~number:Durable_storage_path.Block.(Nth n) base
+  let nth_block base ~full_transaction_object n =
+    block
+      ~full_transaction_object
+      ~number:Durable_storage_path.Block.(Nth n)
+      base
 end
 
 module type S = sig
@@ -222,11 +234,13 @@ module type S = sig
 
   val inject_raw_transaction : string -> unit tzresult Lwt.t
 
-  val current_block : unit -> Ethereum_types.block tzresult Lwt.t
+  val current_block :
+    full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
 
   val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
 
-  val nth_block : Z.t -> Ethereum_types.block tzresult Lwt.t
+  val nth_block :
+    full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
 end
 
 module Make (Base : sig
