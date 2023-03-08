@@ -363,8 +363,8 @@ let convert_api version (endpoints : Api.service Api.endpoint list) : Openapi.t
     =
   let envs, endpoints = List.map convert_endpoint endpoints |> List.split in
   Openapi.make
-    ~title:"Tezos RPC"
-    ~description:"Tezos client RPC API."
+    ~title:"Octez RPC"
+    ~description:"The RPC API served by the Octez node."
     ~version
     ~definitions:(String_map.bindings (merge_env_list envs))
     endpoints
