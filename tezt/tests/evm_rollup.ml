@@ -229,14 +229,7 @@ let test_rpc_getBalance =
   let* {node; client; sc_rollup_node; evm_proxy_server; _} =
     setup_evm_kernel protocol
   in
-  let* () = Client.bake_for_and_wait client in
-  let first_evm_run_level = Node.get_level node in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:30.
-      sc_rollup_node
-      first_evm_run_level
-  in
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
