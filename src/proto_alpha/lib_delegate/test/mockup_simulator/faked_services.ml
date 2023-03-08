@@ -234,17 +234,6 @@ module Make (Hooks : Mocked_services_hooks) = struct
         | None -> failwith "faked_services.inject_operation: can't deserialize"
         | Some operation -> Hooks.inject_operation operation)
 
-  let inject_private_operation =
-    Directory.register
-      Directory.empty
-      Injection_services.S.private_operation
-      (fun () _chain bytes ->
-        match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
-        | None ->
-            failwith
-              "faked_services.inject_private_operation: can't deserialize"
-        | Some operation -> Hooks.inject_operation operation)
-
   let broadcast_block =
     Directory.register
       Directory.empty
@@ -334,7 +323,6 @@ module Make (Hooks : Mocked_services_hooks) = struct
         chain chain_id;
         inject_block;
         inject_operation;
-        inject_private_operation;
         monitor_operations;
         list_blocks;
         live_blocks;
