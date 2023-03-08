@@ -256,7 +256,13 @@ let test_rpc_sendRawTransaction =
     ~tags:["evm"; "send_raw_transaction"]
     ~title:"RPC method eth_sendRawTransaction"
   @@ fun protocol ->
-  let* {sc_rollup_client; evm_proxy_server; _} = setup_evm_kernel protocol in
+  let* {node; client; evm_proxy_server; sc_rollup_node; sc_rollup_client; _} =
+    setup_evm_kernel protocol
+  in
+  (* [Eth_cli.transaction_send] implicitly calls `eth_blockNumber` at some point.
+     We thus need to at least go the first evm run level for the kernel to be able
+     to read at current block's number path, otherwise the test will fail. *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let* tx_hash =
     Eth_cli.transaction_send
       ~source_private_key:Account.accounts.(0).private_key
