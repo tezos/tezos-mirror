@@ -2847,24 +2847,31 @@ let validate_operation ?(check_signature = true)
             operation
       | Single (Failing_noop _) -> tzfail Validate_errors.Failing_noop_error)
 
-let are_endorsements_required vi =
-  let open Lwt_result_syntax in
-  let+ first_level = First_level_of_protocol.get vi.ctxt in
-  (* [Comment from Legacy_apply] NB: the first level is the level
-     of the migration block. There are no endorsements for this
-     block. Therefore the block at the next level cannot contain
-     endorsements. *)
-  let level_position_in_protocol =
-    Raw_level.diff vi.current_level.level first_level
-  in
-  Compare.Int32.(level_position_in_protocol > 1l)
+(** Block finalization *)
+
+open Validate_errors.Block
 
 let check_endorsement_power vi bs =
-  let required = Constants.consensus_threshold vi.ctxt in
-  let provided = bs.endorsement_power in
-  error_unless
-    Compare.Int.(provided >= required)
-    (Validate_errors.Block.Not_enough_endorsements {required; provided})
+  let open Lwt_result_syntax in
+  let* are_endorsements_required =
+    (* The migration block (whose level is [first_level_of_protocol])
+       is always considered final, and is not endorsed. Therefore, the
+       block at the next level does not need to contain endorsements.
+       (Note that the migration block itself is validated by the
+       previous protocol, so the returned value for it does not matter.) *)
+    let* first_level_of_protocol = First_level_of_protocol.get vi.ctxt in
+    let level_position_in_protocol =
+      Raw_level.diff vi.current_level.level first_level_of_protocol
+    in
+    return Compare.Int32.(level_position_in_protocol > 1l)
+  in
+  if are_endorsements_required then
+    let required = Constants.consensus_threshold vi.ctxt in
+    let provided = bs.endorsement_power in
+    fail_unless
+      Compare.Int.(provided >= required)
+      (Not_enough_endorsements {required; provided})
+  else return_unit
 
 let finalize_validate_block_header vi vs checkable_payload_hash
     (block_header_contents : Block_header.contents) round ~fitness_locked_round
@@ -2894,12 +2901,7 @@ let finalize_block {info; block_state; _} =
   let open Lwt_result_syntax in
   match info.mode with
   | Application {round; locked_round; predecessor_hash; header_contents} ->
-      let* are_endorsements_required = are_endorsements_required info in
-      let*? () =
-        if are_endorsements_required then
-          check_endorsement_power info block_state
-        else ok_unit
-      in
+      let* () = check_endorsement_power info block_state in
       let block_payload_hash =
         compute_payload_hash block_state header_contents ~predecessor_hash
       in
@@ -2914,12 +2916,7 @@ let finalize_block {info; block_state; _} =
       in
       return_unit
   | Partial_validation _ ->
-      let* are_endorsements_required = are_endorsements_required info in
-      let*? () =
-        if are_endorsements_required then
-          check_endorsement_power info block_state
-        else ok_unit
-      in
+      let* () = check_endorsement_power info block_state in
       return_unit
   | Construction {round; predecessor_hash; header_contents} ->
       let block_payload_hash =
@@ -2939,12 +2936,7 @@ let finalize_block {info; block_state; _} =
                hash. *)
             Block_header.No_check
       in
-      let* are_endorsements_required = are_endorsements_required info in
-      let*? () =
-        if are_endorsements_required then
-          check_endorsement_power info block_state
-        else ok_unit
-      in
+      let* () = check_endorsement_power info block_state in
       let*? () =
         finalize_validate_block_header
           info
