@@ -15,12 +15,12 @@ depends: [
   "tezos-protocol-alpha" {with-test}
   "tezos-alpha-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
-  "tezos-protocol-plugin-alpha" {with-test}
   "tezos-client-alpha" {with-test}
   "tezos-benchmark" {with-test}
   "tezos-micheline" {with-test}
   "tezos-benchmark-alpha" {with-test}
   "tezos-benchmark-type-inference-alpha" {with-test}
+  "tezos-protocol-plugin-alpha" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
   "tezt" { with-test & >= "3.0.0" }
