@@ -82,10 +82,10 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
-  let version = V.(at_least "5.0.0" && less_than "5.1.0") in
+  let version = V.(at_least "6.0.1" && less_than "6.1.0") in
   external_lib
     ~js_compatible:true
-    ~npm_deps:[Npm.make "@dannywillems/ocaml-bls12-381" version]
+    ~npm_deps:[Npm.make "@nomadic-labs/ocaml-bls12-381" version]
     "bls12-381"
     version
 

@@ -113,6 +113,8 @@ module Inner = struct
   module Scalar = Bls12_381.Fr
   module Polynomials = Tezos_bls12_381_polynomial_internal.Polynomial
 
+  module G1_array = Tezos_bls12_381_polynomial_internal.Ec_carray.G1_carray
+
   (* Operations on vector of scalars *)
   module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations
 
@@ -1040,14 +1042,6 @@ module Inner = struct
     Pairing.pairing_check
       [(cm, committed_offset_monomial); (proof, G2.(negate (copy one)))]
 
-  let inverse domain =
-    let n = Array.length domain in
-    Array.init n (fun i ->
-        if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
-
-  (* This is a hack to obtain an array from a Domain.t. *)
-  let domain_to_array d = inverse (Domains.inverse d)
-
   let diff_next_power_of_two x = (1 lsl Z.log2up (Z.of_int x)) - x
 
   (* Notations
@@ -1248,7 +1242,7 @@ module Inner = struct
        [l = t.shard_length] here). *)
     assert (t.max_polynomial_length mod t.shard_length = 0) ;
     let domain_length = 2 * t.max_polynomial_length / t.shard_length in
-    let domain = domain_to_array (Domains.build domain_length) in
+    let domain = Domains.build domain_length in
     let srs = t.srs.raw.srs_g1 in
     (* Computes
        points = srs_{m-j-l} srs_{m-j-2l} srs_{m-j-3l} ... srs_{m-j-ql=r}
@@ -1260,7 +1254,7 @@ module Inner = struct
          equals [floor (x /. y)]. *)
       let quotient = (t.max_polynomial_length - j) / t.shard_length in
       let points =
-        Array.init domain_length (fun i ->
+        G1_array.init domain_length (fun i ->
             if i < quotient then
               Bls12_381.G1.copy
                 (Srs_g1.get
@@ -1268,7 +1262,7 @@ module Inner = struct
                    (t.max_polynomial_length - j - ((i + 1) * t.shard_length)))
             else Bls12_381.G1.(copy zero))
       in
-      Bls12_381.G1.fft_inplace ~domain ~points ;
+      G1_array.evaluation_ecfft_inplace ~domain ~points ;
       points
     in
     (domain, Array.init t.shard_length s_j)
@@ -1291,7 +1285,7 @@ module Inner = struct
     (* [t.max_polynomial_length > l] where [l = t.shard_length]. *)
     assert (t.shard_length < t.max_polynomial_length) ;
     (* Step 2. *)
-    let domain_length = Array.length domain in
+    let domain_length = Domains.length domain in
     let h_j j =
       let remainder = (t.max_polynomial_length - j) mod t.shard_length in
       let quotient = (t.max_polynomial_length - j) / t.shard_length in
@@ -1300,11 +1294,12 @@ module Inner = struct
                  ... P_{r+(q-1)l=m-j-l} || 0^{2m/l- (2*q+2*padding+1)}
                  where [q = floor ((m-j)/l) = quotient]. *)
       let points =
-        Array.init domain_length (fun i ->
+        Polynomials.init domain_length (fun i ->
             let idx =
               remainder + ((i - (quotient + (2 * padding))) * t.shard_length)
             in
-            if
+            if i = 0 then Scalar.copy coefficients.(t.max_polynomial_length - j)
+            else if
               i <= quotient + (2 * padding) || idx > t.max_polynomial_length
               (* The second inequality is here in the case
                  [t.max_polynomial_length = 2*t.shard_length]
@@ -1317,32 +1312,33 @@ module Inner = struct
             then Scalar.(copy zero)
             else Scalar.copy coefficients.(idx))
       in
-      (* Set P_{m-j}. *)
-      points.(0) <- Scalar.copy coefficients.(t.max_polynomial_length - j) ;
       (* FFT of step 2. *)
-      Scalar.fft_inplace ~domain ~points ;
-      (* Pairwise product of step 3. *)
-      Array.map2 Bls12_381.G1.mul sj.(j) points
+      Evaluations.evaluation_fft domain points
     in
+
+    (* Pairwise product of step 3. *)
+    let evaluations = Array.init t.shard_length h_j in
+    let h_j = G1_array.mul_arrays ~evaluations ~arrays:sj in
     (* Sum of step 3. *)
-    let sum = h_j 0 in
-    let rec sum_hj j =
-      if j = t.shard_length then ()
-      else
-        let hj = h_j j in
-        Array.iteri (fun i hij -> sum.(i) <- Bls12_381.G1.add sum.(i) hij) hj ;
-        sum_hj (j + 1)
-    in
-    sum_hj 1 ;
+    let sum = h_j.(0) in
+    for i = 1 to t.shard_length - 1 do
+      G1_array.add_arrays_inplace sum h_j.(i)
+    done ;
+
     (* Step 3. Toeplitz matrix-vector multiplication *)
-    Bls12_381.G1.ifft_inplace ~domain:(inverse domain) ~points:sum ;
+    G1_array.interpolation_ecfft_inplace ~domain ~points:sum ;
+
     (* Keep first n / l coefficients *)
-    let points = Array.sub sum 0 (Array.length domain / 2) in
+    let len = Domains.length domain / 2 in
+    let points = G1_array.sub sum ~off:0 ~len in
     (* Step 4. *)
-    let domain =
-      domain_to_array (Domains.build_power_of_two t.shard_proofs_log)
+    let domain = Domains.build_power_of_two t.shard_proofs_log in
+    let proofs =
+      G1_array.init t.number_of_shards (fun _ -> Bls12_381.G1.(copy zero))
     in
-    Bls12_381.G1.fft ~domain ~points
+    G1_array.blit points ~src_off:0 proofs ~dst_off:0 ~len ;
+    G1_array.evaluation_ecfft_inplace ~domain ~points:proofs ;
+    G1_array.to_array proofs
 
   (* [interpolation_poly root domain evaluations] returns the unique
      polynomial P of degree [< Domains.length domain] verifying
@@ -1352,7 +1348,10 @@ module Inner = struct
      - [(Array.length evaluations = Domains.length domain)] *)
   let interpolation_poly ~root ~domain ~evaluations =
     assert (Array.length evaluations = Domains.length domain) ;
-    Scalar.ifft_inplace ~domain:(Domains.inverse domain) ~points:evaluations ;
+    let evaluations =
+      Polynomials.to_dense_coefficients
+        (Evaluations.interpolation_fft2 domain evaluations)
+    in
     (* Computes root_inverse = 1/root. *)
     let root_inverse = Scalar.inverse_exn root in
     (* Computes evaluations[i] = evaluations[i] * root_inverse^i. *)
