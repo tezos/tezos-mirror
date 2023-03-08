@@ -5,7 +5,7 @@
 
 use host::path::*;
 use host::rollup_core::RawRollupCore;
-use host::runtime::{load_value_slice, Runtime};
+use host::runtime::{load_value_slice, Runtime, ValueType};
 
 use std::str::from_utf8;
 
@@ -60,9 +60,9 @@ pub fn store_smart_rollup_address<Host: Runtime + RawRollupCore>(
 pub const WORD_SIZE: usize = 32usize;
 
 /// Read a single unsigned 256 bit value from storage at the path given.
-fn read_u256(host: &impl Runtime, path: &OwnedPath) -> U256 {
-    let bytes = host.store_read(path, 0, WORD_SIZE).unwrap();
-    Wei::from_little_endian(&bytes)
+fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
+    let bytes = host.store_read(path, 0, WORD_SIZE).map_err(Error::from)?;
+    Ok(Wei::from_little_endian(&bytes))
 }
 
 fn write_u256(host: &mut impl Runtime, path: &OwnedPath, value: U256) -> Result<(), Error> {
@@ -77,7 +77,7 @@ fn address_path(address: Hash) -> Result<OwnedPath, Error> {
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
 
-fn account_path(address: Hash) -> Result<OwnedPath, Error> {
+pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
     let address_hash = address_path(address)?;
     concat(&EVM_ACCOUNTS, &address_hash).map_err(Error::from)
 }
@@ -87,6 +87,16 @@ fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
     let number_path = OwnedPath::try_from(raw_number_path).map_err(Error::from)?;
     concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
+}
+
+pub fn has_account<Host: Runtime>(
+    host: &mut Host,
+    account_path: &OwnedPath,
+) -> Result<bool, Error> {
+    match host.store_has(account_path).map_err(Error::from)? {
+        Some(ValueType::Subtree | ValueType::ValueWithSubtree) => Ok(true),
+        _ => Ok(false),
+    }
 }
 
 pub fn read_account_nonce<Host: Runtime + RawRollupCore>(
@@ -107,7 +117,7 @@ pub fn read_account_balance<Host: Runtime + RawRollupCore>(
     account_path: &OwnedPath,
 ) -> Result<Wei, Error> {
     let path = concat(account_path, &EVM_ACCOUNT_BALANCE)?;
-    Ok(read_u256(host, &path))
+    read_u256(host, &path)
 }
 
 pub fn read_account_code_hash<Host: Runtime>(
