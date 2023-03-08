@@ -2873,13 +2873,31 @@ let check_endorsement_power vi bs =
       (Not_enough_endorsements {required; provided})
   else return_unit
 
+(** Check that the locked round in the fitness and the locked round
+    observed in the preendorsements are the same.
+
+    This check is not called in construction mode because there is
+    no provided fitness (meaning that we do not know whether the block
+    should contain any preendorsements).
+
+    When the observed locked round is [Some _], we actually already
+    know that it is identical to the fitness locked round, otherwise
+    {!Consensus.check_preexisting_block_preendorsement} would have
+    rejected the preendorsements. But this check is needed to reject
+    blocks where the fitness locked round has a value yet there are no
+    preendorsements (ie. the observed locked round is [None]). *)
+let check_fitness_locked_round bs fitness_locked_round =
+  let observed_locked_round = Option.map fst bs.locked_round_evidence in
+  error_unless
+    (Option.equal Round.equal observed_locked_round fitness_locked_round)
+    Fitness.Wrong_fitness
+
 type checkable_payload_hash =
   | No_check
   | Expected_payload_hash of Block_payload_hash.t
 
 let finalize_validate_block_header vi vs checkable_payload_hash
-    (block_header_contents : Block_header.contents) round ~fitness_locked_round
-    =
+    (block_header_contents : Block_header.contents) round =
   let open Result_syntax in
   let* () =
     match checkable_payload_hash with
@@ -2890,28 +2908,20 @@ let finalize_validate_block_header vi vs checkable_payload_hash
           (Block_payload_hash.equal actual_payload_hash bph)
           (Invalid_payload_hash {expected = bph; provided = actual_payload_hash})
   in
-  let* observed_locked_round =
-    match vs.locked_round_evidence with
-    | None -> ok None
-    | Some (preendorsement_round, preendorsement_count) ->
-        let* () =
-          error_when
-            Round.(preendorsement_round >= round)
-            (Locked_round_after_block_round
-               {locked_round = preendorsement_round; round})
-        in
-        let* () =
-          let consensus_threshold = Constants.consensus_threshold vi.ctxt in
-          error_when
-            Compare.Int.(preendorsement_count < consensus_threshold)
-            (Insufficient_locked_round_evidence
-               {voting_power = preendorsement_count; consensus_threshold})
-        in
-        ok (Some preendorsement_round)
-  in
-  error_unless
-    (Option.equal Round.equal observed_locked_round fitness_locked_round)
-    Fitness.Wrong_fitness
+  match vs.locked_round_evidence with
+  | None -> ok_unit
+  | Some (preendorsement_round, preendorsement_count) ->
+      let* () =
+        error_when
+          Round.(preendorsement_round >= round)
+          (Locked_round_after_block_round
+             {locked_round = preendorsement_round; round})
+      in
+      let consensus_threshold = Constants.consensus_threshold vi.ctxt in
+      error_when
+        Compare.Int.(preendorsement_count < consensus_threshold)
+        (Insufficient_locked_round_evidence
+           {voting_power = preendorsement_count; consensus_threshold})
 
 let compute_payload_hash block_state
     (block_header_contents : Block_header.contents) ~predecessor_hash =
@@ -2925,6 +2935,7 @@ let finalize_block {info; block_state; _} =
   match info.mode with
   | Application {round; locked_round; predecessor_hash; header_contents} ->
       let* () = check_endorsement_power info block_state in
+      let*? () = check_fitness_locked_round block_state locked_round in
       let block_payload_hash =
         compute_payload_hash block_state header_contents ~predecessor_hash
       in
@@ -2935,7 +2946,6 @@ let finalize_block {info; block_state; _} =
           (Expected_payload_hash block_payload_hash)
           header_contents
           round
-          ~fitness_locked_round:locked_round
       in
       return_unit
   | Partial_validation _ ->
@@ -2967,7 +2977,6 @@ let finalize_block {info; block_state; _} =
           checkable_payload_hash
           header_contents
           round
-          ~fitness_locked_round:(Option.map fst locked_round_evidence)
       in
       return_unit
   | Mempool ->
