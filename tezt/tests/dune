@@ -50,6 +50,7 @@
   src_lib_shell_services_test_tezt_lib
   src_lib_shell_test_tezt_lib
   src_lib_sapling_test_tezt_lib
+  src_lib_rpc_http_test_tezt_lib
   src_lib_requester_test_tezt_lib
   src_lib_proxy_server_config_test_tezt_lib
   src_lib_p2p_tezt_tezt_lib
