@@ -1655,6 +1655,8 @@ module Internal_for_tests = struct
   let minimum_number_of_shards_to_reconstruct_slot (t : t) =
     t.max_polynomial_length / t.number_of_shards
 
+  let select_fft_domain = select_fft_domain
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let max_polynomial_length =

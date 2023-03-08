@@ -392,6 +392,23 @@ module Test = struct
         | Ok true -> true
         | _ -> false)
 
+  let test_select_fft_domain =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test FFT domain selection"
+      ~print:QCheck2.Print.int
+      (QCheck2.Gen.int_range 1 10_000_000)
+      (fun n ->
+        let domain_size, _, _ =
+          Cryptobox.Internal_for_tests.select_fft_domain n
+        in
+        domain_size >= n
+        && List.fold_left
+             (fun acc factor -> fst Z.(remove acc (of_int factor)))
+             (Z.of_int domain_size)
+             [2; 3; 11; 19]
+           = Z.one)
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -476,5 +493,6 @@ let () =
             Test.test_shard_proofs;
             Test.test_commitment_proof;
             Test.test_polynomial_slot_conversions;
+            Test.test_select_fft_domain;
           ] );
     ]

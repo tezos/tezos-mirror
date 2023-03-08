@@ -396,6 +396,18 @@ module Internal_for_tests : sig
      number of shards to reconstruct a slot using [polynomial_from_shards]. *)
   val minimum_number_of_shards_to_reconstruct_slot : t -> int
 
+  (* [select_fft_domain domain_size] selects a suitable domain for the FFT.
+
+     The domain size [domain_size] is expected to be strictly positive.
+     Return [(size, power_of_two, remainder)] such that:
+     * If [domain_size > 1], then [size] is the smallest integer greater or
+     equal to [domain_size] and is of the form 2^a * 3^b * 11^c * 19^d,
+     where a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}.
+     * If [domain_size = 1], then [size = 2].
+     * [size = power_of_two * remainder], [power_of_two] is a power of two,
+     and [remainder] is not divisible by 2. *)
+  val select_fft_domain : int -> int * int * int
+
   (* [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
