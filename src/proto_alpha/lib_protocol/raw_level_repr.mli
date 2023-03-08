@@ -63,6 +63,9 @@ val succ : raw_level -> raw_level
 
 val pred : raw_level -> raw_level option
 
+(** Return the predecessor of [l] when [l >= 2], otherwise return [None]. *)
+val pred_dontreturnzero : raw_level -> raw_level option
+
 (** [add l i] i must be positive *)
 val add : raw_level -> int -> raw_level
 

@@ -61,6 +61,8 @@ let sub l i =
 
 let pred l = if l = 0l then None else Some (Int32.pred l)
 
+let pred_dontreturnzero l = if l <= 1l then None else Some (Int32.pred l)
+
 let diff = Int32.sub
 
 let to_int32 l = l
