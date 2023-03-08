@@ -115,20 +115,38 @@ type mode =
 
     In these modes, endorsements must point to the predecessor's level
     and preendorsements, if any, to the block's level. *)
-let init_consensus_rights_for_block ctxt ~predecessor_level =
+let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt, endorsements_map =
     Baking.endorsing_rights_by_first_slot ctxt predecessor_level
   in
-  let* ctxt, preendorsements_map =
-    Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
+  let*? can_contain_preendorsements =
+    match mode with
+    | Construction _ | Partial_construction _ -> ok true
+    | Application block_header | Partial_validation block_header ->
+        (* A preexisting block, which has a complete and correct block
+           header, can only contain preendorsements when the locked
+           round in the fitness has an actual value. *)
+        let open Result_syntax in
+        let* locked_round =
+          Fitness.locked_round_from_raw block_header.shell.fitness
+        in
+        return (Option.is_some locked_round)
+  in
+  let* ctxt, allowed_preendorsements =
+    if can_contain_preendorsements then
+      let* ctxt, preendorsements_map =
+        Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
+      in
+      return (ctxt, Some preendorsements_map)
+    else return (ctxt, None)
   in
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_endorsements:(Some endorsements_map)
-      ~allowed_preendorsements:(Some preendorsements_map)
+      ~allowed_preendorsements
   in
   return ctxt
 
@@ -187,7 +205,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let* ctxt =
     match mode with
     | Application _ | Partial_validation _ | Construction _ ->
-        init_consensus_rights_for_block ctxt ~predecessor_level
+        init_consensus_rights_for_block ctxt mode ~predecessor_level
     | Partial_construction _ ->
         init_consensus_rights_for_mempool ctxt ~predecessor_level
   in

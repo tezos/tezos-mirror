@@ -70,6 +70,10 @@ val round_from_raw : Fitness.t -> Round_repr.t tzresult
    is from a previous protocol, the returned value will be Round.zero. *)
 val predecessor_round_from_raw : Fitness.t -> Round_repr.t tzresult
 
+(** Returns the locked round from a raw fitness. If the fitness is
+    from a previous version, the returned value will be None. *)
+val locked_round_from_raw : Fitness.t -> Round_repr.t option tzresult
+
 (** Validate only the part of the fitness for which information are
     available during begin_application *)
 val check_except_locked_round :

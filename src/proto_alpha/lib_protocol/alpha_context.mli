@@ -1227,6 +1227,9 @@ module Fitness : sig
 
   val predecessor_round_from_raw : raw -> Round.t tzresult
 
+  (** See {!Fitness_repr.locked_round_from_raw}. *)
+  val locked_round_from_raw : raw -> Round.t option tzresult
+
   val level : t -> Raw_level.t
 
   val round : t -> Round.t

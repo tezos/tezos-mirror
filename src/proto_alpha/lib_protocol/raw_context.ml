@@ -96,7 +96,9 @@ module Raw_consensus = struct
         (** Preendorsements rights for the current block. Only a preendorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
-            slot with its power. This is [None] only in mempool mode. *)
+            slot with its power. This is [None] only in mempool mode, or in
+            application mode when there is no locked round (so the block
+            cannot contain any preendorsements). *)
     endorsements_seen : Slot_repr.Set.t;
         (** Record the endorsements already seen. Only initial slots are indexed. *)
     preendorsements_seen : Slot_repr.Set.t;
