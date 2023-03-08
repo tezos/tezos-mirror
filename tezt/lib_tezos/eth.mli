@@ -23,44 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let path = "eth"
+module Block : sig
+  (** Simplified Ethereum block representation. *)
+  type t = {
+    number : int32;
+    hash : string option;
+    parent : string;
+    nonce : string;
+    sha3Uncles : string;
+    logsBloom : string option;
+    transactionRoot : string;
+    stateRoot : string;
+    receiptRoot : string;
+    miner : string;
+    difficulty : int64;
+    totalDifficulty : int64;
+    extraData : string;
+    size : int32;
+    gasLimit : int32;
+    gasUsed : int32;
+    timestamp : int32;
+    transactions : string list;
+    uncles : string list;
+  }
 
-let spawn_command command =
-  Process.spawn path command |> Process.check_and_read_stdout
-
-let balance ~account ~endpoint =
-  let* answer =
-    spawn_command ["address:balance"; account; "--network"; endpoint]
-  in
-  return (int_of_string (String.trim answer))
-
-let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
-  let* answer =
-    spawn_command
-      [
-        "transaction:send";
-        "--pk";
-        source_private_key;
-        "--to";
-        to_public_key;
-        "--value";
-        Z.to_string value;
-        "--network";
-        endpoint;
-      ]
-  in
-  return (String.trim answer)
-
-let get_block ~block_id ~endpoint =
-  let exception Could_not_parse_block of string in
-  let* answer = spawn_command ["block:get"; block_id; "--network"; endpoint] in
-  let block_as_json =
-    match Data_encoding.Json.from_string answer with
-    | Ok json -> json
-    | Error msg -> raise @@ Could_not_parse_block msg
-  in
-  return @@ Data_encoding.Json.destruct Eth.Block.encoding block_as_json
-
-let block_number ~endpoint =
-  let* answer = spawn_command ["block:number"; "--network"; endpoint] in
-  return (int_of_string (String.trim answer))
+  (** Simplified Ethereum block's encoding. *)
+  val encoding : t Data_encoding.t
+end

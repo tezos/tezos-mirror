@@ -74,6 +74,15 @@ module Account = struct
     |]
 end
 
+(** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
+    the [node]'s next level. *)
+let next_evm_level ~sc_rollup_node ~node ~client =
+  let* () = Client.bake_for_and_wait client in
+  Sc_rollup_node.wait_for_level
+    ~timeout:30.
+    sc_rollup_node
+    (Node.get_level node)
+
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
@@ -220,19 +229,12 @@ let test_rpc_getBalance =
   let* {node; client; sc_rollup_node; evm_proxy_server; _} =
     setup_evm_kernel protocol
   in
-  let* () = Client.bake_for_and_wait client in
-  let first_evm_run_level = Node.get_level node in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:30.
-      sc_rollup_node
-      first_evm_run_level
-  in
-  let evm_proxy_server_endoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
       ~account:Account.prefunded_account_pk
-      ~endpoint:evm_proxy_server_endoint
+      ~endpoint:evm_proxy_server_endpoint
   in
   Check.((balance = 9999) int)
     ~error_msg:
@@ -247,7 +249,13 @@ let test_rpc_sendRawTransaction =
     ~tags:["evm"; "send_raw_transaction"]
     ~title:"RPC method eth_sendRawTransaction"
   @@ fun protocol ->
-  let* {sc_rollup_client; evm_proxy_server; _} = setup_evm_kernel protocol in
+  let* {node; client; evm_proxy_server; sc_rollup_node; sc_rollup_client; _} =
+    setup_evm_kernel protocol
+  in
+  (* [Eth_cli.transaction_send] implicitly calls `eth_blockNumber` at some point.
+     We thus need to at least go the first evm run level for the kernel to be able
+     to read at current block's number path, otherwise the test will fail. *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let* tx_hash =
     Eth_cli.transaction_send
       ~source_private_key:Account.accounts.(0).private_key
@@ -270,10 +278,62 @@ let test_rpc_sendRawTransaction =
   in
   unit
 
+let test_rpc_getBlockByNumber =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_block_by_number"]
+    ~title:"RPC method eth_getBlockByNumber"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* () = Client.bake_for_and_wait client in
+  let first_evm_run_level = Node.get_level node in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:30.
+      sc_rollup_node
+      first_evm_run_level
+  in
+  let* block =
+    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
+  in
+  (* For our needs, we just test these two relevant fields for now: *)
+  Check.((block.number = 0l) int32)
+    ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
+  Check.(block.transactions = ["0x100"])
+    (Check.list Check.string)
+    ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
+  unit
+
+let test_l2_blocks_progression =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_blocks_progression"]
+    ~title:"Check L2 blocks progression"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let check_block_progression ~expected_block_level =
+    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+    let* block_number =
+      Eth_cli.block_number ~endpoint:evm_proxy_server_endpoint
+    in
+    return
+    @@ Check.((block_number = expected_block_level) int)
+         ~error_msg:"Unexpected block number, should be %%R, but got %%L"
+  in
+  let* () = check_block_progression ~expected_block_level:0 in
+  let* () = check_block_progression ~expected_block_level:1 in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
   test_rpc_getBalance protocols ;
-  test_rpc_sendRawTransaction protocols
+  test_rpc_sendRawTransaction protocols ;
+  test_rpc_getBlockByNumber protocols ;
+  test_l2_blocks_progression protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

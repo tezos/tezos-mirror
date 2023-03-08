@@ -33,6 +33,25 @@ module Durable_storage_path = struct
   let account_path (Address s) = accounts ^ "/" ^ s
 
   let balance_path address = account_path address ^ balance
+
+  let number = "/number"
+
+  let transactions = "/transactions"
+
+  module Block = struct
+    let blocks = "/evm/blocks"
+
+    type number = Current | Nth of Z.t
+
+    let number_to_string = function
+      | Current -> "current"
+      | Nth i -> Z.to_string i
+
+    let transactions block_number =
+      blocks ^ "/" ^ number_to_string block_number ^ transactions
+
+    let current_number = blocks ^ "/current" ^ number
+  end
 end
 
 module RPC = struct
@@ -122,6 +141,78 @@ module RPC = struct
        the resulted hash. *)
     let* _answer = call_service ~base batcher_injection () () [tx] in
     return_unit
+
+  exception Invalid_block_structure of string
+
+  let block_number base n =
+    let open Lwt_result_syntax in
+    match n with
+    (* This avoids an unecessary service call in case we ask a block's number
+       with an already expected/known block number [n]. *)
+    | Durable_storage_path.Block.Nth i ->
+        return @@ Ethereum_types.Block_height i
+    | Durable_storage_path.Block.Current -> (
+        let key = Durable_storage_path.Block.current_number in
+        let+ answer = call_service ~base durable_state_value () {key} () in
+        match answer with
+        | Some bytes ->
+            Ethereum_types.Block_height (Bytes.to_string bytes |> Z.of_bits)
+        | None ->
+            raise
+            @@ Invalid_block_structure
+                 "Unexpected [None] value for [current_number]'s [answer]")
+
+  let block ~number base =
+    let open Lwt_result_syntax in
+    let key_transactions = Durable_storage_path.Block.transactions number in
+    let* transactions_answer =
+      call_service ~base durable_state_value () {key = key_transactions} ()
+    in
+    let transactions =
+      match transactions_answer with
+      | Some bytes ->
+          [
+            Ethereum_types.Hash
+              (Bytes.to_string bytes |> Z.of_bits |> z_to_hexa |> strip_0x);
+          ]
+      | None ->
+          raise
+          @@ Invalid_block_structure
+               "Unexpected [None] value for [block.transactions]"
+    in
+    let* number = block_number base number in
+    return
+      {
+        number = Some number;
+        hash = Some (Ethereum_types.Block_hash "");
+        parent = Ethereum_types.Block_hash "";
+        nonce = Ethereum_types.Hash "";
+        sha3Uncles = Ethereum_types.Hash "";
+        logsBloom = None;
+        transactionRoot = Ethereum_types.Hash "";
+        stateRoot = Ethereum_types.Hash "";
+        receiptRoot = Ethereum_types.Hash "";
+        (* We need the following dummy value otherwise eth-cli will complain
+           that miner's address is not a valid Ethereum address. *)
+        miner = Ethereum_types.Hash "6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        difficulty = Ethereum_types.Qty Z.zero;
+        totalDifficulty = Ethereum_types.Qty Z.zero;
+        extraData = "";
+        size = Ethereum_types.Qty Z.zero;
+        gasLimit = Ethereum_types.Qty Z.zero;
+        gasUsed = Ethereum_types.Qty Z.zero;
+        timestamp = Ethereum_types.Qty Z.zero;
+        transactions;
+        uncles = [];
+      }
+
+  let current_block base () =
+    block ~number:Durable_storage_path.Block.Current base
+
+  let current_block_number base () =
+    block_number base Durable_storage_path.Block.Current
+
+  let nth_block base n = block ~number:Durable_storage_path.Block.(Nth n) base
 end
 
 module type S = sig
@@ -130,6 +221,12 @@ module type S = sig
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
   val inject_raw_transaction : string -> unit tzresult Lwt.t
+
+  val current_block : unit -> Ethereum_types.block tzresult Lwt.t
+
+  val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
+
+  val nth_block : Z.t -> Ethereum_types.block tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -140,4 +237,10 @@ end) : S = struct
   let balance = RPC.balance Base.base
 
   let inject_raw_transaction = RPC.inject_raw_transaction Base.base
+
+  let current_block = RPC.current_block Base.base
+
+  let current_block_number = RPC.current_block_number Base.base
+
+  let nth_block = RPC.nth_block Base.base
 end
