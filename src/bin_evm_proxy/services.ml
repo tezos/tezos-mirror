@@ -151,10 +151,13 @@ let inject_raw_transaction (module Rollup_node_rpc : Rollup_node.S)
   let* () = Rollup_node_rpc.inject_raw_transaction tx in
   return (Mock.hash_f Hex.(of_string tx_hash |> show))
 
-let get_block block_param (module Rollup_node_rpc : Rollup_node.S) =
+let get_block ~full_transaction_object block_param
+    (module Rollup_node_rpc : Rollup_node.S) =
   match block_param with
-  | Ethereum_types.(Hash_param (Block_height n)) -> Rollup_node_rpc.nth_block n
-  | Latest | Earliest | Pending -> Rollup_node_rpc.current_block ()
+  | Ethereum_types.(Hash_param (Block_height n)) ->
+      Rollup_node_rpc.nth_block ~full_transaction_object n
+  | Latest | Earliest | Pending ->
+      Rollup_node_rpc.current_block ~full_transaction_object
 
 let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
     =
@@ -183,11 +186,11 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
             in
             return (Block_number.Output (Ok block_number))
         | Get_block_by_number.Input
-            (Some (block_param, _full_transaction_object)) ->
+            (Some (block_param, full_transaction_object)) ->
             let* block =
               match rollup_node_config with
               | Some (rollup_node_rpc, _smart_rollup_address) ->
-                  get_block block_param rollup_node_rpc
+                  get_block ~full_transaction_object block_param rollup_node_rpc
               | None -> return @@ Mock.block ()
             in
             return (Get_block_by_number.Output (Ok block))

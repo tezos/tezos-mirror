@@ -35,15 +35,27 @@ module type S = sig
       batcher queue. *)
   val inject_raw_transaction : string -> unit tzresult Lwt.t
 
-  (** [current_block ()] returns the most recent processed and stored block. *)
-  val current_block : unit -> Ethereum_types.block tzresult Lwt.t
+  (** [current_block ~full_transaction_object] returns the most recent
+      processed and stored block.
 
-  (** [current_block_number ()] returns the most recent processed and stored block
+      If [full_transaction_object] is [true], returns the transaction objects,
+      the transactions hashes otherwise.
+  *)
+  val current_block :
+    full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
+
+  (** [current_block_number ()]  returns the most recent processed and stored block
       number. *)
   val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
 
-  (** [nth_block n] returns the [n]th processed and stored block. *)
-  val nth_block : Z.t -> Ethereum_types.block tzresult Lwt.t
+  (** [nth_block ~full_transaction_object n] returns the [n]th processed and
+      stored block.
+
+      If [full_transaction_object] is [true], returns the transaction objects,
+      the transactions hashes otherwise.
+  *)
+  val nth_block :
+    full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup
