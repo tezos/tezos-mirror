@@ -446,6 +446,8 @@ module Internal_for_tests : sig
   val precomputation_equal :
     shards_proofs_precomputation -> shards_proofs_precomputation -> bool
 
+  val reset_initialisation_parameters : unit -> unit
+
   (* [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool

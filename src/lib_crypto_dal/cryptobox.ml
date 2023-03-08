@@ -1665,6 +1665,8 @@ module Internal_for_tests = struct
     Array.for_all2 Scalar.eq d1 d2
     && Array.for_all2 (Array.for_all2 Bls12_381.G1.eq) a1 a2
 
+  let reset_initialisation_parameters () = initialisation_parameters := None
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let max_polynomial_length =

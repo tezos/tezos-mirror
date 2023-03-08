@@ -473,6 +473,20 @@ module Test = struct
         | Error [Cryptobox.Dal_initialisation_twice] -> true
         | _ -> false)
 
+  let find_trusted_setup_files () =
+    let config : Cryptobox.Config.t =
+      {activated = true; use_mock_srs_for_testing = None}
+    in
+    Cryptobox.Internal_for_tests.reset_initialisation_parameters () ;
+    let find_srs_files () : (string * string) Error_monad.tzresult =
+      Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
+    in
+    Lwt_main.run
+      (Cryptobox.Config.init_dal ~find_srs_files ~srs_size_log2:5 config)
+    |> function
+    | Ok () -> ()
+    | Error _ -> assert false
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -523,7 +537,10 @@ let test =
   List.map
     (fun (test_name, test_func) ->
       Alcotest.test_case test_name `Quick test_func)
-    [ (*("test_collision_page_size", Test.test_collision_page_size);*) ]
+    [
+      ("find_trusted_setup_files", Test.find_trusted_setup_files)
+      (*("test_collision_page_size", Test.test_collision_page_size);*);
+    ]
 
 let () =
   (* Seed for deterministic pseudo-randomness:
