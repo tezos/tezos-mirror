@@ -1566,11 +1566,16 @@ module Internal_for_tests = struct
 
   let load_parameters parameters = initialisation_parameters := Some parameters
 
-  let make_dummy_shards (t : t) ~share_length =
+  let make_dummy_shards (t : t) ~state =
+    Random.set_state state ;
     let rec loop index seq =
       if index = t.number_of_shards then seq
       else
-        let share = Array.init share_length (fun _ -> Scalar.(copy zero)) in
+        let share =
+          Array.init
+            (t.shard_length + 1 + Random.int 100)
+            (fun _ -> Scalar.(random ~state ()))
+        in
         loop (index + 1) (Seq.cons {index; share} seq)
     in
     loop 0 Seq.empty

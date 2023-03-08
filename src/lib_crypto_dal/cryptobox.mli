@@ -365,8 +365,9 @@ module Internal_for_tests : sig
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
 
-  (* Returns a default valid sequence of shards for the given parameters. *)
-  val make_dummy_shards : t -> share_length:int -> shard Seq.t
+  (* Returns a randomized valid sequence of shards using the random state
+     [state] for the given parameters. *)
+  val make_dummy_shards : t -> state:Random.State.t -> shard Seq.t
 
   (* [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
      represent the same polynomial. *)
