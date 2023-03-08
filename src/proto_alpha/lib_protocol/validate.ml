@@ -2896,22 +2896,32 @@ type checkable_payload_hash =
   | No_check
   | Expected_payload_hash of Block_payload_hash.t
 
-let finalize_validate_block_header vi vs checkable_payload_hash
-    (block_header_contents : Block_header.contents) round =
+let finalize_validate_block_header checkable_payload_hash
+    (block_header_contents : Block_header.contents) =
+  match checkable_payload_hash with
+  | No_check -> ok_unit
+  | Expected_payload_hash bph ->
+      let actual_payload_hash = block_header_contents.payload_hash in
+      error_unless
+        (Block_payload_hash.equal actual_payload_hash bph)
+        (Invalid_payload_hash {expected = bph; provided = actual_payload_hash})
+
+(** When there are preendorsements, check that they point to a round
+    before the block's round, and that their total power is high enough.
+
+    Note that this function does not check whether the block actually
+    contains preendorments when they are mandatory. This is checked by
+    {!check_fitness_locked_round} instead. *)
+let check_preendorsement_round_and_power vi vs round =
   let open Result_syntax in
-  let* () =
-    match checkable_payload_hash with
-    | No_check -> ok_unit
-    | Expected_payload_hash bph ->
-        let actual_payload_hash = block_header_contents.payload_hash in
-        error_unless
-          (Block_payload_hash.equal actual_payload_hash bph)
-          (Invalid_payload_hash {expected = bph; provided = actual_payload_hash})
-  in
   match vs.locked_round_evidence with
   | None -> ok_unit
   | Some (preendorsement_round, preendorsement_count) ->
       let* () =
+        (* Actually, this check should never fail, because we have
+           already called {!Consensus.check_round_before_block} for
+           all preendorsements in a block. Nevertheless, it does not
+           cost much to check again here. *)
         error_when
           Round.(preendorsement_round >= round)
           (Locked_round_after_block_round
@@ -2936,16 +2946,14 @@ let finalize_block {info; block_state; _} =
   | Application {round; locked_round; predecessor_hash; header_contents} ->
       let* () = check_endorsement_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
+      let*? () = check_preendorsement_round_and_power info block_state round in
       let block_payload_hash =
         compute_payload_hash block_state header_contents ~predecessor_hash
       in
       let*? () =
         finalize_validate_block_header
-          info
-          block_state
           (Expected_payload_hash block_payload_hash)
           header_contents
-          round
       in
       return_unit
   | Partial_validation _ ->
@@ -2970,13 +2978,9 @@ let finalize_block {info; block_state; _} =
             No_check
       in
       let* () = check_endorsement_power info block_state in
+      let*? () = check_preendorsement_round_and_power info block_state round in
       let*? () =
-        finalize_validate_block_header
-          info
-          block_state
-          checkable_payload_hash
-          header_contents
-          round
+        finalize_validate_block_header checkable_payload_hash header_contents
       in
       return_unit
   | Mempool ->
