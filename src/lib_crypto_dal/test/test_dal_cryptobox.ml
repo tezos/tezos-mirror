@@ -354,7 +354,10 @@ module Test = struct
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
-        let shard_proofs = Cryptobox.prove_shards t polynomial in
+        let precomputation = Cryptobox.precompute_shards_proofs t in
+        let shard_proofs =
+          Cryptobox.prove_shards t ~polynomial ~precomputation
+        in
         let shard_index = randrange params.number_of_shards in
         match
           Seq.find

@@ -141,7 +141,7 @@ module Inner = struct
 
   type shard = {index : int; share : share}
 
-  type shards_proofs_precomputation = Scalar.t array * page_proof array array
+  type shards_proofs_precomputation = scalar array * shard_proof array array
 
   module Encoding = struct
     open Data_encoding
@@ -1468,40 +1468,47 @@ module Inner = struct
            (proof, commit_srs_point_minus_root_pow);
          ])
 
-  let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
-      filename =
-    let chan = open_out_bin filename in
-    output_bytes
-      chan
-      (Data_encoding.Binary.to_bytes_exn
-         Encoding.shards_proofs_precomputation_encoding
-         preprocess) ;
-    close_out_noerr chan
+  let save_precompute_shards_proofs precomputation ~filename =
+    protect (fun () ->
+        Lwt_io.with_file ~mode:Output filename (fun chan ->
+            let open Lwt_result_syntax in
+            let str =
+              Data_encoding.Binary.to_string_exn
+                Encoding.shards_proofs_precomputation_encoding
+                precomputation
+            in
+            let*! () = Lwt_io.write chan str in
+            return_unit))
 
-  let _load_precompute_shards_proofs filename =
-    let chan = open_in_bin filename in
-    let len = Int64.to_int (LargeFile.in_channel_length chan) in
-    let data = Bytes.create len in
-    let () = try really_input chan data 0 len with End_of_file -> () in
-    let precomp =
-      Data_encoding.Binary.of_bytes_exn
-        Encoding.shards_proofs_precomputation_encoding
-        data
-    in
-    close_in_noerr chan ;
-    precomp
+  let load_precompute_shards_proofs ~filename =
+    protect (fun () ->
+        Lwt_io.with_file ~mode:Input filename (fun chan ->
+            let open Lwt_result_syntax in
+            let*! str = Lwt_io.read chan in
+            return
+              (Data_encoding.Binary.of_string_exn
+                 Encoding.shards_proofs_precomputation_encoding
+                 str)))
 
-  let prove_shards t p =
+  let precompute_shards_proofs t =
     (* Precomputes step. 1 of multiple multi-reveals. *)
-    let preprocess = preprocess_multiple_multi_reveals t in
+    let domain, precomputation = preprocess_multiple_multi_reveals t in
+    ( Domains.Domain_unsafe.to_array domain,
+      Array.map G1_array.to_array precomputation )
+
+  let prove_shards t ~precomputation:(domain, precomp) ~polynomial =
+    let setup =
+      ( Domains.Domain_unsafe.of_array domain,
+        Array.map G1_array.of_array precomp )
+    in
     (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)
     let coefficients =
       Array.init (t.max_polynomial_length + 1) (fun _ -> Scalar.(copy zero))
     in
-    let p_length = Polynomials.degree p + 1 in
-    let p = Polynomials.to_dense_coefficients p in
+    let p_length = Polynomials.degree polynomial + 1 in
+    let p = Polynomials.to_dense_coefficients polynomial in
     Array.blit p 0 coefficients 0 p_length ;
-    multiple_multi_reveals t ~preprocess ~coefficients
+    multiple_multi_reveals t ~preprocess:setup ~coefficients
 
   let verify_shard (t : t) commitment {index = shard_index; share = evaluations}
       proof =

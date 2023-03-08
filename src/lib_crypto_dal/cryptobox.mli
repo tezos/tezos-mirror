@@ -276,8 +276,9 @@ type shard_proof
     Ensures:
     - [verify_shard t commitment shard proof = Ok ()] if
     and only if
-    [Array.mem shard (shards_from_polynomial t polynomial])
-    [proof = (prove_shards t polynomial).(shard.index)],
+    [Array.mem shard (shards_from_polynomial t polynomial]),
+    [precomputation = precompute_shards_proofs t],
+    [proof = (prove_shards t ~precomputation ~polynomial).(shard.index)],
     and [commitment = commit t p]. *)
 val verify_shard :
   t ->
@@ -333,23 +334,52 @@ val prove_page :
     | `Segment_index_out_of_range ] )
   Result.t
 
-(** [prove_shards t polynomial] produces [number_of_shards] proofs
-    (π_0, ..., π_{number_of_shards}) for the elements of
-    [polynomial_from_shards polynomial] where [number_of_shards]
-    is declared in [t].
+(** The precomputation used to produce shard proofs. *)
+type shards_proofs_precomputation
 
-    Requires:
-    - [polynomial = polynomial_from_slot t s] for some slot [s] and the
-    same value [t] used in [prove_shards]. Since the caller of [prove_shards]
-    knows [polynomial], it is its responsibility to enforce this requirement.
+val shards_proofs_precomputation_encoding :
+  shards_proofs_precomputation Data_encoding.t
 
-    Ensures:
-    - [verify_shard t commitment shard proof = Ok ()] if
-    and only if
-    [Array.mem shard (shards_from_polynomial t polynomial])
-    [proof = (prove_shards t polynomial).(shard.index)],
-    and [commitment = commit t polynomial]. *)
-val prove_shards : t -> polynomial -> shard_proof array
+(** [precomputation_shard_proofs t] returns the precomputation used to
+   produce shard proofs. *)
+val precompute_shards_proofs : t -> shards_proofs_precomputation
+
+(** [save_precompute_shards_proofs precomputation ~filename] saves the
+   given [precomputation] to disk with the given [filename]. *)
+val save_precompute_shards_proofs :
+  shards_proofs_precomputation ->
+  filename:string ->
+  unit Error_monad.tzresult Lwt.t
+
+(** [load_precompute_shards_proofs ~filename] loads the precomputation from disk
+   from the given [filename]. *)
+val load_precompute_shards_proofs :
+  filename:string -> shards_proofs_precomputation Error_monad.tzresult Lwt.t
+
+(** [prove_shards t ~precomputation ~polynomial] produces
+   [number_of_shards] proofs (π_0, ..., π_{number_of_shards - 1}) for the elements
+   of [polynomial_from_shards polynomial] (where [number_of_shards]
+   is declared in [t]) using the [precomputation].
+
+   Requires:
+   - [polynomial = polynomial_from_slot t s] for some slot [s] and the
+   same value [t] used in [prove_shards]. Since the caller of [prove_shards]
+   knows [polynomial], it is its responsibility to enforce this requirement.
+   - [precomputation = precompute_shards_proofs t] with the same value [t]
+   used in [prove_shards]. There is no way for this function to check that
+   the [precomputation] is correct since it doesn't compute it.
+
+   Ensures:
+   - [verify_shard t commitment shard proof = Ok ()] if
+   and only if
+   [Array.mem shard (shards_from_polynomial t polynomial])
+   [proof = (prove_shards t polynomial).(shard.index)],
+   and [commitment = commit t polynomial]. *)
+val prove_shards :
+  t ->
+  precomputation:shards_proofs_precomputation ->
+  polynomial:polynomial ->
+  shard_proof array
 
 module Internal_for_tests : sig
   (** The initialisation parameters can be too large for testing
