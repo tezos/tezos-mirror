@@ -46,109 +46,27 @@ module Block = struct
     uncles : string list;
   }
 
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {
-             number;
-             hash;
-             parent;
-             nonce;
-             sha3Uncles;
-             logsBloom;
-             transactionRoot;
-             stateRoot;
-             receiptRoot;
-             miner;
-             difficulty;
-             totalDifficulty;
-             extraData;
-             size;
-             gasLimit;
-             gasUsed;
-             timestamp;
-             transactions;
-             uncles;
-           } ->
-        ( ( number,
-            hash,
-            parent,
-            nonce,
-            sha3Uncles,
-            logsBloom,
-            transactionRoot,
-            stateRoot,
-            receiptRoot,
-            miner ),
-          ( difficulty,
-            totalDifficulty,
-            extraData,
-            size,
-            gasLimit,
-            gasUsed,
-            timestamp,
-            transactions,
-            uncles ) ))
-      (fun ( ( number,
-               hash,
-               parent,
-               nonce,
-               sha3Uncles,
-               logsBloom,
-               transactionRoot,
-               stateRoot,
-               receiptRoot,
-               miner ),
-             ( difficulty,
-               totalDifficulty,
-               extraData,
-               size,
-               gasLimit,
-               gasUsed,
-               timestamp,
-               transactions,
-               uncles ) ) ->
-        {
-          number;
-          hash;
-          parent;
-          nonce;
-          sha3Uncles;
-          logsBloom;
-          transactionRoot;
-          stateRoot;
-          receiptRoot;
-          miner;
-          difficulty;
-          totalDifficulty;
-          extraData;
-          size;
-          gasLimit;
-          gasUsed;
-          timestamp;
-          transactions;
-          uncles;
-        })
-      (merge_objs
-         (obj10
-            (req "number" int32)
-            (req "hash" (option string))
-            (req "parent" string)
-            (req "nonce" string)
-            (req "sha3Uncles" string)
-            (req "logsBloom" (option string))
-            (req "transactionRoot" string)
-            (req "stateRoot" string)
-            (req "receiptRoot" string)
-            (req "miner" string))
-         (obj9
-            (req "difficulty" int64)
-            (req "totalDifficulty" int64)
-            (req "extraData" string)
-            (req "size" int32)
-            (req "gasLimit" int32)
-            (req "gasUsed" int32)
-            (req "timestamp" int32)
-            (req "transactions" (list string))
-            (req "uncles" (list string))))
+  let of_json json =
+    let open JSON in
+    {
+      number = json |-> "number" |> as_int32;
+      hash = json |-> "hash" |> as_string_opt;
+      parent = json |-> "parent" |> as_string;
+      nonce = json |-> "nonce" |> as_string;
+      sha3Uncles = json |-> "sha3Uncles" |> as_string;
+      logsBloom = json |-> "logsBloom" |> as_string_opt;
+      transactionRoot = json |-> "transactionRoot" |> as_string;
+      stateRoot = json |-> "stateRoot" |> as_string;
+      receiptRoot = json |-> "receiptRoot" |> as_string;
+      miner = json |-> "miner" |> as_string;
+      difficulty = json |-> "difficulty" |> as_int64;
+      totalDifficulty = json |-> "totalDifficulty" |> as_int64;
+      extraData = json |-> "extraData" |> as_string;
+      size = json |-> "size" |> as_int32;
+      gasLimit = json |-> "gasLimit" |> as_int32;
+      gasUsed = json |-> "gasUsed" |> as_int32;
+      timestamp = json |-> "timestamp" |> as_int32;
+      transactions = json |-> "transactions" |> as_list |> List.map as_string;
+      uncles = json |-> "uncles" |> as_list |> List.map as_string;
+    }
 end
