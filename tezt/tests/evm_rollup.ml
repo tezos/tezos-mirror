@@ -269,7 +269,7 @@ let test_rpc_sendRawTransaction =
   let*! batcher_queue = Sc_rollup_client.batcher_queue sc_rollup_client in
   let () =
     match batcher_queue with
-    | [(_hash, binary_msg)] -> Log.info "binary_msg: %s" binary_msg
+    | [(_hash, _binary_msg)] -> ()
     | _ ->
         Test.fail
           ~__LOC__
