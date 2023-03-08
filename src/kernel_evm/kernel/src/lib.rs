@@ -21,8 +21,11 @@ mod error;
 mod inbox;
 mod storage;
 
-pub fn stage_one<Host: Runtime + RawRollupCore>(host: &mut Host) -> Queue {
-    let queue = fetch(host);
+pub fn stage_one<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Queue {
+    let queue = fetch(host, smart_rollup_address);
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
         debug_msg!(host; "Blueprint {} contains {} transactions.\n", i, blueprint.transactions.len());
@@ -71,14 +74,14 @@ fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(host: &mut Host)
 }
 
 pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
-    let _smart_rollup_address = retrieve_smart_rollup_address(host);
+    let smart_rollup_address = retrieve_smart_rollup_address(host);
 
     match init_mock_account(host) {
         Ok(()) => (),
         Err(_) => debug_msg!(host; "Failed to write the mocked up account"),
     }
 
-    let queue = stage_one(host);
+    let queue = stage_one(host, smart_rollup_address);
 
     stage_two(host, queue)
 }
