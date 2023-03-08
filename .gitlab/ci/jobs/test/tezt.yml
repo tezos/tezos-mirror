@@ -38,10 +38,7 @@ tezt:
     - .template__coverage_files
     - .tezt_template
   variables:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/5068
-    # Re-enable the consensus key tests once the flakiness has
-    # been fixed.
-    TESTS: "/synchronisation_threshold /consensus_key"
+    TESTS: "/synchronisation_threshold"
   dependencies:
     - "build_x86_64"
     - "build_kernels"
