@@ -479,8 +479,10 @@ module Config : sig
       [{activated = false; use_mock_srs_for_testing = None}]. *)
   val default : t
 
-  (** [init_dal find_trusted_setup_files config] initializes the DAL
-     according to the dal configuration [config].
+  (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the
+     DAL according to the dal configuration [config], a function to find the SRS
+     files [find_trusted_setup_files] and the optional log2 of the SRS size
+     [srs_size_log2].
 
       When [config.use_mock_srs_for_testing = None],
      [init_dal] loads [initialisation_parameters] from the files at the
@@ -491,6 +493,7 @@ module Config : sig
      to run. *)
   val init_dal :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+    ?srs_size_log2:int ->
     t ->
     unit Error_monad.tzresult Lwt.t
 end

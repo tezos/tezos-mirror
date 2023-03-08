@@ -64,15 +64,11 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 
-let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path =
+let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path
+    ~srs_size_log2 =
   let open Lwt_result_syntax in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
-
-     The `21` constant is the logarithmic size of the file. Can this
-     constant be recomputed? Even though it should be determined by
-     the integrity check. *)
-  let logarithmic_size = 21 in
-  let to_bigstring path =
+  let len = 1 lsl srs_size_log2 in
+  let to_bigstring ~path =
     let open Lwt_syntax in
     let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
     Lwt.finalize
@@ -81,19 +77,19 @@ let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path =
           (Lwt_bytes.map_file
              ~fd:(Lwt_unix.unix_file_descr fd)
              ~shared:false
-             ~size:(1 lsl logarithmic_size)
              ()))
       (fun () -> Lwt_unix.close fd)
   in
-  let*! srs_g1_bigstring = to_bigstring srs_g1_path in
-  let*! srs_g2_bigstring = to_bigstring srs_g2_path in
+  let*! srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
+  let*! srs_g2_bigstring = to_bigstring ~path:srs_g2_path in
   match
     let open Result_syntax in
-    let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring in
-    let* srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring in
+    let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring ~len in
+    let* srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring ~len in
     return (srs_g1, srs_g2)
   with
-  | Error (`End_of_file s) -> tzfail (Failed_to_load_trusted_setup s)
+  | Error (`End_of_file s) ->
+      tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
   | Error (`Invalid_point p) ->
       tzfail
         (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
@@ -1728,7 +1724,7 @@ module Config = struct
 
   let default = {activated = false; use_mock_srs_for_testing = None}
 
-  let init_dal ~find_srs_files dal_config =
+  let init_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
     let open Lwt_result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
@@ -1737,7 +1733,10 @@ module Config = struct
             return (Internal_for_tests.parameters_initialisation parameters)
         | None ->
             let*? srs_g1_path, srs_g2_path = find_srs_files () in
-            initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path
+            initialisation_parameters_from_files
+              ~srs_g1_path
+              ~srs_g2_path
+              ~srs_size_log2
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit
