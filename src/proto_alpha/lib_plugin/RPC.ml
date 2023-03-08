@@ -227,6 +227,12 @@ module Scripts = struct
            (req "trace" trace_encoding)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
+    let stack_encoding =
+      list
+        (obj2
+           (req "type" Script.expr_encoding)
+           (req "val" Script.expr_encoding))
+
     let run_tzip4_view_encoding =
       let open Data_encoding in
       obj10
@@ -256,6 +262,14 @@ module Scripts = struct
            (req "unparsing_mode" unparsing_mode_encoding)
            (opt "now" Script_timestamp.encoding))
         (obj1 (opt "level" Script_int.n_encoding))
+
+    let normalize_stack_input_encoding =
+      obj3
+        (req "input" stack_encoding)
+        (req "unparsing_mode" unparsing_mode_encoding)
+        (opt "legacy" bool)
+
+    let normalize_stack_output_encoding = obj1 (req "output" stack_encoding)
 
     let run_code =
       RPC_service.post_service
@@ -364,6 +378,15 @@ module Scripts = struct
         ~output:(obj1 (req "normalized" Script.expr_encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_data")
+
+    let normalize_stack =
+      RPC_service.post_service
+        ~description:
+          "Normalize a Michelson stack using the requested unparsing mode"
+        ~query:RPC_query.empty
+        ~input:normalize_stack_input_encoding
+        ~output:normalize_stack_output_encoding
+        RPC_path.(path / "normalize_stack")
 
     let normalize_script =
       RPC_service.post_service
@@ -673,6 +696,61 @@ module Scripts = struct
           return (T_sapling_state, [unparse_memo_size ~loc memo_size], [])
       | Chest_t -> return (T_chest, [], [])
       | Chest_key_t -> return (T_chest_key, [], [])
+  end
+
+  module Normalize_stack = struct
+    type ex_stack =
+      | Ex_stack : ('a, 's) Script_typed_ir.stack_ty * 'a * 's -> ex_stack
+
+    let rec parse_stack :
+        context ->
+        legacy:bool ->
+        (Script.node * Script.node) list ->
+        (ex_stack * context) tzresult Lwt.t =
+     fun ctxt ~legacy l ->
+      match l with
+      | [] -> return (Ex_stack (Bot_t, EmptyCell, EmptyCell), ctxt)
+      | (ty_node, data_node) :: l ->
+          Lwt.return
+          @@ Script_ir_translator.parse_ty
+               ctxt
+               ~legacy
+               ~allow_lazy_storage:true
+               ~allow_operation:true
+               ~allow_contract:true
+               ~allow_ticket:true
+               ty_node
+          >>=? fun (Ex_ty ty, ctxt) ->
+          let elab_conf = elab_conf ~legacy () in
+          Script_ir_translator.parse_data
+            ctxt
+            ~elab_conf
+            ~allow_forged:true
+            ty
+            data_node
+          >>=? fun (x, ctxt) ->
+          parse_stack ctxt ~legacy l >>=? fun (Ex_stack (sty, y, st), ctxt) ->
+          return (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
+
+    let rec unparse_stack :
+        type a s.
+        context ->
+        Script_ir_unparser.unparsing_mode ->
+        (a, s) Script_typed_ir.stack_ty ->
+        a ->
+        s ->
+        ((Script.expr * Script.expr) list * context) tzresult Lwt.t =
+      let loc = Micheline.dummy_location in
+      fun ctxt unparsing_mode sty x st ->
+        match (sty, x, st) with
+        | Bot_t, EmptyCell, EmptyCell -> return ([], ctxt)
+        | Item_t (ty, sty), x, (y, st) ->
+            Script_ir_unparser.unparse_ty ~loc ctxt ty
+            >>?= fun (ty_node, ctxt) ->
+            Script_ir_translator.unparse_data ctxt unparsing_mode ty x
+            >>=? fun (data_node, ctxt) ->
+            unparse_stack ctxt unparsing_mode sty y st >>=? fun (l, ctxt) ->
+            return ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
   end
 
   let rec pp_instr_name :
@@ -1481,6 +1559,19 @@ module Scripts = struct
         >|=? fun (normalized, _ctxt) -> normalized) ;
     Registration.register0
       ~chunked:true
+      S.normalize_stack
+      (fun ctxt () (stack, unparsing_mode, legacy) ->
+        let legacy = Option.value ~default:false legacy in
+        let ctxt = Gas.set_unlimited ctxt in
+        let nodes =
+          List.map (fun (a, b) -> (Micheline.root a, Micheline.root b)) stack
+        in
+        Normalize_stack.parse_stack ctxt ~legacy nodes
+        >>=? fun (Normalize_stack.Ex_stack (st_ty, x, st), ctxt) ->
+        Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
+        >|=? fun (normalized, _ctxt) -> normalized) ;
+    Registration.register0
+      ~chunked:true
       S.normalize_script
       (fun ctxt () (script, unparsing_mode) ->
         let ctxt = Gas.set_unlimited ctxt in
@@ -1651,6 +1742,14 @@ module Scripts = struct
       block
       ()
       (data, ty, unparsing_mode, legacy)
+
+  let normalize_stack ?legacy ~stack ~unparsing_mode ctxt block =
+    RPC_context.make_call0
+      S.normalize_stack
+      ctxt
+      block
+      ()
+      (stack, unparsing_mode, legacy)
 
   let normalize_script ~script ~unparsing_mode ctxt block =
     RPC_context.make_call0

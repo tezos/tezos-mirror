@@ -1945,6 +1945,22 @@ let normalize_data ?hooks ?mode ?legacy ~data ~typ client =
   spawn_normalize_data ?hooks ?mode ?legacy ~data ~typ client
   |> Process.check_and_read_stdout
 
+let spawn_normalize_stack ?hooks ?mode ?(legacy = false) ~stack client =
+  let mode_cmd =
+    Option.map normalize_mode_to_string mode
+    |> Option.map (fun s -> ["--unparsing-mode"; s])
+  in
+  let cmd =
+    ["normalize"; "stack"; stack]
+    @ Option.value ~default:[] mode_cmd
+    @ if legacy then ["--legacy"] else []
+  in
+  spawn_command ?hooks client cmd
+
+let normalize_stack ?hooks ?mode ?legacy ~stack client =
+  spawn_normalize_stack ?hooks ?mode ?legacy ~stack client
+  |> Process.check_and_read_stdout
+
 let spawn_normalize_script ?hooks ?mode ~script client =
   let mode_cmd =
     Option.map normalize_mode_to_string mode

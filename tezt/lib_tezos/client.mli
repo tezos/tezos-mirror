@@ -1483,6 +1483,24 @@ val spawn_normalize_data :
   t ->
   Process.t
 
+(** Run [octez-client normalize stack ...]*)
+val normalize_stack :
+  ?hooks:Process_hooks.t ->
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  stack:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [normalize_stack], but do not wait for the process to exit. *)
+val spawn_normalize_stack :
+  ?hooks:Process_hooks.t ->
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  stack:string ->
+  t ->
+  Process.t
+
 (** Run [octez-client normalize script ..]*)
 val normalize_script :
   ?hooks:Process_hooks.t ->

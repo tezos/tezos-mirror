@@ -31,6 +31,9 @@ val print_expr : Format.formatter -> Script_repr.expr -> unit
 
 val print_expr_unwrapped : Format.formatter -> Script_repr.expr -> unit
 
+val print_typed_stack :
+  Format.formatter -> (Script_repr.expr * Script_repr.expr) list -> unit
+
 val print_execution_trace :
   Format.formatter -> Script_typed_ir.execution_trace -> unit
 

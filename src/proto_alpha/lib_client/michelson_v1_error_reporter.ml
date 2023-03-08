@@ -187,6 +187,28 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     in
     match errs with
     | [] -> ()
+    | Michelson_v1_stack.Wrong_stack_item (loc, expr) :: rest ->
+        Format.fprintf
+          ppf
+          "@[<v 0>%s,@ wrong syntax for a stack element, expecting something \
+           of the following shape: Stack_elt <ty> <val>; got %a.@]"
+          (String.capitalize_ascii
+             (Format.asprintf "%a" Micheline_parser.print_location loc))
+          Micheline_printer.print_expr_unwrapped
+          expr ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Michelson_v1_stack.Wrong_stack (loc, expr) :: rest ->
+        Format.fprintf
+          ppf
+          "@[<v 0>%s,@ wrong syntax for stack, expecting a sequence of \
+           elements of the following shape: Stack_elt <ty> <val>; got %a.@]"
+          (String.capitalize_ascii
+             (Format.asprintf "%a" Micheline_parser.print_location loc))
+          Micheline_printer.print_expr_unwrapped
+          expr ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Environment.Ecoproto_error
         (Michelson_v1_primitives.Invalid_primitive_name (expr, loc))
       :: rest ->
