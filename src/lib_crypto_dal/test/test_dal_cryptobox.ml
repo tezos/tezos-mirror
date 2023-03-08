@@ -259,11 +259,8 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Tezos_error_monad.Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let shards =
-          Cryptobox.Internal_for_tests.make_dummy_shards
-            t
-            ~share_length:(Cryptobox.Internal_for_tests.length_of_share t + 1)
-        in
+        let state = QCheck_base_runner.random_state () in
+        let shards = Cryptobox.Internal_for_tests.make_dummy_shards t ~state in
         Cryptobox.polynomial_from_shards t shards)
         |> function
         | Error (`Invalid_shard_length _) -> true
