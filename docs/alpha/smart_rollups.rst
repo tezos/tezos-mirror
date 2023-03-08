@@ -178,7 +178,7 @@ by a reference implementation of the PVM embedded in the
 protocol. Notice that the PVM implementation is meant for
 verification, not performance: for this reason, a rollup node does not
 normally run a PVM to process inputs but a **fast execution engine**
-(e.g., WASMER for the WASM PVM in the case of the rollup node
+(e.g., based on the Wasmer runtime for the WASM PVM in the case of the rollup node
 distributed with Octez). This fast execution engine implements the
 exact same semantics as the PVM.
 
@@ -714,19 +714,16 @@ Configure WebAssembly fast execution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When the rollup node advances its internal rollup state under normal
-operation, it does so in a mode called "Fast Execution".
+operation, it does so using the fast execution engine.
 
-This mode uses Wasmer when running WebAssembly code at the moment
-which allows you to configure the compiler it will use to deal with
-the WebAssembly code. It can be done using the
-``OCTEZ_WASMER_COMPILER`` environment variable which will be picked
-up by the smart rollup node.
+This engine uses Wasmer for running WebAssembly code. You may configure the compiler used for compiling
+WebAssembly code, via the ``OCTEZ_WASMER_COMPILER`` environment variable.
 
-The choice of compiler primarily affects the performance of the
-WebAssembly execution. Some compilers offer additional security
-guarantees which might be attractive to you.
+The choice of a compiler primarily affects the performance of the
+WebAssembly code execution *vs* the compilation time. Some compilers offer certain security
+guarantees in a blockchain context, such as compiling in linear time to avoid JIT bombs.
 
-There are these options:
+The available options are:
 
 .. list-table:: Wasmer compiler options
    :widths: 25 25 50
@@ -742,6 +739,9 @@ There are these options:
      - ``cranelift``
      - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-cranelift#when-to-use-cranelift>`_
 
+Note that while the rollup node is generally capable of using Wasmer's LLVM-based compiler, Octez does not current ship with it.
+
+When the environment variable is undefined, Cranelift is used by default.
 Developing WASM Kernels
 -----------------------
 
