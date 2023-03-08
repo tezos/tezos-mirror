@@ -449,6 +449,30 @@ module Test = struct
         | Ok true -> true
         | _ -> false)
 
+  let test_dal_initialisation_twice_failure =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test DAL initialisation twice failure"
+      ~print:print_parameters
+      ~count:1
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        let config : Cryptobox.Config.t =
+          {
+            activated = true;
+            use_mock_srs_for_testing = Some (get_cryptobox_parameters params);
+          }
+        in
+        let find_srs_files () : (string * string) Error_monad.tzresult =
+          Ok ("", "")
+        in
+        Lwt_main.run (Cryptobox.Config.init_dal ~find_srs_files config)
+        |> function
+        | Error [Cryptobox.Dal_initialisation_twice] -> true
+        | _ -> false)
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -535,5 +559,6 @@ let () =
             Test.test_polynomial_slot_conversions;
             Test.test_select_fft_domain;
             Test.test_shard_proofs_load_from_file;
+            Test.test_dal_initialisation_twice_failure;
           ] );
     ]

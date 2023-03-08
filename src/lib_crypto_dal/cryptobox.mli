@@ -103,6 +103,11 @@ type page_proof
 
 type ('a, 'b) error_container = {given : 'a; expected : 'b}
 
+open Error_monad
+
+(** [Dal_initialisation_twice], thrown by {!Config.init_dal}. *)
+type error += Dal_initialisation_twice
+
 module Verifier :
   VERIFIER
     with type t = t
