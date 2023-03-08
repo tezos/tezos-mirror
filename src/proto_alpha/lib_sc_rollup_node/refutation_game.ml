@@ -472,7 +472,13 @@ module Make (Interpreter : Interpreter.S) :
         let* timeout_reached =
           timeout_reached ~self head_block node_ctxt staker1 staker2
         in
-        unless timeout_reached @@ fun () -> play_timeout node_ctxt self index
+        unless timeout_reached @@ fun () ->
+        let opponent =
+          if Signature.Public_key_hash.(self = staker1) then staker2
+          else staker1
+        in
+        let*! () = Refutation_game_event.timeout_detected opponent in
+        play_timeout node_ctxt self index
 
   let ongoing_games head_block node_ctxt self =
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
