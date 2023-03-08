@@ -305,18 +305,7 @@ module Consensus = struct
       (fun (block_round, provided) ->
         Preendorsement_round_too_high {block_round; provided}) ;
     register_error_kind
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5061
-
-         The classification of this error has been changed to Branch
-         because it is possible for a previously valid operation to
-         trigger this error during reclassification on a new
-         head. This could lead to the unwarranted kicking of a peer if
-         this error were Permanent.
-
-         The classification should be set back to Permanent once the
-         mempool checks the slot normalization more consistently
-         across all levels. *)
-      `Branch
+      `Permanent
       ~id:"validate.wrong_slot_for_consensus_operation"
       ~title:"Wrong slot for consensus operation"
       ~description:"Wrong slot used for a preendorsement or endorsement."
