@@ -5250,7 +5250,7 @@ module Token : sig
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 
-  type source =
+  type giver =
     [ `Invoice
     | `Bootstrap
     | `Initial_commitments
@@ -5265,7 +5265,7 @@ module Token : sig
     | `Sc_rollup_refutation_rewards
     | container ]
 
-  type sink =
+  type receiver =
     [ `Storage_fees
     | `Double_signing_punishments
     | `Lost_endorsing_rewards of public_key_hash * bool * bool
@@ -5281,15 +5281,15 @@ module Token : sig
   val transfer_n :
     ?origin:Receipt.update_origin ->
     context ->
-    ([< source] * Tez.t) list ->
-    [< sink] ->
+    ([< giver] * Tez.t) list ->
+    [< receiver] ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
   val transfer :
     ?origin:Receipt.update_origin ->
     context ->
-    [< source] ->
-    [< sink] ->
+    [< giver] ->
+    [< receiver] ->
     Tez.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 end
@@ -5305,14 +5305,14 @@ module Fees : sig
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->
-    payer:Token.source ->
+    payer:Token.giver ->
     Z.t ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_storage_increase_fees :
     ?origin:Receipt_repr.update_origin ->
     context ->
-    payer:Token.source ->
+    payer:Token.giver ->
     Z.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
@@ -5320,21 +5320,21 @@ module Fees : sig
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->
-    payer:Token.source ->
+    payer:Token.giver ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_tx_rollup_origination_fees :
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->
-    payer:Token.source ->
+    payer:Token.giver ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_sc_rollup_origination_fees :
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->
-    payer:Token.source ->
+    payer:Token.giver ->
     Z.t ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
@@ -5342,7 +5342,7 @@ module Fees : sig
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->
-    payer:Token.source ->
+    payer:Token.giver ->
     Z.t ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
