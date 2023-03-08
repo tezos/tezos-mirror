@@ -37,6 +37,12 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** Send SIGKILL and wait for the process to terminate. *)
 val kill : t -> unit Lwt.t
 
+(** Send SIGSTOP to the process. *)
+val stop : t -> unit Lwt.t
+
+(** Send SIGCONT to the process. *)
+val continue : t -> unit Lwt.t
+
 (** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
 

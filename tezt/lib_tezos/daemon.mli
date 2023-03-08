@@ -119,6 +119,12 @@ module Make : functor (X : PARAMETERS) -> sig
   (** Send SIGKILL to a daemon and wait for it to terminate. *)
   val kill : t -> unit Lwt.t
 
+  (** Send SIGSTOP to a daemon. *)
+  val stop : t -> unit Lwt.t
+
+  (** Send SIGCONT to a daemon. *)
+  val continue : t -> unit Lwt.t
+
   (** Generate a fresh indentifier based on [X.base_default_name].
       This function ensures that a same name can't be returned twice. *)
   val fresh_name : unit -> string
