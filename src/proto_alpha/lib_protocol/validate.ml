@@ -2943,8 +2943,10 @@ let finalize_block {info; block_state; _} =
         check_payload_hash block_state ~predecessor_hash header_contents
       in
       return_unit
-  | Partial_validation _ ->
+  | Partial_validation {round; locked_round; _} ->
       let* () = check_endorsement_power info block_state in
+      let*? () = check_fitness_locked_round block_state locked_round in
+      let*? () = check_preendorsement_round_and_power info block_state round in
       return_unit
   | Construction {round; predecessor_hash; header_contents} ->
       let* () = check_endorsement_power info block_state in
