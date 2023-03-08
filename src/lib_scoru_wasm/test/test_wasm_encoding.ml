@@ -90,20 +90,15 @@ let test_generic_tree ~pp ~gen ~encoding () =
        is not important when encoding or decoding. *)
     Instance.ModuleMap.create ()
   in
-  let host_funcs = Host_funcs.empty () in
-  qcheck ~print (gen ~host_funcs ~module_reg:dummy_module_reg) (fun value1 ->
+  qcheck ~print (gen ~module_reg:dummy_module_reg) (fun value1 ->
       let*! empty_tree = empty_tree () in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value1 in
-      let*! tree1 =
-        Tree_encoding_runner.encode (encoding ~host_funcs) value1 empty_tree
-      in
-      let*! value2 = Tree_encoding_runner.decode (encoding ~host_funcs) tree1 in
+      let*! tree1 = Tree_encoding_runner.encode encoding value1 empty_tree in
+      let*! value2 = Tree_encoding_runner.decode encoding tree1 in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value2 in
-      let*! tree2 =
-        Tree_encoding_runner.encode (encoding ~host_funcs) value2 empty_tree
-      in
+      let*! tree2 = Tree_encoding_runner.encode encoding value2 empty_tree in
       assert (Tree.equal tree1 tree2) ;
       return_unit)
 
@@ -111,42 +106,40 @@ let test_generic_tree ~pp ~gen ~encoding () =
 let test_module_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_module
-    ~gen:(fun ~host_funcs:_ ~module_reg ->
-      Ast_generators.module_gen ~module_reg ())
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.module_instance_encoding)
+    ~gen:(fun ~module_reg -> Ast_generators.module_gen ~module_reg ())
+    ~encoding:Wasm_encoding.module_instance_encoding
 
 (** Test serialize/deserialize frames and compare trees. *)
 let test_frame_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_frame
-    ~gen:(fun ~host_funcs:_ -> Ast_generators.frame_gen)
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.frame_encoding)
+    ~gen:Ast_generators.frame_gen
+    ~encoding:Wasm_encoding.frame_encoding
 
 (** Test serialize/deserialize input and output buffers and compare trees. *)
 let test_buffers_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_buffers
-    ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.buffers_gen)
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.buffers_encoding)
+    ~gen:(fun ~module_reg:_ -> Ast_generators.buffers_gen)
+    ~encoding:Wasm_encoding.buffers_encoding
 
 (** Test serialize/deserialize values and compare trees. *)
 let test_values_tree =
   test_generic_tree
     ~pp:(Ast_printer.pp_vector Ast_printer.Values.pp_value)
-    ~gen:(fun ~host_funcs:_ ~module_reg:_ ->
+    ~gen:(fun ~module_reg:_ ->
       QCheck2.Gen.(
         map
           Tezos_lazy_containers.Lazy_vector.Int32Vector.of_list
           (list Ast_generators.value_gen)))
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.values_encoding)
+    ~encoding:Wasm_encoding.values_encoding
 
 (** Test serialize/deserialize administrative instructions and compare trees. *)
 let test_admin_instr_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_admin_instr
-    ~gen:(fun ~host_funcs:_ ~module_reg ->
-      Ast_generators.admin_instr_gen ~module_reg)
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.admin_instr_encoding)
+    ~gen:(fun ~module_reg -> Ast_generators.admin_instr_gen ~module_reg)
+    ~encoding:Wasm_encoding.admin_instr_encoding
 
 let test_config_tree =
   test_generic_tree

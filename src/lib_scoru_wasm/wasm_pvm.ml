@@ -71,9 +71,7 @@ let tick_state_encoding =
            (scope ["self"] Wasm_encoding.module_key_encoding)
            (scope ["ast_module"]
            @@ Parsing.(no_region_encoding Module.module_encoding))
-           (scope
-              ["init_kont"]
-              (Init_encodings.init_kont_encoding ~host_funcs:Host_funcs.all))
+           (scope ["init_kont"] Init_encodings.init_kont_encoding)
            (scope ["modules"] Wasm_encoding.module_instances_encoding))
         (function
           | Init {self; ast_module; init_kont; module_reg} ->
@@ -85,8 +83,7 @@ let tick_state_encoding =
         "eval"
         (tup2
            ~flatten:true
-           (scope ["config"]
-           @@ Wasm_encoding.config_encoding ~host_funcs:Host_funcs.all)
+           (scope ["config"] @@ Wasm_encoding.config_encoding)
            (scope ["modules"] Wasm_encoding.module_instances_encoding))
         (function
           | Eval {config; module_reg} -> Some (config, module_reg) | _ -> None)
