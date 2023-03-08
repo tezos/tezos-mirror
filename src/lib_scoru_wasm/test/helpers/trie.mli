@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,38 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
+(* In-memory trie implementation.
+   It's needed for three reasons:
+    1. To generated initialy decoded irmin tree.
+    2. To keep track of tree structure in order to generate keys and offsets
+       for stress-tests operations properly.
+       During stress-testing we would like to maintain a requested
+       percent of valid operations: it's why we need this tree.
+    3. In order to have all operations on the trie pure and, hence,
+       be able to use it in QCheck.Gen.
 *)
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5028
-         Beware: there is a weird test failure when
-         Durable snapshot test doesn't go first
-      *)
-      ("Durable snapshot", Test_durable_shapshot.tests);
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-      ("WASM VM", Test_wasm_vm.tests);
-      ("Module Initialisation", Test_init.tests);
-      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
-      ("Hash correspondence", Test_hash_consistency.tests);
-      ("Reveal", Test_reveal.tests);
-      ("Debug", Test_debug.tests);
-      ("Host functions ticks", Test_host_functions_ticks.tests);
-      ("Protocol migration", Test_protocol_migration.tests);
-    ]
-  |> Lwt_main.run
+type key = string list
+
+module Children : Map.S with type key = string
+
+(* Support subtree sizes in order to generate keys evenly *)
+type 'a t = {
+  value : 'a option;
+  children : 'a t Children.t;
+  keys_count : int;
+  nodes_count : int; (* including empty one *)
+}
+
+val empty : 'a t
+
+val set_value : edit_readonly:bool -> key -> 'a -> 'a t -> 'a t option
+
+val get_value : key -> 'a t -> 'a option
+
+val lookup : key -> 'a t -> 'a t option
+
+val subtrees_size : key -> 'a t -> int
+
+val copy_tree :
+  edit_readonly:bool -> from_key:key -> to_key:key -> 'a t -> 'a t option
+
+val move_tree : from_key:key -> to_key:key -> 'a t -> 'a t option
+
+val delete : edit_readonly:bool -> key -> 'a t -> 'a t option

@@ -31,6 +31,8 @@ exception Uninitialized_self_ref
 (** A key in the tree is a list of string. *)
 type key = string trace
 
+exception Key_not_found of key
+
 (** {2 Types}*)
 
 (** Represents a partial encoder for a specific constructor of a sum-type. *)

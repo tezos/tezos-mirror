@@ -34,6 +34,8 @@ type key = string list
 module E = Encoding
 module D = Decoding
 
+exception Key_not_found = D.Key_not_found
+
 type 'a encoding = 'a E.t
 
 type 'a decoding = 'a D.t
