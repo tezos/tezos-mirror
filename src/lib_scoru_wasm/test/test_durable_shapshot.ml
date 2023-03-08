@@ -33,7 +33,7 @@
 
 open Tztest
 open QCheck2
-open Encodings_util
+open Tezos_scoru_wasm_helpers.Encodings_util
 open Durable_snapshot_util
 open Probability_utils
 

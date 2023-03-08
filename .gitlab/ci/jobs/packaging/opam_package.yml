@@ -303,7 +303,7 @@ opam:octez-proxy-server:
 opam:octez-signer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: octez-signer
 
@@ -469,7 +469,7 @@ opam:tezos-client-000-Ps9mPmXa:
 opam:tezos-client-001-PtCJ7pwo:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-client-001-PtCJ7pwo
 
@@ -602,7 +602,7 @@ opam:tezos-client-base-unix:
 opam:tezos-client-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-commands
 
@@ -777,14 +777,14 @@ opam:tezos-embedded-protocol-011-PtHangz2:
 opam:tezos-embedded-protocol-012-Psithaca:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-012-Psithaca
 
 opam:tezos-embedded-protocol-013-PtJakart:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-013-PtJakart
 
@@ -929,7 +929,7 @@ opam:tezos-mockup:
 opam:tezos-mockup-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-mockup-commands
 
@@ -1112,7 +1112,7 @@ opam:tezos-protocol-alpha:
 opam:tezos-protocol-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-demo-counter
 
@@ -1147,7 +1147,7 @@ opam:tezos-protocol-plugin-007-PsDELPH1:
 opam:tezos-protocol-plugin-007-PsDELPH1-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-protocol-plugin-007-PsDELPH1-registerer
 
@@ -1424,7 +1424,7 @@ opam:tezos-shell-services:
 opam:tezos-signer-backends:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-signer-backends
 
@@ -1475,7 +1475,7 @@ opam:tezos-stdlib-unix:
 opam:tezos-store:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-store
 

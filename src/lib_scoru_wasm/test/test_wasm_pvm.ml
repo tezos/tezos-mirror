@@ -33,9 +33,9 @@
 *)
 
 open Tezos_scoru_wasm
+open Tezos_scoru_wasm_helpers.Encodings_util
 open Wasm_utils
 open Tztest_helper
-open Encodings_util
 
 let should_boot_unreachable_kernel ~version ~batch_size kernel =
   let open Lwt_syntax in

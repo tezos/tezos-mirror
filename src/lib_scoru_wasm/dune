@@ -11,6 +11,7 @@
   tezos-lazy-containers
   tezos-webassembly-interpreter
   tezos-context.sigs
+  tezos-context.memory
   tezos-lwt-result-stdlib
   data-encoding)
  (flags

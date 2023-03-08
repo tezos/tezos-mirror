@@ -307,14 +307,61 @@ module Wrapped : TREE with type tree = wrapped_tree
 val wrapped_tree : wrapped_tree t
 
 module Runner : sig
-  (** Builds a new runner for encoders using a specific tree. *)
-  module Make (T : TREE) : sig
+  module type S = sig
+    type tree
+
     (** [encode enc x tree] encodes a value [x] using the encoder [enc]
     into the provided [tree]. *)
-    val encode : 'a t -> 'a -> T.tree -> T.tree Lwt.t
+    val encode : 'a t -> 'a -> tree -> tree Lwt.t
 
     (** [decode enc x tree] decodes a value using the encoder [enc] from
     the provided [tree]. *)
-    val decode : 'a t -> T.tree -> 'a Lwt.t
+    val decode : 'a t -> tree -> 'a Lwt.t
+  end
+
+  (** Builds a new runner for encoders using a specific tree. *)
+  module Make (T : TREE) : S with type tree = T.tree
+end
+
+module Encodings_util : sig
+  module type Bare_tezos_context_sig = sig
+    type t
+
+    type tree
+
+    type index
+
+    module Tree :
+      Tezos_context_sigs.Context.TREE
+        with type t := t
+         and type key := string list
+         and type value := bytes
+         and type tree := tree
+
+    val init :
+      ?patch_context:(t -> t tzresult Lwt.t) ->
+      ?readonly:bool ->
+      ?index_log_size:int ->
+      string ->
+      index Lwt.t
+
+    val empty : index -> t
+  end
+
+  module Make (Ctx : Bare_tezos_context_sig) : sig
+    module Tree : sig
+      include module type of Ctx.Tree
+
+      type tree = Ctx.tree
+
+      val select : Tezos_lazy_containers.Lazy_map.tree -> tree
+
+      val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
+    end
+
+    module Tree_encoding_runner : Runner.S with type tree = Ctx.tree
+
+    (* Create an empty tree *)
+    val empty_tree : unit -> Ctx.tree Lwt.t
   end
 end

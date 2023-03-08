@@ -1284,6 +1284,14 @@ let _lazy_containers_tests =
         alcotezt;
       ]
 
+let octez_context_sigs =
+  public_lib
+    "tezos-context.sigs"
+    ~path:"src/lib_context/sigs"
+    ~opam:"tezos-context"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib |> open_]
+    ~js_compatible:true
+
 let tree_encoding =
   public_lib
     "tezos-tree-encoding"
@@ -1294,6 +1302,7 @@ let tree_encoding =
       [
         octez_base |> open_ ~m:"TzPervasives";
         lazy_containers;
+        octez_context_sigs;
         octez_lwt_result_stdlib;
         data_encoding;
       ]
@@ -1448,14 +1457,6 @@ let _octez_workers_tests =
         octez_base_test_helpers |> open_;
         alcotezt;
       ]
-
-let octez_context_sigs =
-  public_lib
-    "tezos-context.sigs"
-    ~path:"src/lib_context/sigs"
-    ~opam:"tezos-context"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib |> open_]
-    ~js_compatible:true
 
 let octez_merkle_proof_encoding =
   public_lib
@@ -1807,38 +1808,6 @@ let octez_wasmer =
           c_library_flags = [];
         }
 
-let octez_scoru_wasm =
-  public_lib
-    "tezos-scoru-wasm"
-    ~path:"src/lib_scoru_wasm"
-    ~synopsis:
-      "Protocol environment dependency providing WASM functionality for SCORU"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        tree_encoding;
-        lazy_containers;
-        octez_webassembly_interpreter;
-        octez_context_sigs;
-        octez_lwt_result_stdlib;
-        data_encoding;
-      ]
-
-let octez_scoru_wasm_fast =
-  public_lib
-    "tezos-scoru-wasm-fast"
-    ~path:"src/lib_scoru_wasm/fast"
-    ~synopsis:"WASM functionality for SCORU Fast Execution"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        tree_encoding;
-        octez_webassembly_interpreter;
-        lazy_containers;
-        octez_scoru_wasm;
-        octez_wasmer;
-      ]
-
 let octez_context_encoding =
   public_lib
     "tezos-context.encoding"
@@ -1866,13 +1835,6 @@ let octez_context_helpers =
         irmin_pack;
       ]
 
-let octez_context_dump =
-  public_lib
-    "tezos-context.dump"
-    ~path:"src/lib_context/dump"
-    ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
-
 let octez_context_memory =
   public_lib
     "tezos-context.memory"
@@ -1887,6 +1849,46 @@ let octez_context_memory =
         octez_context_encoding;
         octez_context_helpers;
       ]
+
+let octez_scoru_wasm =
+  public_lib
+    "tezos-scoru-wasm"
+    ~path:"src/lib_scoru_wasm"
+    ~synopsis:
+      "Protocol environment dependency providing WASM functionality for SCORU"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        lazy_containers;
+        octez_webassembly_interpreter;
+        octez_context_sigs;
+        octez_context_memory;
+        octez_lwt_result_stdlib;
+        data_encoding;
+      ]
+
+let octez_scoru_wasm_fast =
+  public_lib
+    "tezos-scoru-wasm-fast"
+    ~path:"src/lib_scoru_wasm/fast"
+    ~synopsis:"WASM functionality for SCORU Fast Execution"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_webassembly_interpreter;
+        lazy_containers;
+        octez_scoru_wasm;
+        octez_wasmer;
+      ]
+
+let octez_context_dump =
+  public_lib
+    "tezos-context.dump"
+    ~path:"src/lib_context/dump"
+    ~deps:
+      [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
 
 let octez_context_disk =
   public_lib

@@ -30,12 +30,6 @@ open Tezos_lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
 module Wasm_fast = Tezos_scoru_wasm_fast.Pvm.Make (Tree)
 
-let empty_tree () =
-  let open Lwt_syntax in
-  let* index = Context.init "/tmp" in
-  let empty_store = Context.empty index in
-  return @@ Context.Tree.empty empty_store
-
 let parse_module code =
   let def = Parse.string_to_module code in
   match def.it with

@@ -397,9 +397,68 @@ let wrapped_tree : wrapped_tree t =
   {encode = E.wrapped_tree; decode = D.wrapped_tree}
 
 module Runner = struct
+  module type S = sig
+    type tree
+
+    val encode : 'a t -> 'a -> tree -> tree Lwt.t
+
+    val decode : 'a t -> tree -> 'a Lwt.t
+  end
+
   module Make (T : TREE) = struct
+    type tree = T.tree
+
     let encode {encode; _} value tree = E.run (module T) encode value tree
 
     let decode {decode; _} tree = D.run (module T) decode tree
+  end
+end
+
+module Encodings_util = struct
+  module type Bare_tezos_context_sig = sig
+    type t
+
+    type tree
+
+    type index
+
+    module Tree :
+      Tezos_context_sigs.Context.TREE
+        with type t := t
+         and type key := string list
+         and type value := bytes
+         and type tree := tree
+
+    val init :
+      ?patch_context:(t -> t tzresult Lwt.t) ->
+      ?readonly:bool ->
+      ?index_log_size:int ->
+      string ->
+      index Lwt.t
+
+    val empty : index -> t
+  end
+
+  (* TREE instance for Tezos context *)
+  module Make (Ctx : Bare_tezos_context_sig) = struct
+    type Tezos_lazy_containers.Lazy_map.tree += Tree of Ctx.tree
+
+    module Tree = struct
+      type tree = Ctx.tree
+
+      include Ctx.Tree
+
+      let select = function Tree t -> t | _ -> raise Incorrect_tree_type
+
+      let wrap t = Tree t
+    end
+
+    module Tree_encoding_runner = Runner.Make (Tree)
+
+    let empty_tree () =
+      let open Lwt_syntax in
+      let* index = Ctx.init "/tmp" in
+      let empty_store = Ctx.empty index in
+      return @@ Ctx.Tree.empty empty_store
   end
 end

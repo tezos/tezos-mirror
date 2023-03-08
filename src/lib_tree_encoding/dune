@@ -8,6 +8,7 @@
  (libraries
   tezos-base
   tezos-lazy-containers
+  tezos-context.sigs
   tezos-lwt-result-stdlib
   data-encoding)
  (flags
