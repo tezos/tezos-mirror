@@ -545,7 +545,7 @@ representation of the message payload, one can do:
 .. code:: sh
 
     octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
-     send sc rollup message "hex:[ \"${EMESSAGE}\" ]" \
+     send smart rollup message "hex:[ \"${EMESSAGE}\" ]" \
      from "${OPERATOR_ADDR}"
 
 to inject such an external message.
