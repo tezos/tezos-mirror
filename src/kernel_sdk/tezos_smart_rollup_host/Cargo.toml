@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_smart_rollup_host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.tezos_smart_rollup_core]
+path = "../tezos_smart_rollup_core"
+
+[dependencies.crypto]
+git = "https://github.com/trilitech/tezedge.git"
+branch = "master"
+default-features = false
+optional = true
+
+[dev-dependencies]
+mockall = "0.11.0"
+
+[dev-dependencies.tezos_smart_rollup_core]
+path = "../tezos_smart_rollup_core"
+features = ["testing"]
+
+[features]
+default = ["alloc", "crypto"]
+alloc = []
+testing = ["crypto"]
