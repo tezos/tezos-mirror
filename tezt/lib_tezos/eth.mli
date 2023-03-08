@@ -47,6 +47,6 @@ module Block : sig
     uncles : string list;
   }
 
-  (** Simplified Ethereum block's encoding. *)
-  val encoding : t Data_encoding.t
+  (** Extracts a block {!t} from a JSON. *)
+  val of_json : JSON.t -> t
 end

@@ -49,16 +49,7 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
     JSON.as_string
 
 let get_block ~block_id ~endpoint =
-  let exception Could_not_parse_block of string in
-  let* answer =
-    spawn_command ["block:get"; block_id; "--network"; endpoint] Fun.id
-  in
-  let block_as_json =
-    match Data_encoding.Json.from_string (JSON.encode answer) with
-    | Ok json -> json
-    | Error msg -> raise @@ Could_not_parse_block msg
-  in
-  return @@ Data_encoding.Json.destruct Eth.Block.encoding block_as_json
+  spawn_command ["block:get"; block_id; "--network"; endpoint] Eth.Block.of_json
 
 let block_number ~endpoint =
   spawn_command ["block:number"; "--network"; endpoint] JSON.as_int
