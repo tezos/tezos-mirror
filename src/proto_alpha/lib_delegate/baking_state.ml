@@ -290,7 +290,6 @@ type level_state = {
   is_latest_proposal_applied : bool;
   delayed_prequorum :
     (Operation_worker.candidate * Kind.preendorsement operation list) option;
-  injected_preendorsements : packed_operation list option;
   (* Last proposal received where we injected an endorsement (thus we
      have seen 2f+1 preendorsements) *)
   locked_round : locked_round option;
@@ -823,7 +822,6 @@ let pp_level_state fmt
       latest_proposal;
       is_latest_proposal_applied;
       delayed_prequorum;
-      injected_preendorsements;
       locked_round;
       endorsable_payload;
       elected_block;
@@ -834,14 +832,12 @@ let pp_level_state fmt
   Format.fprintf
     fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b, \
-     delayed prequorum:%b, injected preendorsements: %d):@ %a@]@ locked round: \
-     %a@ endorsable payload: %a@ elected block: %a@ @[<v 2>own delegate \
-     slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ next level \
-     proposed round: %a@]"
+     delayed prequorum:%b):@ %a@]@ locked round: %a@ endorsable payload: %a@ \
+     elected block: %a@ @[<v 2>own delegate slots:@ %a@]@ @[<v 2>next level \
+     own delegate slots:@ %a@]@ next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied
     (Option.is_some delayed_prequorum)
-    (match injected_preendorsements with None -> 0 | Some l -> List.length l)
     pp_proposal
     latest_proposal
     (pp_option pp_locked_round)

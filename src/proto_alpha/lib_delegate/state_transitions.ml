@@ -319,7 +319,6 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           latest_proposal = new_proposal;
           is_latest_proposal_applied = is_proposal_applied;
           delayed_prequorum = None;
-          injected_preendorsements = None;
           (* Unlock values *)
           locked_round = None;
           endorsable_payload = None;
@@ -774,24 +773,10 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   in
   let new_state = {state with level_state = new_level_state} in
   match new_state.level_state.delayed_prequorum with
-  | None -> (
-      (* The application arrived before the prequorum: wait for the prequorum. *)
+  | None ->
+      (* The application arrived before the prequorum: just wait for the prequorum. *)
       let new_state = update_current_phase new_state Awaiting_preendorsements in
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4877 This
-         mechanism is only temporary and should be removed when the
-         protocol and prevalidator correctly accept early
-         preendorsements. *)
-      match new_state.level_state.injected_preendorsements with
-      | None -> do_nothing new_state
-      | Some preendorsements ->
-          let reinject_preendorsement_action =
-            Reinject_preendorsements {preendorsements}
-          in
-          let new_level_state =
-            {new_state.level_state with injected_preendorsements = None}
-          in
-          let new_state = {new_state with level_state = new_level_state} in
-          Lwt.return (new_state, reinject_preendorsement_action))
+      do_nothing new_state
   | Some (candidate, preendorsement_qc) ->
       (* The application arrived after the prequorum: handle the
          prequorum received earlier. *)
