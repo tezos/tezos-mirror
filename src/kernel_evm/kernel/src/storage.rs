@@ -146,7 +146,7 @@ pub fn read_account<Host: Runtime + RawRollupCore>(
     })
 }
 
-fn store_nonce<Host: Runtime + RawRollupCore>(
+pub fn store_nonce<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account_path: &OwnedPath,
     nonce: u64,
@@ -156,7 +156,7 @@ fn store_nonce<Host: Runtime + RawRollupCore>(
         .map_err(Error::from)
 }
 
-fn store_balance<Host: Runtime + RawRollupCore>(
+pub fn store_balance<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account_path: &OwnedPath,
     balance: Wei,
