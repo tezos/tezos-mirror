@@ -460,25 +460,23 @@ module Make (Interpreter : Interpreter.S) :
     match game_result with
     | Some (Loser {loser; _}) ->
         let is_it_me = Signature.Public_key_hash.(self = loser) in
-        return (not is_it_me)
-    | _ -> return_false
+        if is_it_me then return_none else return (Some loser)
+    | _ -> return_none
 
   let play head_block node_ctxt self game staker1 staker2 =
     let open Lwt_result_syntax in
     let index = Sc_rollup.Game.Index.make staker1 staker2 in
     match turn ~self game index with
     | Our_turn {opponent} -> play_next_move node_ctxt game self opponent
-    | Their_turn ->
+    | Their_turn -> (
         let* timeout_reached =
           timeout_reached ~self head_block node_ctxt staker1 staker2
         in
-        unless timeout_reached @@ fun () ->
-        let opponent =
-          if Signature.Public_key_hash.(self = staker1) then staker2
-          else staker1
-        in
-        let*! () = Refutation_game_event.timeout_detected opponent in
-        play_timeout node_ctxt self index
+        match timeout_reached with
+        | Some opponent ->
+            let*! () = Refutation_game_event.timeout_detected opponent in
+            play_timeout node_ctxt self index
+        | None -> return_unit)
 
   let ongoing_games head_block node_ctxt self =
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
