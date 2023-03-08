@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::blueprint::Queue;
 use crate::error::Error;
 use crate::storage;
+use crate::{blueprint::Queue, inbox::Transaction};
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 use tezos_ethereum::eth_gen::{L2Level, OwnedHash, Quantity, TransactionHash};
@@ -77,14 +77,17 @@ fn validate(block: L2Block) -> Result<L2Block, Error> {
 }
 
 pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
-    for _proposal in queue.proposals.iter() {
+    for proposal in queue.proposals.iter() {
         let current_level = storage::read_current_block_number(host);
         let next_level = match current_level {
             Ok(current_level) => current_level + 1,
             Err(_) => 0,
         };
-        // This will be fixed in a forthcoming commit.
-        let transactions = Vec::new();
+        let transactions = proposal
+            .transactions
+            .iter()
+            .map(|transaction: &Transaction| -> TransactionHash { transaction.tx_hash })
+            .collect();
         let candidate_block = L2Block::new(next_level, transactions);
         if let Ok(valid_block) = validate(candidate_block) {
             storage::store_current_block(host, valid_block).unwrap_or_else(|_| {

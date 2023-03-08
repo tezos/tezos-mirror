@@ -9,10 +9,11 @@ use host::input::Message;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
-use tezos_ethereum::eth_gen::RawTransaction;
+use tezos_ethereum::eth_gen::{RawTransaction, TransactionHash};
 
 pub struct Transaction {
     pub level: i32,
+    pub tx_hash: TransactionHash,
     pub tx: RawTransaction,
 }
 
@@ -38,10 +39,16 @@ impl Transaction {
         // Next 20 bytes is the targeted smart rollup address.
         let (target_smart_rollup_address, remaining) = remaining.split_at(20);
         Self::ensures(target_smart_rollup_address == smart_rollup_address)?;
+        // Next 32 bytes is the transaction hash.
+        let (tx_hash, remaining) = remaining.split_at(32);
+        let tx_hash: TransactionHash = tx_hash.try_into().ok()?;
+        // Remaining bytes is the rlp encoded transaction.
+        let tx = RawTransaction::decode_from_rlp(remaining).ok()?;
 
         Some(Transaction {
             level: input.level,
-            tx: remaining.to_vec(),
+            tx_hash,
+            tx,
         })
     }
 
