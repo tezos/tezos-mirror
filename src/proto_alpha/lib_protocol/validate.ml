@@ -1352,19 +1352,24 @@ module Anonymous = struct
           Block_payload_hash.(e1.block_payload_hash = e2.block_payload_hash)
         in
         let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
+        let same_slots = Slot.(e1.slot = e2.slot) in
         let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
         let is_denunciation_consistent =
           same_levels && same_rounds
-          (* Either the payloads or the branches must differ for the
-             double (pre)endorsement to be punishable. Indeed,
-             different payloads would endanger the consensus process,
-             while different branches could be used to spam mempools
-             with a lot of valid operations. On the other hand, if the
-             operations have identical levels, rounds, payloads, and
-             branches (and of course delegates), then only their
+          (* For the double (pre)endorsements to be punishable, they
+             must point to the same block (same level and round), but
+             also have at least a difference that is the delegate's
+             fault: different payloads, different branches, or
+             different slots. Note that different payloads would
+             endanger the consensus process, while different branches
+             or slots could be used to spam mempools with a lot of
+             valid operations (since the minimality of the slot in not
+             checked in mempool mode, only in block-related modes). On
+             the other hand, if the operations have identical levels,
+             rounds, payloads, branches, and slots, then only their
              signatures are different, which is not considered the
              delegate's fault and therefore is not punished. *)
-          && ((not same_payload) || not same_branches)
+          && ((not same_payload) || (not same_branches) || not same_slots)
           && (* we require an order on hashes to avoid the existence of
                    equivalent evidences *)
           ordered_hashes
