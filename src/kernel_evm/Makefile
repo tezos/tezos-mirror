@@ -3,11 +3,17 @@
 #
 # SPDX-License-Identifier: MIT
 
-all:
+.PHONY: all
+all: build test
+
+build:
 	@cargo fmt --check
-	@cargo clippy -- --deny warnings
+	@cargo clippy --all-targets -- --deny warnings
 	@cargo build --target wasm32-unknown-unknown --release
 
 build-deps:
 	@rustup target add wasm32-unknown-unknown
 	@rustup component add rustfmt clippy
+
+test:
+	@cargo test
