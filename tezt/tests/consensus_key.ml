@@ -442,14 +442,20 @@ let bake_n_cycles n client =
       loop (n - 1)
   in
   let* current_level = Helpers.get_current_level client in
-  let nb_remaining_blocks = current_level.level mod blocks_per_cycle in
-  let nb_baked_blocks_in_cycle = blocks_per_cycle - nb_remaining_blocks in
+  let current_level = current_level.level in
+  let nb_baked_blocks_in_cycle = current_level mod blocks_per_cycle in
   let nb_blocks_to_bake = (n * blocks_per_cycle) - nb_baked_blocks_in_cycle in
+  Log.info
+    "Bake past %d cycles (from level %d to %d)"
+    n
+    current_level
+    (current_level + nb_blocks_to_bake) ;
   loop nb_blocks_to_bake
 
 let update_consensus_key ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(src : Account.key)
     ~(consensus_key : Account.key) client =
+  Log.info "Set consensus_key of %s to %s" src.alias consensus_key.alias ;
   let* () =
     Client.update_consensus_key
       ~hooks
@@ -498,6 +504,56 @@ let drain_delegate ~delegate ~consensus_key ~destination
   in
   Client.bake_for_and_wait ~keys:[baker] client
 
+type consensus_key = {
+  active_consensus_key : string;
+  (* Pending consensus keys per cycle *)
+  pending_consensus_keys : (int * string) list;
+}
+
+let consensus_key_typ : consensus_key Check.typ =
+  Check.(
+    convert
+      (fun {active_consensus_key; pending_consensus_keys} ->
+        (active_consensus_key, pending_consensus_keys))
+      (tuple2 string (list (tuple2 int string))))
+
+let get_consensus_key client (delegate : Account.key) : consensus_key Lwt.t =
+  let* delegate_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_delegate delegate.public_key_hash
+  in
+  return
+    JSON.
+      {
+        active_consensus_key =
+          delegate_json |-> "active_consensus_key" |> as_string;
+        pending_consensus_keys =
+          delegate_json |-> "pending_consensus_keys" |> as_list
+          |> List.map (fun pending_key ->
+                 ( pending_key |-> "cycle" |> as_int,
+                   pending_key |-> "pkh" |> as_string ));
+      }
+
+let check_consensus_key ~__LOC__ delegate ?(expected_active = delegate)
+    ?(expected_pending = []) client =
+  let* consensus_key = get_consensus_key client delegate in
+  let expected_consensus_key =
+    {
+      active_consensus_key = expected_active.public_key_hash;
+      pending_consensus_keys =
+        List.map
+          (fun (cycle, (account : Account.key)) ->
+            (cycle, account.public_key_hash))
+          expected_pending;
+    }
+  in
+  Check.(
+    (consensus_key = expected_consensus_key)
+      consensus_key_typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  unit
+
 let register_key_as_delegate ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(owner : Account.key)
     ~(consensus_key : Account.key) client =
@@ -544,8 +600,11 @@ let transfer ?hooks ?(expect_failure = false)
   in
   Client.bake_for_and_wait ~keys:[baker] client
 
-let register title test =
-  Protocol.register_regression_test ~__FILE__ ~title ~tags:["consensus_key"]
+let register ?(regression = true) title test =
+  Protocol.(if regression then register_regression_test else register_test)
+    ~__FILE__
+    ~title
+    ~tags:["consensus_key"]
   @@ fun protocol ->
   let parameters =
     (* we update paramaters for faster testing: no need to wait
@@ -591,9 +650,63 @@ let test_register_delegate_with_consensus_key ?(expect_failure = false)
   let* () = Client.bake_for_and_wait ~keys:[new_consensus_key.alias] client in
   unit
 
+(* Like [register_key_as_delegate] this function registers [owner] as a delegate,
+   sets its consensus key to [consensus_key] and bakes until the
+   consensus_key takes effect. Unlike [register_key_as_delegate], this
+   does not store a regression trace. Instead, it [Check]s that the new
+   consensus key is as expected. *)
+let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
+    ~(owner : Account.key) ~(consensus_key : Account.key) client =
+  let* () =
+    Client.register_key ~consensus:consensus_key.alias owner.alias client
+  in
+  let* level_information = Helpers.get_current_level client in
+  let* () = Client.bake_for_and_wait ~keys:[baker] client in
+  let* () =
+    check_consensus_key
+      ~__LOC__
+      owner
+      ~expected_pending:
+        [(level_information.cycle + preserved_cycles + 1, consensus_key)]
+      client
+  in
+  (* Wait for consensus key to be active *)
+  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  check_consensus_key ~__LOC__ owner ~expected_active:consensus_key client
+
+(* Like [update_consensus_key] this function updates the consensus key
+   of [src] to [consensus_key] and bakes until the new [consensus_key]
+   takes effect. Unlike [update_consensus_key] this does does not
+   store a regression trace. Instead, it [Check]s that the new
+   consensus key is as expected. *)
+let update_consensus_key_no_reg ?(baker = Constant.bootstrap1.alias)
+    ~(src : Account.key) ~(consensus_key : Account.key) ~expected_active client
+    =
+  let* () =
+    Client.update_consensus_key ~src:src.alias ~pk:consensus_key.alias client
+  in
+  let* level_information = Helpers.get_current_level client in
+  let* () = Client.bake_for_and_wait ~keys:[baker] client in
+  let* () =
+    check_consensus_key
+      ~__LOC__
+      src
+      ~expected_active
+      ~expected_pending:
+        [(level_information.cycle + preserved_cycles + 1, consensus_key)]
+      client
+  in
+  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  check_consensus_key
+    ~__LOC__
+    consensus_key
+    ~expected_active:consensus_key
+    client
+
 let test_revert_to_unique_consensus_key ?(baker = Constant.bootstrap1.alias)
     ~(new_delegate : Account.key) ~(new_consensus_key : Account.key) client =
   (* Set a new consensus key *)
+  Log.info "Transfer 1_000_000 tez from baker to new_delegate" ;
   let* () =
     transfer
       ~source:baker
@@ -603,24 +716,29 @@ let test_revert_to_unique_consensus_key ?(baker = Constant.bootstrap1.alias)
       client
   in
   let* () =
-    register_key_as_delegate
+    Log.info "Register as delegate with consensus key" ;
+    register_key_as_delegate_no_reg
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
       ~baker
       client
   in
-  (* Check that new_consensus_key can bake *)
-  let* () = Client.bake_for_and_wait ~keys:[new_consensus_key.alias] client in
-  (* Revert the consensus key *)
   let* () =
-    update_consensus_key
-      ~baker
+    Log.info "Check that the new consensus key can bake" ;
+    Client.bake_for_and_wait ~keys:[new_consensus_key.alias] client
+  in
+  let* () =
+    Log.info "Revert the consensus key" ;
+    update_consensus_key_no_reg
       ~src:new_delegate
       ~consensus_key:new_delegate
+      ~expected_active:new_consensus_key
       client
   in
-  (* Check that new_delegate can bake *)
-  let* () = Client.bake_for_and_wait ~keys:[new_delegate.alias] client in
+  let* () =
+    Log.info "Check that the new delegate can bake" ;
+    Client.bake_for_and_wait ~keys:[new_delegate.alias] client
+  in
   unit
 
 let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
@@ -733,6 +851,7 @@ let register ~protocols =
   let () =
     register
       "Test revert to unique consensus key"
+      ~regression:false
       (fun client baker_0 _baker_1 account_0 account_1 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
