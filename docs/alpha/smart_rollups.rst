@@ -572,7 +572,7 @@ can encode an outbox transaction using the Octez rollup client as follows:
     MESSAGE='[ { \
       "destination" : "${CONTRACT}", \
       "parameters" : "\"Hello world\"", \
-      "entrypoint" : "default" } ]'
+      "entrypoint" : "%default" } ]'
 
 
     EMESSAGE=$(octez-smart-rollup-client-alpha encode outbox message "${MESSAGE}")
@@ -606,7 +606,7 @@ Here is the output for this command:
       { "transactions":
           [ { "parameters": { "string": "Hello world" },
               "destination": "${CONTRACT}",
-              "entrypoint": "default" } ] } } ]
+              "entrypoint": "%default" } ] } } ]
 
 
 At this point, the actual execution of a given outbox message can be
