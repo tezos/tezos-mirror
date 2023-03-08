@@ -2242,10 +2242,11 @@ let octez_shell_context =
       ]
 
 let _octez_protocol_environment_tests =
-  tests
+  tezt
     [
       "test_mem_context";
       "test_mem_context_array_theory";
+      "test_mem_context_common";
       "test_cache";
       "test_data_encoding";
     ]
@@ -2256,7 +2257,7 @@ let _octez_protocol_environment_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_protocol_environment |> open_;
-        alcotest_lwt;
+        alcotezt;
         octez_test_helpers |> open_;
         qcheck_alcotest;
         lwt_unix;
