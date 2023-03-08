@@ -3,6 +3,16 @@
 Changelog
 '''''''''
 
+Version 16.0
+============
+
+Node
+----
+
+- Updated the built-in network alias for Mumbainet (``--network mumbainet``).
+  The new alias matches the relaunch of Mumbainet with the protocol ``PtMumbai2``.
+
+
 Version 16.0-rc3
 ================
 
