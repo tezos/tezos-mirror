@@ -15,7 +15,7 @@ depends: [
   "tezos-lwt-result-stdlib"
   "tezos-scoru-wasm"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "bls12-381" { >= "6.0.1" & < "6.1.0" }
+  "bls12-381" { >= "6.1.0" & < "6.2.0" }
   "tezos-plonk" { >= "1.0.1" & < "2.0.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"

@@ -238,12 +238,14 @@ opam:octez-baker-PtMumbai:
 
 # Ignoring unreleased package octez-baker-alpha.
 
-opam:octez-bls12-381-hash:
+# Ignoring unreleased package octez-bls12-381-hash.
+
+opam:octez-bls12-381-signature:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_7
   variables:
-    package: octez-bls12-381-hash
+    package: octez-bls12-381-signature
 
 opam:octez-client:
   extends:
@@ -279,12 +281,7 @@ opam:octez-injector:
   variables:
     package: octez-injector
 
-opam:octez-mec:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_7
-  variables:
-    package: octez-mec
+# Ignoring unreleased package octez-mec.
 
 opam:octez-node:
   extends:
@@ -300,12 +297,7 @@ opam:octez-node-config:
   variables:
     package: octez-node-config
 
-opam:octez-polynomial:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_7
-  variables:
-    package: octez-polynomial
+# Ignoring unreleased package octez-polynomial.
 
 opam:octez-protocol-compiler:
   extends:

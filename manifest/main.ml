@@ -91,10 +91,6 @@ let bls12_381 =
     "bls12-381"
     version
 
-let bls12_381_signature =
-  let version = V.exactly "1.0.0" in
-  external_lib ~js_compatible:true "bls12-381-signature" version
-
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
@@ -836,6 +832,62 @@ let octez_rpc =
       ]
     ~js_compatible:true
 
+let octez_bls12_381_signature =
+  public_lib
+    "octez-bls12-381-signature"
+    ~path:"src/lib_bls12_381_signature"
+    ~internal_name:"bls12_381_signature"
+    ~synopsis:
+      "Implementation of BLS signatures for the pairing-friendly curve \
+       BLS12-381"
+    ~deps:[bls12_381]
+    ~modules:["bls12_381_signature"]
+    ~js_compatible:true
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = ["-Wall"; "-Wextra"; ":standard"];
+        names = ["blst_bindings_stubs"];
+      }
+    ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
+    ~js_of_ocaml:[[S "javascript_files"; S "blst_bindings_stubs.js"]]
+
+    ~linkall:true
+    ~dune:
+      Dune.
+        [
+          targets_rule
+            ["needed-wasm-names"]
+            ~promote:true
+            ~action:
+              [
+                S "with-outputs-to";
+                S "%{targets}";
+                [S "run"; S "./gen_wasm_needed_names.exe"; S "%{files}"];
+              ]
+            ~deps:[[S ":files"; S "blst_bindings_stubs.js"]];
+        ]
+
+(* TODO: dep_globs aren't added to the rules for JS tests *)
+let _octez_bls12_381_signature_tests =
+  tests
+    ["test_aggregated_signature"; "test_signature"]
+    ~path:"src/lib_bls12_381_signature/test"
+    ~opam:"octez-bls12-381-signature"
+    ~modes:[Native; JS]
+    ~deps:[bls12_381; octez_bls12_381_signature; alcotest; integers_stubs_js]
+    ~dep_globs_rec:["test_vectors/*"]
+    ~js_compatible:true
+
+let _octez_bls12_381_signature_gen_wasm_needed_names =
+  private_exe
+    "gen_wasm_needed_names"
+    ~path:"src/lib_bls12_381_signature"
+    ~opam:"octez-bls12-381-signature"
+    ~bisect_ppx:No
+    ~modules:["gen_wasm_needed_names"]
+    ~deps:[re]
+
 let octez_crypto =
   public_lib
     "tezos-crypto"
@@ -856,7 +908,7 @@ let octez_crypto =
         zarith;
         zarith_stubs_js;
         bls12_381;
-        bls12_381_signature;
+        octez_bls12_381_signature;
       ]
     ~js_compatible:true
 

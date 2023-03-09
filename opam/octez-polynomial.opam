@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "bls12-381" { >= "6.0.1" & < "6.1.0" }
+  "bls12-381" { >= "6.1.0" & < "6.2.0" }
   "bisect_ppx" { >= "2.7.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "octez-mec" {with-test}

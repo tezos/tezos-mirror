@@ -1,0 +1,38 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (env-vars (NODE_PRELOAD ocaml-bls12-381))))
+
+(executables
+ (names test_aggregated_signature test_signature)
+ (modes native js)
+ (libraries
+  bls12-381
+  octez-bls12-381-signature
+  alcotest
+  integers_stubs_js)
+ (js_of_ocaml))
+
+(rule
+ (alias runtest)
+ (package octez-bls12-381-signature)
+ (deps (glob_files_rec test_vectors/*))
+ (action (run %{dep:./test_aggregated_signature.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-bls12-381-signature)
+ (deps (glob_files_rec test_vectors/*))
+ (action (run %{dep:./test_signature.exe})))
+
+(rule
+ (alias runtest_js)
+ (package octez-bls12-381-signature)
+ (deps (glob_files_rec test_vectors/*))
+ (action (run node %{dep:./test_aggregated_signature.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package octez-bls12-381-signature)
+ (deps (glob_files_rec test_vectors/*))
+ (action (run node %{dep:./test_signature.bc.js})))

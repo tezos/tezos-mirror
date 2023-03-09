@@ -11,6 +11,7 @@
 (package (name octez-baker-PtMumbai))
 (package (name octez-baker-alpha))
 (package (name octez-bls12-381-hash))
+(package (name octez-bls12-381-signature))
 (package (name octez-client))
 (package (name octez-codec))
 (package (name octez-crawler))
