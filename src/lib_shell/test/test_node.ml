@@ -140,7 +140,7 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
       {
         level = Some Internal_event.Notice;
         section = Some section;
-        name = "shell-node";
+        name = "p2p-initialization";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   (* End tests *)
@@ -174,7 +174,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
       {
         level = Some Internal_event.Notice;
         section = Some section;
-        name = "shell-node";
+        name = "p2p-initialization";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   Mock_sink.Pattern.(
@@ -182,7 +182,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
       {
         level = Some Internal_event.Notice;
         section = Some section;
-        name = "shell-node";
+        name = "p2p-initialization";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 1) ;
   (* End tests *)

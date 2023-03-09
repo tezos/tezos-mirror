@@ -34,8 +34,8 @@ let section = section_root
 let p2p_event =
   declare_1
     ~section
-    ~name:"shell-node"
-    ~msg:"shell-node initialization: {status}"
+    ~name:"p2p-initialization"
+    ~msg:"p2p initialization: {status}"
     ~level:Notice
     ("status", Data_encoding.string)
 
