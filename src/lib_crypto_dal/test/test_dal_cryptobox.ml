@@ -433,6 +433,28 @@ module Test = struct
         | Ok true -> true
         | _ -> false)
 
+  let test_commitment_proof_invalid =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test invalid commitment proof"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let* commitment = Cryptobox.commit t polynomial in
+        let* commitment_proof = Cryptobox.prove_commitment t polynomial in
+        let altered_proof =
+          Cryptobox.Internal_for_tests.alter_commitment_proof commitment_proof
+        in
+        return (Cryptobox.verify_commitment t commitment altered_proof))
+        |> function
+        | Ok false -> true
+        | _ -> false)
+
   let test_select_fft_domain =
     let open QCheck2 in
     Test.make
@@ -628,6 +650,7 @@ let () =
             Test.test_shard_proofs;
             Test.test_shard_proof_invalid;
             Test.test_commitment_proof;
+            Test.test_commitment_proof_invalid;
             Test.test_polynomial_slot_conversions;
             Test.test_select_fft_domain;
             Test.test_shard_proofs_load_from_file;
