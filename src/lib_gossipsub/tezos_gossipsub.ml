@@ -126,7 +126,38 @@ module type S = sig
 
   val make : Random.State.t -> limits -> parameters -> state
 
-  type 'a output
+  type _ output =
+    | Negative_peer_score : Score.t -> [`IHave] output
+    | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
+    | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
+    | Message_topic_not_tracked : [`IHave] output
+    | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+    | On_iwant_messages_to_route : {
+        peer : Peer.t;
+        routed_message_ids :
+          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
+      }
+        -> [`IWant] output
+    | Peer_filtered : [`Graft] output
+    | Unknown_topic : [`Graft] output
+    | Peer_already_in_mesh : [`Graft] output
+    | Grafting_direct_peer : [`Graft] output
+    | Unexpected_grafting_peer : [`Graft] output
+    | Grafting_peer_with_negative_score : [`Graft] output
+    | Grafting_successfully : [`Graft] output
+    | Peer_backed_off : [`Graft] output
+    | No_peer_in_mesh : [`Prune] output
+    | Ignore_PX_score_too_low : Score.t -> [`Prune] output
+    | No_PX : [`Prune] output
+    | PX : Peer.Set.t -> [`Prune] output
+    | Publish_message : Peer.Set.t -> [`Publish] output
+    | Already_subscribed : [`Join] output
+    | Joining_topic : Peer.Set.t -> [`Join] output
+    | Not_subscribed : [`Leave] output
+    | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Peer_added : [`Add_peer] output
+    | Peer_already_known : [`Add_peer] output
+    | Removing_peer : [`Remove_peer] output
 
   type 'a monad := state -> state * 'a output
 
