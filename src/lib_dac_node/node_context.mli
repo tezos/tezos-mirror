@@ -89,3 +89,9 @@ val get_page_store : t -> Page_store.Filesystem.t
 (** [get_node_store ctxt access_mode] returns the [Store.Irmin_store.t] with
     [access_mode] used by Dac components. *)
 val get_node_store : t -> 'a Store_sigs.mode -> 'a Store.Irmin_store.t
+
+(** [get_dac_committee ctxt] returns the Dac committee public key hashes from
+    [Configuration.Legacy.dac_members_addresses] or 
+    [Configuration.Coordinator.dac_members_addresses] *)
+val get_dac_committee :
+  t -> Tezos_crypto.Aggregate_signature.public_key_hash list tzresult

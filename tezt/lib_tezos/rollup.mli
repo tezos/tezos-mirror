@@ -435,10 +435,15 @@ module Dac : sig
         stores the [signature] generated from signing [hex_root_hash] by
         [dac_member_pkh]. *)
     val dac_store_dac_member_signature :
-      hex_root_hash:string ->
+      hex_root_hash:Hex.t ->
       dac_member_pkh:string ->
       signature:Tezos_crypto.Aggregate_signature.t ->
       (Dac_node.t, unit) RPC_core.t
+
+    (** [get_certificate hex_root_hash] fetches the Dac certificate for a
+        given [hex_root_hash]. *)
+    val get_certificate :
+      hex_root_hash:Hex.t -> (Dac_node.t, int * string * string) RPC_core.t
 
     (** [coordinator_store_preimage ~payload] sends a [payload] to the dac
         [Coordinator] via a POST RPC call to "/preimage". It returns a hex

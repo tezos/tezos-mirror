@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Irmin_store] representation for Dac node. *)
-module Irmin_store : sig
-  include Store_sigs.Store
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5073
+   Update Certificate repr to handle a dynamic dac.
+*)
 
-  include Store_sigs.BACKEND
-end
-
-(** [Signature_store] is a nested map where [primary_key]s are root_hashes and
-    [secondary_key]s are dac member public key hashes. Root hashes are strings
-    instead of [Dac_hash.t] because we want to avoid runtime functorization of
-    the module. 
-  *)
-module Signature_store :
-  Store_sigs.Nested_map
-    with type 'a store = 'a Irmin_store.t
-     and type primary_key = Dac_plugin.hash
-     and type secondary_key = Tezos_crypto.Aggregate_signature.public_key_hash
-     and type value = Tezos_crypto.Aggregate_signature.signature
-
-type certificate_store_value = {
+(* Representation of a Data Availibility Committee Certificate. *)
+type t = {
+  root_hash : Dac_plugin.hash;
   aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
   witnesses : Z.t;
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4853
+         Use BitSet for witnesses field in external message
+      *)
 }
 
-(** Key-value store for Dac certificates where keys are hexified [Dac_hash.t]
-    and values are [Certificate_repr.t]. *)
-module Certificate_store :
-  Store_sigs.Map
-    with type 'a store = 'a Irmin_store.t
-     and type key = Dac_plugin.hash
-     and type value = certificate_store_value
+let encoding ((module P) : Dac_plugin.t) =
+  let obj_enc =
+    Data_encoding.(
+      obj3
+        (req "root_hash" P.encoding)
+        (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
+        (req "witnesses" z))
+  in
+
+  Data_encoding.(
+    conv
+      (fun {root_hash; aggregate_signature; witnesses} ->
+        (root_hash, aggregate_signature, witnesses))
+      (fun (root_hash, aggregate_signature, witnesses) ->
+        {root_hash; aggregate_signature; witnesses})
+      obj_enc)

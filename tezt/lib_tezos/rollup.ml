@@ -930,10 +930,11 @@ module Dac = struct
 
     let dac_store_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature
         =
+      let (`Hex root_hash) = hex_root_hash in
       let payload =
         `O
           [
-            ("root_hash", `String hex_root_hash);
+            ("root_hash", `String root_hash);
             ("signer_pkh", `String dac_member_pkh);
             ( "signature",
               `String (Tezos_crypto.Aggregate_signature.to_b58check signature)
@@ -951,5 +952,13 @@ module Dac = struct
       in
       let data : RPC_core.data = Data (JSON.unannotate preimage) in
       make ~data POST ["preimage"] JSON.as_string
+
+    let get_certificate ~hex_root_hash =
+      let (`Hex page_hash) = hex_root_hash in
+      make GET ["certificates"; page_hash] @@ fun json ->
+      JSON.
+        ( json |-> "witnesses" |> as_int,
+          json |-> "aggregate_signature" |> as_string,
+          json |-> "root_hash" |> as_string )
   end
 end

@@ -80,6 +80,14 @@ let store_dac_member_signature dac_plugin =
     ~output:Data_encoding.empty
     Tezos_rpc.Path.(open_root / "dac_member_signature")
 
+let get_certificate ((module P) : Dac_plugin.t) =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Retrieve the Dac certificate associated with the given root page hash"
+    ~query:Tezos_rpc.Query.empty
+    ~output:(Data_encoding.option (Certificate_repr.encoding (module P)))
+    Tezos_rpc.Path.(open_root / "certificates" /: P.hash_rpc_arg)
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4935
    Coordinator's "POST /preimage" endpoint should in addition to root page hash
    also return expiration level. Additionally, when it pushes a new root hash to

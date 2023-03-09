@@ -31,3 +31,64 @@ module Irmin_store = struct
   include IStore
   include Store_utils.Make (IStore)
 end
+
+module Signature_store =
+  Irmin_store.Make_nested_map
+    (struct
+      let path = ["coordinator"; "signature_store"]
+    end)
+    (struct
+      type key = Dac_plugin.hash
+
+      let to_path_representation key = Hex.show @@ Dac_plugin.hash_to_hex key
+    end)
+    (struct
+      type key = Tezos_crypto.Aggregate_signature.public_key_hash
+
+      let name = "Committee member public key hash"
+
+      let compare = Tezos_crypto.Aggregate_signature.Public_key_hash.compare
+
+      let encoding = Tezos_crypto.Aggregate_signature.Public_key_hash.encoding
+    end)
+    (struct
+      type value = Tezos_crypto.Aggregate_signature.signature
+
+      let name = "Committee member signature of root hash"
+
+      let encoding = Tezos_crypto.Aggregate_signature.encoding
+    end)
+
+type certificate_store_value = {
+  aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
+  witnesses : Z.t;
+}
+
+module Certificate_store =
+  Irmin_store.Make_updatable_map
+    (struct
+      let path = ["coordinator"; "certificate_store"]
+    end)
+    (struct
+      type key = Dac_plugin.hash
+
+      let to_path_representation key = Hex.show @@ Dac_plugin.hash_to_hex key
+    end)
+    (struct
+      type value = certificate_store_value
+
+      let name = "Data availability certificate for root hash"
+
+      let encoding =
+        Data_encoding.(
+          conv
+            (fun {aggregate_signature; witnesses} ->
+              (aggregate_signature, witnesses))
+            (fun (aggregate_signature, witnesses) ->
+              {aggregate_signature; witnesses})
+            (obj2
+               (req
+                  "aggregate_signature"
+                  Tezos_crypto.Aggregate_signature.encoding)
+               (req "witnesses" z)))
+    end)
