@@ -56,7 +56,6 @@ unit:015_PtLimaPt:
         @src/proto_015_PtLimaPt/lib_protocol/test/integration/validate/runtest
     proto_015_PtLimaPt__lib_protocol__3: >
         @src/proto_015_PtLimaPt/lib_protocol/test/unit/runtest
-        @src/proto_015_PtLimaPt/lib_protocol/runtezt
   parallel:
     matrix:
       - TEST_TARGETS:
@@ -82,7 +81,6 @@ unit:016_PtMumbai:
         @src/proto_016_PtMumbai/lib_protocol/test/integration/validate/runtest
     proto_016_PtMumbai__lib_protocol__3: >
         @src/proto_016_PtMumbai/lib_protocol/test/unit/runtest
-        @src/proto_016_PtMumbai/lib_protocol/runtezt
     proto_016_PtMumbai: >
         @src/proto_016_PtMumbai/lib_dal/runtest
   parallel:
@@ -111,7 +109,6 @@ unit:alpha:
         @src/proto_alpha/lib_protocol/test/integration/validate/runtest
     proto_alpha__lib_protocol__3: >
         @src/proto_alpha/lib_protocol/test/unit/runtest
-        @src/proto_alpha/lib_protocol/runtezt
     proto_alpha: >
         @src/proto_alpha/lib_dal/runtest
   parallel:
