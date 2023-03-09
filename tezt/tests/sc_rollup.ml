@@ -2603,10 +2603,13 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let published_commitments = ref [] in
   let detected_timeouts = Hashtbl.create 5 in
   let _ =
-    let* conflict = wait_for_conflict_detected sc_rollup_node in
-    conflict_detected := true ;
-    detected_conflicts := conflict :: !detected_conflicts ;
-    unit
+    let rec gather_conflicts () =
+      let* conflict = wait_for_conflict_detected sc_rollup_node in
+      conflict_detected := true ;
+      detected_conflicts := conflict :: !detected_conflicts ;
+      gather_conflicts ()
+    in
+    gather_conflicts ()
   in
   let _ =
     let rec gather_commitments () =
