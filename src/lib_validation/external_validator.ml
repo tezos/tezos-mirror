@@ -469,15 +469,18 @@ let run ~readonly ~using_std_channel input output =
             | Some cache ->
                 `Inherited (cache, predecessor_resulting_context_hash)
           in
-          Block_validation.precheck
-            ~chain_id
-            ~predecessor_block_header
-            ~predecessor_block_hash
-            ~predecessor_context
-            ~predecessor_resulting_context_hash
-            ~cache
-            header
-            operations
+          let*! protocol_hash = Context_ops.get_protocol predecessor_context in
+          let* () = load_protocol protocol_hash protocol_root in
+          with_retry_to_load_protocol protocol_root (fun () ->
+              Block_validation.precheck
+                ~chain_id
+                ~predecessor_block_header
+                ~predecessor_block_hash
+                ~predecessor_context
+                ~predecessor_resulting_context_hash
+                ~cache
+                header
+                operations)
         in
         let*! () =
           External_validation.send
