@@ -83,6 +83,16 @@ type ('peer, 'message_id) parameters = {
     'peer -> [`IHave of 'message_id | `IWant of 'message_id | `Graft] -> bool;
 }
 
+module Score : sig
+  type t
+
+  val float : t -> float
+
+  val zero : t
+
+  val penality : t -> int -> t
+end
+
 module type S = sig
   (** Type for peers *)
   type peer
