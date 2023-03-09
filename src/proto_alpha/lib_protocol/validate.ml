@@ -2892,20 +2892,6 @@ let check_fitness_locked_round bs fitness_locked_round =
     (Option.equal Round.equal observed_locked_round fitness_locked_round)
     Fitness.Wrong_fitness
 
-type checkable_payload_hash =
-  | No_check
-  | Expected_payload_hash of Block_payload_hash.t
-
-let finalize_validate_block_header checkable_payload_hash
-    (block_header_contents : Block_header.contents) =
-  match checkable_payload_hash with
-  | No_check -> ok_unit
-  | Expected_payload_hash bph ->
-      let actual_payload_hash = block_header_contents.payload_hash in
-      error_unless
-        (Block_payload_hash.equal actual_payload_hash bph)
-        (Invalid_payload_hash {expected = bph; provided = actual_payload_hash})
-
 (** When there are preendorsements, check that they point to a round
     before the block's round, and that their total power is high enough.
 
@@ -2933,12 +2919,18 @@ let check_preendorsement_round_and_power vi vs round =
         (Insufficient_locked_round_evidence
            {voting_power = preendorsement_count; consensus_threshold})
 
-let compute_payload_hash block_state
-    (block_header_contents : Block_header.contents) ~predecessor_hash =
-  Block_payload.hash
-    ~predecessor_hash
-    ~payload_round:block_header_contents.payload_round
-    (List.rev block_state.recorded_operations_rev)
+let check_payload_hash block_state ~predecessor_hash
+    (block_header_contents : Block_header.contents) =
+  let expected =
+    Block_payload.hash
+      ~predecessor_hash
+      ~payload_round:block_header_contents.payload_round
+      (List.rev block_state.recorded_operations_rev)
+  in
+  let provided = block_header_contents.payload_hash in
+  error_unless
+    (Block_payload_hash.equal expected provided)
+    (Invalid_payload_hash {expected; provided})
 
 let finalize_block {info; block_state; _} =
   let open Lwt_result_syntax in
@@ -2947,40 +2939,28 @@ let finalize_block {info; block_state; _} =
       let* () = check_endorsement_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
       let*? () = check_preendorsement_round_and_power info block_state round in
-      let block_payload_hash =
-        compute_payload_hash block_state header_contents ~predecessor_hash
-      in
       let*? () =
-        finalize_validate_block_header
-          (Expected_payload_hash block_payload_hash)
-          header_contents
+        check_payload_hash block_state ~predecessor_hash header_contents
       in
       return_unit
   | Partial_validation _ ->
       let* () = check_endorsement_power info block_state in
       return_unit
   | Construction {round; predecessor_hash; header_contents} ->
-      let block_payload_hash =
-        compute_payload_hash block_state header_contents ~predecessor_hash
-      in
-      let locked_round_evidence = block_state.locked_round_evidence in
-      let checkable_payload_hash =
-        match locked_round_evidence with
-        | Some _ -> Expected_payload_hash block_payload_hash
-        | None ->
-            (* In full construction, when there is no locked round
-               evidence (and thus no preendorsements), the baker cannot
-               know the payload hash before selecting the operations. We
-               may dismiss checking the initially given
-               payload_hash. However, to be valid, the baker must patch
-               the resulting block header with the actual payload
-               hash. *)
-            No_check
-      in
       let* () = check_endorsement_power info block_state in
       let*? () = check_preendorsement_round_and_power info block_state round in
       let*? () =
-        finalize_validate_block_header checkable_payload_hash header_contents
+        match block_state.locked_round_evidence with
+        | Some _ ->
+            check_payload_hash block_state ~predecessor_hash header_contents
+        | None ->
+            (* In construction mode, when there is no locked round
+               evidence (ie. no preendorsements), the baker cannot know
+               the payload hash before selecting the operations.
+               Therefore, we do not check the initially given payload
+               hash. The baker will have to patch the resulting block
+               header with the actual payload hash afterwards. *)
+            ok_unit
       in
       return_unit
   | Mempool ->
