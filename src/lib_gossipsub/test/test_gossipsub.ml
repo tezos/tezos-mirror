@@ -24,13 +24,14 @@
 (*****************************************************************************)
 
 include Tezos_gossipsub
+open Tezt_core.Base
 
 module Configuration :
   CONFIGURATION
     with type Time.t = int
      and type Time.span = int
      and type Peer.t = int
-     and type Topic.t = int
+     and type Topic.t = string
      and type Message_id.t = int
      and type Message.t = int = struct
   module Time = struct
@@ -54,7 +55,13 @@ module Configuration :
     module Set = Set.Make (Int)
   end
 
-  module Topic = Peer
+  module Topic = struct
+    type t = string
+
+    module Map = Map.Make (String)
+    module Set = Set.Make (String)
+  end
+
   module Message_id = Peer
   module Message = Peer
 end
@@ -77,7 +84,7 @@ let limits =
 let parameters = {peer_filter = (fun _peer _action -> true)}
 
 (* This is to use a seed with Tezt. *)
-let _seed =
+let seed =
   match
     Tezt_core.Cli.get
       ~default:None
@@ -91,13 +98,46 @@ let _seed =
       Random.bits ()
   | Some seed -> seed
 
-(* This dummy test can be removed once the first unit tests are
-   registered. *)
-let () =
-  Tezt_core.Test.register ~__FILE__ ~title:"simple" ~tags:["simple"]
-  @@ fun () ->
-  let rng = Random.get_state () in
-  let _state = GS.make rng limits parameters in
-  Tezt_core.Base.unit
+let init_state ~(peer_no : int) ~(topics : string list) ~(direct : bool)
+    ~(outbound : bool) : GS.state =
+  let rng = Random.State.make [|seed|] in
+  let state =
+    List.fold_left
+      (fun state topic ->
+        let state, _output = GS.join topic state in
+        state)
+      (GS.make rng limits parameters)
+      topics
+  in
+  let peers =
+    List.init ~when_negative_length:() peer_no (fun i -> i)
+    |> WithExceptions.Result.get_ok ~loc:__LOC__
+  in
+  let state =
+    List.fold_left
+      (fun state peer ->
+        let state, _output = GS.add_peer ~direct ~outbound peer state in
+        state)
+      state
+      peers
+  in
+  state
 
-let () = Tezt.Test.run ()
+(** Test that grafting an unknown topic is ignored. *)
+let test_ignore_graft_from_unknown_topic () =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Ignore graft from unknown topic"
+    ~tags:["gossipsub"; "graft"]
+  @@ fun () ->
+  let state = init_state ~peer_no:0 ~topics:[] ~direct:false ~outbound:false in
+  let _state, output = GS.handle_graft 1 "unknown_topic" state in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
+     Use Tezt.Check to assert output *)
+  match output with
+  | Unknown_topic -> unit
+  | _ -> Tezt.Test.fail "Expected output [Unknown_topic]"
+
+let () =
+  test_ignore_graft_from_unknown_topic () ;
+  Tezt.Test.run ()
