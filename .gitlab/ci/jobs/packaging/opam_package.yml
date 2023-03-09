@@ -279,6 +279,13 @@ opam:octez-injector:
   variables:
     package: octez-injector
 
+opam:octez-mec:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: octez-mec
+
 opam:octez-node:
   extends:
     - .opam_template

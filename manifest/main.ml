@@ -74,6 +74,8 @@ let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
 let astring = external_lib ~js_compatible:true "astring" V.True
 
+let bigarray_compat = external_lib ~js_compatible:true "bigarray-compat" V.True
+
 let bigstring = external_lib ~js_compatible:true "bigstring" V.True
 
 let bigstringaf =
@@ -139,6 +141,8 @@ let data_encoding =
 let dune_configurator = external_lib "dune-configurator" V.True
 
 let dynlink = external_lib "dynlink" V.True ~opam:""
+
+let eqaf = external_lib "eqaf" V.True
 
 let ezjsonm = external_lib ~js_compatible:true "ezjsonm" V.(at_least "1.1.0")
 
@@ -950,6 +954,73 @@ let _octez_bls12_381_hash_tests =
     ~opam:"octez-bls12-381-hash"
     ~deps:[alcotest; bls12_381; octez_bls12_381_hash]
     ~flags:(Flags.standard ~disable_warnings:[3] ())
+
+let octez_mec =
+  public_lib
+    "octez-mec"
+    ~path:"src/lib_mec"
+    ~internal_name:"mec"
+    ~synopsis:"Modular Experimental Cryptography library"
+    ~deps:[alcotest; bls12_381; bigarray_compat; eqaf]
+
+let _octez_mec_tests =
+  tests
+    [
+      "test_neptunus";
+      "test_orchard";
+      "test_pedersen_hash";
+      "test_poseidon128";
+      "test_poseidon252";
+      "test_sinsemilla";
+      "test_babyjubjub";
+      "test_babyjubjub_reduced";
+      "test_bandersnatch_affine_montgomery";
+      "test_bandersnatch_affine_weierstrass";
+      "test_bandersnatch_affine_edwards";
+      (* FIXME: test_bandersnatch_all has been removed from the repository, see
+         https://gitlab.com/tezos/tezos/-/issues/5147 *)
+      "test_bls12_381_affine";
+      "test_bls12_381_projective";
+      "test_bn254_affine";
+      "test_bn254_jacobian";
+      "test_bn254_projective";
+      "test_curve25519_affine_edwards";
+      "test_curve25519_conversions_between_forms";
+      "test_curve25519_montgomery";
+      "test_curve448";
+      "test_ec_functor";
+      "test_iso_pallas_affine";
+      "test_jubjub";
+      "test_jubjub_conversions_between_forms";
+      "test_jubjub_weierstrass";
+      "test_pallas_affine";
+      "test_pallas_jacobian";
+      "test_pallas_projective";
+      "test_secp256k1_affine";
+      "test_secp256k1_jacobian";
+      "test_secp256k1_projective";
+      "test_secp256r1_affine";
+      "test_secp256r1_jacobian";
+      "test_secp256r1_projective";
+      "test_tweedledee_affine";
+      "test_tweedledee_jacobian";
+      "test_tweedledee_projective";
+      "test_tweedledum_affine";
+      "test_tweedledum_jacobian";
+      "test_tweedledum_projective";
+      "test_vesta_affine";
+      "test_vesta_jacobian";
+      "test_vesta_projective";
+      "test_digestif";
+      "test_linear_trick";
+      "test_marvellous";
+      "test_redjubjub";
+      "test_find_group_hash";
+      "test_iterator";
+    ]
+    ~path:"src/lib_mec/test"
+    ~opam:"octez-mec"
+    ~deps:[alcotest; octez_mec |> open_]
 
 let octez_bls12_381_polynomial_internal =
   public_lib

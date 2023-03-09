@@ -18,6 +18,7 @@
 (package (name octez-dal-node))
 (package (name octez-evm-proxy))
 (package (name octez-injector))
+(package (name octez-mec))
 (package (name octez-node))
 (package (name octez-node-config))
 (package (name octez-protocol-compiler))

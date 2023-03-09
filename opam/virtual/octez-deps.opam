@@ -14,6 +14,7 @@ depends: [
   "alcotest-lwt" { >= "1.5.0" }
   "astring"
   "base-unix"
+  "bigarray-compat"
   "bigstring"
   "bigstringaf" { >= "0.5.0" }
   "bisect_ppx" { >= "2.7.0" }
@@ -33,6 +34,7 @@ depends: [
   "ctypes_stubs_js"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "dune-configurator"
+  "eqaf"
   "ezjsonm" { >= "1.1.0" }
   "fmt" { >= "0.8.7" }
   "hacl-star" { >= "0.6.1" & < "0.7" }
