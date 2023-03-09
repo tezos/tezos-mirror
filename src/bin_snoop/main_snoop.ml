@@ -96,11 +96,12 @@ let benchmark_cmd (bench_pattern : Namespace.t)
       Option.iter
         (fun filename -> Measure.to_csv ~filename ~bench ~workload_data)
         bench_opts.csv_export ;
-      Measure.save
-        ~filename:bench_opts.save_file
-        ~options:bench_opts.options
-        ~bench
-        ~workload_data
+      ignore
+      @@ Measure.save
+           ~filename:bench_opts.save_file
+           ~options:bench_opts.options
+           ~bench
+           ~workload_data
 
 let is_constant_input (type a t) (bench : (a, t) Benchmark.poly) workload_data =
   let module Bench = (val bench) in
