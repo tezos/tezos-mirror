@@ -53,6 +53,7 @@ let () =
   Printf.printf "Random seed: %d\n" seed ;
   Random.init seed ;
   Alcotest.run
+    ~__FILE__
     "PlonK"
     [
       ("Domains", Test_domains.tests);

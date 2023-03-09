@@ -53,6 +53,7 @@ end
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > unit"
     [Unit_test.spec "Data_streamer.ml" Test_data_streamer.tests]
   |> Lwt_main.run

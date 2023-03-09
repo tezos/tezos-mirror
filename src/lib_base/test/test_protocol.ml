@@ -65,5 +65,6 @@ let env_v_comparison_checks =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Protocol"
     [("environment-version-comparison", env_v_comparison_checks)]

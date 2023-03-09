@@ -343,5 +343,8 @@ let tests_buffer =
   ("Buffer handling", [Tztest.tztest "Dropbox/Async" `Quick test_async_dropbox])
 
 let () =
-  Alcotest_lwt.run "Workers" [tests_history; tests_status; tests_buffer]
+  Alcotest_lwt.run
+    ~__FILE__
+    "Workers"
+    [tests_history; tests_status; tests_buffer]
   |> Lwt_main.run

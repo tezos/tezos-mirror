@@ -132,5 +132,6 @@ let chunk_bytes_tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "TzString"
     [("split", split_tests); ("chunk_bytes", chunk_bytes_tests)]

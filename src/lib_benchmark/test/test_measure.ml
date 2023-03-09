@@ -52,4 +52,6 @@ let tests =
       test_parse_config;
   ]
 
-let () = Alcotest_lwt.run "tezos-benchmark" [("measure", tests)] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("measure", tests)]
+  |> Lwt_main.run

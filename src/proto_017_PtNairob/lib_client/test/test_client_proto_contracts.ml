@@ -89,6 +89,7 @@ let test_find_destination _ =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-lib-client-proto-contracts"
     [
       ( Protocol.name ^ ": client_proto_contracts",

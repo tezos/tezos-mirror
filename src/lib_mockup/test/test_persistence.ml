@@ -269,6 +269,7 @@ let test_get_registered_mockup_take_requested =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-mockup"
     [
       ( "persistence",

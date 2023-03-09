@@ -18,6 +18,7 @@ let test_next_power_of_two () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "Utils"
     [
       ( "Reorganizing the coefficients",

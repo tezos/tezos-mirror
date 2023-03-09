@@ -44,5 +44,6 @@ let merkle_proof_eq_tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Block_services"
     [("merkle_proof_eq", qcheck_wrap merkle_proof_eq_tests)]

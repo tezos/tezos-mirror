@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > integration > validate"
     [
       (Protocol.name ^ ": sanity checks", Test_sanity.tests);

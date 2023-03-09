@@ -312,6 +312,7 @@ let with_timeout t f () =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "Lwt_pipe"
        [
          ( "Bounded",

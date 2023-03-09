@@ -577,6 +577,7 @@ let () =
   let module Proof2_V2 =
     Proof2 (Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2) in
   Alcotest.run
+    ~__FILE__
     "test_merkle_proof"
     [
       ("sample32_v1", [("sample", `Quick, Proof32_V1.test_sample)]);

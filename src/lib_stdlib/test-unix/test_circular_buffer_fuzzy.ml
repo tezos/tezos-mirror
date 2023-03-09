@@ -347,6 +347,7 @@ let () =
         true)
   in
   Alcotest.run
+    ~__FILE__
     "Stdlib.circular_buffer"
     [
       ("Invalid argument", qcheck_wrap [test_invalid_argument]);

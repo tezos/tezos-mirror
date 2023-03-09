@@ -656,6 +656,7 @@ let () =
     Tztest.tztest name `Quick (Init.wrap_tzresult_lwt_disk f)
   in
   Alcotest_lwt.run
+    ~__FILE__
     "mempool-prevalidation"
     [
       (* Run only those tests with:

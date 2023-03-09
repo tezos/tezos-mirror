@@ -62,5 +62,6 @@ let test_operation =
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
+    ~__FILE__
     "Operation_encoding"
     [(Protocol.name ^ ": roundtrip", qcheck_wrap [test_operation])]

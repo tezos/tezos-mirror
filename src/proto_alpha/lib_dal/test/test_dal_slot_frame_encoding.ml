@@ -413,6 +413,7 @@ let tests =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > unit"
     [
       Test_helpers.Unit_test.spec

@@ -210,5 +210,8 @@ let tests : unit Alcotest_lwt.test_case list =
     tests
 
 let () =
-  Alcotest_lwt.run "tezos-shell-proxy-context" [("proxy_context", tests)]
+  Alcotest_lwt.run
+    ~__FILE__
+    "tezos-shell-proxy-context"
+    [("proxy_context", tests)]
   |> Lwt_main.run

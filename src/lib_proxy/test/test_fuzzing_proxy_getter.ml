@@ -85,5 +85,6 @@ let test_add_leaf_get =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Proxy Getter"
     [("Array theory", qcheck_wrap [test_add_leaf_get])]

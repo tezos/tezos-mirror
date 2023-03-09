@@ -172,6 +172,7 @@ let () =
       test_set_domain
   in
   Alcotest.run
+    ~__FILE__
     "Memory context array theory"
     [
       ("domain", qcheck_wrap [test_domain]);

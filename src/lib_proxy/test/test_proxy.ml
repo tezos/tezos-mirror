@@ -232,6 +232,7 @@ let test_split_key_triggers () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-proxy"
     [
       ( "all tests",

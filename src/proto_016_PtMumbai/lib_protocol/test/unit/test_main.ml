@@ -47,6 +47,7 @@ end
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > unit"
     [
       Unit_test.spec (Protocol.name ^ ": Tez_repr.ml") Test_tez_repr.tests;

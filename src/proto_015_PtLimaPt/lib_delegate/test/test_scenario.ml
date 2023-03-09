@@ -1466,7 +1466,7 @@ let test_scenario_m8 () =
     ]
 
 let () =
-  Alcotest_lwt.run "mockup_baking"
+  Alcotest_lwt.run "mockup_baking" ~__FILE__
   @@ List.map
        (fun (title, body) ->
          let open Tezos_base_test_helpers.Tztest in

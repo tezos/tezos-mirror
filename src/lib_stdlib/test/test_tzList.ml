@@ -133,6 +133,7 @@ let test_all_equal _ =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "stdlib"
     [
       ( "tzList",

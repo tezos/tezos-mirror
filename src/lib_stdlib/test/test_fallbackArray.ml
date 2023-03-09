@@ -68,4 +68,4 @@ module Tests = struct
   let tests = ("of_list", `Quick, check_of_list) :: tests
 end
 
-let () = Alcotest.run "stdlib" [("FallbackArray", Tests.tests)]
+let () = Alcotest.run ~__FILE__ "stdlib" [("FallbackArray", Tests.tests)]

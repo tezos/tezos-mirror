@@ -105,6 +105,7 @@ let test_fold_es_error () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "stdlib"
     [
       ( "hash_queue_lwt",

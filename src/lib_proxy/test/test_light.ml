@@ -116,6 +116,7 @@ let test_parse_example_sources _ =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "tezos-light"
     [
       ( "light",

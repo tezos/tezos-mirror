@@ -145,6 +145,7 @@ let test_partial_fold_es =
 let () =
   let mk_tests label tests = (label, qcheck_wrap tests) in
   Alcotest.run
+    ~__FILE__
     "Prevalidator_pending_operations"
     [
       mk_tests "iter ordering" [test_iter_ordering];

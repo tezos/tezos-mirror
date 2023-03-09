@@ -190,6 +190,7 @@ let tests_sqrt = [test_sqrt_squared; test_squared_sqrt]
 
 let () =
   Alcotest.run
+    ~__FILE__
     "protocol > pbt > saturation"
     [
       (Protocol.name ^ ": add", qcheck_wrap tests_add);

@@ -329,5 +329,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "tezos-signer-backends" [("encrypted", tests)]
+  Alcotest_lwt.run ~__FILE__ "tezos-signer-backends" [("encrypted", tests)]
   |> Lwt_main.run

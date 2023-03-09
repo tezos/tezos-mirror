@@ -396,6 +396,7 @@ let test_media_type_pp_parse =
 let () =
   let open Qcheck2_helpers in
   Alcotest.run
+    ~__FILE__
     "tezos-rpc-http"
     [
       ( "qcheck",

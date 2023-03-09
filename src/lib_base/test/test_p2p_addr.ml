@@ -252,6 +252,7 @@ let tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Base.P2p"
     [
       ("P2p_addr", qcheck_wrap p2p_addr);

@@ -210,6 +210,7 @@ let tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     ("protocol > script_bytes > " ^ Protocol.name
    ^ ": bytes and int/nat conversion ")
     tests

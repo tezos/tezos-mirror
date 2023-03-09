@@ -104,4 +104,4 @@ let tests =
     Alcotest.test_case "registered" `Quick test_registered;
   ]
 
-let () = Alcotest.run "splitted" [("splitted", tests)]
+let () = Alcotest.run ~__FILE__ "splitted" [("splitted", tests)]

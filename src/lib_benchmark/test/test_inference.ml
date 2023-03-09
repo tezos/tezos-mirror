@@ -120,4 +120,5 @@ let test () =
 let tests = [Test.tztest_assert "regression" `Quick @@ test]
 
 let () =
-  Alcotest_lwt.run "tezos-benchmark" [("inference", tests)] |> Lwt_main.run
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("inference", tests)]
+  |> Lwt_main.run

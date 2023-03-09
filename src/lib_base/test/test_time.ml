@@ -291,6 +291,7 @@ end
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Time"
     [
       ("Protocol", qcheck_wrap Protocol.tests);

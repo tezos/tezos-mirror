@@ -784,6 +784,7 @@ let () =
     make_test_battery_for_prime_order_field Z.(pow (succ one) 255 - of_int 19)
   in
   run
+    ~__FILE__
     "Polynomials with F379 and some random prime fields"
     (List.concat
        [

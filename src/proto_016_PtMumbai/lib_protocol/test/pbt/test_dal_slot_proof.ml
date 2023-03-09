@@ -219,5 +219,8 @@ let () =
 
     let dal_parameters = constants_test.dal
   end) in
-  Alcotest_lwt.run (Protocol.name ^ ": Dal slots refutation game") Test.tests
+  Alcotest_lwt.run
+    ~__FILE__
+    (Protocol.name ^ ": Dal slots refutation game")
+    Test.tests
   |> Lwt_main.run

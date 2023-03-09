@@ -84,4 +84,7 @@ let test_parser _ =
         (parse_version x))
 
 let () =
-  Alcotest.run "version" [("parser", [("versions", `Quick, test_parser)])]
+  Alcotest.run
+    ~__FILE__
+    "version"
+    [("parser", [("versions", `Quick, test_parser)])]

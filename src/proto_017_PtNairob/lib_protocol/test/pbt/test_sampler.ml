@@ -266,6 +266,7 @@ let alias_z_test =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "protocol > pbt > sampling"
     [
       ( Protocol.name ^ ": sampling",

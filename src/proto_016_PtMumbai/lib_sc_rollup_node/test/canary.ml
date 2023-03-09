@@ -98,5 +98,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "canary" [(Protocol.name ^ ": canary", tests)]
+  Alcotest_lwt.run ~__FILE__ "canary" [(Protocol.name ^ ": canary", tests)]
   |> Lwt_main.run

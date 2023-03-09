@@ -216,6 +216,7 @@ let test_consensus_spec =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Mode Light"
     [
       ( "Consensus consistency examples",

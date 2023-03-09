@@ -478,4 +478,4 @@ let tests =
     ("test failing ivk_to_pkd", `Quick, test_failing_ivk_to_pkd);
   ]
 
-let () = Alcotest.run "sapling" [("rustzcash", tests)]
+let () = Alcotest.run ~__FILE__ "sapling" [("rustzcash", tests)]

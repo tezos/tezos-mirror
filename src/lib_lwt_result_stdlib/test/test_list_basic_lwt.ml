@@ -352,6 +352,7 @@ end
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "list-basic-lwt"
     [
       ("init", Init.tests);

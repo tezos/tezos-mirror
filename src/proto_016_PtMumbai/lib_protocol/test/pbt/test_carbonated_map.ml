@@ -549,5 +549,6 @@ let () =
   (* Ensure deterministic results. *)
   let rand = Random.State.make [|0x1337533D; 71287309; 397060904|] in
   Alcotest.run
+    ~__FILE__
     "protocol > pbt > carbonated map"
     [(Protocol.name ^ ": Carbonated map", tests ~rand)]

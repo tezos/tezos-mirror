@@ -943,6 +943,7 @@ let () =
 
   Random.init seed ;
   Alcotest.run
+    ~__FILE__
     "DAL cryptobox"
     [
       ("Unit tests", test);

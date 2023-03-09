@@ -107,6 +107,7 @@ let test_diff (c1, c2) =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "bits"
     [
       ( Protocol.name ^ ": quantity",

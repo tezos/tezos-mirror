@@ -63,4 +63,4 @@ let tests =
     ("numbits_correct", `Slow, exhaustive_check);
   ]
 
-let () = Alcotest.run "stdlib" [("numbits", tests)]
+let () = Alcotest.run ~__FILE__ "stdlib" [("numbits", tests)]

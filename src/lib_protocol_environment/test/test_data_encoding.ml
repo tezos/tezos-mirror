@@ -72,6 +72,7 @@ let test_unparsable_lazyexpr () =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "proto-env-v8-data-encoding"
        [
          ( "lazy",

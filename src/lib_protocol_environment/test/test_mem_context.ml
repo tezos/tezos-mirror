@@ -478,5 +478,5 @@ let tests =
       domain_tests
 
 let () =
-  Alcotest_lwt.run "tezos-shell-context" [("mem_context", tests)]
+  Alcotest_lwt.run ~__FILE__ "tezos-shell-context" [("mem_context", tests)]
   |> Lwt_main.run

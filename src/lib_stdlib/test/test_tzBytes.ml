@@ -257,4 +257,4 @@ let () =
   Format.eprintf "TEST_SEED=%d@." seed ;
   (* To run the same test for the same seed, even if not all the tests are selected *)
   let get_rng () = Random.State.make [|seed|] in
-  Alcotest.run "TzBytes" (Bitwise.tests get_rng)
+  Alcotest.run ~__FILE__ "TzBytes" (Bitwise.tests get_rng)

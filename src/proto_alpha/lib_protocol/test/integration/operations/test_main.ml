@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > integration > operations"
     [
       (Protocol.name ^ ": voting", Test_voting.tests);

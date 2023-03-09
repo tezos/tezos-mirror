@@ -87,6 +87,7 @@ let test_empty_works () =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "stdlib"
     [
       ( "Bounded_heap",

@@ -143,4 +143,4 @@ let fold =
 
 let all_map : unit Alcotest.test_case list = [iter; fold]
 
-let () = Alcotest.run "FuzzRef" [("Map", all_map)]
+let () = Alcotest.run ~__FILE__ "FuzzRef" [("Map", all_map)]

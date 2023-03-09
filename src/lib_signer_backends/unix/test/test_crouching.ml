@@ -16,4 +16,5 @@ let test_example () =
 
 let tests = [Alcotest.test_case "print_example" `Quick test_example]
 
-let () = Alcotest.run "tezos-signer-backends" [("ledger-names", tests)]
+let () =
+  Alcotest.run ~__FILE__ "tezos-signer-backends" [("ledger-names", tests)]
