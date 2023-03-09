@@ -14,7 +14,10 @@ module Test = struct
     done ;
     indices
 
-  let max_slot_size_log2 = 11
+  (* The maximum value for the slot size is chosen to trigger
+     cases where some domain sizes for the FFT are not powers
+     of two.*)
+  let max_slot_size_log2 = 13
 
   let size_offset_log2 = 3
 
