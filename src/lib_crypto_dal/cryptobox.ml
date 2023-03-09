@@ -1667,10 +1667,8 @@ module Internal_for_tests = struct
 
   let alter_commitment_proof (proof : commitment_proof) = alter_proof proof
 
-  let length_of_share (t : t) = t.shard_length
-
   let minimum_number_of_shards_to_reconstruct_slot (t : t) =
-    t.max_polynomial_length / t.number_of_shards
+    t.number_of_shards / t.redundancy_factor
 
   let select_fft_domain = select_fft_domain
 

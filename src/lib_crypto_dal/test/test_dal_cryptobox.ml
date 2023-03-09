@@ -1,6 +1,7 @@
 module Test = struct
-  (* [randrange n] returns a random integer in the range [0, n - 1]. *)
-  let randrange n = QCheck2.Gen.(generate1 (int_bound (n - 1)))
+  (* [randrange ?(min=0) max] returns a random integer in the range [min, max - 1]. *)
+  let randrange ?(min = 0) max =
+    min + QCheck2.Gen.(generate1 (int_bound (max - min - 1)))
 
   (* Samples k random integers within the range [0, bound[. *)
   let random_indices bound k =
@@ -132,10 +133,15 @@ module Test = struct
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let shards_amount =
+          Cryptobox.Internal_for_tests
+          .minimum_number_of_shards_to_reconstruct_slot
+            t
+        in
         let random_shard_indices =
           random_indices
             (params.number_of_shards - 1)
-            (params.number_of_shards / params.redundancy_factor)
+            (randrange ~min:shards_amount params.number_of_shards)
         in
         let random_shards =
           Seq.filter
@@ -169,10 +175,15 @@ module Test = struct
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let shards_amount =
+          Cryptobox.Internal_for_tests
+          .minimum_number_of_shards_to_reconstruct_slot
+            t
+        in
         let random_shard_indices =
           random_indices
             (params.number_of_shards - 1)
-            (params.number_of_shards / params.redundancy_factor)
+            (randrange ~min:shards_amount params.number_of_shards)
         in
         let random_shards =
           Seq.filter
@@ -206,10 +217,13 @@ module Test = struct
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let shards_amount =
+          Cryptobox.Internal_for_tests
+          .minimum_number_of_shards_to_reconstruct_slot
+            t
+        in
         let random_shard_indices =
-          random_indices
-            (params.number_of_shards - 1)
-            ((params.number_of_shards / params.redundancy_factor) - 1)
+          random_indices (params.number_of_shards - 1) (randrange shards_amount)
         in
         let random_shards =
           Seq.filter
@@ -235,8 +249,13 @@ module Test = struct
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let shards_amount =
+          Cryptobox.Internal_for_tests
+          .minimum_number_of_shards_to_reconstruct_slot
+            t
+        in
         let random_shards =
-          Seq.take (params.number_of_shards / params.redundancy_factor) shards
+          Seq.take shards_amount shards
           |> Seq.map
                (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
                  {index = index + 1000; share})

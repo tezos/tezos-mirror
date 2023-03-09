@@ -427,9 +427,6 @@ module Internal_for_tests : sig
      proof than the input. *)
   val alter_commitment_proof : commitment_proof -> commitment_proof
 
-  (* [length_of_share t] returns the shard_length for the given parameters [t]. *)
-  val length_of_share : t -> int
-
   (* [minimum_number_of_shards_to_reconstruct_slot t] returns the minimum
      number of shards to reconstruct a slot using [polynomial_from_shards]. *)
   val minimum_number_of_shards_to_reconstruct_slot : t -> int
