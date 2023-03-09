@@ -69,7 +69,7 @@ module Test = struct
     let slot_size = 1 lsl slot_size_log2 in
     let* data = bytes_size (int_range 0 slot_size) in
     let padding_threshold = Bytes.length data in
-    let slot = Bytes.make slot_size '0' in
+    let slot = Bytes.make slot_size '\000' in
     Bytes.blit data 0 slot 0 padding_threshold ;
     map
       (fun ( slot_size,

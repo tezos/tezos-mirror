@@ -751,7 +751,7 @@ module Inner = struct
     (* The last operation of [polynomial_from_slot] is the interpolation,
        so we undo it with an evaluation on the same domain [t.domain_polynomial_length]. *)
     let evaluations = fft t.max_polynomial_length p in
-    let slot = Bytes.make t.slot_size '0' in
+    let slot = Bytes.make t.slot_size '\x00' in
     let offset = ref 0 in
     (* Reverse permutation from [polynomial_from_slot]. *)
     for page = 0 to t.pages_per_slot - 1 do
