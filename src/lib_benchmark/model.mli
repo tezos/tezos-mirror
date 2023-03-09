@@ -121,7 +121,16 @@ val add_model : 'a t -> 'b t -> ('a * 'b) t
 val precompose : ('a -> 'b) -> 'b t -> 'a t
 
 (** Returns the set of free variables of a model *)
-val get_free_variable_set : 'a model -> Free_variable.Set.t
+val get_free_variable_set : _ model -> Free_variable.Set.t
+
+val get_free_variable_set_of_t : _ t -> Free_variable.Set.t
+
+(** Returns the set of free variables of an applied model
+
+    Note that this can be very different from [get_free_variable_set].
+*)
+val get_free_variable_set_applied :
+  'workload t -> 'workload -> Free_variable.Set.t
 
 (* -------------------------------------------------------------------------- *)
 (** Commonly used abstract models
