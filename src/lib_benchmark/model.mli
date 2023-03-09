@@ -106,6 +106,8 @@ type 'workload t =
     }
       -> 'workload t
 
+val pp : Format.formatter -> _ t -> unit
+
 val make : conv:('a -> 'b) -> model:'b model -> 'a t
 
 val make_aggregated :
@@ -247,7 +249,7 @@ val trilinear :
   (int * (int * (int * unit))) model
 
 (** A multi-affine model in two parts. The breakpoint [break] indicates the
-    point at which the slope changes coefficient. 
+    point at which the slope changes coefficient.
 *)
 val breakdown :
   name:Namespace.t ->

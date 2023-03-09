@@ -86,6 +86,21 @@ type _ t =
     }
       -> 'workload t
 
+let pp_packed_model ppf (Model model) =
+  let module Model = (val model) in
+  let module Pp = Model.Def (Costlang.Pp) in
+  Format.fprintf ppf "@[<2>%a:@ %s@]" Namespace.pp Model.name Pp.model
+
+let pp ppf = function
+  | Abstract {model; _} ->
+      Format.fprintf ppf "@[<2>Abstract@ %a@]" pp_packed_model (Model model)
+  | Aggregate {sub_models; _} ->
+      Format.fprintf
+        ppf
+        "@[<2>Aggregate@ @[%a@]@]"
+        (Format.pp_print_list pp_packed_model)
+        sub_models
+
 let apply_model : 'arg -> 'arg model -> applied =
   fun (type e) (elim : e) ((module Impl) : e model) ->
    let module Applied (X : Costlang.S) = struct
