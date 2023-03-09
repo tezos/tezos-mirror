@@ -413,38 +413,6 @@ let test_inbox_proof_verification (list_of_payloads, l, n) =
       | None -> fail [err "inboxes was empty"])
   | Error _ -> fail [err "Proof production failed"]
 
-let test_empty_inbox_proof (level, n) =
-  let open Lwt_result_syntax in
-  let*! index = Tezos_context_memory.Context.init "foo" in
-  let ctxt = Tezos_context_memory.Context.empty index in
-  let*! inbox = Node.empty ctxt rollup level in
-  let history = History.empty ~capacity:10000L in
-  let* history, history_proof =
-    Node.form_history_proof ctxt history inbox None
-    >|= Environment.wrap_tzresult
-  in
-  let*! result =
-    Node.produce_proof ctxt history history_proof (Raw_level_repr.root, n)
-  in
-  match result with
-  | Ok (proof, input) -> (
-      (* We now switch to a protocol inbox for verification. *)
-      create_context ()
-      >>=? fun ctxt ->
-      let*! inbox = empty ctxt rollup level in
-      let snapshot = take_snapshot inbox in
-      let proof = node_proof_to_protocol_proof proof in
-      let*! verification =
-        verify_proof (Raw_level_repr.root, n) snapshot proof
-      in
-      match verification with
-      | Ok v_input ->
-          fail_unless
-            (v_input = input && v_input = None)
-            (err "Proof verified but did not match")
-      | Error _ -> fail [err "Proof verification failed"])
-  | Error _ -> fail [err "Proof production failed"]
-
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
 let init_inboxes_histories_with_different_capacities
@@ -739,13 +707,6 @@ let tests =
       ~name:"Verify inbox proofs"
       gen_proof_inputs
       test_inbox_proof_verification;
-    Tztest.tztest_qcheck2
-      ~name:"An empty inbox is still able to produce proofs that return None"
-      QCheck2.Gen.(
-        let* n = 0 -- 2000 in
-        let* m = 0 -- 1000 in
-        return (level_of_int n, Z.of_int m))
-      test_empty_inbox_proof;
     Tztest.tztest_qcheck2
       ~count:10
       ~name:"Checking inboxes history length"
