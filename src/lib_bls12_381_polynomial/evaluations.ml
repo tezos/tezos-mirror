@@ -304,7 +304,7 @@ module type Evaluations_sig = sig
   - [degree polynomial < size domain] *)
   val dft : domain -> polynomial -> t
 
-  (** [idft_inplace domain t] converts the evaluation representation of
+  (** [idft domain t] converts the evaluation representation of
   a polynomial [p] to the coefficient representation. [domain] can be obtained
   using {!Domain.build}.
 
@@ -315,7 +315,7 @@ module type Evaluations_sig = sig
   - [size domain] to divide Bls12_381.Fr.order - 1
   - [size domain != 2^k]
   - [size domain = size t] *)
-  val idft_inplace : domain -> t -> polynomial
+  val idft : domain -> t -> polynomial
 
   (** [evaluation_fft_prime_factor_algorithm domain1 domain2 p] converts the
   coefficient representation of a polynomial [p] to the evaluation representation.
@@ -342,7 +342,7 @@ module type Evaluations_sig = sig
   - if for some k [size domain1 != 2^k] then [size domain1 <= 2^10]
   - if for some k [size domain2 != 2^k] then [size domain2 <= 2^10]
   - [size t = size domain1 * size domain2] *)
-  val interpolation_fft_prime_factor_algorithm_inplace :
+  val interpolation_fft_prime_factor_algorithm :
     domain1:domain -> domain2:domain -> t -> polynomial
 end
 
@@ -664,7 +664,7 @@ module Evaluations_impl = struct
     Stubs.dft_inplace evaluations (Domain.to_carray domain) false length ;
     (d, evaluations)
 
-  let idft_inplace domain (_, evaluations) =
+  let idft domain (_, evaluations) =
     let length = Domain.length domain in
     if length > 1 lsl 10 then
       raise @@ Invalid_argument "Domain size must be <= 2^10." ;
@@ -672,8 +672,9 @@ module Evaluations_impl = struct
       raise @@ Invalid_argument "Domain size must not be a power of two" ;
     if not (length = Fr_carray.length evaluations) then
       raise @@ Invalid_argument "Size of coefficients should be same as domain." ;
-    Stubs.dft_inplace evaluations (Domain.to_carray domain) true length ;
-    Polynomial.of_carray evaluations
+    let coefficients = Fr_carray.copy evaluations in
+    Stubs.dft_inplace coefficients (Domain.to_carray domain) true length ;
+    Polynomial.of_carray coefficients
 
   let evaluation_fft_prime_factor_algorithm ~domain1 ~domain2 polynomial =
     let domain1_length = Domain.length domain1 in
@@ -712,8 +713,8 @@ module Evaluations_impl = struct
         false ;
       (d, res)
 
-  let interpolation_fft_prime_factor_algorithm_inplace ~domain1 ~domain2
-      (d, evaluations) =
+  let interpolation_fft_prime_factor_algorithm ~domain1 ~domain2 (d, evaluations)
+      =
     let domain1_length = Domain.length domain1 in
     let domain2_length = Domain.length domain2 in
     if
@@ -734,18 +735,17 @@ module Evaluations_impl = struct
     let n_evaluations = Fr_carray.length evaluations in
     if not (n_evaluations = n_domain) then
       raise @@ Invalid_argument "Size of coefficients should be same as domain." ;
-    if d = -1 then (
-      Fr_carray.erase evaluations n_domain ;
-      Polynomial.of_carray evaluations)
+    if d = -1 then Polynomial.zero
     else
       let domain1 = Domain.to_carray domain1 in
       let domain2 = Domain.to_carray domain2 in
+      let coefficients = Fr_carray.copy evaluations in
       Stubs.fft_prime_factor_algorithm_inplace
-        evaluations
+        coefficients
         (domain1, domain1_length)
         (domain2, domain2_length)
         true ;
-      Polynomial.of_carray evaluations
+      Polynomial.of_carray coefficients
 end
 
 module type Evaluations_unsafe_sig = sig
