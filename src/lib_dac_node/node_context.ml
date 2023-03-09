@@ -83,7 +83,9 @@ let set_ready ctxt dac_plugin =
       ctxt.status <- Ready {dac_plugin; hash_streamer = Data_streamer.init ()}
   | Ready _ -> raise Status_already_ready
 
-type error += Node_not_ready
+type error +=
+  | Node_not_ready
+  | Invalid_operation_for_mode of {mode : string; operation : string}
 
 let () =
   register_error_kind
@@ -97,7 +99,26 @@ let () =
         "DAC node is starting. It's not ready to respond to RPCs.")
     Data_encoding.(unit)
     (function Node_not_ready -> Some () | _ -> None)
-    (fun () -> Node_not_ready)
+    (fun () -> Node_not_ready) ;
+  register_error_kind
+    `Permanent
+    ~id:"dac_unexpected_mode"
+    ~title:"Invalid operation for the current mode of Dac node."
+    ~description:
+      "An operation was called that it not supported by the current Dac node."
+    ~pp:(fun ppf (mode, operation) ->
+      Format.fprintf
+        ppf
+        "An operation was called that it not supported by the current Dac \
+         node. Mode: %s; Unsupported_operation: %s"
+        mode
+        operation)
+    Data_encoding.(
+      obj2 (req "mode" (string' Plain)) (req "operation" (string' Plain)))
+    (function
+      | Invalid_operation_for_mode {mode; operation} -> Some (mode, operation)
+      | _ -> None)
+    (fun (mode, operation) -> Invalid_operation_for_mode {mode; operation})
 
 let get_ready ctxt =
   let open Result_syntax in
@@ -124,3 +145,17 @@ let get_node_store (type a) ctxt (access_mode : a Store_sigs.mode) :
   match access_mode with
   | Store_sigs.Read_only -> Store.Irmin_store.readonly ctxt.node_store
   | Store_sigs.Read_write -> ctxt.node_store
+
+let get_dac_committee ctxt =
+  let open Result_syntax in
+  match ctxt.config.mode with
+  | Legacy legacy -> Ok legacy.dac_members_addresses
+  | Coordinator coordinator -> Ok coordinator.dac_members_addresses
+  | Observer _ ->
+      tzfail
+      @@ Invalid_operation_for_mode
+           {mode = "observer"; operation = "get_dac_committee"}
+  | Dac_member _ ->
+      tzfail
+      @@ Invalid_operation_for_mode
+           {mode = "dac_member"; operation = "get_dac_committee"}

@@ -34,6 +34,8 @@ type hash
 
 val hash_to_bytes : hash -> bytes
 
+val hash_to_hex : hash -> Hex.t
+
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
     Fix static supported_hashes type *)
 type supported_hashes = Blake2B

@@ -53,6 +53,56 @@ let regression_test ~__FILE__ ?(tags = []) title f =
   let tags = "dac" :: tags in
   Protocol.register_regression_test ~__FILE__ ~title ~tags f
 
+let assert_lwt_failure ?__LOC__ msg unit_lwt =
+  let* passed =
+    Lwt.catch
+      (fun () -> Lwt.map (fun () -> false) unit_lwt)
+      (fun _exn -> return true)
+  in
+  if passed then unit else Test.fail ?__LOC__ msg
+
+let init_hex_root_hash ?payload coordinator_node =
+  let payload = Option.value payload ~default:"hello test message" in
+  let* root_hash, _l1_op =
+    RPC.call
+      coordinator_node
+      (Rollup.Dac.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Merkle_tree_V0")
+  in
+  let hex_root_hash = `Hex root_hash in
+  return hex_root_hash
+
+let assert_verify_aggregate_signature members_keys hex_root_hash agg_sig_b58 =
+  let verified =
+    let root_hash = Hex.to_bytes hex_root_hash in
+    let data =
+      List.map
+        (fun (member : Account.aggregate_key) ->
+          let pk =
+            Tezos_crypto.Aggregate_signature.Public_key.of_b58check_exn
+              member.aggregate_public_key
+          in
+          (pk, None, root_hash))
+        members_keys
+    in
+    Tezos_crypto.Aggregate_signature.aggregate_check
+      data
+      (Tezos_crypto.Aggregate_signature.of_b58check_exn agg_sig_b58)
+  in
+  Check.(
+    (true = verified)
+      ~__LOC__
+      bool
+      ~error_msg:"Failed to verify aggregate signature.")
+
+let assert_witnesses ~__LOC__ expected witnesses =
+  Check.(
+    (expected = witnesses)
+      ~__LOC__
+      int
+      ~error_msg:"Expected witnesses bitset to be %L. Found: %R")
+
 (* Some initialization functions to start needed nodes. *)
 
 let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
@@ -121,19 +171,17 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
         Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
       sc_rollup_node
   in
-
   let* dac_members =
-    Lwt_list.map_p
-      (fun i ->
-        let* dac_member =
-          Client.bls_gen_keys
-            ~alias:("dac_member_" ^ Int.to_string i)
+    List.fold_left
+      (fun keys i ->
+        let* keys in
+        let* key =
+          Client.bls_gen_and_show_keys
+            ~alias:(Format.sprintf "dac-member-%d" i)
             tezos_client
         in
-        let* dac_member_info =
-          Client.bls_show_address ~alias:dac_member tezos_client
-        in
-        return dac_member_info.aggregate_public_key_hash)
+        return (key :: keys))
+      (return [])
       (range dac_members)
   in
   let dac_node =
@@ -142,7 +190,10 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
       ~client:tezos_client
       ?reveal_data_dir
       ~threshold
-      ~dac_members
+      ~dac_members:
+        (List.map
+           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
+           dac_members)
       ()
   in
   let* _dir = Dac_node.init_config dac_node in
@@ -272,6 +323,16 @@ let wait_for_handle_new_subscription_to_hash_streamer dac_node =
     dac_node
     "handle_new_subscription_to_hash_streamer.v0"
     (fun _ -> Some ())
+
+let bls_sign_hex_hash (signer : Account.aggregate_key) hex_root_hash =
+  let sk =
+    match signer.aggregate_secret_key with
+    | Unencrypted sk -> sk
+    | Encrypted encsk -> raise (Invalid_argument encsk)
+  in
+  let bytes_root_hash = Hex.to_bytes hex_root_hash in
+  let sk = Tezos_crypto.Aggregate_signature.Secret_key.of_b58check_exn sk in
+  Tezos_crypto.Aggregate_signature.sign sk bytes_root_hash
 
 type status = Applied | Failed of {error_id : string}
 
@@ -662,6 +723,11 @@ module Legacy = struct
        2. Initialize their default configuration.
        3. Update their configuration so that their dac node client context
           points to [coordinator]. *)
+    let dac_members =
+      List.map
+        (fun (a : Account.aggregate_key) -> a.aggregate_public_key_hash)
+        dac_members
+    in
     let observer_1 =
       Dac_node.create_legacy ~threshold ~dac_members ~node ~client ()
     in
@@ -827,6 +893,11 @@ module Legacy = struct
           reveal data dir,
        4. Update the configuration of the observer so that the dac node client
           context points to [coordinator]. *)
+    let dac_members =
+      List.map
+        (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
+        dac_members
+    in
     let observer =
       Dac_node.create_legacy
         ~threshold
@@ -902,37 +973,160 @@ module Legacy = struct
     Lwt.return_unit
 end
 
-let test_stores_dac_member_signature_stub _protocol _node client
-    coordinator_node _committee_size _keys =
-  let* member1 = Client.bls_gen_keys ~alias:"dac_member_1" client in
-  let* member1_key = Client.bls_show_address ~alias:member1 client in
-  let payload = "hello test message" in
-  let* hex_root_hash, _l1_op =
-    RPC.call
-      coordinator_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Merkle_tree_V0")
+module Signature_manager = struct
+  module Coordinator = struct
+    let test_non_committee_signer_should_fail tz_client
+        (coordinator_node, hex_root_hash, _dac_committee) =
+      let* invalid_signer_key =
+        Client.bls_gen_and_show_keys ~alias:"invalid_signer" tz_client
+      in
+      let signature = bls_sign_hex_hash invalid_signer_key hex_root_hash in
+      let result =
+        RPC.call
+          coordinator_node
+          (Rollup.Dac.RPC.dac_store_dac_member_signature
+             ~hex_root_hash
+             ~dac_member_pkh:invalid_signer_key.aggregate_public_key_hash
+             ~signature)
+      in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected failure with non-committee member signer."
+        result
+
+    (* Tests that trying to store a dac member signature for a different key
+       - one that was not used for creating the signature - fails. *)
+    let test_signature_verification_failure_should_fail
+        (coordinator_node, hex_root_hash, dac_committee) =
+      let member_i = Random.int (List.length dac_committee) in
+      let memberi = List.nth dac_committee member_i in
+      let memberj =
+        List.find
+          (fun (dc : Account.aggregate_key) -> memberi <> dc)
+          dac_committee
+      in
+      let signature = bls_sign_hex_hash memberi hex_root_hash in
+      let result =
+        RPC.call
+          coordinator_node
+          (Rollup.Dac.RPC.dac_store_dac_member_signature
+             ~hex_root_hash
+             ~dac_member_pkh:memberj.aggregate_public_key_hash
+             ~signature)
+      in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected failure when signature verification fails but did not."
+        result
+
+    (* Tests that a valid signature over [hex_root_hash] that is submitted to
+       the [coordinator_node] is stored. 2 signatures are produced and stored
+       in the [coordinator_node]. The effects of this can be asserted
+       by checking that the witness bitset is set to 3 *)
+    let test_store_valid_signature_should_update_aggregate_signature
+        (coordinator_node, hex_root_hash, dac_committee) =
+      let members =
+        List.map
+          (fun i ->
+            let key = List.nth dac_committee i in
+            let signature = bls_sign_hex_hash key hex_root_hash in
+            (key, signature))
+          (range 0 1)
+      in
+      let* members_keys =
+        List.fold_left
+          (fun keys ((member : Account.aggregate_key), signature) ->
+            let* keys in
+            let* () =
+              RPC.call
+                coordinator_node
+                (Rollup.Dac.RPC.dac_store_dac_member_signature
+                   ~hex_root_hash
+                   ~dac_member_pkh:member.aggregate_public_key_hash
+                   ~signature)
+            in
+            return (member :: keys))
+          (return [])
+          members
+      in
+      let* witnesses, certificate, _root_hash =
+        RPC.call
+          coordinator_node
+          (Rollup.Dac.RPC.get_certificate ~hex_root_hash)
+      in
+      assert_witnesses ~__LOC__ 3 witnesses ;
+      assert_verify_aggregate_signature members_keys hex_root_hash certificate ;
+      unit
+
+    let test_store_same_signature_more_than_once_should_be_noop
+        (coordinator_node, _hex_root_hash, dac_committee) =
+      let* hex_root_hash =
+        init_hex_root_hash ~payload:"noop test abc 3210" coordinator_node
+      in
+      let member_i = 2 in
+      let member = List.nth dac_committee member_i in
+      let signature = bls_sign_hex_hash member hex_root_hash in
+      let dac_member_pkh = member.aggregate_public_key_hash in
+      let call () =
+        RPC.call
+          coordinator_node
+          (Rollup.Dac.RPC.dac_store_dac_member_signature
+             ~hex_root_hash
+             ~dac_member_pkh
+             ~signature)
+      in
+      let* () = call () in
+      let* () = call () in
+      let* witnesses, certificate, _root_hash =
+        RPC.call
+          coordinator_node
+          (Rollup.Dac.RPC.get_certificate ~hex_root_hash)
+      in
+      assert_witnesses ~__LOC__ 4 witnesses ;
+      assert_verify_aggregate_signature [member] hex_root_hash certificate ;
+      unit
+
+    let test_handle_store_signature _protocol _tezos_node tz_client coordinator
+        _threshold dac_committee =
+      let* hex_root_hash = init_hex_root_hash coordinator in
+      let dac_env = (coordinator, hex_root_hash, dac_committee) in
+      let* () = test_non_committee_signer_should_fail tz_client dac_env in
+      let* () = test_signature_verification_failure_should_fail dac_env in
+      let* () =
+        test_store_valid_signature_should_update_aggregate_signature dac_env
+      in
+      let* () =
+        test_store_same_signature_more_than_once_should_be_noop dac_env
+      in
+      unit
+  end
+end
+
+(* Tests that it's possible to retrieve the witness and certificate after
+   storing a dac member signature. Also asserts that the certificate contains
+   the member used for signing. *)
+let test_get_certificate _protocol _tezos_node _tz_client coordinator _threshold
+    dac_committee =
+  let i = Random.int (List.length dac_committee) in
+  let member = List.nth dac_committee i in
+  let* hex_root_hash =
+    init_hex_root_hash ~payload:"test get certificate payload 123" coordinator
   in
-  let signature1 =
-    let sk =
-      match member1_key.aggregate_secret_key with
-      | Unencrypted sk -> sk
-      | Encrypted encsk -> raise (Invalid_argument encsk)
-    in
-    let sk = Tezos_crypto.Aggregate_signature.Secret_key.of_b58check_exn sk in
-    Tezos_crypto.Aggregate_signature.sign sk (Hex.to_bytes (`Hex hex_root_hash))
-  in
+  let signature = bls_sign_hex_hash member hex_root_hash in
   let* () =
-    let dac_member_pkh = member1_key.aggregate_public_key_hash in
-    let signature = signature1 in
     RPC.call
-      coordinator_node
+      coordinator
       (Rollup.Dac.RPC.dac_store_dac_member_signature
          ~hex_root_hash
-         ~dac_member_pkh
+         ~dac_member_pkh:member.aggregate_public_key_hash
          ~signature)
   in
+  let* witnesses, certificate, _root_hash =
+    RPC.call coordinator (Rollup.Dac.RPC.get_certificate ~hex_root_hash)
+  in
+  let expected_witnesses = Z.shift_left Z.one i in
+  assert_witnesses ~__LOC__ (Z.to_int expected_witnesses) witnesses ;
+  assert_verify_aggregate_signature [member] hex_root_hash certificate ;
   unit
 
 let register ~protocols =
@@ -991,10 +1185,10 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
-    ~dac_members:0
+    ~dac_members:3
     ~tags:["dac"; "dac_node"]
-    "dac_store_member_signature"
-    test_stores_dac_member_signature_stub
+    "dac_get_certificate"
+    test_get_certificate
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
@@ -1002,4 +1196,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_coordinator_post_preimage_endpoint"
     Legacy.test_coordinator_post_preimage_endpoint
+    protocols ;
+  scenario_with_layer1_and_legacy_dac_nodes
+    ~threshold:0
+    ~dac_members:3
+    ~tags:["dac"; "dac_node"]
+    "dac_store_member_signature"
+    Signature_manager.Coordinator.test_handle_store_signature
     protocols

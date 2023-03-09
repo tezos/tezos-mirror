@@ -78,6 +78,11 @@ module Keys = struct
                 return_none
             | Some sk_uri -> return_some (pkh, pk, sk_uri)))
 
+  let get_public_key cctxt address =
+    let open Lwt_result_syntax in
+    let+ address_keys_opt = get_address_keys cctxt address in
+    Option.bind address_keys_opt (fun (_pkh, pk_opt, _sk_uri) -> pk_opt)
+
   let get_keys ~addresses ~threshold cctxt =
     let open Lwt_result_syntax in
     let* keys = List.map_es (get_address_keys cctxt) addresses in

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Module for managing the verification of aggregate signatures *)
+(* Module for managing the verification of aggregate signatures. *)
 type error +=
   | Cannot_convert_root_page_hash_to_bytes of string
   | Cannot_compute_aggregate_signature of string
@@ -40,7 +40,7 @@ val sign_root_hash :
   (Tezos_crypto.Aggregate_signature.signature * Z.t, tztrace) result Lwt.t
 
 (** [verify dac_plugin public_keys_opt root_hash aggregate_signature witnesses] verifies
-    the [aggergate_signature] signed by the witnessed dac members. The witnessed 
+    the [aggregate_signature] signed by the witnessed dac members. The witnessed
     dac members is given by applying the [witnesses] bitmap against [public_keys_opt]
  *)
 val verify :
@@ -54,6 +54,16 @@ val verify :
 (** Module that exposes signature operations necsesary when running in
     [Configuration.Coordinator] mode.*)
 module Coordinator : sig
+  type error +=
+    | Public_key_is_non_dac_member of
+        Tezos_crypto.Aggregate_signature.public_key_hash
+    | Signature_verification_failed of
+        (Tezos_crypto.Aggregate_signature.public_key
+        * Tezos_crypto.Aggregate_signature.t
+        * string)
+    | Public_key_for_dac_member_not_available of
+        Tezos_crypto.Aggregate_signature.public_key_hash
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
      Verify that root hash is one that the coordinator has *)
 
@@ -70,7 +80,6 @@ module Coordinator : sig
   val handle_store_dac_member_signature :
     Node_context.t ->
     #Client_context.wallet ->
-    Tezos_crypto.Aggregate_signature.public_key option list ->
     Signature_repr.t ->
     unit tzresult Lwt.t
 end

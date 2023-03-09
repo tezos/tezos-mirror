@@ -27,6 +27,8 @@ type hash = bytes
 
 let hash_to_bytes = Fun.id
 
+let hash_to_hex hash = Hex.of_bytes hash
+
 type supported_hashes = Blake2B
 
 module type T = sig
