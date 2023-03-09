@@ -18,6 +18,7 @@ use tezos_ethereum::wei::{from_eth, Wei};
 mod block;
 mod blueprint;
 mod error;
+mod helpers;
 mod inbox;
 mod storage;
 

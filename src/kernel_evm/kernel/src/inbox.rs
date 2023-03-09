@@ -9,6 +9,8 @@ use host::input::Message;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
 
+use crate::helpers::ensures;
+
 use tezos_ethereum::eth_gen::{RawTransaction, TransactionHash};
 
 pub struct Transaction {
@@ -22,23 +24,15 @@ pub enum Error {
 }
 
 impl Transaction {
-    fn ensures(cond: bool) -> Option<()> {
-        if cond {
-            Some(())
-        } else {
-            None
-        }
-    }
-
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Option<Self> {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = bytes.split_first()?;
         // External messages starts with the tag 1, they are the only
         // messages we consider.
-        Self::ensures(*input_tag == 1)?;
+        ensures(*input_tag == 1)?;
         // Next 20 bytes is the targeted smart rollup address.
         let (target_smart_rollup_address, remaining) = remaining.split_at(20);
-        Self::ensures(target_smart_rollup_address == smart_rollup_address)?;
+        ensures(target_smart_rollup_address == smart_rollup_address)?;
         // Next 32 bytes is the transaction hash.
         let (tx_hash, remaining) = remaining.split_at(32);
         let tx_hash: TransactionHash = tx_hash.try_into().ok()?;
