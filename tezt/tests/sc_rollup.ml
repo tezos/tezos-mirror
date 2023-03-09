@@ -778,7 +778,7 @@ let bake_until ?hook cond n client =
     if 0 < i then
       let* cond = cond client in
       if cond then
-        let* () = match hook with None -> unit | Some hook -> hook i in
+        let* () = match hook with None -> unit | Some hook -> hook (n - i) in
         let* () = Client.bake_for_and_wait client in
         go (i - 1)
       else return ()
