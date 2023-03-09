@@ -147,3 +147,12 @@ val list_benchmarks : mode:list_mode -> tags:tag list -> t -> string list Lwt.t
 
 val write_config :
   benchmark:string -> bench_config:string -> file:string -> t -> unit Lwt.t
+
+(** Execute
+    [octez-snoop generate code using solution <solution> for inferred models]
+    comamnd and returns its stdout output.
+
+    If [fixed_point] is specified [--fixed-point <fixed_point>] option is added.
+*)
+val generate_code_using_solution :
+  solution:string -> ?fixed_point:string -> t -> string Lwt.t

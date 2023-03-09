@@ -608,13 +608,14 @@ module Codegen_cmd = struct
       Some (Codegen {solution; model_name; codegen_options}) ;
     Lwt.return_ok ()
 
-  let options =
-    Tezos_clic.args1
-      (Tezos_clic.arg
-         ~doc:"Apply fixed-point transform to the model"
-         ~long:"fixed-point"
-         ~placeholder:"json-config-file"
-         (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename)))
+  let fixed_point_arg =
+    Tezos_clic.arg
+      ~doc:"Apply fixed-point transform to the model"
+      ~long:"fixed-point"
+      ~placeholder:"json-config-file"
+      (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
+
+  let options = Tezos_clic.args1 fixed_point_arg
 
   let model_param =
     Tezos_clic.param
@@ -687,17 +688,24 @@ module Codegen_all_cmd = struct
       codegen_all_handler
 end
 
+(* Obsolete.  It will be superceded by Codegen_for_solutions *)
 module Codegen_inferred_cmd = struct
   include Codegen_cmd
 
-  let codegen_infer_handler json solution () =
+  let codegen_inferred_handler (json, exclusions) solution () =
     let codegen_options =
       match json with
       | None -> No_transform
       | Some json_file -> load_fixed_point_parameters json_file
     in
+    let exclusions =
+      Option.fold
+        ~none:String.Set.empty
+        ~some:Codegen.load_exclusions
+        exclusions
+    in
     commandline_outcome_ref :=
-      Some (Codegen_inferred {solution; codegen_options}) ;
+      Some (Codegen_inferred {solution; codegen_options; exclusions}) ;
     Lwt.return_ok ()
 
   let params =
@@ -710,13 +718,22 @@ module Codegen_inferred_cmd = struct
               switch"
       @@ fixed ["for"; "inferred"; "models"])
 
+  let exclude_arg =
+    Tezos_clic.arg
+      ~doc:"A file containing the function names to exclude for the codegen"
+      ~long:"exclude-file"
+      ~placeholder:"filename"
+      (Tezos_clic.parameter (fun (_ : unit) filename -> Lwt.return_ok filename))
+
+  let options = Tezos_clic.args2 Codegen_cmd.fixed_point_arg exclude_arg
+
   let command =
     Tezos_clic.command
       ~group
       ~desc:"Generate code for models inferred from the solution file"
       options
       params
-      codegen_infer_handler
+      codegen_inferred_handler
 end
 
 module Solution_print_cmd = struct
@@ -744,6 +761,46 @@ module Solution_print_cmd = struct
       Tezos_clic.no_options
       params
       solution_print_handler
+end
+
+module Codegen_for_solutions_cmd = struct
+  include Codegen_cmd
+
+  let codegen_for_solutions_handler (json, exclusions) solutions () =
+    let codegen_options =
+      match json with
+      | None -> No_transform
+      | Some json_file -> load_fixed_point_parameters json_file
+    in
+    let exclusions =
+      Option.fold
+        ~none:String.Set.empty
+        ~some:Codegen.load_exclusions
+        exclusions
+    in
+    commandline_outcome_ref :=
+      Some (Codegen_for_solutions {solutions; codegen_options; exclusions}) ;
+    Lwt.return_ok ()
+
+  let params =
+    Tezos_clic.(
+      prefixes ["generate"; "code"; "for"; "solutions"]
+      @@ seq_of_param
+           (string
+              ~name:"SOLUTION-FILE"
+              ~desc:
+                "File containing solution, as obtained using the \
+                 --save-solution switch"))
+
+  let options = Codegen_inferred_cmd.options
+
+  let command =
+    Tezos_clic.command
+      ~group
+      ~desc:"Generate code for the models inferred from the solution files"
+      options
+      params
+      codegen_for_solutions_handler
 end
 
 module List_cmd = struct
@@ -1396,6 +1453,7 @@ let all_commands =
     Codegen_cmd.command;
     Codegen_all_cmd.command;
     Codegen_inferred_cmd.command;
+    Codegen_for_solutions_cmd.command;
     Generate_config_cmd.command;
     Solution_print_cmd.command;
   ]

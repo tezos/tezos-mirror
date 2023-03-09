@@ -389,8 +389,8 @@ and get_all_workload_data_files directory =
   in
   loop []
 
-let codegen_cmd solution model_name codegen_options =
-  let sol = Codegen.load_solution solution in
+let codegen_cmd solution_fn model_name codegen_options =
+  let sol = Codegen.load_solution solution_fn in
   match Registration.find_model model_name with
   | None ->
       Format.eprintf "Model %a not found, exiting@." Namespace.pp model_name ;
@@ -407,9 +407,8 @@ let codegen_cmd solution model_name codegen_options =
             let module Transform = Fixed_point_transform.Apply (P) in
             ((module Transform) : Costlang.transform)
       in
-      let name = Format.asprintf "model_%a" Namespace.pp model_name in
       let code =
-        match Codegen.codegen model sol transform name with
+        match Codegen.codegen model sol transform model_name with
         | exception e ->
             Format.eprintf
               "Error in code generation for model %a, exiting@."
@@ -417,14 +416,15 @@ let codegen_cmd solution model_name codegen_options =
               model_name ;
             Format.eprintf "Exception caught: %s@." (Printexc.to_string e) ;
             exit 1
-        | None ->
-            Format.eprintf "Code generation failed. Bad model? Exiting.@." ;
-            exit 1
-        | Some s -> s
+        | s -> s
       in
-      Format.printf "%a@." Codegen.pp_model code
+      Format.printf "%a@." Codegen.pp_code code
 
-let generate_code_for_models sol models codegen_options =
+let generate_code_for_models sol models codegen_options ~exclusions =
+  (* The order of the models is pretty random.  It is better to sort them. *)
+  let models =
+    List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
+  in
   let transform =
     match codegen_options with
     | Cmdline.No_transform -> ((module Costlang.Identity) : Costlang.transform)
@@ -435,15 +435,23 @@ let generate_code_for_models sol models codegen_options =
         let module Transform = Fixed_point_transform.Apply (P) in
         ((module Transform) : Costlang.transform)
   in
-  Codegen.codegen_module models sol transform
+  Codegen.codegen_models models sol transform ~exclusions
 
-let codegen_all_cmd solution regexp codegen_options =
+let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
-  let sol = Codegen.load_solution solution in
+  let sol = Codegen.load_solution solution_fn in
   let models = List.filter ok (Registration.all_models ()) in
-  let result = generate_code_for_models sol models codegen_options in
+  (* no support of exclusions for this command *)
+  let result =
+    Codegen.make_toplevel_module
+    @@ generate_code_for_models
+         sol
+         models
+         codegen_options
+         ~exclusions:String.Set.empty
+  in
   Codegen.pp_module Format.std_formatter result
 
 let fvs_of_codegen_model model =
@@ -452,13 +460,11 @@ let fvs_of_codegen_model model =
   let module FV = Model.Def (Costlang.Free_variables) in
   FV.model
 
-let codegen_infer_cmd solution codegen_options =
-  let solution = Codegen.load_solution solution in
-
+let codegen_for_a_solution solution_fn codegen_options ~exclusions =
+  let solution = Codegen.load_solution solution_fn in
   Format.eprintf "Inference model: %s@." solution.inference_model_name ;
 
   let ( let* ) = Option.bind in
-  let or_else m f = match m with Some x -> Some x | None -> f () in
 
   let found_codegen_models =
     let get_codegen_from_bench (bench_name, (module Bench : Benchmark.S)) =
@@ -467,15 +473,11 @@ let codegen_infer_cmd solution codegen_options =
         List.assoc_opt ~equal:( = ) solution.inference_model_name Bench.models
       in
       (* We assume a benchmark has up to one codegen model, *)
-      (* which has the same name as the benchmark and may be qualified with "__alpha" *)
-      let codegen_name = Namespace.basename bench_name in
-      let codegen_name_alpha = codegen_name ^ "__alpha" in
       let find_codegen name =
-        let* model = Registration.find_model (Namespace.of_string name) in
-        Some (Namespace.of_string name, model)
+        let* model = Registration.find_model name in
+        Some (name, model)
       in
-      or_else (find_codegen codegen_name) (fun () ->
-          find_codegen codegen_name_alpha)
+      find_codegen bench_name
     in
     List.filter_map get_codegen_from_bench (Registration.all_benchmarks ())
   in
@@ -496,11 +498,20 @@ let codegen_infer_cmd solution codegen_options =
         ok)
       found_codegen_models
   in
+  generate_code_for_models solution codegen_models codegen_options ~exclusions
 
-  let generated_code =
-    generate_code_for_models solution codegen_models codegen_options
-  in
-  Codegen.pp_module Format.std_formatter generated_code
+let codegen_inferred_cmd solution_fn codegen_options ~exclusions =
+  Codegen.pp_module Format.std_formatter
+  @@ Codegen.make_toplevel_module
+  @@ codegen_for_a_solution solution_fn codegen_options ~exclusions
+
+let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
+  Codegen.pp_module Format.std_formatter
+  @@ Codegen.make_toplevel_module
+  @@ List.concat_map
+       (fun solution_fn ->
+         codegen_for_a_solution solution_fn codegen_options ~exclusions)
+       solution_fns
 
 let solution_print_cmd solution_fns =
   List.iter
@@ -543,6 +554,8 @@ let () =
           codegen_cmd solution model_name codegen_options
       | Codegen_all {solution; matching; codegen_options} ->
           codegen_all_cmd solution matching codegen_options
-      | Codegen_inferred {solution; codegen_options} ->
-          codegen_infer_cmd solution codegen_options
+      | Codegen_inferred {solution; codegen_options; exclusions} ->
+          codegen_inferred_cmd solution codegen_options ~exclusions
+      | Codegen_for_solutions {solutions; codegen_options; exclusions} ->
+          codegen_for_solutions_cmd solutions codegen_options ~exclusions
       | Solution_print solutions -> solution_print_cmd solutions)
