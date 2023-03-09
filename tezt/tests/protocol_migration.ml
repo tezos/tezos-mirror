@@ -771,13 +771,27 @@ let test_forked_migration_bakers ?(migration_level = 4)
         (Protocol.name protocol)
         (Node.name node)
     in
-    match wait_for_ready with
-    | Some true | None -> Baker.init ~protocol ~name node client ~delegates
-    | Some false ->
-        let* () = Node.wait_for_ready node in
-        let baker = Baker.create ~protocol ~name ~delegates node client in
-        let* () = Baker.run baker in
-        return baker
+    let event_sections_levels =
+      [(String.concat "." [Protocol.encoding_prefix protocol; "baker"], `Debug)]
+    in
+    let* baker =
+      match wait_for_ready with
+      | Some true | None ->
+          Baker.init
+            ~event_sections_levels
+            ~protocol
+            ~name
+            node
+            client
+            ~delegates
+      | Some false ->
+          let* () = Node.wait_for_ready node in
+          let baker = Baker.create ~protocol ~name ~delegates node client in
+          let* () = Baker.run ~event_sections_levels baker in
+          return baker
+    in
+    Baker.log_events baker ;
+    return baker
   in
 
   (* Split bootstrap delegates into 2 groups that will not be able to make
@@ -788,7 +802,6 @@ let test_forked_migration_bakers ?(migration_level = 4)
   let delegates_3 = [Constant.bootstrap5.alias] in
 
   Log.info "Start first baker for %s" (Protocol.name migrate_to) ;
-
   let* _to_1 =
     baker_for_proto
       ~wait_for_ready:false
