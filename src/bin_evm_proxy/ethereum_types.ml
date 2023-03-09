@@ -423,6 +423,99 @@ let transaction_receipt_encoding =
           (req "status" quantity_encoding)
           (req "contractAddress" (option address_encoding))))
 
+type transaction_object = {
+  blockHash : block_hash;
+  blockNumber : quantity;
+  from : address;
+  gas : quantity;
+  gasPrice : quantity;
+  hash : hash;
+  input : hash option;
+  nonce : quantity;
+  to_ : address;
+  transactionIndex : quantity;
+      (* It can be null if it's in a pending block, but we don't have a notion of pending. *)
+  value : quantity;
+  v : quantity;
+  r : quantity;
+  s : quantity;
+}
+
+let transaction_object_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           blockHash;
+           blockNumber;
+           from;
+           gas;
+           gasPrice;
+           hash;
+           input;
+           nonce;
+           to_;
+           transactionIndex;
+           value;
+           v;
+           r;
+           s;
+         } ->
+      ( ( blockHash,
+          blockNumber,
+          from,
+          gas,
+          gasPrice,
+          hash,
+          input,
+          nonce,
+          to_,
+          transactionIndex ),
+        (value, v, r, s) ))
+    (fun ( ( blockHash,
+             blockNumber,
+             from,
+             gas,
+             gasPrice,
+             hash,
+             input,
+             nonce,
+             to_,
+             transactionIndex ),
+           (value, v, r, s) ) ->
+      {
+        blockHash;
+        blockNumber;
+        from;
+        gas;
+        gasPrice;
+        hash;
+        input;
+        nonce;
+        to_;
+        transactionIndex;
+        value;
+        v;
+        r;
+        s;
+      })
+    (merge_objs
+       (obj10
+          (req "blockHash" block_hash_encoding)
+          (req "blockNumber" quantity_encoding)
+          (req "from" address_encoding)
+          (req "gas" quantity_encoding)
+          (req "gasPrice" quantity_encoding)
+          (req "hash" hash_encoding)
+          (req "input" (option hash_encoding))
+          (req "nonce" quantity_encoding)
+          (req "to" address_encoding)
+          (req "transactionIndex" quantity_encoding))
+       (obj4
+          (req "value" quantity_encoding)
+          (req "v" quantity_encoding)
+          (req "r" quantity_encoding)
+          (req "s" quantity_encoding)))
+
 type transaction = {
   from : address;
   to_ : address;

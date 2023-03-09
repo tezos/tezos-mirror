@@ -92,6 +92,9 @@ let dispatch ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
               match res with Ok x -> return_some x | Error _ -> return_none
             in
             return (Get_transaction_receipt.Output (Ok receipt))
+        | Get_transaction_by_hash.Input _ ->
+            return
+              (Get_transaction_by_hash.Output (Ok Mockup.transaction_object))
         | Send_raw_transaction.Input (Some tx_raw) ->
             let* tx_hash =
               Rollup_node_rpc.inject_raw_transaction
