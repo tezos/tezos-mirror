@@ -4,9 +4,9 @@ trace
     [ (Pair { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 } {}) ]
   - CAR (entry) @ location: 9
     [ (Pair { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 } {}) ]
-    - log/CONST (exit) @ location: 9
+    - log/PUSH (exit) @ location: 9
       [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 } ]
-  - CONST (entry) @ location: 10
+  - PUSH (entry) @ location: 10
     [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 } ]
     - log/SWAP (exit) @ location: 10
       [ 0
@@ -53,9 +53,9 @@ trace
   - DIP (entry) @ location: 20
     [ 1
       0 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 0 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 0 ]
     - log/ADD (exit) @ location: 22
       [ 1
@@ -109,9 +109,9 @@ trace
   - DIP (entry) @ location: 20
     [ 3
       1 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 1 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 1 ]
     - log/ADD (exit) @ location: 22
       [ 1
@@ -165,9 +165,9 @@ trace
   - DIP (entry) @ location: 20
     [ 5
       2 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 2 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 2 ]
     - log/ADD (exit) @ location: 22
       [ 1
@@ -221,9 +221,9 @@ trace
   - DIP (entry) @ location: 20
     [ 7
       3 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 3 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 3 ]
     - log/ADD (exit) @ location: 22
       [ 1
@@ -277,9 +277,9 @@ trace
   - DIP (entry) @ location: 20
     [ 9
       4 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 4 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 4 ]
     - log/ADD (exit) @ location: 22
       [ 1
@@ -333,9 +333,9 @@ trace
   - DIP (entry) @ location: 20
     [ 11
       5 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 5 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 5 ]
     - log/ADD (exit) @ location: 22
       [ 1
@@ -389,9 +389,9 @@ trace
   - DIP (entry) @ location: 20
     [ 13
       6 ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ 6 ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ 6 ]
     - log/ADD (exit) @ location: 22
       [ 1

@@ -50,9 +50,9 @@ trace
       [ 60 ]
   - DROP (entry) @ location: 19
     [ 60 ]
-    - log/CONST (exit) @ location: 19
+    - log/PUSH (exit) @ location: 19
       [  ]
-  - CONST (entry) @ location: 20
+  - PUSH (entry) @ location: 20
     [  ]
     - log/[halt] (exit) @ location: 20
       [ 1 ]
@@ -71,11 +71,11 @@ trace
   - DUP (entry) @ location: 23
     [ 2
       1 ]
-    - log/CONST (exit) @ location: 23
+    - log/PUSH (exit) @ location: 23
       [ 2
         2
         1 ]
-  - CONST (entry) @ location: 24
+  - PUSH (entry) @ location: 24
     [ 2
       2
       1 ]
@@ -105,10 +105,10 @@ trace
     [ False
       2
       1 ]
-    - log/CONST (exit) @ location: 30
+    - log/PUSH (exit) @ location: 30
       [ 2
         1 ]
-  - CONST (entry) @ location: 37
+  - PUSH (entry) @ location: 37
     [ 2
       1 ]
     - log/SWAP (exit) @ location: 37
@@ -153,10 +153,10 @@ trace
     [ 1
       1
       1 ]
-    - log/CONST (exit) @ location: 50
+    - log/PUSH (exit) @ location: 50
       [ 1
         1 ]
-  - CONST (entry) @ location: 52
+  - PUSH (entry) @ location: 52
     [ 1
       1 ]
     - log/ADD (exit) @ location: 52
@@ -199,9 +199,9 @@ trace
       [  ]
   - SELF (entry) @ location: 62
     [  ]
-    - log/CONST (exit) @ location: 62
+    - log/PUSH (exit) @ location: 62
       [ "[CONTRACT_HASH]" ]
-  - CONST (entry) @ location: 63
+  - PUSH (entry) @ location: 63
     [ "[CONTRACT_HASH]" ]
     - log/[halt] (exit) @ location: 63
       [ 0

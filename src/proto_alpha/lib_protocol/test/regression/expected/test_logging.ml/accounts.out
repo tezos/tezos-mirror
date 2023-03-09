@@ -45,14 +45,14 @@ trace
     [ {}
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 20
+    - PUSH (entry) @ location: 20
       [ {}
         {} ]
-      - log/CONST (exit) @ location: 20
+      - log/PUSH (exit) @ location: 20
         [ "[PUBLIC_KEY_HASH]"
           {}
           {} ]
-    - CONST (entry) @ location: 20
+    - PUSH (entry) @ location: 20
       [ "[PUBLIC_KEY_HASH]"
         {}
         {} ]
