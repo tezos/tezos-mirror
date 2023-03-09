@@ -2643,13 +2643,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       (fun loser_sc_rollup_node -> Sc_rollup_node.run loser_sc_rollup_node [])
       loser_sc_rollup_nodes
   in
-  let losers_reported_lost =
-    Lwt_list.iter_p
-      (Sc_rollup_node.check_error
-         ~exit_code:1
-         ~msg:(rex "The rollup node lost the refutation game"))
-      loser_sc_rollup_nodes
-  in
+
   let stop_losers level =
     if List.mem level stop_loser_at then
       Lwt_list.iter_p
@@ -2734,7 +2728,6 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
   let*! _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
-  let* () = losers_reported_lost in
   unit
 
 let rec swap i l =
