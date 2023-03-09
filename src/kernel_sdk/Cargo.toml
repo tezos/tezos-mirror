@@ -8,6 +8,7 @@ members = [
   # Kernel Dev
   "tezos_smart_rollup_core",
   "tezos_smart_rollup_host",
+  "tezos_smart_rollup_debug",
   # UX
   "installer_kernel",
   "installer_client"
