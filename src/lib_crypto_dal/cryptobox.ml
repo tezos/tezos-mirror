@@ -309,19 +309,6 @@ module Inner = struct
 
   let is_power_of_two n = n <> 0 && n land (n - 1) = 0
 
-  (* [slot_as_polynomial_length ~slot_size] returns the length of the
-     polynomial of maximal degree that can represent a slot of size
-     [slot_size]. *)
-  let slot_as_polynomial_length ~slot_size =
-    1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
-
-  (* [shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards]
-     returns the log2 of the length of a shard. *)
-  let shard_length_log ~erasure_encoded_polynomial_length ~number_of_shards =
-    (* [erasure_encoded_polynomial_length / number_of_shard] is an integer if [erasure_encoded_polynomial_length] and [number_of_shards]
-       were validated by [ensure_validity]. *)
-    Z.log2up (Z.of_int (erasure_encoded_polynomial_length / number_of_shards))
-
   (* Return the powerset of {3,11,19}. *)
   let combinations_factors =
     let rec powerset = function
@@ -417,6 +404,15 @@ module Inner = struct
      hence the + 1 to account for the remainder of the division. *)
   let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
 
+  (* [slot_as_polynomial_length ~slot_size ~page_size] returns the length of the
+     polynomial of maximal degree representing a slot of size [slot_size] with
+     [slot_size / page_size] pages. The returned length thus depends on the number
+     of pages. *)
+  let slot_as_polynomial_length ~slot_size ~page_size =
+    let page_length = page_length ~page_size in
+    let page_length_domain, _ = select_fft_domain page_length in
+    slot_size / page_size * page_length_domain
+
   let ensure_validity ~slot_size ~page_size ~erasure_encoded_polynomial_length
       ~max_polynomial_length ~redundancy_factor ~number_of_shards ~shard_length
       ~srs_g1_length ~srs_g2_length =
@@ -471,9 +467,10 @@ module Inner = struct
     in
     let* () =
       assert_result
-        (Z.(log2 (of_int erasure_encoded_polynomial_length)) <= 32)
-        (* n must be at most 2^32, the cardinal of the biggest subgroup of 2^i
-           roots of unity in the multiplicative group of Fr, because the FFTs
+        (snd Z.(remove (of_int erasure_encoded_polynomial_length) (of_int 2))
+        <= 32)
+        (* The 2-adicity of n must be at most 2^32, the size of the biggest subgroup
+           of 2^i roots of unity in the multiplicative group of Fr, because the FFTs
            operate on such groups. *)
           (fun () ->
           Format.asprintf
@@ -569,7 +566,9 @@ module Inner = struct
       ({redundancy_factor; slot_size; page_size; number_of_shards} as
       parameters) =
     let open Result_syntax in
-    let max_polynomial_length = slot_as_polynomial_length ~slot_size in
+    let max_polynomial_length =
+      slot_as_polynomial_length ~slot_size ~page_size
+    in
     let erasure_encoded_polynomial_length =
       redundancy_factor * max_polynomial_length
     in
@@ -1612,23 +1611,18 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let parameters_initialisation parameters =
-    let length = slot_as_polynomial_length ~slot_size:parameters.slot_size in
+  let parameters_initialisation
+      {slot_size; page_size; number_of_shards; redundancy_factor; _} =
+    let length = slot_as_polynomial_length ~slot_size ~page_size in
     let secret =
       Bls12_381.Fr.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
     let srs_g1 = Srs_g1.generate_insecure length secret in
     (* The error is caught during the instantiation through [make]. *)
-    let erasure_encoded_polynomial_length =
-      parameters.redundancy_factor * length
-    in
-    let evaluations_per_proof_log =
-      match
-        shard_length_log
-          ~erasure_encoded_polynomial_length
-          ~number_of_shards:parameters.number_of_shards
-      with
+    let erasure_encoded_polynomial_length = redundancy_factor * length in
+    let evaluations_per_proof =
+      match erasure_encoded_polynomial_length / number_of_shards with
       | exception Invalid_argument _ -> 0
       | x -> x
     in
@@ -1677,7 +1671,9 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let max_polynomial_length = slot_as_polynomial_length ~slot_size in
+    let max_polynomial_length =
+      slot_as_polynomial_length ~slot_size ~page_size
+    in
     let erasure_encoded_polynomial_length =
       redundancy_factor * max_polynomial_length
     in
