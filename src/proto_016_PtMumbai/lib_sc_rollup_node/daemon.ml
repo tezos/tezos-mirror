@@ -182,21 +182,25 @@ module Make (PVM : Pvm.S) = struct
         in
         return_unit
     | ( Sc_rollup_refute _,
-        Sc_rollup_refute_result
-          {game_status = Ended (Loser {reason; loser}); balance_updates; _} )
-      when Node_context.is_operator node_ctxt loser ->
-        let*? slashed_amount =
-          List.fold_left_e
-            (fun slashed -> function
-              | ( Receipt.Sc_rollup_refutation_punishments,
-                  Receipt.Credited amount,
-                  _ ) ->
-                  Environment.wrap_tzresult Tez.(slashed +? amount)
-              | _ -> Ok slashed)
-            Tez.zero
-            balance_updates
-        in
-        tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
+        Sc_rollup_refute_result {game_status = Ended end_status; _} )
+    | ( Sc_rollup_timeout _,
+        Sc_rollup_timeout_result {game_status = Ended end_status; _} ) -> (
+        match end_status with
+        | Loser {loser; _} when Node_context.is_operator node_ctxt loser ->
+            tzfail (Sc_rollup_node_errors.Lost_game end_status)
+        | Loser _ ->
+            (* Other player lost *)
+            return_unit
+        | Draw ->
+            let stakers =
+              match operation with
+              | Sc_rollup_refute {opponent; _} -> [source; opponent]
+              | Sc_rollup_timeout {stakers = {alice; bob}; _} -> [alice; bob]
+              | _ -> assert false
+            in
+            fail_when
+              (List.exists (Node_context.is_operator node_ctxt) stakers)
+              (Sc_rollup_node_errors.Lost_game end_status))
     | Dal_publish_slot_header slot_header, Dal_publish_slot_header_result _
       when Node_context.dal_supported node_ctxt ->
         let* () =
@@ -469,7 +473,7 @@ module Make (PVM : Pvm.S) = struct
                 l1_ctxt.stopper () ;
                 return_unit
             | Error e ->
-                Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
+                Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
                 let* _ = Lwt_exit.exit_and_wait 1 in
                 return_unit)
           l1_ctxt.heads
