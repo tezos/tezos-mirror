@@ -2581,7 +2581,13 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
 
 *)
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind (loser_modes, inputs, final_level, empty_levels, stop_loser_at) =
+    ~kind
+    ( loser_modes,
+      inputs,
+      final_level,
+      empty_levels,
+      stop_loser_at,
+      reset_honest_on ) =
   test_full_scenario
     ?commitment_period
     ~kind
@@ -2602,33 +2608,56 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let detected_conflicts = ref [] in
   let published_commitments = ref [] in
   let detected_timeouts = Hashtbl.create 5 in
-  let _ =
-    let rec gather_conflicts () =
-      let* conflict = wait_for_conflict_detected sc_rollup_node in
-      conflict_detected := true ;
-      detected_conflicts := conflict :: !detected_conflicts ;
+
+  let rec run_honest_node sc_rollup_node =
+    let _ =
+      let rec gather_conflicts () =
+        let* conflict = wait_for_conflict_detected sc_rollup_node in
+        conflict_detected := true ;
+        detected_conflicts := conflict :: !detected_conflicts ;
+        gather_conflicts ()
+      in
       gather_conflicts ()
     in
-    gather_conflicts ()
-  in
-  let _ =
-    let rec gather_commitments () =
-      let* c = wait_for_publish_commitment sc_rollup_node in
-      published_commitments := c :: !published_commitments ;
+    let _ =
+      let rec gather_commitments () =
+        let* c = wait_for_publish_commitment sc_rollup_node in
+        published_commitments := c :: !published_commitments ;
+        gather_commitments ()
+      in
       gather_commitments ()
     in
-    gather_commitments ()
-  in
-  let _ =
-    let rec gather_timeouts () =
-      let* other = wait_for_timeout_detected sc_rollup_node in
-      Hashtbl.replace
-        detected_timeouts
-        other
-        (Option.value ~default:0 (Hashtbl.find_opt detected_timeouts other) + 1) ;
+    let _ =
+      let rec gather_timeouts () =
+        let* other = wait_for_timeout_detected sc_rollup_node in
+        Hashtbl.replace
+          detected_timeouts
+          other
+          (Option.value ~default:0 (Hashtbl.find_opt detected_timeouts other)
+          + 1) ;
+        gather_timeouts ()
+      in
       gather_timeouts ()
     in
-    gather_timeouts ()
+    let _ =
+      (* Reset node when detecting certain events *)
+      Lwt_list.iter_p
+        (fun (event, delay) ->
+          let* () =
+            Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
+          in
+          let current_level = Node.get_level node in
+          let* _ =
+            Sc_rollup_node.wait_for_level
+              ~timeout:3.0
+              sc_rollup_node
+              (current_level + delay)
+          in
+          let* () = Sc_rollup_node.terminate sc_rollup_node in
+          run_honest_node sc_rollup_node)
+        reset_honest_on
+    in
+    Sc_rollup_node.run sc_rollup_node []
   in
 
   let loser_sc_rollup_nodes =
@@ -2650,7 +2679,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
           sc_rollup_address)
     @@ List.combine loser_modes loser_sc_rollup_nodes
   in
-  let* () = Sc_rollup_node.run sc_rollup_node []
+  let* () = run_honest_node sc_rollup_node
   and* () =
     Lwt_list.iter_p
       (fun loser_sc_rollup_node -> Sc_rollup_node.run loser_sc_rollup_node [])
@@ -2665,7 +2694,6 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
         loser_sc_rollup_nodes
     else unit
   in
-
   let rec consume_inputs = function
     | [] -> unit
     | inputs :: next_batches as all ->
@@ -2774,47 +2802,53 @@ let test_refutation protocols ~kind =
              message index of the failure, and the third integer is the
              index of the failing tick during the processing of this
              message. *)
-          ("inbox_proof_at_genesis", (["3 0 0"], inputs_for 10, 80, [], []));
-          ("pvm_proof_at_genesis", (["3 0 1"], inputs_for 10, 80, [], []));
-          ("inbox_proof", (["5 0 0"], inputs_for 10, 80, [], []));
+          ("inbox_proof_at_genesis", (["3 0 0"], inputs_for 10, 80, [], [], []));
+          ("pvm_proof_at_genesis", (["3 0 1"], inputs_for 10, 80, [], [], []));
+          ("inbox_proof", (["5 0 0"], inputs_for 10, 80, [], [], []));
           ( "inbox_proof_with_new_content",
-            (["5 0 0"], inputs_for 30, 80, [], []) );
+            (["5 0 0"], inputs_for 30, 80, [], [], []) );
           (* In "inbox_proof_with_new_content" we add messages after the commitment
              period so the current inbox is not equal to the inbox snapshot-ted at the
              game creation. *)
           ( "inbox_proof_one_empty_level",
-            (["6 0 0"], inputs_for 10, 80, [2], []) );
+            (["6 0 0"], inputs_for 10, 80, [2], [], []) );
           ( "inbox_proof_many_empty_levels",
-            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], []) );
-          ("pvm_proof_0", (["5 2 1"], inputs_for 10, 80, [], []));
-          ("pvm_proof_1", (["7 2 0"], inputs_for 10, 80, [], []));
-          ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], []));
-          ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], []));
-          ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35]));
-          ("parallel_games_0", (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], []));
+            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], [], []) );
+          ("pvm_proof_0", (["5 2 1"], inputs_for 10, 80, [], [], []));
+          ("pvm_proof_1", (["7 2 0"], inputs_for 10, 80, [], [], []));
+          ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], [], []));
+          ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], [], []));
+          ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35], []));
+          ( "parallel_games_0",
+            (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], []) );
           ( "parallel_games_1",
-            (["3 0 0"; "3 0 1"; "3 0 0"], inputs_for 10, 200, [], []) );
+            (["3 0 0"; "3 0 1"; "3 0 0"], inputs_for 10, 200, [], [], []) );
         ]
     | "wasm_2_0_0" ->
         [
           (* First message of an inbox (level 3) *)
-          ("inbox_proof_0", (["3 0 0"], inputs_for 10, 80, [], []));
+          ("inbox_proof_0", (["3 0 0"], inputs_for 10, 80, [], [], []));
           (* Fourth message of an inbox (level 3) *)
-          ("inbox_proof_1", (["3 4 0"], inputs_for 10, 80, [], []));
+          ("inbox_proof_1", (["3 4 0"], inputs_for 10, 80, [], [], []));
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
-          ("pvm_proof_0", (["5 7 11_000_000_001"], inputs_for 10, 80, [], []));
-          ("pvm_proof_1", (["7 7 11_000_001_000"], inputs_for 10, 80, [], []));
+          ( "pvm_proof_0",
+            (["5 7 11_000_000_001"], inputs_for 10, 80, [], [], []) );
+          ( "pvm_proof_1",
+            (["7 7 11_000_001_000"], inputs_for 10, 80, [], [], []) );
           (* End of evaluation *)
-          ("pvm_proof_2", (["7 7 22_000_002_000"], inputs_for 10, 80, [], []));
+          ( "pvm_proof_2",
+            (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], []) );
           (* During padding *)
-          ("pvm_proof_3", (["7 7 22_010_000_000"], inputs_for 10, 80, [], []));
+          ( "pvm_proof_3",
+            (["7 7 22_010_000_000"], inputs_for 10, 80, [], [], []) );
           ( "parallel_games_0",
-            (["4 0 0"; "5 7 11_000_000_001"], inputs_for 10, 80, [], []) );
+            (["4 0 0"; "5 7 11_000_000_001"], inputs_for 10, 80, [], [], []) );
           ( "parallel_games_1",
             ( ["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"],
               inputs_for 10,
               80,
+              [],
               [],
               [] ) );
         ]
@@ -2840,7 +2874,7 @@ let test_accuser protocols =
     ~challenge_window:10
     ~commitment_period:10
     ~variant:"pvm_proof_2"
-    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [])
+    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [])
     protocols
 
 (** Helper to check that the operation whose hash is given is successfully
