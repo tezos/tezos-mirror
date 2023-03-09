@@ -297,8 +297,6 @@ type block_info = {
   round : Round.t;
   locked_round : Round.t option;
   predecessor_hash : Block_hash.t;
-  block_producer : Consensus_key.pk;
-  payload_producer : Consensus_key.pk;
   header_contents : Block_header.contents;
 }
 
@@ -307,8 +305,6 @@ type block_info = {
 type construction_info = {
   round : Round.t;
   predecessor_hash : Block_hash.t;
-  block_producer : Consensus_key.pk;
-  payload_producer : Consensus_key.pk;
   header_contents : Block_header.contents;
 }
 
@@ -2346,7 +2342,8 @@ let begin_any_application ctxt chain_id ~predecessor_level
   let* () =
     Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
   in
-  let* ctxt, _slot, payload_producer =
+  let* ctxt, _slot, _payload_producer =
+    (* We just make sure that this call will not fail in apply.ml *)
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2358,8 +2355,6 @@ let begin_any_application ctxt chain_id ~predecessor_level
       round;
       locked_round = Fitness.locked_round fitness;
       predecessor_hash;
-      block_producer;
-      payload_producer;
       header_contents = block_header.protocol_data.contents;
     }
   in
@@ -2419,7 +2414,8 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
   let* () =
     Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
   in
-  let* ctxt, _slot, payload_producer =
+  let* ctxt, _slot, _payload_producer =
+    (* We just make sure that this call will not fail in apply.ml *)
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2428,14 +2424,7 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
   let validation_state =
     init_validation_state
       ctxt
-      (Construction
-         {
-           round;
-           predecessor_hash;
-           block_producer;
-           payload_producer;
-           header_contents;
-         })
+      (Construction {round; predecessor_hash; header_contents})
       chain_id
       ~predecessor_level_and_round:
         (Some (predecessor_level.Level.level, predecessor_round))
@@ -2904,7 +2893,7 @@ let compute_payload_hash block_state
 let finalize_block {info; block_state; _} =
   let open Lwt_result_syntax in
   match info.mode with
-  | Application {round; locked_round; predecessor_hash; header_contents; _} ->
+  | Application {round; locked_round; predecessor_hash; header_contents} ->
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
         if are_endorsements_required then
@@ -2932,7 +2921,7 @@ let finalize_block {info; block_state; _} =
         else ok_unit
       in
       return_unit
-  | Construction {round; predecessor_hash; header_contents; _} ->
+  | Construction {round; predecessor_hash; header_contents} ->
       let block_payload_hash =
         compute_payload_hash block_state header_contents ~predecessor_hash
       in
