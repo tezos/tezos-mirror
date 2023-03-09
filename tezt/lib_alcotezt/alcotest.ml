@@ -37,11 +37,11 @@ exception Test_error
 
 type 'a test = string * 'a test_case list
 
-let run library_name tests =
+let run ~__FILE__ library_name tests =
   tests
   |> List.iter @@ fun (test_name, test_cases) ->
      Test.register
-       ~__FILE__:library_name
+       ~__FILE__
        ~title:(library_name ^ ": " ^ test_name)
        ~tags:["alcotezt"]
      @@ fun () ->
