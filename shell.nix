@@ -179,6 +179,7 @@ let
     })
     pkgs.rust-analyzer
     pkgs.wabt
+    pkgs.clang
   ];
 
   devPackageSet = pkgs.opamPackages.overrideScope' (

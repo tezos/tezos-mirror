@@ -3,15 +3,18 @@
 #
 # SPDX-License-Identifier: MIT
 
+CC=$(which clang)
+
 all: build test doc
 
 build:
 	@cargo fmt --check
-	@cargo clippy --all-targets -- --deny warnings
+	@cargo clippy --all-targets --all-features -- --deny warnings
+	@cargo check --no-default-features
 	@cargo build --target wasm32-unknown-unknown --release
 
 test:
-	@cargo test
+	@cargo test --all-features
 
 doc:
 	@cargo doc
