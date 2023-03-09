@@ -857,8 +857,22 @@ let octez_crypto =
     ~js_compatible:true
 
 let _octez_crypto_tests =
-  tests
-    ["test_run"; "test_prop_signature"]
+  tezt
+    [
+      "test_run";
+      "test_prop_signature";
+      "roundtrips";
+      "key_encoding_vectors";
+      "test_base58";
+      "test_blake2b";
+      "test_crypto_box";
+      "test_deterministic_nonce";
+      "test_merkle";
+      "test_signature";
+      "test_signature_encodings";
+      "test_timelock";
+      "test_context_hash";
+    ]
     ~path:"src/lib_crypto/test"
     ~opam:"tezos-crypto"
     ~deps:
@@ -870,7 +884,7 @@ let _octez_crypto_tests =
         zarith_stubs_js;
         octez_hacl;
         data_encoding |> open_;
-        alcotest;
+        alcotezt;
         qcheck_alcotest;
         octez_test_helpers |> open_;
       ]
@@ -878,7 +892,7 @@ let _octez_crypto_tests =
     ~js_compatible:true
 
 let _octez_crypto_tests_unix =
-  tests
+  tezt
     ["test_crypto_box"]
     ~path:"src/lib_crypto/test-unix"
     ~opam:"tezos-crypto"
@@ -891,8 +905,7 @@ let _octez_crypto_tests_unix =
         zarith_stubs_js;
         octez_hacl;
         data_encoding |> open_;
-        alcotest;
-        alcotest_lwt;
+        alcotezt;
         lwt_unix;
         qcheck_alcotest;
         octez_test_helpers |> open_;
