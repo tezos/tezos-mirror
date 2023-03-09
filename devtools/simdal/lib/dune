@@ -1,0 +1,9 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name simdal)
+ (libraries
+  ocamlgraph
+  prbnmcn-stats
+  unix))

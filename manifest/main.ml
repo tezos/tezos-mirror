@@ -6017,6 +6017,26 @@ let _yes_wallet_test =
       ]
     ~bisect_ppx:false
 
+let simdal_lib =
+  private_lib
+    "simdal"
+    ~path:("devtools" // "simdal" // "lib")
+    ~synopsis:"P2P simulator library"
+    ~opam:""
+    ~deps:[ocamlgraph; prbnmcn_stats; unix]
+    ~static:false
+    ~bisect_ppx:false
+
+let _simdal =
+  private_exes
+    ["sim"; "concat"]
+    ~path:("devtools" // "simdal" // "bin")
+    ~synopsis:"DAL/P2P simulator"
+    ~opam:""
+    ~deps:[simdal_lib]
+    ~static:false
+    ~bisect_ppx:false
+
 let _ppinclude =
   private_exe
     "ppinclude"
