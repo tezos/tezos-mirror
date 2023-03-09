@@ -81,10 +81,10 @@ let remove_stake ctxt delegate amount =
     && Tez_repr.(staking_balance < minimal_stake)
   then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if not inactive then
+    if inactive then return ctxt
+    else
       Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
       >>= fun ctxt -> return ctxt
-    else return ctxt
   else
     (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
         - because it did not have the minimal required stake, in which case it
