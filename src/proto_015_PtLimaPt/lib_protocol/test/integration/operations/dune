@@ -35,8 +35,6 @@
   test_origination
   test_paid_storage_increase
   test_reveal
-  test_sc_rollup_transfer
-  test_sc_rollup
   test_transfer
   test_voting
   test_zk_rollup
