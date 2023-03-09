@@ -374,6 +374,44 @@ module Test = struct
         | Ok () -> true
         | _ -> false)
 
+  let test_shard_proof_invalid =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test invalid shard proof"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let* commitment = Cryptobox.commit t polynomial in
+        let shards = Cryptobox.shards_from_polynomial t polynomial in
+        let precomputation = Cryptobox.precompute_shards_proofs t in
+        let shard_proofs =
+          Cryptobox.prove_shards t ~precomputation ~polynomial
+        in
+        let shard_index = randrange params.number_of_shards in
+        match
+          Seq.find
+            (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
+            shards
+        with
+        | None ->
+            (* The shard index was sampled within the bounds, so this case
+               (the queried index is out of bounds) doesn't happen. *)
+            assert false
+        | Some shard ->
+            let altered_proof =
+              Cryptobox.Internal_for_tests.alter_shard_proof
+                shard_proofs.(shard_index)
+            in
+            Cryptobox.verify_shard t commitment shard altered_proof)
+        |> function
+        | Error `Invalid_shard -> true
+        | _ -> false)
+
   (* Tests that the slot behind the commitment has its size bounded
      by [t.slot_size]. *)
   let test_commitment_proof =
@@ -588,6 +626,7 @@ let () =
             Test.test_page_proofs;
             Test.test_page_proofs_invalid;
             Test.test_shard_proofs;
+            Test.test_shard_proof_invalid;
             Test.test_commitment_proof;
             Test.test_polynomial_slot_conversions;
             Test.test_select_fft_domain;
