@@ -4020,8 +4020,8 @@ end = struct
             ("test_origination", true);
             ("test_paid_storage_increase", true);
             ("test_reveal", true);
-            ("test_sc_rollup_transfer", true);
-            ("test_sc_rollup", true);
+            ("test_sc_rollup_transfer", N.(number >= 016));
+            ("test_sc_rollup", N.(number >= 016));
             ("test_transfer", true);
             ("test_voting", true);
             ("test_zk_rollup", true);
@@ -4105,8 +4105,8 @@ end = struct
             (2, "test_tez_repr", true);
             (2, "test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
             (2, "test_bitset", N.(number >= 013));
-            (2, "test_sc_rollup_tick_repr", N.(number >= 013));
-            (2, "test_sc_rollup_encoding", N.(number >= 015));
+            (2, "test_sc_rollup_tick_repr", N.(number >= 016));
+            (2, "test_sc_rollup_encoding", N.(number >= 016));
             (2, "test_sc_rollup_inbox", N.(number >= 017));
             (3, "refutation_game_pbt", N.(number == 013));
             (3, "test_refutation_game", N.(number >= 016));

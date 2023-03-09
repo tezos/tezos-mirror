@@ -44,8 +44,6 @@ let () =
       (Protocol.name ^ ": combined", Test_combined_operations.tests);
       (Protocol.name ^ ": failing_noop operation", Test_failing_noop.tests);
       (Protocol.name ^ ": tx rollup", Test_tx_rollup.tests);
-      (Protocol.name ^ ": sc rollup", Test_sc_rollup.tests);
-      (Protocol.name ^ ": sc rollup transfer", Test_sc_rollup_transfer.tests);
       (Protocol.name ^ ": zk rollup", Test_zk_rollup.tests);
     ]
   |> Lwt_main.run

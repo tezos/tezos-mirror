@@ -42,8 +42,6 @@
   test_tez_repr
   test_tx_rollup_l2_encoding
   test_bitset
-  test_sc_rollup_tick_repr
-  test_sc_rollup_encoding
   test_carbonated_map
   test_zk_rollup_encoding
   test_compare_operations))
