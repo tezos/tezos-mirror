@@ -106,11 +106,11 @@ module type S = sig
 
      Maybe it would be better if the interface would be more generic
      and would look like an automaton? *)
-  type peer
+  module Peer : ITERABLE
 
-  type topic
+  module Topic : ITERABLE
 
-  type message_id
+  module Message_id : ITERABLE
 
   type message
 
@@ -120,9 +120,9 @@ module type S = sig
 
   type state
 
-  type limits := (peer, message_id, span) limits
+  type limits := (Peer.t, Message_id.t, span) limits
 
-  type parameters := (peer, message_id) parameters
+  type parameters := (Peer.t, Message_id.t) parameters
 
   val make : Random.State.t -> limits -> parameters -> state
 
@@ -130,42 +130,44 @@ module type S = sig
 
   type 'a monad := state -> state * 'a output
 
-  val add_peer : direct:bool -> outbound:bool -> peer -> [`Add_peer] monad
+  val add_peer : direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] monad
 
-  val remove_peer : peer -> [`Remove_peer] monad
+  val remove_peer : Peer.t -> [`Remove_peer] monad
 
-  val handle_ihave : peer -> topic -> message_id list -> [`IHave] monad
+  val handle_ihave : Peer.t -> Topic.t -> Message_id.t list -> [`IHave] monad
 
-  val handle_iwant : peer -> message_id list -> [`IWant] monad
+  val handle_iwant : Peer.t -> Message_id.t list -> [`IWant] monad
 
-  val handle_graft : peer -> topic -> [`Graft] monad
+  val handle_graft : Peer.t -> Topic.t -> [`Graft] monad
 
   val handle_prune :
-    peer -> topic -> px:peer Seq.t -> backoff:span -> [`Prune] monad
+    Peer.t -> Topic.t -> px:Peer.t Seq.t -> backoff:span -> [`Prune] monad
 
   val publish :
-    sender:peer option -> topic -> message_id -> message -> [`Publish] monad
+    sender:Peer.t option ->
+    Topic.t ->
+    Message_id.t ->
+    message ->
+    [`Publish] monad
 
   val heartbeat : [`Heartbeat] monad
 
-  val join : topic -> [`Join] monad
+  val join : Topic.t -> [`Join] monad
 
-  val leave : topic -> [`Leave] monad
+  val leave : Topic.t -> [`Leave] monad
 end
 
 module Make (C : CONFIGURATION) :
   S
     with type time = C.Time.t
      and type span = C.Time.span
-     and type peer = C.Peer.t
-     and type topic = C.Topic.t
-     and type message_id = C.Message_id.t
+     and module Peer = C.Peer
+     and module Topic = C.Topic
+     and module Message_id = C.Message_id
      and type message = C.Message.t = struct
-  type peer = C.Peer.t
-
-  type topic = C.Topic.t
-
-  type message_id = C.Message_id.t
+  module Peer = C.Peer
+  module Topic = C.Topic
+  module Message_id = C.Message_id
 
   type message = C.Message.t
 
@@ -173,9 +175,9 @@ module Make (C : CONFIGURATION) :
 
   type span = C.Time.span
 
-  type nonrec limits = (peer, message_id, C.Time.span) limits
+  type nonrec limits = (Peer.t, Message_id.t, C.Time.span) limits
 
-  type nonrec parameters = (peer, message_id) parameters
+  type nonrec parameters = (Peer.t, Message_id.t) parameters
 
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
@@ -184,11 +186,11 @@ module Make (C : CONFIGURATION) :
     | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
     | Message_topic_not_tracked : [`IHave] output
-    | Message_requested_message_ids : message_id list -> [`IHave] output
+    | Message_requested_message_ids : Message_id.t list -> [`IHave] output
     | On_iwant_messages_to_route : {
-        peer : peer;
+        peer : Peer.t;
         routed_message_ids :
-          [`Ignored | `Not_found | `Message of message] C.Message_id.Map.t;
+          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
       }
         -> [`IWant] output
     | Peer_filtered : [`Graft] output
@@ -202,18 +204,18 @@ module Make (C : CONFIGURATION) :
     | No_peer_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
-    | PX : C.Peer.Set.t -> [`Prune] output
-    | Publish_message : C.Peer.Set.t -> [`Publish] output
+    | PX : Peer.Set.t -> [`Prune] output
+    | Publish_message : Peer.Set.t -> [`Publish] output
     | Already_subscribed : [`Join] output
-    | Joining_topic : C.Peer.Set.t -> [`Join] output
+    | Joining_topic : Peer.Set.t -> [`Join] output
     | Not_subscribed : [`Leave] output
-    | Leaving_topic : {to_prune : C.Peer.Set.t} -> [`Leave] output
+    | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
     | Peer_added : [`Add_peer] output
     | Peer_already_known : [`Add_peer] output
     | Removing_peer : [`Remove_peer] output
 
   type connection = {
-    topics : C.Topic.Set.t;
+    topics : Topic.Set.t;
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
 
        When does this field should be updated? *)
@@ -222,20 +224,20 @@ module Make (C : CONFIGURATION) :
     outbound : bool;
         (** An outbound connection is a connection we
                           connected to. *)
-    backoff : C.Time.t C.Topic.Map.t;
+    backoff : C.Time.t Topic.Map.t;
         (** The backoff times associated to this peer for each topic *)
     score : Score.t;  (** The score associated to this peer. *)
     expire : C.Time.t option;
         (** The expiring time after having being disconnected from this peer. *)
   }
 
-  type connections = connection C.Peer.Map.t
+  type connections = connection Peer.Map.t
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4982
 
      This module is incomplete. *)
   module Memory_cache = struct
-    type value = {message : message; access : int C.Peer.Map.t}
+    type value = {message : message; access : int Peer.Map.t}
 
     type t = {messages : value C.Message_id.Map.t}
 
@@ -246,7 +248,7 @@ module Make (C : CONFIGURATION) :
       | None -> None
       | Some {message; access} ->
           let access =
-            C.Peer.Map.update
+            Peer.Map.update
               peer
               (function None -> Some 1 | Some x -> Some (x + 1))
               access
@@ -260,7 +262,7 @@ module Make (C : CONFIGURATION) :
           Some (t, message)
 
     let add_message message_id message t =
-      let value = {message; access = C.Peer.Map.empty} in
+      let value = {message; access = Peer.Map.empty} in
       {messages = C.Message_id.Map.add message_id value t.messages}
   end
 
@@ -271,20 +273,20 @@ module Make (C : CONFIGURATION) :
     limits : limits;
     parameters : parameters;
     connections : connections;
-    ihave_per_heartbeat : int C.Peer.Map.t;
-    iwant_per_heartbeat : int C.Peer.Map.t;
-    mesh : C.Peer.Set.t C.Topic.Map.t;
-    fanout : C.Peer.Set.t C.Topic.Map.t;
-    last_published_time : C.Time.t C.Topic.Map.t;
+    ihave_per_heartbeat : int Peer.Map.t;
+    iwant_per_heartbeat : int Peer.Map.t;
+    mesh : Peer.Set.t Topic.Map.t;
+    fanout : Peer.Set.t Topic.Map.t;
+    last_published_time : C.Time.t Topic.Map.t;
     seen_messages : C.Message_id.Set.t;
     memory_cache : Memory_cache.t;
     rng : Random.State.t;
   }
   (* Invariants:
 
-     - Forall t set, C.Topic.Map.find t mesh = Some set -> C.Peer.Set set <> C.Peer.Set.empty
+     - Forall t set, Topic.Map.find t mesh = Some set -> Peer.Set set <> Peer.Set.empty
 
-     - Forall t set, C.Topic.Map.find t fanout = Some set -> C.Peer.Set set <> C.Peer.Set.empty
+     - Forall t set, Topic.Map.find t fanout = Some set -> Peer.Set set <> Peer.Set.empty
   *)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4984
@@ -341,12 +343,12 @@ module Make (C : CONFIGURATION) :
     {
       limits;
       parameters;
-      connections = C.Peer.Map.empty;
-      ihave_per_heartbeat = C.Peer.Map.empty;
-      iwant_per_heartbeat = C.Peer.Map.empty;
-      mesh = C.Topic.Map.empty;
-      fanout = C.Topic.Map.empty;
-      last_published_time = C.Topic.Map.empty;
+      connections = Peer.Map.empty;
+      ihave_per_heartbeat = Peer.Map.empty;
+      iwant_per_heartbeat = Peer.Map.empty;
+      mesh = Topic.Map.empty;
+      fanout = Topic.Map.empty;
+      last_published_time = Topic.Map.empty;
       seen_messages = C.Message_id.Set.empty;
       memory_cache = Memory_cache.create ();
       rng;
@@ -389,14 +391,14 @@ module Make (C : CONFIGURATION) :
     let rng state = state.rng
 
     let update ?(delta = 1) key map =
-      C.Peer.Map.update
+      Peer.Map.update
         key
         (function None -> Some delta | Some n -> Some (n + delta))
         map
 
     let update_and_get ?(delta = 1) key map =
       let res = ref delta in
-      C.Peer.Map.update
+      Peer.Map.update
         key
         (function
           | None -> Some delta
@@ -420,7 +422,7 @@ module Make (C : CONFIGURATION) :
       (state, ())
 
     let find ?(default = 0) key map =
-      match C.Peer.Map.find key map with None -> default | Some n -> n
+      match Peer.Map.find key map with None -> default | Some n -> n
 
     let find_iwant_per_heartbeat ?default key state =
       find ?default key state.iwant_per_heartbeat
@@ -429,12 +431,12 @@ module Make (C : CONFIGURATION) :
 
     let topic_is_tracked topic state =
       let {mesh; _} = state in
-      match C.Topic.Map.find topic mesh with None -> false | Some _ -> true
+      match Topic.Map.find topic mesh with None -> false | Some _ -> true
 
     let set_memory_cache memory_cache state = ({state with memory_cache}, ())
 
     let get_score ~default peer state =
-      match C.Peer.Map.find peer state.connections with
+      match Peer.Map.find peer state.connections with
       | None -> default
       | Some connection -> connection.score
 
@@ -442,32 +444,32 @@ module Make (C : CONFIGURATION) :
       let open Monad.Syntax in
       let*! connections in
       let*! rng in
-      C.Peer.Map.to_seq connections
+      Peer.Map.to_seq connections
       |> Seq.filter_map (fun (peer, connections) ->
              let topics = connections.topics in
-             if filter peer connections && C.Topic.Set.mem topic topics then
+             if filter peer connections && Topic.Set.mem topic topics then
                Some peer
              else None)
-      |> List.of_seq |> List.shuffle ~rng |> List.take_n max
-      |> C.Peer.Set.of_list |> return
+      |> List.of_seq |> List.shuffle ~rng |> List.take_n max |> Peer.Set.of_list
+      |> return
 
     let set_mesh_topic topic peers state =
-      let state = {state with mesh = C.Topic.Map.add topic peers state.mesh} in
+      let state = {state with mesh = Topic.Map.add topic peers state.mesh} in
       (state, ())
 
     let set_mesh mesh state =
       let state = {state with mesh} in
       (state, ())
 
-    let find_mesh topic state = C.Topic.Map.find topic state.mesh
+    let find_mesh topic state = Topic.Map.find topic state.mesh
 
-    let find_fanout topic state = C.Topic.Map.find topic state.fanout
+    let find_fanout topic state = Topic.Map.find topic state.fanout
 
     let set_fanout_topic topic peers state =
-      if C.Peer.Set.is_empty peers then (state, ())
+      if Peer.Set.is_empty peers then (state, ())
       else
         let state =
-          {state with fanout = C.Topic.Map.add topic peers state.fanout}
+          {state with fanout = Topic.Map.add topic peers state.fanout}
         in
         (state, ())
 
@@ -476,11 +478,11 @@ module Make (C : CONFIGURATION) :
       (state, ())
 
     let delete_mesh topic state =
-      let state = {state with mesh = C.Topic.Map.remove topic state.mesh} in
+      let state = {state with mesh = Topic.Map.remove topic state.mesh} in
       (state, ())
 
     let delete_fanout topic state =
-      let state = {state with fanout = C.Topic.Map.remove topic state.fanout} in
+      let state = {state with fanout = Topic.Map.remove topic state.fanout} in
       (state, ())
 
     let set_last_published_time topic time state =
@@ -488,7 +490,7 @@ module Make (C : CONFIGURATION) :
         {
           state with
           last_published_time =
-            C.Topic.Map.add topic time state.last_published_time;
+            Topic.Map.add topic time state.last_published_time;
         }
       in
       (state, ())
@@ -497,8 +499,7 @@ module Make (C : CONFIGURATION) :
       let state =
         {
           state with
-          last_published_time =
-            C.Topic.Map.remove topic state.last_published_time;
+          last_published_time = Topic.Map.remove topic state.last_published_time;
         }
       in
       (state, ())
@@ -514,13 +515,13 @@ module Make (C : CONFIGURATION) :
       (state, ())
 
     let update_backoff peer topic expire connections =
-      C.Peer.Map.update
+      Peer.Map.update
         peer
         (function
           | None -> None
           | Some connection ->
               let backoff =
-                C.Topic.Map.update
+                Topic.Map.update
                   topic
                   (function
                     | None -> Some expire
@@ -544,7 +545,7 @@ module Make (C : CONFIGURATION) :
       set_connections connections
 
     let add_connections_score peer score =
-      C.Peer.Map.update
+      Peer.Map.update
         peer
         (Option.map (fun connection -> {connection with score}))
 
@@ -597,7 +598,7 @@ module Make (C : CONFIGURATION) :
       | [] -> Message_requested_message_ids [] |> fail
       | _ -> unit
 
-    let filter peer message_ids : message_id list Monad.t =
+    let filter peer message_ids : Message_id.t list Monad.t =
       let open Monad.Syntax in
       let*! peer_filter in
       let*! seen_messages in
@@ -607,7 +608,8 @@ module Make (C : CONFIGURATION) :
       in
       List.filter should_handle_message_id message_ids |> return
 
-    let shuffle_and_trunc message_ids ~limit : (int * message_id list) Monad.t =
+    let shuffle_and_trunc message_ids ~limit : (int * Message_id.t list) Monad.t
+        =
       let open Monad.Syntax in
       let*! rng in
       let iwant_message_ids_len = List.length message_ids in
@@ -646,8 +648,8 @@ module Make (C : CONFIGURATION) :
       Message_requested_message_ids requested_message_ids |> return
   end
 
-  let handle_ihave : peer -> topic -> message_id list -> [`IHave] output Monad.t
-      =
+  let handle_ihave :
+      Peer.t -> Topic.t -> Message_id.t list -> [`IHave] output Monad.t =
     IHave.handle
 
   module IWant = struct
@@ -687,7 +689,7 @@ module Make (C : CONFIGURATION) :
       On_iwant_messages_to_route {peer; routed_message_ids} |> return
   end
 
-  let handle_iwant : peer -> message_id list -> [`IWant] output Monad.t =
+  let handle_iwant : Peer.t -> Message_id.t list -> [`IWant] output Monad.t =
     IWant.handle
 
   module Graft = struct
@@ -704,12 +706,12 @@ module Make (C : CONFIGURATION) :
 
     let check_not_in_mesh mesh peer =
       let open Monad.Syntax in
-      if C.Peer.Set.mem peer mesh then Peer_already_in_mesh |> fail else unit
+      if Peer.Set.mem peer mesh then Peer_already_in_mesh |> fail else unit
 
     let check_not_direct peer =
       let open Monad.Syntax in
       let*! connections in
-      match C.Peer.Map.find peer connections with
+      match Peer.Map.find peer connections with
       | None -> Unexpected_grafting_peer |> fail
       | Some ({direct; _} as connection) ->
           if direct then Grafting_direct_peer |> fail else pass connection
@@ -725,7 +727,7 @@ module Make (C : CONFIGURATION) :
     let check_backoff peer topic {backoff; score; _} =
       let open Monad.Syntax in
       let*! prune_backoff in
-      match C.Topic.Map.find topic backoff with
+      match Topic.Map.find topic backoff with
       | None -> unit
       | Some backoff ->
           let current = C.Time.now () in
@@ -751,14 +753,14 @@ module Make (C : CONFIGURATION) :
       let*? connection = check_not_direct peer in
       let*? () = check_backoff peer topic connection in
       let*? () = check_score peer topic connection in
-      let* () = set_mesh_topic topic (C.Peer.Set.add peer mesh) in
+      let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
       (* FIXME https://gitlab.com/tezos/tezos/-/issues/5007
 
          Handle negative score  and the size check is missing *)
       Grafting_successfully |> return
   end
 
-  let handle_graft : peer -> topic -> [`Graft] output Monad.t = Graft.handle
+  let handle_graft : Peer.t -> Topic.t -> [`Graft] output Monad.t = Graft.handle
 
   module Prune = struct
     let check_px_score peer =
@@ -778,20 +780,20 @@ module Make (C : CONFIGURATION) :
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5006
 
              backoff computation. *)
-          let mesh = C.Peer.Set.remove peer mesh in
+          let mesh = Peer.Set.remove peer mesh in
           let* () = set_mesh_topic topic mesh in
           let* _ = add_backoff backoff topic peer in
-          let px = C.Peer.Set.of_seq px in
-          if C.Peer.Set.is_empty px then No_PX |> return
+          let px = Peer.Set.of_seq px in
+          if Peer.Set.is_empty px then No_PX |> return
           else
             let*? () = check_px_score peer in
             return (PX px)
   end
 
   let handle_prune :
-      peer ->
-      topic ->
-      px:peer Seq.t ->
+      Peer.t ->
+      Topic.t ->
+      px:Peer.t Seq.t ->
       backoff:C.Time.span ->
       [`Prune] output Monad.t =
     Prune.handle
@@ -840,16 +842,16 @@ module Make (C : CONFIGURATION) :
       let peers =
         Option.fold
           ~none:peers
-          ~some:(fun peer -> C.Peer.Set.remove peer peers)
+          ~some:(fun peer -> Peer.Set.remove peer peers)
           sender
       in
       Publish_message peers |> return
   end
 
   let publish :
-      sender:C.Peer.t option ->
-      topic ->
-      message_id ->
+      sender:Peer.t option ->
+      Topic.t ->
+      Message_id.t ->
       message ->
       [`Publish] output Monad.t =
     Publish.handle
@@ -859,13 +861,13 @@ module Make (C : CONFIGURATION) :
         < fail : [`Join] output ; pass : unit > Monad.check =
       let open Monad.Syntax in
       let*! mesh in
-      match C.Topic.Map.find topic mesh with
+      match Topic.Map.find topic mesh with
       | None -> unit
       | Some _ -> Already_subscribed |> fail
 
     let get_more_peers topic ~max =
       let filter _peer {backoff; score; direct; _} =
-        not (direct || C.Topic.Map.mem topic backoff || Score.(score < zero))
+        not (direct || Topic.Map.mem topic backoff || Score.(score < zero))
       in
       get_peers topic ~filter ~max
 
@@ -874,7 +876,7 @@ module Make (C : CONFIGURATION) :
       let*! expected_peers_per_topic in
       let*! connections in
       let is_valid peer =
-        match C.Peer.Map.find peer connections with
+        match Peer.Map.find peer connections with
         | None ->
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/5005
 
@@ -882,28 +884,28 @@ module Make (C : CONFIGURATION) :
                return a value for defensive programming. *)
             false
         | Some {backoff; score; _} ->
-            not (C.Topic.Map.mem topic backoff || Score.(score < zero))
+            not (Topic.Map.mem topic backoff || Score.(score < zero))
       in
       let*! fanout in
       let valid_fanout_peers =
-        match C.Topic.Map.find topic fanout with
-        | None -> C.Peer.Set.empty
-        | Some fanout_peers -> C.Peer.Set.filter is_valid fanout_peers
+        match Topic.Map.find topic fanout with
+        | None -> Peer.Set.empty
+        | Some fanout_peers -> Peer.Set.filter is_valid fanout_peers
       in
       let* peers =
         (* We prioritize fanout peers to be in the mesh for this
            topic. If we need more peers, we look at all our peers
            subscribed to this topic. *)
-        if C.Peer.Set.cardinal valid_fanout_peers >= expected_peers_per_topic
-        then return valid_fanout_peers
+        if Peer.Set.cardinal valid_fanout_peers >= expected_peers_per_topic then
+          return valid_fanout_peers
         else
           let max =
             max
               0
-              (expected_peers_per_topic - C.Peer.Set.cardinal valid_fanout_peers)
+              (expected_peers_per_topic - Peer.Set.cardinal valid_fanout_peers)
           in
           let* more_peers = get_more_peers topic ~max in
-          return (C.Peer.Set.union more_peers valid_fanout_peers)
+          return (Peer.Set.union more_peers valid_fanout_peers)
       in
       let* () = set_mesh_topic topic peers in
       let* () = delete_fanout topic in
@@ -916,16 +918,16 @@ module Make (C : CONFIGURATION) :
       init_mesh topic
   end
 
-  let join : topic -> [`Join] output Monad.t = Join.handle
+  let join : Topic.t -> [`Join] output Monad.t = Join.handle
 
   module Leave = struct
-    type mesh = C.Peer.Set.t
+    type mesh = Peer.Set.t
 
     let check_already_subscribed topic :
         < fail : [`Leave] output ; pass : mesh > Monad.check =
       let open Monad.Syntax in
       let*! mesh in
-      match C.Topic.Map.find topic mesh with
+      match Topic.Map.find topic mesh with
       | None -> Not_subscribed |> fail
       | Some mesh -> pass mesh
 
@@ -934,7 +936,7 @@ module Make (C : CONFIGURATION) :
       let*! unsubscribe_backoff in
       let*! connections in
       let connections =
-        C.Peer.Set.fold
+        Peer.Set.fold
           (fun peer connections ->
             add_connections_backoff unsubscribe_backoff topic peer connections)
           mesh
@@ -950,7 +952,7 @@ module Make (C : CONFIGURATION) :
       handle_mesh topic mesh
   end
 
-  let leave : topic -> [`Leave] output Monad.t = Leave.handle
+  let leave : Topic.t -> [`Leave] output Monad.t = Leave.handle
 
   module Heartbeat = struct
     let handle _ =
@@ -966,45 +968,43 @@ module Make (C : CONFIGURATION) :
     let handle ~direct ~outbound peer : [`Add_peer] output Monad.t =
       let open Monad.Syntax in
       let*! connections in
-      match C.Peer.Map.find peer connections with
+      match Peer.Map.find peer connections with
       | None ->
           let connection =
             {
               direct;
               score = Score.zero;
-              backoff = C.Topic.Map.empty;
-              topics = C.Topic.Set.empty;
+              backoff = Topic.Map.empty;
+              topics = Topic.Set.empty;
               outbound;
               expire = None;
             }
           in
-          let connections = C.Peer.Map.add peer connection connections in
+          let connections = Peer.Map.add peer connection connections in
           let* () = set_connections connections in
           return Peer_added
       | Some _ -> return Peer_already_known
   end
 
   let add_peer :
-      direct:bool -> outbound:bool -> peer -> [`Add_peer] output Monad.t =
+      direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] output Monad.t =
     Add_peer.handle
 
   module Remove_peer = struct
     let handle peer : [`Remove_peer] output Monad.t =
       let open Monad.Syntax in
       let*! mesh in
-      let mesh =
-        C.Topic.Map.map (fun peers -> C.Peer.Set.remove peer peers) mesh
-      in
+      let mesh = Topic.Map.map (fun peers -> Peer.Set.remove peer peers) mesh in
       let* () = set_mesh mesh in
       let*! fanout in
       let fanout =
-        C.Topic.Map.map (fun peers -> C.Peer.Set.remove peer peers) fanout
+        Topic.Map.map (fun peers -> Peer.Set.remove peer peers) fanout
       in
       let* () = set_fanout fanout in
       let*! connections in
       let*! retain_duration in
       let connections =
-        C.Peer.Map.update
+        Peer.Map.update
           peer
           (function
             | None -> None
@@ -1018,5 +1018,5 @@ module Make (C : CONFIGURATION) :
       Removing_peer |> return
   end
 
-  let remove_peer : peer -> [`Remove_peer] output Monad.t = Remove_peer.handle
+  let remove_peer : Peer.t -> [`Remove_peer] output Monad.t = Remove_peer.handle
 end
