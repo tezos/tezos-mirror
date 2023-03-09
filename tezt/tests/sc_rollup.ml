@@ -2819,6 +2819,13 @@ let test_refutation protocols ~kind =
           ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], [], []));
           ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], [], []));
           ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35], []));
+          ( "reset_honest_during_game",
+            ( ["5 2 1"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [("sc_rollup_node_conflict_detected.v0", 2)] ) );
           ( "parallel_games_0",
             (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], []) );
           ( "parallel_games_1",
