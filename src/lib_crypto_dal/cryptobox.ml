@@ -477,18 +477,26 @@ module Inner = struct
             slot_size
             page_size)
     in
+    let max_two_adicity_log = 32 in
+    let two_adicity_log =
+      snd Z.(remove (of_int erasure_encoded_polynomial_length) (of_int 2))
+    in
     let* () =
       assert_result
-        (snd Z.(remove (of_int erasure_encoded_polynomial_length) (of_int 2))
-        <= 32)
-        (* The 2-adicity of n must be at most 2^32, the size of the biggest subgroup
-           of 2^i roots of unity in the multiplicative group of Fr, because the FFTs
-           operate on such groups. *)
-          (fun () ->
+        (two_adicity_log <= max_two_adicity_log)
+        (* The 2-adicity of [erasure_encoded_polynomial_length] must be at most 2^32,
+           the size of the biggest subgroup of 2^i roots of unity in the multiplicative group of Fr,
+           because the FFTs operate on such groups. *)
+        (fun () ->
           Format.asprintf
-            "Slot size is expected to be less than '%d'. Got: %d"
-            (1 lsl 36)
-            slot_size)
+            "Slot size (%d) and/or redundancy factor (%d) is/are too high: \
+             expected 2-adicity of erasure_encoded_polynomial_length (%d) to \
+             be at most 2^%d, got: 2^%d"
+            slot_size
+            redundancy_factor
+            erasure_encoded_polynomial_length
+            max_two_adicity_log
+            two_adicity_log)
     in
     let* () =
       assert_result
