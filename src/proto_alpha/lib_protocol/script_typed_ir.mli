@@ -445,7 +445,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ISwap :
       Script.location * ('b, 'a * ('c * 's), 'r, 'f) kinstr
       -> ('a, 'b * ('c * 's), 'r, 'f) kinstr
-  | IConst :
+  | IPush :
       Script.location * ('ty, _) ty * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   (*

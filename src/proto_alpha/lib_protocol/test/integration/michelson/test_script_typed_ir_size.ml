@@ -711,7 +711,7 @@ let check_kinstr_size () =
   let halt () = IHalt loc in
   let drop () = IDrop (loc, halt ()) in
   let cdr = ICdr (loc, halt ()) in
-  let const ty v = IConst (loc, ty, v, halt ()) in
+  let push ty v = IPush (loc, ty, v, halt ()) in
   let unit_option_t () =
     WithExceptions.Result.get_ok ~loc:__LOC__ @@ option_t loc Unit_t
   in
@@ -745,7 +745,7 @@ let check_kinstr_size () =
       Kinstr ("IDrop", drop ());
       Kinstr ("IDup", IDup (loc, halt ()));
       Kinstr ("ISwap", ISwap (loc, halt ()));
-      Kinstr ("IConst", const String_t @@ str "tezos");
+      Kinstr ("IPush", push String_t @@ str "tezos");
       Kinstr ("ICons_pair", ICons_pair (loc, halt ()));
       Kinstr ("ICar", ICar (loc, halt ()));
       Kinstr ("ICdr", cdr);
@@ -863,7 +863,7 @@ let check_kinstr_size () =
               branch_if_false = halt ();
               k = halt ();
             } );
-      Kinstr ("ILoop", ILoop (loc, const Bool_t true, halt ()));
+      Kinstr ("ILoop", ILoop (loc, push Bool_t true, halt ()));
       Kinstr ("ILoop_left", ILoop_left (loc, INever loc, halt ()));
       Kinstr ("IDip", IDip (loc, halt (), None, halt ()));
       Kinstr ("IExec", IExec (loc, None, halt ()));

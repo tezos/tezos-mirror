@@ -426,7 +426,7 @@ and kinstr_size :
     | IDrop (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IDup (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ISwap (loc, k) -> ret_succ_adding accu (base1 loc k)
-    | IConst (loc, ty, x, k) ->
+    | IPush (loc, ty, x, k) ->
         let accu = ret_succ_adding accu (base1 loc k +! (word_size *? 2)) in
         (value_size [@ocaml.tailcall])
           ~count_lambda_nodes

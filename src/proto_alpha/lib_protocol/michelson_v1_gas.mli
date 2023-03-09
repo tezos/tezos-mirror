@@ -300,7 +300,7 @@ module Cost_of : sig
 
     val halt : Gas.cost
 
-    val const : Gas.cost
+    val push : Gas.cost
 
     val empty_big_map : Gas.cost
 

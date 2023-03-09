@@ -130,8 +130,7 @@ let test_stack_overflow () =
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
-      else
-        aux (n - 1) (IConst (dummy_loc, Bool_t, true, IDrop (dummy_loc, acc)))
+      else aux (n - 1) (IPush (dummy_loc, Bool_t, true, IDrop (dummy_loc, acc)))
     in
     aux n (IHalt dummy_loc)
   in
@@ -166,7 +165,7 @@ let test_stack_overflow_in_lwt () =
           (n - 1)
           (IDup
              ( dummy_loc,
-               IConst
+               IPush
                  ( dummy_loc,
                    Unit_t,
                    (),

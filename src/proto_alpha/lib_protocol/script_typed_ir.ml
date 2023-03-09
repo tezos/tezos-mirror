@@ -468,7 +468,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ISwap :
       Script.location * ('b, 'a * ('c * 's), 'r, 'f) kinstr
       -> ('a, 'b * ('c * 's), 'r, 'f) kinstr
-  | IConst :
+  | IPush :
       Script.location * ('ty, _) ty * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   (*
@@ -1569,7 +1569,7 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | IDrop (loc, _) -> loc
   | IDup (loc, _) -> loc
   | ISwap (loc, _) -> loc
-  | IConst (loc, _, _, _) -> loc
+  | IPush (loc, _, _, _) -> loc
   | ICons_pair (loc, _) -> loc
   | ICar (loc, _) -> loc
   | ICdr (loc, _) -> loc
@@ -1972,7 +1972,7 @@ let kinstr_traverse i init f =
     | IDrop (_, k) -> (next [@ocaml.tailcall]) k
     | IDup (_, k) -> (next [@ocaml.tailcall]) k
     | ISwap (_, k) -> (next [@ocaml.tailcall]) k
-    | IConst (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IPush (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | ICons_pair (_, k) -> (next [@ocaml.tailcall]) k
     | ICar (_, k) -> (next [@ocaml.tailcall]) k
     | ICdr (_, k) -> (next [@ocaml.tailcall]) k
