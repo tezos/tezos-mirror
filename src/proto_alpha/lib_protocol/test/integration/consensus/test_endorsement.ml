@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (endorsement)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^endorsement$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe -- --test "alpha: endorsement"
     Subject:    Endorsing a block adds an extra layer of confidence
                 to the Tezos' PoS algorithm. The block endorsing
                 operation must be included in the following block.
@@ -98,6 +96,55 @@ let test_fitness_gap () =
   in
   Assert.equal_int32 ~loc:__LOC__ level_diff 1l
 
+(** Return a delegate and its second smallest slot for the level of [block]. *)
+let delegate_and_second_slot block =
+  let open Lwt_result_syntax in
+  let* endorsers = Context.get_endorsers (B block) in
+  let delegate, slots =
+    (* Find an endorser with more than 1 slot. *)
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (List.find_map
+         (fun {RPC.Validators.delegate; slots; _} ->
+           if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
+           else None)
+         endorsers)
+  in
+  (* Check that the slots are sorted and have no duplicates. *)
+  let rec check_sorted = function
+    | [] | [_] -> true
+    | x :: (y :: _ as t) -> Slot.compare x y < 0 && check_sorted t
+  in
+  assert (check_sorted slots) ;
+  let slot =
+    match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
+  in
+  return (delegate, slot)
+
+(** Test that the mempool accepts endorsements with a non-normalized
+    slot (that is, a slot that belongs to the delegate but is not the
+    delegate's smallest slot) at all three allowed levels for
+    endorsements (and various rounds). *)
+let test_mempool_second_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis () in
+  let* predecessor = Block.bake grandparent ~policy:(By_round 3) in
+  let* future_block = Block.bake predecessor ~policy:(By_round 5) in
+  let check_non_smallest_slot_ok loc endorsed_block =
+    let* delegate, slot = delegate_and_second_slot endorsed_block in
+    Consensus_helpers.test_consensus_operation
+      ~loc
+      ~endorsed_block
+      ~predecessor
+      ~delegate
+      ~slot
+      Endorsement
+      Mempool
+  in
+  let* () = check_non_smallest_slot_ok __LOC__ grandparent in
+  let* () = check_non_smallest_slot_ok __LOC__ predecessor in
+  check_non_smallest_slot_ok __LOC__ future_block
+
 (** {1 Negative tests}
 
     The following test scenarios are supposed to raise errors. *)
@@ -127,26 +174,7 @@ let test_negative_slot () =
 let test_not_smallest_slot () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
-  let* endorsers = Context.get_endorsers (B b) in
-  let delegate, slots =
-    (* Find an endorser with more than 1 slot. *)
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (List.find_map
-         (fun {RPC.Validators.delegate; slots; _} ->
-           if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
-           else None)
-         endorsers)
-  in
-  (* Check that the slots are sorted and have no duplicates. *)
-  let rec check_sorted = function
-    | [] | [_] -> true
-    | x :: (y :: _ as t) -> Slot.compare x y < 0 && check_sorted t
-  in
-  assert (check_sorted slots) ;
-  let slot =
-    match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
-  in
+  let* delegate, slot = delegate_and_second_slot b in
   let error_wrong_slot = function
     | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
         {kind; _}
@@ -164,17 +192,22 @@ let test_not_smallest_slot () =
     ?mempool_error:None
     Endorsement
 
-(** Endorsement with a slot that does not belong to the delegate. *)
-let test_other_delegate_slot () =
+let delegate_and_someone_elses_slot block =
   let open Lwt_result_syntax in
-  let* _genesis, b = init_genesis () in
-  let* endorsers = Context.get_endorsers (B b) in
+  let* endorsers = Context.get_endorsers (B block) in
   let delegate, other_delegate_slot =
     match endorsers with
     | [] | [_] -> assert false (* at least two delegates with rights *)
     | {delegate; _} :: {slots; _} :: _ ->
         (delegate, WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
   in
+  return (delegate, other_delegate_slot)
+
+(** Endorsement with a slot that does not belong to the delegate. *)
+let test_not_own_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* delegate, other_delegate_slot = delegate_and_someone_elses_slot b in
   Consensus_helpers.test_consensus_operation_all_modes
     ~loc:__LOC__
     ~endorsed_block:b
@@ -183,6 +216,29 @@ let test_other_delegate_slot () =
     ~error:(function
       | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
     Endorsement
+
+(** In mempool mode, also test endorsements with a slot that does not
+    belong to the delegate for various allowed levels and rounds. *)
+let test_mempool_not_own_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis ~policy:(By_round 2) () in
+  let* predecessor = Block.bake grandparent ~policy:(By_round 1) in
+  let* future_block = Block.bake predecessor in
+  let check_not_own_slot_fails loc b =
+    let* delegate, other_delegate_slot = delegate_and_someone_elses_slot b in
+    Consensus_helpers.test_consensus_operation
+      ~loc
+      ~endorsed_block:b
+      ~delegate
+      ~slot:other_delegate_slot
+      ~error:(function
+        | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
+      Endorsement
+      Mempool
+  in
+  let* () = check_not_own_slot_fails __LOC__ grandparent in
+  let* () = check_not_own_slot_fails __LOC__ predecessor in
+  check_not_own_slot_fails __LOC__ future_block
 
 (** {2 Wrong level} *)
 
@@ -583,11 +639,13 @@ let tests =
     Tztest.tztest "Arbitrary branch" `Quick test_arbitrary_branch;
     Tztest.tztest "Non-zero round" `Quick test_non_zero_round;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
+    Tztest.tztest "Mempool: non-smallest slot" `Quick test_mempool_second_slot;
     (* Negative tests *)
     (* Wrong slot *)
     Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
     Tztest.tztest "Non-normalized slot" `Quick test_not_smallest_slot;
-    Tztest.tztest "Slot of another delegate" `Quick test_other_delegate_slot;
+    Tztest.tztest "Not own slot" `Quick test_not_own_slot;
+    Tztest.tztest "Mempool: not own slot" `Quick test_mempool_not_own_slot;
     (* Wrong level *)
     Tztest.tztest "One level too old" `Quick test_one_level_too_old;
     Tztest.tztest "Two levels too old" `Quick test_two_levels_too_old;
