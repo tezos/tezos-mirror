@@ -3409,7 +3409,7 @@ let octez_dal_node_lib =
       ]
 
 let _octez_dal_node_lib_tests =
-  tests
+  tezt
     ["test_lib_dal_node"]
     ~path:"src/lib_dal_node/test"
     ~opam:"tezos-dal-node-lib"
@@ -3423,7 +3423,7 @@ let _octez_dal_node_lib_tests =
         octez_base_test_helpers |> open_;
         octez_crypto_dal |> open_;
         octez_dal_node_lib |> open_;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_dac_node_lib =
