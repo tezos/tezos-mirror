@@ -65,20 +65,21 @@ let received_operation_encoding =
        operation_encoding
        (obj2
           (req "reception_time" Time.System.encoding)
-          (dft "errors" RPC_error.opt_encoding None)))
+          (dft "errors" Tezos_rpc.Error.opt_encoding None)))
 
-type delegate_ops = (Signature.public_key_hash * received_operation list) list
+type delegate_ops =
+  (Tezos_crypto.Signature.public_key_hash * received_operation list) list
 
 let delegate_ops_encoding =
   Data_encoding.(
     list
       (tup2
-         Signature.Public_key_hash.encoding
+         Tezos_crypto.Signature.Public_key_hash.encoding
          (list received_operation_encoding)))
 
 type block_op = {
   op : operation;
-  delegate : Signature.public_key_hash;
+  delegate : Tezos_crypto.Signature.public_key_hash;
   power : int;
 }
 
@@ -89,11 +90,11 @@ let block_op_encoding =
     (fun (op, delegate, power) -> {op; delegate; power})
     (obj3
        (req "operation" operation_encoding)
-       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
        (req "endorsing_power" int16))
 
 type right = {
-  address : Signature.Public_key_hash.t;
+  address : Tezos_crypto.Signature.Public_key_hash.t;
   first_slot : int;
   power : int;
 }
@@ -104,7 +105,7 @@ let right_encoding =
     (fun {address; first_slot; power} -> (address, first_slot, power))
     (fun (address, first_slot, power) -> {address; first_slot; power})
     (obj3
-       (req "address" Signature.Public_key_hash.encoding)
+       (req "address" Tezos_crypto.Signature.Public_key_hash.encoding)
        (req "first_slot" int31)
        (req "power" int16))
 

@@ -29,6 +29,13 @@ module Block_services =
 open Lwt_result_syntax
 open Tezos_protocol_008_PtEdo2Zk
 
+let public_key_hash_of_v0 :
+    Environment.Signature.public_key_hash ->
+    Tezos_crypto.Signature.public_key_hash = function
+  | Environment.Signature.Ed25519 x -> Tezos_crypto.Signature.Ed25519 x
+  | Environment.Signature.Secp256k1 x -> Tezos_crypto.Signature.Secp256k1 x
+  | Environment.Signature.P256 x -> Tezos_crypto.Signature.P256 x
+
 module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let hash = Protocol.hash
 
@@ -52,7 +59,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
          (fun Protocol.Delegate_services.Endorsing_rights.{delegate; slots; _} ->
            Consensus_ops.
              {
-               address = delegate;
+               address = public_key_hash_of_v0 delegate;
                first_slot = Stdlib.List.hd (List.sort compare slots);
                power = List.length slots;
              })
@@ -127,7 +134,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         cctxt
         ()
     in
-    return metadata.protocol_data.baker
+    return (public_key_hash_of_v0 metadata.protocol_data.baker)
 
   let block_round header =
     match
@@ -162,7 +169,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 Consensus_ops.
                   {
                     op = {hash; round = None; kind = Consensus_ops.Endorsement};
-                    delegate;
+                    delegate = public_key_hash_of_v0 delegate;
                     power = List.length slots;
                   }
           | _ -> None)
@@ -178,7 +185,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Block_services.metadata ~chain:cctxt#chain ~block:(`Level level) cctxt ()
     in
     return
-      ( metadata.protocol_data.baker,
+      ( public_key_hash_of_v0 metadata.protocol_data.baker,
         header.shell.timestamp,
         header.protocol_data.contents.priority,
         header.hash )

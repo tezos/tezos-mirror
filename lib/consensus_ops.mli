@@ -43,20 +43,21 @@ type received_operation = {
   errors : error list option;
 }
 
-type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
+type delegate_ops =
+  (Tezos_crypto.Signature.Public_key_hash.t * received_operation list) list
 
 val delegate_ops_encoding : delegate_ops Data_encoding.t
 
 type block_op = {
   op : operation;
-  delegate : Signature.public_key_hash;
+  delegate : Tezos_crypto.Signature.public_key_hash;
   power : int;
 }
 
 val block_op_encoding : block_op Data_encoding.encoding
 
 type right = {
-  address : Signature.Public_key_hash.t;
+  address : Tezos_crypto.Signature.Public_key_hash.t;
   first_slot : int;
   power : int;
 }

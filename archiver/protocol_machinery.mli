@@ -46,7 +46,8 @@ module type PROTOCOL_SERVICES = sig
   val couple_ops_to_rights :
     (int * 'a) list ->
     Consensus_ops.rights ->
-    (Signature.public_key_hash * 'a) list * Signature.public_key_hash list
+    (Tezos_crypto.Signature.public_key_hash * 'a) list
+    * Tezos_crypto.Signature.public_key_hash list
 
   type block_id
 
@@ -59,12 +60,14 @@ module type PROTOCOL_SERVICES = sig
         * int))
      * error trace option)
      Lwt_stream.t
-    * RPC_context.stopper)
+    * Tezos_rpc.Context.stopper)
     tzresult
     Lwt.t
 
   val baker :
-    wrap_full -> Block_hash.t -> Signature.public_key_hash tzresult Lwt.t
+    wrap_full ->
+    Block_hash.t ->
+    Tezos_crypto.Signature.public_key_hash tzresult Lwt.t
 
   val block_round : Block_header.t -> int tzresult
 
@@ -74,6 +77,10 @@ module type PROTOCOL_SERVICES = sig
   val get_block_info :
     wrap_full ->
     Int32.t ->
-    (Signature.public_key_hash * Time.Protocol.t * int * Block_hash.t) tzresult
+    (Tezos_crypto.Signature.public_key_hash
+    * Time.Protocol.t
+    * int
+    * Block_hash.t)
+    tzresult
     Lwt.t
 end

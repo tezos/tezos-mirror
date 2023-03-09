@@ -6,7 +6,7 @@ fmt:
   stage: build
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   script:
-    - opam-2.1 install ocamlformat.0.21.0
+    - opam-2.1 install ocamlformat.0.24.1
     - dune build @fmt
 
 build:

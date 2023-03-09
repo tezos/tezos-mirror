@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Lwt_result_syntax
-module Map = Signature.Public_key_hash.Map
+module Map = Tezos_crypto.Signature.Public_key_hash.Map
 
 type t = string Map.t
 

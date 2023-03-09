@@ -39,7 +39,7 @@ module Anomaly = struct
         if Compare.Int32.(head.Data.Anomaly.level < level) then anomaly :: l
         else if
           Int32.equal head.level level
-          && Signature.Public_key_hash.equal head.delegate delegate
+          && Tezos_crypto.Signature.Public_key_hash.equal head.delegate delegate
         then if head.problem = Missed then anomaly :: tail else l
         else head :: insert_in_ordered_list anomaly tail
 end
@@ -233,7 +233,9 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
         match
           List.partition
             (fun op ->
-              Signature.Public_key_hash.equal op.Consensus_ops.delegate delegate)
+              Tezos_crypto.Signature.Public_key_hash.equal
+                op.Consensus_ops.delegate
+                delegate)
             missing
         with
         | op :: other_ops_by_same_delegate, missing' ->
@@ -417,7 +419,8 @@ let dump_received cctxt path ?unaccurate level received_ops =
                    delegate_ops) ->
               match
                 List.partition
-                  (fun (pkh, _) -> Signature.Public_key_hash.equal pkh delegate)
+                  (fun (pkh, _) ->
+                    Tezos_crypto.Signature.Public_key_hash.equal pkh delegate)
                   missing
               with
               | (_, new_operations) :: other_ops_by_same_delegate, missing' ->
@@ -495,7 +498,7 @@ type chunk =
       * Int32.t
       * Time.Protocol.t
       * Time.System.t
-      * Signature.Public_key_hash.t
+      * Tezos_crypto.Signature.Public_key_hash.t
       * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 

@@ -30,6 +30,13 @@ open Lwt_result_syntax
 open Tezos_protocol_012_Psithaca
 open Tezos_protocol_plugin_012_Psithaca
 
+let public_key_hash_of_v0 :
+    Environment.Signature.public_key_hash ->
+    Tezos_crypto.Signature.public_key_hash = function
+  | Environment.Signature.Ed25519 x -> Tezos_crypto.Signature.Ed25519 x
+  | Environment.Signature.Secp256k1 x -> Tezos_crypto.Signature.Secp256k1 x
+  | Environment.Signature.P256 x -> Tezos_crypto.Signature.P256 x
+
 module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let hash = Protocol.hash
 
@@ -63,7 +70,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     {delegate; first_slot; endorsing_power} ->
                Consensus_ops.
                  {
-                   address = delegate;
+                   address = public_key_hash_of_v0 delegate;
                    first_slot = slot_to_int first_slot;
                    power = endorsing_power;
                  })
@@ -158,7 +165,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         cctxt
         ()
     in
-    return metadata.protocol_data.baker
+    return (public_key_hash_of_v0 metadata.protocol_data.baker)
 
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
@@ -216,7 +223,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     round = Some (get_preendorsement_round protocol_data);
                     kind = Consensus_ops.Preendorsement;
                   };
-                delegate;
+                delegate = public_key_hash_of_v0 delegate;
                 power = preendorsement_power;
               }
             :: acc
@@ -236,7 +243,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     round = Some (get_endorsement_round protocol_data);
                     kind = Consensus_ops.Endorsement;
                   };
-                delegate;
+                delegate = public_key_hash_of_v0 delegate;
                 power = endorsement_power;
               }
             :: acc
@@ -254,7 +261,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     let*? round = raw_block_round header.shell in
     return
-      (metadata.protocol_data.baker, header.shell.timestamp, round, header.hash)
+      ( public_key_hash_of_v0 metadata.protocol_data.baker,
+        header.shell.timestamp,
+        round,
+        header.hash )
 end
 
 module M = General_archiver.Define (Services)

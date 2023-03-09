@@ -81,7 +81,7 @@ type received = {
 }
 
 type op_info = {
-  included : Tezos_crypto.Block_hash.t list;
+  included : Tezos_crypto.Hashed.Block_hash.t list;
   received : received list;
 }
 

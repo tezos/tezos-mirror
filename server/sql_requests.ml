@@ -148,14 +148,17 @@ module Type = struct
 
   let block_hash =
     Caqti_type.custom
-      ~encode:(fun t -> Result.Ok (Tezos_crypto.Block_hash.to_string t))
-      ~decode:(fun s -> decode_error (Tezos_crypto.Block_hash.of_string s))
+      ~encode:(fun t -> Result.Ok (Tezos_crypto.Hashed.Block_hash.to_string t))
+      ~decode:(fun s ->
+        decode_error (Tezos_crypto.Hashed.Block_hash.of_string s))
       Caqti_type.octets
 
   let operation_hash =
     Caqti_type.custom
-      ~encode:(fun t -> Result.Ok (Tezos_crypto.Operation_hash.to_string t))
-      ~decode:(fun s -> decode_error (Tezos_crypto.Operation_hash.of_string s))
+      ~encode:(fun t ->
+        Result.Ok (Tezos_crypto.Hashed.Operation_hash.to_string t))
+      ~decode:(fun s ->
+        decode_error (Tezos_crypto.Hashed.Operation_hash.of_string s))
       Caqti_type.octets
 
   let public_key_hash =

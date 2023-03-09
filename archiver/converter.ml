@@ -29,7 +29,7 @@ let fake_hash level round delegate kind =
     [
       level;
       Int32.to_string (Option.value round ~default:0l);
-      Signature.Public_key_hash.to_string delegate;
+      Tezos_crypto.Signature.Public_key_hash.to_string delegate;
       (if kind = Consensus_ops.Endorsement then "" else "P");
     ]
 

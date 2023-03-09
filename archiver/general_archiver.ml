@@ -51,10 +51,7 @@ let wallet cctx =
       Lwt.return Wallet.empty
 
 module Ring =
-  (val Ringo.set_maker
-         ~replacement:Ringo.LRU
-         ~overflow:Ringo.Strong
-         ~accounting:Ringo.Precise)
+  Aches.Vache.Set (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
     (struct
       type t = Int32.t
 
@@ -301,7 +298,7 @@ module Loops (Archiver : Archiver.S) = struct
 
   let blocks_loop cctx =
     let*! block_stream =
-      Shell_services.Monitor.valid_blocks cctx ~chains:[cctx#chain] ()
+      Shell_services.Monitor.applied_blocks cctx ~chains:[cctx#chain] ()
     in
     match block_stream with
     | Error e ->
@@ -311,7 +308,7 @@ module Loops (Archiver : Archiver.S) = struct
         let*! wallet = wallet cctx in
         let*! _ =
           Lwt_stream.fold_s
-            (fun ((_chain_id, hash), header) acc ->
+            (fun (_chain_id, hash, header, _operations) acc ->
               let*! block_recorder, acc' =
                 match acc with
                 | Some (f, proto_level)

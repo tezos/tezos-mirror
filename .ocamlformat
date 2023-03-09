@@ -1,5 +1,5 @@
-version=0.21.0
-ocaml-version=4.14.1
+version=0.24.1
+ocaml-version=4.14
 wrap-fun-args=false
 let-binding-spacing=compact
 field-space=loose

@@ -23,45 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Lwt_result_syntax
-open Tezos_clic
 
-let group = {Clic.name = "teztale"; Clic.title = "A delegate operation monitor"}
+let group =
+  {
+    Tezos_clic.name = "teztale";
+    Tezos_clic.title = "A delegate operation monitor";
+  }
 
 let user_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~doc:"Name of the feeder"
     ~short:'u'
     ~long:"user"
     ~placeholder:"name"
     ~default:"archiver"
-    (Clic.parameter (fun _ p -> return p))
+    (Tezos_clic.parameter (fun _ p -> return p))
 
 let password_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~doc:"Authentification to the endpoint"
     ~short:'p'
     ~long:"password"
     ~placeholder:"secret"
     ~default:""
-    (Clic.parameter (fun _ p -> return p))
+    (Tezos_clic.parameter (fun _ p -> return p))
 
 let starting_block_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~doc:"Starting block"
     ~short:'b'
     ~long:"block"
     ~placeholder:"int"
     ~default:"1"
-    (Clic.parameter (fun _ p -> return (Int32.of_string p)))
+    (Tezos_clic.parameter (fun _ p -> return (Int32.of_string p)))
 
 let endpoint_param =
-  Clic.param
+  Tezos_clic.param
     ~name:"server_endpoint"
     ~desc:"Teztale server to feed"
-    (Clic.parameter (fun _ p -> return (Uri.of_string p)))
+    (Tezos_clic.parameter (fun _ p -> return (Uri.of_string p)))
 
 let directory_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       if not (Sys.file_exists p && Sys.is_directory p) then
         failwith "Directory doesn't exist: '%s'" p
       else return p)
@@ -101,50 +104,51 @@ let main_server state cctxt =
 let select_commands _ctxt Client_config.{chain; _} =
   return
     [
-      Clic.command
+      Tezos_clic.command
         ~group
         ~desc:"run the json archiver"
-        Clic.no_options
-        (Clic.prefixes ["run"; "json-archiver"; "in"]
-        @@ Clic.param
+        Tezos_clic.no_options
+        (Tezos_clic.prefixes ["run"; "json-archiver"; "in"]
+        @@ Tezos_clic.param
              ~name:"archive_path"
              ~desc:"folder in which to dump files"
              directory_parameter
-        @@ Clic.stop)
+        @@ Tezos_clic.stop)
         (fun () prefix cctxt -> main_json cctxt prefix);
-      Clic.command
+      Tezos_clic.command
         ~group
         ~desc:"upload a file hierarchy to a teztale_server"
-        (Clic.args2
-           (Clic.default_arg
+        (Tezos_clic.args2
+           (Tezos_clic.default_arg
               ~doc:"Name of the feeder"
               ~short:'u'
               ~long:"user"
               ~placeholder:"name"
               ~default:"archiver"
-              (Clic.parameter (fun _ p -> return p)))
-           (Clic.default_arg
+              (Tezos_clic.parameter (fun _ p -> return p)))
+           (Tezos_clic.default_arg
               ~doc:"Name of the feeder"
               ~short:'p'
               ~long:"password"
               ~placeholder:"secret"
               ~default:""
-              (Clic.parameter (fun _ p -> return p))))
-        (Clic.prefixes ["convert"; "from"]
-        @@ Clic.string ~name:"archive_path" ~desc:"folder where files are"
-        @@ Clic.prefix "to"
-        @@ Clic.param
+              (Tezos_clic.parameter (fun _ p -> return p))))
+        (Tezos_clic.prefixes ["convert"; "from"]
+        @@ Tezos_clic.string ~name:"archive_path" ~desc:"folder where files are"
+        @@ Tezos_clic.prefix "to"
+        @@ Tezos_clic.param
              ~name:"server_endpoint"
              ~desc:"Teztale server to feed"
-             (Clic.parameter (fun _ p -> return (Uri.of_string p)))
-        @@ Clic.stop)
+             (Tezos_clic.parameter (fun _ p -> return (Uri.of_string p)))
+        @@ Tezos_clic.stop)
         (fun (source, pass) prefix endpoint _cctxt ->
           Converter.main source pass endpoint prefix);
-      Clic.command
+      Tezos_clic.command
         ~group
         ~desc:"inject endorsing rights in a teztale_server"
-        (Clic.args3 user_arg password_arg starting_block_arg)
-        (Clic.prefixes ["insert"; "rights"; "in"] @@ endpoint_param @@ Clic.stop)
+        (Tezos_clic.args3 user_arg password_arg starting_block_arg)
+        (Tezos_clic.prefixes ["insert"; "rights"; "in"]
+        @@ endpoint_param @@ Tezos_clic.stop)
         (fun (source, pass, starting) endpoint cctxt ->
           let*! ctx =
             match X509.Authenticator.of_string "none" with
@@ -166,11 +170,12 @@ let select_commands _ctxt Client_config.{chain; _} =
           in
           let*! out = Lwt.join [dumper; main] in
           return out);
-      Clic.command
+      Tezos_clic.command
         ~group
         ~desc:"inject past blocks in a teztale_server"
-        (Clic.args3 user_arg password_arg starting_block_arg)
-        (Clic.prefixes ["insert"; "blocks"; "in"] @@ endpoint_param @@ Clic.stop)
+        (Tezos_clic.args3 user_arg password_arg starting_block_arg)
+        (Tezos_clic.prefixes ["insert"; "blocks"; "in"]
+        @@ endpoint_param @@ Tezos_clic.stop)
         (fun (source, pass, starting) endpoint cctxt ->
           let*! ctx =
             match X509.Authenticator.of_string "none" with
@@ -192,11 +197,11 @@ let select_commands _ctxt Client_config.{chain; _} =
           in
           let*! out = Lwt.join [dumper; main] in
           return out);
-      Clic.command
+      Tezos_clic.command
         ~group
         ~desc:"run the archiver to a teztale_server"
-        (Clic.args2 user_arg password_arg)
-        (Clic.prefixes ["feed"] @@ endpoint_param @@ Clic.stop)
+        (Tezos_clic.args2 user_arg password_arg)
+        (Tezos_clic.prefixes ["feed"] @@ endpoint_param @@ Tezos_clic.stop)
         (fun auth endpoint cctxt ->
           let*! ctx =
             match X509.Authenticator.of_string "none" with

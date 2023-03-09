@@ -32,4 +32,4 @@ val empty : t
 val of_context : #Tezos_client_base.Client_context.wallet -> t tzresult Lwt.t
 
 (** give the alias of a public key hash  *)
-val alias_of_pkh : t -> Signature.public_key_hash -> string option
+val alias_of_pkh : t -> Tezos_crypto.Signature.public_key_hash -> string option
