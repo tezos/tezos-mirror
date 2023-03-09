@@ -107,7 +107,7 @@ let () =
   Alcotest_lwt.run
     "stdlib"
     [
-      ( "hash_queue",
+      ( "hash_queue_lwt",
         [
           ("fold_s", `Quick, test_fold_s);
           ("fold_es", `Quick, test_fold_es);
