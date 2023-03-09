@@ -957,8 +957,12 @@ module Fold_constants (X : S) = struct
 
   let app f arg = Not_const (X.app (prj f) (prj arg))
 
-  let let_ ~name (m : 'a repr) (f : 'a repr -> 'b repr) : 'b repr =
-    Not_const (X.let_ ~name (prj m) (fun x -> prj (f (inj x))))
+  let let_ ~name (type a) (m : a repr) (f : a repr -> 'b repr) : 'b repr =
+    match m with
+    | Int _ | Float _ | Bool _ ->
+        (* let x = const in e => e[const/x] *)
+        f m
+    | Not_const _ -> Not_const (X.let_ ~name (prj m) (fun x -> prj (f (inj x))))
 
   let if_ cond ift iff =
     match cond with
