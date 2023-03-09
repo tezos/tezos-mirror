@@ -63,7 +63,6 @@ depends: [
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
   "ometrics" { >= "0.2.1" }
-  "polynomial" { >= "0.4.0" & < "0.5.0" }
   "ppx_deriving"
   "ppx_expect"
   "ppx_import"

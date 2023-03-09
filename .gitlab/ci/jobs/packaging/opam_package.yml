@@ -300,6 +300,13 @@ opam:octez-node-config:
   variables:
     package: octez-node-config
 
+opam:octez-polynomial:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: octez-polynomial
+
 opam:octez-protocol-compiler:
   extends:
     - .opam_template

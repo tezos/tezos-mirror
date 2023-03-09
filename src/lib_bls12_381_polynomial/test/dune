@@ -8,7 +8,7 @@
   tezt.core
   octez-alcotezt
   qcheck-alcotest
-  polynomial
+  octez-polynomial
   bls12-381
   tezos-bls12-381-polynomial-internal)
  (library_flags (:standard -linkall))

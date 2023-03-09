@@ -1,0 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_with_finite_field test_utils)
+ (libraries
+  bls12-381
+  octez-mec
+  alcotest
+  octez-polynomial))
+
+(rule
+ (alias runtest)
+ (package octez-polynomial)
+ (action (run %{dep:./test_with_finite_field.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-polynomial)
+ (action (run %{dep:./test_utils.exe})))

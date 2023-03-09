@@ -252,9 +252,6 @@ let plompiler =
 
 let plonk = external_lib "tezos-plonk" V.(at_least "1.0.1" && less_than "2.0.0")
 
-let polynomial =
-  external_lib "polynomial" V.(at_least "0.4.0" && less_than "0.5.0")
-
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
 let ppx_import = external_lib "ppx_import" V.True
@@ -1022,6 +1019,21 @@ let _octez_mec_tests =
     ~opam:"octez-mec"
     ~deps:[alcotest; octez_mec |> open_]
 
+let octez_polynomial =
+  public_lib
+    "octez-polynomial"
+    ~path:"src/lib_polynomial"
+    ~internal_name:"polynomial"
+    ~synopsis:"Polynomials over finite fields"
+    ~deps:[bls12_381; bisect_ppx; zarith]
+
+let _octez_polynomial_tests =
+  tests
+    ["test_with_finite_field"; "test_utils"]
+    ~path:"src/lib_polynomial/test"
+    ~opam:"octez-polynomial"
+    ~deps:[bls12_381; octez_mec; alcotest; octez_polynomial]
+
 let octez_bls12_381_polynomial_internal =
   public_lib
     "tezos-bls12-381-polynomial-internal"
@@ -1066,7 +1078,7 @@ let _octez_bls12_381_polynomial_tests =
       [
         alcotezt;
         qcheck_alcotest;
-        polynomial;
+        octez_polynomial;
         bisect_ppx;
         bls12_381;
         octez_bls12_381_polynomial_internal;

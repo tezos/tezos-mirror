@@ -10,19 +10,15 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "ppx_repr" { >= "0.6.0" }
   "bls12-381" { >= "6.0.1" & < "6.1.0" }
-  "bigstringaf" { >= "0.5.0" }
-  "tezt" { with-test & >= "3.0.0" }
-  "octez-alcotezt" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.20" }
-  "octez-polynomial" {with-test}
-  "bisect_ppx" { with-test & >= "2.7.0" }
+  "bisect_ppx" { >= "2.7.0" }
+  "zarith" { >= "1.12" & < "1.13" }
+  "octez-mec" {with-test}
+  "alcotest" { with-test & >= "1.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Polynomials over BLS12-381 finite field - Temporary vendored version of Octez"
+synopsis: "Polynomials over finite fields"
