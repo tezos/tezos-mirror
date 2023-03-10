@@ -364,7 +364,6 @@ module Inner = struct
     remaining_bytes : int;
     (* Log of the number of evaluations that constitute an erasure encoded
        polynomial. *)
-    shard_proofs_log : int; (* Log of the number of shards proofs. *)
     srs : srs;
   }
 
@@ -690,7 +689,6 @@ module Inner = struct
         page_length;
         page_length_domain;
         remaining_bytes = page_size mod scalar_bytes_amount;
-        shard_proofs_log = Z.(log2 (of_int number_of_shards));
         srs;
       }
 
@@ -1415,10 +1413,6 @@ module Inner = struct
      Implements the "Multiple multi-reveals" section above. *)
   let multiple_multi_reveals t ~preprocess:(domain, sj) ~coefficients :
       shard_proof array =
-    (* The log2 of the number of proofs [t.shard_proofs_log] is > 0
-       because [2^t.shard_proofs_log = t.number_of_shards > 0]. *)
-    assert (
-      t.shard_proofs_log > 0 && t.number_of_shards = 1 lsl t.shard_proofs_log) ;
     (* [t.max_polynomial_length > l] where [l = t.shard_length]. *)
     assert (t.shard_length < t.max_polynomial_length) ;
     (* Step 2. *)
@@ -1469,7 +1463,7 @@ module Inner = struct
     let len = Domains.length domain / 2 in
     let points = G1_array.sub sum ~off:0 ~len in
     (* Step 4. *)
-    let domain = Domains.build_power_of_two t.shard_proofs_log in
+    let domain = Domains.build t.number_of_shards in
     G1_array.(to_array (evaluation_ecfft ~domain ~points))
 
   (* [interpolation_poly root domain evaluations] returns the unique
