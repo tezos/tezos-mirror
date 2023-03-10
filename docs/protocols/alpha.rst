@@ -85,6 +85,14 @@ Minor Changes
   now be immediately propagated by the mempool, allowing for a much
   faster PQC. (MR :gl:`!7815`)
 
+- The mempool now accepts and propagates consensus operations with a
+  non-minimal slot (for performance reasons: testing the minimality of
+  the slot there is too costly). Such operations are still invalid in
+  blocks. To avoid mempools getting spammed with operations with
+  various slots, double (pre)endorsement denunciations can now punish
+  multiple operations from the same delegate with distinct slots.
+  (MR :gl:`!7927`)
+
 Internal
 --------
 
