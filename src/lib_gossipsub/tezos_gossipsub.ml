@@ -95,7 +95,7 @@ module Score : sig
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
 
      This is incomplete *)
-  type t
+  include Compare.S
 
   val float : t -> float
 
@@ -111,6 +111,17 @@ end = struct
 
   let penalty {behaviour_penalty} penalty =
     {behaviour_penalty = behaviour_penalty + penalty}
+
+  let compare s1 s2 =
+    let f1 = float s1 in
+    let f2 = float s2 in
+    Float.compare f1 f2
+
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
 end
 
 module type S = sig
@@ -570,8 +581,7 @@ module Make (C : CONFIGURATION) :
     let _check_peer_score peer =
       let open Monad.Syntax in
       let*! peer_score = get_score ~default:Score.zero peer in
-      if Compare.Float.(peer_score |> Score.float < 0.) then
-        Negative_peer_score peer_score |> fail
+      if Score.(peer_score < zero) then Negative_peer_score peer_score |> fail
       else unit
   end
 
