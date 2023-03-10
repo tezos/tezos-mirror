@@ -145,6 +145,7 @@ fi
 DIRS=""
 for d in "$INPUT_CSV_DIR"/*
 do
+    d=$(basename "$d")
     if [[ "$d" > "$FIRST_DIR" || "$d" == "$FIRST_DIR" ]]
     then
         if [ -z "$DIRS" ]
@@ -182,10 +183,14 @@ for f in "$INPUT_CSV_DIR/$LAST_DIR"/*
 do
     b="$(basename "$f")"
 
-    files=$(for d in $DIRS; do echo "$INPUT_CSV_DIR/$d/$b"; done)
+    files=$(for d in $DIRS; do local="$INPUT_CSV_DIR/$d/$b"; if [ -f "$local" ]; then echo "$local"; fi; done)
 
     # Comparing all runs from FIRST_DIR.
-    $DUNE exec --no-build gas_parameter_diff -- "$files" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+    # The parameter expansion syntax ${files:+$files} is used as a trick to
+    # output $files without quoting it (because gas_parameter_diff needs a list
+    # of files, not one parameter containing all file names), and without making
+    # `shellcheck` complain.
+    $DUNE exec --no-build gas_parameter_diff -- ${files:+$files} > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
 
     # Comparing with the reference and previous runs.
     for current in reference previous
