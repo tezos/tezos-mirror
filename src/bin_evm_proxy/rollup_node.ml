@@ -25,6 +25,20 @@
 
 open Ethereum_types
 
+(** [chunks bytes size] returns [Bytes.length bytes / size] chunks of size
+    [size]. *)
+let chunks bytes size =
+  let n = Bytes.length bytes in
+  assert (n mod size = 0) ;
+  let nb = n / size in
+  let rec collect i acc =
+    if i = nb then acc
+    else
+      let chunk = Bytes.sub_string bytes (i * size) size in
+      collect (i + 1) (chunk :: acc)
+  in
+  collect 0 [] |> List.rev
+
 module Durable_storage_path = struct
   let accounts = "/eth_accounts"
 
@@ -173,10 +187,8 @@ module RPC = struct
       in
       match transactions_answer with
       | Some bytes ->
-          [
-            Ethereum_types.Hash
-              (Bytes.to_string bytes |> Z.of_bits |> z_to_hexa |> strip_0x);
-          ]
+          let chunks = chunks bytes Ethereum_types.transaction_hash_size in
+          List.map (fun bytes -> Hash Hex.(of_string bytes |> show)) chunks
       | None ->
           raise
           @@ Invalid_block_structure

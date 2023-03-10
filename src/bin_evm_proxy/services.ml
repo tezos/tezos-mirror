@@ -149,7 +149,7 @@ let inject_raw_transaction (module Rollup_node_rpc : Rollup_node.S)
   let tx_raw = Ethereum_types.hash_to_bytes tx_raw in
   let tx = smart_rollup_address ^ tx_hash ^ tx_raw in
   let* () = Rollup_node_rpc.inject_raw_transaction tx in
-  return (Mock.hash_f Hex.(of_string tx_hash |> show))
+  return (Ethereum_types.Hash Hex.(of_string tx_hash |> show))
 
 let get_block ~full_transaction_object block_param
     (module Rollup_node_rpc : Rollup_node.S) =

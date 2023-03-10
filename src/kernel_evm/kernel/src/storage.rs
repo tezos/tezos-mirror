@@ -12,10 +12,12 @@ use std::str::from_utf8;
 use crate::block::L2Block;
 use crate::error::Error;
 use tezos_ethereum::account::*;
-use tezos_ethereum::eth_gen::{Hash, L2Level, RawTransaction, RawTransactions};
+use tezos_ethereum::eth_gen::{Hash, L2Level, TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::U256;
+
+const SMART_ROLLUP_ADDRESS: RefPath = RefPath::assert_from(b"/metadata/smart_rollup_address");
 
 const EVM_ACCOUNTS: RefPath = RefPath::assert_from(b"/eth_accounts");
 
@@ -30,6 +32,29 @@ const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
 const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
 const HASH_MAX_SIZE: usize = 32;
+
+// We can read/store at most [128] transaction hashes per block.
+// TRANSACTION_HASH_SIZE * 128 = 4096.
+const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
+
+pub fn read_smart_rollup_address<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+) -> Result<[u8; 20], Error> {
+    let mut buffer = [0u8; 20];
+
+    match load_value_slice(host, &SMART_ROLLUP_ADDRESS, &mut buffer) {
+        Ok(20) => Ok(buffer),
+        _ => Err(Error::Generic),
+    }
+}
+
+pub fn store_smart_rollup_address<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Result<(), Error> {
+    host.store_write(&SMART_ROLLUP_ADDRESS, &smart_rollup_address, 0)
+        .map_err(Error::from)
+}
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
@@ -163,17 +188,26 @@ pub fn read_current_block_number<Host: Runtime + RawRollupCore>(
 
 fn read_current_block_transactions<Host: Runtime>(
     host: &mut Host,
-) -> Result<RawTransaction, Error> {
+) -> Result<Vec<TransactionHash>, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_TRANSACTIONS)?;
-    host.store_read(&path, 0, HASH_MAX_SIZE)
-        .map_err(Error::from)
+
+    let transactions_bytes = host
+        .store_read(&path, 0, MAX_TRANSACTION_HASHES)
+        .map_err(Error::from)?;
+
+    Ok(transactions_bytes
+        .chunks(TRANSACTION_HASH_SIZE)
+        .filter_map(|tx_hash_bytes: &[u8]| -> Option<TransactionHash> {
+            tx_hash_bytes.try_into().ok()
+        })
+        .collect::<Vec<TransactionHash>>())
 }
 
 pub fn read_current_block<Host: Runtime + RawRollupCore>(
     host: &mut Host,
 ) -> Result<L2Block, Error> {
     let number = read_current_block_number(host)?;
-    let transactions = vec![read_current_block_transactions(host)?];
+    let transactions = read_current_block_transactions(host)?;
 
     Ok(L2Block::new(number, transactions))
 }
@@ -200,13 +234,12 @@ fn store_block_hash<Host: Runtime + RawRollupCore>(
 fn store_block_transactions<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     block_path: &OwnedPath,
-    block_transactions: &RawTransactions,
+    block_transactions: &[TransactionHash],
 ) -> Result<(), Error> {
     let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
-    /* For now, to keep it simple we made the assumption that ONE BLOCK = ONE TRANSACTION,
-    this is why the following code make sense in this case: */
-    let transaction = &block_transactions[0];
-    host.store_write(&path, transaction, 0).map_err(Error::from)
+    let block_transactions = &block_transactions.concat()[..];
+    host.store_write(&path, block_transactions, 0)
+        .map_err(Error::from)
 }
 
 fn store_block<Host: Runtime + RawRollupCore>(

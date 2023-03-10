@@ -83,6 +83,39 @@ let next_evm_level ~sc_rollup_node ~node ~client =
     sc_rollup_node
     (Node.get_level node)
 
+(** [next_evm_until ?max_next_level ~stop_condition ~sc_rollup_node ~node client]
+    calls {!next_evm_level} until [stop_condition] returns true.
+
+    [max_next_level] limits the number of calls to {!next_evm_level},
+    defaults to [10].
+*)
+let rec next_evm_until ?(max_next_level = 10) ~stop_condition ~sc_rollup_node
+    ~node client =
+  let* stop_condition_ok = stop_condition () in
+  if stop_condition_ok then unit
+  else if max_next_level = 0 then
+    Test.fail "[next_evm_until] is not allowed to move to next level again"
+  else
+    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+    next_evm_until
+      ~max_next_level:(max_next_level - 1)
+      ~stop_condition
+      ~sc_rollup_node
+      ~node
+      client
+
+let wait_until_tx_included ~evm_proxy_server_endpoint ~sc_rollup_node ~node
+    ~tx_hash client =
+  let stop_condition () =
+    let endpoint = evm_proxy_server_endpoint in
+    let* current = Eth_cli.block_number ~endpoint in
+    let* {transactions; _} =
+      Eth_cli.get_block ~block_id:(string_of_int current) ~endpoint
+    in
+    return (List.exists (String.equal tx_hash) transactions)
+  in
+  next_evm_until ~stop_condition ~sc_rollup_node ~node client
+
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
@@ -256,6 +289,7 @@ let test_rpc_sendRawTransaction =
      We thus need to at least go the first evm run level for the kernel to be able
      to read at current block's number path, otherwise the test will fail. *)
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* tx_hash =
     Eth_cli.transaction_send
       ~source_private_key:Account.accounts.(0).private_key
@@ -263,18 +297,26 @@ let test_rpc_sendRawTransaction =
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
             Introduce a eth/wei module. *)
       ~value:Z.(of_int 42 * (of_int 10 ** 18))
-      ~endpoint:(Evm_proxy_server.endpoint evm_proxy_server)
+      ~endpoint:evm_proxy_server_endpoint
   in
   Log.info "Sent %s to the proxy server." tx_hash ;
   let*! batcher_queue = Sc_rollup_client.batcher_queue sc_rollup_client in
   let () =
     match batcher_queue with
-    | [(_hash, binary_msg)] -> Log.info "binary_msg: %s" binary_msg
+    | [(_hash, _binary_msg)] -> ()
     | _ ->
         Test.fail
           ~__LOC__
           "Expected exactly one element to the batcher queue, got %d"
           (List.length batcher_queue)
+  in
+  let* () =
+    wait_until_tx_included
+      ~evm_proxy_server_endpoint
+      ~sc_rollup_node
+      ~tx_hash
+      ~node
+      client
   in
   unit
 
@@ -301,7 +343,7 @@ let test_rpc_getBlockByNumber =
   (* For our needs, we just test these two relevant fields for now: *)
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
-  Check.(block.transactions = ["0x100"])
+  Check.(block.transactions = [])
     (Check.list Check.string)
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit

@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Transaction hash size is 32 bytes. *)
+let transaction_hash_size = 32
+
 (** Append the [0x] prefix to a string. *)
 let append_0x s = "0x" ^ s
 

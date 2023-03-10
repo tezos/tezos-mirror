@@ -32,18 +32,32 @@ impl Queue {
     }
 }
 
-fn fetch_transactions<Host: Runtime + RawRollupCore>(host: &mut Host, blueprint: &mut Blueprint) {
-    if let Ok(transaction) = read_input(host, 4096) {
+// Conditionally push a transaction in the blueprint.
+fn push(blueprint: &mut Blueprint, transaction: Option<Transaction>) {
+    if let Some(transaction) = transaction {
         blueprint.transactions.push(transaction);
-        fetch_transactions(host, blueprint)
     }
 }
 
-pub fn fetch<Host: Runtime + RawRollupCore>(host: &mut Host) -> Queue {
+fn fetch_transactions<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    blueprint: &mut Blueprint,
+    smart_rollup_address: [u8; 20],
+) {
+    if let Ok(transaction) = read_input(host, 4096, smart_rollup_address) {
+        push(blueprint, transaction);
+        fetch_transactions(host, blueprint, smart_rollup_address)
+    }
+}
+
+pub fn fetch<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Queue {
     let mut blueprint = Blueprint {
         transactions: Vec::new(),
     };
-    fetch_transactions(host, &mut blueprint);
+    fetch_transactions(host, &mut blueprint, smart_rollup_address);
     Queue {
         proposals: vec![blueprint],
     }
