@@ -2621,7 +2621,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     }
   @@ fun protocol sc_rollup_node sc_client1 sc_rollup_address node client ->
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  let bootstrap2_key = Constant.bootstrap2.public_key_hash in
+  let loser_keys =
+    List.mapi
+      (fun i _ -> Account.Bootstrap.keys.(i + 1).public_key_hash)
+      loser_modes
+  in
 
   let game_started = ref false in
   let conflict_detected = ref false in
@@ -2681,14 +2685,15 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   in
 
   let loser_sc_rollup_nodes =
-    List.map
-      (fun _ ->
+    List.map2
+      (fun default_operator _ ->
         Sc_rollup_node.create
           ~protocol
           Operator
           node
           ~base_dir:(Client.base_dir client)
-          ~default_operator:bootstrap2_key)
+          ~default_operator)
+      loser_keys
       loser_modes
   in
   let* _configuration_filenames =
@@ -2778,24 +2783,30 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
             level)
       !published_commitments) ;
 
+  let* {stake_amount; _} = get_sc_rollup_constants client in
   let* honest_deposit_json =
     RPC.Client.call client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap1_key ()
   in
-  let* loser_deposit_json =
-    RPC.Client.call client
-    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap2_key ()
+  let* loser_deposits_json =
+    Lwt_list.map_p
+      (fun id ->
+        RPC.Client.call client
+        @@ RPC.get_chain_block_context_contract_frozen_bonds ~id ())
+      loser_keys
   in
-  let* {stake_amount; _} = get_sc_rollup_constants client in
 
   Check.(
     (honest_deposit_json = stake_amount)
       Tez.typ
       ~error_msg:"expecting deposit for honest participant = %R, got %L") ;
-  Check.(
-    (loser_deposit_json = Tez.zero)
-      Tez.typ
-      ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
+  List.iter
+    (fun loser_deposit_json ->
+      Check.(
+        (loser_deposit_json = Tez.zero)
+          Tez.typ
+          ~error_msg:"expecting loss for dishonest participant = %R, got %L"))
+    loser_deposits_json ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
   let*! _value = Sc_rollup_client.state_hash sc_client1 in
