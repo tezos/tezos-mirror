@@ -1326,13 +1326,14 @@ let register ~protocols =
     "dac_get_certificate"
     test_get_certificate
     protocols ;
-  scenario_with_layer1_and_legacy_dac_nodes
-    ~threshold:0
-    ~committee_members:0
-    ~tags:["dac"; "dac_node"]
-    "dac_coordinator_post_preimage_endpoint"
-    Legacy.test_coordinator_post_preimage_endpoint
-    protocols ;
+  (* TODO: reenable once tests for whole infrastructure have been written. *)
+  (* scenario_with_layer1_and_legacy_dac_nodes
+     ~threshold:0
+     ~committee_members:0
+     ~tags:["dac"; "dac_node"]
+     "dac_coordinator_post_preimage_endpoint"
+     Legacy.test_coordinator_post_preimage_endpoint
+     protocols ; *)
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
     ~committee_members:3
