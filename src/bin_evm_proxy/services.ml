@@ -200,9 +200,14 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
             return (Get_block_by_hash.Output (Ok (Mock.block ())))
         | Get_code.Input _ -> return (Get_code.Output (Ok Mock.code))
         | Gas_price.Input _ -> return (Gas_price.Output (Ok Mock.gas_price))
-        | Get_transaction_count.Input _ ->
-            return
-              (Get_transaction_count.Output (Ok (Mock.transaction_count ())))
+        | Get_transaction_count.Input (Some (address, _)) ->
+            let* nonce =
+              match rollup_node_config with
+              | Some ((module Rollup_node_rpc), _smart_rollup_address) ->
+                  Rollup_node_rpc.nonce address
+              | None -> return (Mock.transaction_count ())
+            in
+            return (Get_transaction_count.Output (Ok nonce))
         | Get_transaction_receipt.Input _ ->
             return
               (Get_transaction_receipt.Output (Ok (Mock.transaction_receipt ())))
