@@ -94,3 +94,4 @@ opam_repo.patch
 target
 
 evm_kernel.wasm
+smart-rollup-installer

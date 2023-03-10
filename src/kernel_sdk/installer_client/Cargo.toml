@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_smart_rollup_installer"
+version = "0.1.0"
+edition = "2021"
+authors = ["TriliTech <contact@trili.tech>"]
+include = [
+  "build.rs",
+  "src/*",
+  "../installer_kernel/src/*"
+]
+
+[[bin]]
+name = "smart-rollup-installer"
+path = "src/main.rs"
+
+[dependencies.tezos_rollup_encoding]
+git = "https://gitlab.com/tezos/kernel"
+
+[dependencies.clap]
+version = "4.1"
+features = ["derive"]
+
+[dependencies.hex]
+version = "0.4"
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.wasm-gen]
+version = "0.1.4"
