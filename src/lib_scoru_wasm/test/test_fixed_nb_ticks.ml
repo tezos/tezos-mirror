@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Wasm_pvm
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Max nb of ticks$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_fixed_nb_ticks.ml
     Subject:      WASM PVM evaluation tests for fixed nb of ticks per top level call
 *)
 
@@ -161,3 +160,7 @@ let tests =
       ("stuck in decode", `Quick, test_stuck_in_decode_kernel);
       ("stuck in init", `Quick, test_stuck_in_init_kernel);
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Max nb of ticks", tests)]
+  |> Lwt_main.run

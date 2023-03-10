@@ -40,7 +40,7 @@ let qcheck ?count ?print gen f =
     QCheck2.Test.make ?count ?print gen (fun x ->
         Result.is_ok @@ Lwt_main.run (f x))
   in
-  let res = QCheck_base_runner.run_tests ~verbose:true [test] in
+  let res = QCheck_base_runner.run_tests [test] in
   if res = 0 then return_unit else failwith "QCheck tests failed"
 
 let make_test ?print encoding gen check () =

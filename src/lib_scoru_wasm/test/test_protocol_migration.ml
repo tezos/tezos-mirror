@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm protocol migration internal message
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "Protocol migration"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_protocol_migration.ml
     Subject:      Protocol migration tests for the tezos-scoru-wasm library
 *)
 
@@ -66,3 +65,10 @@ let tests =
       `Quick
       test_protocol_migration_message;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("Protocol migration", tests)]
+  |> Lwt_main.run

@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Tree_encoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^AST Generators$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_ast_generators.ml
     Subject:      Encoding tests for the tezos-scoru-wasm library
 *)
 
@@ -52,3 +51,7 @@ let test_gen_print_module () =
       return_unit)
 
 let tests = [tztest "Module" `Quick test_gen_print_module]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("AST Generators", tests)]
+  |> Lwt_main.run

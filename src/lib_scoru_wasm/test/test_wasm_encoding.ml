@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Tree_encoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^WASM Encodings$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_wasm_encoding.ml
     Subject:      Encoding tests for the tezos-scoru-wasm library
 *)
 
@@ -158,3 +157,7 @@ let tests =
     tztest "Frame trees" `Quick test_frame_tree;
     tztest "Config trees" `Quick test_config_tree;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("WASM Encodings", tests)]
+  |> Lwt_main.run

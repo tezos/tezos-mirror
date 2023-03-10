@@ -27,8 +27,7 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^WASM PVM Encodings$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_wasm_pvm_encodings.ml
     Subject:      WASM PVM encoding tests for the tezos-scoru-wasm library
 *)
 
@@ -312,3 +311,10 @@ let tests =
          error_state_gen
          error_state_check);
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("WASM PVM Encodings", tests)]
+  |> Lwt_main.run

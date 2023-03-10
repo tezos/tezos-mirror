@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Lib_scoru_wasm_fast
+    Invocation:   dune exec src/lib_scoru_wasm/fast/test/main.exe -- --file test_fast.ml
+    Subject:      Tests for the tezos-scoru-wasm library
+*)
+
 module Preimage_map = Map.Make (String)
 open Wasm_utils
 open Tztest_helper
@@ -989,3 +996,10 @@ let tests =
         `Quick,
         test_read_input_write_output_failing );
     ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru-wasm-fast"
+    [("Fast Execution", tests)]
+  |> Lwt_main.run

@@ -70,8 +70,6 @@ let final_protocol_versions =
 
 let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
 
-let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
-
 let astring = external_lib ~js_compatible:true "astring" V.True
 
 let bigarray_compat = external_lib ~js_compatible:true "bigarray-compat" V.True
@@ -411,7 +409,8 @@ let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec ?dep_files ?opam_with_test ?synopsis
-    ?(with_macos_security_framework = false) ?dune l =
+    ?(with_macos_security_framework = false) ?dune ?preprocess
+    ?preprocessor_deps l =
   tezt_without_tezt_lib_dependency
     ~with_macos_security_framework
     ~opam
@@ -427,6 +426,8 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_files
     ?opam_with_test
     ?dune
+    ?preprocess
+    ?preprocessor_deps
     l
 
 (* The main module [Octez_alcotest] is [open_] so that one can replace
@@ -4142,7 +4143,7 @@ let octez_scoru_wasm_tests_helpers =
         octez_scoru_wasm_fast;
         octez_scoru_wasm_helpers;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
         octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
@@ -4175,8 +4176,30 @@ let _octez_scoru_wasm_benchmark_exe =
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_benchmark]
 
 let _octez_scoru_wasm_tests =
-  test
-    "test_scoru_wasm"
+  tezt
+    [
+      "test_ast_generators";
+      "test_debug";
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5028
+         Beware: there is a weird test failure when
+         Durable snapshot test doesn't go first *)
+      "test_durable_shapshot";
+      "test_durable_storage";
+      "test_fixed_nb_ticks";
+      "test_get_set";
+      "test_hash_consistency";
+      "test_host_functions_ticks";
+      "test_init";
+      "test_input";
+      "test_output";
+      "test_parser_encoding";
+      "test_protocol_migration";
+      "test_reveal";
+      "test_wasm_encoding";
+      "test_wasm_pvm_encodings";
+      "test_wasm_pvm";
+      "test_wasm_vm";
+    ]
     ~path:"src/lib_scoru_wasm/test"
     ~opam:"tezos-scoru-wasm-test"
     ~synopsis:"Tests for the scoru-wasm functionality"
@@ -4190,7 +4213,7 @@ let _octez_scoru_wasm_tests =
         octez_test_helpers |> open_;
         octez_scoru_wasm;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
         octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
         octez_webassembly_interpreter_extra |> open_;
@@ -4198,8 +4221,15 @@ let _octez_scoru_wasm_tests =
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let _octez_scoru_wasm_fast_tests =
-  test
-    "test_scoru_wasm_fast"
+  tezt
+    [
+      "gen";
+      "partial_memory";
+      "qcheck_helpers";
+      "test_fast_cache";
+      "test_fast";
+      "test_memory_access";
+    ]
     ~path:"src/lib_scoru_wasm/fast/test"
     ~opam:"tezos-scoru-wasm-fast-test"
     ~synopsis:"Tests for the scoru-wasm-fast functionality"
@@ -4216,7 +4246,7 @@ let _octez_scoru_wasm_fast_tests =
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 

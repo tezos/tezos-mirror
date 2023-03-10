@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm durable
-    Invocation:   dune exec src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "Durable storage"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_durable_storage.ml
     Subject:      Durable storage tests for the tezos-scoru-wasm library
 *)
 
@@ -1285,3 +1284,7 @@ let tests =
       tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
       tztest "Durable: readonly keys" `Quick test_readonly_key;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Durable storage", tests)]
+  |> Lwt_main.run

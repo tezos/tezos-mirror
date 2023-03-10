@@ -27,8 +27,7 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Parser Encodings$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_parser_encoding.ml
     Subject:      Parser encoding tests for the tezos-scoru-wasm library
 *)
 
@@ -1368,3 +1367,7 @@ let tests =
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
   @ Block.tests @ Size.tests @ Code.tests @ Elem.tests @ Data.tests
   @ Field.tests @ Module.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Parser Encodings", tests)]
+  |> Lwt_main.run

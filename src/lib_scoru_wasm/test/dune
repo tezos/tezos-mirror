@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_scoru_wasm)
+(library
+ (name src_lib_scoru_wasm_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-tree-encoding
   tezos-base.unix
@@ -12,21 +14,57 @@
   tezos-test-helpers
   tezos-scoru-wasm
   qcheck-alcotest
-  alcotest-lwt
+  octez-alcotezt
   tezos-scoru-wasm-helpers
   tezos_scoru_wasm_test_helpers
   tezos-webassembly-interpreter-extra)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
   -open Tezos_test_helpers
+  -open Octez_alcotezt
   -open Tezos_scoru_wasm_helpers
   -open Tezos_scoru_wasm_test_helpers
-  -open Tezos_webassembly_interpreter_extra))
+  -open Tezos_webassembly_interpreter_extra)
+ (modules
+  test_ast_generators
+  test_debug
+  test_durable_shapshot
+  test_durable_storage
+  test_fixed_nb_ticks
+  test_get_set
+  test_hash_consistency
+  test_host_functions_ticks
+  test_init
+  test_input
+  test_output
+  test_parser_encoding
+  test_protocol_migration
+  test_reveal
+  test_wasm_encoding
+  test_wasm_pvm_encodings
+  test_wasm_pvm
+  test_wasm_vm))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_scoru_wasm_test_tezt_lib
+  tezt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-scoru-wasm-test)
- (action (run %{dep:./test_scoru_wasm.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

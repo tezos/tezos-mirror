@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-base" {with-test}
   "tezos-tree-encoding" {with-test}
   "tezos-context" {with-test}
@@ -22,7 +23,7 @@ depends: [
   "tezos-scoru-wasm" {with-test}
   "tezos-scoru-wasm-fast" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

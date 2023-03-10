@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm input
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Input$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_input.ml
     Subject:      Input tests for the tezos-scoru-wasm library
 *)
 
@@ -328,3 +327,7 @@ let tests =
         `Quick
         test_read_input_max_size_above_limit;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Input", tests)]
+  |> Lwt_main.run

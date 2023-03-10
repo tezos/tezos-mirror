@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Lib_scoru_wasm_fast
+    Invocation:   dune exec src/lib_scoru_wasm/fast/test/main.exe -- --file test_memory_access.ml
+    Subject:      Tests for the tezos-scoru-wasm library
+*)
+
 module Wasmer = Tezos_wasmer
 module Preimage_map = Map.Make (String)
 module Memory_access_fast = Tezos_scoru_wasm_fast.Memory_access.Wasmer
@@ -116,3 +123,10 @@ let tests : unit Alcotest_lwt.test_case list =
   List.map
     Qcheck_helpers.to_alcotest_lwt
     [test_store_bytes; test_load_bytes; test_store_num]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru-wasm-fast"
+    [("Memory access", tests)]
+  |> Lwt_main.run

@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm durable
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Durable snapshot$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_durable_shapshot.ml
     Subject:      Tests for the tezos-scoru-wasm durable snapshotting
 *)
 
@@ -234,3 +233,7 @@ let tests : unit Alcotest_lwt.test_case trace =
       stress_strcture_ops ~init_size:2000 ~rounds:3000;
     ]
     (stress_each_op ())
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Durable snapshot", tests)]
+  |> Lwt_main.run
