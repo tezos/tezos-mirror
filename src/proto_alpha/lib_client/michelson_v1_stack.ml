@@ -48,7 +48,7 @@ let micheline_printer_node_encoding :
 
 let () =
   let open Data_encoding in
-  register_error_kind
+  Protocol_client_context.register_error_kind
     `Permanent
     ~id:"michelson.stack.wrong_stack_item"
     ~title:"Wrong stack item"
@@ -65,7 +65,7 @@ let () =
        (req "node" micheline_printer_node_encoding))
     (function Wrong_stack_item (loc, node) -> Some (loc, node) | _ -> None)
     (fun (loc, node) -> Wrong_stack_item (loc, node)) ;
-  register_error_kind
+  Protocol_client_context.register_error_kind
     `Permanent
     ~id:"michelson.stack.wrong_stack"
     ~title:"Wrong stack"
