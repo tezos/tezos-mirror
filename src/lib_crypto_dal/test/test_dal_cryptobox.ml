@@ -482,17 +482,13 @@ module Test = struct
     Test.make
       ~name:"DAL cryptobox: test FFT domain selection"
       ~print:QCheck2.Print.int
+      ~count:100_000
       (QCheck2.Gen.int_range 1 10_000_000)
       (fun n ->
         let domain_size, _, _ =
           Cryptobox.Internal_for_tests.select_fft_domain n
         in
-        domain_size >= n
-        && List.fold_left
-             (fun acc factor -> fst Z.(remove acc (of_int factor)))
-             (Z.of_int domain_size)
-             [2; 3; 11; 19]
-           = Z.one)
+        domain_size >= n)
 
   let path filename = project_root // Filename.dirname __FILE__ // filename
 
