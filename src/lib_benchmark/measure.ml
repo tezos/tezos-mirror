@@ -435,6 +435,10 @@ module Time = struct
     = "caml_clock_gettime_byte" "caml_clock_gettime"
     [@@noalloc]
 
+  external clock_getres : unit -> (int64[@unboxed])
+    = "caml_clock_getres_byte" "caml_clock_getres"
+    [@@noalloc]
+
   let measure f =
     let bef = get_time_ns () in
     let _ = f () in
@@ -450,6 +454,17 @@ module Time = struct
     let dt = Int64.(to_float (sub aft bef)) in
     (dt, x)
     [@@inline always]
+
+  let check_timer_resolution () =
+    let ns = clock_getres () in
+    if ns = 1L then ()
+    else if ns = 0L then
+      Stdlib.failwith "Snoop: cannot work without a proper clock"
+    else
+      Format.eprintf
+        "WARNING: This machine's clock reslution is %Ldns, which is too large \
+         for Snoop benchmarks!@."
+        ns
 end
 
 let compute_empirical_timing_distribution :
@@ -489,6 +504,7 @@ let set_gc_increment () =
 
 let perform_benchmark (type c t) (options : options)
     (bench : (c, t) Benchmark.poly) : t workload_data =
+  Time.check_timer_resolution () ;
   let (module Bench) = bench in
   let config =
     Config.parse_config ~print:Stdlib.stderr bench options.config_file
