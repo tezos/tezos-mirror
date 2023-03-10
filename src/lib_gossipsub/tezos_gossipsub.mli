@@ -102,7 +102,7 @@ module Score : sig
 
   val zero : t
 
-  val penality : t -> int -> t
+  val penalty : t -> int -> t
 end
 
 module type S = sig

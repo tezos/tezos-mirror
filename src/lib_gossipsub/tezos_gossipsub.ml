@@ -101,16 +101,16 @@ module Score : sig
 
   val zero : t
 
-  val penality : t -> int -> t
+  val penalty : t -> int -> t
 end = struct
-  type t = {behaviour_penality : int}
+  type t = {behaviour_penalty : int}
 
-  let zero = {behaviour_penality = 0}
+  let zero = {behaviour_penalty = 0}
 
-  let float {behaviour_penality} = behaviour_penality |> float_of_int
+  let float {behaviour_penalty} = behaviour_penalty |> float_of_int
 
-  let penality {behaviour_penality} penality =
-    {behaviour_penality = behaviour_penality + penality}
+  let penalty {behaviour_penalty} penalty =
+    {behaviour_penalty = behaviour_penalty + penalty}
 end
 
 module type S = sig
@@ -745,11 +745,11 @@ module Make (C : CONFIGURATION) :
           let current = C.Time.now () in
           if C.Time.(current >= backoff) then unit
           else
-            let score = Score.penality score 1 in
+            let score = Score.penalty score 1 in
             let*! graft_flood_backoff in
             let score =
               if C.Time.(current < add backoff graft_flood_backoff) then
-                Score.penality score 1
+                Score.penalty score 1
               else score
             in
             let* () = add_backoff prune_backoff topic peer in
