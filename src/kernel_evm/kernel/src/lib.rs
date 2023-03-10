@@ -10,10 +10,7 @@ use debug::debug_msg;
 use kernel::kernel_entry;
 
 use crate::blueprint::{fetch, Queue};
-use crate::error::Error;
-use crate::storage::{read_smart_rollup_address, store_account, store_smart_rollup_address};
-use tezos_ethereum::account::Account;
-use tezos_ethereum::wei::{from_eth, Wei};
+use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
 
 mod block;
 mod blueprint;
@@ -53,20 +50,6 @@ pub fn stage_two<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
     }
 }
 
-pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
-    let hash = (b"6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c").to_ascii_lowercase();
-    let path = storage::account_path(&hash)?;
-
-    if !storage::has_account(host, &path)? {
-        let balance: Wei = from_eth(9999);
-
-        let mock_account = Account::default_account(balance);
-
-        store_account(host, mock_account, &path)?
-    };
-    Ok(())
-}
-
 fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(host: &mut Host) -> [u8; 20] {
     match read_smart_rollup_address(host) {
         Ok(smart_rollup_address) => smart_rollup_address,
@@ -81,32 +64,9 @@ fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(host: &mut Host)
 pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
     let smart_rollup_address = retrieve_smart_rollup_address(host);
 
-    match init_mock_account(host) {
-        Ok(()) => (),
-        Err(_) => debug_msg!(host; "Failed to write the mocked up account"),
-    }
-
     let queue = stage_one(host, smart_rollup_address);
 
     stage_two(host, queue)
 }
 
 kernel_entry!(main);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use mock_runtime::host::MockHost;
-
-    #[test]
-    // Test the mock account can be written in the durable storage.
-    fn test_init_mock_account() {
-        let mut host = MockHost::default();
-
-        match init_mock_account(&mut host) {
-            Ok(()) => (),
-            Err(_) => panic!("The account should be writable"),
-        }
-    }
-}
