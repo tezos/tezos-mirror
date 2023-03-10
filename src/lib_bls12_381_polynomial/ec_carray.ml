@@ -70,7 +70,7 @@ module type EC_carray_sig = sig
 
   type domain
 
-  (** [evaluation_ecfft_inplace domain points] computes the ECFFT.
+  (** [evaluation_ecfft domain points] computes the ECFFT.
   [domain] can be obtained using {!Domain.build}.
 
   The ECFFT computes the G-linear map
@@ -82,7 +82,7 @@ module type EC_carray_sig = sig
   Note:
   - size of domain must be a power of two
   - degree of polynomial must be strictly less than the size of domain *)
-  val evaluation_ecfft_inplace : domain:domain -> points:t -> unit
+  val evaluation_ecfft : domain:domain -> points:t -> t
 
   (** [interpolation_ecfft_inplace domain points] computes the inverse ECFFT.
   [domain] can be obtained using {!Domain.build}.
@@ -121,12 +121,14 @@ module Make
 
   module Domain = Domain.Domain_unsafe
 
-  let evaluation_ecfft_inplace ~domain ~points =
+  let evaluation_ecfft ~domain ~points =
+    let n_domain = Domain.length domain in
+    let res = EC_point_array.init n_domain (fun _ -> EC_point.(copy zero)) in
     let degree = EC_point_array.degree points in
-    if degree = -1 then ()
+    let n_domain = Domain.length domain in
+    if degree = -1 then res
     else
-      let log = Z.log2 (Z.of_int (length points)) in
-      let n_domain = Domain.length domain in
+      let log = Z.log2 (Z.of_int n_domain) in
       if not (Helpers.is_power_of_two n_domain) then
         raise @@ Invalid_argument "Size of domain should be a power of 2." ;
       if not (degree < n_domain) then
@@ -134,11 +136,14 @@ module Make
         @@ Invalid_argument
              "Degree of poly should be strictly less than domain size." ;
       let log_degree = Z.log2up (Z.of_int (degree + 1)) in
+      let len = EC_point_array.length points in
+      EC_point_array.blit points ~src_off:0 res ~dst_off:0 ~len ;
       Stubs.evaluation_ecfft_inplace
-        points
+        res
         ~domain:(Domain.to_carray domain)
         ~log
-        ~log_degree
+        ~log_degree ;
+      res
 
   let interpolation_ecfft_inplace ~domain ~points =
     if EC_point_array.degree points = -1 then ()
