@@ -107,7 +107,7 @@ end = struct
 
   let zero = {behaviour_penalty = 0}
 
-  let float {behaviour_penalty} = behaviour_penalty |> float_of_int
+  let float {behaviour_penalty} = -behaviour_penalty |> float_of_int
 
   let penalty {behaviour_penalty} penalty =
     {behaviour_penalty = behaviour_penalty + penalty}
