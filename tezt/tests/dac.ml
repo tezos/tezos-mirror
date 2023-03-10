@@ -1199,25 +1199,6 @@ module Legacy = struct
        Once profiles are implemented this should be moved out of the
        `Legacy` module. Additionally, the test should be run using dac
        node running in the coordinator and not legacy mode. *)
-  let test_coordinator_post_preimage_endpoint _protocol _node _client
-      coordinator _threshold _dac_members =
-    (* 1. Send the [payload] to coordinator.
-       2. Assert that it returns [expected_rh].
-       3. Assert event that root hash has been pushed to data streamer
-          was emitted. *)
-    let payload = "test_1" in
-    let expected_rh =
-      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
-    in
-    let root_hash_pushed_to_data_streamer_promise =
-      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
-    in
-    let* actual_rh =
-      RPC.call coordinator (Dac_rpc.Coordinator.post_preimage ~payload)
-    in
-    let () = check_valid_root_hash expected_rh actual_rh in
-    let* () = root_hash_pushed_to_data_streamer_promise in
-    Lwt.return_unit
 end
 
 module Signature_manager = struct
@@ -1369,6 +1350,27 @@ module Signature_manager = struct
   end
 end
 
+module Full_infrastructure = struct
+  let test_coordinator_post_preimage_endpoint Scenarios.{coordinator_node; _} =
+    (* 1. Send the [payload] to coordinator.
+       2. Assert that it returns [expected_rh].
+       3. Assert event that root hash has been pushed to data streamer
+          was emitted. *)
+    let payload = "test_1" in
+    let expected_rh =
+      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+    in
+    let root_hash_pushed_to_data_streamer_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
+    in
+    let* actual_rh =
+      RPC.call coordinator_node (Dac_rpc.Coordinator.post_preimage ~payload)
+    in
+    let () = check_valid_root_hash expected_rh actual_rh in
+    let* () = root_hash_pushed_to_data_streamer_promise in
+    Lwt.return_unit
+end
+
 (* Tests that it's possible to retrieve the witness and certificate after
    storing a dac member signature. Also asserts that the certificate contains
    the member used for signing. *)
@@ -1515,14 +1517,13 @@ let register ~protocols =
     "dac_get_certificate"
     test_get_certificate
     protocols ;
-  (* TODO: reenable once tests for whole infrastructure have been written. *)
-  (* scenario_with_layer1_and_legacy_dac_nodes
-     ~threshold:0
-     ~committee_members:0
-     ~tags:["dac"; "dac_node"]
-     "dac_coordinator_post_preimage_endpoint"
-     Legacy.test_coordinator_post_preimage_endpoint
-     protocols ; *)
+  scenario_with_full_dac_infrastructure
+    ~observers:0
+    ~committee_members:0
+    ~tags:["dac"; "dac_node"]
+    "dac_coordinator_post_preimage_endpoint"
+    Full_infrastructure.test_coordinator_post_preimage_endpoint
+    protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
     ~committee_members:3
