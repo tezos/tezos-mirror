@@ -67,7 +67,7 @@ type ('peer, 'message_id, 'span) limits = {
       message to our peers. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
-  unsuscribe_backoff : 'span;
+  unsubscribe_backoff : 'span;
       (** The duration that prevent reconnections after leaving a topic to our full connections. *)
   graft_flood_backoff : 'span;
       (** The duration added when a peer tries to graft our connection

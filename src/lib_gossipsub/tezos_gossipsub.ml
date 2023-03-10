@@ -65,7 +65,7 @@ type ('peer, 'message_id, 'span) limits = {
   expected_peers_per_topic : int;
   gossip_publish_threshold : float;
   accept_px_threshold : float;
-  unsuscribe_backoff : 'span;
+  unsubscribe_backoff : 'span;
   graft_flood_backoff : 'span;
       (* WRT to go implementation, the value of this constant is
          actually [graft_flood_threshold - prune_backoff] *)
@@ -366,7 +366,9 @@ module Make (C : CONFIGURATION) :
 
     let accept_px_threshold state = state.limits.accept_px_threshold
 
-    let unsuscribe_backoff state = state.limits.unsuscribe_backoff
+    let prune_backoff state = state.limits.prune_backoff
+
+    let unsubscribe_backoff state = state.limits.unsubscribe_backoff
 
     let graft_flood_backoff state = state.limits.graft_flood_backoff
 
@@ -714,15 +716,15 @@ module Make (C : CONFIGURATION) :
 
     let check_score peer topic {score; _} =
       let open Monad.Syntax in
-      let*! unsuscribe_backoff in
+      let*! prune_backoff in
       if Score.(score >= zero) then unit
       else
-        let* () = add_backoff unsuscribe_backoff topic peer in
+        let* () = add_backoff prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
 
     let check_backoff peer topic {backoff; score; _} =
       let open Monad.Syntax in
-      let*! unsuscribe_backoff in
+      let*! prune_backoff in
       match C.Topic.Map.find topic backoff with
       | None -> unit
       | Some backoff ->
@@ -736,7 +738,7 @@ module Make (C : CONFIGURATION) :
                 Score.penality score 1
               else score
             in
-            let* () = add_backoff unsuscribe_backoff topic peer in
+            let* () = add_backoff prune_backoff topic peer in
             let* () = add_score peer score in
             fail Peer_backed_off
 
@@ -929,12 +931,12 @@ module Make (C : CONFIGURATION) :
 
     let handle_mesh topic mesh : [`Leave] output Monad.t =
       let open Monad.Syntax in
-      let*! unsuscribe_backoff in
+      let*! unsubscribe_backoff in
       let*! connections in
       let connections =
         C.Peer.Set.fold
           (fun peer connections ->
-            add_connections_backoff unsuscribe_backoff topic peer connections)
+            add_connections_backoff unsubscribe_backoff topic peer connections)
           mesh
           connections
       in
