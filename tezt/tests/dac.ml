@@ -163,7 +163,7 @@ let with_layer1 ?additional_bootstrap_accounts ?commitment_period
   f node client bootstrap1_key
 
 let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~threshold ~dac_members tezos_client f =
+    ?(wait_ready = true) ~threshold ~committee_members tezos_client f =
   let range i = List.init i Fun.id in
   let reveal_data_dir =
     Option.map
@@ -171,7 +171,7 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
         Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
       sc_rollup_node
   in
-  let* dac_members =
+  let* committee_members =
     List.fold_left
       (fun keys i ->
         let* keys in
@@ -182,7 +182,7 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
         in
         return (key :: keys))
       (return [])
-      (range dac_members)
+      (range committee_members)
   in
   let dac_node =
     Dac_node.create_legacy
@@ -190,15 +190,15 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
       ~client:tezos_client
       ?reveal_data_dir
       ~threshold
-      ~dac_members:
+      ~committee_members:
         (List.map
            (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-           dac_members)
+           committee_members)
       ()
   in
   let* _dir = Dac_node.init_config dac_node in
   let* () = Dac_node.run dac_node ~wait_ready in
-  f dac_node dac_members
+  f dac_node committee_members
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4706
    Keep pvm name value in Sc_rollup.t. *)
@@ -248,7 +248,7 @@ let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
 
 let scenario_with_layer1_and_legacy_dac_nodes
     ?(tags = ["dac"; "layer1"; "legacy"]) ?commitment_period ?challenge_window
-    ~threshold ~dac_members variant scenario =
+    ~threshold ~committee_members variant scenario =
   let description = "Testing DAC node" in
   test
     ~__FILE__
@@ -257,13 +257,13 @@ let scenario_with_layer1_and_legacy_dac_nodes
     (fun protocol ->
       with_layer1 ?commitment_period ?challenge_window ~protocol
       @@ fun node client _key ->
-      with_legacy_dac_node ~threshold ~dac_members node client
-      @@ fun dac_node dac_members ->
-      scenario protocol node client dac_node threshold dac_members)
+      with_legacy_dac_node ~threshold ~committee_members node client
+      @@ fun dac_node committee_members ->
+      scenario protocol node client dac_node threshold committee_members)
 
 let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
     ?(pvm_name = "arith") ?commitment_period ?challenge_window ~threshold
-    ~dac_members variant scenario =
+    ~committee_members variant scenario =
   let description = "Testing DAC rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -281,9 +281,9 @@ let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
             ~sc_rollup_node
             ~pvm_name
             ~threshold
-            ~dac_members
+            ~committee_members
             client
-          @@ fun dac_node dac_members ->
+          @@ fun dac_node committee_members ->
           scenario
             protocol
             dac_node
@@ -293,7 +293,7 @@ let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
             client
             pvm_name
             threshold
-            dac_members)
+            committee_members)
         node
         client
         key)
@@ -364,7 +364,7 @@ let test_dac_node_startup =
       ()
   in
   let dac_node =
-    Dac_node.create_legacy ~node ~client ~threshold:0 ~dac_members:[] ()
+    Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
   in
   let* _dir = Dac_node.init_config dac_node in
   let* () = run_dac dac_node in
@@ -419,7 +419,7 @@ let check_preimage expected_preimage actual_preimage =
 
 let test_dac_node_handles_dac_store_preimage_merkle_V0 _protocol dac_node
     sc_rollup_node _sc_rollup_address _node _client pvm_name _threshold
-    _dac_members =
+    _committee_members =
   let payload = "test" in
   let* actual_rh, l1_operation =
     RPC.call
@@ -459,7 +459,7 @@ let test_dac_node_handles_dac_store_preimage_merkle_V0 _protocol dac_node
 
 let test_dac_node_handles_dac_store_preimage_hash_chain_V0 _protocol dac_node
     sc_rollup_node _sc_rollup_address _node _client pvm_name _threshold
-    _dac_members =
+    _committee_members =
   let payload = "test" in
   let* actual_rh, _l1_operation =
     RPC.call
@@ -491,7 +491,7 @@ let test_dac_node_handles_dac_store_preimage_hash_chain_V0 _protocol dac_node
 
 let test_dac_node_handles_dac_retrieve_preimage_merkle_V0 _protocol dac_node
     sc_rollup_node _sc_rollup_address _node _client pvm_name _threshold
-    _dac_members =
+    _committee_members =
   let payload = "test" in
   let* actual_rh, _l1_operation =
     RPC.call
@@ -528,7 +528,7 @@ let test_dac_node_handles_dac_retrieve_preimage_merkle_V0 _protocol dac_node
   unit
 
 let test_rollup_arith_uses_reveals protocol dac_node sc_rollup_node
-    sc_rollup_address _node client _pvm_name _threshold _dac_members =
+    sc_rollup_address _node client _pvm_name _threshold _committee_members =
   let* genesis_info =
     RPC.Client.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -593,7 +593,7 @@ let test_rollup_arith_uses_reveals protocol dac_node sc_rollup_node
   unit
 
 let test_reveals_fails_on_wrong_hash _protocol dac_node sc_rollup_node
-    sc_rollup_address _node client _pvm_name _threshold _dac_members =
+    sc_rollup_address _node client _pvm_name _threshold _committee_members =
   let payload = "Some data that is not related to the hash" in
   let _actual_rh =
     RPC.call
@@ -634,7 +634,7 @@ let test_reveals_fails_on_wrong_hash _protocol dac_node sc_rollup_node
   in
   expect_failure
 
-let test_dac_node_imports_dac_member =
+let test_dac_node_imports_committee_members =
   Protocol.register_test
     ~__FILE__
     ~title:"dac node imports dac members sk_uris"
@@ -643,15 +643,21 @@ let test_dac_node_imports_dac_member =
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let run_dac = Dac_node.run ~wait_ready:false in
-  let* dac_member = Client.bls_gen_keys ~alias:"dac_member" client in
-  let* dac_member_info = Client.bls_show_address ~alias:dac_member client in
-  let dac_member_address = dac_member_info.aggregate_public_key_hash in
+  let* committee_member =
+    Client.bls_gen_keys ~alias:"committee_member" client
+  in
+  let* committee_member_info =
+    Client.bls_show_address ~alias:committee_member client
+  in
+  let committee_member_address =
+    committee_member_info.aggregate_public_key_hash
+  in
   let dac_node =
     Dac_node.create_legacy
       ~node
       ~client
       ~threshold:1
-      ~dac_members:[dac_member_address]
+      ~committee_members:[committee_member_address]
       ()
   in
   let* _dir = Dac_node.init_config dac_node in
@@ -672,7 +678,7 @@ let test_dac_node_dac_threshold_not_reached =
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let dac_node =
-    Dac_node.create_legacy ~node ~client ~threshold:1 ~dac_members:[] ()
+    Dac_node.create_legacy ~node ~client ~threshold:1 ~committee_members:[] ()
   in
   let* _dir = Dac_node.init_config dac_node in
   let run_dac = Dac_node.run ~wait_ready:false in
@@ -718,21 +724,21 @@ module Legacy = struct
     return @@ check_valid_root_hash expected_rh actual_rh
 
   let test_streaming_of_root_hashes _protocol node client coordinator threshold
-      dac_members =
+      committee_members =
     (* 1. Create two new dac nodes; [observer_1] and [observer_2].
        2. Initialize their default configuration.
        3. Update their configuration so that their dac node client context
           points to [coordinator]. *)
-    let dac_members =
+    let committee_members =
       List.map
         (fun (a : Account.aggregate_key) -> a.aggregate_public_key_hash)
-        dac_members
+        committee_members
     in
     let observer_1 =
-      Dac_node.create_legacy ~threshold ~dac_members ~node ~client ()
+      Dac_node.create_legacy ~threshold ~committee_members ~node ~client ()
     in
     let observer_2 =
-      Dac_node.create_legacy ~threshold ~dac_members ~node ~client ()
+      Dac_node.create_legacy ~threshold ~committee_members ~node ~client ()
     in
     let* _ = Dac_node.init_config observer_1 in
     let* _ = Dac_node.init_config observer_2 in
@@ -886,22 +892,22 @@ module Legacy = struct
     (payload, root_hash)
 
   let test_observer_downloads_pages _protocol node client coordinator threshold
-      dac_members =
+      committee_members =
     (* 1. Create one new dac nodes; [observer_1],
        2. Initialize the default configuration,
        3. Specify a temporary directory within the test data for the observer
           reveal data dir,
        4. Update the configuration of the observer so that the dac node client
           context points to [coordinator]. *)
-    let dac_members =
+    let committee_members =
       List.map
         (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-        dac_members
+        committee_members
     in
     let observer =
       Dac_node.create_legacy
         ~threshold
-        ~dac_members
+        ~committee_members
         ~name:"observer"
         ~node
         ~client
@@ -1132,7 +1138,7 @@ let test_get_certificate _protocol _tezos_node _tz_client coordinator _threshold
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   test_dac_node_startup protocols ;
-  test_dac_node_imports_dac_member protocols ;
+  test_dac_node_imports_committee_members protocols ;
   test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_all_nodes
     ~tags:["dac"; "dac_node"]
@@ -1140,18 +1146,18 @@ let register ~protocols =
     test_dac_node_handles_dac_store_preimage_merkle_V0
     protocols
     ~threshold:1
-    ~dac_members:1 ;
+    ~committee_members:1 ;
   scenario_with_all_nodes
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_hash_chain_v0"
     test_dac_node_handles_dac_store_preimage_hash_chain_V0
     protocols
     ~threshold:1
-    ~dac_members:1 ;
+    ~committee_members:1 ;
   scenario_with_all_nodes
     ~tags:["dac"; "dac_node"]
     ~threshold:0
-    ~dac_members:0
+    ~committee_members:0
     "dac_retrieve_preimage"
     test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
@@ -1161,45 +1167,45 @@ let register ~protocols =
     test_rollup_arith_uses_reveals
     protocols
     ~threshold:1
-    ~dac_members:1 ;
+    ~committee_members:1 ;
   scenario_with_all_nodes
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_wrong_hash"
     test_reveals_fails_on_wrong_hash
     ~threshold:1
-    ~dac_members:1
+    ~committee_members:1
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
-    ~dac_members:0
+    ~committee_members:0
     ~tags:["dac"; "dac_node"]
     "dac_streaming_of_root_hashes_in_legacy_mode"
     Legacy.test_streaming_of_root_hashes
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
-    ~dac_members:0
+    ~committee_members:0
     ~tags:["dac"; "dac_node"]
     "committee member downloads pages from coordinator"
     Legacy.test_observer_downloads_pages
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
-    ~dac_members:3
+    ~committee_members:2
     ~tags:["dac"; "dac_node"]
     "dac_get_certificate"
     test_get_certificate
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
-    ~dac_members:0
+    ~committee_members:0
     ~tags:["dac"; "dac_node"]
     "dac_coordinator_post_preimage_endpoint"
     Legacy.test_coordinator_post_preimage_endpoint
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0
-    ~dac_members:3
+    ~committee_members:3
     ~tags:["dac"; "dac_node"]
     "dac_store_member_signature"
     Signature_manager.Coordinator.test_handle_store_signature

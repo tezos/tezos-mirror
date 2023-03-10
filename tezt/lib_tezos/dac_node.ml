@@ -24,11 +24,14 @@
 (*****************************************************************************)
 
 module Parameters = struct
-  type legacy_mode_settings = {threshold : int; dac_members : string list}
+  type legacy_mode_settings = {threshold : int; committee_members : string list}
 
-  type coordinator_mode_settings = {threshold : int; dac_members : string list}
+  type coordinator_mode_settings = {
+    threshold : int;
+    committee_members : string list;
+  }
 
-  type dac_member_mode_settings = {
+  type committee_member_mode_settings = {
     address : string;
     coordinator_rpc_host : string;
     coordinator_rpc_port : int;
@@ -42,7 +45,7 @@ module Parameters = struct
   type mode_settings =
     | Legacy of legacy_mode_settings
     | Coordinator of coordinator_mode_settings
-    | Dac_member of dac_member_mode_settings
+    | Committee_member of committee_member_mode_settings
     | Observer of observer_mode_settings
 
   type persistent_state = {
@@ -85,7 +88,7 @@ let mode dac_node =
   match dac_node.persistent_state.mode with
   | Legacy _ -> "Legacy"
   | Coordinator _ -> "Coordinator"
-  | Dac_member _ -> "Dac_member"
+  | Committee_member _ -> "Committee_member"
   | Observer _ -> "Observer"
 
 let rpc_host dac_node = dac_node.persistent_state.rpc_host
@@ -135,7 +138,7 @@ let spawn_config_init dac_node =
           "committee";
           "members";
         ]
-        @ legacy_params.dac_members
+        @ legacy_params.committee_members
     | Coordinator coordinator_params ->
         [
           "configure";
@@ -150,11 +153,11 @@ let spawn_config_init dac_node =
           "committee";
           "members";
         ]
-        @ coordinator_params.dac_members
-    | Dac_member dac_member_params ->
+        @ coordinator_params.committee_members
+    | Committee_member committee_member_params ->
         let coordinator_host =
-          dac_member_params.coordinator_rpc_host ^ ":"
-          ^ Int.to_string dac_member_params.coordinator_rpc_port
+          committee_member_params.coordinator_rpc_host ^ ":"
+          ^ Int.to_string committee_member_params.coordinator_rpc_port
         in
         [
           "configure";
@@ -166,7 +169,7 @@ let spawn_config_init dac_node =
           coordinator_host;
           "and";
           "signer";
-          dac_member_params.address;
+          committee_member_params.address;
         ]
     | Observer observer_params ->
         let coordinator_host =
@@ -271,9 +274,9 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
   dac_node
 
 let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold ~dac_members
-    ~node ~client () =
-  let mode = Legacy {threshold; dac_members} in
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
+    ~committee_members ~node ~client () =
+  let mode = Legacy {threshold; committee_members} in
   create
     ~path
     ?name
@@ -290,8 +293,8 @@ let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
 
 let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
     ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
-    ~dac_members ~node ~client () =
-  let mode = Coordinator {threshold; dac_members} in
+    ~committee_members ~node ~client () =
+  let mode = Coordinator {threshold; committee_members} in
   create
     ~path
     ?name
@@ -306,14 +309,16 @@ let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
     ~client
     ()
 
-let create_dac_member ?(path = Constant.dac_node) ?name ?color ?data_dir
+let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
     ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
     ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port ~address ~node
     ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let mode = Dac_member {address; coordinator_rpc_host; coordinator_rpc_port} in
+  let mode =
+    Committee_member {address; coordinator_rpc_host; coordinator_rpc_port}
+  in
   create
     ~path
     ?name
