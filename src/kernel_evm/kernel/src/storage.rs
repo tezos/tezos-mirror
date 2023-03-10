@@ -93,7 +93,7 @@ pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
     concat(&EVM_ACCOUNTS, &address_hash).map_err(Error::from)
 }
 
-fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
+pub fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
     let number: &str = &number.to_string();
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
     let number_path = OwnedPath::try_from(raw_number_path).map_err(Error::from)?;

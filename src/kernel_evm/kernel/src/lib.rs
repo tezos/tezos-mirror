@@ -15,6 +15,7 @@ use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
 mod block;
 mod blueprint;
 mod error;
+mod genesis;
 mod helpers;
 mod inbox;
 mod storage;
@@ -61,8 +62,20 @@ fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(host: &mut Host)
     }
 }
 
+fn genesis_initialisation<Host: Runtime + RawRollupCore>(host: &mut Host) {
+    let block_path = storage::block_path(0).unwrap();
+    match Runtime::store_has(host, &block_path) {
+        Ok(Some(_)) => (),
+        _ => genesis::init_block(host).unwrap_or_else(|_| {
+            panic!("Error while initializing block genesis: stopping the daemon.")
+        }),
+    }
+}
+
 pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
     let smart_rollup_address = retrieve_smart_rollup_address(host);
+
+    genesis_initialisation(host);
 
     let queue = stage_one(host, smart_rollup_address);
 

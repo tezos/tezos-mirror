@@ -265,7 +265,7 @@ pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
         let current_level = storage::read_current_block_number(host);
         let next_level = match current_level {
             Ok(current_level) => current_level + 1,
-            Err(_) => 0,
+            Err(_) => panic!("Error, cannot produce a new block from a non existing block number."),
         };
 
         let transaction_hashes = proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
