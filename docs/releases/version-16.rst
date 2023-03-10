@@ -37,6 +37,8 @@ This release candidate includes the following baker improvements:
 - The baker no longer verifies the signature of operations when baking a new block. It should be done by the (external) mempool.
 - Reduced delay of preendorsement injection.
   The baker now preendorses block proposals as soons as the node considers the block as valid.
+- Baker inject preendorsement twice: once the block is considered as valid by the node and once it is fully applied by the node.
+  This is a safety measure in case the early preendorsement are dropped by the mempool.
 
 
 Update Instructions

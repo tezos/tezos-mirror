@@ -64,6 +64,11 @@ Baker
   preendorse as soon as the node considers a block as valid instead of
   waiting for the node to fully apply it. (MR :gl:`!7516`)
 
+- Baker injects preendorsement twice: once the block is considered as
+  valid by the node and once it is fully applied by the node. This is
+  a safety measure in case the early preendorsement is dropped by the
+  mempool. (MR :gl:`!7516`)
+
 
 Version 16.0-rc2
 ================
