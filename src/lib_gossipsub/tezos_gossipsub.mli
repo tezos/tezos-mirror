@@ -83,15 +83,25 @@ type ('peer, 'message_id) parameters = {
     'peer -> [`IHave of 'message_id | `IWant of 'message_id | `Graft] -> bool;
 }
 
+module Score : sig
+  type t
+
+  val float : t -> float
+
+  val zero : t
+
+  val penality : t -> int -> t
+end
+
 module type S = sig
-  (** Type for peers *)
-  type peer
+  (** Module for peer *)
+  module Peer : ITERABLE
 
-  (** Type for topic *)
-  type topic
+  (** Module for topic *)
+  module Topic : ITERABLE
 
-  (** Type for message_id *)
-  type message_id
+  (** Module for message_id *)
+  module Message_id : ITERABLE
 
   (** Type for message *)
   type message
@@ -107,13 +117,44 @@ module type S = sig
   type state
 
   (** Limits of the gossipsub protocol. *)
-  type limits := (peer, message_id, span) limits
+  type limits := (Peer.t, Message_id.t, span) limits
 
   (** Parameters of the gossipsub protocol. *)
-  type parameters := (peer, message_id) parameters
+  type parameters := (Peer.t, Message_id.t) parameters
 
   (** Output produced by one of the actions below. *)
-  type 'a output
+  type _ output =
+    | Negative_peer_score : Score.t -> [`IHave] output
+    | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
+    | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
+    | Message_topic_not_tracked : [`IHave] output
+    | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+    | On_iwant_messages_to_route : {
+        peer : Peer.t;
+        routed_message_ids :
+          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
+      }
+        -> [`IWant] output
+    | Peer_filtered : [`Graft] output
+    | Unknown_topic : [`Graft] output
+    | Peer_already_in_mesh : [`Graft] output
+    | Grafting_direct_peer : [`Graft] output
+    | Unexpected_grafting_peer : [`Graft] output
+    | Grafting_peer_with_negative_score : [`Graft] output
+    | Grafting_successfully : [`Graft] output
+    | Peer_backed_off : [`Graft] output
+    | No_peer_in_mesh : [`Prune] output
+    | Ignore_PX_score_too_low : Score.t -> [`Prune] output
+    | No_PX : [`Prune] output
+    | PX : Peer.Set.t -> [`Prune] output
+    | Publish_message : Peer.Set.t -> [`Publish] output
+    | Already_subscribed : [`Join] output
+    | Joining_topic : Peer.Set.t -> [`Join] output
+    | Not_subscribed : [`Leave] output
+    | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Peer_added : [`Add_peer] output
+    | Peer_already_known : [`Add_peer] output
+    | Removing_peer : [`Remove_peer] output
 
   (** A type alias for the state monad. *)
   type 'a monad := state -> state * 'a output
@@ -125,26 +166,26 @@ module type S = sig
       connection. If [direct] is [true], the gossipsub always
       forward messages to those peers. [outbound] is [true] if it is
       an outbound connection. *)
-  val add_peer : direct:bool -> outbound:bool -> peer -> [`Add_peer] monad
+  val add_peer : direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] monad
 
   (** [remove_peer peer] notifies gossipsub that we are disconnected
       from a peer. Do note that the [state] still maintain information
       for this connection for [retain_duration] seconds. *)
-  val remove_peer : peer -> [`Remove_peer] monad
+  val remove_peer : Peer.t -> [`Remove_peer] monad
 
   (** [handle_ihave peer topic message_ids] handles the gossip message
       [IHave] emitted by [peer] for [topic] with the [message_ids].  *)
-  val handle_ihave : peer -> topic -> message_id list -> [`IHave] monad
+  val handle_ihave : Peer.t -> Topic.t -> Message_id.t list -> [`IHave] monad
 
   (** [handle_iwant peer message_ids] handles the gossip message
       [IWant] emitted by [peer] for [topic] with the [message_ids]. *)
-  val handle_iwant : peer -> message_id list -> [`IWant] monad
+  val handle_iwant : Peer.t -> Message_id.t list -> [`IWant] monad
 
   (** [handle_graft peer topic] handles the gossip message [Graft]
       emitted by [peer] for [topic]. This action allows to graft a
       connection to a full connection allowing the transmission of
       full messages for the given topic. *)
-  val handle_graft : peer -> topic -> [`Graft] monad
+  val handle_graft : Peer.t -> Topic.t -> [`Graft] monad
 
   (** [handle_prune peer topic ~px ~backoff] handles the gossip
       message [Prune] emitted by [peer] for [topic]. This action
@@ -153,29 +194,33 @@ module type S = sig
       time, which is a duration for which we cannot [Graft] this peer
       on this topic. *)
   val handle_prune :
-    peer -> topic -> px:peer Seq.t -> backoff:span -> [`Prune] monad
+    Peer.t -> Topic.t -> px:Peer.t Seq.t -> backoff:span -> [`Prune] monad
 
   (** [publish ~sender topic message_id message] allows to route a
       message on the gossip network. If [sender=None], the message
       comes from the application layer and we are the sender. *)
   val publish :
-    sender:peer option -> topic -> message_id -> message -> [`Publish] monad
+    sender:Peer.t option ->
+    Topic.t ->
+    Message_id.t ->
+    message ->
+    [`Publish] monad
 
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
   val heartbeat : [`Heartbeat] monad
 
   (** [join topic] join/subscribe to a new topic. *)
-  val join : topic -> [`Join] monad
+  val join : Topic.t -> [`Join] monad
 
   (** [leave topic] leave/unscribe a topic. *)
-  val leave : topic -> [`Leave] monad
+  val leave : Topic.t -> [`Leave] monad
 end
 
 module Make (C : CONFIGURATION) :
   S
     with type time = C.Time.t
      and type span = C.Time.span
-     and type peer = C.Peer.t
-     and type topic = C.Topic.t
-     and type message_id = C.Message_id.t
+     and module Peer = C.Peer
+     and module Topic = C.Topic
+     and module Message_id = C.Message_id
      and type message = C.Message.t
