@@ -1405,8 +1405,7 @@ module Inner = struct
                 (t.max_polynomial_length - j - ((i + 1) * t.shard_length))
             else Bls12_381.G1.(copy zero))
       in
-      G1_array.evaluation_ecfft_inplace ~domain ~points ;
-      points
+      G1_array.evaluation_ecfft ~domain ~points
     in
     (domain, Array.init t.shard_length s_j)
 
@@ -1471,12 +1470,7 @@ module Inner = struct
     let points = G1_array.sub sum ~off:0 ~len in
     (* Step 4. *)
     let domain = Domains.build_power_of_two t.shard_proofs_log in
-    let proofs =
-      G1_array.init t.number_of_shards (fun _ -> Bls12_381.G1.(copy zero))
-    in
-    G1_array.blit points ~src_off:0 proofs ~dst_off:0 ~len ;
-    G1_array.evaluation_ecfft_inplace ~domain ~points:proofs ;
-    G1_array.to_array proofs
+    G1_array.(to_array (evaluation_ecfft ~domain ~points))
 
   (* [interpolation_poly root domain evaluations] returns the unique
      polynomial P of degree [< Domains.length domain] verifying
