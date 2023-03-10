@@ -8,7 +8,7 @@ a specification and perform API calls from your browser.
 Several code generators also exist to generate API libraries for various
 programming languages.
 
-The Rest API served by Octez on the RPC port is described by several OpenAPI specifications.
+The Rest API served by the Octez node on the RPC port is described by several OpenAPI specifications.
 
 The full RPC served by a node is a union of:
 
