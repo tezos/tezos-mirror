@@ -161,6 +161,9 @@ Node
   kernel>"}`` to produce the origination proof needed to originate a
   smart rollup.
 
+- Updated the built-in network alias for Mumbainet (``--network mumbainet``).
+  The new alias matches the relaunch of Mumbainet with the protocol `PtMumbai2`.
+
 Client
 ------
 
