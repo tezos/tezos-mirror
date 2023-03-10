@@ -407,6 +407,60 @@ let test_l2_blocks_progression =
   let* () = check_block_progression ~expected_block_level:1 in
   unit
 
+let test_l2_transfer =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_transfer"]
+    ~title:"Check L2 transfers are applied"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let balance account =
+    Eth_cli.balance ~account ~endpoint:evm_proxy_server_endpoint
+  in
+  let sender, receiver = (Account.accounts.(0), Account.accounts.(1)) in
+  let* sender_balance = balance sender.address in
+  let* receiver_balance = balance receiver.address in
+  let* sender_nonce = get_transaction_count evm_proxy_server sender.address in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
+      Introduce a eth/wei module. *)
+  let eth_amount = sender_balance / 2 in
+  (* We always send less than the balance, to ensure it always works. *)
+  let amount = Z.(of_int eth_amount * (of_int 10 ** 18)) in
+  let* tx_hash =
+    Eth_cli.transaction_send
+      ~source_private_key:sender.private_key
+      ~to_public_key:receiver.address
+      ~value:amount
+      ~endpoint:evm_proxy_server_endpoint
+  in
+  (* Wait for the transaction to be included in a block. *)
+  let* () =
+    wait_until_tx_included
+      ~evm_proxy_server_endpoint
+      ~sc_rollup_node
+      ~tx_hash
+      ~node
+      client
+  in
+  let* new_sender_balance = balance sender.address in
+  let* new_receiver_balance = balance receiver.address in
+  let* new_sender_nonce =
+    get_transaction_count evm_proxy_server sender.address
+  in
+  Check.((new_sender_balance = sender_balance - eth_amount) int)
+    ~error_msg:
+      "Unexpected sender balance after transfer, should be %R, but got %L" ;
+  Check.((new_receiver_balance = receiver_balance + eth_amount) int)
+    ~error_msg:
+      "Unexpected receiver balance after transfer, should be %R, but got %L" ;
+  Check.((new_sender_nonce = Int64.succ sender_nonce) int64)
+    ~error_msg:
+      "Unexpected sender nonce after transfer, should be %R, but got %L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -414,6 +468,7 @@ let register_evm_proxy_server ~protocols =
   test_rpc_sendRawTransaction protocols ;
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getTransactionCount protocols ;
-  test_l2_blocks_progression protocols
+  test_l2_blocks_progression protocols ;
+  test_l2_transfer protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
