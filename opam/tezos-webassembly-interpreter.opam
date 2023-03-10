@@ -16,11 +16,13 @@ depends: [
   "tezos-error-monad"
   "zarith" { >= "1.12" & < "1.13" }
   "tezos-lazy-containers"
-  "alcotest" { with-test & >= "1.5.0" }
+  "tezt" { with-test & >= "3.0.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "WebAssembly reference interpreter with tweaks for Tezos"

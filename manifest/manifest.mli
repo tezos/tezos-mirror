@@ -934,6 +934,7 @@ val tezt :
   ?synopsis:string ->
   ?opam_with_test:with_test ->
   ?with_macos_security_framework:bool ->
+  ?dune:Dune.s_expr ->
   string list ->
   unit
 

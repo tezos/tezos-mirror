@@ -1797,13 +1797,15 @@ type tezt_target = {
   synopsis : string option;
   opam_with_test : with_test option;
   with_macos_security_framework : bool;
+  dune : Dune.s_expr;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
-    ?synopsis ?opam_with_test ?(with_macos_security_framework = false) modules =
+    ?synopsis ?opam_with_test ?(with_macos_security_framework = false)
+    ?(dune = Dune.[]) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1822,6 +1824,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       synopsis;
       opam_with_test;
       with_macos_security_framework;
+      dune;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
@@ -1843,6 +1846,7 @@ let register_tezt_targets ~make_tezt_exe =
         synopsis;
         opam_with_test;
         with_macos_security_framework;
+        dune;
       } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
@@ -1858,6 +1862,7 @@ let register_tezt_targets ~make_tezt_exe =
         ~deps:lib_deps
         ~modules
         ~linkall:true
+        ~dune
     in
     tezt_test_libs := lib :: !tezt_test_libs ;
     let declare_exe ?js_compatible exe_name modes deps main =

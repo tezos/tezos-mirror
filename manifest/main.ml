@@ -387,7 +387,7 @@ let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec ?dep_files ?opam_with_test ?synopsis
-    ?(with_macos_security_framework = false) l =
+    ?(with_macos_security_framework = false) ?dune l =
   tezt_without_tezt_lib_dependency
     ~with_macos_security_framework
     ~opam
@@ -402,6 +402,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec
     ?dep_files
     ?opam_with_test
+    ?dune
     l
 
 (* The main module [Octez_alcotest] is [open_] so that one can replace
@@ -1347,12 +1348,12 @@ let _octez_webassembly_repl =
       ]
 
 let _octez_webassembly_test =
-  test
-    "main"
+  tezt
+    ["smallint"]
     ~path:"src/lib_webassembly/tests"
     ~opam:"tezos-webassembly-interpreter"
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
-    ~deps:[octez_webassembly_interpreter |> open_; alcotest]
+    ~deps:[octez_webassembly_interpreter |> open_; alcotezt]
 
 let octez_version_parser =
   public_lib
