@@ -51,6 +51,8 @@ let equal = List.equal String.equal
 
 let compare = List.compare String.compare
 
+let hash = Stdlib.Hashtbl.hash
+
 let of_string s =
   (if String.equal s root_name then [] else String.split_on_char sep s)
   |> List.rev
@@ -81,6 +83,13 @@ let name_match (pattern : t) (name : t) =
   | None | Some (Right _) -> List.for_all (fun (a, b) -> String.equal a b) l
   | _ -> false
 
+let to_filename ns =
+  String.concat "__"
+  @@
+  match to_list ns with
+  | hd :: ns when String.equal hd root_name -> ns
+  | ns -> ns
+
 module Hashtbl = Hashtbl.MakeSeeded (struct
   type nonrec t = t
 
@@ -97,6 +106,12 @@ module Hashtbl = Hashtbl.MakeSeeded (struct
 end)
 
 module Set = Set.Make (struct
+  type nonrec t = t
+
+  let compare = compare
+end)
+
+module Map = Map.Make (struct
   type nonrec t = t
 
   let compare = compare
