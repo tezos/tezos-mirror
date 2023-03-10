@@ -48,10 +48,12 @@
 # If regressions are detected during the diffs, they are sent to a Slack
 # channel.
 
-# The results of all comparisons are 3 CSV tables:
+# The results of all comparisons are in up to 4 CSV tables:
 # - all.csv comparing all the runs since FIRST_DIR (included)
 # - reference.csv comparing the reference and last runs
-# - prev.csv comparing the previous and last runs.
+# - previous.csv comparing the previous and last runs.
+# - selected.csv that filters all.csv with the parameters on which a
+#   regression was found.
 # These tables are also sent to the Slack channel
 
 # This is the Slack channel messages will be sent to (gas-benchmarks-reports).
@@ -126,8 +128,10 @@ rm -rf "$OUTPUT_CSV_DIR"
 mkdir -p "$OUTPUT_CSV_DIR"
 
 ALERT_FILE="$OCTEZ_DIR/alerts"
+SELECTION_FILE="$OCTEZ_DIR/selected.csv"
 
 rm -f "$ALERT_FILE"
+rm -f "$SELECTION_FILE"
 
 # All the directories before FIRST_DIR will be ignored.
 export FIRST_DIR
@@ -217,9 +221,28 @@ do
                 echo "Warning while comparing $b between $LAST_DIR and the $current version $CURRENT_DIR"
                 cat tmp2
             } >> "$ALERT_FILE"
+            # Save the parameters with alerts in a file. They are in the lines
+            # with a '%'.
+            grep "%" tmp2 | sed 's/\.//g' | cut -d ' ' -f 4  >> tmp_selection
         fi
         rm -f tmp tmp2
     done
+
+    # Output the lines of parameters with alerts to a dedicated file.
+    if [ -s tmp_selection ]
+    then
+        # Get the header.
+        head -n 1 "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
+        # Get the line of each parameter.
+        # A parameter can appear twice in the alerts, once when comparing with
+        # the reference, and another time when comparing with the previous run.
+        # That's why we're sorting and uniq-ing.
+        for p in $(sort tmp_selection | uniq)
+        do
+            grep "^$p," "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
+        done
+    fi
+    rm -f tmp_selection
 done
 
 cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
@@ -231,6 +254,11 @@ then
     slack_send_file "$ALERT_FILE" "Some regressions were found :sadparrot:"
 else
     slack "No regression :tada:"
+fi
+
+if [ -s "$SELECTION_FILE" ]
+then
+    slack_send_file "$SELECTION_FILE" "CSV comparing all runs on parameters with an alert"
 fi
 
 slack_send_file "$OUTPUT_CSV_DIR/all.csv" "CSV comparing all runs"
