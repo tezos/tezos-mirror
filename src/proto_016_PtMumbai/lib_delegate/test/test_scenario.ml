@@ -587,7 +587,8 @@ let test_scenario_f1 () =
               (3l, bootstrap3);
             ] );
         ];
-      timeout = 60;
+      timeout = 30;
+      debug = true;
     }
   in
   run
