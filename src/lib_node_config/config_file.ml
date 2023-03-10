@@ -208,10 +208,10 @@ let blockchain_network_mumbainet =
   make_blockchain_network
     ~alias:"mumbainet"
     {
-      time = Time.Protocol.of_notation_exn "2023-01-19T15:00:00Z";
+      time = Time.Protocol.of_notation_exn "2023-03-09T15:00:00Z";
       block =
         Block_hash.of_b58check_exn
-          "BMVeyjhT4yd421XJAYcB54hm54CwGqkV6tCzkJ8VpHPVch6Mkx6";
+          "BLytf7aG27Ca4xZ8cG4otofaUQfUA9TdULvHC3L9fToPHBcPKDV";
       protocol =
         Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
@@ -227,10 +227,10 @@ let blockchain_network_mumbainet =
               );
             ];
       }
-    ~chain_name:"TEZOS_MUMBAINET_2023-01-19T15:00:00Z"
+    ~chain_name:"TEZOS_MUMBAINET_2023-03-09T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
-      ["mumbainet.teztnets.xyz"; "mumbainet.visualtez.com"]
+      ["mumbainet.teztnets.xyz"; "mumbainet.boot.ecadinfra.com"]
 
 let blockchain_network_sandbox =
   make_blockchain_network
