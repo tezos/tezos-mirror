@@ -133,3 +133,17 @@ let init ?runner ?rpc_addr ?rpc_port rollup_node =
   let proxy_server = create ?runner ?rpc_addr ?rpc_port rollup_node in
   let* () = run proxy_server in
   return proxy_server
+
+let request method_ parameters : JSON.t =
+  `O
+    [
+      ("jsonrpc", `String "2.0");
+      ("method", `String method_);
+      ("params", parameters);
+      ("id", `String "0");
+    ]
+  |> JSON.annotate ~origin:"evm_proxy_server"
+
+let call_evm_rpc proxy_server ~method_ ~parameters =
+  let endpoint = endpoint proxy_server in
+  RPC.Curl.post endpoint (request method_ parameters) |> Runnable.run

@@ -57,3 +57,7 @@ val spawn_run : t -> Process.t
 (** [endpoint proxy_server] returns the endpoint to communicate with the
     [proxy_server]. *)
 val endpoint : t -> string
+
+(** [call_evm_rpc proxy_server ~method_ ~parameters] sends a JSON-RPC request to
+    the [proxy_server], for the given [method_] and [parameters]. *)
+val call_evm_rpc : t -> method_:string -> parameters:JSON.u -> JSON.t Lwt.t
