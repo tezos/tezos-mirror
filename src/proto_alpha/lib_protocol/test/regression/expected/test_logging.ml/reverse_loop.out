@@ -14,10 +14,10 @@ trace
   - SWAP (entry) @ location: 12
     [ {}
       { "abc" ; "def" ; "ghi" } ]
-    - log/CONST (exit) @ location: 12
+    - log/PUSH (exit) @ location: 12
       [ { "abc" ; "def" ; "ghi" }
         {} ]
-  - CONST (entry) @ location: 13
+  - PUSH (entry) @ location: 13
     [ { "abc" ; "def" ; "ghi" }
       {} ]
     - log/LOOP (exit) @ location: 13
@@ -63,10 +63,10 @@ trace
     [ { "abc" } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 21
+    - log/PUSH (exit) @ location: 21
       [ { "def" ; "ghi" }
         { "abc" } ]
-  - CONST (entry) @ location: 24
+  - PUSH (entry) @ location: 24
     [ { "def" ; "ghi" }
       { "abc" } ]
     - log/[halt] (exit) @ location: 24
@@ -121,10 +121,10 @@ trace
     [ { "def" ; "abc" } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 21
+    - log/PUSH (exit) @ location: 21
       [ { "ghi" }
         { "def" ; "abc" } ]
-  - CONST (entry) @ location: 24
+  - PUSH (entry) @ location: 24
     [ { "ghi" }
       { "def" ; "abc" } ]
     - log/[halt] (exit) @ location: 24
@@ -179,10 +179,10 @@ trace
     [ { "ghi" ; "def" ; "abc" } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 21
+    - log/PUSH (exit) @ location: 21
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - CONST (entry) @ location: 24
+  - PUSH (entry) @ location: 24
     [ {}
       { "ghi" ; "def" ; "abc" } ]
     - log/[halt] (exit) @ location: 24
@@ -213,10 +213,10 @@ trace
       [ { "ghi" ; "def" ; "abc" } ]
   - NIL (entry) @ location: 28
     [ { "ghi" ; "def" ; "abc" } ]
-    - log/CONST (exit) @ location: 28
+    - log/PUSH (exit) @ location: 28
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - CONST (entry) @ location: 30
+  - PUSH (entry) @ location: 30
     [ {}
       { "ghi" ; "def" ; "abc" } ]
     - log/[halt] (exit) @ location: 30

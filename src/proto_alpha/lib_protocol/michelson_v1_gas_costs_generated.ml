@@ -237,8 +237,8 @@ let cost_N_ICons_pair = S.safe_int 10
 (* model N_ICons_some *)
 let cost_N_ICons_some = S.safe_int 10
 
-(* model N_IConst *)
-let cost_N_IConst = S.safe_int 10
+(* model N_IPush *)
+let cost_N_IPush = S.safe_int 10
 
 (* model N_IContract *)
 let cost_N_IContract = S.safe_int 30

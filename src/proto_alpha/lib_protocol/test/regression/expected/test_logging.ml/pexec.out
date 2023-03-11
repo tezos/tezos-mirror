@@ -42,7 +42,7 @@ trace
   - EXEC (entry) @ location: 20
     [ 7
       { PUSH nat 77 ; PAIR ; { UNPAIR ; ADD } } ]
-    - CONST (entry) @ location: 12
+    - PUSH (entry) @ location: 12
       [ 7 ]
       - log/PAIR (exit) @ location: 12
         [ 77

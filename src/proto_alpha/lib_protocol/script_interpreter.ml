@@ -654,7 +654,7 @@ module Raw = struct
         | ISwap (_, k) ->
             let top, stack = stack in
             (step [@ocaml.tailcall]) g gas k ks top (accu, stack)
-        | IConst (_, _ty, v, k) ->
+        | IPush (_, _ty, v, k) ->
             (step [@ocaml.tailcall]) g gas k ks v (accu, stack)
         (* options *)
         | ICons_some (_, k) ->

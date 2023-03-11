@@ -8,9 +8,9 @@ trace
       [ True ]
   - IF (entry) @ location: 9
     [ True ]
-    - log/CONST (exit) @ location: 9
+    - log/PUSH (exit) @ location: 9
       [  ]
-  - CONST (entry) @ location: 11
+  - PUSH (entry) @ location: 11
     [  ]
     - log/[halt] (exit) @ location: 11
       [ True ]

@@ -42,23 +42,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 8
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 8
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ {}
           8
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ {}
         8
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ {}
       8
       {} ]
@@ -87,11 +87,11 @@ trace
   - NIL (entry) @ location: 61
     [ 8
       {} ]
-    - log/CONST (exit) @ location: 61
+    - log/PUSH (exit) @ location: 61
       [ {}
         8
         {} ]
-  - CONST (entry) @ location: 63
+  - PUSH (entry) @ location: 63
     [ {}
       8
       {} ]
@@ -174,23 +174,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 3
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 3
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 8 }
           3
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 8 }
         3
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 8 }
       3
       {} ]
@@ -266,16 +266,16 @@ trace
       3
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         3
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 8
           3
           3
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 8
         3
         3
@@ -392,11 +392,11 @@ trace
       {}
       3
       {} ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 8 }
         3
         {} ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 8 }
       3
       {} ]
@@ -490,23 +490,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 2
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 2
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 3 ; 8 }
           2
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 3 ; 8 }
         2
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 3 ; 8 }
       2
       {} ]
@@ -582,16 +582,16 @@ trace
       2
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         2
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 3
           2
           2
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         2
         2
@@ -708,11 +708,11 @@ trace
       { 8 }
       2
       {} ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 3 ; 8 }
         2
         {} ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 3 ; 8 }
       2
       {} ]
@@ -806,23 +806,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 7
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 7
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 2 ; 3 ; 8 }
           7
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 8 }
         7
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 2 ; 3 ; 8 }
       7
       {} ]
@@ -898,16 +898,16 @@ trace
       7
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 7
         7
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 2
           7
           7
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         7
         7
@@ -1050,11 +1050,11 @@ trace
       { 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 3 ; 8 }
         7
         { 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 3 ; 8 }
       7
       { 2 } ]
@@ -1152,16 +1152,16 @@ trace
       7
       { 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 7
         7
         { 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 3
           7
           7
           { 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         7
         7
@@ -1304,11 +1304,11 @@ trace
       { 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 8 }
         7
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 8 }
       7
       { 3 ; 2 } ]
@@ -1406,16 +1406,16 @@ trace
       7
       { 3 ; 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 7
         7
         { 3 ; 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 8
           7
           7
           { 3 ; 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 8
         7
         7
@@ -1532,11 +1532,11 @@ trace
       {}
       7
       { 3 ; 2 } ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 8 }
         7
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 8 }
       7
       { 3 ; 2 } ]
@@ -1652,23 +1652,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 6
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 6
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 2 ; 3 ; 7 ; 8 }
           6
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 7 ; 8 }
         6
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 2 ; 3 ; 7 ; 8 }
       6
       {} ]
@@ -1744,16 +1744,16 @@ trace
       6
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 6
         6
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 2
           6
           6
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         6
         6
@@ -1896,11 +1896,11 @@ trace
       { 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 3 ; 7 ; 8 }
         6
         { 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 3 ; 7 ; 8 }
       6
       { 2 } ]
@@ -1998,16 +1998,16 @@ trace
       6
       { 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 6
         6
         { 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 3
           6
           6
           { 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         6
         6
@@ -2150,11 +2150,11 @@ trace
       { 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 7 ; 8 }
       6
       { 3 ; 2 } ]
@@ -2252,16 +2252,16 @@ trace
       6
       { 3 ; 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 6
         6
         { 3 ; 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 7
           6
           6
           { 3 ; 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 7
         6
         6
@@ -2378,11 +2378,11 @@ trace
       { 8 }
       6
       { 3 ; 2 } ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 7 ; 8 }
       6
       { 3 ; 2 } ]
@@ -2498,23 +2498,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 9
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 9
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 2 ; 3 ; 6 ; 7 ; 8 }
           9
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 6 ; 7 ; 8 }
         9
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 2 ; 3 ; 6 ; 7 ; 8 }
       9
       {} ]
@@ -2590,16 +2590,16 @@ trace
       9
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 9
         9
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 2
           9
           9
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         9
         9
@@ -2742,11 +2742,11 @@ trace
       { 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 3 ; 6 ; 7 ; 8 }
         9
         { 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 3 ; 6 ; 7 ; 8 }
       9
       { 2 } ]
@@ -2844,16 +2844,16 @@ trace
       9
       { 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 9
         9
         { 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 3
           9
           9
           { 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         9
         9
@@ -2996,11 +2996,11 @@ trace
       { 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 6 ; 7 ; 8 }
         9
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 6 ; 7 ; 8 }
       9
       { 3 ; 2 } ]
@@ -3098,16 +3098,16 @@ trace
       9
       { 3 ; 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 9
         9
         { 3 ; 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 6
           9
           9
           { 3 ; 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 6
         9
         9
@@ -3250,11 +3250,11 @@ trace
       { 6 ; 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 7 ; 8 }
         9
         { 6 ; 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 7 ; 8 }
       9
       { 6 ; 3 ; 2 } ]
@@ -3352,16 +3352,16 @@ trace
       9
       { 6 ; 3 ; 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 9
         9
         { 6 ; 3 ; 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 7
           9
           9
           { 6 ; 3 ; 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 7
         9
         9
@@ -3504,11 +3504,11 @@ trace
       { 7 ; 6 ; 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 8 }
         9
         { 7 ; 6 ; 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 8 }
       9
       { 7 ; 6 ; 3 ; 2 } ]
@@ -3606,16 +3606,16 @@ trace
       9
       { 7 ; 6 ; 3 ; 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 9
         9
         { 7 ; 6 ; 3 ; 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 8
           9
           9
           { 7 ; 6 ; 3 ; 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 8
         9
         9
@@ -3758,11 +3758,11 @@ trace
       { 8 ; 7 ; 6 ; 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ {}
       9
       { 8 ; 7 ; 6 ; 3 ; 2 } ]
@@ -3813,11 +3813,11 @@ trace
   - NIL (entry) @ location: 61
     [ 9
       { 8 ; 7 ; 6 ; 3 ; 2 } ]
-    - log/CONST (exit) @ location: 61
+    - log/PUSH (exit) @ location: 61
       [ {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - CONST (entry) @ location: 63
+  - PUSH (entry) @ location: 63
     [ {}
       9
       { 8 ; 7 ; 6 ; 3 ; 2 } ]
@@ -3955,23 +3955,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 5
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 5
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
           5
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
         5
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
       5
       {} ]
@@ -4047,16 +4047,16 @@ trace
       5
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 5
         5
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 2
           5
           5
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         5
         5
@@ -4199,11 +4199,11 @@ trace
       { 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 3 ; 6 ; 7 ; 8 ; 9 }
         5
         { 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 3 ; 6 ; 7 ; 8 ; 9 }
       5
       { 2 } ]
@@ -4301,16 +4301,16 @@ trace
       5
       { 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 5
         5
         { 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 3
           5
           5
           { 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         5
         5
@@ -4453,11 +4453,11 @@ trace
       { 3 ; 2 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 6 ; 7 ; 8 ; 9 }
       5
       { 3 ; 2 } ]
@@ -4555,16 +4555,16 @@ trace
       5
       { 3 ; 2 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 5
         5
         { 3 ; 2 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 6
           5
           5
           { 3 ; 2 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 6
         5
         5
@@ -4681,11 +4681,11 @@ trace
       { 7 ; 8 ; 9 }
       5
       { 3 ; 2 } ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 6 ; 7 ; 8 ; 9 }
       5
       { 3 ; 2 } ]
@@ -4801,23 +4801,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 1
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 1
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
           1
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
       {} ]
@@ -4893,16 +4893,16 @@ trace
       1
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 1
         1
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 2
           1
           1
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         1
         1
@@ -5019,11 +5019,11 @@ trace
       { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
       {} ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
       {} ]
@@ -5117,23 +5117,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 4
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 4
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
           4
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
       {} ]
@@ -5209,16 +5209,16 @@ trace
       4
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 4
         4
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 1
           4
           4
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 1
         4
         4
@@ -5361,11 +5361,11 @@ trace
       { 1 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 1 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 1 } ]
@@ -5463,16 +5463,16 @@ trace
       4
       { 1 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 4
         4
         { 1 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 2
           4
           4
           { 1 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 2
         4
         4
@@ -5615,11 +5615,11 @@ trace
       { 2 ; 1 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 2 ; 1 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 2 ; 1 } ]
@@ -5717,16 +5717,16 @@ trace
       4
       { 2 ; 1 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 4
         4
         { 2 ; 1 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 3
           4
           4
           { 2 ; 1 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 3
         4
         4
@@ -5869,11 +5869,11 @@ trace
       { 3 ; 2 ; 1 } ]
     - control: KUndip
     - control: KCons
-    - log/CONST (exit) @ location: 45
+    - log/PUSH (exit) @ location: 45
       [ { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - CONST (entry) @ location: 51
+  - PUSH (entry) @ location: 51
     [ { 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 3 ; 2 ; 1 } ]
@@ -5971,16 +5971,16 @@ trace
       4
       { 3 ; 2 ; 1 } ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 4
         4
         { 3 ; 2 ; 1 } ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 5
           4
           4
           { 3 ; 2 ; 1 } ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 5
         4
         4
@@ -6097,11 +6097,11 @@ trace
       { 6 ; 7 ; 8 ; 9 }
       4
       { 3 ; 2 ; 1 } ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 3 ; 2 ; 1 } ]
@@ -6228,23 +6228,23 @@ trace
   - [halt] (entry) @ location: 19
     [ {} ]
     - control: KCons
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ {} ]
-      - log/CONST (exit) @ location: 16
+      - log/PUSH (exit) @ location: 16
         [ 0
           {} ]
-    - CONST (entry) @ location: 16
+    - PUSH (entry) @ location: 16
       [ 0
         {} ]
-      - log/log/log/CONST (exit) @ location: 16
+      - log/log/log/PUSH (exit) @ location: 16
         [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
           0
           {} ]
-    - log/CONST (exit) @ location: 16
+    - log/PUSH (exit) @ location: 16
       [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
-  - CONST (entry) @ location: 21
+  - PUSH (entry) @ location: 21
     [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
       {} ]
@@ -6320,16 +6320,16 @@ trace
       0
       {} ]
     - control: KCons
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 0
         0
         {} ]
-      - log/CONST (exit) @ location: 32
+      - log/PUSH (exit) @ location: 32
         [ 1
           0
           0
           {} ]
-    - CONST (entry) @ location: 32
+    - PUSH (entry) @ location: 32
       [ 1
         0
         0
@@ -6446,11 +6446,11 @@ trace
       { 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
       {} ]
-    - log/CONST (exit) @ location: 56
+    - log/PUSH (exit) @ location: 56
       [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
-  - CONST (entry) @ location: 57
+  - PUSH (entry) @ location: 57
     [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
       {} ]

@@ -44,7 +44,7 @@ type instruction_name =
   | N_IDrop
   | N_IDup
   | N_ISwap
-  | N_IConst
+  | N_IPush
   (* pairs *)
   | N_ICons_pair
   | N_ICar
@@ -267,7 +267,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IDrop -> "N_IDrop"
   | N_IDup -> "N_IDup"
   | N_ISwap -> "N_ISwap"
-  | N_IConst -> "N_IConst"
+  | N_IPush -> "N_IPush"
   | N_ICons_pair -> "N_ICons_pair"
   | N_ICar -> "N_ICar"
   | N_ICdr -> "N_ICdr"
@@ -499,7 +499,7 @@ let all_instructions =
     N_IDrop;
     N_IDup;
     N_ISwap;
-    N_IConst;
+    N_IPush;
     N_ICons_pair;
     N_ICar;
     N_ICdr;
@@ -752,7 +752,7 @@ module Instructions = struct
 
   let swap = ir_sized_step N_ISwap nullary
 
-  let const = ir_sized_step N_IConst nullary
+  let push = ir_sized_step N_IPush nullary
 
   let cons_pair = ir_sized_step N_ICons_pair nullary
 
@@ -1222,7 +1222,7 @@ let extract_ir_sized_step :
   | IDrop (_, _), _ -> Instructions.drop
   | IDup (_, _), _ -> Instructions.dup
   | ISwap (_, _), _ -> Instructions.swap
-  | IConst (_, _, _, _), _ -> Instructions.const
+  | IPush (_, _, _, _), _ -> Instructions.push
   | ICons_pair (_, _), _ -> Instructions.cons_pair
   | ICar (_, _), _ -> Instructions.car
   | ICdr (_, _), _ -> Instructions.cdr

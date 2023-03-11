@@ -2742,12 +2742,12 @@ and parse_instr :
         t
         d
       >>=? fun (v, ctxt) ->
-      let const = {apply = (fun k -> IConst (loc, t, v, k))} in
-      typed ctxt loc const (Item_t (t, stack))
+      let push = {apply = (fun k -> IPush (loc, t, v, k))} in
+      typed ctxt loc push (Item_t (t, stack))
   | Prim (loc, I_UNIT, [], annot), stack ->
       check_var_type_annot loc annot >>?= fun () ->
-      let const = {apply = (fun k -> IConst (loc, unit_t, (), k))} in
-      typed ctxt loc const (Item_t (unit_t, stack))
+      let push = {apply = (fun k -> IPush (loc, unit_t, (), k))} in
+      typed ctxt loc push (Item_t (unit_t, stack))
   (* options *)
   | Prim (loc, I_SOME, [], annot), Item_t (t, rest) ->
       check_var_type_annot loc annot >>?= fun () ->

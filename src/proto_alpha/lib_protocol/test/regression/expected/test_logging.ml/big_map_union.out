@@ -87,12 +87,12 @@ trace
       12
       { Elt "123" 123 }
       Unit ]
-    - log/CONST (exit) @ location: 27
+    - log/PUSH (exit) @ location: 27
       [ "string"
         12
         { Elt "123" 123 }
         Unit ]
-  - CONST (entry) @ location: 29
+  - PUSH (entry) @ location: 29
     [ "string"
       12
       { Elt "123" 123 }
@@ -235,12 +235,12 @@ trace
       99
       { Elt "123" 123 ; Elt "string" 12 }
       Unit ]
-    - log/CONST (exit) @ location: 27
+    - log/PUSH (exit) @ location: 27
       [ "abc"
         99
         { Elt "123" 123 ; Elt "string" 12 }
         Unit ]
-  - CONST (entry) @ location: 29
+  - PUSH (entry) @ location: 29
     [ "abc"
       99
       { Elt "123" 123 ; Elt "string" 12 }
@@ -383,12 +383,12 @@ trace
       3
       { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
       Unit ]
-    - log/CONST (exit) @ location: 27
+    - log/PUSH (exit) @ location: 27
       [ "def"
         3
         { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
         Unit ]
-  - CONST (entry) @ location: 29
+  - PUSH (entry) @ location: 29
     [ "def"
       3
       { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }

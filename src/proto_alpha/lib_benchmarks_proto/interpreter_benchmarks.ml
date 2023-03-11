@@ -715,9 +715,9 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_IConst
+        ~name:Interpreter_workload.N_IPush
         ~stack_type:(unit @$ unit @$ bot)
-        ~kinstr:(IConst (dummy_loc, unit, (), halt))
+        ~kinstr:(IPush (dummy_loc, unit, (), halt))
         ()
 
     (* deep stack manipulation *)
@@ -2164,9 +2164,9 @@ module Registration_section = struct
         ILoop ->
         either
         - IHalt (false on top of stack)
-        - IConst false ; IHalt (true on top of stack)
+        - IPush false ; IHalt (true on top of stack)
        *)
-      let push_false = IConst (dummy_loc, bool, false, halt) in
+      let push_false = IPush (dummy_loc, bool, false, halt) in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop
         ~stack_type:(bool @$ bot)
@@ -2190,7 +2190,7 @@ module Registration_section = struct
       (*
         IDip ->
         IHalt ->
-        IConst ->
+        IPush ->
         IHalt
        *)
       simple_benchmark
@@ -2220,7 +2220,7 @@ module Registration_section = struct
           kaft = unit @$ bot;
           kinstr =
             IDrop
-              (dummy_loc, IDrop (dummy_loc, IConst (dummy_loc, unit, (), halt)));
+              (dummy_loc, IDrop (dummy_loc, IPush (dummy_loc, unit, (), halt)));
         }
       in
       LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
@@ -2270,8 +2270,7 @@ module Registration_section = struct
             kaft = unit @$ bot;
             kinstr =
               IDrop
-                ( dummy_loc,
-                  IDrop (dummy_loc, IConst (dummy_loc, unit, (), halt)) );
+                (dummy_loc, IDrop (dummy_loc, IPush (dummy_loc, unit, (), halt)));
           }
         in
         LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
@@ -3278,7 +3277,7 @@ module Registration_section = struct
         ~amplification:100
         ~name:Interpreter_workload.N_KLoop_in
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
-          let cont = KLoop_in (IConst (dummy_loc, bool, false, halt), KNil) in
+          let cont = KLoop_in (IPush (dummy_loc, bool, false, halt), KNil) in
           let stack = (false, ((), eos)) in
           let stack_type = bool @$ unit @$ bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})

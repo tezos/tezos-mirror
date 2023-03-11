@@ -378,7 +378,7 @@ module Cost_of = struct
 
     let halt = atomic_step_cost cost_N_IHalt
 
-    let const = atomic_step_cost cost_N_IConst
+    let push = atomic_step_cost cost_N_IPush
 
     let empty_big_map = atomic_step_cost cost_N_IEmpty_big_map
 

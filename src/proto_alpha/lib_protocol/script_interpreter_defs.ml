@@ -293,7 +293,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IDrop _ -> Interp_costs.drop
   | IDup _ -> Interp_costs.dup
   | ISwap _ -> Interp_costs.swap
-  | IConst _ -> Interp_costs.const
+  | IPush _ -> Interp_costs.push
   | ICons_some _ -> Interp_costs.cons_some
   | ICons_none _ -> Interp_costs.cons_none
   | IIf_none _ -> Interp_costs.if_none
@@ -469,7 +469,7 @@ let rec kundip :
  fun w accu stack k ->
   match w with
   | KPrefix (loc, ty, w) ->
-      let k = IConst (loc, ty, accu, k) in
+      let k = IPush (loc, ty, accu, k) in
       let accu, stack = stack in
       kundip w accu stack k
   | KRest -> (accu, stack, k)
@@ -514,7 +514,7 @@ let apply ctxt gas capture_ty capture lam =
                 kbef = arg_stack_ty;
                 kaft = descr.kaft;
                 kinstr =
-                  IConst
+                  IPush
                     ( descr.kloc,
                       capture_ty,
                       capture,
@@ -553,7 +553,7 @@ let apply ctxt gas capture_ty capture lam =
                 kbef = arg_stack_ty;
                 kaft = descr.kaft;
                 kinstr =
-                  IConst
+                  IPush
                     ( descr.kloc,
                       capture_ty,
                       capture,
