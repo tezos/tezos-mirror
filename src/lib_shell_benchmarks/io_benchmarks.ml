@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,7 +23,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
+open Benchmarks_shell
 module Context = Tezos_protocol_environment.Context
 module Shell_monad = Tezos_error_monad.Error_monad
 module Key_map = Io_helpers.Key_map
