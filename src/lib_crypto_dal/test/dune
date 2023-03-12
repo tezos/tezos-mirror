@@ -36,6 +36,7 @@
 (rule
  (alias runtezt)
  (package tezos-crypto-dal)
+ (deps srs_zcash_g1_5 srs_zcash_g2_5)
  (action (run %{dep:./main.exe})))
 
 (rule
