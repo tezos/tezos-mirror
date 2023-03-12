@@ -1700,6 +1700,16 @@ module Internal_for_tests = struct
 
   let shard_length t = t.shard_length
 
+  let dummy_polynomial ~state ~degree =
+    let rec nonzero () =
+      let res = Bls12_381.Fr.random ~state () in
+      if Bls12_381.Fr.is_zero res then nonzero () else res
+    in
+    Polynomials.init (degree + 1) (fun i ->
+        if i = degree then nonzero () else Bls12_381.Fr.random ~state ())
+
+  let srs_size_g1 t = Srs_g1.size t.srs.raw.srs_g1
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let max_polynomial_length =

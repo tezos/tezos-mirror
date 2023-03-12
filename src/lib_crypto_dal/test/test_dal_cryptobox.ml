@@ -729,6 +729,55 @@ module Test = struct
         | Error (`Shard_index_out_of_range _) -> true
         | _ -> false)
 
+  let test_commit =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test commit"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let state = QCheck_base_runner.random_state () in
+        let degree = randrange (Cryptobox.Internal_for_tests.srs_size_g1 t) in
+        let polynomial =
+          Cryptobox.Internal_for_tests.dummy_polynomial ~state ~degree
+        in
+        Cryptobox.commit t polynomial)
+        |> function
+        | Ok _ -> true
+        | _ -> false)
+
+  let test_commit_failure =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test commit failure"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        let deg = ref 0 in
+        let size_srs_g1 = ref 0 in
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let state = QCheck_base_runner.random_state () in
+        let min = Cryptobox.Internal_for_tests.srs_size_g1 t in
+        let degree = randrange ~min (min + (1 lsl 10)) in
+        deg := degree ;
+        size_srs_g1 := Cryptobox.Internal_for_tests.srs_size_g1 t ;
+        let polynomial =
+          Cryptobox.Internal_for_tests.dummy_polynomial ~state ~degree
+        in
+        Cryptobox.commit t polynomial)
+        |> function
+        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
+          ->
+            given = !deg && expected = !size_srs_g1
+        | _ -> false)
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -827,5 +876,7 @@ let () =
             Test.test_prove_page_out_of_bounds;
             Test.test_verify_page_out_of_bounds;
             Test.test_verify_shard_out_of_bounds;
+            Test.test_commit;
+            Test.test_commit_failure;
           ] );
     ]

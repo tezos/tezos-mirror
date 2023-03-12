@@ -444,6 +444,10 @@ module Internal_for_tests : sig
 
   val shard_length : t -> int
 
+  val dummy_polynomial : state:Random.State.t -> degree:int -> polynomial
+
+  val srs_size_g1 : t -> int
+
   (** [select_fft_domain domain_size] selects a suitable domain for the FFT.
 
      The domain size [domain_size] is expected to be strictly positive.
