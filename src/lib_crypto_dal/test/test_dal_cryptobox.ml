@@ -603,6 +603,32 @@ module Test = struct
                 0)
         | _ -> false)
 
+  let test_page_length_mismatch =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test page_length_mismatch"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let slot = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
+        assume (Bytes.length slot <> params.slot_size) ;
+        let state = QCheck_base_runner.random_state () in
+        let commitment = Cryptobox.Internal_for_tests.dummy_commitment ~state () in
+        let page = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
+        assume (Bytes.length page <> params.page_size) ;
+        let page_proof = Cryptobox.Internal_for_tests.dummy_page_proof ~state () in
+        let page_index =
+          randrange (Cryptobox.Internal_for_tests.number_of_pages t)
+        in
+        Cryptobox.verify_page t commitment ~page_index page page_proof)
+        |> function
+        | Error `Page_length_mismatch -> true
+        | _ -> false)
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -697,5 +723,6 @@ let () =
             Test.test_shard_proofs_load_from_file;
             Test.test_dal_initialisation_twice_failure;
             Test.test_wrong_slot_size;
+            Test.test_page_length_mismatch;
           ] );
     ]

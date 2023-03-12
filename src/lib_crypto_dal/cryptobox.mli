@@ -431,6 +431,12 @@ module Internal_for_tests : sig
      number of shards to reconstruct a slot using [polynomial_from_shards]. *)
   val minimum_number_of_shards_to_reconstruct_slot : t -> int
 
+  val dummy_commitment : state:Random.State.t -> unit -> commitment
+
+  val dummy_page_proof : state:Random.State.t -> unit -> page_proof
+
+  val number_of_pages : t -> int
+
   (** [select_fft_domain domain_size] selects a suitable domain for the FFT.
 
      The domain size [domain_size] is expected to be strictly positive.
