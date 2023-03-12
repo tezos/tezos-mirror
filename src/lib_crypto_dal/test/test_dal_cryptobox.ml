@@ -129,7 +129,7 @@ module Test = struct
   let test_erasure_code =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test erasure code"
+      ~name:"erasure code"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -171,7 +171,7 @@ module Test = struct
   let test_erasure_code_with_slot_conversion =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test erasure code with slot conversion"
+      ~name:"erasure code with slot conversion"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -213,7 +213,7 @@ module Test = struct
   let test_erasure_code_failure_not_enough_shards =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test erasure code not enough shards"
+      ~name:"erasure code not enough shards"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -245,7 +245,7 @@ module Test = struct
   let test_erasure_code_failure_out_of_range =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test erasure code shard index out of range"
+      ~name:"erasure code shard index out of range"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -281,7 +281,7 @@ module Test = struct
   let test_erasure_code_failure_invalid_shard_length =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test erasure code shard invalid shard length"
+      ~name:"erasure code shard invalid shard length"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -301,7 +301,7 @@ module Test = struct
   let test_polynomial_slot_conversions =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test polynomial-slot conversions"
+      ~name:"polynomial-slot conversions"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -320,7 +320,7 @@ module Test = struct
   let test_page_proofs =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test page proofs"
+      ~name:"page proofs"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -345,7 +345,7 @@ module Test = struct
   let test_page_proofs_invalid =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test page proofs invalid page"
+      ~name:"page proofs invalid page"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -373,7 +373,7 @@ module Test = struct
   let test_shard_proofs =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test shard proofs"
+      ~name:"shard proofs"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -407,7 +407,7 @@ module Test = struct
   let test_shard_proof_invalid =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test invalid shard proof"
+      ~name:"invalid shard proof"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -447,7 +447,7 @@ module Test = struct
   let test_commitment_proof =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test commitment proof"
+      ~name:"commitment proof"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -466,7 +466,7 @@ module Test = struct
   let test_commitment_proof_invalid =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test invalid commitment proof"
+      ~name:"invalid commitment proof"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -488,7 +488,7 @@ module Test = struct
   let test_select_fft_domain =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test FFT domain selection"
+      ~name:"FFT domain selection"
       ~print:QCheck2.Print.int
       ~count:100_000
       (QCheck2.Gen.int_range 1 10_000_000)
@@ -503,7 +503,7 @@ module Test = struct
   let test_shard_proofs_load_from_file =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test shard proofs loading"
+      ~name:"shard proofs loading"
       ~print:print_parameters
       ~count:1
       generate_parameters
@@ -538,7 +538,7 @@ module Test = struct
   let test_dal_initialisation_twice_failure =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test DAL initialisation twice failure"
+      ~name:"DAL initialisation twice failure"
       ~print:print_parameters
       ~count:1
       generate_parameters
@@ -591,7 +591,7 @@ module Test = struct
   let test_wrong_slot_size =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test wrong slot size"
+      ~name:"wrong slot size"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -614,7 +614,7 @@ module Test = struct
   let test_page_length_mismatch =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test page_length_mismatch"
+      ~name:"page_length_mismatch"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -644,7 +644,7 @@ module Test = struct
   let test_prove_page_out_of_bounds =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test prove page out of bound"
+      ~name:"prove page out of bound"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -666,7 +666,7 @@ module Test = struct
   let test_verify_page_out_of_bounds =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test verify page out of bound"
+      ~name:"verify page out of bound"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -698,7 +698,7 @@ module Test = struct
   let test_verify_shard_out_of_bounds =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test verify shard out of bound"
+      ~name:"verify shard out of bound"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -732,7 +732,7 @@ module Test = struct
   let test_commit =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test commit"
+      ~name:"commit"
       ~print:print_parameters
       generate_parameters
       (fun params ->
@@ -753,7 +753,7 @@ module Test = struct
   let test_commit_failure =
     let open QCheck2 in
     Test.make
-      ~name:"DAL cryptobox: test commit failure"
+      ~name:"commit failure"
       ~print:print_parameters
       generate_parameters
       (fun params ->
