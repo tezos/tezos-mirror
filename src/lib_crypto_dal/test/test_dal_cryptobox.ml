@@ -580,6 +580,29 @@ module Test = struct
         if Re.Str.(string_match (regexp "EOF") s 0) then () else assert false
     | _ -> assert false
 
+  let test_wrong_slot_size =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test wrong slot size"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let slot = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
+        assume (Bytes.length slot <> params.slot_size) ;
+        Cryptobox.polynomial_from_slot t slot)
+        |> function
+        | Error (`Slot_wrong_size s) ->
+            Re.Str.(
+              string_match
+                (regexp "message must be \\([0-9]+\\) bytes long")
+                s
+                0)
+        | _ -> false)
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -673,5 +696,6 @@ let () =
             Test.test_select_fft_domain;
             Test.test_shard_proofs_load_from_file;
             Test.test_dal_initialisation_twice_failure;
+            Test.test_wrong_slot_size;
           ] );
     ]
