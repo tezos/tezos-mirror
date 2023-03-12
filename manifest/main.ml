@@ -974,7 +974,6 @@ let _octez_crypto_dal_tests =
     ["test_dal_cryptobox"]
     ~path:"src/lib_crypto_dal/test"
     ~opam:"tezos-crypto-dal"
-    ~dep_files:["shard_proofs_precomp"]
     ~deps:
       [
         octez_stdlib |> open_;

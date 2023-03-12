@@ -36,7 +36,6 @@
 (rule
  (alias runtezt)
  (package tezos-crypto-dal)
- (deps shard_proofs_precomp)
  (action (run %{dep:./main.exe})))
 
 (rule
