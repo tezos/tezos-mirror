@@ -74,14 +74,28 @@ let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path
     Lwt.finalize
       (fun () ->
         return
-          (Lwt_bytes.map_file
-             ~fd:(Lwt_unix.unix_file_descr fd)
-             ~shared:false
-             ()))
+          (match
+             Lwt_bytes.map_file
+               ~fd:(Lwt_unix.unix_file_descr fd)
+               ~shared:false
+               ()
+           with
+          | exception Unix.Unix_error (error_code, function_name, _) ->
+              Error
+                [
+                  Failed_to_load_trusted_setup
+                    (Format.sprintf
+                       "%s: Unix.Unix_error: %s"
+                       function_name
+                       (Unix.error_message error_code));
+                ]
+          | exception e ->
+              Error [Failed_to_load_trusted_setup (Printexc.to_string e)]
+          | res -> Ok res))
       (fun () -> Lwt_unix.close fd)
   in
-  let*! srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
-  let*! srs_g2_bigstring = to_bigstring ~path:srs_g2_path in
+  let* srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
+  let* srs_g2_bigstring = to_bigstring ~path:srs_g2_path in
   match
     let open Result_syntax in
     let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring ~len in
