@@ -345,6 +345,20 @@ module Polynomial_impl = struct
 
   let is_zero p = if degree p = -1 then true else false
 
+  let truncate ~len p =
+    if len < 0 then
+      raise (Invalid_argument "truncate: expected positive length.")
+    else
+      (* [min_len_capacity p] returns the minimum of [len] and [degree p + 1].
+         Here, [degree p + 1] is the minimal length of the {!type:Carray.t}
+         representing the polynomial [p].
+         When [p] is the zero polynomial its degree is -1, so we return 1 for
+         one coefficient holding the value. *)
+      let min_len_capacity p =
+        if is_zero p then 1 else min len (degree p + 1)
+      in
+      copy ~len:(min_len_capacity p) p
+
   let evaluate p scalar =
     let n = length p in
     let res = Fr.copy scalar in
@@ -462,6 +476,13 @@ module type Polynomial_sig = sig
 
   (** [copy p] returns a copy of a polynomial [p] *)
   val copy : ?offset:int -> ?len:int -> t -> t
+
+  (** [truncate ~len p] returns a new polynomial made of the first [len]
+      coefficients of [p]. If [degree p + 1] is less than [len] then
+      [copy p] is returned.
+
+      @raise [Invalid_argument] if [len] is negative. *)
+  val truncate : len:int -> t -> t
 
   (** [to_dense_coefficients p] returns the dense representation of
   a polynomial [p], i.e., it converts a C array to an OCaml array *)
