@@ -9,7 +9,7 @@
   tezos-base
   octez-protocol-compiler.registerer
   tezos-stdlib-unix
-  tezos_dac_node_lib
+  tezos-dac-lib
   tezos-client-alpha
   tezos-embedded-protocol-alpha
   tezos-protocol-alpha)
@@ -22,7 +22,7 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_registerer
   -open Tezos_stdlib_unix
-  -open Tezos_dac_node_lib
+  -open Tezos_dac_lib
   -open Tezos_client_alpha
   -open Tezos_embedded_protocol_alpha
   -open Tezos_protocol_alpha))

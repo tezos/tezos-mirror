@@ -3353,6 +3353,15 @@ let octez_dal_node_lib =
         octez_crypto_dal |> open_;
       ]
 
+let octez_dac_lib =
+  public_lib
+    "tezos-dac-lib"
+    ~path:"src/lib_dac"
+    ~opam:"tezos-dac-lib"
+    ~synopsis:"Tezos: `tezos-dac` library"
+    ~deps:
+      [octez_base |> open_ ~m:"TzPervasives"; octez_protocol_updater |> open_]
+
 let octez_dac_node_lib =
   private_lib
     "tezos_dac_node_lib"
@@ -3369,6 +3378,7 @@ let octez_dac_node_lib =
         octez_stdlib_unix |> open_;
         octez_layer2_store |> open_;
         octez_rpc_http_server;
+        octez_dac_lib |> open_;
       ]
 
 let _octez_dac_node_lib_tests =
@@ -5456,7 +5466,7 @@ module Protocol = Protocol
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
-            octez_dac_node_lib |> open_;
+            octez_dac_lib |> open_;
             client |> if_some |> open_;
             embedded |> open_;
             main |> open_;
