@@ -790,7 +790,7 @@ let test_forked_migration_bakers ?(migration_level = 4)
           let* () = Baker.run ~event_sections_levels baker in
           return baker
     in
-    Baker.log_events baker ;
+    Baker.log_shortened_events baker ;
     return baker
   in
 

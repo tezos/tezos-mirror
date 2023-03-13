@@ -201,3 +201,19 @@ val init :
   Node.t ->
   Client.t ->
   t Lwt.t
+
+(** Log all baker events with [Log.info] on a single line each, which
+    should be easily readable by a human.
+
+    This function should not be called by any test on a permanent
+    basis, but is available for debugging.
+
+    If an event has an unexpected format, the anomaly is signaled with
+    [Log.warn].
+
+    If you want to see all events, don't forget to launch the baker with
+{[
+~event_sections_levels:
+  [(String.concat "." [Protocol.encoding_prefix protocol; "baker"], `Debug)]
+]} *)
+val log_shortened_events : t -> unit
