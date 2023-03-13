@@ -129,7 +129,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
@@ -171,7 +171,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
@@ -213,7 +213,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
@@ -245,7 +245,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let shards = Cryptobox.shards_from_polynomial t polynomial in
@@ -279,7 +279,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let state = QCheck_base_runner.random_state () in
         let shards = Cryptobox.Internal_for_tests.make_dummy_shards t ~state in
@@ -299,7 +299,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let slot = Cryptobox.(polynomial_to_slot t polynomial) in
@@ -318,7 +318,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
@@ -343,7 +343,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
@@ -371,7 +371,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
@@ -405,7 +405,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
@@ -422,7 +422,7 @@ module Test = struct
         with
         | None ->
             (* The shard index was sampled within the bounds, so this case
-               (the queried index is out of bounds) doesn't happen. *)
+               (the queried index is out of bounds) cannot happen. *)
             assert false
         | Some shard ->
             let altered_proof =
@@ -445,7 +445,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
@@ -464,7 +464,7 @@ module Test = struct
       (fun params ->
         init () ;
         assume (ensure_validity params) ;
-        (let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
         let* commitment = Cryptobox.commit t polynomial in
@@ -591,7 +591,7 @@ module Test = struct
   let _test_collision_page_size () =
     let slot_size = 1 lsl 6 in
     init () ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
+    let open Error_monad.Result_syntax in
     (let* t1 =
        Cryptobox.make
          {
