@@ -39,7 +39,16 @@ Smart Rollups
 - Refactor WASM PVM to enable breaking changes such as new host functions and
   parameterization of maximum call depth. (MRs :gl:`!7724`, :gl:`!7726`)
 
-- Allow PVMs to upgrade themselves when a new protocol activates. (MRs :gl:`!7729`)
+- A new kind of internal message informs kernels when a protocol upgrade occurs.
+  The ``Protocol_migration`` message is injected by the economic protocol during
+  a protocol migration. (MR :gl:`!7729`)
+
+- Existing smart rollups can benefit from new protocol improvements. The WASM PVM
+  checks if it needs to upgrade to a new revision when it receives a ``Protocol_migration``
+  message. (MR :gl:`!7730`)
+
+- Remove the failsafe mechanism in inbox construction, aimed at errors that can 
+  never happen at begin application, block finalization, and migration. (MR :gl:`!7833`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -106,6 +115,8 @@ Internal
 
 - Michelson: normalize all lambdas into optimized mode during elaboration. (MR :gl:`!7829`)
 
+- Michelson: ``IConst`` constructor renamed into ``IPush``. (MR :gl:`!7954`)
+
 - Refactor and simplify consensus operation validation. (MR :gl:`!7720`)
 
 - Better documentation for the ``Token`` module (MR :gl:`!7609`)
@@ -115,3 +126,5 @@ Internal
 - Update gas cost for upgrading to librustzcash v5.0.0. (MR :gl:`!7814`)
 
 - Synchronized nodes' mempool are now able to consider early (pre)endorsements. (MR :gl:`!7828`)
+
+- Removed obsolete TORU manager operations. (MR :gl:`!7650`)
