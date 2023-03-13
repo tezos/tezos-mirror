@@ -12,7 +12,7 @@
   data-encoding
   octez-alcotezt
   qcheck-alcotest
-  tezos-bls12-381-polynomial-internal
+  octez-bls12-381-polynomial
   tezos-test-helpers)
  (library_flags (:standard -linkall))
  (flags

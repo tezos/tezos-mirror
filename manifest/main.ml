@@ -1086,9 +1086,9 @@ let _octez_polynomial_tests =
     ~opam:"octez-polynomial"
     ~deps:[bls12_381; octez_mec; alcotest; octez_polynomial]
 
-let octez_bls12_381_polynomial_internal =
+let octez_bls12_381_polynomial =
   public_lib
-    "tezos-bls12-381-polynomial-internal"
+    "octez-bls12-381-polynomial"
     ~path:"src/lib_bls12_381_polynomial"
     ~synopsis:
       "Polynomials over BLS12-381 finite field - Temporary vendored version of \
@@ -1103,12 +1103,12 @@ let octez_bls12_381_polynomial_internal =
         flags = [];
         names =
           [
-            "caml_bls12_381_polynomial_internal_polynomial_stubs";
-            "caml_bls12_381_polynomial_internal_srs_stubs";
-            "caml_bls12_381_polynomial_internal_ec_array_stubs";
-            "caml_bls12_381_polynomial_internal_fft_stubs";
-            "bls12_381_polynomial_internal_polynomial";
-            "bls12_381_polynomial_internal_fft";
+            "caml_bls12_381_polynomial_polynomial_stubs";
+            "caml_bls12_381_polynomial_srs_stubs";
+            "caml_bls12_381_polynomial_ec_array_stubs";
+            "caml_bls12_381_polynomial_fft_stubs";
+            "bls12_381_polynomial_polynomial";
+            "bls12_381_polynomial_fft";
           ];
       }
 
@@ -1125,7 +1125,7 @@ let _octez_bls12_381_polynomial_tests =
       "test_srs";
     ]
     ~path:"src/lib_bls12_381_polynomial/test"
-    ~opam:"tezos-bls12-381-polynomial-internal"
+    ~opam:"octez-bls12-381-polynomial"
     ~deps:
       [
         alcotezt;
@@ -1133,7 +1133,7 @@ let _octez_bls12_381_polynomial_tests =
         octez_polynomial;
         bisect_ppx;
         bls12_381;
-        octez_bls12_381_polynomial_internal;
+        octez_bls12_381_polynomial;
       ]
     ~dep_files:["srs_zcash_g1_5"]
 
@@ -1149,7 +1149,7 @@ let octez_crypto_dal =
         octez_error_monad |> open_;
         data_encoding |> open_;
         octez_crypto;
-        octez_bls12_381_polynomial_internal;
+        octez_bls12_381_polynomial;
         lwt_unix;
       ]
 
@@ -1167,7 +1167,7 @@ let _octez_crypto_dal_tests =
         data_encoding |> open_;
         alcotezt;
         qcheck_alcotest;
-        octez_bls12_381_polynomial_internal;
+        octez_bls12_381_polynomial;
         octez_test_helpers;
       ]
 

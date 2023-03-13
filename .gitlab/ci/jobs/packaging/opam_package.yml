@@ -240,6 +240,13 @@ opam:octez-baker-PtMumbai:
 
 # Ignoring unreleased package octez-bls12-381-hash.
 
+opam:octez-bls12-381-polynomial:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: octez-bls12-381-polynomial
+
 opam:octez-bls12-381-signature:
   extends:
     - .opam_template
@@ -457,13 +464,6 @@ opam:tezos-base-test-helpers:
 # Ignoring unreleased package tezos-benchmarks-proto-016-PtMumbai.
 
 # Ignoring unreleased package tezos-benchmarks-proto-alpha.
-
-opam:tezos-bls12-381-polynomial-internal:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_7
-  variables:
-    package: tezos-bls12-381-polynomial-internal
 
 opam:tezos-clic:
   extends:

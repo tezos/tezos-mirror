@@ -20,10 +20,10 @@
  * SOFTWARE.
  */
 
-#include "bls12_381_polynomial_internal_polynomial.h"
+#include "bls12_381_polynomial_polynomial.h"
 #include <caml/fail.h>
 
-void bls12_381_polynomial_internal_polynomial_add(blst_fr *res, blst_fr *poly_1,
+void bls12_381_polynomial_polynomial_add(blst_fr *res, blst_fr *poly_1,
                                                   blst_fr *poly_2,
                                                   const int size_1,
                                                   const int size_2) {
@@ -44,7 +44,7 @@ void bls12_381_polynomial_internal_polynomial_add(blst_fr *res, blst_fr *poly_1,
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_sub(blst_fr *res, blst_fr *poly_1,
+void bls12_381_polynomial_polynomial_sub(blst_fr *res, blst_fr *poly_1,
                                                   blst_fr *poly_2,
                                                   const int size_1,
                                                   const int size_2) {
@@ -65,7 +65,7 @@ void bls12_381_polynomial_internal_polynomial_sub(blst_fr *res, blst_fr *poly_1,
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_mul(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul(blst_fr *res,
                                                   const blst_fr *poly_1,
                                                   const blst_fr *poly_2,
                                                   const int size_1,
@@ -79,7 +79,7 @@ void bls12_381_polynomial_internal_polynomial_mul(blst_fr *res,
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_mul_by_scalar(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul_by_scalar(blst_fr *res,
                                                             blst_fr *scalar,
                                                             blst_fr *arg,
                                                             int size) {
@@ -89,7 +89,7 @@ void bls12_381_polynomial_internal_polynomial_mul_by_scalar(blst_fr *res,
 }
 
 // res is initialized with blst-fr zeros
-void bls12_381_polynomial_internal_polynomial_linear(blst_fr *res,
+void bls12_381_polynomial_polynomial_linear(blst_fr *res,
                                                      blst_fr **polynomials,
                                                      int *polynomials_len,
                                                      blst_fr *linear_coeffs,
@@ -114,7 +114,7 @@ void bls12_381_polynomial_internal_polynomial_linear(blst_fr *res,
 // res is initialized with blst-fr zeros
 // p_0 + s * p_1 + s^2 * p_2 + ... + s^n * p_n =
 // (..((p_n * s) + p_{n-1}) * s + .. + p_1) * s + p_0
-void bls12_381_polynomial_internal_polynomial_linear_with_powers_horner(
+void bls12_381_polynomial_polynomial_linear_with_powers_horner(
     blst_fr *res, blst_fr **polynomials, int *polynomials_len,
     blst_fr *linear_coeff, int nb_polys) {
   int poly_len_j;
@@ -140,7 +140,7 @@ void bls12_381_polynomial_internal_polynomial_linear_with_powers_horner(
 
 // res is initialized with blst-fr zeros
 // p_0 + s * p_1 + s^2 * p_2 + ... + s^n * p_n
-void bls12_381_polynomial_internal_polynomial_linear_with_powers_naive(
+void bls12_381_polynomial_polynomial_linear_with_powers_naive(
     blst_fr *res, blst_fr **polynomials, int *polynomials_len,
     blst_fr *linear_coeff, int nb_polys) {
   int poly_len_j;
@@ -163,7 +163,7 @@ void bls12_381_polynomial_internal_polynomial_linear_with_powers_naive(
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_linear_with_powers(
+void bls12_381_polynomial_polynomial_linear_with_powers(
     blst_fr *res, blst_fr **polynomials, int *polynomials_len,
     blst_fr *linear_coeff, int nb_polys) {
 
@@ -178,22 +178,22 @@ void bls12_381_polynomial_internal_polynomial_linear_with_powers(
   }
 
   if (max_len != min_len) {
-    bls12_381_polynomial_internal_polynomial_linear_with_powers_naive(
+    bls12_381_polynomial_polynomial_linear_with_powers_naive(
         res, polynomials, polynomials_len, linear_coeff, nb_polys);
   } else {
-    bls12_381_polynomial_internal_polynomial_linear_with_powers_horner(
+    bls12_381_polynomial_polynomial_linear_with_powers_horner(
         res, polynomials, polynomials_len, linear_coeff, nb_polys);
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_negate(blst_fr *res, blst_fr *arg,
+void bls12_381_polynomial_polynomial_negate(blst_fr *res, blst_fr *arg,
                                                      int size) {
   for (int i = 0; i < size; i++) {
     blst_fr_cneg(res + i, arg + i, 1);
   };
 }
 
-void bls12_381_polynomial_internal_polynomial_evaluate(blst_fr *res,
+void bls12_381_polynomial_polynomial_evaluate(blst_fr *res,
                                                        const blst_fr *arg,
                                                        const int size,
                                                        const blst_fr *scalar) {
@@ -205,7 +205,7 @@ void bls12_381_polynomial_internal_polynomial_evaluate(blst_fr *res,
 }
 
 // poly / (X^n + 1), size > n
-void bls12_381_polynomial_internal_polynomial_division_xn_one(
+void bls12_381_polynomial_polynomial_division_xn_one(
     blst_fr *res_q, blst_fr *res_r, const blst_fr *poly, const int size,
     const int n) {
 
@@ -239,7 +239,7 @@ void bls12_381_polynomial_internal_polynomial_division_xn_one(
 }
 
 // poly / (X^n - 1), size > n
-void bls12_381_polynomial_internal_polynomial_division_xn_minus_one(
+void bls12_381_polynomial_polynomial_division_xn_minus_one(
     blst_fr *res_q, blst_fr *res_r, const blst_fr *poly, const int size,
     const int n) {
 
@@ -273,7 +273,7 @@ void bls12_381_polynomial_internal_polynomial_division_xn_minus_one(
 }
 
 // poly / (X^n + scalar), size > n
-void bls12_381_polynomial_internal_polynomial_division_xn(
+void bls12_381_polynomial_polynomial_division_xn(
     blst_fr *res_q, blst_fr *res_r, const blst_fr *poly, const int size,
     const int n, const blst_fr *scalar) {
 
@@ -282,13 +282,13 @@ void bls12_381_polynomial_internal_polynomial_division_xn(
   blst_fr_cneg(&minus_one, &minus_one, 1);
 
   if (blst_fr_is_equal(scalar, &minus_one)) {
-    bls12_381_polynomial_internal_polynomial_division_xn_minus_one(
+    bls12_381_polynomial_polynomial_division_xn_minus_one(
         res_q, res_r, poly, size, n);
     return;
   };
 
   if (blst_fr_is_one(scalar)) {
-    bls12_381_polynomial_internal_polynomial_division_xn_one(res_q, res_r, poly,
+    bls12_381_polynomial_polynomial_division_xn_one(res_q, res_r, poly,
                                                              size, n);
     return;
   };
@@ -328,7 +328,7 @@ void bls12_381_polynomial_internal_polynomial_division_xn(
 
 // poly * (X^n + 1)
 // res is initialized with blst-fr zeros
-void bls12_381_polynomial_internal_polynomial_mul_xn_one(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul_xn_one(blst_fr *res,
                                                          const blst_fr *poly,
                                                          const int size,
                                                          const int n) {
@@ -358,7 +358,7 @@ void bls12_381_polynomial_internal_polynomial_mul_xn_one(blst_fr *res,
 
 // poly * (X^n - 1)
 // res is initialized with blst-fr zeros
-void bls12_381_polynomial_internal_polynomial_mul_xn_minus_one(
+void bls12_381_polynomial_polynomial_mul_xn_minus_one(
     blst_fr *res, const blst_fr *poly, const int size, const int n) {
 
   if (size >= n) {
@@ -386,7 +386,7 @@ void bls12_381_polynomial_internal_polynomial_mul_xn_minus_one(
 
 // poly * (X^n + scalar)
 // res is initialized with blst-fr zeros
-void bls12_381_polynomial_internal_polynomial_mul_xn(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul_xn(blst_fr *res,
                                                      const blst_fr *poly,
                                                      const int size,
                                                      const int n,
@@ -397,13 +397,13 @@ void bls12_381_polynomial_internal_polynomial_mul_xn(blst_fr *res,
   blst_fr_cneg(&minus_one, &minus_one, 1);
 
   if (blst_fr_is_equal(scalar, &minus_one)) {
-    bls12_381_polynomial_internal_polynomial_mul_xn_minus_one(res, poly, size,
+    bls12_381_polynomial_polynomial_mul_xn_minus_one(res, poly, size,
                                                               n);
     return;
   };
 
   if (blst_fr_is_one(scalar)) {
-    bls12_381_polynomial_internal_polynomial_mul_xn_one(res, poly, size, n);
+    bls12_381_polynomial_polynomial_mul_xn_one(res, poly, size, n);
     return;
   };
 
@@ -432,7 +432,7 @@ void bls12_381_polynomial_internal_polynomial_mul_xn(blst_fr *res,
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_evaluations_add(
+void bls12_381_polynomial_polynomial_evaluations_add(
     blst_fr *res, blst_fr *eval_1, blst_fr *eval_2, int size_1, int size_2) {
   int size_res = size_2 >= size_1 ? size_1 : size_2;
   int step1 = size_1 / size_res;
@@ -443,7 +443,7 @@ void bls12_381_polynomial_internal_polynomial_evaluations_add(
   };
 }
 
-void bls12_381_polynomial_internal_polynomial_evaluations_rescale(
+void bls12_381_polynomial_polynomial_evaluations_rescale(
     blst_fr *res, blst_fr *eval, int size_res, int size_eval) {
   int step = size_eval / size_res;
 
@@ -452,7 +452,7 @@ void bls12_381_polynomial_internal_polynomial_evaluations_rescale(
   };
 }
 
-void bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays(
+void bls12_381_polynomial_polynomial_evaluations_mul_arrays(
     blst_fr *res, blst_fr **evaluations, int *evaluations_len,
     int *composition_gx, byte **powers, int *powers_numbits, int size_res,
     int nb_evals) {
@@ -487,7 +487,7 @@ void bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays(
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays(
+void bls12_381_polynomial_polynomial_evaluations_linear_arrays(
     blst_fr *res, blst_fr **evaluations, int *evaluations_len,
     blst_fr *linear_coeffs, int *composition_gx, blst_fr *add_constant,
     int size_res, int nb_evals) {
@@ -533,7 +533,7 @@ void bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays(
   }
 }
 
-void bls12_381_polynomial_internal_polynomial_derivative(blst_fr *res,
+void bls12_381_polynomial_polynomial_derivative(blst_fr *res,
                                                          blst_fr *poly,
                                                          const int size) {
   blst_fr scalar;

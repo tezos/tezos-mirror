@@ -30,78 +30,78 @@
 #include <stdlib.h>
 #include <string.h>
 
-int bls12_381_polynomial_internal_polynomial_degree(blst_fr *arg, const int n);
+int bls12_381_polynomial_polynomial_degree(blst_fr *arg, const int n);
 
-bool bls12_381_polynomial_internal_polynomial_eq(blst_fr *poly_1,
+bool bls12_381_polynomial_polynomial_eq(blst_fr *poly_1,
                                                  blst_fr *poly_2, int size_1,
                                                  int size_2);
 
-void bls12_381_polynomial_internal_polynomial_add(blst_fr *res, blst_fr *arg_1,
+void bls12_381_polynomial_polynomial_add(blst_fr *res, blst_fr *arg_1,
                                                   blst_fr *arg_2, int size_1,
                                                   int size_2);
 
-void bls12_381_polynomial_internal_polynomial_sub(blst_fr *res, blst_fr *arg_1,
+void bls12_381_polynomial_polynomial_sub(blst_fr *res, blst_fr *arg_1,
                                                   blst_fr *arg_2, int size_1,
                                                   int size_2);
 
-void bls12_381_polynomial_internal_polynomial_mul(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul(blst_fr *res,
                                                   const blst_fr *arg_1,
                                                   const blst_fr *arg_2,
                                                   const int size_1,
                                                   const int size_2);
 
-void bls12_381_polynomial_internal_polynomial_mul_by_scalar(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul_by_scalar(blst_fr *res,
                                                             blst_fr *scalar,
                                                             blst_fr *arg,
                                                             int size);
 
-void bls12_381_polynomial_internal_polynomial_linear(blst_fr *res,
+void bls12_381_polynomial_polynomial_linear(blst_fr *res,
                                                      blst_fr **polynomials,
                                                      int *polynomials_len,
                                                      blst_fr *linear_coeffs,
                                                      int nb_polys);
 
-void bls12_381_polynomial_internal_polynomial_linear_with_powers(
+void bls12_381_polynomial_polynomial_linear_with_powers(
     blst_fr *res, blst_fr **polynomials, int *polynomials_len,
     blst_fr *linear_coeff, int nb_polys);
 
-void bls12_381_polynomial_internal_polynomial_negate(blst_fr *res, blst_fr *arg,
+void bls12_381_polynomial_polynomial_negate(blst_fr *res, blst_fr *arg,
                                                      int size);
 
-bool bls12_381_polynomial_internal_polynomial_is_zero(blst_fr *poly, int size);
+bool bls12_381_polynomial_polynomial_is_zero(blst_fr *poly, int size);
 
-void bls12_381_polynomial_internal_polynomial_evaluate(blst_fr *res,
+void bls12_381_polynomial_polynomial_evaluate(blst_fr *res,
                                                        const blst_fr *arg,
                                                        const int size,
                                                        const blst_fr *scalar);
 
-void bls12_381_polynomial_internal_polynomial_division_xn(
+void bls12_381_polynomial_polynomial_division_xn(
     blst_fr *res_q, blst_fr *res_r, const blst_fr *poly, int size, int n,
     const blst_fr *scalar);
 
-void bls12_381_polynomial_internal_polynomial_mul_xn(blst_fr *res,
+void bls12_381_polynomial_polynomial_mul_xn(blst_fr *res,
                                                      const blst_fr *poly,
                                                      const int size,
                                                      const int n,
                                                      const blst_fr *scalar);
 
-void bls12_381_polynomial_internal_polynomial_evaluations_add(
+void bls12_381_polynomial_polynomial_evaluations_add(
     blst_fr *res, blst_fr *eval_1, blst_fr *eval_2, int size_1, int size_2);
 
-void bls12_381_polynomial_internal_polynomial_evaluations_rescale(
+void bls12_381_polynomial_polynomial_evaluations_rescale(
     blst_fr *res, blst_fr *eval, int size_res, int size_eval);
 
-void bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays(
+void bls12_381_polynomial_polynomial_evaluations_mul_arrays(
     blst_fr *res, blst_fr **evaluations, int *evaluations_len,
     int *composition_gx, byte **powers, int *powers_numbits, int size_res,
     int nb_evals);
 
-void bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays(
+void bls12_381_polynomial_polynomial_evaluations_linear_arrays(
     blst_fr *res, blst_fr **evaluations, int *evaluations_len,
     blst_fr *linear_coeffs, int *composition_gx, blst_fr *add_constant,
     int size_res, int nb_evals);
 
-void bls12_381_polynomial_internal_polynomial_derivative(blst_fr *res,
+void bls12_381_polynomial_polynomial_derivative(blst_fr *res,
                                                          blst_fr *poly,
                                                          const int size);
 #endif

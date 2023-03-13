@@ -208,7 +208,7 @@ module Elt_g1 = struct
     [@@noalloc]
 
   external pippenger : G.t -> Bigstringaf.t -> Polynomial.t -> int -> int -> int
-    = "caml_bls12_381_polynomial_internal_srs_g1_pippenger_stubs"
+    = "caml_bls12_381_polynomial_srs_g1_pippenger_stubs"
     [@@noalloc]
 end
 

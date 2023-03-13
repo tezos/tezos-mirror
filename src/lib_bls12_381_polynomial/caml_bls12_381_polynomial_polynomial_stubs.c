@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-#include "bls12_381_polynomial_internal_polynomial.h"
+#include "bls12_381_polynomial_polynomial.h"
 #include "caml_bls12_381_stubs.h"
 #include "ocaml_integers.h"
 #include <caml/alloc.h>
@@ -31,7 +31,7 @@
 
 #define Blst_fr_array_val(v) ((blst_fr *)Caml_ba_data_val(v))
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_carray_get_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_carray_get_stubs(
     value elt, value carray, value idx, value size) {
   CAMLparam4(elt, carray, idx, size);
   void *elt_c = Data_custom_val(elt);
@@ -44,7 +44,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_carray_get_stubs(
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_carray_set_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_carray_set_stubs(
     value carray, value elt, value idx, value size) {
   CAMLparam4(elt, carray, idx, size);
   void *elt_c = Data_custom_val(elt);
@@ -57,7 +57,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_carray_set_stubs(
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_memset_zero_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_memset_zero_stubs(
     value carray, value n) {
   CAMLparam2(carray, n);
   int n_c = Int_val(n);
@@ -67,7 +67,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_memset_zero_stubs(
 }
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_compute_domain_stubs(
+caml_bls12_381_polynomial_polynomial_compute_domain_stubs(
     value buffer, value n, value root_of_unity) {
   CAMLparam3(buffer, n, root_of_unity);
   blst_fr *root_of_unity_c = Blst_fr_val(root_of_unity);
@@ -89,7 +89,7 @@ caml_bls12_381_polynomial_internal_polynomial_compute_domain_stubs(
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_of_sparse_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_of_sparse_stubs(
     value polynomial, value coefficients, value nb_coefficients) {
   CAMLparam3(polynomial, coefficients, nb_coefficients);
 
@@ -108,7 +108,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_of_sparse_stubs(
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_add_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_add_stubs(
     value res, value arg_1, value arg_2, value size_1, value size_2) {
   CAMLparam5(res, arg_1, arg_2, size_1, size_2);
   blst_fr *arg_1_c = Blst_fr_array_val(arg_1);
@@ -117,12 +117,12 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_add_stubs(
   int size_1_c = Int_val(size_1);
   int size_2_c = Int_val(size_2);
 
-  bls12_381_polynomial_internal_polynomial_add(res_c, arg_1_c, arg_2_c,
+  bls12_381_polynomial_polynomial_add(res_c, arg_1_c, arg_2_c,
                                                size_1_c, size_2_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_sub_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_sub_stubs(
     value res, value arg_1, value arg_2, value size_1, value size_2) {
   CAMLparam5(res, arg_1, arg_2, size_1, size_2);
   blst_fr *arg_1_c = Blst_fr_array_val(arg_1);
@@ -131,12 +131,12 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_sub_stubs(
   int size_1_c = Int_val(size_1);
   int size_2_c = Int_val(size_2);
 
-  bls12_381_polynomial_internal_polynomial_sub(res_c, arg_1_c, arg_2_c,
+  bls12_381_polynomial_polynomial_sub(res_c, arg_1_c, arg_2_c,
                                                size_1_c, size_2_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_mul_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_mul_stubs(
     value res, value arg_1, value arg_2, value size_1, value size_2) {
   CAMLparam5(res, arg_1, arg_2, size_1, size_2);
   blst_fr *arg_1_c = Blst_fr_array_val(arg_1);
@@ -145,13 +145,13 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_mul_stubs(
   int size_1_c = Int_val(size_1);
   int size_2_c = Int_val(size_2);
 
-  bls12_381_polynomial_internal_polynomial_mul(res_c, arg_1_c, arg_2_c,
+  bls12_381_polynomial_polynomial_mul(res_c, arg_1_c, arg_2_c,
                                                size_1_c, size_2_c);
   CAMLreturn(Val_unit);
 }
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_mul_by_scalar_stubs(value res,
+caml_bls12_381_polynomial_polynomial_mul_by_scalar_stubs(value res,
                                                                   value scalar,
                                                                   value arg,
                                                                   value size) {
@@ -161,12 +161,12 @@ caml_bls12_381_polynomial_internal_polynomial_mul_by_scalar_stubs(value res,
   blst_fr *arg_c = Blst_fr_array_val(arg);
   int size_c = Int_val(size);
 
-  bls12_381_polynomial_internal_polynomial_mul_by_scalar(res_c, scalar_c, arg_c,
+  bls12_381_polynomial_polynomial_mul_by_scalar(res_c, scalar_c, arg_c,
                                                          size_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_linear_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_linear_stubs(
     value res, value poly_polylen_coeff, value nb_polys) {
   CAMLparam3(res, poly_polylen_coeff, nb_polys);
   blst_fr *res_c = Blst_fr_array_val(res);
@@ -186,13 +186,13 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_linear_stubs(
     memcpy(linear_coeffs_c + i, c, sizeof(blst_fr));
   }
 
-  bls12_381_polynomial_internal_polynomial_linear(res_c, polys_c, polys_len_c,
+  bls12_381_polynomial_polynomial_linear(res_c, polys_c, polys_len_c,
                                                   linear_coeffs_c, nb_polys_c);
   CAMLreturn(Val_unit);
 }
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_linear_with_powers_stubs(
+caml_bls12_381_polynomial_polynomial_linear_with_powers_stubs(
     value res, value coeff, value poly_polylen, value nb_polys) {
   CAMLparam4(res, coeff, poly_polylen, nb_polys);
   blst_fr *res_c = Blst_fr_array_val(res);
@@ -209,23 +209,23 @@ caml_bls12_381_polynomial_internal_polynomial_linear_with_powers_stubs(
     polys_len_c[i] = Int_val(Field(idx_i, 1));
   }
 
-  bls12_381_polynomial_internal_polynomial_linear_with_powers(
+  bls12_381_polynomial_polynomial_linear_with_powers(
       res_c, polys_c, polys_len_c, coeff_c, nb_polys_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_negate_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_negate_stubs(
     value res, value arg, value size) {
   CAMLparam3(res, arg, size);
   blst_fr *res_c = Blst_fr_array_val(res);
   blst_fr *arg_c = Blst_fr_array_val(arg);
   int size_c = Int_val(size);
 
-  bls12_381_polynomial_internal_polynomial_negate(res_c, arg_c, size_c);
+  bls12_381_polynomial_polynomial_negate(res_c, arg_c, size_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_evaluate_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_evaluate_stubs(
     value res, value arg, value size, value scalar) {
   CAMLparam4(res, arg, size, scalar);
   blst_fr *res_c = Blst_fr_val(res);
@@ -233,12 +233,12 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_evaluate_stubs(
   int size_c = Int_val(size);
   blst_fr *scalar_c = Blst_fr_val(scalar);
 
-  bls12_381_polynomial_internal_polynomial_evaluate(res_c, arg_c, size_c,
+  bls12_381_polynomial_polynomial_evaluate(res_c, arg_c, size_c,
                                                     scalar_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_division_xn_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_division_xn_stubs(
     value res_q, value res_r, value poly, value size, value n_and_scalar) {
   CAMLparam5(res_q, res_r, poly, size, n_and_scalar);
   blst_fr *poly_c = Blst_fr_array_val(poly);
@@ -247,12 +247,12 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_division_xn_stubs(
   int size_c = Int_val(size);
   int n_c = Int_val(Field(n_and_scalar, 0));
   blst_fr *scalar_c = Blst_fr_val(Field(n_and_scalar, 1));
-  bls12_381_polynomial_internal_polynomial_division_xn(res_q_c, res_r_c, poly_c,
+  bls12_381_polynomial_polynomial_division_xn(res_q_c, res_r_c, poly_c,
                                                        size_c, n_c, scalar_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_mul_xn_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_mul_xn_stubs(
     value res, value poly, value size, value n, value scalar) {
   CAMLparam4(res, poly, size, n);
   blst_fr *poly_c = Blst_fr_array_val(poly);
@@ -260,7 +260,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_mul_xn_stubs(
   int size_c = Int_val(size);
   int n_c = Int_val(n);
   blst_fr *scalar_c = Blst_fr_val(scalar);
-  bls12_381_polynomial_internal_polynomial_mul_xn(res_c, poly_c, size_c, n_c,
+  bls12_381_polynomial_polynomial_mul_xn(res_c, poly_c, size_c, n_c,
                                                   scalar_c);
   CAMLreturn(Val_unit);
 }
@@ -268,7 +268,7 @@ CAMLprim value caml_bls12_381_polynomial_internal_polynomial_mul_xn_stubs(
 // Bindings for evaluations.ml
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_evaluations_add_stubs(
+caml_bls12_381_polynomial_polynomial_evaluations_add_stubs(
     value res, value eval_1, value eval_2, value size_1, value size_2) {
   CAMLparam5(res, eval_1, eval_2, size_1, size_2);
   blst_fr *res_c = Blst_fr_array_val(res);
@@ -277,13 +277,13 @@ caml_bls12_381_polynomial_internal_polynomial_evaluations_add_stubs(
   int size_1_c = Int_val(size_1);
   int size_2_c = Int_val(size_2);
 
-  bls12_381_polynomial_internal_polynomial_evaluations_add(
+  bls12_381_polynomial_polynomial_evaluations_add(
       res_c, eval_1_c, eval_2_c, size_1_c, size_2_c);
   CAMLreturn(Val_unit);
 }
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_evaluations_rescale_stubs(
+caml_bls12_381_polynomial_polynomial_evaluations_rescale_stubs(
     value res, value eval, value size_res, value size_eval) {
   CAMLparam4(res, eval, size_res, size_eval);
   blst_fr *res_c = Blst_fr_array_val(res);
@@ -291,13 +291,13 @@ caml_bls12_381_polynomial_internal_polynomial_evaluations_rescale_stubs(
   int size_res_c = Int_val(size_res);
   int size_eval_c = Int_val(size_eval);
 
-  bls12_381_polynomial_internal_polynomial_evaluations_rescale(
+  bls12_381_polynomial_polynomial_evaluations_rescale(
       res_c, eval_c, size_res_c, size_eval_c);
   CAMLreturn(Val_unit);
 }
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays_stubs(
+caml_bls12_381_polynomial_polynomial_evaluations_mul_arrays_stubs(
     value res, value eval_evallen_comp_power_powlen, value size_res,
     value nb_evals) {
   CAMLparam4(res, eval_evallen_comp_power_powlen, size_res, nb_evals);
@@ -321,14 +321,14 @@ caml_bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays_stubs(
     powers_len_c[i] = Int_val(Field(idx_i, 4));
   }
 
-  bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays(
+  bls12_381_polynomial_polynomial_evaluations_mul_arrays(
       res_c, evaluations_c, evaluations_len_c, composition_gx_c, powers_c,
       powers_len_c, size_res_c, nb_evals_c);
   CAMLreturn(Val_unit);
 }
 
 CAMLprim value
-caml_bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays_stubs(
+caml_bls12_381_polynomial_polynomial_evaluations_linear_arrays_stubs(
     value res, value eval_evallen_coeff_comp, value add_constant,
     value size_res, value nb_evals) {
   CAMLparam5(res, eval_evallen_coeff_comp, add_constant, size_res, nb_evals);
@@ -353,18 +353,18 @@ caml_bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays_stubs(
     composition_gx_c[i] = Int_val(Field(idx_i, 3));
   }
 
-  bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays(
+  bls12_381_polynomial_polynomial_evaluations_linear_arrays(
       res_c, evaluations_c, evaluations_len_c, linear_coeffs_c,
       composition_gx_c, add_constant_c, size_res_c, nb_evals_c);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_bls12_381_polynomial_internal_polynomial_derivative_stubs(
+CAMLprim value caml_bls12_381_polynomial_polynomial_derivative_stubs(
     value res, value poly, value size) {
   CAMLparam3(res, poly, size);
   blst_fr *poly_c = Blst_fr_array_val(poly);
   blst_fr *res_c = Blst_fr_array_val(res);
   int size_c = Int_val(size);
-  bls12_381_polynomial_internal_polynomial_derivative(res_c, poly_c, size_c);
+  bls12_381_polynomial_polynomial_derivative(res_c, poly_c, size_c);
   CAMLreturn(Val_unit);
 }

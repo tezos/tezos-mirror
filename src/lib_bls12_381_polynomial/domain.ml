@@ -39,7 +39,7 @@ module Stubs = struct
   ensures:
   - [res[i] = g^i] for [i = 0..(n-1)] *)
   external compute_domain : fr_array -> int -> fr -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_compute_domain_stubs"
+    = "caml_bls12_381_polynomial_polynomial_compute_domain_stubs"
     [@@noalloc]
 
   (** [rescale res a size_res size_a] writes the result of rescaling the evaluation
@@ -53,7 +53,7 @@ module Stubs = struct
    - [res] and [a] are disjoint
    - [size_res mod size_a = 0] *)
   external rescale : fr_array -> fr_array -> int -> int -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_evaluations_rescale_stubs"
+    = "caml_bls12_381_polynomial_polynomial_evaluations_rescale_stubs"
     [@@noalloc]
 end
 
