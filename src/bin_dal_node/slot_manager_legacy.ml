@@ -180,9 +180,8 @@ let rev_fetched_values_as seq f init =
     init
     seq
 
-let get_shards cryptobox store commitment shard_ids =
+let get_shards store commitment shard_ids =
   let open Lwt_result_syntax in
-  let _share_size = Cryptobox.encoded_share_size cryptobox in
   let res =
     Store.Shards.read_values store
     @@ with_commitment_as_seq commitment shard_ids

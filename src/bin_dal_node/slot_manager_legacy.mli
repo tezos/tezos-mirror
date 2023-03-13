@@ -44,10 +44,9 @@ val get_shard :
   int ->
   Cryptobox.shard tzresult Lwt.t
 
-(** [get_shards cryptobox store commitment shard_ids] gets the shards
-    associated to [commitment] at the ranges [shard_ids]. *)
+(** [get_shards store commitment shard_ids] gets the shards associated to
+    [commitment] at the ranges [shard_ids]. *)
 val get_shards :
-  Cryptobox.t ->
   Store.Shards.t ->
   Cryptobox.commitment ->
   int list ->

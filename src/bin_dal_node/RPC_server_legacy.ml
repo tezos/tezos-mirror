@@ -41,10 +41,7 @@ let handle_shard ctxt ((_, commitment), shard) () () =
     shard
 
 let handle_shards ctxt (_, commitment) () shards =
-  let open Lwt_result_syntax in
-  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_shards
-    cryptobox
     (Node_context.get_store ctxt).shard_store
     commitment
     shards
