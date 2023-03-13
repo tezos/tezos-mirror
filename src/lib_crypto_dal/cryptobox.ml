@@ -1664,6 +1664,11 @@ module Internal_for_tests = struct
 
   let select_fft_domain = select_fft_domain
 
+  let precomputation_equal ((d1, a1) : shards_proofs_precomputation)
+      ((d2, a2) : shards_proofs_precomputation) =
+    Array.for_all2 Scalar.eq d1 d2
+    && Array.for_all2 (Array.for_all2 Bls12_381.G1.eq) a1 a2
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let max_polynomial_length =

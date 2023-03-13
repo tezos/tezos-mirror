@@ -438,6 +438,9 @@ module Internal_for_tests : sig
      and [remainder] is not divisible by 2. *)
   val select_fft_domain : int -> int * int * int
 
+  val precomputation_equal :
+    shards_proofs_precomputation -> shards_proofs_precomputation -> bool
+
   (* [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
