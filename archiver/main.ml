@@ -232,5 +232,6 @@ module M012 = Psithaca_machine.M
 module M013 = PtJakart_machine.M
 module M014 = PtKathma_machine.M
 module M015 = PtLimaPt_machine.M
+module M016 = PtMumbai_machine.M
 
 let () = Client_main_run.run (module Client_config) ~select_commands
