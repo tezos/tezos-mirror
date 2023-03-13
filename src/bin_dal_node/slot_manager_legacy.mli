@@ -36,8 +36,8 @@
 
 type slot = bytes
 
-(** [get_shard dal_constants store slot_header shard_id] gets the shard associated to
-    [slot_header] at the range [shard_id]. *)
+(** [get_shard cryptobox store commitment shard_id] gets the shard associated to
+    [commitment] at the range [shard_id]. *)
 val get_shard :
   Cryptobox.t ->
   Store.Shards.t ->
@@ -45,8 +45,8 @@ val get_shard :
   int ->
   Cryptobox.shard tzresult Lwt.t
 
-(** [get_shards dal_constants store slot_header shard_ids] gets the shards
-    associated to [slot_header] at the ranges [shard_ids]. *)
+(** [get_shards cryptobox store commitment shard_ids] gets the shards
+    associated to [commitment] at the ranges [shard_ids]. *)
 val get_shards :
   Cryptobox.t ->
   Store.Shards.t ->
@@ -67,8 +67,8 @@ val get_slot_pages :
   Cryptobox.commitment ->
   bytes list tzresult Lwt.t
 
-(** [save_shards store slot_header shards] stores [shards] onto the [store]
-    associated to the given [slot_header] *)
+(** [save_shards store commitment shards] stores [shards] onto the [store]
+    associated to the given [commitment] *)
 val save_shards :
   Store.node_store ->
   Cryptobox.t ->
