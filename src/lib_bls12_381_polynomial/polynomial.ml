@@ -424,6 +424,8 @@ module Polynomial_impl = struct
   let ( * ) = mul
 
   let constant c = of_coefficients [(c, 0)]
+
+  let fold_left_map = Fr_carray.fold_left_map
 end
 
 module type Polynomial_sig = sig
@@ -591,6 +593,10 @@ module type Polynomial_sig = sig
 
   (** [constant s] creates a value of type [t] from a blst_fr element [s] *)
   val constant : scalar -> t
+
+  (** [fold_left_map] is a combination of fold_left and map that threads an
+    accumulator through calls to [f]. *)
+  val fold_left_map : ('acc -> scalar -> 'acc * scalar) -> 'acc -> t -> 'acc * t
 end
 
 module type Polynomial_unsafe_sig = sig
