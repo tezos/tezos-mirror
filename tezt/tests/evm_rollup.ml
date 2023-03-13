@@ -56,22 +56,32 @@ let evm_proxy_server_version proxy_server =
   RPC.Curl.get get_version_url
 
 module Account = struct
-  type t = {public_key : string; private_key : string}
-
-  (** Prefunded account public key in the kernel, has a balance of 9999. *)
-  let prefunded_account_pk = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE"
+  type t = {address : string; private_key : string}
 
   let accounts =
     [|
       {
-        public_key = "0x6471A723296395CF1Dcc568941AFFd7A390f94CE";
-        private_key = "0x9bfc9fbe6296c8fef8eb8d6ce2ed5f772a011898";
+        address = "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c";
+        private_key =
+          "0x9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0";
       };
       {
-        public_key = "0x0b52D4D3bE5D18a7aB5E4476a2F5382bBf2B38d8";
-        private_key = "0x672c4a81a943f2bf450869a135bd27fd43d90e9a";
+        address = "0xB53dc01974176E5dFf2298C5a94343c2585E3c54";
+        private_key =
+          "0x3a6a6ca30c1ef1ce605a63a7a1a4ff4c689f8414ca0838bca29423f0ec280ff5";
+      };
+      {
+        address = "0x9b49c988b5817Be31DfB00F7a5a4671772dCce2B";
+        private_key =
+          "0x0eb9bfa77d6cd145cdc0e3d6f902ee1464aeb5f62b02e38f111c9b60cd3adab5";
       };
     |]
+
+  (** Prefunded account public key in the kernel, has a balance of 9999.
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5071
+  *)
+  let prefunded_account_address = accounts.(0).address
 end
 
 (** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
@@ -266,14 +276,14 @@ let test_rpc_getBalance =
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
-      ~account:Account.prefunded_account_pk
+      ~account:Account.prefunded_account_address
       ~endpoint:evm_proxy_server_endpoint
   in
   Check.((balance = 9999) int)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
-         Account.prefunded_account_pk) ;
+         Account.prefunded_account_address) ;
   unit
 
 let test_rpc_sendRawTransaction =
@@ -293,7 +303,7 @@ let test_rpc_sendRawTransaction =
   let* tx_hash =
     Eth_cli.transaction_send
       ~source_private_key:Account.accounts.(0).private_key
-      ~to_public_key:Account.accounts.(1).public_key
+      ~to_public_key:Account.accounts.(1).address
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
             Introduce a eth/wei module. *)
       ~value:Z.(of_int 42 * (of_int 10 ** 18))

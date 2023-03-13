@@ -54,7 +54,7 @@ pub fn stage_two<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
 }
 
 pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
-    let hash = ("6471a723296395cf1dcc568941affd7a390f94ce").to_ascii_lowercase();
+    let hash = ("6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c").to_ascii_lowercase();
 
     let balance: Wei = from_eth(9999);
 
