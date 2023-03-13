@@ -16,6 +16,20 @@ rules:
     category: performance
     technology:
     - ocaml
+- id: ocamllint-fold-left-iter-list
+  pattern-either:
+  - pattern: List.fold_left $X () $Y
+  - pattern: List.fold_left_e $X () $Y
+  - pattern: List.fold_left_s $X () $Y
+  - pattern: List.fold_left_p $X () $Y
+  - pattern: List.fold_left_es $X () $Y
+  message: You probably want to use List.iter (or one of its monadic variants).
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
 - id: ocamllint-length-list-compare
   pattern-either:
   - pattern: compare (List.length $X) $Y
