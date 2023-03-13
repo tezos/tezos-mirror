@@ -39,15 +39,6 @@ class unix_cctxt :
     the client configuration parameters. *)
 val make_unix_cctxt : scheme:string -> host:string -> port:int -> cctxt
 
-(** Generic function for a normal RPC call. *)
-val call :
-  #cctxt ->
-  ([< Resto.meth], unit, 'a, 'b, 'c, 'd) Tezos_rpc.Service.t ->
-  'a ->
-  'b ->
-  'c ->
-  'd tzresult Lwt.t
-
 (** Generic function for a streamed RPC call. *)
 val streamed_call :
   #cctxt ->
@@ -59,8 +50,48 @@ val streamed_call :
   'c ->
   (unit -> unit) tzresult Lwt.t
 
-(** [get_preimage cctxt hash] requests the preimage of hash, consisting of a
+(** [retrieve_preimage cctxt hash] requests the preimage of hash, consisting of a
     single page, from cctxt. When the request succeeds, the raw page will be
     returned as a sequence of bytes. *)
-val get_preimage :
-  Dac_plugin.t -> #cctxt -> Dac_plugin.hash -> bytes tzresult Lwt.t
+val retrieve_preimage :
+  Dac_plugin.t -> #cctxt -> page_hash:Dac_plugin.hash -> bytes tzresult Lwt.t
+
+(** [store_preimage ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage 
+    using a given [pagination_scheme]. It returns the base58 encoded root page hash 
+    and the raw bytes. *)
+val store_preimage :
+  Dac_plugin.t ->
+  #cctxt ->
+  payload:bytes ->
+  pagination_scheme:Pagination_scheme.t ->
+  (Dac_plugin.hash * bytes) tzresult Lwt.t
+
+(** [verify_external_message_signature external_message] requests the DAL node to verify
+    the signature of the external message [external_message] via
+    the plugin/dac/verify_signature endpoint. The DAC committee
+    of the DAL node must be the same that was used to produce the
+    [external_message]. *)
+val verify_external_message_signature :
+  #cctxt -> external_message:string option -> bool tzresult Lwt.t
+
+(** [store_dac_member_signature signature:Signature_repr.t]
+    stores the [signature] generated from signing [hex_root_hash] by
+    [dac_member_pkh]. *)
+val store_dac_member_signature :
+  Dac_plugin.t -> #cctxt -> signature:Signature_repr.t -> unit tzresult Lwt.t
+
+(** [get_certificate root_page_hash] fetches the DAC certificate for the
+    provided [root_page_hash]. *)
+val get_certificate :
+  Dac_plugin.t ->
+  #cctxt ->
+  root_page_hash:Dac_plugin.hash ->
+  Certificate_repr.t option tzresult Lwt.t
+
+(** [coordinator_post_preimage ~payload] sends a [payload] to the DAC
+  [Coordinator] via a POST RPC call to dac/preimage. It returns a hex
+  encoded root page hash, produced by [Merkle_tree_V0] pagination scheme.
+  On the backend side it also pushes root page hash of the preimage to all
+  the subscribed DAC Members and Obervers. *)
+val coordinator_post_preimage :
+  Dac_plugin.t -> #cctxt -> payload:bytes -> Dac_plugin.hash tzresult Lwt.t

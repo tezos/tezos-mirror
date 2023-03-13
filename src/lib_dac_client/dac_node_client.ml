@@ -54,5 +54,33 @@ let streamed_call (cctxt : #cctxt) = cctxt#call_streamed_service
    hash of the protocol that the coordinator was using when the page hash
    was computed.
 *)
-let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) page_hash =
+let retrieve_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~page_hash =
   call cctxt (RPC_services.retrieve_preimage plugin) ((), page_hash) () ()
+
+let store_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
+    ~pagination_scheme =
+  call
+    cctxt
+    (RPC_services.dac_store_preimage plugin)
+    ()
+    ()
+    (payload, pagination_scheme)
+
+let verify_external_message_signature (cctxt : #cctxt) ~external_message =
+  call
+    cctxt
+    RPC_services.verify_external_message_signature
+    ()
+    external_message
+    ()
+
+let store_dac_member_signature (plugin : Dac_plugin.t) (cctxt : #cctxt)
+    ~signature =
+  call cctxt (RPC_services.store_dac_member_signature plugin) () () signature
+
+let get_certificate (plugin : Dac_plugin.t) (cctxt : #cctxt) ~root_page_hash =
+  call cctxt (RPC_services.get_certificate plugin) ((), root_page_hash) () ()
+
+let coordinator_post_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
+    =
+  call cctxt (RPC_services.coordinator_post_preimage plugin) () () payload
