@@ -175,7 +175,6 @@ let get_stakes_for_selected_index ctxt index =
         let frozen_deposits_percentage =
           Int64.of_int @@ Constants_storage.frozen_deposits_percentage ctxt
         in
-        let max_mutez = of_mutez_exn Int64.max_int in
         let frozen_deposits_limit =
           match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
         in
