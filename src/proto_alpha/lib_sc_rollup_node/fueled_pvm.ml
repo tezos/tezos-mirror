@@ -280,7 +280,7 @@ module Make (PVM : Pvm.S) = struct
       {input with Sc_rollup.payload}
 
     type feed_input_completion =
-      | Feed_input_aborted of {state : PVM.state; fuel : fuel}
+      | Feed_input_aborted of {state : PVM.state; fuel : fuel; fed_input : bool}
       | Feed_input_completed of {state : PVM.state; fuel : fuel}
 
     (** [feed_input node_ctxt reveal_map level message_index ~fuel
@@ -305,11 +305,12 @@ module Make (PVM : Pvm.S) = struct
           state
       in
       match res with
-      | Aborted {state; fuel; _} -> return (Feed_input_aborted {state; fuel})
+      | Aborted {state; fuel; _} ->
+          return (Feed_input_aborted {state; fuel; fed_input = false})
       | Completed {state; fuel; current_tick = tick; failing_ticks} -> (
           let open Delayed_write_monad.Lwt_result_syntax in
           match F.consume F.one_tick_consumption fuel with
-          | None -> return (Feed_input_aborted {state; fuel})
+          | None -> return (Feed_input_aborted {state; fuel; fed_input = false})
           | Some fuel -> (
               let>* input, failing_ticks =
                 match failing_ticks with
@@ -340,7 +341,7 @@ module Make (PVM : Pvm.S) = struct
               in
               match res with
               | Aborted {state; fuel; _} ->
-                  return (Feed_input_aborted {state; fuel})
+                  return (Feed_input_aborted {state; fuel; fed_input = true})
               | Completed {state; fuel; _} ->
                   return (Feed_input_completed {state; fuel})))
 
@@ -385,7 +386,18 @@ module Make (PVM : Pvm.S) = struct
             match res with
             | Feed_input_completed {state; fuel} ->
                 feed_messages (state, fuel) (message_index + 1) messages
-            | Feed_input_aborted {state; fuel} -> return (state, fuel))
+            | Feed_input_aborted {state; fuel; fed_input = false} ->
+                return
+                  ( state,
+                    fuel,
+                    message_index - message_counter_offset,
+                    message :: messages )
+            | Feed_input_aborted {state; fuel; fed_input = true} ->
+                return
+                  ( state,
+                    fuel,
+                    message_index + 1 - message_counter_offset,
+                    messages ))
       in
       (feed_messages [@tailcall]) (state, fuel) message_counter_offset messages
 
