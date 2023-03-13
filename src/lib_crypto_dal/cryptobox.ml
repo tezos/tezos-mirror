@@ -1723,6 +1723,8 @@ module Internal_for_tests = struct
 
   let srs_size_g1 t = Srs_g1.size t.srs.raw.srs_g1
 
+  let encoded_share_size = encoded_share_size
+
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let max_polynomial_length =

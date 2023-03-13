@@ -778,6 +778,40 @@ module Test = struct
             given = !deg && expected = !size_srs_g1
         | _ -> false)
 
+  let test_encoded_share_size =
+    let open QCheck2 in
+    Test.make
+      ~name:"encoded share_size"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        (* This encoding has not a fixed size since it depends on the DAL
+           parameters, so we must supply a default value share with the shard
+           length from the DAL cryptobox configuration record [t].
+           So we provide a default value for a share to
+           [Data_encoding.Binary.length]. The length of a share is the one
+           from the configuration record [t]: [t.shard_length]. *)
+        let state = QCheck_base_runner.random_state () in
+        let shard =
+          Cryptobox.Internal_for_tests.make_dummy_shard
+            ~state
+            ~index:0
+            ~length:(Cryptobox.Internal_for_tests.shard_length t)
+        in
+        let expected_encoded_share_size =
+          Data_encoding.Binary.length Cryptobox.share_encoding shard.share
+        in
+        return
+          (Cryptobox.Internal_for_tests.encoded_share_size t
+          = expected_encoded_share_size))
+        |> function
+        | Ok check -> check
+        | _ -> false)
+
   (* We can craft two slots whose commitments are equal for two different
      page sizes. *)
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
@@ -878,5 +912,6 @@ let () =
             Test.test_verify_shard_out_of_bounds;
             Test.test_commit;
             Test.test_commit_failure;
+            Test.test_encoded_share_size;
           ] );
     ]
