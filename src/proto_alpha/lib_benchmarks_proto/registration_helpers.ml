@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ns = Namespace.(make (make root "proto") Protocol.name)
+let ns = Namespace.root
 
 let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark.S = struct

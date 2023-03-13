@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ns = Namespace.make Namespace.root "shell"
+let ns = Namespace.root
