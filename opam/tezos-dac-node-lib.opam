@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-client-base"
-  "tezos-protocol-updater"
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
   "tezos-layer2-store"

@@ -3373,7 +3373,6 @@ let octez_dac_node_lib =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_client_base |> open_;
-        octez_protocol_updater |> open_;
         octez_client_base_unix |> open_;
         octez_stdlib_unix |> open_;
         octez_layer2_store |> open_;
@@ -5493,6 +5492,7 @@ module Protocol = Protocol
             main |> open_;
             octez_base_test_helpers |> open_;
             test_helpers |> if_some |> open_;
+            octez_dac_lib |> open_;
             octez_dac_node_lib |> open_;
             alcotezt;
           ]
