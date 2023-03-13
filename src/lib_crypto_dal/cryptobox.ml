@@ -43,6 +43,7 @@ let () =
     (function
       | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
     (fun parameter -> Failed_to_load_trusted_setup parameter)
+  [@@coverage off]
 
 type initialisation_parameters = {srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
 
@@ -180,6 +181,7 @@ module Inner = struct
         (fun {index; share} -> (index, share))
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
+      [@@coverage off]
 
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
@@ -199,18 +201,22 @@ module Inner = struct
     let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
 
     let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt
+      [@@coverage off]
 
     let commitment_of_bytes_exn bytes =
       match Bls12_381.G1.of_compressed_bytes_opt bytes with
       | None ->
           Format.kasprintf Stdlib.failwith "Unexpected data (DAL commitment)"
       | Some commitment -> commitment
+      [@@coverage off]
 
-    let commitment_size = Bls12_381.G1.compressed_size_in_bytes
+    let commitment_size = Bls12_381.G1.compressed_size_in_bytes [@@coverage off]
 
     let to_string commitment = commitment_to_bytes commitment |> Bytes.to_string
+      [@@coverage off]
 
     let of_string_opt str = commitment_of_bytes_opt (String.to_bytes str)
+      [@@coverage off]
 
     let b58check_encoding =
       Base58.register_encoding
@@ -219,6 +225,7 @@ module Inner = struct
         ~to_raw:to_string
         ~of_raw:of_string_opt
         ~wrap:(fun x -> Data x)
+      [@@coverage off]
 
     let raw_encoding =
       let open Data_encoding in
@@ -226,6 +233,7 @@ module Inner = struct
         commitment_to_bytes
         commitment_of_bytes_exn
         (Fixed.bytes commitment_size)
+      [@@coverage off]
 
     include Tezos_crypto.Helpers.Make (struct
       type t = commitment
@@ -247,10 +255,12 @@ module Inner = struct
            function exposed. We only need the Base58 encoding and the
            rpc_arg. *)
         assert false
+        [@@coverage off]
 
       let seeded_hash _ _ =
         (* Same argument. *)
         assert false
+        [@@coverage off]
     end)
 
     let of_b58check = of_b58check
@@ -268,6 +278,7 @@ module Inner = struct
             Stdlib.failwith
             "Unexpected data (DAL commitment proof)"
       | Some proof -> proof
+      [@@coverage off]
 
     let size = Bls12_381.G1.compressed_size_in_bytes
 
@@ -577,6 +588,7 @@ module Inner = struct
          (req "page_size" uint16)
          (req "slot_size" int31)
          (req "number_of_shards" uint16))
+    [@@coverage off]
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
 
@@ -644,6 +656,7 @@ module Inner = struct
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
     {redundancy_factor; slot_size; page_size; number_of_shards}
+    [@@coverage off]
 
   let polynomial_degree = Polynomials.degree
 
@@ -1755,6 +1768,7 @@ module Config = struct
          (req "page_size" int31)
          (req "redundancy_factor" int31)
          (req "number_of_shards" int31))
+    [@@coverage off]
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
@@ -1766,6 +1780,7 @@ module Config = struct
       (obj2
          (req "activated" bool)
          (req "use_mock_srs_for_testing" (option parameters_encoding)))
+    [@@coverage off]
 
   let default = {activated = false; use_mock_srs_for_testing = None}
 
