@@ -47,6 +47,9 @@ val sample_float_in_interval : min:float -> max:float -> float sampler
 (** Samples a boolean uniformly at random *)
 val uniform_bool : bool sampler
 
+(** Sample a byte uniformly at random *)
+val uniform_byte : char sampler
+
 (** Samples the specified number of bits uniformly at random.
     The sampled bits are the [nbits] least significant ones in the
     returned char.
