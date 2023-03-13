@@ -3362,6 +3362,22 @@ let octez_dac_lib =
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_protocol_updater |> open_]
 
+let octez_dac_client_lib =
+  public_lib
+    "tezos-dac-client-lib"
+    ~path:"src/lib_dac_client"
+    ~opam:"tezos-dac-client-lib"
+    ~synopsis:"Tezos: `tezos-dac-client` library"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
+        octez_stdlib_unix |> open_;
+        octez_dac_lib |> open_;
+      ]
+
 let octez_dac_node_lib =
   private_lib
     "tezos_dac_node_lib"
@@ -3378,6 +3394,7 @@ let octez_dac_node_lib =
         octez_layer2_store |> open_;
         octez_rpc_http_server;
         octez_dac_lib |> open_;
+        octez_dac_client_lib |> open_;
       ]
 
 let _octez_dac_node_lib_tests =
