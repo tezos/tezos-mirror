@@ -208,10 +208,17 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
               | None -> return (Mock.transaction_count ())
             in
             return (Get_transaction_count.Output (Ok nonce))
-        | Get_transaction_receipt.Input _ ->
-            return
-              (Get_transaction_receipt.Output
-                 (Ok (Some (Mock.transaction_receipt ()))))
+        | Get_transaction_receipt.Input (Some tx_hash) ->
+            let* receipt =
+              match rollup_node_config with
+              | Some ((module Rollup_node_rpc), _smart_rollup_address) -> (
+                  let*! res = Rollup_node_rpc.transaction_receipt tx_hash in
+                  match res with
+                  | Ok x -> return_some x
+                  | Error _ -> return_none)
+              | None -> return_some (Mock.transaction_receipt ())
+            in
+            return (Get_transaction_receipt.Output (Ok receipt))
         | Send_raw_transaction.Input (Some tx_raw) ->
             let* tx_hash =
               match rollup_node_config with

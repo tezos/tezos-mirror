@@ -76,6 +76,26 @@ module Durable_storage_path = struct
 
     let current_number = blocks ^ "/current" ^ number
   end
+
+  module Transaction_receipt = struct
+    let receipts = "/transactions_receipts"
+
+    let receipt_field tx_hash field = receipts ^ "/" ^ tx_hash ^ "/" ^ field
+
+    let block_hash tx_hash = receipt_field tx_hash "block_hash"
+
+    let block_number tx_hash = receipt_field tx_hash "block_number"
+
+    let from tx_hash = receipt_field tx_hash "from"
+
+    let to_ tx_hash = receipt_field tx_hash "to"
+
+    let index tx_hash = receipt_field tx_hash "index"
+
+    let status tx_hash = receipt_field tx_hash "status"
+
+    let type_ tx_hash = receipt_field tx_hash "type"
+  end
 end
 
 module RPC = struct
@@ -268,6 +288,76 @@ module RPC = struct
       ~full_transaction_object
       ~number:Durable_storage_path.Block.(Nth n)
       base
+
+  let transaction_receipt base (Hash tx_hash) =
+    let open Lwt_result_syntax in
+    let inspect_durable_and_decode key decode =
+      let* bytes = call_service ~base durable_state_value () {key} () in
+      match bytes with
+      | Some bytes -> return (decode bytes)
+      | None -> failwith "null"
+    in
+    let decode_block_hash bytes =
+      Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
+    in
+    let decode_address bytes =
+      Address (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
+    in
+    let decode_number bytes =
+      Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
+    in
+    let* block_hash =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.block_hash tx_hash)
+        decode_block_hash
+    in
+    let* block_number =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.block_number tx_hash)
+        decode_number
+    in
+    let* from =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.from tx_hash)
+        decode_address
+    in
+    (* This can be none *)
+    let* to_ =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.to_ tx_hash)
+        decode_address
+    in
+    let* index =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.index tx_hash)
+        decode_number
+    in
+    let* status =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.status tx_hash)
+        decode_number
+    in
+    let+ type_ =
+      inspect_durable_and_decode
+        (Durable_storage_path.Transaction_receipt.type_ tx_hash)
+        decode_number
+    in
+    {
+      transactionHash = Hash tx_hash;
+      transactionIndex = index;
+      blockHash = block_hash;
+      blockNumber = block_number;
+      from;
+      to_;
+      cumulativeGasUsed = Ethereum_types.quantity_of_z Z.zero;
+      effectiveGasPrice = Ethereum_types.quantity_of_z Z.zero;
+      gasUsed = Ethereum_types.quantity_of_z Z.zero;
+      logs = [];
+      logsBloom = Hash (String.make 256 'a');
+      type_;
+      status;
+      contractAddress = None;
+    }
 end
 
 module type S = sig
@@ -286,6 +376,9 @@ module type S = sig
 
   val nth_block :
     full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
+
+  val transaction_receipt :
+    Ethereum_types.hash -> Ethereum_types.transaction_receipt tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -304,4 +397,6 @@ end) : S = struct
   let current_block_number = RPC.current_block_number Base.base
 
   let nth_block = RPC.nth_block Base.base
+
+  let transaction_receipt = RPC.transaction_receipt Base.base
 end
