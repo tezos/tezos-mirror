@@ -394,7 +394,6 @@ let octez_test_helpers =
     ~deps:
       [uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix; data_encoding]
     ~js_compatible:true
-    ~ocaml:V.(at_least "4.12")
     ~linkall:true
     ~dune:
       Dune.
@@ -435,7 +434,6 @@ let octez_stdlib =
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; aches]
-    ~ocaml:V.(at_least "4.14")
     ~js_compatible:true
     ~js_of_ocaml:
       [[S "javascript_files"; G (Dune.of_atom_list ["tzBytes_js.js"])]]
@@ -560,7 +558,6 @@ let octez_lwt_result_stdlib =
     "tezos-lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
     ~synopsis:"Tezos: error-aware stdlib replacement"
-    ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
     ~documentation:[Dune.[S "package"; S "tezos-lwt-result-stdlib"]]
     ~deps:
@@ -618,7 +615,6 @@ let octez_error_monad =
     "tezos-error-monad"
     ~path:"src/lib_error_monad"
     ~synopsis:"Tezos: error monad"
-    ~ocaml:V.(at_least "4.07")
     ~deps:
       [
         octez_stdlib |> open_;
@@ -638,7 +634,6 @@ let octez_hacl =
     "tezos-hacl"
     ~path:"src/lib_hacl"
     ~synopsis:"Tezos: thin layer around hacl-star"
-    ~ocaml:V.(at_least "4.14")
     ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
     ~js_of_ocaml:
       [
@@ -1162,7 +1157,6 @@ let lazy_containers =
     ~synopsis:
       "A collection of lazy containers whose contents is fetched from \
        arbitrary backend on-demand"
-    ~ocaml:V.(at_least "4.14")
     ~deps:[octez_lwt_result_stdlib; zarith]
 
 let _lazy_containers_tests =
@@ -1203,7 +1197,6 @@ let octez_webassembly_interpreter =
     ~extra_authors:["WebAssembly Authors"]
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
-    ~ocaml:V.(at_least "4.14")
     ~deps:[octez_lwt_result_stdlib; zarith; lazy_containers |> open_]
     ~preprocess:[pps ppx_deriving_show]
 
@@ -1384,7 +1377,6 @@ let octez_test_helpers_extra =
     ~internal_name:"lib_test_extra"
     ~synopsis:"Test helpers dependent on tezos-base"
     ~deps:[octez_base; octez_crypto; octez_test_helpers]
-    ~ocaml:V.(at_least "4.08")
     ~dune:
       Dune.
         [
