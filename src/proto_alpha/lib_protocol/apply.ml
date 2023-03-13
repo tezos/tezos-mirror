@@ -43,7 +43,6 @@ type error +=
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
-  | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Invalid_transfer_to_sc_rollup
   | Invalid_source of Destination.t
 
@@ -216,21 +215,6 @@ let () =
     Data_encoding.empty
     (function Multiple_revelation -> Some () | _ -> None)
     (fun () -> Multiple_revelation) ;
-  register_error_kind
-    `Permanent
-    ~id:"delegate.zero_frozen_deposits"
-    ~title:"Zero frozen deposits"
-    ~description:"The delegate has zero frozen deposits."
-    ~pp:(fun ppf delegate ->
-      Format.fprintf
-        ppf
-        "Delegate %a has zero frozen deposits; it is not allowed to \
-         bake/preendorse/endorse."
-        Signature.Public_key_hash.pp
-        delegate)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
-    (fun delegate -> Zero_frozen_deposits delegate) ;
   register_error_kind
     `Permanent
     ~id:"operations.invalid_transfer_to_smart_rollup_from_implicit_account"
