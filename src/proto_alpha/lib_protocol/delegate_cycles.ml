@@ -48,13 +48,9 @@ let update_activity ctxt last_cycle =
 
 (* Return a map from delegates (with active stake at some cycle
    in the cycle window [from_cycle, to_cycle]) to the maximum
-   of the stake to be deposited for each such cycle (which is just the
-   [frozen_deposits_percentage] of the active stake at that cycle). Also
+   of the active stake in that window. Also
    return the delegates that have fallen out of the sliding window. *)
 let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
-  let frozen_deposits_percentage =
-    Constants_storage.frozen_deposits_percentage ctxt
-  in
   let cycles = Cycle_repr.(from_cycle ---> to_cycle) in
   (match Cycle_repr.pred from_cycle with
   | None -> return Signature.Public_key_hash.Set.empty
@@ -75,16 +71,12 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
       >|=? fun active_stakes ->
       List.fold_left
         (fun (maxima, delegates_to_remove) (delegate, stake) ->
-          let stake_to_be_deposited =
-            Tez_repr.(div_exn (mul_exn stake frozen_deposits_percentage) 100)
-          in
           let maxima =
             Signature.Public_key_hash.Map.update
               delegate
               (function
-                | None -> Some stake_to_be_deposited
-                | Some maximum ->
-                    Some (Tez_repr.max maximum stake_to_be_deposited))
+                | None -> Some stake
+                | Some maximum -> Some (Tez_repr.max maximum stake))
               maxima
           in
           let delegates_to_remove =
@@ -115,8 +107,15 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
   >>=? fun (maxima, delegates_to_remove) ->
+  let frozen_deposits_percentage =
+    Constants_storage.frozen_deposits_percentage ctxt
+  in
   Signature.Public_key_hash.Map.fold_es
-    (fun delegate maximum_stake_to_be_deposited (ctxt, balance_updates) ->
+    (fun delegate maximum_stake (ctxt, balance_updates) ->
+      let maximum_stake_to_be_deposited =
+        Tez_repr.(
+          div_exn (mul_exn maximum_stake frozen_deposits_percentage) 100)
+      in
       (* Here we make sure to preserve the following invariant :
          maximum_stake_to_be_deposited <= frozen_deposits + balance
          See select_distribution_for_cycle *)
