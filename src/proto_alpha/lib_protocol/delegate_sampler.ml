@@ -169,19 +169,15 @@ let get_stakes_for_selected_index ctxt index =
       let* frozen_deposits_limit =
         Delegate_storage.frozen_deposits_limit ctxt delegate
       in
-      let* balance_and_frozen_bonds =
-        Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
-      in
       let* frozen_deposits =
         Frozen_deposits_storage.get ctxt delegate_contract
-      in
-      let*? total_balance =
-        balance_and_frozen_bonds +? frozen_deposits.current_amount
       in
       let frozen_deposits_limit =
         match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
       in
-      let available_to_freeze = min total_balance frozen_deposits_limit in
+      let available_to_freeze =
+        min frozen_deposits.current_amount frozen_deposits_limit
+      in
       let total_stake_for_cycle =
         match
           available_to_freeze *? delegation_over_baking_limit_plus_1_int64
