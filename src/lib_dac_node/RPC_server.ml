@@ -57,7 +57,7 @@ let () =
 let add_service registerer service handler directory =
   registerer directory service handler
 
-let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
+let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
     hash_streamer (data, pagination_scheme) =
   let open Lwt_result_syntax in
   let open Pages_encoding in
@@ -97,8 +97,7 @@ let handle_serialize_dac_store_preimage dac_plugin cctxt dac_sk_uris page_store
   | Ok external_message -> return @@ (root_hash, external_message)
   | Error _ -> tzfail @@ Cannot_construct_external_message
 
-let handle_verify_external_message_signature dac_plugin public_keys_opt
-    encoded_l1_message =
+let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
   let open Lwt_result_syntax in
   let external_message =
     let open Option_syntax in
@@ -117,23 +116,24 @@ let handle_verify_external_message_signature dac_plugin public_keys_opt
         signature
         witnesses
 
-let handle_retrieve_preimage dac_plugin page_store hash =
+let handle_get_preimage dac_plugin page_store hash =
   Page_store.Filesystem.load dac_plugin page_store hash
 
-let handle_coordinator_preimage_endpoint dac_plugin page_store hash_streamer
-    payload =
-  let open Lwt_result_syntax in
-  let* root_hash =
-    Pages_encoding.Merkle_tree.V0.Filesystem.serialize_payload
-      dac_plugin
-      ~page_store
-      payload
-  in
-  let () = Data_streamer.publish hash_streamer root_hash in
-  let*! () =
-    Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
-  in
-  return root_hash
+module Coordinator = struct
+  let handle_post_preimage dac_plugin page_store hash_streamer payload =
+    let open Lwt_result_syntax in
+    let* root_hash =
+      Pages_encoding.Merkle_tree.V0.Filesystem.serialize_payload
+        dac_plugin
+        ~page_store
+        payload
+    in
+    let () = Data_streamer.publish hash_streamer root_hash in
+    let*! () =
+      Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
+    in
+    return root_hash
+end
 
 (* Handler for subscribing to the streaming of root hashes via
    GET monitor/root_hashes RPC call. *)
@@ -154,14 +154,14 @@ let handle_get_certificate ctx root_hash =
       Certificate_repr.{aggregate_signature; witnesses; root_hash})
     value_opt
 
-let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
-    hash_streamer directory =
+let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer
+    directory =
   directory
   |> add_service
        Tezos_rpc.Directory.register0
-       (RPC_services.dac_store_preimage ctx)
+       (RPC_services.post_store_preimage ctx)
        (fun () input ->
-         handle_serialize_dac_store_preimage
+         handle_post_store_preimage
            ctx
            cctxt
            dac_sk_uris
@@ -169,23 +169,19 @@ let register_serialize_dac_store_preimage ctx cctxt dac_sk_uris page_store
            hash_streamer
            input)
 
-let register_verify_external_message_signature dac_plugin public_keys_opt
-    directory =
+let register_get_verify_signature dac_plugin public_keys_opt directory =
   directory
   |> add_service
        Tezos_rpc.Directory.register0
-       RPC_services.verify_external_message_signature
+       RPC_services.get_verify_signature
        (fun external_message () ->
-         handle_verify_external_message_signature
-           dac_plugin
-           public_keys_opt
-           external_message)
+         handle_get_verify_signature dac_plugin public_keys_opt external_message)
 
-let register_retrieve_preimage dac_plugin page_store =
+let register_get_preimage dac_plugin page_store =
   add_service
     Tezos_rpc.Directory.register1
-    (RPC_services.retrieve_preimage dac_plugin)
-    (fun hash () () -> handle_retrieve_preimage dac_plugin page_store hash)
+    (RPC_services.get_preimage dac_plugin)
+    (fun hash () () -> handle_get_preimage dac_plugin page_store hash)
 
 let register_monitor_root_hashes dac_plugin hash_streamer dir =
   Tezos_rpc.Directory.gen_register
@@ -193,22 +189,22 @@ let register_monitor_root_hashes dac_plugin hash_streamer dir =
     (Monitor_services.S.root_hashes dac_plugin)
     (fun () () () -> handle_monitor_root_hashes hash_streamer)
 
-let register_store_dac_member_signature ctx dac_plugin cctxt =
+let register_put_dac_member_signature ctx dac_plugin cctxt =
   add_service
     Tezos_rpc.Directory.register0
-    (RPC_services.store_dac_member_signature dac_plugin)
+    (RPC_services.put_dac_member_signature dac_plugin)
     (fun () dac_member_signature ->
-      Signature_manager.Coordinator.handle_store_dac_member_signature
+      Signature_manager.Coordinator.handle_put_dac_member_signature
         ctx
         cctxt
         dac_member_signature)
 
-let register_coordinator_preimage_endpoint dac_plugin hash_streamer page_store =
+let register_coordinator_post_preimage dac_plugin hash_streamer page_store =
   add_service
     Tezos_rpc.Directory.register0
-    (RPC_services.coordinator_post_preimage dac_plugin)
+    (RPC_services.Coordinator.post_preimage dac_plugin)
     (fun () payload ->
-      handle_coordinator_preimage_endpoint
+      Coordinator.handle_post_preimage
         dac_plugin
         page_store
         hash_streamer
@@ -224,20 +220,20 @@ let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
     hash_streamer =
   let page_store = Node_context.get_page_store node_context in
   Tezos_rpc.Directory.empty
-  |> register_serialize_dac_store_preimage
+  |> register_post_store_preimage
        dac_plugin
        cctxt
        dac_sk_uris
        page_store
        hash_streamer
-  |> register_verify_external_message_signature dac_plugin dac_public_keys_opt
-  |> register_retrieve_preimage dac_plugin page_store
+  |> register_get_verify_signature dac_plugin dac_public_keys_opt
+  |> register_get_preimage dac_plugin page_store
   |> register_monitor_root_hashes dac_plugin hash_streamer
-  |> register_store_dac_member_signature node_context dac_plugin cctxt
+  |> register_put_dac_member_signature node_context dac_plugin cctxt
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4934
      Once profiles are implemented, registration of the coordinator's
      "/preimage" endpoint should be moved out of the [start_legacy]. *)
-  |> register_coordinator_preimage_endpoint dac_plugin hash_streamer page_store
+  |> register_coordinator_post_preimage dac_plugin hash_streamer page_store
   |> register_get_certificate node_context dac_plugin
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750

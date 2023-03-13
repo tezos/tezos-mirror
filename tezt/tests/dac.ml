@@ -66,9 +66,7 @@ let init_hex_root_hash ?payload coordinator_node =
   let* root_hash, _l1_op =
     RPC.call
       coordinator_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Merkle_tree_V0")
+      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Merkle_tree_V0")
   in
   let hex_root_hash = `Hex root_hash in
   return hex_root_hash
@@ -433,9 +431,7 @@ let test_dac_node_handles_dac_store_preimage_merkle_V0 _protocol dac_node
   let* actual_rh, l1_operation =
     RPC.call
       dac_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Merkle_tree_V0")
+      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Merkle_tree_V0")
   in
   (* Expected reveal hash equals to the result of
      [Tezos_dac_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
@@ -458,7 +454,7 @@ let test_dac_node_handles_dac_store_preimage_merkle_V0 _protocol dac_node
   in
   check_preimage payload recovered_preimage ;
   let* is_signature_valid =
-    RPC.call dac_node (Rollup.Dac.RPC.dac_verify_signature l1_operation)
+    RPC.call dac_node (Dac_rpc.get_verify_signature l1_operation)
   in
   Check.(
     (is_signature_valid = true)
@@ -473,9 +469,7 @@ let test_dac_node_handles_dac_store_preimage_hash_chain_V0 _protocol dac_node
   let* actual_rh, _l1_operation =
     RPC.call
       dac_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Hash_chain_V0")
+      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Hash_chain_V0")
   in
   (* Expected reveal hash equals to the result of
      [Tezos_dac_alpha.Dac_pages_encoding.Hash_chain.V0.serialize_payload "test"].
@@ -505,9 +499,7 @@ let test_dac_node_handles_dac_retrieve_preimage_merkle_V0 _protocol dac_node
   let* actual_rh, _l1_operation =
     RPC.call
       dac_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Merkle_tree_V0")
+      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Merkle_tree_V0")
   in
   (* Expected reveal hash equals to the result of
      [Tezos_dac_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
@@ -525,9 +517,7 @@ let test_dac_node_handles_dac_retrieve_preimage_merkle_V0 _protocol dac_node
   let recovered_payload = really_input_string cin (in_channel_length cin) in
   let () = close_in cin in
   let recovered_preimage = Hex.of_string recovered_payload in
-  let* preimage =
-    RPC.call dac_node (Rollup.Dac.RPC.dac_retrieve_preimage expected_rh)
-  in
+  let* preimage = RPC.call dac_node (Dac_rpc.get_preimage expected_rh) in
   Check.(
     (preimage = Hex.show recovered_preimage)
       string
@@ -565,9 +555,7 @@ let test_rollup_arith_uses_reveals protocol dac_node sc_rollup_node
   let* actual_rh, _l1_operation =
     RPC.call
       dac_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Hash_chain_V0")
+      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Hash_chain_V0")
   in
   let expected_rh =
     "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428e7aa3"
@@ -607,9 +595,7 @@ let test_reveals_fails_on_wrong_hash _protocol dac_node sc_rollup_node
   let _actual_rh =
     RPC.call
       dac_node
-      (Rollup.Dac.RPC.dac_store_preimage
-         ~payload
-         ~pagination_scheme:"Hash_chain_V0")
+      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Hash_chain_V0")
   in
   let errorneous_hash =
     "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
@@ -726,7 +712,7 @@ module Legacy = struct
     let* actual_rh, _l1_operation =
       RPC.call
         coordinator
-        (Rollup.Dac.RPC.dac_store_preimage
+        (Dac_rpc.post_store_preimage
            ~payload
            ~pagination_scheme:"Merkle_tree_V0")
     in
@@ -898,12 +884,12 @@ module Legacy = struct
      the empty list. *)
   let check_downloaded_page coordinator observer page_hash =
     let* coordinator_hex_encoded_page =
-      RPC.call coordinator (Rollup.Dac.RPC.dac_retrieve_preimage page_hash)
+      RPC.call coordinator (Dac_rpc.get_preimage page_hash)
     in
     let coordinator_page = Hex.to_string (`Hex coordinator_hex_encoded_page) in
     (* Check that the page has been saved by the observer. *)
     let* observer_hex_encoded_page =
-      RPC.call observer (Rollup.Dac.RPC.dac_retrieve_preimage page_hash)
+      RPC.call observer (Dac_rpc.get_preimage page_hash)
     in
     let observer_page = Hex.to_string (`Hex observer_hex_encoded_page) in
     (* Check that the raw page for the root hash  stored in the coordinator
@@ -1041,7 +1027,7 @@ module Legacy = struct
       wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
     in
     let* actual_rh =
-      RPC.call coordinator (Rollup.Dac.RPC.coordinator_store_preimage ~payload)
+      RPC.call coordinator (Dac_rpc.Coordinator.post_preimage ~payload)
     in
     let () = check_valid_root_hash expected_rh actual_rh in
     let* () = root_hash_pushed_to_data_streamer_promise in
@@ -1059,7 +1045,7 @@ module Signature_manager = struct
       let result =
         RPC.call
           coordinator_node
-          (Rollup.Dac.RPC.dac_store_dac_member_signature
+          (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh:invalid_signer_key.aggregate_public_key_hash
              ~signature)
@@ -1084,7 +1070,7 @@ module Signature_manager = struct
       let result =
         RPC.call
           coordinator_node
-          (Rollup.Dac.RPC.dac_store_dac_member_signature
+          (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh:memberj.aggregate_public_key_hash
              ~signature)
@@ -1115,7 +1101,7 @@ module Signature_manager = struct
             let* () =
               RPC.call
                 coordinator_node
-                (Rollup.Dac.RPC.dac_store_dac_member_signature
+                (Dac_rpc.put_dac_member_signature
                    ~hex_root_hash
                    ~dac_member_pkh:member.aggregate_public_key_hash
                    ~signature)
@@ -1125,9 +1111,7 @@ module Signature_manager = struct
           members
       in
       let* witnesses, certificate, _root_hash =
-        RPC.call
-          coordinator_node
-          (Rollup.Dac.RPC.get_certificate ~hex_root_hash)
+        RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
       in
       assert_witnesses ~__LOC__ 3 witnesses ;
       assert_verify_aggregate_signature members_keys hex_root_hash certificate ;
@@ -1145,7 +1129,7 @@ module Signature_manager = struct
       let call () =
         RPC.call
           coordinator_node
-          (Rollup.Dac.RPC.dac_store_dac_member_signature
+          (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh
              ~signature)
@@ -1153,9 +1137,7 @@ module Signature_manager = struct
       let* () = call () in
       let* () = call () in
       let* witnesses, certificate, _root_hash =
-        RPC.call
-          coordinator_node
-          (Rollup.Dac.RPC.get_certificate ~hex_root_hash)
+        RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
       in
       assert_witnesses ~__LOC__ 4 witnesses ;
       assert_verify_aggregate_signature [member] hex_root_hash certificate ;
@@ -1191,13 +1173,13 @@ let test_get_certificate _protocol _tezos_node _tz_client coordinator _threshold
   let* () =
     RPC.call
       coordinator
-      (Rollup.Dac.RPC.dac_store_dac_member_signature
+      (Dac_rpc.put_dac_member_signature
          ~hex_root_hash
          ~dac_member_pkh:member.aggregate_public_key_hash
          ~signature)
   in
   let* witnesses, certificate, _root_hash =
-    RPC.call coordinator (Rollup.Dac.RPC.get_certificate ~hex_root_hash)
+    RPC.call coordinator (Dac_rpc.get_certificate ~hex_root_hash)
   in
   let expected_witnesses = Z.shift_left Z.one i in
   assert_witnesses ~__LOC__ (Z.to_int expected_witnesses) witnesses ;

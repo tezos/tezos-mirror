@@ -51,31 +51,23 @@ let make_unix_cctxt ~scheme ~host ~port =
    was computed.
 *)
 let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~page_hash =
-  cctxt#call_service
-    (RPC_services.retrieve_preimage plugin)
-    ((), page_hash)
-    ()
-    ()
+  cctxt#call_service (RPC_services.get_preimage plugin) ((), page_hash) () ()
 
 let post_store_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
     ~pagination_scheme =
   cctxt#call_service
-    (RPC_services.dac_store_preimage plugin)
+    (RPC_services.post_store_preimage plugin)
     ()
     ()
     (payload, pagination_scheme)
 
 let get_verify_signature (cctxt : #cctxt) ~external_message =
-  cctxt#call_service
-    RPC_services.verify_external_message_signature
-    ()
-    external_message
-    ()
+  cctxt#call_service RPC_services.get_verify_signature () external_message ()
 
 let put_dac_member_signature (plugin : Dac_plugin.t) (cctxt : #cctxt) ~signature
     =
   cctxt#call_service
-    (RPC_services.store_dac_member_signature plugin)
+    (RPC_services.put_dac_member_signature plugin)
     ()
     ()
     signature
@@ -87,9 +79,11 @@ let get_certificate (plugin : Dac_plugin.t) (cctxt : #cctxt) ~root_page_hash =
     ()
     ()
 
-let post_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload =
-  cctxt#call_service
-    (RPC_services.coordinator_post_preimage plugin)
-    ()
-    ()
-    payload
+module Coordinator = struct
+  let post_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload =
+    cctxt#call_service
+      (RPC_services.Coordinator.post_preimage plugin)
+      ()
+      ()
+      payload
+end

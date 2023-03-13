@@ -311,7 +311,7 @@ module Coordinator = struct
          (fun pkh -> Aggregate_signature.Public_key_hash.equal signer_pkh pkh)
          dac_committee
 
-  let handle_store_dac_member_signature ctx cctxt dac_member_signature =
+  let handle_put_dac_member_signature ctx cctxt dac_member_signature =
     let open Lwt_result_syntax in
     let*? dac_plugin = Node_context.get_dac_plugin ctx in
     let Signature_repr.{signer_pkh; root_hash; signature} =

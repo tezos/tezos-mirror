@@ -23,66 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Instance of [Tezos_client_base.Client_context] that only handles IOs and
-    RPCs. Can be used for keys and RPCs related commands. *)
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
-
-(** Instance of [cctxt] for linux systems. Relies on
-    [Tezos_rpc_http_client_unix]. *)
-class unix_cctxt :
-  rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config -> cctxt
-
-(** [make_unix_client_context scheme host port] generates a cctxt from
-    the client configuration parameters. *)
-val make_unix_cctxt : scheme:string -> host:string -> port:int -> cctxt
-
-(** [get_preimage cctxt ~hash] requests the preimage of hash, consisting of a
+(** [get_preimage hash] requests the preimage of hash, consisting of a
     single page, from cctxt. When the request succeeds, the raw page will be
     returned as a sequence of bytes. *)
-val get_preimage :
-  Dac_plugin.t -> #cctxt -> page_hash:Dac_plugin.hash -> bytes tzresult Lwt.t
+val get_preimage : string -> (Dac_node.t, string) RPC_core.t
 
 (** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage 
     using a given [pagination_scheme]. It returns the base58 encoded root page hash 
-    and the raw bytes. *)
+    and the raw bytes that can be used as contents of a rollup message to trigger the request of
+    the payload in a WASM rollup. *)
 val post_store_preimage :
-  Dac_plugin.t ->
-  #cctxt ->
-  payload:bytes ->
-  pagination_scheme:Pagination_scheme.t ->
-  (Dac_plugin.hash * bytes) tzresult Lwt.t
+  payload:string ->
+  pagination_scheme:string ->
+  (Dac_node.t, string * string) RPC_core.t
 
-(** [get_verify_signature cctxt ~external_message] requests the DAL node to verify
+(** [get_verify_signature cctxt external_message] requests the DAL node to verify
     the signature of the external message [external_message] via
     the plugin/dac/verify_signature endpoint. The DAC committee
     of the DAL node must be the same that was used to produce the
     [external_message]. *)
-val get_verify_signature :
-  #cctxt -> external_message:string option -> bool tzresult Lwt.t
+val get_verify_signature : string -> (Dac_node.t, bool) RPC_core.t
 
-(** [put_dac_member_signature cctxt ~signature:Signature_repr.t]
+(** [put_dac_member_signature hex_root_hash dac_member_pkh signature]
     stores the [signature] generated from signing [hex_root_hash] by
     [dac_member_pkh]. *)
 val put_dac_member_signature :
-  Dac_plugin.t -> #cctxt -> signature:Signature_repr.t -> unit tzresult Lwt.t
+  hex_root_hash:Hex.t ->
+  dac_member_pkh:string ->
+  signature:Tezos_crypto.Aggregate_signature.t ->
+  (Dac_node.t, unit) RPC_core.t
 
-(** [get_certificate cctxt ~root_page_hash] fetches the DAC certificate for the
-    provided [root_page_hash]. *)
+(** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
+    provided [hex_root_hash]. *)
 val get_certificate :
-  Dac_plugin.t ->
-  #cctxt ->
-  root_page_hash:Dac_plugin.hash ->
-  Certificate_repr.t option tzresult Lwt.t
+  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string) RPC_core.t
 
 module Coordinator : sig
-  (** [post_preimage cctxt ~payload] sends a [payload] to the DAC
-  [Coordinator] via a POST RPC call to dac/preimage. It returns a hex
-  encoded root page hash, produced by [Merkle_tree_V0] pagination scheme.
-  On the backend side it also pushes root page hash of the preimage to all
-  the subscribed DAC Members and Observers. *)
-  val post_preimage :
-    Dac_plugin.t -> #cctxt -> payload:bytes -> Dac_plugin.hash tzresult Lwt.t
+  (** [post_preimage ~payload] sends a [payload] to the DAC
+    [Coordinator] via a POST RPC call to dac/preimage. It returns a hex
+    encoded root page hash, produced by [Merkle_tree_V0] pagination scheme.
+    On the backend side it also pushes root page hash of the preimage to all
+    the subscribed DAC Members and Observers. *)
+  val post_preimage : payload:string -> (Dac_node.t, string) RPC_core.t
 end
