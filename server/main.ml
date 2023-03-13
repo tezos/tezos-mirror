@@ -213,20 +213,24 @@ let maybe_create_tables db_pool =
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
     block_hash operations =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-  if operations <> [] then
-    let* () =
+  let* () =
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+      (fun op ->
+        Db.exec
+          Sql_requests.maybe_insert_operation
+          Teztale_lib.Consensus_ops.
+            ( (level, op.op.hash, op.op.kind = Endorsement),
+              (op.delegate, op.op.round, level) ))
+      operations
+  in
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+    (fun op ->
       Db.exec
-        (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-           ~oneshot:true
-           (Sql_requests.maybe_insert_operations_from_block ~level operations))
-        ()
-    in
-    Db.exec
-      (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-         ~oneshot:true
-         (Sql_requests.insert_included_operations block_hash ~level operations))
-      ()
-  else return_unit
+        Sql_requests.insert_included_operation
+        ( Teztale_lib.Consensus_ops.
+            (op.delegate, op.op.kind = Endorsement, op.op.round),
+          (block_hash, level) ))
+    operations
 
 let endorsing_rights_callback db_pool g rights =
   let level = Int32.of_string (Re.Group.get g 1) in
@@ -236,17 +240,19 @@ let endorsing_rights_callback db_pool g rights =
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         Db.with_transaction (fun () ->
             let* () =
-              Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Sql_requests.maybe_insert_delegates_from_rights rights))
-                ()
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun right ->
+                  Db.exec
+                    Sql_requests.maybe_insert_delegate
+                    right.Teztale_lib.Consensus_ops.address)
+                rights
             in
-            Db.exec
-              (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                 ~oneshot:true
-                 (Sql_requests.maybe_insert_endorsing_rights ~level rights))
-              ()))
+            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+              (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
+                Db.exec
+                  Sql_requests.maybe_insert_endorsing_right
+                  (level, address, first_slot, power))
+              rights))
       db_pool
   in
   with_caqti_error out (fun () ->
@@ -309,30 +315,38 @@ let operations_callback db_pool g source operations =
         Db.with_transaction (fun () ->
             let* () = Db.exec Sql_requests.maybe_insert_source source in
             let* () =
-              Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Sql_requests.maybe_insert_delegates_from_received
-                      operations))
-                ()
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun (delegate, _) ->
+                  Db.exec Sql_requests.maybe_insert_delegate delegate)
+                operations
             in
             let* () =
-              Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Sql_requests.maybe_insert_operations_from_received
-                      ~level
-                      operations))
-                ()
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun (delegate, ops) ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun (op : Teztale_lib.Consensus_ops.received_operation) ->
+                      Db.exec
+                        Sql_requests.maybe_insert_operation
+                        Teztale_lib.Consensus_ops.
+                          ( (level, op.op.hash, op.op.kind = Endorsement),
+                            (delegate, op.op.round, level) ))
+                    ops)
+                operations
             in
-            Db.exec
-              (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                 ~oneshot:true
-                 (Sql_requests.insert_received_operations
-                    ~source
-                    ~level
-                    operations))
-              ()))
+            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+              (fun (delegate, ops) ->
+                Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                  (fun op ->
+                    Db.exec
+                      Sql_requests.insert_received_operation
+                      Teztale_lib.Consensus_ops.
+                        ( ( op.reception_time,
+                            op.errors,
+                            delegate,
+                            op.op.kind = Endorsement ),
+                          (op.op.round, source, level) ))
+                  ops)
+              operations))
       db_pool
   in
   with_caqti_error out (fun () ->

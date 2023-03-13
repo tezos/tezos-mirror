@@ -23,14 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto
-open Teztale_lib
-
-(* TRUE/FALSE literals were introduced in Sqlite 3.23 (and are represented as
-   the integers 1 and 0. To support older versions, we convert booleans to
-   integers. *)
-let bool_to_int b = if b then 1 else 0
-
 let create_delegates =
   "  CREATE TABLE IF NOT EXISTS delegates(\n\
   \     id INTEGER PRIMARY KEY,\n\
@@ -201,98 +193,30 @@ let maybe_insert_source =
   Caqti_request.Infix.(Caqti_type.(string ->. unit))
     "INSERT INTO nodes (name) VALUES (?) ON CONFLICT DO NOTHING"
 
-let maybe_insert_delegates_from_rights rights =
-  Format.asprintf
-    "INSERT INTO delegates (address) VALUES %a ON CONFLICT DO NOTHING"
-    (Format.pp_print_list
-       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f r ->
-         Format.fprintf
-           f
-           "(x'%a')"
-           Hex.pp
-           (Signature.Public_key_hash.to_hex r.Consensus_ops.address)))
-    rights
+let maybe_insert_delegate =
+  Caqti_request.Infix.(Caqti_type.(Type.public_key_hash ->. unit))
+    "INSERT INTO delegates (address) VALUES (?) ON CONFLICT DO NOTHING"
 
-let maybe_insert_endorsing_rights ~level rights =
-  Format.asprintf
+let maybe_insert_endorsing_right =
+  Caqti_request.Infix.(
+    Caqti_type.(tup4 int32 Type.public_key_hash int int ->. unit))
     "INSERT INTO endorsing_rights (level, delegate, first_slot, \
      endorsing_power) SELECT column1, delegates.id, column3, column4 FROM \
-     delegates JOIN (VALUES %a) ON delegates.address = column2 ON CONFLICT DO \
-     NOTHING"
-    (Format.pp_print_list
-       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f Teztale_lib.Consensus_ops.{address; first_slot; power} ->
-         Format.fprintf
-           f
-           "(%ld, x'%a', %d, %d)"
-           level
-           Hex.pp
-           (Signature.Public_key_hash.to_hex address)
-           first_slot
-           power))
-    rights
+     delegates JOIN (VALUES (?, ?, ?, ?)) ON delegates.address = column2 ON \
+     CONFLICT DO NOTHING"
 
-let maybe_insert_operations level extractor op_extractor l =
-  Format.asprintf
+let maybe_insert_operation =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      tup2
+        (tup3 int32 Type.operation_hash bool)
+        (tup3 Type.public_key_hash (option int32) int32)
+      ->. unit))
     "INSERT INTO operations (hash, endorsement, endorser, level, round) SELECT \
-     column1, column2, delegates.id, %ld, column4 FROM delegates JOIN (VALUES \
-     %a) ON delegates.address = column3 WHERE (column2, delegates.id, column4) \
-     NOT IN (SELECT endorsement, endorser, round FROM operations WHERE level = \
-     %ld)"
-    level
-    (Format.pp_print_list
-       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f x ->
-         let delegate, ops = extractor x in
-         Format.pp_print_list
-           ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-           (fun f y ->
-             let op = op_extractor y in
-             Format.fprintf
-               f
-               "(x'%a', %d, x'%a', %a)"
-               Hex.pp
-               (Operation_hash.to_hex op.Consensus_ops.hash)
-               (bool_to_int (op.Consensus_ops.kind = Consensus_ops.Endorsement))
-               Hex.pp
-               (Signature.Public_key_hash.to_hex delegate)
-               (Format.pp_print_option
-                  ~none:(fun f () -> Format.pp_print_string f "NULL")
-                  (fun f x -> Format.fprintf f "%li" x))
-               op.Consensus_ops.round)
-           f
-           ops))
-    l
-    level
-
-let maybe_insert_operations_from_block ~level operations =
-  maybe_insert_operations
-    level
-    (fun op -> Consensus_ops.(op.delegate, [op.op]))
-    (fun x -> x)
-    operations
-
-let maybe_insert_operations_from_received ~level operations =
-  let operations = List.filter (fun (_, l) -> l <> []) operations in
-  maybe_insert_operations
-    level
-    (fun (delegate, ops) -> (delegate, ops))
-    (fun (op : Consensus_ops.received_operation) -> op.op)
-    operations
-
-let maybe_insert_delegates_from_received operations =
-  Format.asprintf
-    "INSERT INTO delegates (address) VALUES %a ON CONFLICT DO NOTHING"
-    (Format.pp_print_list
-       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f (address, _) ->
-         Format.fprintf
-           f
-           "(x'%a')"
-           Hex.pp
-           (Signature.Public_key_hash.to_hex address)))
-    operations
+     column1, column2, delegates.id, ?, column4 FROM delegates JOIN (VALUES \
+     (?,?,?,?)) ON delegates.address = column3 WHERE (column2, delegates.id, \
+     column4) NOT IN (SELECT endorsement, endorser, round FROM operations \
+     WHERE level = ?)"
 
 let maybe_insert_block =
   Caqti_request.Infix.(
@@ -307,80 +231,34 @@ let maybe_insert_block =
      (timestamp, level, round, baker) = (EXCLUDED.timestamp, EXCLUDED.level, \
      EXCLUDED.round, EXCLUDED.baker) WHERE True"
 
-let insert_received_operations ~source ~level operations =
-  let operations = List.filter (fun (_, l) -> l <> []) operations in
-  Format.asprintf
+let insert_received_operation =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      tup2
+        (tup4 ptime Type.errors Type.public_key_hash bool)
+        (tup3 (option int32) string int32)
+      ->. unit))
     "INSERT INTO operations_reception (timestamp, operation, source, errors) \
      SELECT column1, operations.id, nodes.id, column2 FROM operations, \
-     delegates, nodes, (VALUES %a) ON delegates.address = column3 AND \
+     delegates, nodes, (VALUES (?,?,?,?,?)) ON delegates.address = column3 AND \
      operations.endorser = delegates.id AND operations.endorsement = column4 \
      AND ((operations.round IS NULL AND column5 IS NULL) OR operations.round = \
-     column5) WHERE nodes.name = '%s' AND operations.level = %ld AND \
-     (operations.id, nodes.id) NOT IN (SELECT operation,source FROM \
-     operations_reception)"
-    (Format.pp_print_list
-       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f (endorser, l) ->
-         (Format.pp_print_list
-            ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-            (fun f (op : Consensus_ops.received_operation) ->
-              Format.fprintf
-                f
-                "('%a', %a, x'%a', %d, %a)"
-                Tezos_base.Time.System.pp_hum
-                op.reception_time
-                (Format.pp_print_option
-                   ~none:(fun f () -> Format.pp_print_string f "NULL")
-                   (fun f errors ->
-                     Format.fprintf
-                       f
-                       "x'%a'"
-                       Hex.pp
-                       (Hex.of_bytes
-                          (Data_encoding.Binary.to_bytes_exn
-                             (Data_encoding.list
-                                Tezos_error_monad.Error_monad.error_encoding)
-                             errors))))
-                op.errors
-                Hex.pp
-                (Signature.Public_key_hash.to_hex endorser)
-                (bool_to_int
-                   (op.op.Consensus_ops.kind = Consensus_ops.Endorsement))
-                (Format.pp_print_option
-                   ~none:(fun f () -> Format.pp_print_string f "NULL")
-                   (fun f x -> Format.fprintf f "%li" x))
-                op.Consensus_ops.op.round))
-           f
-           l))
-    operations
-    source
-    level
+     column5) WHERE nodes.name = ? AND operations.level = ? ON CONFLICT DO \
+     NOTHING"
 
-let insert_included_operations block_hash ~level operations =
-  Format.asprintf
+let insert_included_operation =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      tup2
+        (tup3 Type.public_key_hash bool (option int32))
+        (tup2 Type.block_hash int32)
+      ->. unit))
     "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
-     operations.id FROM operations, delegates, blocks, (VALUES %a) ON \
+     operations.id FROM operations, delegates, blocks, (VALUES (?,?,?)) ON \
      delegates.address = column1 AND operations.endorser = delegates.id AND \
      operations.endorsement = column2 AND ((operations.round IS NULL AND \
-     column3 IS NULL) OR operations.round = column3) WHERE blocks.hash = x'%a' \
-     AND operations.level = %ld ON CONFLICT DO NOTHING"
-    (Format.pp_print_list
-       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f (op : Consensus_ops.block_op) ->
-         Format.fprintf
-           f
-           "(x'%a', %d, %a)"
-           Hex.pp
-           (Signature.Public_key_hash.to_hex op.Consensus_ops.delegate)
-           (bool_to_int (op.op.Consensus_ops.kind = Consensus_ops.Endorsement))
-           (Format.pp_print_option
-              ~none:(fun f () -> Format.pp_print_string f "NULL")
-              (fun f x -> Format.fprintf f "%li" x))
-           op.Consensus_ops.op.round))
-    operations
-    Hex.pp
-    (Block_hash.to_hex block_hash)
-    level
+     column3 IS NULL) OR operations.round = column3) WHERE blocks.hash = ? AND \
+     operations.level = ? ON CONFLICT DO NOTHING"
 
 let insert_received_block =
   Caqti_request.Infix.(Caqti_type.(tup3 ptime Type.block_hash string ->. unit))

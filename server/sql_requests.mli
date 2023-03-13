@@ -35,28 +35,27 @@ module Type : sig
   val errors : Tezos_error_monad.TzCore.error list option Caqti_type.t
 end
 
-val bool_to_int : bool -> int
-
 val create_tables : string list
 
 val db_schema : string
 
 val maybe_insert_source : (string, unit, [`Zero]) Caqti_request.t
 
-val maybe_insert_delegates_from_rights :
-  Teztale_lib.Consensus_ops.rights -> string
+val maybe_insert_delegate :
+  (Tezos_crypto.Signature.public_key_hash, unit, [`Zero]) Caqti_request.t
 
-val maybe_insert_delegates_from_received :
-  Teztale_lib.Consensus_ops.delegate_ops -> string
+val maybe_insert_endorsing_right :
+  ( int32 * Tezos_crypto.Signature.public_key_hash * int * int,
+    unit,
+    [`Zero] )
+  Caqti_request.t
 
-val maybe_insert_endorsing_rights :
-  level:Int32.t -> Teztale_lib.Consensus_ops.rights -> string
-
-val maybe_insert_operations_from_block :
-  level:Int32.t -> Teztale_lib.Consensus_ops.block_op list -> string
-
-val maybe_insert_operations_from_received :
-  level:Int32.t -> Teztale_lib.Consensus_ops.delegate_ops -> string
+val maybe_insert_operation :
+  ( (int32 * Tezos_crypto.Operation_hash.t * bool)
+    * (Tezos_crypto.Signature.public_key_hash * int32 option * int32),
+    unit,
+    [`Zero] )
+  Caqti_request.t
 
 val maybe_insert_block :
   ( (int32 (* level *) * Tezos_base.Time.Protocol.t * Tezos_crypto.Block_hash.t)
@@ -65,19 +64,22 @@ val maybe_insert_block :
     [`Zero] )
   Caqti_request.t
 
-val insert_received_operations :
-  source:string ->
-  level:Int32.t ->
-  (Tezos_crypto.Signature.public_key_hash
-  * Teztale_lib.Consensus_ops.received_operation list)
-  list ->
-  string
+val insert_received_operation :
+  ( (Ptime.t
+    * Tezos_error_monad.TzCore.error list option
+    * Tezos_crypto.Signature.public_key_hash
+    * bool)
+    * (int32 option * string * int32),
+    unit,
+    [`Zero] )
+  Caqti_request.t
 
-val insert_included_operations :
-  Tezos_crypto.Block_hash.t ->
-  level:Int32.t ->
-  Teztale_lib.Consensus_ops.block_op list ->
-  string
+val insert_included_operation :
+  ( (Tezos_crypto.Signature.public_key_hash * bool * int32 option)
+    * (Tezos_crypto.Block_hash.t * int32),
+    unit,
+    [`Zero] )
+  Caqti_request.t
 
 val insert_received_block :
   (Ptime.t * Tezos_crypto.Block_hash.t * string, unit, [`Zero]) Caqti_request.t
