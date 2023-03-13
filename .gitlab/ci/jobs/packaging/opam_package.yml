@@ -363,6 +363,8 @@ opam:octez-smart-rollup-wasm-debugger:
 
 # Ignoring unreleased package octez-snoop.
 
+# Ignoring unreleased package octez-srs-extraction.
+
 # Ignoring unreleased package octez-testnet-scenarios.
 
 opam:octez-tx-rollup-client-PtLimaPt:

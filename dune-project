@@ -35,6 +35,7 @@
 (package (name octez-smart-rollup-wasm-benchmark-lib)(allow_empty))
 (package (name octez-smart-rollup-wasm-debugger))
 (package (name octez-snoop))
+(package (name octez-srs-extraction))
 (package (name octez-testnet-scenarios))
 (package (name octez-tx-rollup-client-PtLimaPt))
 (package (name octez-tx-rollup-node-PtLimaPt))
