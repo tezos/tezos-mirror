@@ -53,15 +53,15 @@ let all_bootstrap_keys =
   List.map (fun b -> b.Account.alias) (Array.to_list Account.Bootstrap.keys)
 
 (** Boilerplate code to create a user-migratable node. Used in the tests below. **)
-let user_migratable_node_init ?node_name ?client_name ~migration_level
-    ~migrate_to () =
+let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
+    ~migration_level ~migrate_to () =
   let* node =
     Node.init
       ?name:node_name
       ~patch_config:
         (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
            [(migration_level, migrate_to)])
-      [Synchronisation_threshold 0; Private_mode]
+      ([Node.Synchronisation_threshold 0; Private_mode] @ more_node_args)
   in
   let* client = Client.(init ?name:client_name ~endpoint:(Node node) ()) in
   Lwt.return (client, node)
@@ -737,14 +737,15 @@ let test_forked_migration_bakers ?(migration_level = 4)
          (Protocol.tag migrate_from)
          (Protocol.tag migrate_to))
   @@ fun () ->
+  let more_node_args = [Node.Connections 2] in
   let* ((client_1, node_1) as cn1) =
-    user_migratable_node_init ~migrate_to ~migration_level ()
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
   in
   let* ((client_2, node_2) as cn2) =
-    user_migratable_node_init ~migrate_to ~migration_level ()
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
   in
   let* ((client_3, node_3) as cn3) =
-    user_migratable_node_init ~migrate_to ~migration_level ()
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
   in
 
   let* () = connect cn1 cn2
