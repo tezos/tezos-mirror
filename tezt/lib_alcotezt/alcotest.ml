@@ -55,7 +55,18 @@ let run library_name tests =
             body ()) ;
      Base.unit
 
-type 'a testable = (module Tezt_core.Check.EQUALABLE with type t = 'a)
+module type TESTABLE = sig
+  (** The type to test. *)
+  type t
+
+  (** A way to pretty-print the value. *)
+  val pp : Format.formatter -> t -> unit
+
+  (** Test for equality between two values. *)
+  val equal : t -> t -> bool
+end
+
+type 'a testable = (module TESTABLE with type t = 'a)
 
 let testable (type a) (pp : Format.formatter -> a -> return)
     (eq : a -> a -> bool) : a testable =
