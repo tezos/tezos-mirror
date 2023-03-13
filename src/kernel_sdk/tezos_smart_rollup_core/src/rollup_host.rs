@@ -48,7 +48,7 @@ unsafe impl SmartRollupCore for RollupHost {
         core::write_output(src, num_bytes)
     }
 
-    unsafe fn write_debug(src: *const u8, num_bytes: usize) {
+    unsafe fn write_debug(&self, src: *const u8, num_bytes: usize) {
         core::write_debug(src, num_bytes)
     }
 

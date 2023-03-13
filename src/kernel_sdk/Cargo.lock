@@ -1065,6 +1065,14 @@ version = "0.1.0"
 source = "git+https://gitlab.com/tezos/tezos.git#6053c9173cdad0f2733615a65b3469ea368a9409"
 
 [[package]]
+name = "tezos_smart_rollup_debug"
+version = "0.1.0"
+dependencies = [
+ "tezos_smart_rollup_core 0.1.0",
+ "tezos_smart_rollup_host",
+]
+
+[[package]]
 name = "tezos_smart_rollup_host"
 version = "0.1.0"
 dependencies = [

@@ -191,7 +191,7 @@ where
     }
 
     fn write_debug(&self, msg: &str) {
-        unsafe { Host::write_debug(msg.as_ptr(), msg.len()) };
+        unsafe { SmartRollupCore::write_debug(self, msg.as_ptr(), msg.len()) };
     }
 
     #[cfg(feature = "alloc")]

@@ -218,7 +218,7 @@ pub unsafe trait SmartRollupCore {
     /// # Safety
     /// - `src` must be a ptr to an initialised slice of bytes.
     /// - `num_bytes` must be the length of that slice.
-    unsafe fn write_debug(src: *const u8, num_bytes: usize);
+    unsafe fn write_debug(&self, src: *const u8, num_bytes: usize);
 
     /// See [store_has].
     ///
