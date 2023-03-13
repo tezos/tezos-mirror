@@ -470,7 +470,7 @@ let baking_minimal_timestamp state =
   let pool =
     Operation_pool.add_operations
       current_mempool
-      (List.map snd signed_endorsements)
+      (List.map (fun (_, x, _, _) -> x) signed_endorsements)
   in
   let dal_attestation_level = Int32.succ latest_proposal.block.shell.level in
   let* own_dal_attestations =
