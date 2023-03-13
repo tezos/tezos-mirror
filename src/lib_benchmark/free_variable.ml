@@ -48,5 +48,16 @@ module Table = Hashtbl.Make (struct
 end)
 
 module Map = Map.Make (Namespace)
-module Set = Set.Make (Namespace)
+
+module Set = struct
+  include Set.Make (Namespace)
+
+  let pp_sep s ppf () = Format.fprintf ppf "%s@;" s
+
+  let pp fmtr set =
+    let open Format in
+    let elts = elements set in
+    fprintf fmtr "{ @[<hv>%a@] }" (pp_print_list ~pp_sep:(pp_sep "; ") pp) elts
+end
+
 module Sparse_vec = Sparse_vec.Make (Map)

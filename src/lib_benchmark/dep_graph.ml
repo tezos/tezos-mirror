@@ -108,19 +108,8 @@ module Solver = struct
   let force_solved {dependencies; undecided_variables; meta} =
     {dependencies; provides = undecided_variables; meta}
 
-  let pp_list =
-    Format.pp_print_list
-      ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
-      Free_variable.pp
-
   let pp_node fmtr (from, to_) =
-    Format.fprintf
-      fmtr
-      "%a -> %a"
-      pp_list
-      (Fv_set.elements from)
-      pp_list
-      (Fv_set.elements to_)
+    Format.fprintf fmtr "%a -> %a" Fv_set.pp from Fv_set.pp to_
 
   (* Sets free variable [v] to be 'solved' in node [n] *)
   let set_variable_as_solved (n : 'a unsolved) (v : Free_variable.t) =
