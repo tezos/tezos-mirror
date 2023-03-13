@@ -55,6 +55,16 @@ let evm_proxy_server_version proxy_server =
   let get_version_url = endpoint ^ "/version" in
   RPC.Curl.get get_version_url
 
+let get_transaction_count proxy_server address =
+  let parameters : JSON.u = `A [`String address; `String "latest"] in
+  let* transaction_count =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      ~method_:"eth_getTransactionCount"
+      ~parameters
+  in
+  return JSON.(transaction_count |-> "result" |> as_int64)
+
 module Account = struct
   type t = {address : string; private_key : string}
 
@@ -358,6 +368,23 @@ let test_rpc_getBlockByNumber =
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
 
+let test_rpc_getTransactionCount =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_transaction_count"]
+    ~title:"RPC method eth_getTransactionCount"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  (* Force a level to got past the genesis block *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* transaction_count =
+    get_transaction_count evm_proxy_server Account.prefunded_account_address
+  in
+  Check.((transaction_count = 0L) int64)
+    ~error_msg:"Expected a nonce of %R, but got %L" ;
+  unit
+
 let test_l2_blocks_progression =
   Protocol.register_test
     ~__FILE__
@@ -386,6 +413,7 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getBalance protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_rpc_getBlockByNumber protocols ;
+  test_rpc_getTransactionCount protocols ;
   test_l2_blocks_progression protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

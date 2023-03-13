@@ -44,9 +44,13 @@ module Durable_storage_path = struct
 
   let balance = "/balance"
 
+  let nonce = "/nonce"
+
   let account_path (Address s) = accounts ^ "/" ^ s
 
   let balance_path address = account_path address ^ balance
+
+  let nonce_path address = account_path address ^ nonce
 
   let number = "/number"
 
@@ -140,6 +144,15 @@ module RPC = struct
   let balance base address =
     let open Lwt_result_syntax in
     let key = Durable_storage_path.balance_path address in
+    let+ answer = call_service ~base durable_state_value () {key} () in
+    match answer with
+    | Some bytes ->
+        Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
+    | None -> Ethereum_types.Qty Z.zero
+
+  let nonce base address =
+    let open Lwt_result_syntax in
+    let key = Durable_storage_path.nonce_path address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
@@ -244,6 +257,8 @@ module type S = sig
 
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
+  val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+
   val inject_raw_transaction : string -> unit tzresult Lwt.t
 
   val current_block :
@@ -261,6 +276,8 @@ end) : S = struct
   let smart_rollup_address = RPC.smart_rollup_address Base.base
 
   let balance = RPC.balance Base.base
+
+  let nonce = RPC.nonce Base.base
 
   let inject_raw_transaction = RPC.inject_raw_transaction Base.base
 

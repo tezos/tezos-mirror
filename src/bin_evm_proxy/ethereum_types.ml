@@ -31,17 +31,19 @@ let append_0x s = "0x" ^ s
 
 (** Strip the [0x] prefix of a string. *)
 let strip_0x s =
-  let n = String.length s in
-  String.sub s 2 (n - 2)
+  if String.starts_with ~prefix:"0x" s then
+    let n = String.length s in
+    String.sub s 2 (n - 2)
+  else s
 
 (** Ethereum address (20 bytes) *)
 type address = Address of string [@@ocaml.unboxed]
 
-let address_of_string s = Address s
+let address_of_string s = Address (String.lowercase_ascii (strip_0x s))
 
 let address_encoding =
   Data_encoding.(
-    conv (fun (Address a) -> a) (fun a -> Address (strip_0x a)) string)
+    conv (fun (Address a) -> append_0x a) (fun a -> address_of_string a) string)
 
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
