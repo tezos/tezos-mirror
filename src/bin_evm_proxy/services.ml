@@ -127,7 +127,7 @@ module Mock = struct
       gasUsed = gas_price;
       logs = [];
       logsBloom = hash_f @@ String.make 256 'a';
-      type_ = hash_f "00";
+      type_ = qty_f Z.zero;
       status = qty_f Z.one;
       root = hash_f @@ String.make 32 'a';
     }

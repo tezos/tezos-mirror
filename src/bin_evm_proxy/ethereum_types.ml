@@ -343,7 +343,7 @@ type transaction_receipt = {
   gasUsed : quantity;
   logs : transaction_log list;
   logsBloom : hash;
-  type_ : hash;
+  type_ : quantity;
   status : quantity;
   root : hash;
   contractAddress : address option;
@@ -422,7 +422,7 @@ let transaction_receipt_encoding =
           (req "logs" (list transaction_log_encoding)))
        (obj5
           (req "logsBloom" hash_encoding)
-          (req "type" hash_encoding)
+          (req "type" quantity_encoding)
           (req "status" quantity_encoding)
           (req "root" hash_encoding)
           (req "contractAddress" (option address_encoding))))
