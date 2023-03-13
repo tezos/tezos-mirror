@@ -39,17 +39,6 @@ class unix_cctxt :
     the client configuration parameters. *)
 val make_unix_cctxt : scheme:string -> host:string -> port:int -> cctxt
 
-(** Generic function for a streamed RPC call. *)
-val streamed_call :
-  #cctxt ->
-  ([< Resto.meth], unit, 'a, 'b, 'c, 'd) Tezos_rpc.Service.t ->
-  on_chunk:('d -> unit) ->
-  on_close:(unit -> unit) ->
-  'a ->
-  'b ->
-  'c ->
-  (unit -> unit) tzresult Lwt.t
-
 (** [retrieve_preimage cctxt hash] requests the preimage of hash, consisting of a
     single page, from cctxt. When the request succeeds, the raw page will be
     returned as a sequence of bytes. *)

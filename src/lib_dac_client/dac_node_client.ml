@@ -46,8 +46,6 @@ let make_unix_cctxt ~scheme ~host ~port =
 
 let call (cctxt : #cctxt) = cctxt#call_service
 
-let streamed_call (cctxt : #cctxt) = cctxt#call_streamed_service
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
    If the preimage was generated using a different plugin, the computation of
    the hash might fail. In practice it would be better to retrieve the
