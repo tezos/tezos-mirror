@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_pool
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_pool.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Testing of the Pool
                   Each test launches nodes in separate process, each node
@@ -742,6 +742,7 @@ let () =
   let repeat_connections = 5 in
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "tezos-p2p"
        [
          ( "p2p-connection-pool",
@@ -757,3 +758,5 @@ let () =
                  No_common_network.run points);
            ] );
        ]
+
+let () = Tezt.Test.run ()

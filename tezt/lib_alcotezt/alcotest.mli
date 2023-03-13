@@ -71,8 +71,19 @@ type 'a test = string * 'a test_case list
     The name of the test suite is used as the filename for the Tezt test. *)
 val run : __FILE__:string -> string -> unit test list -> return
 
+module type TESTABLE = sig
+  (** The type to test. *)
+  type t
+
+  (** A way to pretty-print the value. *)
+  val pp : Format.formatter -> t -> unit
+
+  (** Test for equality between two values. *)
+  val equal : t -> t -> bool
+end
+
 (** Values that can be tested with {!check}. *)
-type 'a testable = (module Tezt_core.Check.EQUALABLE with type t = 'a)
+type 'a testable = (module TESTABLE with type t = 'a)
 
 (** [testable pp eq] is a new {!type-testable} with the pretty-printer [pp] and
     equality [eq]. *)

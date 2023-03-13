@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_io_scheduler.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      On I/O scheduling of client-server connections.
 *)
@@ -261,6 +261,7 @@ let () =
   let clients = 8 in
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "tezos-p2p"
        [
          ( "p2p.io-scheduler",
@@ -278,3 +279,5 @@ let () =
                    clients);
            ] );
        ]
+
+let () = Tezt.Test.run ()

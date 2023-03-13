@@ -10,11 +10,11 @@
   tezos-stdlib-unix
   tezos-event-logging-test-helpers
   tezos-test-helpers
-  alcotest
-  alcotest-lwt
+  octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt))
