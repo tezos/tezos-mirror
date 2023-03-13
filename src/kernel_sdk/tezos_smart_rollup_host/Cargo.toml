@@ -10,9 +10,8 @@ edition = "2021"
 [dependencies.tezos_smart_rollup_core]
 path = "../tezos_smart_rollup_core"
 
-[dependencies.crypto]
-git = "https://github.com/trilitech/tezedge.git"
-branch = "master"
+[dependencies.tezos_crypto_rs]
+version = "0.4"
 default-features = false
 optional = true
 
@@ -25,5 +24,6 @@ features = ["testing"]
 
 [features]
 default = ["alloc", "crypto"]
+crypto = ["tezos_crypto_rs"]
 alloc = []
 testing = ["crypto"]
