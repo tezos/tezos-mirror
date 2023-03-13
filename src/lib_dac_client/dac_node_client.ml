@@ -44,8 +44,6 @@ let make_unix_cctxt ~scheme ~host ~port =
   in
   new unix_cctxt ~rpc_config
 
-let call (cctxt : #cctxt) = cctxt#call_service
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
    If the preimage was generated using a different plugin, the computation of
    the hash might fail. In practice it would be better to retrieve the
@@ -53,20 +51,22 @@ let call (cctxt : #cctxt) = cctxt#call_service
    was computed.
 *)
 let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~page_hash =
-  call cctxt (RPC_services.retrieve_preimage plugin) ((), page_hash) () ()
+  cctxt#call_service
+    (RPC_services.retrieve_preimage plugin)
+    ((), page_hash)
+    ()
+    ()
 
 let post_store_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
     ~pagination_scheme =
-  call
-    cctxt
+  cctxt#call_service
     (RPC_services.dac_store_preimage plugin)
     ()
     ()
     (payload, pagination_scheme)
 
 let get_verify_signature (cctxt : #cctxt) ~external_message =
-  call
-    cctxt
+  cctxt#call_service
     RPC_services.verify_external_message_signature
     ()
     external_message
@@ -74,10 +74,22 @@ let get_verify_signature (cctxt : #cctxt) ~external_message =
 
 let put_dac_member_signature (plugin : Dac_plugin.t) (cctxt : #cctxt) ~signature
     =
-  call cctxt (RPC_services.store_dac_member_signature plugin) () () signature
+  cctxt#call_service
+    (RPC_services.store_dac_member_signature plugin)
+    ()
+    ()
+    signature
 
 let get_certificate (plugin : Dac_plugin.t) (cctxt : #cctxt) ~root_page_hash =
-  call cctxt (RPC_services.get_certificate plugin) ((), root_page_hash) () ()
+  cctxt#call_service
+    (RPC_services.get_certificate plugin)
+    ((), root_page_hash)
+    ()
+    ()
 
 let post_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload =
-  call cctxt (RPC_services.coordinator_post_preimage plugin) () () payload
+  cctxt#call_service
+    (RPC_services.coordinator_post_preimage plugin)
+    ()
+    ()
+    payload
