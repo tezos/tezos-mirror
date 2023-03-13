@@ -1474,20 +1474,18 @@ module Inner = struct
     assert (Array.length evaluations = Domains.length domain) ;
     let size = Domains.length domain in
     let evaluations =
-      Polynomials.to_dense_coefficients
-        (ifft_inplace size (Evaluations.of_array (size - 1, evaluations)))
+      ifft_inplace size (Evaluations.of_array (size - 1, evaluations))
     in
     (* Computes root_inverse = 1/root. *)
     let root_inverse = Scalar.inverse_exn root in
     (* Computes evaluations[i] = evaluations[i] * root_inverse^i. *)
-    Polynomials.of_dense
-      (snd
-         (Array.fold_left_map
-            (fun root_pow_inverse coefficient ->
-              ( Scalar.mul root_pow_inverse root_inverse,
-                Scalar.mul coefficient root_pow_inverse ))
-            Scalar.(copy one)
-            evaluations))
+    snd
+      (Polynomials.fold_left_map
+         (fun root_pow_inverse coefficient ->
+           ( Scalar.mul root_pow_inverse root_inverse,
+             Scalar.mul coefficient root_pow_inverse ))
+         Scalar.(copy one)
+         evaluations)
 
   (* [verify t commitment srs_point domain root evaluations proof]
      verifies that P(root * domain.(i)) = evaluations.(i),
