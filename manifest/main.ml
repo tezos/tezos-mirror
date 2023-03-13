@@ -1590,6 +1590,7 @@ let tezt_tezos =
         cohttp_lwt_unix;
       ]
     ~cram:true
+    ~release_status:Released
 
 let _tezt_self_tests =
   public_exe
@@ -1683,6 +1684,7 @@ let _octez_p2p_tests =
         octez_event_logging_test_helpers |> open_;
         octez_p2p_test_common |> open_;
         octez_p2p_services |> open_;
+        tezt_tezos;
         alcotest_lwt;
         astring;
       ]
@@ -1698,86 +1700,27 @@ let _octez_p2p_tests =
         let run_exe prog args =
           setenv "BISECT_SIGTERM" "yes" @@ run_exe prog args
         in
-        (* BEWARE use "--ports" to target different ranges for each
-           test to run them in parallel or use locks to run them
-           sequentially. *)
-        (* ALSO, `--addr ::ffff:127.0.0.1` should be used for test to run correctly on CI runners *)
         [
-          alias_rule "runtest_p2p_socket" ~action:(run_exe "test_p2p_socket" []);
           alias_rule
             "runtest_p2p_pool"
             ~locks:"/ports/49152-65535"
-            ~action:
-              (run_exe "test_p2p_pool" ["--clients"; "10"; "--repeat"; "5"]);
+            ~action:(run_exe "test_p2p_pool" []);
           alias_rule
-            "runtest_p2p_broadcast_ipv4"
+            "runtest_p2p_broadcast"
             ~locks:"/ports/49152-65535"
-            ~action:
-              (run_exe
-                 "test_p2p_broadcast"
-                 [
-                   "--clients";
-                   "3";
-                   "--addr";
-                   "::ffff:127.0.0.1";
-                   "--repeat";
-                   "5";
-                 ]);
+            ~action:(run_exe "test_p2p_broadcast" []);
           alias_rule
             "runtest_p2p_io_scheduler"
             ~locks:"/ports/49152-65535"
-            ~action:
-              (run_exe
-                 "test_p2p_io_scheduler"
-                 [
-                   "--delay";
-                   "5";
-                   "--clients";
-                   "8";
-                   "--max-upload-speed";
-                   "262144";
-                   (* 1 << 18 = 256kB *)
-                   "--max-download-speed";
-                   "1048576" (* 1 << 20 = 1MB *);
-                 ]);
+            ~action:(run_exe "test_p2p_io_scheduler" []);
           alias_rule
-            "runtest_p2p_socket_ipv4"
+            "runtest_p2p_socket"
             ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_socket" ["--addr"; "::ffff:127.0.0.1"]);
+            ~action:(run_exe "test_p2p_socket" []);
           alias_rule
-            "runtest_p2p_pool_ipv4"
+            "runtest_p2p_node"
             ~locks:"/ports/49152-65535"
-            ~action:
-              (run_exe
-                 "test_p2p_pool"
-                 [
-                   "--clients";
-                   "10";
-                   "--repeat";
-                   "5";
-                   "--addr";
-                   "::ffff:127.0.0.1";
-                 ]);
-          alias_rule
-            "runtest_p2p_io_scheduler_ipv4"
-            ~locks:"/ports/49152-65535"
-            ~action:
-              (run_exe
-                 "test_p2p_io_scheduler"
-                 [
-                   "--delay";
-                   "5";
-                   "--clients";
-                   "8";
-                   "--max-upload-speed";
-                   "262144";
-                   (* 1 << 18 = 256kB *)
-                   "--max-download-speed";
-                   "1048576";
-                   (* 1 << 20 = 1MB *)
-                   "--addr";
-                   "::ffff:127.0.0.1";
-                 ]);
+            ~action:(run_exe "test_p2p_node" []);
           alias_rule
             "runtest_p2p_peerset"
             ~action:(run_exe "test_p2p_peerset" []);
@@ -1787,10 +1730,6 @@ let _octez_p2p_tests =
           alias_rule
             "runtest_p2p_banned_peers"
             ~action:(run_exe "test_p2p_banned_peers" []);
-          alias_rule
-            "runtest_p2p_node"
-            ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_node" []);
           alias_rule
             "runtest_p2p_connect_handler"
             ~action:(run_exe "test_p2p_connect_handler" []);
@@ -1802,10 +1741,10 @@ let _octez_p2p_tests =
             ~package:"tezos-p2p"
             ~alias_deps:
               [
-                "runtest_p2p_socket_ipv4";
-                "runtest_p2p_pool_ipv4";
-                "runtest_p2p_broadcast_ipv4";
-                "runtest_p2p_io_scheduler_ipv4";
+                "runtest_p2p_socket";
+                "runtest_p2p_pool";
+                "runtest_p2p_broadcast";
+                "runtest_p2p_io_scheduler";
                 "runtest_p2p_peerset";
                 "runtest_p2p_buffer_reader";
                 "runtest_p2p_banned_peers";

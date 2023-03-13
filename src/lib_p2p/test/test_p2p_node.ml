@@ -79,26 +79,18 @@ let propagation_tzresult points =
   in
   match r with Ok () -> tzfail Invalid_test_result | Error _ -> return_unit
 
-let points = ref []
+let gen_points ?(clients = 4) addr = Node.gen_points clients addr
 
-let gen_points () =
-  let clients = 4 in
-  let addr = Ipaddr.V6.localhost in
-  let port = 49152 + Random.int 16384 in
-  let ports = port -- (port + clients - 1) in
-  points := List.map (fun port -> (addr, port)) ports
-
-let wrap n f =
+let wrap addr n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let rec aux n f =
         let open Lwt_syntax in
-        let* r = f () in
+        let* r = f (gen_points addr) in
         match r with
         | Ok () -> Lwt.return_unit
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
           ->
             let* () = Event.(emit port_conflicts) () in
-            gen_points () ;
             aux n f
         | Error error ->
             Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
@@ -108,19 +100,20 @@ let wrap n f =
 let main () =
   let () =
     let lwt_log_sink =
-      Lwt_log_sink_unix.create_cfg ~rules:"test.p2p.node -> debug;" ()
+      Lwt_log_sink_unix.create_cfg ~rules:"test.p2p.node -> info;" ()
     in
     Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
   in
-  gen_points () ;
+  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p"
        [
          ( "p2p-node",
-           [wrap "propagation-tzresult" (fun _ -> propagation_tzresult !points)]
-         );
+           [
+             wrap addr "propagation-tzresult" (fun points ->
+                 propagation_tzresult points);
+           ] );
        ]
 
 let () =

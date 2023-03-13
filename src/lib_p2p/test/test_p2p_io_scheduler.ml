@@ -238,63 +238,6 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
 
 let () = Random.self_init ()
 
-let addr = ref Ipaddr.V6.localhost
-
-let port = ref None
-
-let max_download_speed = ref None
-
-let max_upload_speed = ref None
-
-let read_buffer_size = ref (1 lsl 14)
-
-let read_queue_size = ref (Some (1 lsl 14))
-
-let write_queue_size = ref (Some (1 lsl 14))
-
-let delay = ref 60.
-
-let clients = ref 8
-
-let display_client_stat = ref None
-
-let spec =
-  Arg.
-    [
-      ("--port", Int (fun p -> port := Some p), " Listening port");
-      ( "--addr",
-        String (fun p -> addr := Ipaddr.V6.of_string_exn p),
-        " Listening addr" );
-      ( "--max-download-speed",
-        Int (fun i -> max_download_speed := Some i),
-        " Max download speed in B/s (default: unbounded)" );
-      ( "--max-upload-speed",
-        Int (fun i -> max_upload_speed := Some i),
-        " Max upload speed in B/s (default: unbounded)" );
-      ( "--read-buffer-size",
-        Set_int read_buffer_size,
-        " Size of the read buffers" );
-      ( "--read-queue-size",
-        Int (fun i -> read_queue_size := if i <= 0 then None else Some i),
-        " Size of the read queue (0=unbounded)" );
-      ( "--write-queue-size",
-        Int (fun i -> write_queue_size := if i <= 0 then None else Some i),
-        " Size of the write queue (0=unbounded)" );
-      ("--delay", Set_float delay, " Client execution time.");
-      ("--clients", Set_int clients, " Number of concurrent clients.");
-      ( "--hide-clients-stat",
-        Unit (fun () -> display_client_stat := Some false),
-        " Hide the client bandwidth statistic." );
-      ( "--display_clients_stat",
-        Unit (fun () -> display_client_stat := Some true),
-        " Display the client bandwidth statistic." );
-    ]
-
-let () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg
-
 let init_logs = lazy (Tezos_base_unix.Internal_event_unix.init ())
 
 let wrap n f =
@@ -308,24 +251,32 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let () =
+  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
+  let port = Some (Tezt_tezos.Port.fresh ()) in
+  let max_download_speed = 1048576 in
+  let max_upload_speed = 262144 in
+  (* 1 << 14 = 16kB *)
+  let read_buffer_size = 1 lsl 14 in
+  let read_queue_size = 1 lsl 14 in
+  let write_queue_size = 1 lsl 14 in
+  let delay = 5. in
+  let clients = 8 in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p"
        [
          ( "p2p.io-scheduler",
            [
              wrap "trivial-quota" (fun () ->
                  run
-                   ?display_client_stat:!display_client_stat
-                   ?max_download_speed:!max_download_speed
-                   ?max_upload_speed:!max_upload_speed
-                   ~read_buffer_size:!read_buffer_size
-                   ?read_queue_size:!read_queue_size
-                   ?write_queue_size:!write_queue_size
-                   !addr
-                   !port
-                   !delay
-                   !clients);
+                   ~max_download_speed
+                   ~max_upload_speed
+                   ~read_buffer_size
+                   ~read_queue_size
+                   ~write_queue_size
+                   addr
+                   port
+                   delay
+                   clients);
            ] );
        ]
