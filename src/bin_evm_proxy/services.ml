@@ -129,7 +129,6 @@ module Mock = struct
       logsBloom = hash_f @@ String.make 256 'a';
       type_ = qty_f Z.zero;
       status = qty_f Z.one;
-      root = hash_f @@ String.make 32 'a';
     }
 
   let call = hash_f "0x"
