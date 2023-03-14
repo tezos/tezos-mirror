@@ -1241,6 +1241,15 @@ let octez_plonk_distribution =
     ~deps:[octez_plonk; octez_plonk_aggregation]
     ~preprocess:[pps ppx_repr]
 
+let _octez_plonk_test_helpers =
+  public_lib
+    "octez-plonk.plonk-test"
+    ~path:"src/lib_plonk/test"
+    ~internal_name:"plonk_test"
+    ~deps:[octez_plonk; octez_plonk_aggregation; octez_plonk_distribution]
+    ~modules:["helpers"; "cases"]
+    ~preprocess:[pps ppx_repr]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]
