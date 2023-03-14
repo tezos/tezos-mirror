@@ -507,9 +507,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IOpt_map : {
       loc : Script.location;
       body : ('a, 'S, 'b, 'S) kinstr;
-      k : ('b option, 'S, 'c, 'T) kinstr;
+      k : ('b option, 'S, 'c, 'F) kinstr;
     }
-      -> ('a option, 'S, 'c, 'T) kinstr
+      -> ('a option, 'S, 'c, 'F) kinstr
   (*
      Ors
      ------
@@ -827,9 +827,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       loc : Script.location;
-      branch_if_true : ('a, 'S, 'b, 'U) kinstr;
-      branch_if_false : ('a, 'S, 'b, 'U) kinstr;
-      k : ('b, 'U, 'r, 'F) kinstr;
+      branch_if_true : ('a, 'S, 'b, 'T) kinstr;
+      branch_if_false : ('a, 'S, 'b, 'T) kinstr;
+      k : ('b, 'T, 'r, 'F) kinstr;
     }
       -> (bool, 'a * 'S, 'r, 'F) kinstr
   | ILoop :
@@ -1944,7 +1944,7 @@ let chest_key_t = Chest_key_t
 let chest_t = Chest_t
 
 type 'a kinstr_traverse = {
-  apply : 'b 'U 'r 'F. 'a -> ('b, 'U, 'r, 'F) kinstr -> 'a;
+  apply : 'b 'S 'r 'F. 'a -> ('b, 'S, 'r, 'F) kinstr -> 'a;
 }
 
 let kinstr_traverse i init f =
