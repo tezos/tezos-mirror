@@ -192,9 +192,10 @@ let get_stakes_for_selected_index ctxt index =
             let*? r = max_mutez /? frozen_deposits_percentage in
             return r
       in
-      let*? total_stake = Tez_repr.(total_stake +? stake_for_cycle) in
+      let stake_for_cycle = Stake_repr.make ~total:stake_for_cycle in
+      let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
       return ((delegate, stake_for_cycle) :: acc, total_stake))
-    ~init:([], Tez_repr.zero)
+    ~init:([], Stake_repr.zero)
 
 let compute_snapshot_index_for_seed ~max_snapshot_index seed =
   let rd = Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"] in
@@ -222,7 +223,7 @@ let select_distribution_for_cycle ctxt cycle =
   List.fold_left_es
     (fun acc (pkh, stake) ->
       Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
-      >|=? fun pk -> (pk, Tez_repr.to_mutez stake) :: acc)
+      >|=? fun pk -> (pk, Stake_repr.staking_weight stake) :: acc)
     []
     stakes
   >>=? fun stakes_pk ->

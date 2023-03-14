@@ -22,3 +22,23 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type t = {total : Tez_repr.t}
+
+let make ~total = {total}
+
+let total {total} = total
+
+let encoding =
+  Data_encoding.conv total (fun total -> make ~total) Tez_repr.encoding
+
+let zero = make ~total:Tez_repr.zero
+
+let staking_weight stake = Tez_repr.to_mutez (total stake)
+
+let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)
+
+let ( +? ) s1 s2 =
+  let open Result_syntax in
+  let+ total = Tez_repr.(total s1 +? total s2) in
+  make ~total

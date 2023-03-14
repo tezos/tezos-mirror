@@ -235,7 +235,7 @@ type back = {
   dictator_proposal_seen : bool;
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
-    Tez_repr.t Signature.Public_key_hash.Map.t option;
+    Stake_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;

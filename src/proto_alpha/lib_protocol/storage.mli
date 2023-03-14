@@ -416,7 +416,7 @@ module Stake : sig
   module Selected_distribution_for_cycle :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
+       and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
        and type t := Raw_context.t
 
   (** Sum of the active stakes of all the delegates with
@@ -424,7 +424,7 @@ module Stake : sig
   module Total_active_stake :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = Tez_repr.t
+       and type value = Stake_repr.t
        and type t := Raw_context.t
 end
 

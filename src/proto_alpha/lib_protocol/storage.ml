@@ -998,14 +998,14 @@ module Cycle = struct
         let name = ["selected_stake_distribution"]
       end)
       (struct
-        type t = (Signature.Public_key_hash.t * Tez_repr.t) list
+        type t = (Signature.Public_key_hash.t * Stake_repr.t) list
 
         let encoding =
           Data_encoding.(
             Variable.list
               (obj2
                  (req "baker" Signature.Public_key_hash.encoding)
-                 (req "active_stake" Tez_repr.encoding)))
+                 (req "active_stake" Stake_repr.encoding)))
       end)
 
   module Total_active_stake =
@@ -1014,7 +1014,7 @@ module Cycle = struct
       (struct
         let name = ["total_active_stake"]
       end)
-      (Tez_repr)
+      (Stake_repr)
 
   module Delegate_sampler_state =
     Indexed_context.Make_map

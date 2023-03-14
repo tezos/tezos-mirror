@@ -22,3 +22,21 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** Stake of a delegate. *)
+type t
+
+val zero : t
+
+val make : total:Tez_repr.t -> t
+
+val encoding : t Data_encoding.t
+
+val total : t -> Tez_repr.t
+
+(** Weight for staking rights. *)
+val staking_weight : t -> int64
+
+val compare : t -> t -> int
+
+val ( +? ) : t -> t -> t tzresult

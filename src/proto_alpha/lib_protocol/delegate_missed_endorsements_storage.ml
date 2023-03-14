@@ -79,9 +79,11 @@ let record_endorsing_participation ctxt ~delegate ~participation
               Stake_storage.get_total_active_stake ctxt level.cycle
               >>=? fun total_active_stake ->
               let expected_slots =
-                let active_stake_weight = Tez_repr.to_mutez active_stake in
+                let active_stake_weight =
+                  Stake_repr.staking_weight active_stake
+                in
                 let total_active_stake_weight =
-                  Tez_repr.to_mutez total_active_stake
+                  Stake_repr.staking_weight total_active_stake
                 in
                 expected_slots_for_given_active_stake
                   ctxt
@@ -171,8 +173,10 @@ let participation_info ctxt delegate =
       Stake_storage.get_total_active_stake ctxt level.cycle
       >>=? fun total_active_stake ->
       let expected_cycle_activity =
-        let active_stake_weight = Tez_repr.to_mutez active_stake in
-        let total_active_stake_weight = Tez_repr.to_mutez total_active_stake in
+        let active_stake_weight = Stake_repr.staking_weight active_stake in
+        let total_active_stake_weight =
+          Stake_repr.staking_weight total_active_stake
+        in
         expected_slots_for_given_active_stake
           ctxt
           ~total_active_stake_weight
