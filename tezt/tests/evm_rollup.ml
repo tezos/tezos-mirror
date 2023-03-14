@@ -355,8 +355,8 @@ let test_l2_blocks_progression =
     @@ Check.((block_number = expected_block_level) int)
          ~error_msg:"Unexpected block number, should be %%R, but got %%L"
   in
-  let* () = check_block_progression ~expected_block_level:0 in
   let* () = check_block_progression ~expected_block_level:1 in
+  let* () = check_block_progression ~expected_block_level:2 in
   unit
 
 let test_l2_transfer =
