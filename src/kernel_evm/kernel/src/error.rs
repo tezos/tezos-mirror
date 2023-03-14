@@ -7,10 +7,17 @@ use host::runtime::RuntimeError;
 use std::str::Utf8Error;
 
 #[derive(Debug)]
+pub enum TransferError {
+    InvalidSignature,
+    InvalidNonce,
+    NotEnoughBalance,
+}
+
+#[derive(Debug)]
 pub enum Error {
     Path(PathError),
     Runtime(RuntimeError),
-    Transfer,
+    Transfer(TransferError),
     Generic,
 }
 

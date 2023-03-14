@@ -297,10 +297,13 @@ dependencies = [
 name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
+ "clarity",
  "debug",
+ "hex",
  "host",
  "kernel",
  "mock_runtime",
+ "num-traits",
  "primitive-types",
  "tezos_ethereum",
 ]

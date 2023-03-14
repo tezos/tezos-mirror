@@ -54,13 +54,17 @@ pub fn stage_two<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
 }
 
 pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
-    let hash = ("6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c").to_ascii_lowercase();
+    let hash = (b"6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c").to_ascii_lowercase();
+    let path = storage::account_path(&hash)?;
 
-    let balance: Wei = from_eth(9999);
+    if !storage::has_account(host, &path)? {
+        let balance: Wei = from_eth(9999);
 
-    let mock_account = Account::default_account(Vec::from(hash), balance);
+        let mock_account = Account::default_account(hash, balance);
 
-    store_account(host, mock_account)
+        store_account(host, mock_account)?
+    };
+    Ok(())
 }
 
 fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(host: &mut Host) -> [u8; 20] {
