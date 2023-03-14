@@ -56,7 +56,6 @@ unified_coverage:
     - "tezt 39/40"
     - "tezt 40/40"
     - "unit:alpha: [proto_alpha]"
-    - "unit:alpha: [proto_alpha__lib_protocol__1]"
     - "unit:alpha: [proto_alpha__lib_protocol__2]"
     - "unit:alpha: [proto_alpha__lib_protocol__3]"
     - "unit:non-proto-x86_64"

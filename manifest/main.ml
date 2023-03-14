@@ -4009,8 +4009,21 @@ end = struct
             ]
       in
       let _integration =
-        test
-          "main"
+        let modules =
+          [
+            ("test_main", true);
+            ("test_constants", true);
+            ("test_frozen_bonds", true);
+            ("test_liquidity_baking", true);
+            ("test_storage_functions", true);
+            ("test_storage", true);
+            ("test_token", true);
+            ("test_sc_rollup_wasm", N.(number >= 016));
+          ]
+          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+        in
+        tezt
+          modules
           ~path:(path // "lib_protocol/test/integration")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true
@@ -4018,7 +4031,7 @@ end = struct
             [
               (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
               octez_context;
-              alcotest_lwt;
+              alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               client |> if_some |> open_;
