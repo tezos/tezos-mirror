@@ -256,7 +256,7 @@ module Models = struct
       ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff1:(fv (sf "%s_inputs" name))
-      ~coeff2:(fv (sf "%s_ouputs" name))
+      ~coeff2:(fv (sf "%s_outputs" name))
 
   let list_enter_body_model name =
     let module M = struct
@@ -339,13 +339,35 @@ module Models = struct
     (module M : Model.Model_impl
       with type arg_type = int * (int * (int * (int * unit))))
 
+  (* Almost [Model.bilinear_affine] but the intercept is not at 0s
+     but size1=0 and size2=1 *)
   let lsl_bytes_model name =
-    Model.bilinear_affine
-      ~name:(ns name)
-      ~intercept:(fv (sf "%s_const" name))
-      ~coeff1:(fv (sf "%s_bytes" name))
-      ~coeff2:(fv (sf "%s_shift" name))
+    let intercept = fv (sf "%s_const" name) in
+    let coeff1 = fv (sf "%s_bytes" name) in
+    let coeff2 = fv (sf "%s_shift" name) in
+    let module M = struct
+      type arg_type = int * (int * unit)
 
+      let name = ns name
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size -> size -> size
+
+        let arity = Model.arity_2
+
+        let model =
+          lam ~name:"size1" @@ fun size1 ->
+          lam ~name:"size2" @@ fun size2 ->
+          free ~name:intercept
+          + (free ~name:coeff1 * size1)
+          + (free ~name:coeff2 * sat_sub size2 (int 1))
+      end
+    end in
+    (module M : Model.Model_impl with type arg_type = int * (int * unit))
+
+  (* The intercept is not at 0s but size1=0 and size2=1 *)
   let lsr_bytes_model name =
     let const = fv (sf "%s_const" name) in
     let coeff = fv (sf "%s_coeff" name) in
