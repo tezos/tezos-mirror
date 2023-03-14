@@ -37,31 +37,6 @@ let
         frameworks
     );
 
-  addFrameworksInputs = frameworks: drv:
-    let
-      frameworkPackages =
-        pkgs.lib.lists.map
-          (framework: pkgs.darwin.apple_sdk.frameworks.${framework})
-          frameworks;
-    in
-    drv.overrideAttrs (old: {
-      propagatedBuildInputs =
-        (old.propagatedBuildInputs or [ ])
-        ++
-        frameworkPackages;
-    });
-
-  addFrameworksFlags = frameworks: drv:
-    let frameworkFlags = mkFrameworkFlags frameworks; in
-    drv.overrideAttrs (old: {
-      NIX_LDFLAGS = "${old.NIX_LDFLAGS or ""} ${frameworkFlags}";
-    });
-
-  addFrameworks = frameworks: drv:
-    addFrameworksFlags frameworks (
-      addFrameworksInputs frameworks drv
-    );
-
   tezos-opam-repository-rev = builtins.readFile (
     pkgs.runCommand
       "tezos-opam-repo-rev"
@@ -90,20 +65,16 @@ let
       NIX_CFLAGS_COMPILE = [ "-Wno-unused-command-line-argument" ];
     });
 
-    class_group_vdf = addFrameworks [ "CoreServices" "CoreFoundation" ] (
-      prev.class_group_vdf.overrideAttrs (old: {
-        hardeningDisable =
-          (old.hardeningDisable or [ ])
-          ++
-          pkgs.lib.optionals pkgs.stdenv.isAarch64 [ "stackprotector" ];
-      })
-    );
+    class_group_vdf = prev.class_group_vdf.overrideAttrs (old: {
+      hardeningDisable =
+        (old.hardeningDisable or [ ])
+        ++
+        pkgs.lib.optionals pkgs.stdenv.isAarch64 [ "stackprotector" ];
+    });
 
     # This package makes no sense to build on MacOS. Some OPAM package
     # incorrectly depends on it universally.
     inotify = null;
-
-    dune = addFrameworksInputs [ "CoreServices" "Foundation" ] prev.dune;
   };
 
   packageSet = pkgs.opamPackages.overrideScope' (pkgs.lib.composeManyExtensions [
