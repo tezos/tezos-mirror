@@ -52,6 +52,19 @@ let initialisation_parameters = ref None
 
 type error += Dal_initialisation_twice
 
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.initialisation_twice"
+    ~title:"Initialisation_twice"
+    ~description:"DAL parameters were initialised twice"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "DAL parameters were initialised twice")
+    Data_encoding.empty
+    (function Dal_initialisation_twice -> Some () | _ -> None)
+    (function () -> Dal_initialisation_twice)
+  [@@coverage off]
+
 (* This function is expected to be called once. *)
 let load_parameters parameters =
   let open Result_syntax in
