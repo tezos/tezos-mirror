@@ -5,9 +5,9 @@
 
 //! Rollup Metadata definition
 #[cfg(feature = "crypto")]
-use crypto::hash::{FromBytesError, HashTrait, SmartRollupHash};
+use tezos_crypto_rs::hash::{FromBytesError, HashTrait, SmartRollupHash};
 
-/// Size of raw rollup address - (SmartRollupHash)[crypto::hash::SmartRollupHash]
+/// Size of raw rollup address - (SmartRollupHash)[tezos_crypto_rs::hash::SmartRollupHash].
 pub const RAW_ROLLUP_ADDRESS_SIZE: usize = 20;
 
 /// Size of raw metadata: 20 (rollup address) + 4 (origination level).

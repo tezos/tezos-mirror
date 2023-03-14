@@ -1009,6 +1009,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95059e91184749cb66be6dc994f67f182b6d897cb3df74a5bf66b5e709295fd8"
 
 [[package]]
+name = "tezos_crypto_rs"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b408b3b8818a952cd5055cb4c6f4cb95fb4dedc4c6d983132b835f42966fe01"
+dependencies = [
+ "anyhow",
+ "base58",
+ "blst",
+ "byteorder 1.4.3",
+ "cryptoxide",
+ "ed25519-compact",
+ "hex",
+ "libsecp256k1",
+ "num-bigint",
+ "num-traits",
+ "p256",
+ "rand 0.7.3",
+ "serde",
+ "strum",
+ "strum_macros",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
 name = "tezos_encoding"
 version = "3.1.1"
 source = "git+https://github.com/trilitech/tezedge.git?branch=master#b8183d3954a0818b839fc53f04498a9535298cdb"
@@ -1076,8 +1101,8 @@ dependencies = [
 name = "tezos_smart_rollup_host"
 version = "0.1.0"
 dependencies = [
- "crypto",
  "mockall",
+ "tezos_crypto_rs",
  "tezos_smart_rollup_core 0.1.0",
 ]
 
