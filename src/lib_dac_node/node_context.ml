@@ -63,6 +63,11 @@ module Coordinator = struct
     List.map
       (fun Wallet_account.Coordinator.{public_key_opt; _} -> public_key_opt)
       t.committee_members
+
+  let committee_members t =
+    List.map
+      (fun Wallet_account.Coordinator.{public_key_hash; _} -> public_key_hash)
+      t.committee_members
 end
 
 module Committee_member = struct
@@ -195,6 +200,11 @@ module Legacy = struct
   let secret_key_uris_opt t =
     List.map
       (fun Wallet_account.Legacy.{secret_key_uri_opt; _} -> secret_key_uri_opt)
+      t.committee_members
+
+  let committee_members t =
+    List.map
+      (fun Wallet_account.Legacy.{public_key_hash; _} -> public_key_hash)
       t.committee_members
 end
 

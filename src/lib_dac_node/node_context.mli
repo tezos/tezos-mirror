@@ -50,6 +50,9 @@ module Coordinator : sig
       data availability committee of [t]. *)
   val public_keys_opt :
     t -> Tezos_crypto.Aggregate_signature.public_key option list
+
+  val committee_members :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
 end
 
 (** [Committee_member] defines a partial [Node_context.t] that is available
@@ -111,6 +114,9 @@ module Legacy : sig
   (** [secret_key_uris_opt] return the list of optional secret key URIs of the
       committee members of [t]. *)
   val secret_key_uris_opt : t -> Client_keys.aggregate_sk_uri option list
+
+  val committee_members :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
 end
 
 (** Operating mode specific fraction of a [Node_context.t] *)
