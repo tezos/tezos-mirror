@@ -327,11 +327,11 @@ module Get_transaction_receipt = MethodMaker (struct
 
   type input = hash
 
-  type output = transaction_receipt
+  type output = transaction_receipt option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = transaction_receipt_encoding
+  let output_encoding = Data_encoding.option transaction_receipt_encoding
 
   let method_ = "eth_getTransactionReceipt"
 end)

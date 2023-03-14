@@ -209,7 +209,8 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
             return (Get_transaction_count.Output (Ok nonce))
         | Get_transaction_receipt.Input _ ->
             return
-              (Get_transaction_receipt.Output (Ok (Mock.transaction_receipt ())))
+              (Get_transaction_receipt.Output
+                 (Ok (Some (Mock.transaction_receipt ()))))
         | Send_raw_transaction.Input (Some tx_raw) ->
             let* tx_hash =
               match rollup_node_config with
