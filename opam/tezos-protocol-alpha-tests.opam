@@ -21,11 +21,11 @@ depends: [
   "tezos-benchmark-alpha" {with-test}
   "tezos-benchmark-type-inference-alpha" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.20" }
-  "tezos-test-helpers" {with-test}
   "tezt" { with-test & >= "3.0.0" }
   "tezos-context" {with-test}
   "octez-alcotezt" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "tezos-test-helpers" {with-test}
   "tezos-smart-rollup-alpha" {with-test}
   "tezos-crypto-dal" {with-test}
   "tezt-tezos" {with-test}
