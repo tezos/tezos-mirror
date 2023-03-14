@@ -28,6 +28,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_proto_016_PtMumbai_lib_dal_test_tezt_lib
   tezt)

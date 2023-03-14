@@ -25,6 +25,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_lib_proxy_server_config_test_tezt_lib
   tezt)

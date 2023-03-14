@@ -21,6 +21,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_lib_webassembly_tests_tezt_lib
   tezt)

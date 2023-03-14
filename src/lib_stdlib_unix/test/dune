@@ -23,6 +23,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_lib_stdlib_unix_test__tezt_lib
   tezt)

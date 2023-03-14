@@ -30,6 +30,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_lib_context_test_tezt_lib
   tezt)

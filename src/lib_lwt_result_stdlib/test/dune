@@ -35,6 +35,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_lib_lwt_result_stdlib_test_tezt_lib
   tezt)

@@ -62,6 +62,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_proto_015_PtLimaPt_lib_protocol_test_unit_tezt_lib
   tezt)
