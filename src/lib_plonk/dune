@@ -1,0 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name plonk)
+ (public_name octez-plonk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  repr
+  hacl-star
+  data-encoding
+  octez-bls12-381-polynomial
+  octez-plompiler)
+ (preprocess (pps ppx_repr))
+ (flags
+  (:standard)
+  -open Octez_bls12_381_polynomial
+  -open Plompiler))

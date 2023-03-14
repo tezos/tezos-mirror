@@ -243,8 +243,6 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let plonk = external_lib "tezos-plonk" V.(at_least "1.0.1" && less_than "2.0.0")
-
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
 let ppx_import = external_lib "ppx_import" V.True
@@ -1188,6 +1186,34 @@ let octez_plompiler =
             ~deps_dune:[S "z3/run_z3_tests.sh"; [S "glob_files"; S "z3/*.z3"]]
             ~action:[S "chdir"; S "z3"; [S "run"; S "sh"; S "run_z3_tests.sh"]];
         ]
+
+let octez_plonk =
+  public_lib
+    "octez-plonk"
+    ~internal_name:"plonk"
+    ~path:"src/lib_plonk"
+    ~synopsis:"Plonk zero-knowledge proving system"
+    ~deps:
+      [
+        repr;
+        hacl_star;
+        data_encoding;
+        octez_bls12_381_polynomial |> open_;
+        octez_plompiler |> open_;
+      ]
+    ~preprocess:[pps ppx_repr]
+
+(* let _octez_plonk_tests = *)
+(*   private_lib *)
+(*     "octez-plonk.plonk-test" *)
+(*     ~path:"src/lib_plonk/test" *)
+(*     ~synopsis:"Test framework for Plonk zero-knowledge proving system test" *)
+(*     ~deps: *)
+(*       [ *)
+(*         octez_plonk; *)
+(*       ] *)
+(*       ~modules:["helpers"; "cases"] *)
+
 
 let _octez_srs_extraction_tests =
   tests
@@ -2425,7 +2451,7 @@ let octez_protocol_environment_structs =
         octez_scoru_wasm;
         data_encoding;
         bls12_381;
-        plonk;
+        octez_plonk;
       ]
 
 let octez_protocol_environment =
@@ -2454,7 +2480,7 @@ protocols.|}
         zarith;
         zarith_stubs_js;
         bls12_381;
-        plonk;
+        octez_plonk;
         octez_crypto_dal;
         vdf;
         aches;
