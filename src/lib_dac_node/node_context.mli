@@ -162,9 +162,9 @@ val get_ready : t -> ready_ctxt tzresult
 (** [get_status ctxt] returns the dac node status. *)
 val get_status : t -> status
 
-(** [mode node_ctxt] returns the operating mode specific fraction of a
+(** [get_mode node_ctxt] returns the operating mode specific fraction of a
     [Node_context.t]. *)
-val mode : t -> mode
+val get_mode : t -> mode
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Client_context.full

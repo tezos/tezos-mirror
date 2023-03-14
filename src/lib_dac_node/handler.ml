@@ -362,7 +362,7 @@ let handlers node_ctxt =
   let*? plugin = Node_context.get_dac_plugin node_ctxt in
   let page_store = Node_context.get_page_store node_ctxt in
   let wallet_cctxt = Node_context.get_tezos_node_cctxt node_ctxt in
-  match Node_context.mode node_ctxt with
+  match Node_context.get_mode node_ctxt with
   | Coordinator _ -> return [new_head node_ctxt]
   | Committee_member ctxt ->
       return

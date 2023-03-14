@@ -138,10 +138,10 @@ let handle_monitor_root_hashes hash_streamer =
   let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
   Tezos_rpc.Answer.return_stream {next; shutdown}
 
-let handle_get_certificate dac_plugin ctx raw_root_hash =
+let handle_get_certificate dac_plugin node_store raw_root_hash =
   let open Lwt_result_syntax in
   let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
-  let node_store = Node_context.get_node_store ctx Store_sigs.Read_only in
+
   let+ value_opt = Store.Certificate_store.find node_store root_hash in
   Option.map
     (fun Store.{aggregate_signature; witnesses} ->
@@ -196,11 +196,12 @@ let register_monitor_root_hashes hash_streamer dir =
     Monitor_services.S.root_hashes
     (fun () () () -> handle_monitor_root_hashes hash_streamer)
 
-let register_get_certificate ctx dac_plugin =
+let register_get_certificate node_store dac_plugin =
   add_service
     Tezos_rpc.Directory.register1
     RPC_services.get_certificate
-    (fun root_hash () () -> handle_get_certificate dac_plugin ctx root_hash)
+    (fun root_hash () () ->
+      handle_get_certificate dac_plugin node_store root_hash)
 
 let register_get_missing_page dac_plugin page_store cctxt =
   add_service
@@ -226,7 +227,7 @@ module Coordinator = struct
     in
     return @@ Dac_plugin.hash_to_raw root_hash
 
-  let handle_monitor_certificate dac_plugin ro_store certificate_streamers
+  let handle_monitor_certificate dac_plugin ro_node_store certificate_streamers
       raw_root_hash committee_members =
     let open Lwt_result_syntax in
     let*? stream, stopper =
@@ -243,7 +244,7 @@ module Coordinator = struct
        a certificate is returned even in the case that no updates to the
        certificate happen for a long time. *)
     let*! current_certificate_store_value_res =
-      Store.Certificate_store.find ro_store root_hash
+      Store.Certificate_store.find ro_node_store root_hash
     in
     match current_certificate_store_value_res with
     | Ok current_certificate_store_value ->
@@ -279,8 +280,8 @@ module Coordinator = struct
         return (next, shutdown)
     | Error e -> fail e
 
-  let register_monitor_certificate dac_plugin ro_store certificate_streamers
-      committee_members dir =
+  let register_monitor_certificate dac_plugin ro_node_store
+      certificate_streamers committee_members dir =
     Tezos_rpc.Directory.gen_register
       dir
       Monitor_services.S.certificate
@@ -289,7 +290,7 @@ module Coordinator = struct
         let*! handler =
           handle_monitor_certificate
             dac_plugin
-            ro_store
+            ro_node_store
             certificate_streamers
             root_hash
             committee_members
@@ -319,24 +320,16 @@ module Coordinator = struct
           cctxt
           dac_member_signature)
 
-  let dynamic_rpc_dir dac_plugin rw_store page_store cctxt
-      (coordinator_node_ctxt : Node_context.t) =
-    let modal_node_ctxt =
-      match Node_context.mode coordinator_node_ctxt with
-      | Coordinator modal_node_ctxt -> modal_node_ctxt
-      (* We only pass [Node_context.t] values whose mode is [Coordinator _] to
-         this function. *)
-      | _ -> assert false
-    in
-
+  let dynamic_rpc_dir dac_plugin rw_store page_store cctxt coordinator_node_ctxt
+      =
     let hash_streamer =
-      modal_node_ctxt.Node_context.Coordinator.hash_streamer
+      coordinator_node_ctxt.Node_context.Coordinator.hash_streamer
     in
     let public_keys_opt =
-      Node_context.Coordinator.public_keys_opt modal_node_ctxt
+      Node_context.Coordinator.public_keys_opt coordinator_node_ctxt
     in
-    let certificate_streamers = modal_node_ctxt.certificate_streamers in
-    let committee_members = modal_node_ctxt.committee_members in
+    let certificate_streamers = coordinator_node_ctxt.certificate_streamers in
+    let committee_members = coordinator_node_ctxt.committee_members in
     Tezos_rpc.Directory.empty
     |> register_post_preimage dac_plugin hash_streamer page_store
     |> register_get_verify_signature dac_plugin public_keys_opt
@@ -348,12 +341,12 @@ module Coordinator = struct
          certificate_streamers
          committee_members
     |> register_put_dac_member_signature
-         modal_node_ctxt
+         coordinator_node_ctxt
          dac_plugin
          rw_store
          page_store
          cctxt
-    |> register_get_certificate coordinator_node_ctxt dac_plugin
+    |> register_get_certificate rw_store dac_plugin
 end
 
 module Committee_member = struct
@@ -384,20 +377,15 @@ module Legacy = struct
           dac_member_signature)
 
   let dynamic_rpc_dir dac_plugin rw_store page_store cctxt legacy_node_ctxt =
-    let modal_node_ctxt =
-      match Node_context.mode legacy_node_ctxt with
-      | Legacy modal_node_ctxt -> modal_node_ctxt
-      (* We only pass [Node_context.t] values whose mode is [Coordinator _] to
-         this function. *)
-      | _ -> assert false
+    let hash_streamer = legacy_node_ctxt.Node_context.Legacy.hash_streamer in
+    let public_keys_opt =
+      Node_context.Legacy.public_keys_opt legacy_node_ctxt
     in
-    let hash_streamer = modal_node_ctxt.Node_context.Legacy.hash_streamer in
-    let public_keys_opt = Node_context.Legacy.public_keys_opt modal_node_ctxt in
     let secret_key_uris_opt =
-      Node_context.Legacy.secret_key_uris_opt modal_node_ctxt
+      Node_context.Legacy.secret_key_uris_opt legacy_node_ctxt
     in
     let register_get_missing_page =
-      match modal_node_ctxt.coordinator_cctxt with
+      match legacy_node_ctxt.coordinator_cctxt with
       | None -> fun dir -> dir
       | Some cctxt ->
           fun dir ->
@@ -414,12 +402,12 @@ module Legacy = struct
     |> register_get_preimage dac_plugin page_store
     |> register_monitor_root_hashes hash_streamer
     |> register_put_dac_member_signature
-         modal_node_ctxt
+         legacy_node_ctxt
          dac_plugin
          rw_store
          page_store
          cctxt
-    |> register_get_certificate legacy_node_ctxt dac_plugin
+    |> register_get_certificate rw_store dac_plugin
     |> register_get_missing_page
 end
 
@@ -429,20 +417,25 @@ let start ~rpc_address ~rpc_port node_ctxt =
   let page_store = Node_context.get_page_store node_ctxt in
   let cctxt = Node_context.get_tezos_node_cctxt node_ctxt in
   let register_dynamic_rpc dac_plugin =
-    match Node_context.mode node_ctxt with
-    | Coordinator _ ->
+    match Node_context.get_mode node_ctxt with
+    | Coordinator coordinator_node_ctxt ->
         Coordinator.dynamic_rpc_dir
           dac_plugin
           rw_store
           page_store
           cctxt
-          node_ctxt
-    | Committee_member _ ->
+          coordinator_node_ctxt
+    | Committee_member _committee_member_node_ctxt ->
         Committee_member.dynamic_rpc_dir dac_plugin page_store
     | Observer {coordinator_cctxt; _} ->
         Observer.dynamic_rpc_dir dac_plugin coordinator_cctxt page_store
-    | Legacy _ ->
-        Legacy.dynamic_rpc_dir dac_plugin rw_store page_store cctxt node_ctxt
+    | Legacy legacy_node_ctxt ->
+        Legacy.dynamic_rpc_dir
+          dac_plugin
+          rw_store
+          page_store
+          cctxt
+          legacy_node_ctxt
   in
   let dir =
     Tezos_rpc.Directory.register_dynamic_directory

@@ -261,7 +261,7 @@ let init config cctxt =
     mode;
   }
 
-let mode node_ctxt = node_ctxt.mode
+let get_mode node_ctxt = node_ctxt.mode
 
 let set_ready ctxt dac_plugin =
   match ctxt.status with
