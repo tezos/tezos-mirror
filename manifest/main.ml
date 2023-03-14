@@ -2469,7 +2469,7 @@ let octez_protocol_environment_structs =
         octez_scoru_wasm;
         data_encoding;
         bls12_381;
-        octez_plonk;
+        octez_plonk |> open_;
       ]
 
 let octez_protocol_environment =
@@ -2498,7 +2498,7 @@ protocols.|}
         zarith;
         zarith_stubs_js;
         bls12_381;
-        octez_plonk;
+        octez_plonk |> open_;
         octez_crypto_dal;
         vdf;
         aches;
