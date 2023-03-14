@@ -243,9 +243,6 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let plompiler =
-  external_lib "tezos-plompiler" V.(at_least "1.0.1" && less_than "2.0.0")
-
 let plonk = external_lib "tezos-plonk" V.(at_least "1.0.1" && less_than "2.0.0")
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
@@ -284,6 +281,8 @@ let qcheck_core = external_lib "qcheck-core" V.True
 
 let re = external_lib ~js_compatible:true "re" V.(at_least "1.9.0")
 
+let repr = external_lib "repr" V.True
+
 let resto_version = V.(at_least "1.0")
 
 let resto = external_lib ~js_compatible:true "resto" resto_version
@@ -317,6 +316,8 @@ let secp256k1_internal =
     version
 
 let seqes = external_lib ~js_compatible:true "seqes" V.(at_least "0.2")
+
+let stdint = external_lib "stdint" V.True
 
 let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
@@ -1162,6 +1163,31 @@ let _octez_srs_extraction_main =
         bls12_381;
         octez_bls12_381_polynomial |> open_;
       ]
+
+let octez_plompiler =
+  public_lib
+    "octez-plompiler"
+    ~internal_name:"plompiler"
+    ~path:"src/lib_plompiler"
+    ~synopsis:"Library to write arithmetic circuits for Plonk"
+    ~deps:
+      [
+        repr;
+        stdint;
+        hacl_star;
+        octez_bls12_381_hash;
+        octez_polynomial;
+        octez_mec;
+      ]
+    ~preprocess:[staged_pps [ppx_repr; ppx_deriving_show]]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~deps_dune:[S "z3/run_z3_tests.sh"; [S "glob_files"; S "z3/*.z3"]]
+            ~action:[S "chdir"; S "z3"; [S "run"; S "sh"; S "run_z3_tests.sh"]];
+        ]
 
 let _octez_srs_extraction_tests =
   tests
@@ -5080,7 +5106,7 @@ module Protocol = Protocol
             octez_protocol_environment;
             plugin |> if_some |> open_;
             octez_shell_services |> open_;
-            plompiler |> if_ N.(number >= 015);
+            octez_plompiler |> if_ N.(number >= 015);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in

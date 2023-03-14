@@ -10,22 +10,18 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "qcheck-alcotest" { >= "0.20" }
-  "tezos-test-helpers"
-  "tezos-base"
-  "tezos-micheline"
-  "tezos-stdlib-unix"
-  "tezos-protocol-alpha"
-  "tezos-client-alpha"
-  "tezos-protocol-environment"
-  "tezos-protocol-plugin-alpha"
-  "tezos-shell-services"
-  "octez-plompiler"
-  "tezos-crypto-dal"
+  "ppx_repr" { >= "0.6.0" }
+  "ppx_deriving"
+  "repr"
+  "stdint"
+  "hacl-star" { >= "0.6.1" & < "0.7" }
+  "octez-bls12-381-hash"
+  "octez-polynomial"
+  "octez-mec"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol testing framework"
+synopsis: "Library to write arithmetic circuits for Plonk"

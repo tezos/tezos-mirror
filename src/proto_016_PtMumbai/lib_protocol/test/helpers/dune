@@ -17,7 +17,7 @@
   tezos-protocol-environment
   tezos-protocol-plugin-016-PtMumbai
   tezos-shell-services
-  tezos-plompiler
+  octez-plompiler
   tezos-crypto-dal)
  (flags
   (:standard)

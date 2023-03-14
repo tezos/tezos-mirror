@@ -304,6 +304,8 @@ opam:octez-node-config:
   variables:
     package: octez-node-config
 
+# Ignoring unreleased package octez-plompiler.
+
 # Ignoring unreleased package octez-polynomial.
 
 opam:octez-protocol-compiler:
