@@ -53,6 +53,12 @@ module Selected_distribution_for_cycle = struct
     | None -> Storage.Stake.Selected_distribution_for_cycle.get ctxt cycle
     | Some v -> return v
 
+  let find ctxt cycle =
+    let id = identifier_of_cycle cycle in
+    Cache.find ctxt id >>=? function
+    | None -> Storage.Stake.Selected_distribution_for_cycle.find ctxt cycle
+    | Some _ as some_v -> return some_v
+
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
     Cache.update ctxt id None >>?= fun ctxt ->
@@ -192,8 +198,7 @@ let fold_on_active_delegates_with_minimal_stake =
 
 let get_selected_distribution = Selected_distribution_for_cycle.get
 
-let find_selected_distribution =
-  Storage.Stake.Selected_distribution_for_cycle.find
+let find_selected_distribution = Selected_distribution_for_cycle.find
 
 let prepare_stake_distribution ctxt =
   let level = Level_storage.current ctxt in
