@@ -43,13 +43,3 @@ end = struct
 
   let _skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
 end
-
-let () =
-  Alcotest_lwt.run
-    "protocol > unit"
-    [
-      Unit_test.spec
-        "Slot_framing_protocol.ml"
-        Test_dal_slot_frame_encoding.tests;
-    ]
-  |> Lwt_main.run
