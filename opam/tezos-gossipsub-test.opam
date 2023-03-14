@@ -13,6 +13,8 @@ depends: [
   "tezos-base" {with-test}
   "tezos-gossipsub" {with-test}
   "tezt" { with-test & >= "3.0.0" }
+  "qcheck-core" {with-test}
+  "tezos-test-helpers" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

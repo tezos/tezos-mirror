@@ -7,11 +7,14 @@
   tezos-base
   tezos-base.unix
   tezos-gossipsub
-  tezt)
+  tezt
+  qcheck-core
+  tezos-test-helpers)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_gossipsub))
+  -open Tezos_gossipsub
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

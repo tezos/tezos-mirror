@@ -1780,6 +1780,8 @@ let _octez_gossipsub_test =
         octez_base_unix;
         octez_gossipsub |> open_;
         tezt_lib;
+        qcheck_core;
+        octez_test_helpers |> open_;
       ]
 
 let octez_wasmer =
