@@ -35,13 +35,13 @@ val decrypt :
   #Client_context.io_wallet ->
   ?name:string ->
   Client_keys.sk_uri ->
-  Signature.secret_key tzresult Lwt.t
+  Tezos_crypto.Signature.secret_key tzresult Lwt.t
 
 val decrypt_aggregate :
   #Client_context.io_wallet ->
   ?name:string ->
   Client_keys.aggregate_sk_uri ->
-  Aggregate_signature.secret_key tzresult Lwt.t
+  Tezos_crypto.Aggregate_signature.secret_key tzresult Lwt.t
 
 val decrypt_all : #Client_context.io_wallet -> unit tzresult Lwt.t
 
@@ -49,13 +49,16 @@ val decrypt_list :
   #Client_context.io_wallet -> string list -> unit tzresult Lwt.t
 
 (** Encrypts a secret key using the given password *)
-val encrypt : Signature.secret_key -> bytes -> Client_keys.sk_uri tzresult Lwt.t
+val encrypt :
+  Tezos_crypto.Signature.secret_key ->
+  bytes ->
+  Client_keys.sk_uri tzresult Lwt.t
 
 (** Prompts password twice to user for confirmation and returns
     the corresponding encrypted secret key *)
 val prompt_twice_and_encrypt :
   #Client_context.io ->
-  Signature.secret_key ->
+  Tezos_crypto.Signature.secret_key ->
   Client_keys.sk_uri tzresult Lwt.t
 
 (** [prompt_twice_and_encrypt_aggregate cctxt sk] Prompts password twice to user
@@ -63,7 +66,7 @@ val prompt_twice_and_encrypt :
     key *)
 val prompt_twice_and_encrypt_aggregate :
   #Client_context.io ->
-  Aggregate_signature.secret_key ->
+  Tezos_crypto.Aggregate_signature.secret_key ->
   Client_keys.aggregate_sk_uri tzresult Lwt.t
 
 val encrypt_sapling_key :

@@ -56,6 +56,7 @@ let implicit_of_b58data : Base58.data -> Signature.public_key_hash option =
   | Ed25519.Public_key_hash.Data h -> Some (Signature.Ed25519 h)
   | Secp256k1.Public_key_hash.Data h -> Some (Signature.Secp256k1 h)
   | P256.Public_key_hash.Data h -> Some (Signature.P256 h)
+  | Bls.Public_key_hash.Data h -> Some (Signature.Bls h)
   | _ -> None
 
 let originated_of_b58data = function
@@ -130,8 +131,9 @@ let encoding_gen ~id_extra ~title_extra ~can_be ~cases ~to_b58check ~of_b58data
             (fun s ->
               match of_b58check_gen ~of_b58data s with
               | Ok s -> s
-              | Error _ -> Json.cannot_destruct "Invalid contract notation.")
-            string)
+              | Error _ ->
+                  Json.cannot_destruct "Invalid contract notation %S." s)
+            (string Plain))
 
 let encoding =
   encoding_gen
@@ -169,7 +171,7 @@ let () =
     ~pp:(fun ppf x -> Format.fprintf ppf "Invalid contract notation %S" x)
     ~description:
       "A malformed contract notation was given to an RPC or in a script."
-    (obj1 (req "notation" string))
+    (obj1 (req "notation" (string Plain)))
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
 

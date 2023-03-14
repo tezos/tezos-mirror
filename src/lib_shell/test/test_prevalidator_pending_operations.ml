@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
+
+   This file is part of the test suite for the new mempool, which
+   uses features of the protocol that only exist since Lima.
+
+   When you modify this file, consider whether you should also change
+   the ones that test the legacy mempool for Kathmandu. They all
+   start with the "legacy" prefix and will be removed when Lima is
+   activated on Mainnet. *)
+
 (** Testing
     -------
     Component:    Shell (Prevalidator pending operations)
@@ -30,7 +40,7 @@
     Subject:      Unit tests the Prevalidator pending operations APIs
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 module Pending_ops = Prevalidator_pending_operations
 module CompareListQ = Compare.List (Q)
 
@@ -39,7 +49,7 @@ let pending_of_list =
     (fun pendings (op, priority) ->
       if
         Operation_hash.Set.mem
-          (Prevalidation.Internal_for_tests.hash_of op)
+          (Shell_operation.Internal_for_tests.hash_of op)
           (Pending_ops.hashes pendings)
       then (* no duplicate hashes *)
         pendings

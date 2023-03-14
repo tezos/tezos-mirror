@@ -32,7 +32,15 @@ val equal : t -> t -> bool
 
 val of_string : string -> t
 
+val to_string : t -> string
+
+val of_namespace : Namespace.t -> t
+
+val to_namespace : t -> Namespace.t
+
 val pp : Format.formatter -> t -> unit
+
+val pp_short : Format.formatter -> t -> unit
 
 module Table : Hashtbl.S with type key = t
 

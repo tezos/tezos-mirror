@@ -1,0 +1,48 @@
+{
+  "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+  "nonce": 0,
+  "kind": "origination",
+  "balance": "84143",
+  "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+  "script": {
+    "code": [{
+        "prim": "parameter",
+        "args": [{
+          "prim": "string"
+        }]
+      },
+      {
+        "prim": "storage",
+        "args": [{
+          "prim": "option",
+          "args": [{
+            "prim": "string"
+          }]
+        }]
+      },
+      {
+        "prim": "code",
+        "args": [
+          [{
+              "prim": "CAR"
+            }, {
+              "prim": "SOME"
+            },
+            {
+              "prim": "NIL",
+              "args": [{
+                "prim": "operation"
+              }]
+            },
+            {
+              "prim": "PAIR"
+            }
+          ]
+        ]
+      }
+    ],
+    "storage": [{
+      "string": "test"
+    }]
+  }
+}

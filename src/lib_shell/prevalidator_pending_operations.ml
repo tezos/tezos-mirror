@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,18 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
+
+   This file is part of the implementation of the new mempool, which
+   uses features of the protocol that only exist since Lima.
+
+   When you modify this file, consider whether you should also change
+   the files that implement the legacy mempool for Kathmandu. They all
+   start with the "legacy" prefix and will be removed when Lima is
+   activated on Mainnet. *)
+
+open Shell_operation
 
 (* Ordering is important, as it is used below in map keys comparison *)
 type priority = [`High | `Medium | `Low of Q.t list]
@@ -63,7 +75,7 @@ module Sized_set = Tezos_base.Sized.MakeSizedSet (Operation_hash.Set)
 *)
 type 'a t = {
   (* The main map *)
-  pending : 'a Prevalidation.operation Map.t Priority_map.t;
+  pending : 'a operation Map.t Priority_map.t;
   (* Used for advertising *)
   hashes : Sized_set.t;
   (* We need to remember the priority of each hash, to be used when removing
@@ -96,7 +108,7 @@ let get_priority_map prio pending =
   match Priority_map.find prio pending with None -> Map.empty | Some mp -> mp
 
 let add op prio {pending; hashes; priority_of} =
-  let oph = op.Prevalidation.hash in
+  let oph = op.hash in
   let mp = get_priority_map prio pending |> Map.add oph op in
   {
     pending = Priority_map.add prio mp pending;

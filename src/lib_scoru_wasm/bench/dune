@@ -1,0 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name benchmark_scoru_wasm)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezt
+  tezos-webassembly-interpreter
+  tezos-context.memory
+  tezos-scoru-wasm
+  tezos-scoru-wasm-helpers
+  lwt.unix)
+ (preprocess (pps ppx_deriving.show))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

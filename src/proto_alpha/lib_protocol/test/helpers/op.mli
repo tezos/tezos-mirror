@@ -44,35 +44,69 @@ open Alpha_context
 val pack_operation :
   Context.t -> signature option -> 'a contents_list -> packed_operation
 
-val endorsement :
-  ?delegate:public_key_hash * Slot.t list ->
+val sign :
+  ?watermark:Signature.watermark ->
+  Signature.secret_key ->
+  Block_hash.t ->
+  packed_contents_list ->
+  packed_operation
+
+(** Create an unpacked endorsement that is expected for given [Block.t].
+
+    Optional parameters allow to specify the endorsed values: [level],
+    [round] and/or [block_payload_hash].
+
+    They also allow to specify the endorser, [delegate], and/or the
+    [slot].
+
+    Finally, the predecessor branch, [pred_branch] can be specified.*)
+val raw_endorsement :
+  ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  ?signing_context:Context.t ->
-  unit ->
+  ?pred_branch:Block_hash.t ->
+  Block.t ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
-val preendorsement :
-  ?delegate:public_key_hash * Slot.t list ->
+(** Create an unpacked preendorsement that is expected for a given
+    [Block.t].
+
+    Optional parameters are the same than {!raw_endorsement}. *)
+val raw_preendorsement :
+  ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  ?signing_context:Context.t ->
-  unit ->
+  ?pred_branch:Block_hash.t ->
+  Block.t ->
   Kind.preendorsement Operation.t tzresult Lwt.t
 
-val miss_signed_endorsement :
+(** Create a packed endorsement that is expected for a given
+    [Block.t] by packing the result of {!raw_endorsement}. *)
+val endorsement :
+  ?delegate:public_key_hash ->
+  ?slot:Slot.t ->
   ?level:Raw_level.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  Kind.endorsement Operation.t tzresult Lwt.t
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?pred_branch:Block_hash.t ->
+  Block.t ->
+  Operation.packed tzresult Lwt.t
+
+(** Create a packed preendorsement that is expected for a given
+    [Block.t] by packing the result of {!raw_preendorsement}. *)
+val preendorsement :
+  ?delegate:public_key_hash ->
+  ?slot:Slot.t ->
+  ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?pred_branch:Block_hash.t ->
+  Block.t ->
+  Operation.packed tzresult Lwt.t
 
 type gas_limit =
   | Max  (** Max corresponds to the [max_gas_limit_per_operation] constant. *)
@@ -89,7 +123,7 @@ val pp_gas_limit : Format.formatter -> gas_limit -> unit
 
 val transaction :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -115,10 +149,10 @@ val transaction :
     yet. Disabled (set to [false]) by default.}} *)
 val unsafe_transaction :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?parameters:
     Michelson_v1_primitives.prim Micheline.canonical Data_encoding.lazy_t ->
   ?entrypoint:Entrypoint_repr.t ->
@@ -132,7 +166,7 @@ val delegation :
   ?force_reveal:bool ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -144,7 +178,7 @@ val set_deposits_limit :
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   Context.t ->
   Contract.t ->
   Tez.tez option ->
@@ -152,7 +186,7 @@ val set_deposits_limit :
 
 val increase_paid_storage :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -177,14 +211,14 @@ val increase_paid_storage :
     {li [?forge_pkh]: use a provided [pkh] as source, instead of
     hashing [pkh]. Useful for forging non-honest reveal operations}
 
-    {li [?storage_limit:counter]: forces a storage limit, otherwise
+    {li [?storage_limit:Z.t]: forces a storage limit, otherwise
     set to [Z.zero]}
 *)
 val revelation :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   ?forge_pkh:public_key_hash option ->
   Context.t ->
   public_key ->
@@ -207,7 +241,7 @@ val failing_noop :
     yet. Disabled (set to [false]) by default.}} *)
 val contract_origination :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
@@ -221,7 +255,7 @@ val contract_origination :
 
 val contract_origination_hash :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
@@ -237,7 +271,7 @@ val originated_contract : Operation.packed -> Contract.t
 
 val register_global_constant :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?public_key:Signature.public_key ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
@@ -275,7 +309,7 @@ val activation :
 
 val combine_operations :
   ?public_key:public_key ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?spurious_operation:packed_operation ->
   source:Contract.t ->
   Context.t ->
@@ -357,142 +391,6 @@ val dummy_script : Script.t
 
 val dummy_script_cost : Tez.t
 
-(** [tx_rollup_origination ctxt source] Originate a new tx rollup operation,
-    sign it with [source] and returns it alongside the tx rollup address. The
-    tx_rollup address is using the initial origination nonce with the hash of the
-    operation. If this operation is combined with [combine_operations] then the
-    tx rollup address is false as the nonce is not based on the correct operation
-    hash. *)
-val tx_rollup_origination :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  (Operation.packed * Tx_rollup.t) tzresult Lwt.t
-
-(** [tx_rollup_submit_batch ctxt source tx_rollup batch] submits
-    [batch], an array of bytes that is expected to be a batch of L2
-    transactions, to be appended in the inbox of [tx_rollup].
-
-    Optional arguments allow to override defaults:
-
-    {ul {li [?force_reveal:bool]: prepend the operation to reveal
-    [source]'s public key if the latter has not been revealed
-    yet. Disabled (set to [false]) by default.}} *)
-val tx_rollup_submit_batch :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?burn_limit:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  string ->
-  Operation.packed tzresult Lwt.t
-
-(** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a
-    tx.
-
-    Optional arguments allow to override defaults:
-
-    {ul {li [?force_reveal:bool]: prepend the operation to reveal
-    [source]'s public key if the latter has not been revealed
-    yet. Disabled (set to [false]) by default.}} *)
-val tx_rollup_commit :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  Tx_rollup_commitment.Full.t ->
-  Operation.packed tzresult Lwt.t
-
-(** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment
-    bond.
-
-    Optional arguments allow to override defaults:
-
-    {ul {li [?force_reveal:bool]: prepend the operation to reveal
-    [source]'s public key if the latter has not been revealed
-    yet. Disabled (set to [false]) by default..}} *)
-val tx_rollup_return_bond :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  Operation.packed tzresult Lwt.t
-
-(** [tx_rollup_finalize ctxt source tx_rollup] finalizes the most
-    recent final level of a rollup.
-
-    Optional arguments allow to override defaults:
-
-    {ul {li [?force_reveal:bool]: prepend the operation to reveal
-    [source]'s public key if the latter has not been revealed
-    yet. Disabled (set to [false]) by default.}} *)
-val tx_rollup_finalize :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  Operation.packed tzresult Lwt.t
-
-(** [tx_rollup_remove_commitment ctxt source tx_rollup] tries to
-    remove a commitment from the rollup context. *)
-val tx_rollup_remove_commitment :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  Operation.packed tzresult Lwt.t
-
-(** [tx_rollup_dispatch_tickets ctxt ~source ~message_index tx_rollup
-    level context_hash tickets_info] sends all tickets from
-    [tickets_info] to the appropriate implicit accounts, as authorized
-    by the [message_index]th hash of the commitment of [tx_rollup]
-    posted for [level].
-
-    Optional arguments allow to override defaults:
-
-    {ul {li [?force_reveal:bool]: prepend the operation to reveal
-    [source]'s public key if the latter has not been revealed
-    yet. Disabled (set to [false]) by default.}} *)
-val tx_rollup_dispatch_tickets :
-  ?force_reveal:bool ->
-  ?counter:counter ->
-  ?fee:Tez.t ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
-  Context.t ->
-  source:Contract.t ->
-  message_index:int ->
-  message_result_path:Tx_rollup_commitment.Merkle.path ->
-  Tx_rollup.t ->
-  Tx_rollup_level.t ->
-  Context_hash.t ->
-  Tx_rollup_reveal.t list ->
-  (packed_operation, tztrace) result Lwt.t
-
 (** [transfer_ticket] allows an implicit account to transfer tickets they owned.
 
     The arguments are:
@@ -519,10 +417,10 @@ val tx_rollup_dispatch_tickets :
     yet. Disabled (set to [false]) by default.}} *)
 val transfer_ticket :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   source:Contract.t ->
   contents:Script.lazy_expr ->
@@ -533,63 +431,9 @@ val transfer_ticket :
   entrypoint:Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
 
-(** [tx_rollup_raw_reject] is a low-level helpers to reject a
-    commitment by providing a serialized proofs (which can be
-    invalid). See {!tx_rollup_reject} if you are interested in a
-    helper that guarantees the submitted proof to be decodable by the
-    protocol. *)
-val tx_rollup_raw_reject :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  Tx_rollup_level.t ->
-  Tx_rollup_message.t ->
-  message_position:int ->
-  message_path:Tx_rollup_inbox.Merkle.path ->
-  message_result_hash:Tx_rollup_message_result_hash.t ->
-  message_result_path:Tx_rollup_commitment.Merkle.path ->
-  proof:Tx_rollup_l2_proof.serialized ->
-  previous_message_result:Tx_rollup_message_result.t ->
-  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
-  Operation.packed tzresult Lwt.t
-
-(** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
-    index proof] Rejects a tx rollup commitment.
-
-    Optional arguments allow to override defaults:
-
-    {ul {li [?force_reveal:bool]: prepend the operation to reveal
-    [source]'s public key if the latter has not been revealed
-    yet. Disabled (set to [false]) by default.}} *)
-val tx_rollup_reject :
-  ?force_reveal:bool ->
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  Context.t ->
-  Contract.t ->
-  Tx_rollup.t ->
-  Tx_rollup_level.t ->
-  Tx_rollup_message.t ->
-  message_position:int ->
-  message_path:Tx_rollup_inbox.Merkle.path ->
-  message_result_hash:Tx_rollup_message_result_hash.t ->
-  message_result_path:Tx_rollup_commitment.Merkle.path ->
-  proof:Tx_rollup_l2_proof.t ->
-  previous_message_result:Tx_rollup_message_result.t ->
-  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
-  Operation.packed tzresult Lwt.t
-
 (** [sc_rollup_origination ctxt source kind boot_sector] originates a
     new smart contract rollup of some given [kind] booting using
-    [boot_sector].  The process is the same as in
-    [tx_rollup_origination].
+    [boot_sector].
 
     Optional arguments allow to override defaults:
 
@@ -598,11 +442,11 @@ val tx_rollup_reject :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_origination :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
-  ?origination_proof:string ->
+  ?storage_limit:Z.t ->
+  ?origination_proof:Sc_rollup.Proof.serialized ->
   Context.t ->
   Contract.t ->
   Sc_rollup.Kind.t ->
@@ -621,7 +465,7 @@ val sc_rollup_origination :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_publish :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -641,7 +485,7 @@ val sc_rollup_publish :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_cement :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -652,10 +496,10 @@ val sc_rollup_cement :
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_execute_outbox_message :
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?force_reveal:bool ->
   Context.t ->
   Contract.t ->
@@ -664,9 +508,10 @@ val sc_rollup_execute_outbox_message :
   output_proof:string ->
   (packed_operation, tztrace) result Lwt.t
 
-(** [sc_rollup_recover_bond ctxt source sc_rollup] returns a commitment bond. *)
+(** [sc_rollup_recover_bond ctxt source sc_rollup staker] recovers the
+    commitment bond of [staker]. *)
 val sc_rollup_recover_bond :
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -674,23 +519,23 @@ val sc_rollup_recover_bond :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
+  public_key_hash ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_add_messages :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  Sc_rollup.t ->
   string list ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_refute :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -698,12 +543,12 @@ val sc_rollup_refute :
   Contract.t ->
   Sc_rollup.t ->
   public_key_hash ->
-  Sc_rollup.Game.refutation option ->
+  Sc_rollup.Game.refutation ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_timeout :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -715,39 +560,37 @@ val sc_rollup_timeout :
 
 val dal_publish_slot_header :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  Dal.Slot.Header.t ->
+  Dal.Operations.Publish_slot_header.t ->
   (packed_operation, tztrace) result Lwt.t
 
 (** [zk_rollup_origination ctxt source ~public_parameters ~circuits_info
     ~init_state ~nb_ops] tries to originate a ZK Rollup. *)
 val zk_rollup_origination :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  public_parameters:
-    Plonk.Main_protocol.verifier_public_parameters
-    * Plonk.Main_protocol.transcript ->
-  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  public_parameters:Plonk.Main_protocol.verifier_public_parameters ->
+  circuits_info:[`Public | `Private | `Fee] Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
   (Operation.packed * Zk_rollup.t) tzresult Lwt.t
 
 val update_consensus_key :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   public_key ->
@@ -764,12 +607,26 @@ val drain_delegate :
     to the pending list of a ZK Rollup. *)
 val zk_rollup_publish :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   zk_rollup:Zk_rollup.t ->
   ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  Operation.packed tzresult Lwt.t
+
+(** [zk_rollup_update ctxt source ~zk_rollup ~update] tries to apply an update
+    to a ZK Rollup. *)
+val zk_rollup_update :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  zk_rollup:Zk_rollup.t ->
+  update:Zk_rollup.Update.t ->
   Operation.packed tzresult Lwt.t

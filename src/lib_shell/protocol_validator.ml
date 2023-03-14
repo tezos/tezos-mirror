@@ -89,7 +89,7 @@ let create db =
   bv.worker <-
     Lwt_utils.worker
       "block_validator"
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> worker_loop bv)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions bv.canceler) ;
   bv
@@ -160,17 +160,23 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
       let* context = Store.Block.context chain_store block in
       let protocol =
         let*! protocol_hash = Context_ops.get_protocol context in
-        let* _p = fetch_and_compile_protocol pv ?peer ?timeout protocol_hash in
+        let* (module Proto) =
+          fetch_and_compile_protocol pv ?peer ?timeout protocol_hash
+        in
         Store.Chain.may_update_protocol_level
           chain_store
           ~protocol_level
+          ~expect_predecessor_context:
+            (Proto.expected_context_hash = Predecessor_resulting_context)
           (block, protocol_hash)
       and test_protocol =
         let*! v = Context_ops.get_test_chain context in
         match v with
         | Not_running -> return_unit
         | Forking {protocol; _} | Running {protocol; _} -> (
-            let* _ = fetch_and_compile_protocol pv ?peer ?timeout protocol in
+            let* (module Proto) =
+              fetch_and_compile_protocol pv ?peer ?timeout protocol
+            in
             let*! o = Store.Chain.testchain chain_store in
             match o with
             | None -> return_unit
@@ -180,6 +186,9 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
                   Store.Chain.may_update_protocol_level
                     test_chain_store
                     ~protocol_level
+                    ~expect_predecessor_context:
+                      (Proto.expected_context_hash
+                     = Predecessor_resulting_context)
                     (block, protocol)
                 in
                 return_unit)

@@ -32,19 +32,36 @@ type t = B of Block.t | I of Incremental.t
 
 val branch : t -> Block_hash.t
 
+val pred_branch : t -> Block_hash.t
+
 val get_level : t -> Raw_level.t tzresult
 
 (** Either retrieve the alpha context (in the [Incremental] case) or
     build one (in the [Block] case). *)
 val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
 
+(** Given a context, returns the list of endorsers charactized by
+    the [level], the public key hash of the [delegate], its [consensus_key]
+    and its assigned [slots].
+    see {! Plugin.RPC.Validator.t}. *)
 val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
+(** Return the two first elements of the list returns by [get_endorsers]. *)
 val get_first_different_endorsers :
   t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
 
+(** Return the first element [delegate,slot] of the list returns by
+    [get_endorsers], where [delegate] is the [consensus key] when
+    is set. *)
 val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
+(** Given a [delegate], and a context [ctxt], if [delegate] is in
+    [get_endorsers ctxt] returns the [slots] of [delegate] otherwise
+    return [None]. *)
+val get_endorser_slot :
+  t -> public_key_hash -> Slot.t list option tzresult Lwt.t
+
+(** Return the [n]th element of the list returns by [get_endorsers]. *)
 val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
 val get_endorsing_power_for_delegate :
@@ -62,7 +79,7 @@ val get_bakers :
   t ->
   public_key_hash list tzresult Lwt.t
 
-val get_baker : t -> round:int -> public_key_hash tzresult Lwt.t
+val get_baker : t -> round:Round.t -> public_key_hash tzresult Lwt.t
 
 val get_first_different_baker :
   public_key_hash -> public_key_hash trace -> public_key_hash
@@ -148,7 +165,7 @@ module Contract : sig
 
   val balance_and_frozen_bonds : t -> Contract.t -> Tez.t tzresult Lwt.t
 
-  val counter : t -> Contract.t -> Z.t tzresult Lwt.t
+  val counter : t -> Contract.t -> Manager_counter.t tzresult Lwt.t
 
   val manager : t -> Contract.t -> Account.t tzresult Lwt.t
 
@@ -209,30 +226,8 @@ module Delegate : sig
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
 end
 
-module Tx_rollup : sig
-  val state : t -> Tx_rollup.t -> Tx_rollup_state.t tzresult Lwt.t
-
-  (** [inbox ctxt tx_rollup level] returns the inbox of this
-      transaction rollup at [level]. If the inbox does not exist, the
-      function returns an error. *)
-  val inbox :
-    t ->
-    Tx_rollup.t ->
-    Tx_rollup_level.t ->
-    Tx_rollup_inbox.t option tzresult Lwt.t
-
-  (** [commitment ctxt tx_rollup] returns the commitment of this
-      transaction rollup at [level]. If the commitment does not exist,
-      the function returns an error. *)
-  val commitment :
-    t ->
-    Tx_rollup.t ->
-    Tx_rollup_level.t ->
-    Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
-end
-
 module Sc_rollup : sig
-  val inbox : t -> Sc_rollup.t -> Sc_rollup.Inbox.t tzresult Lwt.t
+  val inbox : t -> Sc_rollup.Inbox.t tzresult Lwt.t
 
   val commitment :
     t ->
@@ -246,15 +241,16 @@ module Sc_rollup : sig
   val timeout :
     t ->
     Sc_rollup.t ->
-    Signature.Public_key_hash.t * Signature.Public_key_hash.t ->
+    Signature.Public_key_hash.t ->
+    Signature.Public_key_hash.t ->
     Sc_rollup.Game.timeout option tzresult Lwt.t
 
-  val ongoing_game_for_staker :
+  val ongoing_games_for_staker :
     t ->
     Sc_rollup.t ->
     Signature.public_key_hash ->
     (Sc_rollup.Game.t * Signature.public_key_hash * Signature.public_key_hash)
-    option
+    list
     tzresult
     Lwt.t
 end
@@ -270,12 +266,12 @@ val tup_hd : ('a, 'elts) tup -> 'elts -> 'a
 type 'accounts init :=
   ?rng_state:Random.State.t ->
   ?commitments:Commitment.t list ->
-  ?initial_balances:int64 list ->
+  ?bootstrap_balances:int64 list ->
+  ?bootstrap_delegations:Signature.Public_key_hash.t option list ->
+  ?bootstrap_consensus_keys:Signature.Public_key.t option list ->
   ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
-  ?bootstrap_delegations:
-    (Signature.Public_key_hash.t * Signature.Public_key_hash.t) list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
   ?liquidity_baking_subsidy:Tez.t ->
@@ -285,11 +281,8 @@ type 'accounts init :=
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
-  ?tx_rollup_enable:bool ->
-  ?tx_rollup_sunset_level:int32 ->
-  ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
-  ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
+  ?sc_rollup_arith_pvm_enable:bool ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
@@ -338,6 +331,37 @@ val init_with_constants1 :
 
 val init_with_constants2 :
   Constants.Parametric.t ->
+  (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
+  Lwt.t
+
+(** [init_with_parameters_gen tup params] returns an initial block parametrised
+    with [params] and the implicit contracts corresponding to its bootstrap
+    accounts. The number of bootstrap accounts, and the structure of the
+    returned contracts, are specified by the [tup] argument. *)
+val init_with_parameters_gen :
+  (Alpha_context.Contract.t, 'contracts) tup ->
+  Parameters.t ->
+  (Block.t * 'contracts) tzresult Lwt.t
+
+(** [init_with_parameters_n params n] returns an initial block parametrized
+    with [params] with [n] initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters_n :
+  Parameters.t ->
+  int ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+(** [init_with_parameters1 params] returns an initial block parametrized with
+    [params] with one initialized account and the associated implicit
+    contract. *)
+val init_with_parameters1 :
+  Parameters.t -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+(** [init_with_parameters2 params] returns an initial block parametrized with
+    [params] with two initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters2 :
+  Parameters.t ->
   (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
   Lwt.t
 

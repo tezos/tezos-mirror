@@ -1,15 +1,15 @@
-Overview of Testing in Tezos
+Overview of Testing in Octez
 ============================
 
 The goal of this document is to give an overview on how testing is done in
-Tezos, and to help Tezos contributors use the test suite and
+Octez, and to help Octez contributors use the test suite and
 write tests by pointing them towards the most
 appropriate testing framework for their use case. Finally, this guide
-explains how tests can be :ref:`run automatically in the Tezos CI
+explains how tests can be :ref:`run automatically in the Octez CI
 <gitlab_test_ci>` and how to :ref:`measure test coverage
 <measuring-test-coverage>`.
 
-The frameworks used in Tezos can be categorized along two axes: the
+The frameworks used in Octez can be categorized along two axes: the
 type of component they test, and the type of testing they perform. We
 distinguish the following components:
 
@@ -56,10 +56,10 @@ Acceptance testing
    Testing of the software in real conditions. It is usually slower,
    more costly and less amenable to automation than integration or
    system testing. It is often the final step in the testing process,
-   performed before a release. However, in Tezos, acceptance testing
-   is decoupled from releases, and currently consists in manually running 
+   performed before a release. However, in Octez, acceptance testing
+   is decoupled from releases, and currently consists in manually running
    a net of resilience tests on a regular base. These tests use various
-   testing frameworks. 
+   testing frameworks.
 
 ..
    Inline testing
@@ -79,7 +79,7 @@ in more detail.
                        MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
 
 
-.. csv-table:: Testing frameworks and their applications in Tezos. PT:
+.. csv-table:: Testing frameworks and their applications in Octez. PT:
                :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression","Performance"
 
@@ -102,7 +102,7 @@ Alcotest
 
 `Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
 and integration testing in OCaml. Alcotest is the primary tool in
-Tezos for unit and integration testing of OCaml code.
+Octez for unit and integration testing of OCaml code.
 
 Typical use cases:
  - Verifying simple input-output specifications for functions with a
@@ -112,18 +112,12 @@ Typical use cases:
 Example tests:
  - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
    execute them locally, run ``dune build @src/lib_requester/runtest`` in
-   the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker unit:requester``.
+   the Octez root.
  - Integration tests for the P2P layer in the shell.  For instance
    :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
    processes that exercise large parts of the P2P layer.  To execute
-   it locally, run ``dune build @runtest_p2p_pool`` in the Tezos
-   root. To execute the P2P tests on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker unit:p2p``. The job-name
-   ``unit:p2p`` is ill-chosen, since the test is in fact an
-   integration test.
+   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
+   root.
 
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
@@ -145,11 +139,11 @@ Typical use cases:
 Example tests:
  - Unit tests for :src:`src/lib_micheline`, in :src:`src/lib_micheline/test/test_parser.ml`. To
    execute them locally, run ``dune runtest src/lib_micheline/test`` in
-   the Tezos root.
+   the Octez root.
 
 
 References:
- - :doc:`Section in Tezos Developer Documentation on Ppx_expect <ppx_expect>`
+ - :doc:`Section in Octez Developer Documentation on Ppx_expect <ppx_expect>`
  - `Ppx_expect README <https://github.com/janestreet/ppx_expect>`_.
  - `Dune documentation about inline expectation tests <https://dune.readthedocs.io/en/stable/tests.html#inline-expectation-tests>`_.
  - `Ppx_inline_test README <https://github.com/janestreet/ppx_inline_test>`_.
@@ -178,9 +172,9 @@ References:
 Python testing and execution framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
-framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
-``tezos-node`` and ``tezos-client``, to perform integration testing
+The Octez project uses `pytest <https://docs.pytest.org/>`_, a Python testing
+framework, combined with :doc:`a Python wrapper <python_testing_framework>`
+around ``octez-node`` and ``octez-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
 and endorser.
 
@@ -191,7 +185,7 @@ enables regression testing.
 
 
 Typical use cases:
- - Testing the commands of ``tezos-client``. This allows to test the
+ - Testing the commands of ``octez-client``. This allows to test the
    full chain: from client, to node RPC to the implementation of the
    economic protocol.
  - Test networks of nodes, with daemons.
@@ -203,15 +197,11 @@ Example tests:
    interpreter (in
    :src:`tests_python/tests_alpha/test_contract_opcodes.py`).  To execute it
    locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
-   in the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker integration:contract_opcodes``.
+   in the Octez root.
  - Setting up networks of nodes and ensuring their connection
    (in :src:`tests_python/tests_alpha/test_p2p.py`).
    To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
-   the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker integration:p2p``.
+   the Octez root.
 
 References:
  - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
@@ -225,7 +215,7 @@ References:
 Tezt
 ~~~~
 
-:doc:`Tezt <tezt>` is a system testing framework for Tezos. It is
+:doc:`Tezt <tezt>` is a system testing framework for Octez. It is
 intended as a replacement to `Flextesa <https://tezos.gitlab.io/flextesa/>`_ and as an OCaml-based alternative
 to :ref:`Python testing and execution framework
 <pytest_section>`. Like the latter, Tezt is also capable of regression
@@ -234,8 +224,8 @@ used for some manual tests (see the :src:`tezt/manual_tests`
 folder). Its main strengths are summarized in its :doc:`section in the
 Tezos Developer Documentation <tezt>`. Conceptually Tezt consists of a
 generic framework for writing tests interacting with external
-processes, and a set of Tezos-specific modules for interacting with
-the Tezos binaries: the client, baker, etc.
+processes, and a set of Octez-specific modules for interacting with
+the Octez binaries: the client, baker, etc.
 
 Typical use cases:
  - In terms of use cases, Tezt is similar to the :ref:`Python testing and
@@ -252,7 +242,7 @@ Example tests:
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
- - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
+ - `Octez-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
 .. _long_tezt_section:
 
@@ -274,7 +264,7 @@ detect performance regressions. See :doc:`long-tezts`.
    The `Michelson unit test proposal
    <https://gitlab.com/tezos/tezos/-/merge_requests/1487>`__ defines a
    format for unit tests for Michelson snippets. If the proposal is eventually accepted, then these
-   tests will be executable through ``tezos-client``.
+   tests will be executable through ``octez-client``.
 
    Example use cases:
     - Verifying the functional (input--output) behavior of snippets of
@@ -444,8 +434,8 @@ guidelines:
 
 For system test frameworks
    System test frameworks, as :doc:`tezt` and :doc:`python_testing_framework`,
-   run binaries e.g. ``tezos-client`` and
-   ``tezos-node``. Typically, they do so with calls to ``exec`` so the
+   run binaries e.g. ``octez-client`` and
+   ``octez-node``. Typically, they do so with calls to ``exec`` so the
    resulting process does not inherit the signal handlers from the
    parent process (the test framework). When writing tests in these
    frameworks, the author must ensure that the processes launched are
@@ -510,7 +500,7 @@ The results of the test suite on terminated pipelines is presented on
 the details of the merge request page corresponding to the
 pipeline's branch (if any). For more information, see the `GitLab
 documentation on Unit test reports
-<https://docs.gitlab.com/ee/ci/unit_test_reports.html>`__.
+<https://docs.gitlab.com/ee/ci/testing/unit_test_reports.html>`__.
 
 By default, the ``test`` of the CI runs the tests as a set of independent jobs
 that cluster the tests with a varying grain. This strikes a balance between exploiting GitLab
@@ -519,7 +509,7 @@ pipeline. The grain used varies slightly for different types of
 tests:
 
 Python integration and regression tests
-   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/test/integration.yml`). This number is
+   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/jobs/test/python_integration_tests.yml`). This number is
    chosen to keep the duration of job each lower under 10 minutes on
    average, and to accommodate the addition of new protocol test
    suites.
@@ -544,7 +534,7 @@ for doing this depends on the type of test you've added:
 Python integration and regression tests
   New Pytest tests will be included automatically in the CI.
   To rebalance the Pytest batches based on a previous pipeline,
-  run (from the root of the Tezos repository):
+  run (from the root of the Octez repository):
   ``cd tests_python && poetry run python ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
   setting ``<PROJECT_ID>`` to a GitLab project id (e.g. ``3836952`` or `tezos/tezos <https://gitlab.com/tezos/tezos>`_)
   and ``<PIPELINE_ID>`` to the id of a pipeline in this project for which integration tests have executed
@@ -553,7 +543,7 @@ Python integration and regression tests
 
 Tezt integration and regression tests
   New Tezt tests will be included automatically in the CI.
-  To rebalance the Tezt batches, run (from the root of the Tezos repository):
+  To rebalance the Tezt batches, run (from the root of the Octez repository):
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
@@ -561,7 +551,7 @@ The OCaml package tests (Alcotest & QCheck)
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 
-  Protocol tests must be added to :src:`.gitlab/ci/test/unit.yml` under the
+  Protocol tests must be added to :src:`.gitlab/ci/jobs/test/unit.yml` under the
   protocol that they are testing. For example, to run a new protocol test for
   ``proto_XXX_YYYYYYYY``, add the corresponding
   ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
@@ -571,14 +561,13 @@ Other
   For other types of tests, you need to manually modify the
   :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
   Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
-  introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
+  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_.
 
 Test coverage in merge requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Build and tests are instrumented with ``bisect_ppx`` in the CI for each merge
-request on Tezos. To measure test coverage in the CI, it launches the job
+request on Octez. To measure test coverage in the CI, it launches the job
 ``unified_job`` in stage ``test_coverage`` which generates the coverage report.
 They are stored as an HTML report that can be downloaded or browsed from the CI page
 upon completion of the job (see the Artifacts produced by the MR pipeline in the GitLab UI).
@@ -589,7 +578,7 @@ The summary report gives the merge request an overall test coverage percentage
 Additionally, using ``bisect-ppx-report cobertura``, we produce and
 upload a Cobertura artifact activating the `test coverage
 visualization
-<https://docs.gitlab.com/ee/user/project/merge_requests/test_coverage_visualization.html>`_
+<https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html>`_
 in GitLab:
 
 .. image:: images/testing-coverage-markers.png
@@ -632,43 +621,6 @@ coverage result from there, and also retrieves the artifacts which
 contains the HTML coverage report.
 GitLab also produces a `graph of the coverage ratio over time
 <https://gitlab.com/tezos/tezos/-/graphs/master/charts>`_.
-
-
-
-
-.. _executing_gitlab_ci_locally:
-
-Executing the GitLab CI locally
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-GitLab offers the ability to run jobs defined in the :src:`.gitlab-ci.yml` file on your own machine.
-This is helpful to debug the CI pipeline.
-For this, you need to setup ``gitlab-runner`` on your machine.
-To avoid using outdated versions of the binary, it is recommended to install a
-`release from the development repository <https://gitlab.com/gitlab-org/gitlab-runner/-/releases>`_.
-
-``gitlab-runner`` works with the concept of `executor`. We recommend to use the
-``docker`` executor to sandbox the environment the job will be executed in. This
-supposes that you have docker installed on your machine.
-
-For example, if you want to run the job ``check_python_linting`` which checks the Python syntax, you can use:
-
-.. code-block:: bash
-
-    gitlab-runner exec docker check_python_linting
-
-Note that the first time you execute a job, it may take a long time because it
-requires downloading the docker image, and ``gitlab-runner`` is not verbose on this
-subject. For instance, if Tezos' opam repository has changed, requiring
-a refresh of the locally cached docker image.
-
-Local changes must be committed (but not necessarily pushed remotely)
-before executing the job locally. Indeed, ``gitlab-runner`` will clone
-the head of the current local branch to execute the job.
-
-Another limitation is that only single jobs can be executed using
-``gitlab-runner``. For instance, there is no direct way of executing all
-jobs in the stage ``test``.
 
 Conventions
 -----------

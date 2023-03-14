@@ -30,21 +30,21 @@ open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts
 open Client_proto_programs
-open Client_keys
+open Client_keys_v0
 open Client_proto_args
 
 let encrypted_switch =
-  Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
+  Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let dry_run_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"dry-run"
     ~short:'D'
     ~doc:"don't inject the operation, just display it"
     ()
 
 let verbose_signing_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose-signing"
     ~doc:"display extra information before signing the operation"
     ()
@@ -64,7 +64,7 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> Lwt.return_some data
 
 let json_file_or_text_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (Ezjsonm.from_string text)
       | ["file"; path] -> Lwt_utils_unix.Json.read_file path
@@ -76,32 +76,32 @@ let json_file_or_text_parameter =
               failwith "Neither an existing file nor valid JSON: '%s'" p))
 
 let data_parameter =
-  Clic.parameter (fun _ data ->
+  Tezos_clic.parameter (fun _ data ->
       Lwt.return
         (Micheline_parser.no_parsing_error
         @@ Michelson_v1_parser.parse_expression data))
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let block_hash_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let transfer_command amount source destination cctxt
     ( fee,
@@ -133,7 +133,7 @@ let transfer_command amount source destination cctxt
   | None ->
       let contract = source in
       Managed_contract.get_contract_manager cctxt source >>=? fun source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       Managed_contract.transfer
         cctxt
         ~chain:cctxt#chain
@@ -156,7 +156,7 @@ let transfer_command amount source destination cctxt
         ?counter
         ()
   | Some source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       transfer
         cctxt
         ~chain:cctxt#chain
@@ -186,7 +186,7 @@ let transfer_command amount source destination cctxt
   | Some (_res, _contracts) -> return_unit
 
 let commands network () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -249,9 +249,9 @@ let commands network () =
          contract (deprecated)."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
@@ -272,13 +272,13 @@ let commands network () =
       ~desc:"Get a value in a big map."
       no_options
       (prefixes ["get"; "element"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"key"
            ~desc:"the key to look for"
-           (Clic.parameter (fun _ s ->
+           (Tezos_clic.parameter (fun _ s ->
                 return (Script_expr_hash.of_b58check_exn s)))
       @@ prefixes ["of"; "big"; "map"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"big_map"
            ~desc:"identifier of the big_map"
            int_parameter
@@ -323,7 +323,7 @@ let commands network () =
       ~desc:"Get the type of an entrypoint of a contract."
       no_options
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ Tezos_clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
@@ -442,7 +442,7 @@ let commands network () =
         | None ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -465,7 +465,7 @@ let commands network () =
               errors
             >>= fun _ -> return_unit
         | Some mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -521,7 +521,7 @@ let commands network () =
         | None ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -544,7 +544,7 @@ let commands network () =
               errors
             >>= fun _ -> return_unit
         | Some mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -569,7 +569,7 @@ let commands network () =
          gas_limit_arg
          storage_limit_arg
          delegate_arg
-         (Client_keys.force_switch ())
+         (Client_keys_v0.force_switch ())
          init_arg
          no_print_source_flag
          minimal_fees_arg
@@ -623,7 +623,7 @@ let commands network () =
             failwith
               "only implicit accounts can be the source of an origination"
         | Some source -> (
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
                 Injection.minimal_fees;
@@ -834,7 +834,7 @@ let commands network () =
         match Contract.is_implicit source with
         | None -> failwith "only implicit accounts can be revealed"
         | Some source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
                 Injection.minimal_fees;
@@ -887,7 +887,7 @@ let commands network () =
              burn_cap )
            src_pkh
            cctxt ->
-        Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
+        Client_keys_v0.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         let fee_parameter =
           {
             Injection.minimal_fees;
@@ -972,7 +972,7 @@ let commands network () =
             @@ Public_key_hash.alias_param @@ prefixes ["with"]
             @@ param
                  ~name:"code"
-                 (Clic.parameter (fun _ctx code ->
+                 (Tezos_clic.parameter (fun _ctx code ->
                       protect (fun () ->
                           return
                             (Blinded_public_key_hash.activation_code_of_hex
@@ -1119,7 +1119,7 @@ let commands network () =
           match Contract.is_implicit source with
           | None -> failwith "only implicit accounts can submit proposals"
           | Some src_pkh -> (
-              Client_keys.get_key cctxt src_pkh
+              Client_keys_v0.get_key cctxt src_pkh
               >>=? fun (src_name, _src_pk, src_sk) ->
               get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
               >>=? fun info ->
@@ -1181,13 +1181,15 @@ let commands network () =
                   not
                     (List.exists
                        (fun (pkh, _) ->
-                         Signature.Public_key_hash.equal pkh src_pkh)
+                         Tezos_crypto.Signature.V0.Public_key_hash.equal
+                           pkh
+                           src_pkh)
                        listings)
                 then
                   error
                     "Public-key-hash `%a` from account `%s` does not appear to \
                      have voting rights."
-                    Signature.Public_key_hash.pp
+                    Tezos_crypto.Signature.V0.Public_key_hash.pp
                     src_pkh
                     src_name ;
                 if !errors <> [] then
@@ -1283,7 +1285,7 @@ let commands network () =
           match Contract.is_implicit source with
           | None -> failwith "only implicit accounts can submit ballot"
           | Some src_pkh ->
-              Client_keys.get_key cctxt src_pkh
+              Client_keys_v0.get_key cctxt src_pkh
               >>=? fun (_src_name, _src_pk, src_sk) ->
               get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
               >>=? fun info ->

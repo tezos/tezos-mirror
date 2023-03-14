@@ -1,0 +1,30 @@
+# Basic, specialised, minimal, orthogonal templates
+
+# Some settings we want by default on all jobs that cannot be set
+# through the key `default` in `.gitlab-ci.yml`.
+.default_settings_template:
+  # `dependencies` are empty be default. Each individual job or
+  # template requiring artifacts from preceeding jobs should declare
+  # their dependencies locally.
+  dependencies: []
+
+# Add variables for bisect_ppx instrumentation
+.template__coverage:
+  variables:
+    COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
+    BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
+    SLACK_COVERAGE_CHANNEL: "C02PHBE7W73"
+
+.build_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage
+  stage: build
+  before_script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate

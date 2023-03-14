@@ -34,7 +34,7 @@
 
 open Tezos_protocol_environment.Internal_for_tests.Environment_cache
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 module Test = QCheck2.Test
 
@@ -676,7 +676,9 @@ let load_cache_correctly_restores_cache_in_memory builder mode
   in
   let*! ctxt0 = Context.Cache.sync ctxt ~cache_nonce:Bytes.empty in
   (* We want to avoid a cache hit in the cache of caches. *)
-  let block = Block_hash.hash_string [string_of_int (Random.bits ())] in
+  let block =
+    Tezos_crypto.Hashed.Block_hash.hash_string [string_of_int (Random.bits ())]
+  in
   let ctxt0 = Context.Cache.clear ctxt0 in
   let* ctxt1 = Context.load_cache block ctxt0 mode (builder entries) in
   (* We force the execution of [value_of_key] even in Lazy mode by
@@ -771,3 +773,6 @@ let tests =
     (name, speed, fun () -> Lwt.return (f ()))
   in
   List.map to_alcotest_lwt qtests
+
+let () =
+  Alcotest_lwt.run "tezos-shell-context" [("cache", tests)] |> Lwt_main.run

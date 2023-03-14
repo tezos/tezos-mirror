@@ -40,9 +40,6 @@
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
-
-let wrap m = m >|= Environment.wrap_tzresult
 
 type init_env = {
   block : Block.t;
@@ -51,18 +48,22 @@ type init_env = {
 }
 
 let init_env () =
+  let open Lwt_result_wrap_syntax in
   let* block, baker, contract, _src2 = Contract_helpers.init () in
   return {block; baker; contract}
 
 let collect_token_amounts ctxt tickets =
   let accum (tokens, ctxt) ticket =
-    let token, amount = Ticket_token.token_and_amount_of_ex_ticket ticket in
+    let token, amount =
+      Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
+    in
     let tokens = (token, Script_int.(to_zint (amount :> n num))) :: tokens in
     return (tokens, ctxt)
   in
   List.fold_left_es accum ([], ctxt) tickets
 
 let tokens_of_value ~include_lazy ctxt ty x =
+  let open Lwt_result_wrap_syntax in
   let*? has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
   let* tickets, ctxt =
     Ticket_scanner.tickets_of_value ~include_lazy ctxt has_tickets x
@@ -78,6 +79,7 @@ let tokens_of_value ~include_lazy ctxt ty x =
 
 (* Extract ticket-token balance of storage *)
 let ticket_balance_of_storage ctxt (contract : Alpha_context.Contract.t) =
+  let open Lwt_result_wrap_syntax in
   match contract with
   | Implicit _ -> return ([], ctxt)
   | Originated contract_hash -> (
@@ -118,6 +120,7 @@ let ticket_balance_of_storage ctxt (contract : Alpha_context.Contract.t) =
           return (tokens, ctxt))
 
 let transaction block ~sender ~recipient ~amount ~parameters =
+  let open Lwt_result_wrap_syntax in
   let parameters = Script.lazy_expr @@ Expr.from_string parameters in
   let* block = Incremental.begin_construction block in
   let* operation =
@@ -135,6 +138,7 @@ let transaction block ~sender ~recipient ~amount ~parameters =
   Incremental.finalize_block block
 
 let all_contracts current_block =
+  let open Lwt_result_wrap_syntax in
   let* ctxt =
     Incremental.begin_construction current_block >|=? Incremental.alpha_ctxt
   in
@@ -142,6 +146,7 @@ let all_contracts current_block =
 
 (* Fetch all added contracts between [before] and [after]. *)
 let new_contracts ~before ~after =
+  let open Lwt_result_wrap_syntax in
   let* cs1 = all_contracts before in
   let* cs2 = all_contracts after in
   let not_in_cs1 =
@@ -152,6 +157,7 @@ let new_contracts ~before ~after =
   return @@ List.filter not_in_cs1 cs2
 
 let get_first_two_new_contracts before f =
+  let open Lwt_result_wrap_syntax in
   let* after = f before in
   let* c = new_contracts ~before ~after in
   match c with
@@ -210,6 +216,7 @@ let show_balance_table kvs =
   show_rows (("Token x Content x Owner", "Balance") :: kvs)
 
 let validate_ticket_balances block =
+  let open Lwt_result_wrap_syntax in
   let* contracts = all_contracts block in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
@@ -666,6 +673,7 @@ end
    and validating the balance table against tickets in the storage once
    completed. *)
 let setup_test () =
+  let open Lwt_result_wrap_syntax in
   let module TM = Ticket_manager in
   let* {block; baker; contract = originator} = init_env () in
   let* ticket_manager, _script, block = TM.originate block ~originator baker in
@@ -680,6 +688,7 @@ let setup_test () =
 
 (** Test create new contracts and send tickets to them. *)
 let test_create_contract_and_send_tickets () =
+  let open Lwt_result_wrap_syntax in
   let module TM = Ticket_manager in
   let* test, originator, b = setup_test () in
 
@@ -715,13 +724,14 @@ let test_create_contract_and_send_tickets () =
   (* Add a green ticket to the lazy storage at index 1 and send it to the green
      ticket-receiver *)
   let* b = test b @@ TM.add_lazy ~index:1 ~content:"Green" ~amount:10 in
-  let* _b =
+  let* (_b : Block.t) =
     test b @@ TM.send_lazy ~index:1 ~recipient:ticket_receiver_green_2
   in
   return ()
 
 (** Tets add and remove tickets from lazy storage. *)
 let test_add_remove_from_lazy_storage () =
+  let open Lwt_result_wrap_syntax in
   let module TM = Ticket_manager in
   let* tm, _, b = setup_test () in
   let* b = tm b @@ TM.add_lazy ~index:1 ~content:"Red" ~amount:10 in
@@ -735,11 +745,14 @@ let test_add_remove_from_lazy_storage () =
   (* Remove the big-map. *)
   let* b = tm b TM.remove_all_lazy in
   (* Add back a ticket at index 1. *)
-  let* _b = tm b @@ TM.add_lazy ~index:1 ~content:"Red" ~amount:10 in
+  let* (_b : Block.t) =
+    tm b @@ TM.add_lazy ~index:1 ~content:"Red" ~amount:10
+  in
   return ()
 
 (** Test send to self and replace big-map. *)
 let test_send_self_replace_big_map () =
+  let open Lwt_result_wrap_syntax in
   let module TM = Ticket_manager in
   let* tm, _, b = setup_test () in
   (* Send self replace bigmap *)
@@ -748,11 +761,12 @@ let test_send_self_replace_big_map () =
   let* b = tm b @@ TM.add_lazy ~index:3 ~content:"Blue" ~amount:1 in
   let* b = tm b @@ TM.send_self_replace_big_map in
   let* b = tm b @@ TM.send_self_replace_big_map in
-  let* _b = tm b @@ TM.send_self_replace_big_map in
+  let* (_b : Block.t) = tm b @@ TM.send_self_replace_big_map in
   return ()
 
 (** Test add to and remove from strict storage. *)
 let test_add_remove_strict () =
+  let open Lwt_result_wrap_syntax in
   let module TM = Ticket_manager in
   let* tm, _, b = setup_test () in
   (* Add some more strict tickets *)
@@ -764,11 +778,12 @@ let test_add_remove_strict () =
 
   (* Remove strict tickets *)
   let* b = tm b @@ TM.remove_strict in
-  let* _b = tm b @@ TM.add_strict ~content:"Red" ~amount:1 in
+  let* (_b : Block.t) = tm b @@ TM.add_strict ~content:"Red" ~amount:1 in
   return ()
 
 (** Test mixed operations. *)
 let test_mixed_operations () =
+  let open Lwt_result_wrap_syntax in
   let module TM = Ticket_manager in
   let* tm, _, b = setup_test () in
   (* Add some more strict tickets *)
@@ -780,7 +795,7 @@ let test_mixed_operations () =
   let* b = tm b @@ TM.add_lazy ~index:3 ~content:"Blue" ~amount:1 in
   (* Remove strict and lazy *)
   let* b = tm b @@ TM.remove_strict in
-  let* _b = tm b @@ TM.remove_all_lazy in
+  let* (_b : Block.t) = tm b @@ TM.remove_all_lazy in
   return ()
 
 let tests =

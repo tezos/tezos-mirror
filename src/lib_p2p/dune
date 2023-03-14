@@ -9,6 +9,7 @@
   lwt-watcher
   lwt-canceler
   ringo
+  aches
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix

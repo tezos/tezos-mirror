@@ -30,6 +30,30 @@
    Subject:      .
 *)
 
+(** Section containing the prevalidator worker events.
+
+    These events are defined in [lib_workers/worker_events.ml], and
+    the section name comes from the [Name] module given as argument to
+    [Worker.MakeGroup] in either [lib_shell/prevalidator_internal.ml]
+    (for protocols Lima and up) or [lib_shell/legacy_prevalidator_internal.ml]
+    (for Kathmandu and older). They should not be confused with the
+    prevalidator-specific events from
+    [lib_shell/prevalidator_events.ml], which are always in the
+    "prevalidator" section regardless of the protocol version. *)
+let prevalidator_worker_event_section protocol =
+  if Protocol.number protocol <= 014 (* Kathmandu *) then "legacy_prevalidator"
+  else "prevalidator"
+
+(** The [event_sections_levels] argument that should be provided to
+    {!Node.init} in order to observe all debug-level prevalidator
+    events, depending on the protocol version. See
+    {!prevalidator_worker_event_section} regarding the section
+    names. *)
+let prevalidator_debug protocol =
+  if Protocol.number protocol <= 014 (* Kathmandu *) then
+    [("prevalidator", `Debug); ("legacy_prevalidator", `Debug)]
+  else [("prevalidator", `Debug)]
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1657
 
    Some refactorisation is needed. All new tests should be in the Revamped
@@ -78,7 +102,9 @@ module Revamped = struct
   let set_filter ?(log = false) config_str client =
     let* res =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_filter ~data:(Ezjsonm.from_string config_str) ()
+      @@ RPC.post_chain_mempool_filter
+           ~data:(Data (Ezjsonm.from_string config_str))
+           ()
     in
     if log then Log.info "Updated filter config with: %s." config_str ;
     return res
@@ -163,7 +189,7 @@ module Revamped = struct
         (fun i ->
           let alias = Account.Bootstrap.alias i in
           let* key = Client.gen_and_show_keys ~alias client in
-          return (key, None))
+          return (key, None, true))
         (range
            (1 + bootstrap_accounts)
            (bootstrap_accounts + nb_additional_bootstrap_accounts))
@@ -181,7 +207,7 @@ module Revamped = struct
     log_step 2 "Inject %d transfer operations." number_of_operations ;
     let* _ =
       Tezos_base__TzPervasives.List.iter_s
-        (fun ((key : Account.key), _) ->
+        (fun ((key : Account.key), _, _) ->
           Client.transfer
             ~amount:(Tez.of_int 1)
             ~giver:key.alias
@@ -258,7 +284,7 @@ module Revamped = struct
     log_step 1 "Connect and initialise two nodes." ;
     let* node1 =
       Node.init
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         [Synchronisation_threshold 0; Private_mode]
     and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -462,7 +488,7 @@ module Revamped = struct
     log_step 6 "Ban the operation %s." oph1 ;
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step 7 "Check that the node's mempool contains %s as applied." oph2 ;
@@ -577,7 +603,7 @@ module Revamped = struct
     in
     let* node3, client3 =
       Client.init_with_protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
@@ -803,9 +829,11 @@ module Revamped = struct
        the [force] argument of [inject] defaults to [false] so the faulty \
        injected operation is discarded." ;
     let error =
-      rex
-        ~opts:[`Dotall]
-        "Only one manager operation per manager per block allowed"
+      if Protocol.number protocol <= 014 (* Kathmandu *) then
+        rex "Only one manager operation per manager per block allowed"
+      else
+        rex
+          {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
     in
     let* (`OpHash _) =
       Operation.Manager.(
@@ -853,98 +881,6 @@ module Revamped = struct
       ~branch_delayed:[oph1bis]
       ~outdated:[oph2]
       client
-
-  (** This test checks that an operation with a wrong signature that is
-      initially branch_delayed (1 M) will be correctly
-      reclassifed after the ban of the two successive applied operations from
-      the same manager, followed by a flush. *)
-  let wrong_signed_branch_delayed_becomes_refused =
-    Protocol.register_test
-      ~__FILE__
-      ~supports:
-        (Protocol.Until_protocol
-           14
-           (* Since protocol 15, the 1M restriction check is done
-              after the validation of the op (which includes the
-              signature checks) *))
-      ~title:"Reclassify branch_delayed operation with wrong signature"
-      ~tags:["mempool"; "wrong"; "signature"]
-    @@ fun protocol ->
-    log_step 1 "Initialize a node and a client." ;
-    let* _node, client =
-      Client.init_with_protocol
-        ~nodes_args:[Synchronisation_threshold 0]
-        ~protocol
-        `Client
-        ()
-    in
-
-    log_step 2 "Inject a transfer with a correct counter." ;
-    let* (`OpHash oph1) =
-      Operation.Manager.(inject [make ~fee:1_000 @@ transfer ()] client)
-    in
-
-    log_step
-      3
-      "Inject a second transfer with a correct counter with lower fee than the \
-       previous operation to avoid replacing it and be rejected with the 1M \
-       restriction." ;
-    let* (`OpHash oph2) =
-      Operation.Manager.(
-        inject ~force:true [make ~fee:999 @@ transfer ()] client)
-    in
-
-    log_step
-      4
-      "Inject a transfer with a correct counter, but with less fees and \
-       ill-signed." ;
-    let* (`OpHash oph3) =
-      Operation.Manager.(
-        inject
-          ~force:true
-          ~signer:Constant.bootstrap2
-          [make ~fee:998 @@ transfer ()]
-          client)
-    in
-
-    log_step
-      5
-      "Check that the mempool contains %s as applied and %s + %s as \
-       branch_delayed."
-      oph1
-      oph2
-      oph3 ;
-    let* () =
-      check_mempool ~applied:[oph1] ~branch_delayed:[oph2; oph3] client
-    in
-
-    log_step 6 "Ban the operation %s." oph1 ;
-    let* _ =
-      RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
-    in
-
-    log_step
-      7
-      "Check that the mempool contains %s as applied and %s as branch_delayed."
-      oph2
-      oph3 ;
-    let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph3] client in
-
-    log_step 8 "Ban the operation %s." oph2 ;
-    let* _ =
-      RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
-    in
-
-    log_step
-      9
-      "Check that the mempool contains %s as refused and that %s + %s are not \
-       in the mempool anymore."
-      oph3
-      oph2
-      oph1 ;
-    check_mempool ~refused:[oph3] client
 
   (** This test checks that an operation applied is not reclassified and stays
       applied after the ban of a branch_delayed operation. *)
@@ -1007,7 +943,7 @@ module Revamped = struct
     in
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step
@@ -1022,7 +958,7 @@ module Revamped = struct
     Check.(
       (!to_reclassified = false)
         bool
-        ~error_msg:"a flush have been triggered after the ban") ;
+        ~error_msg:"A flush has been triggered after the ban.") ;
     unit
 
   (* This test checks that on a ban of an applied operation the flush respect
@@ -1036,7 +972,7 @@ module Revamped = struct
     log_step 1 "Initialize a node and a client." ;
     let* node, client =
       Client.init_with_protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
@@ -1089,7 +1025,7 @@ module Revamped = struct
     log_step 5 "Ban the operation %s." oph1 ;
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step
@@ -1375,7 +1311,7 @@ module Revamped = struct
     in
     let* node2, client2 =
       Client.init_with_node
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         ~nodes_args:[Synchronisation_threshold 0; Connections 2]
         `Client
         ()
@@ -1409,7 +1345,7 @@ module Revamped = struct
     log_step 3 "Ban %s on node 2." oph1 ;
     let* _ =
       RPC.Client.call client2
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~applied:[oph2] client2 in
 
@@ -1420,7 +1356,7 @@ module Revamped = struct
     log_step 5 "Add node3 connected only to node2." ;
     let* node3, client3 =
       Client.init_with_node
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
@@ -1487,11 +1423,11 @@ module Revamped = struct
     (* We ban twice to check banning an operation is idempotent. *)
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~applied:[oph2] client1 in
 
@@ -1502,11 +1438,11 @@ module Revamped = struct
     log_step 5 "Ban op2 and op1 again." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~applied:[oph3] client1 in
 
@@ -1521,7 +1457,7 @@ module Revamped = struct
     log_step 7 "Unban op1, successfully reinject op1." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ = inject_op ~wait:true `A in
     let* () = check_mempool ~applied:[oph3; oph1] client1 in
@@ -1536,7 +1472,7 @@ module Revamped = struct
     log_step 9 "Unban op2, successfully reinject op2." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
 
     let* _ = inject_op ~wait:true `B in
@@ -1545,7 +1481,7 @@ module Revamped = struct
     log_step 10 "Ban op1 again, check that reinjecting it fails." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     let wait_reinject_op1_banned_again =
@@ -1558,11 +1494,11 @@ module Revamped = struct
     log_step 11 "Try unban op3 and op2 check that nothing changes." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph3) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph3)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
     check_mempool ~applied:[oph3; oph2] client1
 
@@ -1578,14 +1514,14 @@ module Revamped = struct
     log_step 1 "Start two nodes, connect them, activate the protocol." ;
     let* node1, client1 =
       Client.init_with_node
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
     in
     let* node2, client2 =
       Client.init_with_node
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
@@ -1621,15 +1557,15 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph3) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph3)) ()
     in
     let* () = check_mempool ~applied:[oph4] client1 in
 
@@ -1663,7 +1599,7 @@ module Revamped = struct
     let gas_limit = 1500 in
     let* node1 =
       Node.init
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         [Synchronisation_threshold 0; Private_mode]
     and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -1845,7 +1781,7 @@ module Revamped = struct
     let gas_limit = 1500 in
     let* node1 =
       Node.init
-        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~event_sections_levels:(prevalidator_debug protocol)
         [Synchronisation_threshold 0; Private_mode]
     and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -2089,6 +2025,96 @@ module Revamped = struct
         ~error_msg:"The [applied] batch has a wrong number of manager payloads.") ;
     Log.info "The [applied] batch as the correct number of manager payloads." ;
     unit
+
+  (** Runs a network of three nodes, one of which has a disabled mempool.
+      Check that operations do not propagate to the node with disable mempool and
+      that this node does not run a prevalidator nor accepts operation injections. *)
+  let mempool_disabled =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Mempool disabled"
+      ~tags:["mempool"; "disabled"; "injection"]
+    @@ fun protocol ->
+    log_step
+      1
+      "Initialize three nodes and connect them. The mempool of the third node \
+       is disabled." ;
+    let* node1, client1 =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+    let* node2, client2 =
+      Client.init_with_node ~nodes_args:[Synchronisation_threshold 0] `Client ()
+    in
+    let* node3, client3 =
+      Client.init_with_node
+        ~nodes_args:[Synchronisation_threshold 0; Disable_mempool]
+        `Client
+        ()
+    in
+    (* Connect nodes and wait for them to synchronize on node1's level. *)
+    let* () = Client.Admin.connect_address ~peer:node2 client1 in
+    let* () = Client.Admin.connect_address ~peer:node3 client1 in
+    let* () = Client.Admin.connect_address ~peer:node3 client2 in
+    let lvl1 = Node.get_level node1 in
+    let* (_ : int) = Node.wait_for_level node2 lvl1
+    and* (_ : int) = Node.wait_for_level node3 lvl1 in
+    log_step
+      2
+      "Verify that prevalidators are running on node1 and node2, but not on \
+       node3." ;
+    let get_prevalidators client =
+      let* prevalidators =
+        RPC.Client.call client @@ RPC.get_workers_prevalidators
+      in
+      return JSON.(as_list prevalidators)
+    in
+    let* prevalidators1 = get_prevalidators client1 in
+    Check.(
+      (prevalidators1 <> [])
+        (list json)
+        ~__LOC__
+        ~error_msg:"Expected node1 to have running prevalidators") ;
+    let* prevalidators2 = get_prevalidators client2 in
+    Check.(
+      (prevalidators2 <> [])
+        (list json)
+        ~__LOC__
+        ~error_msg:"Expected node2 to have running prevalidators") ;
+    let* prevalidators3 = get_prevalidators client3 in
+    Check.(
+      (prevalidators3 = [])
+        (list json)
+        ~__LOC__
+        ~error_msg:"Did not expected node3 to have running prevalidators") ;
+    log_step 3 "Forge and inject an operation on node1." ;
+    let* (`OpHash oph1) =
+      Operation.Manager.(inject [make (transfer ())]) client1
+    in
+    log_step
+      4
+      "Ensure that the operation is applied on first two nodes, but not on the \
+       third." ;
+    let* () = check_mempool ~applied:[oph1] client1 in
+    let* () = check_mempool ~applied:[oph1] client2 in
+    let* () = check_mempool ~applied:[] client3 in
+    log_step
+      5
+      "Check that injecting an operation into the node with disabled mempool \
+       fails." ;
+    let* (`OpHash _oph2) =
+      let error =
+        rex "Prevalidator is not running, cannot inject the operation."
+      in
+      let source = Constant.bootstrap2 in
+      let dest = Constant.bootstrap3 in
+      Operation.Manager.(inject ~error [make ~source (transfer ~dest ())])
+        client3
+    in
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -2243,14 +2269,15 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
   let* op_hex =
     RPC.Client.call client
     @@ RPC.post_chain_block_helpers_forge_operations
-         ~data:(Ezjsonm.from_string op_json_branch)
+         ~data:(Data (Ezjsonm.from_string op_json_branch))
          ()
   in
   return (`Hex (JSON.as_string op_hex))
 
 let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  RPC.Client.call client @@ RPC.post_injection_operation (`String signed_op)
+  RPC.Client.call client
+  @@ RPC.post_injection_operation (Data (`String signed_op))
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client =
@@ -2446,11 +2473,11 @@ let propagation_future_endorsement =
   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
   and* node_2 =
     Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
       [Synchronisation_threshold 0; Private_mode]
   and* node_3 =
     Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
       [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
@@ -2483,14 +2510,14 @@ let propagation_future_endorsement =
   Log.info "%s" step5_msg ;
   let* _ =
     RPC.Client.call client_1
-    @@ RPC.post_chain_mempool_ban_operation ~data:(`String hash) ()
+    @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String hash)) ()
   in
   Log.info "%s" step6_msg ;
   let (`Hex bytes) = Hex.of_bytes bytes in
   let injection_waiter = wait_for_injection node_2 in
   let* _ =
     RPC.Client.call client_2
-    @@ RPC.post_private_injection_operation (`String bytes)
+    @@ RPC.post_private_injection_operation (Data (`String bytes))
   in
   let* () = injection_waiter in
   Log.info "%s" step7_msg ;
@@ -2667,7 +2694,7 @@ let refetch_failed_operation =
     Node.init
     (* Run the node with the new config.
        event_level is set to debug to catch fetching event at this level *)
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
         (* Set a low operations_request_timeout to force timeout at fetching *)
       ~patch_config:(set_config_operations_timeout 0.00001)
       [Synchronisation_threshold 0; Private_mode]
@@ -2858,7 +2885,7 @@ let ban_operation_and_check_applied =
   Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
   let* node_1 =
     Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
         (* to witness operation arrival events *)
       [Synchronisation_threshold 0; Connections 1]
   and* node_2 = Node.init [Synchronisation_threshold 0; Connections 1] in
@@ -2926,7 +2953,7 @@ let ban_operation_and_check_applied =
   Log.info "Operation to ban: %s" oph_to_ban ;
   let* _ =
     RPC.Client.call client_1
-    @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph_to_ban) ()
+    @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph_to_ban)) ()
   in
   Log.info "Operation %s is now banned." oph_to_ban ;
   Log.info "Step 4: Check that applied operations in node_1 are still applied." ;
@@ -2982,9 +3009,8 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
     RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   let open JSON in
-  (* get (and log) applied operations *)
-  let applied_ophs =
-    let classification = "applied" in
+  (* get (and log) applied and refused operations *)
+  let get_ophs_and_log_fees classification =
     List.map
       (fun op ->
         let oph = get_hash op in
@@ -2992,32 +3018,17 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
         oph)
       (ops |-> classification |> as_list)
   in
-  (* get (and log) refused operations *)
-  let refused_ophs =
-    let classification = "refused" in
-    List.map
-      (fun op ->
-        match op |> as_list with
-        | [oph; descr] ->
-            let oph = as_string oph in
-            log_op
-              classification
-              oph
-              (descr |-> "contents" |=> 0 |-> "fee" |> as_int) ;
-            oph
-        | _ ->
-            Test.fail
-              "Unexpected JSON structure for refused operation in %s's mempool."
-              name)
-      (ops |-> classification |> as_list)
-  in
+  let applied_ophs = get_ophs_and_log_fees "applied" in
+  let refused_ophs = get_ophs_and_log_fees "refused" in
   (* various checks about applied and refused operations *)
   Check.(
-    (List.compare_length_with applied_ophs applied = 0)
+    (* Not using [List.compare_length_with] allows for a more informative
+       error message. The lists are expected to be short anyway. *)
+    (List.length applied_ophs = applied)
       int
       ~error_msg:(name ^ ": found %L applied operation(s), expected %R.")) ;
   Check.(
-    (List.compare_length_with refused_ophs refused = 0)
+    (List.length refused_ophs = refused)
       int
       ~error_msg:(name ^ ": found %L refused operation(s), expected %R.")) ;
   List.iter
@@ -3041,8 +3052,13 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
 
 (** Waits for [node] to receive a notification from a peer of a mempool
     containing exactly [n_ops] valid operations. *)
-let wait_for_notify_n_valid_ops node n_ops =
-  Node.wait_for node "request_no_errors_prevalidator.v0" (fun event ->
+let wait_for_notify_n_valid_ops proto node n_ops =
+  let name =
+    Format.sprintf
+      "request_no_errors_%s.v0"
+      (prevalidator_worker_event_section proto)
+  in
+  Node.wait_for node name (fun event ->
       let open JSON in
       let view = event |-> "view" in
       match view |-> "request" |> as_string_opt with
@@ -3114,7 +3130,7 @@ let test_do_not_reclassify =
     "Step 1: Start two nodes, connect them, and activate the protocol." ;
   let* node1 =
     Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
       [Synchronisation_threshold 0; Connections 1]
   and* node2 = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
@@ -3177,7 +3193,9 @@ let test_do_not_reclassify =
      so it must not be revalidated." ;
   let* _ = set_filter_no_fee_requirement client1 in
   let* () = inject_transfer Constant.bootstrap3 ~fee:5 in
-  let waiter_notify_3_valid_ops = wait_for_notify_n_valid_ops node1 3 in
+  let waiter_notify_3_valid_ops =
+    wait_for_notify_n_valid_ops protocol node1 3
+  in
   let* () =
     bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
@@ -3233,7 +3251,7 @@ let test_pending_operation_version =
   (* Initialise one node *)
   let* node_1 =
     Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
       [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) () in
@@ -3262,11 +3280,11 @@ let test_pending_operation_version =
   (* Step 4 *)
   (* Get pending operations using different version of the RPC and check  *)
   let* mempool_v0 =
-    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client_1
+    @@ RPC.get_chain_mempool_pending_operations ~version:"0" ()
   in
   let* mempool_v1 =
-    RPC.Client.call client_1
-    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
   in
   let ophs_refused_v0 = get_refused_operation_hash_list_v0 mempool_v0 in
   let ophs_refused_v1 = get_refused_operation_hash_list_v1 mempool_v1 in
@@ -3321,7 +3339,7 @@ let force_operation_injection =
     ~tags:["force"; "mempool"]
   @@ fun protocol ->
   Log.info "%s" step1_msg ;
-  let node1 = Node.create [] in
+  let node1 = Node.create ~allow_all_rpc:false [] in
   let* () = Node.config_init node1 [] in
   let address =
     Node.rpc_host node1 ^ ":" ^ string_of_int (Node.rpc_port node1)
@@ -3385,7 +3403,8 @@ let force_operation_injection =
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
   let*? p =
-    RPC.Client.spawn client1 @@ RPC.post_injection_operation (`String signed_op)
+    RPC.Client.spawn client1
+    @@ RPC.post_injection_operation (Data (`String signed_op))
   in
   let injection_error_rex =
     rex
@@ -3396,7 +3415,7 @@ let force_operation_injection =
   Log.info "%s" step6_msg ;
   let*? p =
     RPC.Client.spawn client1
-    @@ RPC.post_private_injection_operation (`String signed_op)
+    @@ RPC.post_private_injection_operation (Data (`String signed_op))
   in
   let access_error_rex =
     rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
@@ -3404,13 +3423,14 @@ let force_operation_injection =
   let* () = Process.check_error ~msg:access_error_rex p in
   Log.info "%s" step7_msg ;
   let*? p =
-    RPC.Client.spawn client2 @@ RPC.post_injection_operation (`String signed_op)
+    RPC.Client.spawn client2
+    @@ RPC.post_injection_operation (Data (`String signed_op))
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step8_msg ;
   let* _ =
     RPC.Client.call client2
-    @@ RPC.post_private_injection_operation (`String signed_op)
+    @@ RPC.post_private_injection_operation (Data (`String signed_op))
   in
   unit
 
@@ -3476,7 +3496,7 @@ let injecting_old_operation_fails =
   log_step 5 step5 ;
   let*? process =
     RPC.Client.spawn client
-    @@ RPC.post_injection_operation (`String (op_str_hex ^ signature))
+    @@ RPC.post_injection_operation (Data (`String (op_str_hex ^ signature)))
   in
   let injection_error_rex =
     rex
@@ -3723,7 +3743,7 @@ let test_get_post_mempool_filter =
     (* We need event level [debug] for event
        [invalid_mempool_filter_configuration]. *)
     init_single_node_and_activate_protocol
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
       protocol
   in
   log_step 2 step2_msg ;
@@ -3975,7 +3995,7 @@ let test_mempool_filter_operation_arrival =
   let* node1, client1, node2, client2 =
     init_two_connected_nodes_and_activate_protocol
     (* Need event level [debug] to receive operation arrival events in [node1]. *)
-      ~event_sections_levels1:[("prevalidator", `Debug)]
+      ~event_sections_levels1:(prevalidator_debug protocol)
       protocol
   in
   log_step 2 step2 ;
@@ -4056,7 +4076,7 @@ let test_request_operations_peer =
   Log.info "%s" step1_msg ;
   let init_node () =
     Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~event_sections_levels:(prevalidator_debug protocol)
       [Synchronisation_threshold 0; Private_mode]
   in
   let* node_1 = init_node () and* node_2 = init_node () in
@@ -4119,10 +4139,10 @@ let register ~protocols =
   Revamped.unban_all_operations protocols ;
   Revamped.test_prefiltered_limit protocols ;
   Revamped.test_prefiltered_limit_remove protocols ;
-  Revamped.wrong_signed_branch_delayed_becomes_refused protocols ;
   Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
+  Revamped.mempool_disabled protocols ;
   propagation_future_endorsement protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;

@@ -103,7 +103,7 @@ let () =
 
 let () =
   if Filename.basename Sys.argv.(0) = "octez-validator" then
-    Octez_validator.Command_line.run ()
+    Tezos_validation.Command_line.run ()
 
 let term =
   let open Cmdliner.Term in
@@ -116,7 +116,7 @@ let description =
     `P Node_identity_command.Manpage.command_description;
     `P Node_run_command.Manpage.command_description;
     `P Node_replay_command.Manpage.command_description;
-    `P Node_config_command.Manpage.command_description;
+    `P Config_command.Manpage.command_description;
     `P Node_upgrade_command.Manpage.command_description;
     `P Node_snapshot_command.Manpage.command_description;
     `P Node_reconstruct_command.Manpage.command_description;
@@ -204,7 +204,7 @@ let commands =
     [
       Node_run_command.cmd;
       Node_replay_command.cmd;
-      Node_config_command.cmd;
+      Config_command.cmd;
       Node_identity_command.cmd;
       Node_upgrade_command.cmd;
       Node_snapshot_command.cmd;

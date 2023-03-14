@@ -78,10 +78,10 @@ let () =
 module S = struct
   open Data_encoding
 
-  let path = RPC_path.(root / "injection")
+  let path = Tezos_rpc.Path.(root / "injection")
 
   let block_query =
-    let open RPC_query in
+    let open Tezos_rpc.Query in
     query (fun async force chain ->
         object
           method async = async
@@ -103,7 +103,7 @@ module S = struct
          (list (dynamic_size (list (dynamic_size Operation.encoding)))))
 
   let block =
-    RPC_service.post_service
+    Tezos_rpc.Service.post_service
       ~description:
         "Inject a block in the node and broadcast it. The `operations` \
          embedded in `blockHeader` might be pre-validated using a contextual \
@@ -118,10 +118,10 @@ module S = struct
       ~query:block_query
       ~input:block_param
       ~output:Block_hash.encoding
-      RPC_path.(path / "block")
+      Tezos_rpc.Path.(path / "block")
 
   let operation_query =
-    let open RPC_query in
+    let open Tezos_rpc.Query in
     query (fun async chain ->
         object
           method async = async
@@ -133,7 +133,7 @@ module S = struct
     |> seal
 
   let operations_query =
-    let open RPC_query in
+    let open Tezos_rpc.Query in
     query (fun async force chain ->
         object
           method async = async
@@ -153,7 +153,7 @@ module S = struct
      test or internal use only. The [private/] prefix is used to forbid the use
      of such RPC on a public node *)
   let operation ~private_ =
-    RPC_service.post_service
+    Tezos_rpc.Service.post_service
       ~description:
         "Inject an operation in node and broadcast it. Returns the ID of the \
          operation. The `signedOperationContents` should be constructed using \
@@ -168,11 +168,12 @@ module S = struct
       ~query:operation_query
       ~input:bytes
       ~output:Operation_hash.encoding
-      (if private_ then RPC_path.(root / "private" / "injection" / "operation")
-      else RPC_path.(path / "operation"))
+      (if private_ then
+       Tezos_rpc.Path.(root / "private" / "injection" / "operation")
+      else Tezos_rpc.Path.(path / "operation"))
 
   let private_operations =
-    RPC_service.post_service
+    Tezos_rpc.Service.post_service
       ~description:
         "Inject a list of operations in a node. If [force] is [true] then the \
          operations are immediatly injected. The injection will succeed, but \
@@ -192,14 +193,14 @@ module S = struct
       ~query:operations_query
       ~input:(list (dynamic_size bytes))
       ~output:(list Operation_hash.encoding)
-      RPC_path.(root / "private" / "injection" / "operations")
+      Tezos_rpc.Path.(root / "private" / "injection" / "operations")
 
   let private_operation = operation ~private_:true
 
   let operation = operation ~private_:false
 
   let protocol_query =
-    let open RPC_query in
+    let open Tezos_rpc.Query in
     query (fun async ->
         object
           method async = async
@@ -208,7 +209,7 @@ module S = struct
     |> seal
 
   let protocol =
-    RPC_service.post_service
+    Tezos_rpc.Service.post_service
       ~description:
         "Inject a protocol in node. Returns the ID of the protocol. If ?async \
          is true, the function returns immediately. Otherwise, the protocol \
@@ -216,10 +217,10 @@ module S = struct
       ~query:protocol_query
       ~input:Protocol.encoding
       ~output:Protocol_hash.encoding
-      RPC_path.(path / "protocol")
+      Tezos_rpc.Path.(path / "protocol")
 end
 
-open RPC_context
+open Tezos_rpc.Context
 
 let block ctxt ?(async = false) ?(force = false) ?chain raw operations =
   make_call

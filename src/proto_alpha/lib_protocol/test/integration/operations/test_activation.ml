@@ -87,7 +87,9 @@ let secrets () =
         let sk = Bytes.sub sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519
-            (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
+            (Data_encoding.Binary.of_bytes_exn
+               Signature.Ed25519.Secret_key.encoding
+               sk)
         in
         let pk = Signature.Secret_key.to_public_key sk in
         let pkh = Signature.Public_key.hash pk in
@@ -343,7 +345,7 @@ let activation_init () =
     baked. *)
 let test_simple_init_with_commitments () =
   activation_init () >>=? fun (blk, _contract, _secrets) ->
-  Block.bake blk >>=? fun _ -> return_unit
+  Block.bake blk >>=? fun (_ : Block.t) -> return_unit
 
 (** A single activation *)
 let test_single_activation () =
@@ -378,7 +380,7 @@ let test_multi_activation_1 () =
       >|=? fun () -> blk)
     blk
     secrets
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Block.t) -> return_unit
 
 (** All of the 10 activations occur in one bake. *)
 let test_multi_activation_2 () =

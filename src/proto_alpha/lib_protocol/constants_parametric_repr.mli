@@ -28,8 +28,9 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  endorsement_lag : int;
-  availability_threshold : int;
+  attestation_lag : int;
+  attestation_threshold : int;
+  blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
 
@@ -86,9 +87,9 @@ type tx_rollup = {
 
 type sc_rollup = {
   enable : bool;
+  arith_pvm_enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
-  max_number_of_messages_per_commitment_period : int;
   stake_amount : Tez_repr.t;
   (* The period with which commitments are made. *)
   commitment_period_in_blocks : int;
@@ -121,6 +122,8 @@ type sc_rollup = {
   timeout_period_in_blocks : int;
   (* The maximum number of cemented commitments stored for a sc rollup. *)
   max_number_of_stored_cemented_commitments : int;
+  (* The maximum number of parallel games played by a given staker. *)
+  max_number_of_parallel_games : int;
 }
 
 type zk_rollup = {

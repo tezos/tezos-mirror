@@ -1,0 +1,28 @@
+# Contract for sending tickets from storage. Has two entrypoints:
+# - Mint: creates two new tickets and saves them in the storage
+# - Send: takes a contract and sends all stored tickets to it
+{ parameter (or (unit %mint) (contract %send (list (ticket string)))) ;
+  storage (list (ticket string)) ;
+  code { UNPAIR ;
+         IF_LEFT
+           { DROP ;
+             PUSH nat 1 ;
+             PUSH string "Ticket" ;
+             TICKET ;
+             ASSERT_SOME ;
+             CONS ;
+             PUSH nat 1 ;
+             PUSH string "Ticket2" ;
+             TICKET ;
+             ASSERT_SOME ;
+             CONS ;
+             NIL operation ;
+             PAIR }
+           { PUSH mutez 0 ;
+             DIG 2 ;
+             TRANSFER_TOKENS ;
+             NIL (ticket string) ;
+             NIL operation ;
+             DIG 2 ;
+             CONS ;
+             PAIR } } }

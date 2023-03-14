@@ -8,7 +8,7 @@ There is pretty comprehensive documentation about ``Inline expectation tests`` a
  - `Dune documentation about inline expectation tests <https://dune.readthedocs.io/en/stable/tests.html#inline-expectation-tests>`_.
  - `Ppx_expect README <https://github.com/janestreet/ppx_expect>`_.
 
-Here, we will just cover enough to get started using them inside the Tezos codebase.
+Here, we will just cover enough to get started using them inside the Octez codebase.
 
 How to run tests
 ----------------
@@ -148,5 +148,5 @@ Integration with Lwt
 
 Ppx_expect can be used in combination with Lwt, see the
 `README <https://github.com/janestreet/ppx_expect/blob/master/README.org#lwt>`_.
-This integration has not been tested on the Tezos codebase yet, hence some work will be
+This integration has not been tested on the Octez codebase yet, hence some work will be
 needed to a have specific support for the codebase.

@@ -25,9 +25,9 @@
 
 type t = {
   peer_id : P2p_peer.Id.t;
-  public_key : Crypto_box.public_key;
-  secret_key : Crypto_box.secret_key;
-  proof_of_work_stamp : Crypto_box.nonce;
+  public_key : Tezos_crypto.Crypto_box.public_key;
+  secret_key : Tezos_crypto.Crypto_box.secret_key;
+  proof_of_work_stamp : Tezos_crypto.Crypto_box.nonce;
 }
 
 let encoding =
@@ -49,15 +49,21 @@ let encoding =
          {peer_id; public_key; secret_key; proof_of_work_stamp})
        (obj4
           (opt "peer_id" P2p_peer_id.encoding)
-          (req "public_key" Crypto_box.public_key_encoding)
-          (req "secret_key" Crypto_box.secret_key_encoding)
-          (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
+          (req "public_key" Tezos_crypto.Crypto_box.public_key_encoding)
+          (req "secret_key" Tezos_crypto.Crypto_box.secret_key_encoding)
+          (req "proof_of_work_stamp" Tezos_crypto.Crypto_box.nonce_encoding))
 
 let generate_with_bound ?yield_every ?max pow_target =
   let open Error_monad.Lwt_syntax in
-  let secret_key, public_key, peer_id = Crypto_box.random_keypair () in
+  let secret_key, public_key, peer_id =
+    Tezos_crypto.Crypto_box.random_keypair ()
+  in
   let+ proof_of_work_stamp =
-    Crypto_box.generate_proof_of_work ?yield_every ?max public_key pow_target
+    Tezos_crypto.Crypto_box.generate_proof_of_work
+      ?yield_every
+      ?max
+      public_key
+      pow_target
   in
   {peer_id; public_key; secret_key; proof_of_work_stamp}
 
@@ -65,9 +71,11 @@ let generate ?yield_every pow_target =
   generate_with_bound ?yield_every pow_target
 
 let generate_with_pow_target_0 () =
-  let secret_key, public_key, peer_id = Crypto_box.random_keypair () in
+  let secret_key, public_key, peer_id =
+    Tezos_crypto.Crypto_box.random_keypair ()
+  in
   let proof_of_work_stamp =
-    Crypto_box.generate_proof_of_work_with_target_0 public_key
+    Tezos_crypto.Crypto_box.generate_proof_of_work_with_target_0 public_key
   in
   {peer_id; public_key; secret_key; proof_of_work_stamp}
 

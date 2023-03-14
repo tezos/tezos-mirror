@@ -503,7 +503,13 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
       match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
     in
     Filename.Infix.(
-      dir // Format.asprintf "%s_%s_%s.pdf" Bench.name model_name kind)
+      dir
+      // Format.asprintf
+           "%a_%s_%s.pdf"
+           Namespace.pp_short
+           Bench.name
+           model_name
+           kind)
   in
   let workload_data =
     List.map

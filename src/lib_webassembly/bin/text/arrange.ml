@@ -57,16 +57,18 @@ let list f xs = List.map f xs
 let opt f xo = list f (list_of_opt xo)
 
 let lazy_vector f map =
-  List.map (fun (_, v) -> f v) (Lazy_vector.Int32Vector.loaded_bindings map)
+  List.filter_map
+    (fun (_, v) -> Option.map f v)
+    (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let lazy_vectori f map =
-  List.map
-    (fun (i32, v) -> f (Int32.to_int i32) v)
+  List.filter_map
+    (function i32, Some v -> Some (f (Int32.to_int i32) v) | _ -> None)
     (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let lazy_vectori_lwt f map =
-  TzStdLib.List.map_s
-    (fun (i32, v) -> f (Int32.to_int i32) v)
+  TzStdLib.List.filter_map_s
+    (fun (i32, v) -> TzStdLib.Option.map_s (f (Int32.to_int i32)) v)
     (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let tab head f xs = if xs = [] then [] else [Node (head, list f xs)]
@@ -749,6 +751,7 @@ let definition mode x_opt def =
             | Textual m -> Lwt.return m
             | Encoded (_, bytes) ->
                 Decode.decode
+                  ~allow_floats:true
                   ~name:""
                   ~bytes:(Chunked_byte_vector.of_string bytes)
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
@@ -762,6 +765,7 @@ let definition mode x_opt def =
             | Encoded (_, bytes) ->
                 let* m =
                   Decode.decode
+                    ~allow_floats:true
                     ~name:""
                     ~bytes:(Chunked_byte_vector.of_string bytes)
                 in

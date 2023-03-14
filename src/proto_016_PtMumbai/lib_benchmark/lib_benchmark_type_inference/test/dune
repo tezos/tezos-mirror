@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_uf test_inference)
+ (libraries
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark-type-inference-016-PtMumbai
+  tezos-protocol-016-PtMumbai
+  tezos-error-monad
+  tezos-client-016-PtMumbai)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_micheline
+  -open Tezos_benchmark_type_inference_016_PtMumbai))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-type-inference-016-PtMumbai)
+ (action (run %{dep:./test_uf.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-type-inference-016-PtMumbai)
+ (action (run %{dep:./test_inference.exe})))

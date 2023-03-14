@@ -62,7 +62,14 @@ module Memory_table (P : PARAMETERS) :
   module Htbl = Hashtbl.MakeSeeded (struct
     type t = P.key
 
+    (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+    [@@@ocaml.warning "-32"]
+
     let hash = Hashtbl.seeded_hash
+
+    let seeded_hash = Hashtbl.seeded_hash
+
+    [@@@ocaml.warning "+32"]
 
     let equal = ( = )
   end)

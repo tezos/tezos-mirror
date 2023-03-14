@@ -30,25 +30,6 @@
    Subject:      Check that annotations in contracts do not break cache consistency.
 *)
 
-let contract =
-  {|
-parameter (or (unit %renew) (unit %keep));
-storage (big_map (nat :a) string);
-code {
-       UNPAIR;
-       IF_LEFT
-         {
-           DROP 2;
-           EMPTY_BIG_MAP nat string;
-         }
-         {
-           DROP;
-         };
-       NIL operation;
-       PAIR
-     }
-|}
-
 let register =
   Protocol.register_test
     ~__FILE__
@@ -58,15 +39,15 @@ let register =
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
-  let* contract_hash =
-    Client.originate_contract
+  let* _alias, contract_hash =
+    Client.originate_contract_at
       ~init:"{}"
-      ~alias:"supercontrat"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:contract
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "cache_consistency"]
+      protocol
   in
   let* () = wait_injection in
   (* We use [context_path] to ensure the baker will not use the

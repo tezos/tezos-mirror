@@ -25,52 +25,20 @@
 
 open Tezos_shell_services
 
-let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
-    (proto_hash : Protocol_hash.t) (chain : Block_services.chain)
-    (block : Block_services.block) : unit tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* {current_protocol; _} =
-    Block_services.protocols rpc_context ~chain ~block ()
-  in
-  if Protocol_hash.equal current_protocol proto_hash then return_unit
-  else
-    failwith
-      "Protocol passed to the proxy (%a) and protocol of the node (%a) differ."
-      Protocol_hash.pp
-      proto_hash
-      Protocol_hash.pp
-      current_protocol
-
-let get_node_protocol (rpc_context : #RPC_context.simple)
-    (chain : Block_services.chain) (block : Block_services.block) :
-    Protocol_hash.t tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* {current_protocol; _} =
-    Block_services.protocols rpc_context ~chain ~block ()
-  in
-  return current_protocol
-
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
 
   (** RPCs provided by the protocol *)
-  val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
-
-  (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
-  val hash :
-    #RPC_context.simple ->
-    ?chain:Block_services.chain ->
-    ?block:Block_services.block ->
-    unit ->
-    Block_hash.t tzresult Lwt.t
+  val directory : Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.t
 
   (** How to build the context to execute RPCs on *)
-  val init_env_rpc_context :
+  val initial_context :
     Proxy_getter.rpc_context_args ->
-    Tezos_protocol_environment.rpc_context tzresult Lwt.t
+    Context_hash.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   val time_between_blocks :
-    RPC_context.generic ->
+    Tezos_rpc.Context.generic ->
     Block_services.chain ->
     Block_services.block ->
     int64 option tzresult Lwt.t
@@ -101,31 +69,8 @@ let register_proxy_context m =
 let get_all_registered () : proxy_environment list = !registered
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
-    ?(chain = `Main) ?(block = `Head 0)
-    (protocol_hash_opt : Protocol_hash.t option) :
-    proxy_environment tzresult Lwt.t =
+    (protocol_hash : Protocol_hash.t) : proxy_environment tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let mode_str =
-    match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
-  in
-  let* protocol_hash =
-    match protocol_hash_opt with
-    | None ->
-        let* protocol_hash = get_node_protocol rpc_context chain block in
-        let*! () =
-          printer#warning
-            "protocol of %s unspecified, using the node's protocol: %a"
-            mode_str
-            Protocol_hash.pp
-            protocol_hash
-        in
-        return protocol_hash
-    | Some protocol_hash -> return protocol_hash
-  in
-  let* () =
-    check_client_node_proto_agree rpc_context protocol_hash chain block
-  in
   let available = !registered in
   let proxy_opt =
     List.find_opt

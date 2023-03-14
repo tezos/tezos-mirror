@@ -8,12 +8,14 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
   "alcotest" { >= "1.5.0" }
   "alcotest-lwt" { >= "1.5.0" }
   "astring"
   "base-unix"
   "bigstring"
-  "bigstringaf" { >= "0.2.0" }
+  "bigstringaf" { >= "0.5.0" }
   "bisect_ppx" { >= "2.7.0" }
   "bls12-381" { >= "5.0.0" & < "5.1.0" }
   "bls12-381-signature" { = "1.0.0" }
@@ -23,17 +25,17 @@ depends: [
   "caqti-lwt"
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
-  "cohttp-lwt-unix" { >= "2.2.0" }
+  "cohttp-lwt-unix" { >= "4.0.0" }
   "conf-libev"
   "conf-rust"
   "ctypes" { >= "0.18.0" }
+  "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
-  "data-encoding" { >= "0.6" & < "0.7" }
-  "digestif" { >= "0.7.3" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "dune-configurator"
   "ezjsonm" { >= "1.1.0" }
   "fmt" { >= "0.8.7" }
-  "hacl-star" { >= "0.4.2" & < "0.5" }
+  "hacl-star" { >= "0.6.1" & < "0.7" }
   "hacl-star-raw"
   "hashcons"
   "hex" { >= "1.3.0" }
@@ -41,19 +43,17 @@ depends: [
   "integers"
   "integers_stubs_js"
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
-  "irmin" { >= "3.4.3" & < "3.5.0" }
-  "irmin-pack" { >= "3.4.3" & < "3.5.0" }
-  "js_of_ocaml" { >= "4.0.0" & < "5.0.0" }
-  "js_of_ocaml-lwt" { >= "4.0.0" & < "5.0.0" }
-  "json-data-encoding" { >= "0.11" & < "0.13" }
-  "ledgerwallet-tezos" { >= "0.2.1" }
+  "irmin" { >= "3.5.2" & < "3.6.0" }
+  "irmin-pack" { >= "3.5.2" & < "3.6.0" }
+  "json-data-encoding" { >= "0.12" & < "0.13" }
+  "ledgerwallet-tezos" { >= "0.3.0" }
   "logs"
   "lwt" { >= "5.6.0" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "lwt-watcher" { = "0.2" }
   "lwt_log"
-  "mtime" { >= "1.0.0" }
+  "mtime" { >= "1.4.0" & < "2.0.0" }
   "num"
   "ocaml-migrate-parsetree"
   "ocamlformat" { = "0.21.0" }
@@ -74,9 +74,9 @@ depends: [
   "ptime" { >= "1.0.0" }
   "pure-splitmix" { = "0.3" }
   "pyml"
-  "qcheck-alcotest" { >= "0.18" }
+  "qcheck-alcotest" { >= "0.20" }
   "qcheck-core"
-  "re" { >= "1.7.2" }
+  "re" { >= "1.9.0" }
   "resto" { >= "1.0" }
   "resto-acl" { >= "1.0" }
   "resto-cohttp" { >= "1.0" }
@@ -84,17 +84,17 @@ depends: [
   "resto-cohttp-self-serving-client" { >= "1.0" }
   "resto-cohttp-server" { >= "1.0" }
   "resto-directory" { >= "1.0" }
-  "ringo" { >= "0.9" & < "1.0.0" }
-  "ringo-lwt" { >= "0.9" }
-  "secp256k1-internal" { >= "0.3.0" }
+  "ringo" { >= "1.0.0" }
+  "secp256k1-internal" { >= "0.4.0" }
   "tar"
-  "tar-unix" { = "2.0.0" }
-  "tezos-bls12-381-polynomial" { >= "0.1.3" }
-  "tezos-plompiler" { >= "0.1.2" }
-  "tezos-plonk" { >= "0.1.2" }
-  "tezos-rust-libs" { = "1.1" }
-  "tls" { >= "0.10" }
-  "uri" { >= "2.2.0" }
+  "tar-unix" { >= "2.0.1" & < "3.0.0" }
+  "tezos-bls12-381-polynomial" { >= "1.0.1" & < "2.0.0" }
+  "tezos-plompiler" { >= "1.0.1" & < "2.0.0" }
+  "tezos-plonk" { >= "1.0.1" & < "2.0.0" }
+  "tezos-rust-libs" { = "1.5" }
+  "tezt" { >= "3.0.0" }
+  "tls-lwt" { >= "0.16.0" }
+  "uri" { >= "3.1.0" }
   "uutf"
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"

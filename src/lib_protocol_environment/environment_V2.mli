@@ -35,41 +35,44 @@ module type T = sig
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
-       and type Chain_id.t = Chain_id.t
-       and type Block_hash.t = Block_hash.t
-       and type Operation_hash.t = Operation_hash.t
-       and type Operation_list_hash.t = Operation_list_hash.t
-       and type Operation_list_list_hash.t = Operation_list_list_hash.t
+       and type Chain_id.t = Tezos_crypto.Hashed.Chain_id.t
+       and type Block_hash.t = Tezos_crypto.Hashed.Block_hash.t
+       and type Operation_hash.t = Tezos_crypto.Hashed.Operation_hash.t
+       and type Operation_list_hash.t =
+        Tezos_crypto.Hashed.Operation_list_hash.t
+       and type Operation_list_list_hash.t =
+        Tezos_crypto.Hashed.Operation_list_list_hash.t
        and type Context.t = Context.t
-       and type Context_hash.t = Context_hash.t
-       and type Protocol_hash.t = Protocol_hash.t
+       and type Context_hash.t = Tezos_crypto.Hashed.Context_hash.t
+       and type Protocol_hash.t = Tezos_crypto.Hashed.Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
        and type Block_header.t = Block_header.t
-       and type 'a RPC_directory.t = 'a RPC_directory.t
-       and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
-       and type Ed25519.Public_key.t = Ed25519.Public_key.t
-       and type Ed25519.t = Ed25519.t
-       and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
-       and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
-       and type Secp256k1.t = Secp256k1.t
-       and type P256.Public_key_hash.t = P256.Public_key_hash.t
-       and type P256.Public_key.t = P256.Public_key.t
-       and type P256.t = P256.t
-       and type Signature.public_key_hash = Signature.public_key_hash
-       and type Signature.public_key = Signature.public_key
-       and type Signature.t = Signature.t
-       and type Signature.watermark = Signature.watermark
+       and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
+       and type Ed25519.Public_key_hash.t = Signature.Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t = Signature.Ed25519.Public_key.t
+       and type Ed25519.t = Signature.Ed25519.t
+       and type Secp256k1.Public_key_hash.t =
+        Signature.Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Signature.Secp256k1.Public_key.t
+       and type Secp256k1.t = Signature.Secp256k1.t
+       and type P256.Public_key_hash.t = Signature.P256.Public_key_hash.t
+       and type P256.Public_key.t = Signature.P256.Public_key.t
+       and type P256.t = Signature.P256.t
+       and type Signature.public_key_hash = Signature.V0.public_key_hash
+       and type Signature.public_key = Signature.V0.public_key
+       and type Signature.t = Signature.V0.t
+       and type Signature.watermark = Signature.V0.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
-       and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
-       and type RPC_service.meth = RPC_service.meth
+       and type ('a, 'b) RPC_path.t = ('a, 'b) Tezos_rpc.Path.t
+       and type RPC_service.meth = Tezos_rpc.Service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and module Sapling = Tezos_sapling.Core.Validator_legacy
@@ -117,7 +120,7 @@ module type T = sig
        and type validation_state = P.validation_state
 
   class ['chain, 'block] proto_rpc_context :
-    Tezos_rpc.RPC_context.t
+    Tezos_rpc.Context.t
     -> (unit, (unit * 'chain) * 'block) RPC_path.t
     -> ['chain * 'block] RPC_context.simple
 

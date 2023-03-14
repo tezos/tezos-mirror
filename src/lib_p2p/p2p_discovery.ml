@@ -140,7 +140,7 @@ module Answer = struct
     st.worker <-
       Lwt_utils.worker
         "discovery_answer"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end
@@ -242,7 +242,7 @@ module Sender = struct
     st.worker <-
       Lwt_utils.worker
         "discovery_sender"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop Config.initial st)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end

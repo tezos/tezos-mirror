@@ -31,7 +31,8 @@ type parameters = {
   sandbox_parameters : Data_encoding.json option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 type request =
@@ -43,6 +44,7 @@ type request =
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
       max_operations_ttl : int;
       should_precheck : bool;
@@ -60,12 +62,14 @@ type request =
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
     }
   | Precheck of {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
+      predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
       operations : Operation.t list list;
       hash : Block_hash.t;
@@ -76,7 +80,11 @@ type request =
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {context_hash : Context_hash.t}
+  | Context_garbage_collection of {
+      context_hash : Context_hash.t;
+      gc_lockfile_path : string;
+    }
+  | Context_split
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t
@@ -114,12 +122,13 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
-  | Context_garbage_collection {context_hash} ->
+  | Context_garbage_collection {context_hash; gc_lockfile_path = _} ->
       Format.fprintf
         ppf
         "garbage collecting context below %a"
         Context_hash.pp
         context_hash
+  | Context_split -> Format.fprintf ppf "splitting context"
   | Reconfigure_event_logging _ ->
       Format.fprintf ppf "reconfigure event logging"
 
@@ -136,6 +145,7 @@ let parameters_encoding =
            user_activated_protocol_overrides;
            operation_metadata_size_limit;
            sandbox_parameters;
+           dal_config;
          } ->
       ( context_root,
         protocol_root,
@@ -143,14 +153,16 @@ let parameters_encoding =
         user_activated_upgrades,
         user_activated_protocol_overrides,
         operation_metadata_size_limit,
-        sandbox_parameters ))
+        sandbox_parameters,
+        dal_config ))
     (fun ( context_root,
            protocol_root,
            genesis,
            user_activated_upgrades,
            user_activated_protocol_overrides,
            operation_metadata_size_limit,
-           sandbox_parameters ) ->
+           sandbox_parameters,
+           dal_config ) ->
       {
         context_root;
         protocol_root;
@@ -159,8 +171,9 @@ let parameters_encoding =
         user_activated_protocol_overrides;
         operation_metadata_size_limit;
         sandbox_parameters;
+        dal_config;
       })
-    (obj7
+    (obj8
        (req "context_root" string)
        (req "protocol_root" string)
        (req "genesis" Genesis.encoding)
@@ -168,20 +181,24 @@ let parameters_encoding =
        (req
           "user_activated_protocol_overrides"
           User_activated.protocol_overrides_encoding)
-       (opt "operation_metadata_size_limit" int31)
-       (opt "sandbox_parameters" json))
+       (req
+          "operation_metadata_size_limit"
+          Shell_limits.operation_metadata_size_limit_encoding)
+       (opt "sandbox_parameters" json)
+       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding))
 
 let case_validate tag =
   let open Data_encoding in
   case
     tag
     ~title:"validate"
-    (obj9
+    (obj10
        (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "pred_header" (dynamic_size Block_header.encoding))
        (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
        (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
+       (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "max_operations_ttl" int31)
        (req "operations" (list (list (dynamic_size Operation.encoding))))
        (req "should_precheck" bool)
@@ -194,6 +211,7 @@ let case_validate tag =
             predecessor_block_header;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
+            predecessor_resulting_context_hash;
             max_operations_ttl;
             operations;
             should_precheck;
@@ -205,6 +223,7 @@ let case_validate tag =
               predecessor_block_header,
               predecessor_block_metadata_hash,
               predecessor_ops_metadata_hash,
+              predecessor_resulting_context_hash,
               max_operations_ttl,
               operations,
               should_precheck,
@@ -215,6 +234,7 @@ let case_validate tag =
            predecessor_block_header,
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
+           predecessor_resulting_context_hash,
            max_operations_ttl,
            operations,
            should_precheck,
@@ -226,6 +246,7 @@ let case_validate tag =
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           max_operations_ttl;
           operations;
           should_precheck;
@@ -251,7 +272,9 @@ let case_preapply tag =
           (opt
              "predecessor_ops_metadata_hash"
              Operation_metadata_list_list_hash.encoding))
-       (obj1 (req "operations" (list (list (dynamic_size Operation.encoding))))))
+       (obj2
+          (req "predecessor_resulting_context_hash" Context_hash.encoding)
+          (req "operations" (list (list (dynamic_size Operation.encoding))))))
     (function
       | Preapply
           {
@@ -265,6 +288,7 @@ let case_preapply tag =
             predecessor_max_operations_ttl;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
+            predecessor_resulting_context_hash;
             operations;
           } ->
           Some
@@ -278,7 +302,7 @@ let case_preapply tag =
                 predecessor_max_operations_ttl,
                 predecessor_block_metadata_hash,
                 predecessor_ops_metadata_hash ),
-              operations )
+              (predecessor_resulting_context_hash, operations) )
       | _ -> None)
     (fun ( ( chain_id,
              timestamp,
@@ -290,7 +314,7 @@ let case_preapply tag =
              predecessor_max_operations_ttl,
              predecessor_block_metadata_hash,
              predecessor_ops_metadata_hash ),
-           operations ) ->
+           (predecessor_resulting_context_hash, operations) ) ->
       Preapply
         {
           chain_id;
@@ -303,6 +327,7 @@ let case_preapply tag =
           predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
         })
 
@@ -311,10 +336,11 @@ let case_precheck tag =
   case
     tag
     ~title:"precheck"
-    (obj6
+    (obj7
        (req "chain_id" Chain_id.encoding)
        (req "predecessor_block_header" (dynamic_size Block_header.encoding))
        (req "predecessor_block_hash" Block_hash.encoding)
+       (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "header" (dynamic_size Block_header.encoding))
        (req "hash" Block_hash.encoding)
        (req "operations" (list (list (dynamic_size Operation.encoding)))))
@@ -324,6 +350,7 @@ let case_precheck tag =
             chain_id;
             predecessor_block_header;
             predecessor_block_hash;
+            predecessor_resulting_context_hash;
             header;
             operations;
             hash;
@@ -332,6 +359,7 @@ let case_precheck tag =
             ( chain_id,
               predecessor_block_header,
               predecessor_block_hash,
+              predecessor_resulting_context_hash,
               header,
               hash,
               operations )
@@ -339,6 +367,7 @@ let case_precheck tag =
     (fun ( chain_id,
            predecessor_block_header,
            predecessor_block_hash,
+           predecessor_resulting_context_hash,
            header,
            hash,
            operations ) ->
@@ -347,6 +376,7 @@ let case_precheck tag =
           chain_id;
           predecessor_block_header;
           predecessor_block_hash;
+          predecessor_resulting_context_hash;
           header;
           operations;
           hash;
@@ -357,11 +387,24 @@ let case_context_gc tag =
   case
     tag
     ~title:"context_gc"
-    (obj1 (req "context_hash" Context_hash.encoding))
+    (obj2
+       (req "context_hash" Context_hash.encoding)
+       (req "gc_lockfile_path" string))
     (function
-      | Context_garbage_collection {context_hash} -> Some context_hash
+      | Context_garbage_collection {context_hash; gc_lockfile_path} ->
+          Some (context_hash, gc_lockfile_path)
       | _ -> None)
-    (fun context_hash -> Context_garbage_collection {context_hash})
+    (fun (context_hash, gc_lockfile_path) ->
+      Context_garbage_collection {context_hash; gc_lockfile_path})
+
+let case_context_split tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"context_split"
+    unit
+    (function Context_split -> Some () | _ -> None)
+    (fun () -> Context_split)
 
 let request_encoding =
   let open Data_encoding in
@@ -409,6 +452,7 @@ let request_encoding =
       case_preapply (Tag 7);
       case_precheck (Tag 8);
       case_context_gc (Tag 9);
+      case_context_split (Tag 10);
     ]
 
 let send pin encoding data =

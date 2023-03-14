@@ -137,15 +137,15 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
     List.map (fun (k, v) -> sf "Elt %s %s " k @@ Int.to_string v) entries
   in
   let init = "{" ^ String.concat ";" entries_s ^ "}" in
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"originated_contract_advanced"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_perf.tz"
       ~init
       ~burn_cap:Tez.(of_int 9999999)
       client
+      ["mini_scenarios"; "big_map_all"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* mockup_client = Client.init_mockup ~protocol () in
@@ -206,7 +206,7 @@ let test_equivalence =
   let* node, _, alternative = init ~protocol () in
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
-  let tz_log = [("alpha.proxy_rpc", "debug"); ("proxy_getter", "debug")] in
+  let tz_log = [("proxy_rpc", "debug"); ("proxy_getter", "debug")] in
   check_equivalence ~tz_log alt_mode clients
 
 let test_wrong_data_dir =
@@ -255,6 +255,59 @@ let test_proxy_server_redirect_unsupported =
       re_str
   else Lwt.return_unit
 
+let test_multi_protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"proxy_server multi protocols"
+    ~tags:["multi_protocols"]
+  @@ fun to_protocol ->
+  match Protocol.previous_protocol to_protocol with
+  | None -> Lwt.return_unit
+  | Some from_protocol ->
+      (* Create a context with 3 blocks in [from_protocol] and 2 blocks in [to_protocol] *)
+      let patch_config =
+        Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+          [(4, to_protocol)]
+      in
+      let* node = Node.init ~patch_config [Synchronisation_threshold 0] in
+      let* client = Client.init ~endpoint:(Node node) () in
+      let* () = Client.activate_protocol ~protocol:from_protocol client in
+      let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+      (* Launch the proxy server and plug the client to it *)
+      let* proxy_server = Proxy_server.init node in
+      Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
+      (* Ensure the proxy serves a query to a block in [to_protocol] *)
+      let* from_proto_rights =
+        Client.rpc
+          Client.GET
+          ["chains"; "main"; "blocks"; "3"; "helpers"; "endorsing_rights"]
+          client
+      in
+      let from_level_returned =
+        JSON.(from_proto_rights |> geti 0 |> get "level" |> as_int)
+      in
+      Check.(
+        (from_level_returned = 3)
+          int
+          ~error_msg:
+            "Unexpected level returned in proxy_server multi protocol test") ;
+      (* Ensure the proxy serves a query to a block in [from_protocol] *)
+      let* to_proto_rights =
+        Client.rpc
+          Client.GET
+          ["chains"; "main"; "blocks"; "head~1"; "helpers"; "endorsing_rights"]
+          client
+      in
+      let to_level_returned =
+        JSON.(to_proto_rights |> geti 0 |> get "level" |> as_int)
+      in
+      Check.(
+        (to_level_returned = 5)
+          int
+          ~error_msg:
+            "Unexpected level returned in proxy_server multi protocol test") ;
+      Lwt.return_unit
+
 let register ~protocols =
   let register mode =
     let mode_tag =
@@ -275,4 +328,5 @@ let register ~protocols =
   register `Proxy_server_rpc ;
   test_proxy_server_redirect_unsupported protocols ;
   test_equivalence protocols ;
-  test_wrong_data_dir protocols
+  test_wrong_data_dir protocols ;
+  test_multi_protocols protocols

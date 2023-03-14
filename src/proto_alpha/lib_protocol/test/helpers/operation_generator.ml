@@ -23,14 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** These generators aims at generating operations which are not
+    necessary correct. The goal is to tests functions such as {!
+    Operation.compare} with as much as possible parameters that play a
+    role in operation [weight] computation.
+
+    When adding a new operation, one should also add its weight
+    computation, hence knows which kind of generator should be provided
+    for this new operation.*)
+
 open Protocol
 open Alpha_context
-module Random = Random.State
 
-type random_state = {seed : int; rnd_state : Random.t}
-
-let choose_list_element random_state l =
-  Stdlib.List.nth l (Random.int random_state.rnd_state (List.length l))
+(** {2 Operations kind labelling.} *)
 
 let consensus_pass = `PConsensus
 
@@ -42,7 +47,7 @@ let manager_pass = `PManager
 
 let all_passes = [`PConsensus; `PAnonymous; `PVote; `PManager]
 
-let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_slot]
+let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_attestation]
 
 let anonymous_kinds =
   [
@@ -66,14 +71,6 @@ let manager_kinds =
     `KSet_deposits_limit;
     `KIncrease_paid_storage;
     `KRegister_global_constant;
-    `KTx_rollup_origination;
-    `KTx_rollup_submit_batch;
-    `KTx_rollup_commit;
-    `KTx_rollup_return_bond;
-    `KTx_rollup_finalize_commitment;
-    `KTx_rollup_remove_commitment;
-    `KTx_rollup_rejection;
-    `KTx_rollup_dispatch_tickets;
     `KTransfer_ticket;
     `KDal_publish_slot_header;
     `KSc_rollup_originate;
@@ -84,7 +81,6 @@ let manager_kinds =
     `KSc_rollup_timeout;
     `KSc_rollup_execute_outbox_message;
     `KSc_rollup_recover_bond;
-    `KSc_rollup_dal_slot_subscribe;
   ]
 
 let pass_to_operation_kinds = function
@@ -100,7 +96,7 @@ let pp_kind fmt k =
     (match k with
     | `KPreendorsement -> "KPreendorsement"
     | `KEndorsement -> "KEndorsement"
-    | `KDal_slot -> "KDal_slot"
+    | `KDal_attestation -> "KDal_attestation"
     | `KSeed_nonce_revelation -> "KSeed_nonce_revelation"
     | `KVdf_revelation -> "KVdf_revelation"
     | `KDouble_endorsement -> "KDouble_endorsement"
@@ -111,128 +107,119 @@ let pp_kind fmt k =
     | `KBallot -> "KBallot"
     | `KManager -> "KManager")
 
-let block_hashes =
-  List.map
-    Block_hash.of_b58check_exn
-    [
-      "BLbcVY1kYiKQy2MJJfoHJMN2xRk5QPG1PEKWMDSyW2JMxBsMmiL";
-      "BLFhLKqQQn32Cc9QXqtEqysYqWNCowNKaypVHP5zEyZcywbXcHo";
-      "BLuurCvGmNPTzXSnGCpcFPy5h8A49PwH2LnfAWBnp5R1qv5czwe";
-    ]
+(** {2 Generators} *)
 
-let random_shell random_state : Tezos_base.Operation.shell_header =
-  {branch = choose_list_element random_state block_hashes}
+module Gen_hash (H : sig
+  type t
 
-let random_slot random_state =
-  choose_list_element random_state [100; 200; 300]
-  |> Slot.of_int_do_not_use_except_for_parameters
+  val size : int
 
-let random_level random_state =
-  choose_list_element random_state [10l; 20l; 30l] |> Raw_level.of_int32
-  |> function
-  | Ok v -> v
-  | Error _ -> assert false
+  val of_bytes_exn : bytes -> t
+end) =
+struct
+  let gen =
+    let open QCheck2.Gen in
+    let+ str = string_size (pure H.size) in
+    H.of_bytes_exn (Bytes.unsafe_of_string str)
+end
 
-let random_round random_state =
-  choose_list_element random_state [0l; 1l; 2l] |> Round.of_int32 |> function
-  | Ok v -> v
-  | Error _ -> assert false
+(** {3 Selection in hashes list} *)
 
-let payload_hashes =
-  List.map
-    Block_payload_hash.of_b58check_exn
-    [
-      "vh2gWcSUUhJBwvjx4vS7JN5ioMVWpHCSK6W2MKNPr5dn6NUdfFDQ";
-      "vh1p1VzeYjZLEW6WDqdTwVy354KEmGCDgPmagEKcLN4NT4X58mNk";
-      "vh2TyrWeZ2dydEy9ZjmvrjQvyCs5sdHZPypcZrXDUSM1tNuPermf";
-    ]
+let gen_block_hash =
+  let module G = Gen_hash (Block_hash) in
+  G.gen
 
-let random_payload_hash random_state =
-  choose_list_element random_state payload_hashes
+let random_payload_hash =
+  let module G = Gen_hash (Block_payload_hash) in
+  G.gen
 
-let generate_consensus_content random_state : consensus_content =
-  let slot = random_slot random_state in
-  let level = random_level random_state in
-  let round = random_round random_state in
-  let block_payload_hash = random_payload_hash random_state in
-  {slot; level; round; block_payload_hash}
+let gen_algo = QCheck2.Gen.oneofl Signature.algos
 
-let signatures =
-  List.map
-    Signature.of_b58check_exn
-    [
-      "sigaNsiye7D8dJHKSQZBwDbS2aQNXipDP7bw8uQnMgnaXi5pcnoPZRKXrDeFRx4FjWJD2xfyUA9CuBXhwPHhVs7LxkL4vT32";
-      "sigvtPBMQvk2DgNtu3AKFU1ZRsagGxsoiZVQyQhJNEojReBY2vE5sDwt3H7Mh8RMe27QHBjemxqhMVVszZqpNsdDux6KAELX";
-      "sighje7pEbUUwGtJ4GTP7uzMZe5SFz6dRRC3BvZBHnrRHnc47WHGnVdfiscHPMek7esmj7saTuj54QBWy3SezyA2EGbHkmW5";
-    ]
+let random_seed =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.Hacl.Ed25519.sk_size) in
+  Bytes.unsafe_of_string str
 
-let random_signature random_state =
-  Some (choose_list_element random_state signatures)
+let random_keys =
+  let open QCheck2.Gen in
+  let* algo = gen_algo in
+  let+ seed = random_seed in
+  Signature.generate_key ~algo ~seed ()
 
-let pkhs =
-  List.map
-    Signature.Public_key_hash.of_b58check_exn
-    [
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
-      "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU";
-    ]
+let random_tz1 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Signature.Ed25519.Public_key_hash.size) in
+  (Ed25519 (Signature.Ed25519.Public_key_hash.of_string_exn str)
+    : public_key_hash)
 
-let random_pkh random_state = choose_list_element random_state pkhs
+let random_tz2 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Signature.Secp256k1.Public_key_hash.size) in
+  (Secp256k1 (Signature.Secp256k1.Public_key_hash.of_string_exn str)
+    : public_key_hash)
 
-let pks =
-  List.map
-    Signature.Public_key.of_b58check_exn
-    [
-      "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
-      "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
-      "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
-    ]
+let random_tz3 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Signature.P256.Public_key_hash.size) in
+  (P256 (Signature.P256.Public_key_hash.of_string_exn str) : public_key_hash)
 
-let random_pk random_state = choose_list_element random_state pks
+let random_tz4 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Signature.Bls.Public_key_hash.size) in
+  (Bls (Signature.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
 
-let random_fee random_state =
-  choose_list_element random_state [Tez.zero; Tez.one_cent; Tez.one]
+let random_pkh =
+  let open QCheck2.Gen in
+  let* algo = gen_algo in
+  match algo with
+  | Ed25519 -> random_tz1
+  | Secp256k1 -> random_tz2
+  | P256 -> random_tz3
+  | Bls -> random_tz4
 
-let random_amount random_state =
-  choose_list_element random_state [Tez.zero; Tez.one_cent; Tez.one]
+let random_pk =
+  let open QCheck2.Gen in
+  let+ _, pk, _ = random_keys in
+  pk
 
-let random_amount_in_bytes random_state =
-  choose_list_element random_state [Z.zero; Z.one; Z.of_int 100]
+let random_signature =
+  let open QCheck2.Gen in
+  let* algo = option ~ratio:0.8 gen_algo in
+  match algo with
+  | None ->
+      let+ str = string_size (pure Signature.Ed25519.size) in
+      (Unknown (Bytes.unsafe_of_string str) : Signature.t)
+  | Some Ed25519 ->
+      let+ str = string_size (pure Signature.Ed25519.size) in
+      (Ed25519 (Signature.Ed25519.of_string_exn str) : Signature.t)
+  | Some Secp256k1 ->
+      let+ str = string_size (pure Signature.Secp256k1.size) in
+      (Secp256k1 (Signature.Secp256k1.of_string_exn str) : Signature.t)
+  | Some P256 ->
+      let+ str = string_size (pure Signature.P256.size) in
+      (P256 (Signature.P256.of_string_exn str) : Signature.t)
+  | Some Bls ->
+      let+ seed = random_seed in
+      let _, _, sk = Signature.generate_key ~algo:Bls ~seed () in
+      Signature.sign sk Bytes.empty
 
-let contract_hashes =
-  List.map
-    Contract_hash.of_b58check_exn
-    [
-      "KT1WvzYHCNBvDSdwafTHv7nJ1dWmZ8GCYuuC";
-      "KT1NkWx47WzJeHCSyB62WjLtFn4tRf3uXBur";
-      "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
-    ]
+let random_signature =
+  let open QCheck2.Gen in
+  graft_corners
+    random_signature
+    Signature.
+      [
+        of_ed25519 Signature.Ed25519.zero;
+        of_secp256k1 Signature.Secp256k1.zero;
+        of_p256 Signature.P256.zero;
+        of_bls Signature.Bls.zero;
+        Unknown (Bytes.make 64 '\000');
+      ]
+    ()
 
-let random_contract_hash random_state =
-  choose_list_element random_state contract_hashes
-
-let random_contract random_state =
-  if Random.bool random_state.rnd_state then
-    Contract.Implicit (random_pkh random_state)
-  else
-    let contract_hash = random_contract_hash random_state in
-    Contract.Originated contract_hash
-
-let random_contract_hash random_state =
-  choose_list_element random_state contract_hashes
-
-let counters = List.map Z.of_int [123; 456; 789]
-
-let random_counter random_state = choose_list_element random_state counters
-
-let random_gas_limit random_state =
-  choose_list_element
-    random_state
-    Gas.Arith.[zero; integral_of_int_exn 1_000; integral_of_int_exn 10_000]
-
-let random_storage_limit random_state =
-  choose_list_element random_state Z.[zero; of_int 1_000; of_int 10_000]
+let random_contract_hash =
+  let module G = Gen_hash (Contract_hash) in
+  G.gen
 
 let block_headers =
   let bh1 =
@@ -252,8 +239,98 @@ let block_headers =
       | Error _ -> assert false)
     [bh1; bh2; bh3]
 
-let random_block_header random_state =
-  choose_list_element random_state block_headers
+let random_block_header = QCheck2.Gen.oneofl block_headers
+
+let random_sc_rollup =
+  let module G = Gen_hash (Sc_rollup.Address) in
+  G.gen
+
+let random_proto =
+  let module G = Gen_hash (Protocol_hash) in
+  G.gen
+
+let random_code =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Signature.Ed25519.Public_key_hash.size) in
+  let (`Hex hex) = Hex.of_string str in
+  Blinded_public_key_hash.activation_code_of_hex hex
+  |> WithExceptions.Option.get ~loc:__LOC__
+
+(** {2 Operations parameters generators} *)
+
+let random_shell : Tezos_base.Operation.shell_header QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let+ branch = gen_block_hash in
+  Tezos_base.Operation.{branch}
+
+let gen_slot =
+  let open QCheck2.Gen in
+  let+ i = small_nat in
+  match Slot.Internal_for_tests.of_int i with
+  | Ok slot -> slot
+  | Error _ -> assert false
+
+let gen_level =
+  let open QCheck2.Gen in
+  let+ i = ui32 in
+  match Raw_level.of_int32 i with Ok v -> v | Error _ -> assert false
+
+let gen_round =
+  let open QCheck2.Gen in
+  let+ i = ui32 in
+  match Round.of_int32 i with Ok v -> v | Error _ -> assert false
+
+let generate_consensus_content : consensus_content QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* slot = gen_slot in
+  let* level = gen_level in
+  let* round = gen_round in
+  let+ block_payload_hash = random_payload_hash in
+  {slot; level; round; block_payload_hash}
+
+let gen_tez =
+  let open QCheck2.Gen in
+  let+ i = ui64 in
+  match Tez.of_mutez i with None -> Tez.zero | Some v -> v
+
+let gen_fee = gen_tez
+
+let gen_amount = gen_tez
+
+let gen_amount_in_bytes =
+  let open QCheck2.Gen in
+  let+ i = nat in
+  Z.of_int i
+
+let random_contract =
+  let open QCheck2.Gen in
+  let* b = bool in
+  if b then
+    let+ pkh = random_pkh in
+    Contract.Implicit pkh
+  else
+    let+ contract_hash = random_contract_hash in
+    Contract.Originated contract_hash
+
+let gen_counters =
+  let open QCheck2.Gen in
+  let+ i = nat in
+  Manager_counter.Internal_for_tests.of_int i
+
+let gen_ticket_amounts =
+  let open QCheck2.Gen in
+  let+ i = nat in
+  Option.value (Ticket_amount.of_zint (Z.of_int i)) ~default:Ticket_amount.one
+
+let gen_gas_limit =
+  let open QCheck2.Gen in
+  let+ i = nat in
+  Gas.Arith.integral_of_int_exn i
+
+let gen_storage_limit =
+  let open QCheck2.Gen in
+  let+ i = nat in
+  Z.of_int i
 
 let nonces =
   List.map
@@ -265,98 +342,7 @@ let nonces =
       | Error _ -> assert false)
     [1; 2; 3]
 
-let random_nonce random_state = choose_list_element random_state nonces
-
-let random_option f random_state =
-  if Random.bool random_state.rnd_state then Some (f random_state) else None
-
-let tx_rollups =
-  List.filter_map
-    Tx_rollup.of_b58check_opt
-    [
-      "txr1hFmPcr5y1P2xTm7W2y1sfjLLCUdzCZGvg";
-      "txr1jux4nZWf8ToGZc4ojLBbT538BBTTSiJUD";
-      "txr1TAFTENC2YACvoMDrpJHCbdvdfSSjcjEjc";
-    ]
-
-let random_tx_rollup random_state = choose_list_element random_state tx_rollups
-
-let sc_rollups =
-  List.map
-    Sc_rollup.Address.of_b58check_exn
-    [
-      "scr1FPSu51gGtyv9S5HqDqXeH16DJviJ9qpr6";
-      "scr1U39BVdpVQun1QjjiXfd3XgoBKcenWt5sb";
-      "scr1Kqqbvust2adJMtSu2V4fcd49oQHug4BLb";
-    ]
-
-let random_sc_rollup random_state = choose_list_element random_state sc_rollups
-
-let protos =
-  List.map
-    (fun s -> Protocol_hash.of_b58check_exn s)
-    [
-      "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha84efbeiF6cm";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha91249Z65tWS";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha537f5h25LnN";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha5c8fefgDYkr";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha3f31feSSarC";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabe31ahnkxSC";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabab3bgRb7zQ";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaf8d39cctbpk";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha3b981byuYxD";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaa116bccYowi";
-      "ProtoALphaALphaALphaALphaALphaALphaALphacce68eHqboj";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha225c7YrWwR7";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha58743cJL6FG";
-      "ProtoALphaALphaALphaALphaALphaALphaALphac91bcdvmJFR";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha1faaadhV7oW";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha98232gD94QJ";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha9d1d8cijvAh";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaeec52dKF6Gx";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX";
-    ]
-
-let random_proto random_state = choose_list_element random_state protos
-
-let generate_op random_state (gen_op : random_state -> 'kind contents_list) :
-    'kind operation =
-  let shell = random_shell random_state in
-  let signature = random_signature random_state in
-  let contents = gen_op random_state in
-  let protocol_data = {contents; signature} in
-  {shell; protocol_data}
-
-let generate_preendorsement random_state =
-  let gen random_state =
-    Single (Preendorsement (generate_consensus_content random_state))
-  in
-  generate_op random_state gen
-
-let generate_endorsement random_state : Kind.endorsement Operation.t =
-  let gen random_state =
-    Single (Endorsement (generate_consensus_content random_state))
-  in
-  generate_op random_state gen
-
-let generate_dal_slot random_state : Kind.dal_slot_availability Operation.t =
-  let gen random_state =
-    let pkh = random_pkh random_state in
-    let dal_endorsement = Dal.Endorsement.empty in
-    Single (Dal_slot_availability (pkh, dal_endorsement))
-  in
-  generate_op random_state gen
-
-let generate_seed_nonce_revelation random_state :
-    Kind.seed_nonce_revelation Operation.t =
-  let gen random_state =
-    let level = random_level random_state in
-    let nonce = random_nonce random_state in
-    Single (Seed_nonce_revelation {level; nonce})
-  in
-  generate_op random_state gen
+let random_nonce = QCheck2.Gen.oneofl nonces
 
 let vdf_solutions =
   let open Environment.Vdf in
@@ -370,332 +356,193 @@ let vdf_solutions =
       (result, proof))
     [1; 2; 3]
 
-let random_vdf_solution random_state =
-  choose_list_element random_state vdf_solutions
+(** {2 Generators for each Operation Kind} *)
 
-let generate_vdf_revelation random_state : Kind.vdf_revelation Operation.t =
-  let gen random_state =
-    let solution = random_vdf_solution random_state in
-    Single (Vdf_revelation {solution})
-  in
-  generate_op random_state gen
+let wrap_operation sh (pdata : 'kind protocol_data) : 'kind operation =
+  {shell = sh; protocol_data = pdata}
 
-let generate_double_preendorsement random_state :
-    Kind.double_preendorsement_evidence Operation.t =
-  let gen random_state =
-    let op1 = generate_preendorsement random_state in
-    let op2 = generate_preendorsement random_state in
-    Single (Double_preendorsement_evidence {op1; op2})
-  in
-  generate_op random_state gen
+let generate_op (gen_op : 'kind contents QCheck2.Gen.t) :
+    'kind operation QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* op = gen_op in
+  let* signature = option ~ratio:0.9 random_signature in
+  let+ shell = random_shell in
+  let contents = Single op in
+  let protocol_data = {contents; signature} in
+  wrap_operation shell protocol_data
 
-let generate_double_endorsement random_state :
-    Kind.double_endorsement_evidence Operation.t =
-  let gen random_state =
-    let op1 = generate_endorsement random_state in
-    let op2 = generate_endorsement random_state in
-    Single (Double_endorsement_evidence {op1; op2})
-  in
-  generate_op random_state gen
+let generate_operation gen_op =
+  let open QCheck2.Gen in
+  let+ op = generate_op gen_op in
+  Operation.pack op
 
-let generate_double_baking random_state :
-    Kind.double_baking_evidence Operation.t =
-  let gen random_state =
-    let bh1 = random_block_header random_state in
-    let bh2 = random_block_header random_state in
-    Single (Double_baking_evidence {bh1; bh2})
-  in
-  generate_op random_state gen
+let generate_preendorsement =
+  let open QCheck2.Gen in
+  let+ cc = generate_consensus_content in
+  Preendorsement cc
 
-let generate_manager_aux :
-    type kind.
-    public_key_hash option ->
-    random_state ->
-    (random_state -> kind manager_operation) ->
-    kind Kind.manager contents =
- fun opt_source random_state gen_op ->
-  let source =
-    match opt_source with
-    | None -> random_pkh random_state
-    | Some source -> source
+let generate_endorsement =
+  let open QCheck2.Gen in
+  let+ cc = generate_consensus_content in
+  Endorsement cc
+
+let generate_dal_attestation =
+  let open QCheck2.Gen in
+  let+ attestor = random_pkh in
+  Dal_attestation
+    Dal.Attestation.
+      {attestor; attestation = Dal.Attestation.empty; level = Raw_level.root}
+
+let generate_vdf_revelation =
+  let open QCheck2.Gen in
+  let+ solution = oneofl vdf_solutions in
+  Vdf_revelation {solution}
+
+let generate_seed_nonce_revelation =
+  let open QCheck2.Gen in
+  let* level = gen_level in
+  let+ nonce = random_nonce in
+  Seed_nonce_revelation {level; nonce}
+
+let generate_double_preendorsement =
+  let open QCheck2.Gen in
+  let* op1 = generate_op generate_preendorsement in
+  let+ op2 = generate_op generate_preendorsement in
+  Double_preendorsement_evidence {op1; op2}
+
+let generate_double_endorsement =
+  let open QCheck2.Gen in
+  let* op1 = generate_op generate_endorsement in
+  let+ op2 = generate_op generate_endorsement in
+  Double_endorsement_evidence {op1; op2}
+
+let generate_double_baking =
+  let open QCheck2.Gen in
+  let* bh1 = random_block_header in
+  let+ bh2 = random_block_header in
+  Double_baking_evidence {bh1; bh2}
+
+let generate_activate_account =
+  let open QCheck2.Gen in
+  let* activation_code = random_code in
+  let+ id = random_tz1 in
+  let id = match id with Signature.Ed25519 pkh -> pkh | _ -> assert false in
+  Activate_account {id; activation_code}
+
+let random_period =
+  let open QCheck2.Gen in
+  let+ i = ui32 in
+  i
+
+let generate_proposals =
+  let open QCheck2.Gen in
+  let* source = random_pkh in
+  let+ period = random_period in
+  let proposals = [] in
+  Proposals {source; period; proposals}
+
+let generate_ballot =
+  let open QCheck2.Gen in
+  let* source = random_pkh in
+  let* period = random_period in
+  let+ proposal = random_proto in
+  let ballot = Vote.Pass in
+  Ballot {source; period; proposal; ballot}
+
+let generate_manager_aux ?source gen_manop =
+  let open QCheck2.Gen in
+  let* source =
+    match source with None -> random_pkh | Some source -> return source
   in
-  let fee = random_fee random_state in
-  let counter = random_counter random_state in
-  let operation = gen_op random_state in
-  let gas_limit = random_gas_limit random_state in
-  let storage_limit = random_storage_limit random_state in
+  let* fee = gen_fee in
+  let* counter = gen_counters in
+  let* gas_limit = gen_gas_limit in
+  let* storage_limit = gen_storage_limit in
+  let+ operation = gen_manop in
   Manager_operation {source; fee; counter; operation; gas_limit; storage_limit}
 
-let generate_manager random_state
-    (gen_op : random_state -> 'kind manager_operation) :
-    'kind Kind.manager Operation.t =
-  let source = Some (random_pkh random_state) in
-  let shell = random_shell random_state in
-  let signature = random_signature random_state in
-  let contents = Single (generate_manager_aux source random_state gen_op) in
-  let protocol_data = {contents; signature} in
-  {shell; protocol_data}
+let generate_manager ?source gen_manop =
+  generate_op (generate_manager_aux ?source gen_manop)
 
-let generate_managers random_state gen_ops =
-  let source = Some (random_pkh random_state) in
-  let ops_as_single =
-    List.map
-      (fun gen_op -> Contents (generate_manager_aux source random_state gen_op))
-      gen_ops
+let generate_manager_operation ?source gen_manop =
+  let open QCheck2.Gen in
+  let+ manop = generate_manager ?source gen_manop in
+  Operation.pack manop
+
+let generate_reveal =
+  let open QCheck2.Gen in
+  let+ pk = random_pk in
+  Reveal pk
+
+let generate_transaction =
+  let open QCheck2.Gen in
+  let* amount = gen_amount in
+  let+ destination = random_contract in
+  let parameters = Script.unit_parameter in
+  let entrypoint = Entrypoint.default in
+  Transaction {amount; parameters; entrypoint; destination}
+
+let generate_origination =
+  let open QCheck2.Gen in
+  let+ credit = gen_amount in
+  let delegate = None in
+  let script = Script.{code = unit_parameter; storage = unit_parameter} in
+  Origination {delegate; script; credit}
+
+let generate_delegation =
+  let open QCheck2.Gen in
+  let+ delegate = option random_pkh in
+  Delegation delegate
+
+let generate_increase_paid_storage =
+  let open QCheck2.Gen in
+  let* amount_in_bytes = gen_amount_in_bytes in
+  let+ destination = random_contract_hash in
+  Increase_paid_storage {amount_in_bytes; destination}
+
+let generate_set_deposits_limit =
+  let open QCheck2.Gen in
+  let+ amount_opt = option gen_amount in
+  Set_deposits_limit amount_opt
+
+let generate_register_global_constant =
+  let value = Script_repr.lazy_expr (Expr.from_string "Pair 1 2") in
+  QCheck2.Gen.pure (Register_global_constant {value})
+
+let generate_transfer_ticket =
+  let open QCheck2.Gen in
+  let* ticketer = random_contract in
+  let* destination = random_contract in
+  let+ amount = gen_ticket_amounts in
+  let contents = Script.lazy_expr (Expr.from_string "1") in
+  let ty = Script.lazy_expr (Expr.from_string "nat") in
+  let entrypoint = Entrypoint.default in
+  Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
+
+let generate_dal_publish_slot_header =
+  let published_level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
+  let slot_index = Alpha_context.Dal.Slot_index.zero in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let slot_header =
+    Alpha_context.Dal.Operations.Publish_slot_header.
+      {published_level; slot_index; commitment; commitment_proof}
   in
-  Operation.of_list ops_as_single
+  QCheck2.Gen.pure (Dal_publish_slot_header slot_header)
 
-let generate_reveal random_state : Kind.reveal Kind.manager Operation.t =
-  let gen random_state = Reveal (random_pk random_state) in
-  generate_manager random_state gen
-
-let generate_transaction random_state =
-  let gen_trans random_state =
-    let amount = random_amount random_state in
-    let parameters = Script.unit_parameter in
-    let entrypoint = Entrypoint.default in
-    let destination = random_contract random_state in
-    Transaction {amount; parameters; entrypoint; destination}
+let generate_sc_rollup_originate =
+  let kind = Sc_rollup.Kind.Example_arith in
+  let boot_sector = "" in
+  let parameters_ty = Script.lazy_expr (Expr.from_string "1") in
+  let origination_proof =
+    Lwt_main.run (Sc_rollup_helpers.origination_proof ~boot_sector kind)
   in
-  generate_manager random_state gen_trans
+  QCheck2.Gen.pure
+    (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
 
-let generate_origination random_state :
-    Kind.origination Kind.manager Operation.t =
-  let gen_origination random_state =
-    let delegate = None in
-    let script = Script.{code = unit_parameter; storage = unit_parameter} in
-    let credit = random_amount random_state in
-    Origination {delegate; script; credit}
-  in
-  generate_manager random_state gen_origination
-
-let generate_delegation random_state : Kind.delegation Kind.manager Operation.t
-    =
-  let gen_delegation random_state =
-    let delegate = random_option random_pkh random_state in
-    Delegation delegate
-  in
-  generate_manager random_state gen_delegation
-
-let generate_set_deposits_limit random_state :
-    Kind.set_deposits_limit Kind.manager Operation.t =
-  let gen_set_deposits_limit random_state =
-    let amount_opt = random_option random_amount random_state in
-    Set_deposits_limit amount_opt
-  in
-  generate_manager random_state gen_set_deposits_limit
-
-let generate_increase_paid_storage random_state :
-    Kind.increase_paid_storage Kind.manager Operation.t =
-  let gen_increase_paid_storage random_state =
-    let amount_in_bytes = random_amount_in_bytes random_state in
-    let destination = random_contract_hash random_state in
-    Increase_paid_storage {amount_in_bytes; destination}
-  in
-  generate_manager random_state gen_increase_paid_storage
-
-let generate_register_global_constant random_state :
-    Kind.register_global_constant Kind.manager Operation.t =
-  let gen_register_global_constant _ =
-    let value = Script_repr.lazy_expr (Expr.from_string "Pair 1 2") in
-    Register_global_constant {value}
-  in
-  generate_manager random_state gen_register_global_constant
-
-let generate_tx_rollup_origination random_state :
-    Kind.tx_rollup_origination Kind.manager Operation.t =
-  let gen_tx_orig _ = Tx_rollup_origination in
-  generate_manager random_state gen_tx_orig
-
-let generate_tx_rollup_submit_batch random_state :
-    Kind.tx_rollup_submit_batch Kind.manager Operation.t =
-  let gen_tx_submit random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    let content = "batch" in
-    let burn_limit = None in
-    Tx_rollup_submit_batch {tx_rollup; content; burn_limit}
-  in
-  generate_manager random_state gen_tx_submit
-
-let generate_tx_rollup_commit random_state :
-    Kind.tx_rollup_commit Kind.manager Operation.t =
-  let gen_tx_commit random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    let commitment : Tx_rollup_commitment.Full.t =
-      {
-        level = Tx_rollup_level.root;
-        messages = [];
-        predecessor = None;
-        inbox_merkle_root = Tx_rollup_inbox.Merkle.merklize_list [];
-      }
-    in
-    Tx_rollup_commit {tx_rollup; commitment}
-  in
-  generate_manager random_state gen_tx_commit
-
-let generate_tx_rollup_return_bond random_state :
-    Kind.tx_rollup_return_bond Kind.manager Operation.t =
-  let gen_tx_return_bd random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    Tx_rollup_return_bond {tx_rollup}
-  in
-  generate_manager random_state gen_tx_return_bd
-
-let generate_tx_finalize_commitment random_state :
-    Kind.tx_rollup_finalize_commitment Kind.manager Operation.t =
-  let gen_tx_finalize random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    Tx_rollup_finalize_commitment {tx_rollup}
-  in
-  generate_manager random_state gen_tx_finalize
-
-let generate_tx_rollup_remove_commitment random_state :
-    Kind.tx_rollup_remove_commitment Kind.manager Operation.t =
-  let gen_tx_remove random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    Tx_rollup_remove_commitment {tx_rollup}
-  in
-  generate_manager random_state gen_tx_remove
-
-let generate_tx_rollup_rejection random_state :
-    Kind.tx_rollup_rejection Kind.manager Operation.t =
-  let gen_tx_rejection random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    let message, _ = Tx_rollup_message.make_batch "" in
-    let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
-    let message_path =
-      match Tx_rollup_inbox.Merkle.compute_path [message_hash] 0 with
-      | Ok message_path -> message_path
-      | _ -> raise (Invalid_argument "Single_message_inbox.message_path")
-    in
-    let proof : Tx_rollup_l2_proof.t =
-      {
-        version = 1;
-        before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-        after = `Value Context_hash.zero;
-        state = Seq.empty;
-      }
-    in
-    let previous_message_result : Tx_rollup_message_result.t =
-      {
-        context_hash = Tx_rollup_message_result.empty_l2_context_hash;
-        withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
-      }
-    in
-    let level = Tx_rollup_level.root in
-    let message_result_hash = Tx_rollup_message_result_hash.zero in
-    let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-    let previous_message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-    let message_position = 0 in
-    let proof = Tx_rollup_l2_proof.serialize_proof_exn proof in
-    Tx_rollup_rejection
-      {
-        tx_rollup;
-        level;
-        message;
-        message_position;
-        message_path;
-        message_result_hash;
-        message_result_path;
-        previous_message_result;
-        previous_message_result_path;
-        proof;
-      }
-  in
-  generate_manager random_state gen_tx_rejection
-
-let generate_tx_dispatch_tickets random_state :
-    Kind.tx_rollup_dispatch_tickets Kind.manager Operation.t =
-  let gen_tx_dispatch random_state =
-    let tx_rollup = random_tx_rollup random_state in
-    let source = random_pkh random_state in
-    let contract = random_contract random_state in
-    let level = Tx_rollup_level.root in
-    let message_index = 0 in
-    let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-    let context_hash = Context_hash.zero in
-    let reveal =
-      Tx_rollup_reveal.
-        {
-          contents = Script.lazy_expr (Expr.from_string "1");
-          ty = Script.lazy_expr (Expr.from_string "nat");
-          ticketer = contract;
-          amount = Tx_rollup_l2_qty.of_int64_exn 10L;
-          claimer = source;
-        }
-    in
-    let tickets_info = [reveal] in
-    Tx_rollup_dispatch_tickets
-      {
-        tx_rollup;
-        level;
-        context_hash;
-        message_index;
-        message_result_path;
-        tickets_info;
-      }
-  in
-  generate_manager random_state gen_tx_dispatch
-
-let generate_transfer_ticket random_state :
-    Kind.transfer_ticket Kind.manager Operation.t =
-  let gen_transfer_ticket random_state =
-    let contents = Script.lazy_expr (Expr.from_string "1") in
-    let ty = Script.lazy_expr (Expr.from_string "nat") in
-    let ticketer = random_contract random_state in
-    let destination = random_contract random_state in
-    let amount =
-      WithExceptions.Option.get ~loc:__LOC__
-      @@ Ticket_amount.of_n
-      @@ Script_int.(
-           add_n one_n
-           @@ Option.value ~default:zero_n
-           @@ is_nat @@ of_zint
-           @@ random_counter random_state)
-    in
-    let entrypoint = Entrypoint.default in
-    Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
-  in
-  generate_manager random_state gen_transfer_ticket
-
-let generate_dal_publish_slot_header random_state :
-    Kind.dal_publish_slot_header Kind.manager Operation.t =
-  let gen_dal_publish _ =
-    let published_level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
-    let index = Alpha_context.Dal.Slot_index.zero in
-    let commitment = Alpha_context.Dal.Slot.Commitment.zero in
-    let slot_header =
-      Alpha_context.Dal.Slot.Header.{id = {published_level; index}; commitment}
-    in
-    Dal_publish_slot_header {slot_header}
-  in
-  generate_manager random_state gen_dal_publish
-
-let generate_sc_rollup_originate random_state :
-    Kind.sc_rollup_originate Kind.manager Operation.t =
-  let gen_sc_originate _ =
-    let kind = Sc_rollup.Kind.Example_arith in
-    let boot_sector = "" in
-    let parameters_ty = Script.lazy_expr (Expr.from_string "1") in
-    let origination_proof =
-      Lwt_main.run (Sc_rollup_helpers.origination_proof ~boot_sector kind)
-    in
-    let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-    let origination_proof =
-      Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
-    in
-    Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty}
-  in
-  generate_manager random_state gen_sc_originate
-
-let generate_sc_rollup_add_messages random_state :
-    Kind.sc_rollup_add_messages Kind.manager Operation.t =
-  let gen_sc_add_messages random_state =
-    let rollup = random_sc_rollup random_state in
-    let messages = [] in
-    Sc_rollup_add_messages {rollup; messages}
-  in
-  generate_manager random_state gen_sc_add_messages
+let generate_sc_rollup_add_messages =
+  let open QCheck2.Gen in
+  return (Sc_rollup_add_messages {messages = []})
 
 let sc_dummy_commitment =
   let number_of_ticks =
@@ -711,181 +558,94 @@ let sc_dummy_commitment =
       compressed_state = Sc_rollup.State_hash.zero;
     }
 
-let generate_sc_rollup_cement random_state :
-    Kind.sc_rollup_cement Kind.manager Operation.t =
-  let gen_sc_cement random_state =
-    let rollup = random_sc_rollup random_state in
-    let commitment =
-      Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment
-    in
-    Sc_rollup_cement {rollup; commitment}
+let generate_sc_rollup_cement =
+  let open QCheck2.Gen in
+  let+ rollup = random_sc_rollup in
+  let commitment = Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment in
+  Sc_rollup_cement {rollup; commitment}
+
+let generate_sc_rollup_publish =
+  let open QCheck2.Gen in
+  let+ rollup = random_sc_rollup in
+  let commitment = sc_dummy_commitment in
+  Sc_rollup_publish {rollup; commitment}
+
+let generate_sc_rollup_refute =
+  let open QCheck2.Gen in
+  let* opponent = random_pkh in
+  let+ rollup = random_sc_rollup in
+  let refutation : Sc_rollup.Game.refutation =
+    Sc_rollup.Game.Move {choice = Sc_rollup.Tick.initial; step = Dissection []}
   in
-  generate_manager random_state gen_sc_cement
+  Sc_rollup_refute {rollup; opponent; refutation}
 
-let generate_sc_rollup_publish random_state :
-    Kind.sc_rollup_publish Kind.manager Operation.t =
-  let gen_sc_publish random_state =
-    let rollup = random_sc_rollup random_state in
-    let commitment = sc_dummy_commitment in
-    Sc_rollup_publish {rollup; commitment}
+let generate_sc_rollup_timeout =
+  let open QCheck2.Gen in
+  let* source = random_pkh in
+  let* rollup = random_sc_rollup in
+  let+ staker = random_pkh in
+  let stakers = Sc_rollup.Game.Index.make source staker in
+  Sc_rollup_timeout {rollup; stakers}
+
+let generate_sc_rollup_execute_outbox_message =
+  let open QCheck2.Gen in
+  let+ rollup = random_sc_rollup in
+  let cemented_commitment =
+    Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment
   in
-  generate_manager random_state gen_sc_publish
+  let output_proof = "" in
+  Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
 
-let generate_sc_rollup_refute random_state :
-    Kind.sc_rollup_refute Kind.manager Operation.t =
-  let gen random_state =
-    let opponent = random_pkh random_state in
-    let rollup = random_sc_rollup random_state in
-    let refutation : Sc_rollup.Game.refutation option =
-      Some {choice = Sc_rollup.Tick.initial; step = Dissection []}
-    in
-    Sc_rollup_refute {rollup; opponent; refutation}
+let generate_sc_rollup_recover_bond =
+  let open QCheck2.Gen in
+  let* staker = random_pkh in
+  let+ sc_rollup = random_sc_rollup in
+  Sc_rollup_recover_bond {sc_rollup; staker}
+
+(** {By Kind Operation Generator} *)
+
+let generator_of ?source = function
+  | `KReveal -> generate_manager_operation ?source generate_reveal
+  | `KTransaction -> generate_manager_operation ?source generate_transaction
+  | `KOrigination -> generate_manager_operation ?source generate_origination
+  | `KSet_deposits_limit ->
+      generate_manager_operation ?source generate_set_deposits_limit
+  | `KIncrease_paid_storage ->
+      generate_manager_operation ?source generate_increase_paid_storage
+  | `KDelegation -> generate_manager_operation ?source generate_delegation
+  | `KRegister_global_constant ->
+      generate_manager_operation ?source generate_register_global_constant
+  | `KTransfer_ticket ->
+      generate_manager_operation ?source generate_transfer_ticket
+  | `KDal_publish_slot_header ->
+      generate_manager_operation ?source generate_dal_publish_slot_header
+  | `KSc_rollup_originate ->
+      generate_manager_operation ?source generate_sc_rollup_originate
+  | `KSc_rollup_add_messages ->
+      generate_manager_operation ?source generate_sc_rollup_add_messages
+  | `KSc_rollup_cement ->
+      generate_manager_operation ?source generate_sc_rollup_cement
+  | `KSc_rollup_publish ->
+      generate_manager_operation ?source generate_sc_rollup_publish
+  | `KSc_rollup_refute ->
+      generate_manager_operation ?source generate_sc_rollup_refute
+  | `KSc_rollup_timeout ->
+      generate_manager_operation ?source generate_sc_rollup_timeout
+  | `KSc_rollup_execute_outbox_message ->
+      generate_manager_operation
+        ?source
+        generate_sc_rollup_execute_outbox_message
+  | `KSc_rollup_recover_bond ->
+      generate_manager_operation ?source generate_sc_rollup_recover_bond
+
+let generate_manager_operation batch_size =
+  let open QCheck2.Gen in
+  let* source = random_pkh in
+  let source = Some source in
+  let* l =
+    flatten_l (Stdlib.List.init batch_size (fun _ -> oneofl manager_kinds))
   in
-  generate_manager random_state gen
-
-let generate_sc_rollup_timeout random_state :
-    Kind.sc_rollup_timeout Kind.manager Operation.t =
-  let gen random_state =
-    let source = random_pkh random_state in
-    let rollup = random_sc_rollup random_state in
-    let staker = random_pkh random_state in
-    let stakers = Sc_rollup.Game.Index.make source staker in
-    Sc_rollup_timeout {rollup; stakers}
-  in
-  generate_manager random_state gen
-
-let generate_sc_rollup_execute_outbox_message random_state :
-    Kind.sc_rollup_execute_outbox_message Kind.manager Operation.t =
-  let gen random_state =
-    let rollup = random_sc_rollup random_state in
-    let cemented_commitment =
-      Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment
-    in
-    let output_proof = "" in
-    Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
-  in
-  generate_manager random_state gen
-
-let generate_sc_rollup_recover_bond random_state :
-    Kind.sc_rollup_recover_bond Kind.manager Operation.t =
-  let gen random_state =
-    let sc_rollup = random_sc_rollup random_state in
-    Sc_rollup_recover_bond {sc_rollup}
-  in
-  generate_manager random_state gen
-
-let generate_sc_rollup_dal_slot_subscribe random_state :
-    Kind.sc_rollup_dal_slot_subscribe Kind.manager Operation.t =
-  let gen random_state =
-    let rollup = random_sc_rollup random_state in
-    let slot_index = Alpha_context.Dal.Slot_index.zero in
-    Sc_rollup_dal_slot_subscribe {rollup; slot_index}
-  in
-  generate_manager random_state gen
-
-let codes =
-  List.filter_map
-    Blinded_public_key_hash.activation_code_of_hex
-    [
-      "41f98b15efc63fa893d61d7d6eee4a2ce9427ac4";
-      "411dfef031eeecc506de71c9df9f8e44297cf5ba";
-      "08d7d355bc3391d12d140780b39717d9f46fcf87";
-    ]
-
-let random_code random_state = choose_list_element random_state codes
-
-let generate_activate_account random_state : Kind.activate_account Operation.t =
-  let gen random_state =
-    let id =
-      random_pkh random_state |> function
-      | Ed25519 pkh -> pkh
-      | _ -> assert false
-    in
-    let activation_code = random_code random_state in
-    Single (Activate_account {id; activation_code})
-  in
-  generate_op random_state gen
-
-let random_period random_state = choose_list_element random_state [0l; 1l; 2l]
-
-let generate_proposals random_state : Kind.proposals Operation.t =
-  let gen random_state =
-    let source = random_pkh random_state in
-    let period = random_period random_state in
-    let proposals = [] in
-    Single (Proposals {source; period; proposals})
-  in
-  generate_op random_state gen
-
-let generate_ballot random_state : Kind.ballot Operation.t =
-  let gen random_state =
-    let source = random_pkh random_state in
-    let period = random_period random_state in
-    let proposal = random_proto random_state in
-    let ballot = Vote.Pass in
-    Single (Ballot {source; period; proposal; ballot})
-  in
-  generate_op random_state gen
-
-let generate_manager_operation batch_size random_state =
-  let l =
-    Stdlib.List.init batch_size (fun _ ->
-        choose_list_element random_state manager_kinds)
-  in
-  let packed_manager_ops =
-    List.map
-      (function
-        | `KReveal -> generate_reveal random_state |> Operation.pack
-        | `KTransaction -> generate_transaction random_state |> Operation.pack
-        | `KOrigination -> generate_origination random_state |> Operation.pack
-        | `KSet_deposits_limit ->
-            generate_set_deposits_limit random_state |> Operation.pack
-        | `KIncrease_paid_storage ->
-            generate_increase_paid_storage random_state |> Operation.pack
-        | `KDelegation -> generate_delegation random_state |> Operation.pack
-        | `KRegister_global_constant ->
-            generate_register_global_constant random_state |> Operation.pack
-        | `KTx_rollup_origination ->
-            generate_tx_rollup_origination random_state |> Operation.pack
-        | `KTransfer_ticket ->
-            generate_transfer_ticket random_state |> Operation.pack
-        | `KDal_publish_slot_header ->
-            generate_dal_publish_slot_header random_state |> Operation.pack
-        | `KTx_rollup_submit_batch ->
-            generate_tx_rollup_submit_batch random_state |> Operation.pack
-        | `KTx_rollup_commit ->
-            generate_tx_rollup_commit random_state |> Operation.pack
-        | `KTx_rollup_return_bond ->
-            generate_tx_rollup_return_bond random_state |> Operation.pack
-        | `KTx_rollup_finalize_commitment ->
-            generate_tx_finalize_commitment random_state |> Operation.pack
-        | `KTx_rollup_remove_commitment ->
-            generate_tx_rollup_remove_commitment random_state |> Operation.pack
-        | `KTx_rollup_rejection ->
-            generate_tx_rollup_rejection random_state |> Operation.pack
-        | `KTx_rollup_dispatch_tickets ->
-            generate_tx_dispatch_tickets random_state |> Operation.pack
-        | `KSc_rollup_originate ->
-            generate_sc_rollup_originate random_state |> Operation.pack
-        | `KSc_rollup_add_messages ->
-            generate_sc_rollup_add_messages random_state |> Operation.pack
-        | `KSc_rollup_cement ->
-            generate_sc_rollup_cement random_state |> Operation.pack
-        | `KSc_rollup_publish ->
-            generate_sc_rollup_publish random_state |> Operation.pack
-        | `KSc_rollup_refute ->
-            generate_sc_rollup_refute random_state |> Operation.pack
-        | `KSc_rollup_timeout ->
-            generate_sc_rollup_timeout random_state |> Operation.pack
-        | `KSc_rollup_execute_outbox_message ->
-            generate_sc_rollup_execute_outbox_message random_state
-            |> Operation.pack
-        | `KSc_rollup_recover_bond ->
-            generate_sc_rollup_recover_bond random_state |> Operation.pack
-        | `KSc_rollup_dal_slot_subscribe ->
-            generate_sc_rollup_dal_slot_subscribe random_state |> Operation.pack)
-      l
-  in
+  let* packed_manager_ops = flatten_l (List.map (generator_of ?source) l) in
   let first_op = Stdlib.List.hd packed_manager_ops in
   let unpacked_operations =
     List.map
@@ -918,30 +678,42 @@ let generate_manager_operation batch_size random_state =
     | Operation_data {signature; _} -> signature
   in
   let protocol_data = {contents = contents_list; signature} in
-  Operation.pack {shell = first_op.shell; protocol_data}
+  return (Operation.pack {shell = first_op.shell; protocol_data})
 
-let generate_operation random_state =
-  let pass = choose_list_element random_state all_passes in
-  let kind = choose_list_element random_state (pass_to_operation_kinds pass) in
-  let packed_operation =
+(** The default upper bound on the number of manager operations in a batch.
+
+    As of December 2022, there is no batch maximal size enforced
+    anywhere in the protocol. However, the Octez Shell only accepts
+    batches of at most [operations_batch_size] operations, which has a
+    default value of [50] in [src/lib_shell_services/shell_limits.ml].
+    The protocol tests do not necessarily have to align with this
+    value, but there is no reason either to choose a different
+    one. Therefore, they use the same bound, but decremented once to
+    account for some tests adding a reveal at the front of the batch as
+    needed. *)
+let max_batch_size = 49
+
+let generate_operation =
+  let open QCheck2.Gen in
+  let* pass = oneofl all_passes in
+  let* kind = oneofl (pass_to_operation_kinds pass) in
+  let+ packed_operation =
     match kind with
-    | `KPreendorsement -> generate_preendorsement random_state |> Operation.pack
-    | `KEndorsement -> generate_endorsement random_state |> Operation.pack
-    | `KDal_slot -> generate_dal_slot random_state |> Operation.pack
+    | `KPreendorsement -> generate_operation generate_preendorsement
+    | `KEndorsement -> generate_operation generate_endorsement
+    | `KDal_attestation -> generate_operation generate_dal_attestation
     | `KSeed_nonce_revelation ->
-        generate_seed_nonce_revelation random_state |> Operation.pack
-    | `KVdf_revelation -> generate_vdf_revelation random_state |> Operation.pack
-    | `KDouble_endorsement ->
-        generate_double_endorsement random_state |> Operation.pack
+        generate_operation generate_seed_nonce_revelation
+    | `KVdf_revelation -> generate_operation generate_vdf_revelation
+    | `KDouble_endorsement -> generate_operation generate_double_endorsement
     | `KDouble_preendorsement ->
-        generate_double_preendorsement random_state |> Operation.pack
-    | `KDouble_baking -> generate_double_baking random_state |> Operation.pack
-    | `KActivate_account ->
-        generate_activate_account random_state |> Operation.pack
-    | `KProposals -> generate_proposals random_state |> Operation.pack
-    | `KBallot -> generate_ballot random_state |> Operation.pack
+        generate_operation generate_double_preendorsement
+    | `KDouble_baking -> generate_operation generate_double_baking
+    | `KActivate_account -> generate_operation generate_activate_account
+    | `KProposals -> generate_operation generate_proposals
+    | `KBallot -> generate_operation generate_ballot
     | `KManager ->
-        let batch_size = 1 + Random.int random_state.rnd_state 3 in
-        generate_manager_operation batch_size random_state
+        let* batch_size = int_range 1 max_batch_size in
+        generate_manager_operation batch_size
   in
   (kind, (Operation.hash_packed packed_operation, packed_operation))

@@ -23,221 +23,104 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Splitting_failed of string
-  | Merging_failed of string
-  | Invalid_slot_header of string * string
-  | Missing_shards
-  | Illformed_shard
-  | Slot_not_found
-  | Illformed_pages
+include Slot_manager_legacy
+
+type error += Invalid_slot_size of {provided : int; expected : int}
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"dal.node.split_failed"
-    ~title:"Split failed"
-    ~description:"Splitting the slot failed"
-    ~pp:(fun ppf msg -> Format.fprintf ppf "%s" msg)
-    Data_encoding.(obj1 (req "msg" string))
-    (function Splitting_failed parameter -> Some parameter | _ -> None)
-    (fun parameter -> Splitting_failed parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.merge_failed"
-    ~title:"Merge failed"
-    ~description:"Merging the slot failed"
-    ~pp:(fun ppf msg -> Format.fprintf ppf "%s" msg)
-    Data_encoding.(obj1 (req "msg" string))
-    (function Merging_failed parameter -> Some parameter | _ -> None)
-    (fun parameter -> Merging_failed parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.invalid_slot_header"
-    ~title:"Invalid slot_header"
-    ~description:"The slot header is not valid"
-    ~pp:(fun ppf (msg, com) -> Format.fprintf ppf "%s : %s" msg com)
-    Data_encoding.(obj2 (req "msg" string) (req "com" string))
-    (function Invalid_slot_header (msg, com) -> Some (msg, com) | _ -> None)
-    (fun (msg, com) -> Invalid_slot_header (msg, com)) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.missing_shards"
-    ~title:"Missing shards"
-    ~description:"Some shards are missing"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Some shards are missing. Store is invalid.")
-    Data_encoding.(unit)
-    (function Missing_shards -> Some () | _ -> None)
-    (fun () -> Missing_shards) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.slot_not_found"
-    ~title:"Slot not found"
-    ~description:"Slot not found at this slot header"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Slot not found on given slot header")
-    Data_encoding.(unit)
-    (function Slot_not_found -> Some () | _ -> None)
-    (fun () -> Slot_not_found) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.illformed_shard"
-    ~title:"Illformed shard"
-    ~description:"Illformed shard found in the store"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Illformed shard found in the store")
-    Data_encoding.(unit)
-    (function Illformed_shard -> Some () | _ -> None)
-    (fun () -> Illformed_shard) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.illformed_pages"
-    ~title:"Illformed pages"
-    ~description:"Illformed pages found in the store"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Illformed pages found in the store")
-    Data_encoding.(unit)
-    (function Illformed_pages -> Some () | _ -> None)
-    (fun () -> Illformed_pages)
+    ~id:"dal.node.invalid_slot_size"
+    ~title:"Invalid slot size"
+    ~description:"The size of the given slot is not as expected"
+    ~pp:(fun ppf (provided, expected) ->
+      Format.fprintf
+        ppf
+        "The size (%d) of the given slot is not as expected (%d)"
+        provided
+        expected)
+    Data_encoding.(obj2 (req "provided" int31) (req "expected" int31))
+    (function
+      | Invalid_slot_size {provided; expected} -> Some (provided, expected)
+      | _ -> None)
+    (fun (provided, expected) -> Invalid_slot_size {provided; expected})
 
-type slot = bytes
+(* Used wrapper functions on top of Cryptobox. *)
 
-let wrap_encoding_error =
-  Result.map_error (fun e ->
-      [Tezos_base.Data_encoding_wrapper.Encoding_error e])
-
-let encode enc v = Data_encoding.Binary.to_string enc v |> wrap_encoding_error
-
-let share_path slot_header shard_id = [slot_header; string_of_int shard_id]
-
-let decode_share s =
-  Data_encoding.Binary.of_string Cryptobox.share_encoding s
-  |> Result.map_error (fun e ->
-         [Tezos_base.Data_encoding_wrapper.Decoding_error e])
-
-let save store slot_header shards =
-  let open Lwt_result_syntax in
-  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
-  Cryptobox.IntMap.iter_es
-    (fun i share ->
-      let path = share_path slot_header i in
-      let*? share = encode Cryptobox.share_encoding share in
-      let*! metadata = Store.set ~msg:"Share stored" store path share in
-      return metadata)
-    shards
-
-let split_and_store cb_constants store slot =
-  let r =
-    let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot cb_constants slot in
-    let commitment = Cryptobox.commit cb_constants polynomial in
-    return (polynomial, commitment)
-  in
-  let open Lwt_result_syntax in
-  match r with
-  | Ok (polynomial, commitment) ->
-      let shards = Cryptobox.shards_from_polynomial cb_constants polynomial in
-      let* () = save store commitment shards in
-      let*! () =
-        Event.(
-          emit stored_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
-      in
-      Lwt.return_ok commitment
-  | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
-
-let get_shard store slot_header shard_id =
-  let open Lwt_result_syntax in
-  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
-  let* share =
-    Lwt.catch
-      (fun () ->
-        let*! r = Store.get store (share_path slot_header shard_id) in
-        return r)
-      (function
-        | Invalid_argument _ -> fail [Slot_not_found] | e -> fail [Exn e])
-  in
-  let*? share = decode_share share in
-  return Cryptobox.{index = shard_id; share}
-
-let check_shards initial_constants shards =
+let polynomial_from_slot cryptobox slot =
   let open Result_syntax in
-  if shards = [] then fail [Slot_not_found]
-  else if
-    Compare.List_length_with.(
-      shards = initial_constants.Cryptobox.number_of_shards)
-  then Ok ()
-  else fail [Missing_shards]
+  match Cryptobox.polynomial_from_slot cryptobox slot with
+  | Ok r -> return r
+  | Error (`Slot_wrong_size _) ->
+      let open Cryptobox in
+      let provided = Bytes.length slot in
+      let {slot_size = expected; _} = parameters cryptobox in
+      tzfail @@ Invalid_slot_size {provided; expected}
 
-let get_slot initial_constants dal_constants store slot_header =
+let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in
-  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
-  let*! shards = Store.list store [slot_header] in
-  let*? () = check_shards initial_constants shards in
-  let* shards =
-    List.fold_left_es
-      (fun shards (i, tree) ->
-        let i = int_of_string i in
-        let* share =
-          match Store.Tree.destruct tree with
-          | `Node _ -> fail [Illformed_shard]
-          | `Contents (c, _metadata) ->
-              protect @@ fun () ->
-              let*! share = Store.Tree.Contents.force_exn c in
-              return share
-        in
-        let*? share = decode_share share in
-        return (Cryptobox.IntMap.add i share shards))
-      Cryptobox.IntMap.empty
-      shards
+  let*! exists =
+    Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
   in
-  let*? polynomial =
-    match Cryptobox.polynomial_from_shards dal_constants shards with
-    | Ok p -> Ok p
-    | Error (`Invert_zero msg | `Not_enough_shards msg) ->
-        Error [Merging_failed msg]
+  if not exists then fail `Not_found else return_unit
+
+(* Main functions *)
+
+let add_commitment node_store slot cryptobox =
+  let open Lwt_result_syntax in
+  let*? polynomial = polynomial_from_slot cryptobox slot in
+  let commitment = Cryptobox.commit cryptobox polynomial in
+  let*! exists =
+    Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
   in
-  let slot = Cryptobox.polynomial_to_bytes dal_constants polynomial in
   let*! () =
-    Event.(
-      emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
+    if exists then Lwt.return_unit
+    else
+      Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
   in
-  return slot
+  return commitment
 
-let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
-    store slot_header =
+let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
   let open Lwt_result_syntax in
-  let* slot = get_slot initial_constants dal_constants store slot_header in
-  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
-     If this is not the case, we throw an `Illformed_pages` error.
-  *)
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
-     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
-  let*? pages =
-    String.chunk_bytes
-      page_size
-      slot
-      ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
+  let* () = commitment_should_exist node_store cryptobox commitment in
+  let*! () =
+    Store.Legacy.associate_slot_id_with_commitment node_store commitment slot_id
   in
-  return @@ List.map (fun page -> String.to_bytes page) pages
+  return_unit
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
+let get_commitment_slot node_store cryptobox commitment =
+  let open Lwt_result_syntax in
+  let*! slot_opt =
+    Store.Legacy.find_slot_by_commitment node_store cryptobox commitment
+  in
+  match slot_opt with
+  | None -> fail `Not_found
+  | Some slot_content -> return slot_content
 
-   This can work only if a slot never ends with a `\000`. But I am not
-   sure in general such thing is required. *)
-module Utils = struct
-  let trim_x00 b =
-    let len = ref 0 in
-    let () =
-      try
-        (* Counts the number of \000 from the end of the bytes *)
-        for i = Bytes.length b - 1 downto 0 do
-          if Bytes.get b i = '\000' then incr len else raise Exit
-        done
-      with Exit -> ()
-    in
-    Bytes.sub b 0 (Bytes.length b - !len)
+let store_slot_headers ~block_level ~block_hash slot_headers node_store =
+  Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store
 
-  let fill_x00 slot_size b =
-    let len = Bytes.length b in
-    let extended = Bytes.extend b 0 (slot_size - len) in
-    let () = Bytes.fill extended len (slot_size - len) '\000' in
-    extended
-end
+let update_selected_slot_headers_statuses ~block_level ~attestation_lag
+    ~number_of_slots attested_slots node_store =
+  Store.Legacy.update_selected_slot_headers_statuses
+    ~block_level
+    ~attestation_lag
+    ~number_of_slots
+    attested_slots
+    node_store
+
+let get_commitment_by_published_level_and_index ~level ~slot_index node_store =
+  Store.Legacy.get_commitment_by_published_level_and_index
+    ~level
+    ~slot_index
+    node_store
+
+let get_commitment_headers commitment ?slot_level ?slot_index node_store =
+  Store.Legacy.get_commitment_headers
+    commitment
+    ?slot_level
+    ?slot_index
+    node_store
+
+let get_published_level_headers ~published_level ?header_status store =
+  Store.Legacy.get_published_level_headers ~published_level ?header_status store

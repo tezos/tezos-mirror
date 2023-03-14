@@ -1,0 +1,10 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# See comments in static_x86_64_experimental.yml.
+build:static-x86_64-linux-binaries:
+  extends:
+    - .build_static_binaries_template
+  needs: [trigger]
+  variables:
+    ARCH: "x86_64"
+    EXECUTABLE_FILES: "script-inputs/released-executables"

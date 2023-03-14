@@ -1,7 +1,7 @@
 Node Configuration
 ==================
 
-The Tezos node can be configured in flexible ways to control various
+The Octez node can be configured in flexible ways to control various
 aspects of its behavior, such as :ref:`RPC <configure_rpc>`, :ref:`P2P
 <configure_p2p>`, or :ref:`shell <configure_shell>` parameters, the directory
 for storing data, :doc:`logging <./logging>`, and so on. These aspects
@@ -15,7 +15,7 @@ When the same parameter is set both in the configuration file and using a comman
 The list of configurable options on the command line interface (CLI) can be
 obtained using the following command::
 
-    tezos-node run --help
+    octez-node run --help
 
 .. _node-conf-file:
 
@@ -24,17 +24,17 @@ Configuration file
 
 Parameters in the configuration file can be specified in two different ways:
 
-- by creating and updating the configuration file using the ``config`` command of ``tezos-node``. This covers a subset of the CLI of the ``run`` command of ``tezos-node`` mentioned above.
+- by creating and updating the configuration file using the ``config`` command of ``octez-node``. This covers a subset of the CLI of the ``run`` command of ``octez-node`` mentioned above.
 
   The list of parameters configurable via the ``config`` command can be obtained using the following command::
 
-    tezos-node config update --help
+    octez-node config update --help
 
-- by directly editing the configuration file. This allows to specify all the available configuration parameters, including some that cannot be set using the options of the ``config`` and ``run`` commands of ``tezos-node``, for example network parameters such as connection or authentication timeouts.
+- by directly editing the configuration file. This allows to specify all the available configuration parameters, including some that cannot be set using the options of the ``config`` and ``run`` commands of ``octez-node``, for example network parameters such as connection or authentication timeouts.
 
   The list of configurable parameters in the configuration file can be obtained using the following command::
 
-    tezos-node config --help
+    octez-node config --help
 
   This command also explains the role of each option and parameter and the range of possible values.
 
@@ -43,7 +43,7 @@ The config command
 
 ::
 
-   ./tezos-node config init
+   ./octez-node config init
 
 This will initialize a configuration file for the node in
 ``$HOME/.tezos-node/config.json``, using default values. It only
@@ -60,11 +60,11 @@ The easiest way to amend this default configuration is to use
 ::
 
    # Update the config file:
-   tezos-node config update <…>
+   octez-node config update <…>
    # Check your new values:
-   tezos-node config show
+   octez-node config show
    # If you want to restart from an empty cfg file:
-   tezos-node config reset <…>
+   octez-node config reset <…>
 
 However, note that the ``network`` configuration parameter, needed to run the node on a network other than the default one (Mainnet), can only be defined when the configuration file is initialized (using ``init``), and cannot be updated later (using ``update``). See the instructions for :doc:`running the node in test networks <./multinetwork>`.
 
@@ -79,13 +79,11 @@ Editing the configuration file
 
 All blockchain data is stored under ``$HOME/.tezos-node/`` by default.
 You can
-change this by doing ``./tezos-node config update --data-dir
-</somewhere/in/your/disk>``.
+change this by doing ``./octez-node config update --data-dir </somewhere/in/your/disk>``.
 
 To run multiple nodes on the same machine, you can duplicate and edit
 ``$HOME/.tezos-node/config.json`` while making sure they don't share
-the same ``data-dir``. Then run your node with ``./tezos-node
-run --config-file=</path/to/alternate_cfg>``.
+the same ``data-dir``. Then run your node with ``./octez-node run --config-file=</path/to/alternate_cfg>``.
 
 Here is an example configuration file with several parameters specified.
 Incidentally, it is exactly the one resulting from the command sequence above.
@@ -162,17 +160,17 @@ by command-line argument ``--rpc-addr`` when starting the node.
 
 Additionally either the ``whitelist`` **or** the ``blacklist`` field must be specified
 (but not both), containing a list of paths which should be black-listed or
-white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``tezos-client rpc``
+white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``octez-client rpc``
 command). It may be preceded by a capitalized HTTP method name. In the absence of
 the method, the rule applies to all methods. The path can include an ``*``
 character, which stands for any whole path segment (i.e. it's not allowed to mix ``*``
 with other characters in a path segment).
 A ``**`` stands for any possible path suffix.
 
-Additionally ``--allow-all-rpc`` CLI option to ``tezos-node`` can be used to
+Additionally ``--allow-all-rpc`` CLI option to ``octez-node`` can be used to
 simply allow all RPC endpoints on a given address. When passed to
-``tezos-node config`` command, this option modifies the ``config.json`` file,
-putting an appropriate ACL there. When passed to ``tezos-node run``, it
+``octez-node config`` command, this option modifies the ``config.json`` file,
+putting an appropriate ACL there. When passed to ``octez-node run``, it
 overrides the settings of the ``config.json`` for this particular run, without
 modifying the file.
 
@@ -195,7 +193,7 @@ Examples
 
 ::
 
-  $ tezos-node run --rpc-addr localhost:8732
+  $ octez-node run --rpc-addr localhost:8732
 
 In this case the RPC is only available for requests coming from ``localhost``
 (i.e. ``127.0.0.1``). There's no need configure the ACL, as an allow-all policy
@@ -203,7 +201,7 @@ is applied to the local host by default.
 
 ::
 
-    $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
+    $ octez-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
 
 In this example the RPC is available to both ``localhost`` and to the local
 network (assuming the node does have address ``192.168.0.3`` in that network).
@@ -214,7 +212,7 @@ be filtered by the default ACL (:ref:`see below <default_acl>`).
 In this last case, to listen on both ``localhost`` and local network, it might
 be tempting to listen on the special ``0.0.0.0`` address::
 
-  $ tezos-node run --rpc-addr 0.0.0.0:8732
+  $ octez-node run --rpc-addr 0.0.0.0:8732
 
 ``0.0.0.0`` is a special address, not attached to any particular networking
 interface. Instead it tells the OS to route messages incoming to **all**
@@ -230,11 +228,11 @@ remote hosts, but enable all RPCs for localhost (which is for instance necessary
 to perform baking and endorsing). Since all RPCs are available to localhost by
 default, it is sufficient to open another listening address::
 
-  $ tezos-node run --rpc-addr localhost --rpc-addr 0.0.0.0
+  $ octez-node run --rpc-addr localhost --rpc-addr 0.0.0.0
 
 The ``--allow-all-rpc`` switch can be used to open all RPCs on a specific address::
 
-  $ tezos-node run --rpc-addr 192.168.0.3 --allow-all-rpc 192.168.0.3
+  $ octez-node run --rpc-addr 192.168.0.3 --allow-all-rpc 192.168.0.3
 
 Note that the addresses of both ``--rpc-addr`` and ``--allow-all-rpc`` switches
 should match. In particular remember that ``0.0.0.0`` is a specific address
@@ -354,7 +352,7 @@ hardware wallet.
 
 ::
 
-   tezos-node run --rpc-addr [::] --private-mode \
+   octez-node run --rpc-addr [::] --private-mode \
                                   --no-bootstrap-peers \
                                   --synchronisation-threshold=1 \
                                   --connections 1 \

@@ -28,7 +28,7 @@ open Protocol
 
 let group =
   {
-    Clic.name = "scripts";
+    Tezos_clic.name = "scripts";
     title = "Commands for managing the library of known scripts";
   }
 
@@ -37,7 +37,7 @@ open Client_proto_programs
 open Client_proto_args
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let show_types_switch =
     switch
       ~long:"details"
@@ -82,17 +82,17 @@ let commands () =
     | Some gas -> return gas
   in
   let data_parameter =
-    Clic.parameter (fun _ data ->
+    Tezos_clic.parameter (fun _ data ->
         Lwt.return
           (Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression data))
   in
   let bytes_parameter ~name ~desc =
-    Clic.param ~name ~desc Client_proto_args.bytes_parameter
+    Tezos_clic.param ~name ~desc Client_proto_args.bytes_parameter
   in
   let signature_parameter =
-    Clic.parameter (fun _cctxt s ->
-        match Signature.of_b58check_opt s with
+    Tezos_clic.parameter (fun _cctxt s ->
+        match Tezos_crypto.Signature.V0.of_b58check_opt s with
         | Some s -> return s
         | None -> failwith "Not given a valid signature")
   in
@@ -136,9 +136,12 @@ let commands () =
       (prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
-      @@ Clic.param ~name:"storage" ~desc:"the storage data" data_parameter
+      @@ Tezos_clic.param
+           ~name:"storage"
+           ~desc:"the storage data"
+           data_parameter
       @@ prefixes ["and"; "input"]
-      @@ Clic.param ~name:"storage" ~desc:"the input data" data_parameter
+      @@ Tezos_clic.param ~name:"storage" ~desc:"the input data" data_parameter
       @@ stop)
       (fun (trace_exec, amount, no_print_source) program storage input cctxt ->
         Lwt.return @@ Micheline_parser.no_parsing_error program
@@ -218,9 +221,12 @@ let commands () =
       ~desc:"Ask the node to typecheck a data expression."
       (args2 no_print_source_flag custom_gas_flag)
       (prefixes ["typecheck"; "data"]
-      @@ Clic.param ~name:"data" ~desc:"the data to typecheck" data_parameter
+      @@ Tezos_clic.param
+           ~name:"data"
+           ~desc:"the data to typecheck"
+           data_parameter
       @@ prefixes ["against"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"the expected type" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"the expected type" data_parameter
       @@ stop)
       (fun (no_print_source, custom_gas) data ty cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
@@ -258,9 +264,9 @@ let commands () =
          `SHA256` or `SHA512` instruction."
       (args1 custom_gas_flag)
       (prefixes ["hash"; "data"]
-      @@ Clic.param ~name:"data" ~desc:"the data to hash" data_parameter
+      @@ Tezos_clic.param ~name:"data" ~desc:"the data to hash" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the data" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the data" data_parameter
       @@ stop)
       (fun custom_gas data typ cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
@@ -305,7 +311,7 @@ let commands () =
       ~desc:
         "Parse a byte sequence (in hexadecimal notation) as a data expression, \
          as per Michelson instruction `UNPACK`."
-      Clic.no_options
+      Tezos_clic.no_options
       (prefixes ["unpack"; "michelson"; "data"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the packed data to parse"
       @@ stop)
@@ -334,11 +340,11 @@ let commands () =
       no_options
       (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
+      @@ prefixes ["for"] @@ Client_keys_v0.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
-        Client_keys.sign cctxt sk bytes >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
-        return_unit);
+        Client_keys_v0.sign cctxt sk bytes >>=? fun signature ->
+        cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
+        >>= fun () -> return_unit);
     command
       ~group
       ~desc:
@@ -348,9 +354,9 @@ let commands () =
       (prefixes ["check"; "that"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
       @@ prefixes ["was"; "signed"; "by"]
-      @@ Client_keys.Public_key.alias_param ~name:"key"
+      @@ Client_keys_v0.Public_key.alias_param ~name:"key"
       @@ prefixes ["to"; "produce"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"signature"
            ~desc:"the signature to check"
            signature_parameter
@@ -360,7 +366,7 @@ let commands () =
            (_, (key_locator, _))
            signature
            (cctxt : #Alpha_client_context.full) ->
-        Client_keys.check key_locator signature bytes >>=? function
+        Client_keys_v0.check key_locator signature bytes >>=? function
         | false -> cctxt#error "invalid signature"
         | true ->
             if quiet then return_unit

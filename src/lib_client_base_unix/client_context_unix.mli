@@ -57,11 +57,12 @@ class unix_mockup :
 
 class unix_proxy :
   base_dir:string
+  -> ?protocol:Protocol_hash.t
   -> chain:Shell_services.chain
   -> block:Shell_services.block
   -> confirmations:int option
   -> password_filename:string option
   -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
   -> mode:Tezos_proxy.Proxy_services.mode
-  -> proxy_env:Tezos_proxy.Registration.proxy_environment
+  -> unit
   -> Client_context.full

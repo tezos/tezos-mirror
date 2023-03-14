@@ -50,6 +50,7 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
+.. _tb_validator:
 .. _tb_validator_lima:
 
 Tenderbake is executed for each new block level by a "committee" whose members
@@ -79,12 +80,14 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
 .. _candidate_block_lima:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
+.. _quorum:
 .. _quorum_lima:
 
 Unlike Emmy*, Tenderbake has `two types of
@@ -105,6 +108,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_lima:
 
 Transaction and block finality
@@ -138,6 +142,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake:
 .. _active_stake_lima:
 
 Validator selection: staking balance, active stake, and frozen deposits
@@ -149,7 +154,7 @@ balance*. Let us first (re)define these and related concepts.
 
 - The *(maximal) staking balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
   balances of all accounts that have delegated to it.
-  It must be at least ``TOKENS_PER_ROLL`` tez, otherwise the delegate cannot be selected as a validator.
+  It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.
@@ -181,8 +186,8 @@ not the other way around.):
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
 Delegates can set an upper limit to their frozen deposits with the
-command ``tezos-client set deposits limit for <delegate> to
-<deposit_limit>``, and unset this limit with the command ``tezos-client
+command ``octez-client set deposits limit for <delegate> to
+<deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``. When emitting such a
 command in cycle ``c``, it affects the active stake for cycles starting
@@ -366,10 +371,11 @@ maximum 2333 extra endorsements it could have theoretically included.) Finally, 
 delegate C, whose active stake at some cycle is 5% of the total stake. Note that
 his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
 2,867,200`` slots. Assume also that the endorsing power of C's endorsements
-included during that cycle has been ``3,123,456`` slots. Given that this number is
+included during that cycle has been ``2,123,456`` slots. Given that this number is
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
 reward of ``2,867,200 * 0.002857 = 8191.59`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_lima:
 
 Slashing
@@ -380,7 +386,7 @@ validator does not reveal its nonce by the end of the cycle, it does not receive
 its endorsing rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or
 it double (pre)endorses (which means voting on two different proposals at the
-same level and round), the frozen deposit is slashed. The slashed amount for double baking
+same level and round), a part of the frozen deposit is slashed. The slashed amount for double baking
 is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double (pre)endorsing is
 a fixed percentage ``RATIO_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ENDORSEMENT``
 of the frozen deposit. The payload producer that includes the misbehavior
@@ -398,6 +404,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _cs_constants:
 .. _cs_constants_lima:
 
 Consensus related protocol parameters
@@ -436,10 +443,16 @@ Consensus related protocol parameters
 
 These are a subset of the :ref:`protocol constants <protocol_constants_lima>`.
 
+.. _shell_proto_revisit:
 .. _shell_proto_revisit_lima:
 
 Shell-protocol interaction revisited
 ------------------------------------
+
+.. FIXME tezos/tezos#3914:
+
+   Integrate protocol-specific block parts in the blocks and ops
+   entry.
 
 :ref:`Recall<shell_proto_interact_lima>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
 Namely, these two notions are the protocol-specific header and the fitness.
@@ -452,6 +465,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_lima>`.
 
+.. _fitness:
 .. _fitness_lima:
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.

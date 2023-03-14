@@ -33,7 +33,7 @@ type state = {
   constants : Constants.t;
   batch_burn_limit : Tez.t option;
   index : Context.index;
-  signer : Signature.public_key_hash;
+  signer : Signature.V0.public_key_hash;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
@@ -158,7 +158,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
   let*? aggregated_signature =
-    match Bls.aggregate_signature_opt tr.signatures with
+    match Signature.Bls.aggregate_signature_opt tr.signatures with
     | Some s -> ok s
     | None -> error_with "could not aggregate signatures of transaction"
   in
@@ -241,7 +241,7 @@ module Types = struct
   type nonrec state = state
 
   type parameters = {
-    signer : Signature.public_key_hash;
+    signer : Signature.V0.public_key_hash;
     index : Context.index;
     constants : Constants.t;
     batch_burn_limit : Tez.t option;

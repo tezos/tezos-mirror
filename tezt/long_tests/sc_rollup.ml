@@ -54,16 +54,13 @@ let hex_encode (input : string) : string =
    the kernel must fit into a single Tezos operation.
 *)
 let read_kernel name : string =
-  let module G = Tezos_scoru_wasm.Gather_floppies in
   let open Tezt.Base in
   let kernel_file =
     project_root // Filename.dirname __FILE__
     // "../../src/proto_alpha/lib_protocol/test/integration/wasm_kernel"
     // (name ^ ".wasm")
   in
-  hex_encode
-  @@ Data_encoding.Binary.to_string_exn G.origination_message_encoding
-  @@ G.Complete_kernel (Bytes.of_string @@ read_file kernel_file)
+  hex_encode (read_file kernel_file)
 
 type sc_rollup_constants = {
   origination_size : int;
@@ -106,12 +103,11 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let operator = Constant.bootstrap1.alias in
   f node client operator
 
-let send_message client sc_rollup msg =
+let send_message client msg =
   let* () =
     Client.Sc_rollup.send_message
       ~hooks
       ~src:Constant.bootstrap2.alias
-      ~dst:sc_rollup
       ~msg
       client
   in
@@ -161,11 +157,12 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
   let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
-      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+           sc_rollup
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-    let* () = Sc_rollup_node.run sc_rollup_node in
+    let* () = Sc_rollup_node.run sc_rollup_node [] in
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
 
     let* level =
@@ -196,16 +193,16 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     in
     (* Called with monotonically increasing [i] *)
     let test_message i =
-      let* prev_state_hash =
+      let*! prev_state_hash =
         Sc_rollup_client.state_hash ~hooks sc_rollup_client
       in
-      let* prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+      let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
       let message = sf "%d %d + value" i ((i + 2) * 2) in
       let* () =
         match forwarder with
         | None ->
             (* External message *)
-            send_message client sc_rollup (sf "[%S]" message)
+            send_message client (sf "[%S]" message)
         | Some forwarder ->
             (* Internal message through forwarder *)
             let* () =
@@ -224,7 +221,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       let* () =
         match kind with
         | "arith" ->
-            let* encoded_value =
+            let*! encoded_value =
               Sc_rollup_client.state_value
                 ~hooks
                 sc_rollup_client
@@ -258,12 +255,12 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         | _otherwise -> raise (Invalid_argument kind)
       in
 
-      let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
+      let*! state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
       Check.(state_hash <> prev_state_hash)
         Check.string
         ~error_msg:"State hash has not changed (%L <> %R)" ;
 
-      let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+      let*! ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
       Check.(ticks >= prev_ticks)
         Check.int
         ~error_msg:"Tick counter did not advance (%L >= %R)" ;

@@ -5,6 +5,9 @@
  (name gen0)
  (libraries
   compiler-libs.common)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules gen0))
 
 (executable

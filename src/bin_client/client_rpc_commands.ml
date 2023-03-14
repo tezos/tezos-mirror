@@ -25,7 +25,7 @@
 
 (* Tezos Command line interface - Generic JSON RPC interface *)
 
-open Clic
+open Tezos_clic
 open Json_schema
 
 (*-- Assisted, schema directed input fill in --------------------------------*)
@@ -210,12 +210,12 @@ let editor_fill_in ?(show_optionals = true) schema =
 (*-- Nice list display ------------------------------------------------------*)
 
 let rec count =
-  let open RPC_description in
+  let open Tezos_rpc.Description in
   function
   | Empty -> 0
   | Dynamic _ -> 1
   | Static {services; subdirs} ->
-      let service = RPC_service.MethMap.cardinal services in
+      let service = Tezos_rpc.Service.MethMap.cardinal services in
       let subdirs =
         match subdirs with
         | None -> 0
@@ -230,14 +230,14 @@ let rec count =
 let list url (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let args = String.split_no_empty '/' url in
-  let* tree = RPC_description.describe cctxt ~recurse:true args in
-  let open RPC_description in
+  let* tree = Tezos_rpc.Description.describe cctxt ~recurse:true args in
+  let open Tezos_rpc.Description in
   let collected_args = ref [] in
   let collect arg =
     if
       not
-        (arg.RPC_arg.descr <> None
-        && List.mem ~equal:RPC_arg.eq_descr arg !collected_args)
+        (arg.Tezos_rpc.Arg.descr <> None
+        && List.mem ~equal:Tezos_rpc.Arg.eq_descr arg !collected_args)
     then collected_args := arg :: !collected_args
   in
   let display_paragraph ppf description =
@@ -248,16 +248,21 @@ let list url (cctxt : #Client_context.full) =
       (String.split_no_empty ' ' description)
   in
   let display_arg ppf arg =
-    match arg.RPC_arg.descr with
-    | None -> Format.fprintf ppf "%s" arg.RPC_arg.name
+    match arg.Tezos_rpc.Arg.descr with
+    | None -> Format.fprintf ppf "%s" arg.Tezos_rpc.Arg.name
     | Some descr ->
-        Format.fprintf ppf "<%s>%a" arg.RPC_arg.name display_paragraph descr
+        Format.fprintf
+          ppf
+          "<%s>%a"
+          arg.Tezos_rpc.Arg.name
+          display_paragraph
+          descr
   in
   let display_service ppf (_path, tpath, service) =
     Format.fprintf
       ppf
       "- %s /%s"
-      (RPC_service.string_of_meth service.meth)
+      (Tezos_rpc.Service.string_of_meth service.meth)
       (String.concat "/" tpath) ;
     match service.description with
     | None | Some "" -> ()
@@ -267,7 +272,7 @@ let list url (cctxt : #Client_context.full) =
     Format.pp_print_list
       (fun ppf (_, s) -> display_service ppf (_path, tpath, s))
       ppf
-      (RPC_service.MethMap.bindings services)
+      (Tezos_rpc.Service.MethMap.bindings services)
   in
   let rec display ppf (path, tpath, tree) =
     match tree with
@@ -281,7 +286,7 @@ let list url (cctxt : #Client_context.full) =
         display_services ppf (path, tpath, services)
     | Static {services; subdirs = Some (Suffixes subdirs)} -> (
         match
-          ( RPC_service.MethMap.cardinal services,
+          ( Tezos_rpc.Service.MethMap.cardinal services,
             Resto.StringMap.bindings subdirs )
         with
         | 0, [] -> ()
@@ -315,15 +320,15 @@ let list url (cctxt : #Client_context.full) =
                 Format.fprintf ppf "@,%a" display (path @ [n], tpath @ [n], t))
               items)
     | Static {services; subdirs = Some (Arg (arg, solo))}
-      when RPC_service.MethMap.cardinal services = 0 ->
+      when Tezos_rpc.Service.MethMap.cardinal services = 0 ->
         collect arg ;
-        let name = Printf.sprintf "<%s>" arg.RPC_arg.name in
+        let name = Printf.sprintf "<%s>" arg.Tezos_rpc.Arg.name in
         display ppf (path @ [name], tpath @ [name], solo)
     | Static {services; subdirs = Some (Arg (arg, solo))} ->
         collect arg ;
         display_services ppf (path, tpath, services) ;
         Format.fprintf ppf "@," ;
-        let name = Printf.sprintf "<%s>" arg.RPC_arg.name in
+        let name = Printf.sprintf "<%s>" arg.Tezos_rpc.Arg.name in
         display ppf (path @ [name], tpath @ [name], solo)
   and display_list tpath =
     Format.pp_print_list (fun ppf (n, t) -> display ppf ([n], tpath @ [n], t))
@@ -347,11 +352,11 @@ let list url (cctxt : #Client_context.full) =
 let schema meth url (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let args = String.split_no_empty '/' url in
-  let open RPC_description in
-  let* s = RPC_description.describe cctxt ~recurse:false args in
+  let open Tezos_rpc.Description in
+  let* s = Tezos_rpc.Description.describe cctxt ~recurse:false args in
   match s with
   | Static {services; _} -> (
-      match RPC_service.MethMap.find_opt meth services with
+      match Tezos_rpc.Service.MethMap.find_opt meth services with
       | None -> no_service_at_valid_prefix cctxt
       | Some {input = Some input; output; _} ->
           let json =
@@ -374,16 +379,16 @@ let schema meth url (cctxt : #Client_context.full) =
 let format binary meth url (cctxt : #Client_context.io_rpcs) =
   let open Lwt_result_syntax in
   let args = String.split_no_empty '/' url in
-  let open RPC_description in
+  let open Tezos_rpc.Description in
   let pp =
     if binary then fun ppf (_, schema) ->
       Data_encoding.Binary_schema.pp ppf schema
     else fun ppf (schema, _) -> Json_schema.pp ppf schema
   in
-  let* s = RPC_description.describe cctxt ~recurse:false args in
+  let* s = Tezos_rpc.Description.describe cctxt ~recurse:false args in
   match s with
   | Static {services; _} -> (
-      match RPC_service.MethMap.find_opt meth services with
+      match Tezos_rpc.Service.MethMap.find_opt meth services with
       | None -> no_service_at_valid_prefix cctxt
       | Some {input = Some input; output; _} ->
           let*! () =
@@ -417,7 +422,7 @@ let fill_in ?(show_optionals = true) schema =
   | _ -> editor_fill_in ~show_optionals schema
 
 let display_answer (cctxt : #Client_context.full) :
-    RPC_context.generic_call_result -> unit Lwt.t = function
+    Tezos_rpc.Context.generic_call_result -> unit Lwt.t = function
   | `Json (`Ok json) -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
   | `Binary (`Ok binary) -> cctxt#answer "%a" Hex.pp (Hex.of_string binary)
   | `Json (`Error (Some error)) ->
@@ -471,10 +476,10 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
     let*! () = display_answer cctxt answer in
     return_unit
   else
-    let* s = RPC_description.describe cctxt ~recurse:false args in
+    let* s = Tezos_rpc.Description.describe cctxt ~recurse:false args in
     match s with
     | Static {services; _} -> (
-        match RPC_service.MethMap.find_opt meth services with
+        match Tezos_rpc.Service.MethMap.find_opt meth services with
         | None -> no_service_at_valid_prefix cctxt
         | Some {input = None; _} ->
             let*! () =
@@ -540,7 +545,8 @@ let meth_params ?(name = "HTTP method") ?(desc = "") params =
          | Some meth -> return meth))
     params
 
-let group = {Clic.name = "rpc"; title = "Commands for the low level RPC layer"}
+let group =
+  {Tezos_clic.name = "rpc"; title = "Commands for the low level RPC layer"}
 
 let commands =
   [

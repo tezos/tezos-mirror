@@ -1,0 +1,10 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+docker:amd64:
+  extends:
+    - .build_docker_release_template
+  variables:
+    IMAGE_ARCH_PREFIX: "amd64_"
+    CI_DOCKER_HUB: "true"
+    EXECUTABLE_FILES: "script-inputs/released-executables"
+  stage: build

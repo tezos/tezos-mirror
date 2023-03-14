@@ -28,7 +28,7 @@
 type validator_environment = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
 }
 
 type validator_kind =
@@ -41,12 +41,17 @@ type validator_kind =
       protocol_root : string;
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
+      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
     }
       -> validator_kind
+
+type simple_kind = External_process | Single_process
 
 (* A common interface for the two type of validation *)
 module type S = sig
   type t
+
+  val kind : simple_kind
 
   val close : t -> unit Lwt.t
 
@@ -73,6 +78,7 @@ module type S = sig
     predecessor_max_operations_ttl:int ->
     predecessor_block_metadata_hash:Block_metadata_hash.t option ->
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+    predecessor_resulting_context_hash:Context_hash.t ->
     Operation.t list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
@@ -86,7 +92,13 @@ module type S = sig
     unit tzresult Lwt.t
 
   val context_garbage_collection :
-    t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
+    t ->
+    Context_ops.index ->
+    Context_hash.t ->
+    gc_lockfile_path:string ->
+    unit tzresult Lwt.t
+
+  val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
@@ -150,7 +162,7 @@ module Internal_validator_process = struct
     chain_store : Store.chain_store;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
-    operation_metadata_size_limit : int option;
+    operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
     (*
        The cache must be updated by the component that owns the
        context, i.e., the component that has the writing permissions
@@ -183,6 +195,8 @@ module Internal_validator_process = struct
         preapply_result = None;
       }
 
+  let kind = Single_process
+
   let close _ = Events.(emit close ())
 
   let get_context_index chain_store =
@@ -198,14 +212,19 @@ module Internal_validator_process = struct
     let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
-    let context_hash = predecessor_block_header.shell.context in
+    let* predecessor_resulting_context_hash =
+      Store.Block.resulting_context_hash chain_store predecessor
+    in
     let context_index = get_context_index chain_store in
     let* predecessor_context =
-      let*! o = Context_ops.checkout context_index context_hash in
+      let*! o =
+        Context_ops.checkout context_index predecessor_resulting_context_hash
+      in
       match o with
       | None ->
           tzfail
-            (Block_validator_errors.Failed_to_checkout_context context_hash)
+            (Block_validator_errors.Failed_to_checkout_context
+               predecessor_resulting_context_hash)
       | Some ctx -> return ctx
     in
     let predecessor_block_metadata_hash =
@@ -222,6 +241,7 @@ module Internal_validator_process = struct
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         predecessor_context;
+        predecessor_resulting_context_hash;
         user_activated_upgrades;
         user_activated_protocol_overrides;
         operation_metadata_size_limit;
@@ -239,12 +259,15 @@ module Internal_validator_process = struct
     in
     let now = Time.System.now () in
     let block_hash = Block_header.hash block_header in
-    let predecessor_context_hash = Store.Block.context_hash predecessor in
+    let predecessor_resulting_context_hash =
+      env.predecessor_resulting_context_hash
+    in
     let*! () = Events.(emit validation_request (block_hash, env.chain_id)) in
     let cache =
       match validator.cache with
       | None -> `Load
-      | Some block_cache -> `Inherited (block_cache, predecessor_context_hash)
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_resulting_context_hash)
     in
     let* {result; cache} =
       Block_validation.apply
@@ -260,7 +283,8 @@ module Internal_validator_process = struct
       let then_ = Time.System.now () in
       Ptime.diff then_ now
     in
-    validator.cache <- Some {context_hash = block_header.shell.context; cache} ;
+    validator.cache <-
+      Some {context_hash = predecessor_resulting_context_hash; cache} ;
     validator.preapply_result <- None ;
     let*! () = Events.(emit validation_success (block_hash, timespan)) in
     return result
@@ -268,18 +292,21 @@ module Internal_validator_process = struct
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash operations =
+      ~predecessor_ops_metadata_hash ~predecessor_resulting_context_hash
+      operations =
     let open Lwt_result_syntax in
     let context_index =
       Store.context_index (Store.Chain.global_store validator.chain_store)
     in
-    let context_hash = predecessor_shell_header.Block_header.context in
     let* predecessor_context =
-      let*! o = Context_ops.checkout context_index context_hash in
+      let*! o =
+        Context_ops.checkout context_index predecessor_resulting_context_hash
+      in
       match o with
       | None ->
           tzfail
-            (Block_validator_errors.Failed_to_checkout_context context_hash)
+            (Block_validator_errors.Failed_to_checkout_context
+               predecessor_resulting_context_hash)
       | Some ctx -> return ctx
     in
     let user_activated_upgrades = validator.user_activated_upgrades in
@@ -300,6 +327,7 @@ module Internal_validator_process = struct
         ~live_blocks
         ~live_operations
         ~predecessor_context
+        ~predecessor_resulting_context_hash
         ~predecessor_shell_header
         ~predecessor_hash
         ~predecessor_max_operations_ttl
@@ -318,20 +346,25 @@ module Internal_validator_process = struct
       Store.context_index (Store.Chain.global_store validator.chain_store)
     in
     let predecessor_block_header = Store.Block.header predecessor in
-    let context_hash = predecessor_block_header.Block_header.shell.context in
+    let* predecessor_resulting_context_hash =
+      Store.Block.resulting_context_hash chain_store predecessor
+    in
     let* predecessor_context =
-      let*! o = Context_ops.checkout context_index context_hash in
+      let*! o =
+        Context_ops.checkout context_index predecessor_resulting_context_hash
+      in
       match o with
       | None ->
           tzfail
-            (Block_validator_errors.Failed_to_checkout_context context_hash)
+            (Block_validator_errors.Failed_to_checkout_context
+               predecessor_resulting_context_hash)
       | Some ctx -> return ctx
     in
     let cache =
       match validator.cache with
       | None -> `Lazy
       | Some block_cache ->
-          `Inherited (block_cache, predecessor_block_header.shell.context)
+          `Inherited (block_cache, predecessor_resulting_context_hash)
     in
     let predecessor_block_hash = Store.Block.hash predecessor in
     Block_validation.precheck
@@ -339,13 +372,20 @@ module Internal_validator_process = struct
       ~predecessor_block_header
       ~predecessor_block_hash
       ~predecessor_context
+      ~predecessor_resulting_context_hash
       ~cache
       header
       operations
 
-  let context_garbage_collection _validator context_index context_hash =
+  let context_garbage_collection _validator context_index context_hash
+      ~gc_lockfile_path:_ =
     let open Lwt_result_syntax in
     let*! () = Context_ops.gc context_index context_hash in
+    return_unit
+
+  let context_split _validator context_index =
+    let open Lwt_result_syntax in
+    let*! () = Context_ops.split context_index in
     return_unit
 
   let commit_genesis validator ~chain_id =
@@ -523,12 +563,15 @@ module External_validator_process = struct
     protocol_root : string;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
-    operation_metadata_size_limit : int option;
+    operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
     process_path : string;
     mutable validator_process : process_status;
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
+    dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   }
+
+  let kind = External_process
 
   (* The shutdown_timeout is used when closing the block validator
      process. It aims to allow it to shutdown gracefully. This delay
@@ -621,6 +664,7 @@ module External_validator_process = struct
         user_activated_upgrades = vp.user_activated_upgrades;
         user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
         operation_metadata_size_limit = vp.operation_metadata_size_limit;
+        dal_config = vp.dal_config;
       }
     in
     vp.validator_process <-
@@ -731,7 +775,7 @@ module External_validator_process = struct
          _;
        } :
         validator_environment) ~genesis ~data_dir ~readonly ~context_root
-      ~protocol_root ~process_path ~sandbox_parameters =
+      ~protocol_root ~process_path ~sandbox_parameters ~dal_config =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
@@ -748,6 +792,7 @@ module External_validator_process = struct
         validator_process = Uninitialized;
         lock = Lwt_mutex.create ();
         sandbox_parameters;
+        dal_config;
       }
     in
     let* () =
@@ -757,6 +802,7 @@ module External_validator_process = struct
 
   let apply_block ~simulate ?(should_precheck = true) validator chain_store
       ~predecessor ~max_operations_ttl block_header operations =
+    let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let predecessor_block_metadata_hash =
@@ -764,6 +810,9 @@ module External_validator_process = struct
     in
     let predecessor_ops_metadata_hash =
       Store.Block.all_operations_metadata_hash predecessor
+    in
+    let* predecessor_resulting_context_hash =
+      Store.Block.resulting_context_hash chain_store predecessor
     in
     let request =
       External_validation.Validate
@@ -773,6 +822,7 @@ module External_validator_process = struct
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
           max_operations_ttl;
           should_precheck;
@@ -784,7 +834,8 @@ module External_validator_process = struct
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash operations =
+      ~predecessor_ops_metadata_hash ~predecessor_resulting_context_hash
+      operations =
     let request =
       External_validation.Preapply
         {
@@ -798,21 +849,27 @@ module External_validator_process = struct
           predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
         }
     in
     send_request validator request Block_validation.preapply_result_encoding
 
   let precheck_block validator chain_store ~predecessor header hash operations =
+    let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let predecessor_block_hash = Store.Block.hash predecessor in
+    let* predecessor_resulting_context_hash =
+      Store.Block.resulting_context_hash chain_store predecessor
+    in
     let request =
       External_validation.Precheck
         {
           chain_id;
           predecessor_block_header;
           predecessor_block_hash;
+          predecessor_resulting_context_hash;
           header;
           operations;
           hash;
@@ -820,10 +877,16 @@ module External_validator_process = struct
     in
     send_request validator request Data_encoding.unit
 
-  let context_garbage_collection validator _index context_hash =
+  let context_garbage_collection validator _index context_hash ~gc_lockfile_path
+      =
     let request =
-      External_validation.Context_garbage_collection {context_hash}
+      External_validation.Context_garbage_collection
+        {context_hash; gc_lockfile_path}
     in
+    send_request validator request Data_encoding.unit
+
+  let context_split validator _index =
+    let request = External_validation.Context_split in
     send_request validator request Data_encoding.unit
 
   let commit_genesis validator ~chain_id =
@@ -915,6 +978,7 @@ let init validator_environment validator_kind =
         protocol_root;
         process_path;
         sandbox_parameters;
+        dal_config;
       } ->
       let* (validator : 'b) =
         External_validator_process.init
@@ -926,11 +990,16 @@ let init validator_environment validator_kind =
           ~protocol_root
           ~process_path
           ~sandbox_parameters
+          ~dal_config
       in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)
       in
       return (E {validator_process; validator})
+
+let kind (E {validator_process; _}) =
+  let (module M) = validator_process in
+  M.kind
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
 
@@ -945,12 +1014,12 @@ let apply_block ?(simulate = false) ?(should_precheck = true)
   let block_hash = Block_header.hash header in
   let* () =
     when_ (not should_precheck) (fun () ->
-        let*! is_prechecked =
-          Store.Block.is_known_prechecked chain_store block_hash
+        let*! is_validated =
+          Store.Block.is_known_validated chain_store block_hash
         in
         fail_unless
-          is_prechecked
-          (Block_validator_errors.Applying_non_prechecked_block block_hash))
+          is_validated
+          (Block_validator_errors.Applying_non_validated_block block_hash))
   in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
@@ -979,8 +1048,16 @@ let precheck_block (E {validator_process = (module VP); validator}) chain_store
   VP.precheck_block validator chain_store ~predecessor header operations
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
-    context_index context_hash =
-  VP.context_garbage_collection validator context_index context_hash
+    context_index context_hash ~gc_lockfile_path =
+  VP.context_garbage_collection
+    validator
+    context_index
+    context_hash
+    ~gc_lockfile_path
+
+let context_split (E {validator_process = (module VP); validator}) context_index
+    =
+  VP.context_split validator context_index
 
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id
@@ -1008,6 +1085,9 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let predecessor_max_operations_ttl =
     Store.Block.max_operations_ttl metadata
   in
+  let* predecessor_resulting_context_hash =
+    Store.Block.resulting_context_hash chain_store predecessor
+  in
   VP.preapply_block
     validator
     ~chain_id
@@ -1020,4 +1100,5 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
     ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash
     ~predecessor_ops_metadata_hash
+    ~predecessor_resulting_context_hash
     operations

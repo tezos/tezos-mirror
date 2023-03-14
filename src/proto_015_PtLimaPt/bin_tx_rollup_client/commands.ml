@@ -23,12 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
 open Tezos_client_base
 
 let l1_destination_parameter =
-  parameter (fun _ s ->
-      match Signature.Public_key_hash.of_b58check_opt s with
+  Tezos_clic.parameter (fun _ s ->
+      match Signature.V0.Public_key_hash.of_b58check_opt s with
       | Some addr -> return addr
       | None -> failwith "cannot parse %s to get a valid destination" s)
 
@@ -39,7 +38,7 @@ let parse_file parse path =
 
 let file_or_text_parameter ~from_text
     ?(from_path = parse_file (from_text ~heuristic:false)) () =
-  parameter @@ fun _ p ->
+  Tezos_clic.parameter @@ fun _ p ->
   match String.split ~limit:1 ':' p with
   | ["text"; text] -> from_text ~heuristic:false text
   | ["file"; path] -> from_path path
@@ -67,51 +66,54 @@ let alias_or_literal ~from_alias ~from_key =
 
 type wallet_entry = {
   alias : string;
-  public_key_hash : Bls.Public_key_hash.t;
-  public_key : Bls.Public_key.t option;
-  secret_key_uri : Client_keys.aggregate_sk_uri option;
+  public_key_hash : Signature.Bls.Public_key_hash.t;
+  public_key : Signature.Bls.Public_key.t option;
+  secret_key_uri : Client_keys_v0.aggregate_sk_uri option;
 }
 
 let wallet_parameter () =
-  parameter (fun cctxt alias ->
+  Tezos_clic.parameter (fun cctxt alias ->
       let open Lwt_result_syntax in
-      let open Aggregate_signature in
+      let open Tezos_crypto.Aggregate_signature in
       let* (Bls12_381 public_key_hash) =
-        Client_keys.Aggregate_alias.Public_key_hash.find cctxt alias
+        Client_keys_v0.Aggregate_alias.Public_key_hash.find cctxt alias
       in
       let* _, pk_opt =
-        Client_keys.Aggregate_alias.Public_key.find cctxt alias
+        Client_keys_v0.Aggregate_alias.Public_key.find cctxt alias
       in
       let public_key =
         Option.map (fun (Bls12_381 pk : public_key) -> pk) pk_opt
       in
       let+ secret_key_uri =
-        Client_keys.Aggregate_alias.Secret_key.find_opt cctxt alias
+        Client_keys_v0.Aggregate_alias.Secret_key.find_opt cctxt alias
       in
       {alias; public_key_hash; public_key; secret_key_uri})
 
 let wallet_param ?(name = "an alias for a tz4 address")
     ?(desc = "an alias for a tz4 address") =
-  param ~name ~desc @@ wallet_parameter ()
+  Tezos_clic.param ~name ~desc @@ wallet_parameter ()
 
-let tezos_pkh_param = Client_keys.Public_key_hash.source_param
+let tezos_pkh_param = Client_keys_v0.Public_key_hash.source_param
 
 let bls_pkh_parameter () =
-  parameter
-    ~autocomplete:Client_keys.Aggregate_alias.Public_key_hash.autocomplete
+  Tezos_clic.parameter
+    ~autocomplete:Client_keys_v0.Aggregate_alias.Public_key_hash.autocomplete
     (fun cctxt s ->
       let open Lwt_result_syntax in
       let from_alias s =
         let* (Bls12_381 pkh) =
-          Client_keys.Aggregate_alias.Public_key_hash.find cctxt s
+          Client_keys_v0.Aggregate_alias.Public_key_hash.find cctxt s
         in
         return pkh
       in
-      let from_key s = Bls.Public_key_hash.of_b58check s |> Lwt.return in
+      let from_key s =
+        Signature.Bls.Public_key_hash.of_b58check s |> Lwt.return
+      in
       alias_or_literal ~from_alias ~from_key s)
 
 let conv_bls_pkh_to_l2_addr pkh =
-  Bls.Public_key_hash.to_b58check pkh |> Tx_rollup_l2_address.of_b58check_exn
+  Signature.Bls.Public_key_hash.to_b58check pkh
+  |> Tx_rollup_l2_address.of_b58check_exn
 
 let bls_pkh_param ?(name = "public key hash")
     ?(desc = "bls public key hash to use") =
@@ -122,15 +124,15 @@ let bls_pkh_param ?(name = "public key hash")
         desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
       ]
   in
-  param
+  Tezos_clic.param
     ~name
     ~desc
-    (map_parameter ~f:conv_bls_pkh_to_l2_addr (bls_pkh_parameter ()))
+    (Tezos_clic.map_parameter ~f:conv_bls_pkh_to_l2_addr (bls_pkh_parameter ()))
 
 let bls_sk_uri_parameter () =
-  parameter
-    ~autocomplete:Client_keys.Aggregate_alias.Secret_key.autocomplete
-    Client_keys.Aggregate_alias.Secret_key.find
+  Tezos_clic.parameter
+    ~autocomplete:Client_keys_v0.Aggregate_alias.Secret_key.autocomplete
+    Client_keys_v0.Aggregate_alias.Secret_key.find
 
 let bls_sk_uri_param ?(name = "secret key") ?(desc = "Bls secret key to use.") =
   let desc =
@@ -140,20 +142,21 @@ let bls_sk_uri_param ?(name = "secret key") ?(desc = "Bls secret key to use.") =
         desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
       ]
   in
-  param ~name ~desc (bls_sk_uri_parameter ())
+  Tezos_clic.param ~name ~desc (bls_sk_uri_parameter ())
 
 let signature_parameter () =
-  parameter (fun _cctxt s -> Bls.of_b58check s |> Lwt.return)
+  Tezos_clic.parameter (fun _cctxt s ->
+      Signature.Bls.of_b58check s |> Lwt.return)
 
 let signature_arg =
-  arg
+  Tezos_clic.arg
     ~doc:"aggregated signature"
     ~long:"aggregated-signature"
     ~placeholder:"current aggregated signature"
     (signature_parameter ())
 
 let transaction_parameter =
-  map_parameter
+  Tezos_clic.map_parameter
     ~f:(fun json ->
       try
         Data_encoding.Json.destruct
@@ -168,10 +171,14 @@ let transaction_parameter =
     json_parameter
 
 let transaction_param next =
-  param ~name:"transaction" ~desc:"Transaction" transaction_parameter next
+  Tezos_clic.param
+    ~name:"transaction"
+    ~desc:"Transaction"
+    transaction_parameter
+    next
 
 let l2_transaction_parameter =
-  map_parameter
+  Tezos_clic.map_parameter
     ~f:(fun json ->
       try Data_encoding.Json.destruct L2_transaction.encoding json
       with Data_encoding.Json.Cannot_destruct (_path, exn) ->
@@ -183,7 +190,7 @@ let l2_transaction_parameter =
     json_parameter
 
 let l2_transaction_param next =
-  param
+  Tezos_clic.param
     ~name:"signed l2 transaction"
     ~desc:
       "Signed l2 transaction. Must be a valid json with the following format: \
@@ -193,44 +200,44 @@ let l2_transaction_param next =
 
 let block_id_param =
   let open Lwt_result_syntax in
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match RPC.destruct_block_id s with
       | Ok v -> return v
       | Error e -> failwith "%s" e)
 
 let ticket_hash_parameter =
   let open Lwt_result_syntax in
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Alpha_context.Ticket_hash.of_b58check_opt s with
       | Some tkh -> return tkh
       | None -> failwith "cannot parse %s to get a valid ticket_hash" s)
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let get_tx_address_balance_command () =
-  command
+  Tezos_clic.command
     ~desc:"returns the balance associated to a given tz4 address and ticket"
-    (args1
-       (default_arg
+    (Tezos_clic.args1
+       (Tezos_clic.default_arg
           ~long:"block"
           ~placeholder:"block"
           ~doc:"block from which the balance is expected"
           ~default:"head"
           block_id_param))
-    (prefixes ["get"; "balance"; "for"]
+    (Tezos_clic.prefixes ["get"; "balance"; "for"]
     @@ bls_pkh_param
          ~name:"tz4"
          ~desc:"tz4 address from which the balance is queried"
-    @@ prefixes ["of"]
-    @@ param
+    @@ Tezos_clic.prefixes ["of"]
+    @@ Tezos_clic.param
          ~name:"ticket-hash"
          ~desc:"ticket from which the balance is expected"
          ticket_hash_parameter
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun block tz4 ticket (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let* value = RPC.balance cctxt block ticket tz4 in
@@ -238,15 +245,15 @@ let get_tx_address_balance_command () =
       return_unit)
 
 let get_tx_inbox () =
-  command
+  Tezos_clic.command
     ~desc:"returns the inbox for a given block identifier"
-    no_options
-    (prefixes ["get"; "inbox"; "for"]
-    @@ param
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["get"; "inbox"; "for"]
+    @@ Tezos_clic.param
          ~name:"block"
          ~desc:"block from which the inbox is requested"
          block_id_param
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun () block (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let* inbox = RPC.inbox cctxt block in
@@ -255,14 +262,14 @@ let get_tx_inbox () =
       return_unit)
 
 let format_flag =
-  default_arg
+  Tezos_clic.default_arg
     ~doc:
       "Whether to return the L2 block in raw format (raw) or as a more  human \
        readable version (fancy, default).\n"
     ~long:"format"
     ~placeholder:"FORMAT"
     ~default:"fancy"
-    (parameter (fun (cctxt : #Client_context.printer) format ->
+    (Tezos_clic.parameter (fun (cctxt : #Client_context.printer) format ->
          match format with
          | "fancy" -> Lwt.return_ok `Fancy
          | "raw" -> Lwt.return_ok `Raw
@@ -271,12 +278,12 @@ let format_flag =
                "Cannot decode --format argument, use 'raw' or 'fancy'."))
 
 let get_tx_block () =
-  command
+  Tezos_clic.command
     ~desc:"returns the tx rollup block for a given block identifier"
-    (args1 format_flag)
-    (prefixes ["get"; "block"]
-    @@ param ~name:"block" ~desc:"block requested" block_id_param
-    @@ stop)
+    (Tezos_clic.args1 format_flag)
+    (Tezos_clic.prefixes ["get"; "block"]
+    @@ Tezos_clic.param ~name:"block" ~desc:"block requested" block_id_param
+    @@ Tezos_clic.stop)
     (fun format block (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let* json =
@@ -320,7 +327,7 @@ let sign_transaction cctxt sks_uri txs =
   in
   List.map_ep
     (fun sk ->
-      let* signature = Client_keys.aggregate_sign cctxt sk buf in
+      let* signature = Client_keys_v0.aggregate_sign cctxt sk buf in
       match signature with
       | Bls12_381 signature -> return signature
       | Unknown _signature -> failwith "failed to sign")
@@ -335,7 +342,7 @@ let craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty =
 
 let aggregate_signature signatures =
   let open Result_syntax in
-  match Bls.aggregate_signature_opt signatures with
+  match Signature.Bls.aggregate_signature_opt signatures with
   | Some res -> return res
   | None -> error_with "aggregate_signature"
 
@@ -352,16 +359,17 @@ let craft_batch ~transactions =
   return Tx_rollup_l2_batch.V1.{aggregated_signature; contents = transactions}
 
 let conv_qty =
-  parameter (fun _ qty ->
+  Tezos_clic.parameter (fun _ qty ->
       match Tx_rollup_l2_qty.of_string qty with
       | Some qty -> return qty
       | None -> failwith "The given qty is invalid")
 
-let conv_counter = parameter (fun _ counter -> return (Int64.of_string counter))
+let conv_counter =
+  Tezos_clic.parameter (fun _ counter -> return (Int64.of_string counter))
 
 let signer_to_address : Tx_rollup_l2_batch.signer -> Tx_rollup_l2_address.t =
   function
-  | Bls_pk pk -> Bls.Public_key.hash pk
+  | Bls_pk pk -> Signature.Bls.Public_key.hash pk
   | L2_addr addr -> addr
 
 let wait_for_synchronized ?(quiet = false)
@@ -431,30 +439,30 @@ let signer_next_counter cctxt signer counter =
 
 let signer_parameter =
   let open Lwt_result_syntax in
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Tx_rollup_l2_address.of_b58check_opt s with
       | Some pkh -> return @@ Tx_rollup_l2_batch.L2_addr pkh
       | None -> (
-          match Bls.Public_key.of_b58check_opt s with
+          match Signature.Bls.Public_key.of_b58check_opt s with
           | Some pk -> return @@ Tx_rollup_l2_batch.Bls_pk pk
           | None -> failwith "cannot parse %s to get a valid signer" s))
 
 let craft_tx_transfers () =
-  command
+  Tezos_clic.command
     ~desc:"WIP: craft a transaction with transfers"
-    (args1
-       (arg
+    (Tezos_clic.args1
+       (Tezos_clic.arg
           ~long:"counter"
           ~placeholder:"counter"
           ~doc:"counter value of the destination"
           conv_counter))
-    (prefixes ["craft"; "tx"; "transfers"; "from"]
-    @@ param
+    (Tezos_clic.prefixes ["craft"; "tx"; "transfers"; "from"]
+    @@ Tezos_clic.param
          ~name:"signer"
          ~desc:"public key or public key hash of the signer"
          signer_parameter
-    @@ prefix "using"
-    @@ param
+    @@ Tezos_clic.prefix "using"
+    @@ Tezos_clic.param
          ~name:"transfers.json"
          ~desc:
            "List of transfers from the signer in JSON format (from a file or \
@@ -462,7 +470,7 @@ let craft_tx_transfers () =
             the form '[ {\"destination\": dst, \"qty\" : val, \"ticket_hash\" \
             : ticket_hash} ]'"
          json_file_or_text_parameter
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun counter
          signer
          transfers_json
@@ -501,26 +509,29 @@ let craft_tx_transfers () =
           return_unit)
 
 let craft_tx_transaction () =
-  command
+  Tezos_clic.command
     ~desc:"WIP: craft a transaction"
-    (args1
-       (arg
+    (Tezos_clic.args1
+       (Tezos_clic.arg
           ~long:"counter"
           ~placeholder:"counter"
           ~doc:"counter value of the destination"
           conv_counter))
-    (prefixes ["craft"; "tx"; "transferring"]
-    @@ param ~name:"qty" ~desc:"qty to transfer" conv_qty
-    @@ prefixes ["from"]
-    @@ param
+    (Tezos_clic.prefixes ["craft"; "tx"; "transferring"]
+    @@ Tezos_clic.param ~name:"qty" ~desc:"qty to transfer" conv_qty
+    @@ Tezos_clic.prefixes ["from"]
+    @@ Tezos_clic.param
          ~name:"signer"
          ~desc:"public key or public key hash of the signer"
          signer_parameter
-    @@ prefixes ["to"]
+    @@ Tezos_clic.prefixes ["to"]
     @@ bls_pkh_param ~name:"dest" ~desc:"tz4 destination address"
-    @@ prefixes ["for"]
-    @@ param ~name:"ticket" ~desc:"ticket to transfer" ticket_hash_parameter
-    @@ stop)
+    @@ Tezos_clic.prefixes ["for"]
+    @@ Tezos_clic.param
+         ~name:"ticket"
+         ~desc:"ticket to transfer"
+         ticket_hash_parameter
+    @@ Tezos_clic.stop)
     (fun counter
          qty
          signer
@@ -540,29 +551,32 @@ let craft_tx_transaction () =
       return_unit)
 
 let craft_tx_withdrawal () =
-  command
+  Tezos_clic.command
     ~desc:"WIP: craft a withdrawal from L2 to L1"
-    (args1
-       (arg
+    (Tezos_clic.args1
+       (Tezos_clic.arg
           ~long:"counter"
           ~placeholder:"counter"
           ~doc:"counter value of the destination"
           conv_counter))
-    (prefixes ["craft"; "tx"; "withdrawing"]
-    @@ param ~name:"qty" ~desc:"qty to withdraw" conv_qty
-    @@ prefixes ["from"]
-    @@ param
+    (Tezos_clic.prefixes ["craft"; "tx"; "withdrawing"]
+    @@ Tezos_clic.param ~name:"qty" ~desc:"qty to withdraw" conv_qty
+    @@ Tezos_clic.prefixes ["from"]
+    @@ Tezos_clic.param
          ~name:"signer"
          ~desc:"public key or public key hash of the signer"
          signer_parameter
-    @@ prefixes ["to"]
-    @@ param
+    @@ Tezos_clic.prefixes ["to"]
+    @@ Tezos_clic.param
          ~name:"dest"
          ~desc:"L1 destination address"
          l1_destination_parameter
-    @@ prefixes ["for"]
-    @@ param ~name:"ticket" ~desc:"ticket to withdraw" ticket_hash_parameter
-    @@ stop)
+    @@ Tezos_clic.prefixes ["for"]
+    @@ Tezos_clic.param
+         ~name:"ticket"
+         ~desc:"ticket to withdraw"
+         ticket_hash_parameter
+    @@ Tezos_clic.stop)
     (fun counter
          qty
          signer
@@ -582,14 +596,15 @@ let craft_tx_withdrawal () =
       return_unit)
 
 let craft_tx_batch () =
-  command
+  Tezos_clic.command
     ~desc:"craft a batch from a list of signed layer-2 transactions"
-    (args1
-       (switch
+    (Tezos_clic.args1
+       (Tezos_clic.switch
           ~doc:"Bytes representation of the batch encoded in hexadecimal"
           ~long:"bytes"
           ()))
-    (prefixes ["craft"; "batch"; "with"] @@ seq_of_param l2_transaction_param)
+    (Tezos_clic.prefixes ["craft"; "batch"; "with"]
+    @@ Tezos_clic.seq_of_param l2_transaction_param)
     (fun show_bytes transactions (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let*? batch = craft_batch ~transactions in
@@ -611,10 +626,10 @@ let craft_tx_batch () =
         return_unit)
 
 let get_batcher_queue () =
-  command
+  Tezos_clic.command
     ~desc:"returns the batcher's queue of pending operations"
-    no_options
-    (prefixes ["get"; "batcher"; "queue"] @@ stop)
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["get"; "batcher"; "queue"] @@ Tezos_clic.stop)
     (fun () (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let* queue = RPC.get_queue cctxt in
@@ -625,21 +640,21 @@ let get_batcher_queue () =
       return_unit)
 
 let valid_transaction_hash =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match L2_transaction.Hash.of_b58check_opt s with
       | Some addr -> return addr
       | None -> failwith "The L2 transaction hash is invalid")
 
 let get_batcher_transaction () =
-  command
+  Tezos_clic.command
     ~desc:"returns a batcher transaction for a given hash"
-    no_options
-    (prefixes ["get"; "batcher"; "transaction"]
-    @@ param
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["get"; "batcher"; "transaction"]
+    @@ Tezos_clic.param
          ~name:"hash"
          ~desc:"requested transaction hash"
          valid_transaction_hash
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun () hash (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let* tx = RPC.get_transaction cctxt hash in
@@ -650,11 +665,11 @@ let get_batcher_transaction () =
       return_unit)
 
 let inject_batcher_transaction () =
-  command
+  Tezos_clic.command
     ~desc:"injects the given transaction into the batcher's transaction queue"
-    no_options
-    (prefixes ["inject"; "batcher"; "transaction"]
-    @@ l2_transaction_param @@ stop)
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["inject"; "batcher"; "transaction"]
+    @@ l2_transaction_param @@ Tezos_clic.stop)
     (fun () transaction_and_sig (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
       let* txh = RPC.inject_transaction cctxt transaction_and_sig in
@@ -672,7 +687,7 @@ let prepare_operation_parameters cctxt signer counter =
     | Some pk -> ok pk
     | None -> error_with "missing signer public key in the wallet"
   in
-  let signer_addr = Bls.Public_key.hash signer_pk in
+  let signer_addr = Signature.Bls.Public_key.hash signer_pk in
   let* () = wait_for_synchronized cctxt in
   let* counter =
     match counter with
@@ -701,26 +716,29 @@ let prepare_operation_parameters cctxt signer counter =
   return (signer, sk_uri, counter)
 
 let transfer () =
-  command
+  Tezos_clic.command
     ~desc:"submit a layer-2 transfer to a rollup node’s batcher"
-    (args1
-       (arg
+    (Tezos_clic.args1
+       (Tezos_clic.arg
           ~long:"counter"
           ~short:'c'
           ~placeholder:"counter"
           ~doc:"The counter associated to the signer address"
           conv_counter))
-    (prefix "transfer"
-    @@ param ~name:"qty" ~desc:"quantity to transfer" conv_qty
-    @@ prefix "of"
-    @@ param ~name:"ticket" ~desc:"A ticket hash" ticket_hash_parameter
-    @@ prefix "from"
+    (Tezos_clic.prefix "transfer"
+    @@ Tezos_clic.param ~name:"qty" ~desc:"quantity to transfer" conv_qty
+    @@ Tezos_clic.prefix "of"
+    @@ Tezos_clic.param
+         ~name:"ticket"
+         ~desc:"A ticket hash"
+         ticket_hash_parameter
+    @@ Tezos_clic.prefix "from"
     @@ wallet_param ~name:"source"
-    @@ prefix "to"
+    @@ Tezos_clic.prefix "to"
     @@ bls_pkh_param
          ~name:"destination"
          ~desc:"A BLS public key hash or an alias"
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun counter qty ticket_hash signer destination cctxt ->
       let open Lwt_result_syntax in
       let open Tx_rollup_l2_batch.V1 in
@@ -746,24 +764,27 @@ let transfer () =
       return_unit)
 
 let withdraw () =
-  command
+  Tezos_clic.command
     ~desc:"submit a layer-2 withdraw to a rollup node’s batcher"
-    (args1
-       (arg
+    (Tezos_clic.args1
+       (Tezos_clic.arg
           ~long:"counter"
           ~short:'c'
           ~placeholder:"counter"
           ~doc:"The counter associated to the signer address"
           conv_counter))
-    (prefix "withdraw"
-    @@ param ~name:"qty" ~desc:"quantity to withdraw" conv_qty
-    @@ prefix "of"
-    @@ param ~name:"ticket" ~desc:"A ticket hash" ticket_hash_parameter
-    @@ prefix "from"
+    (Tezos_clic.prefix "withdraw"
+    @@ Tezos_clic.param ~name:"qty" ~desc:"quantity to withdraw" conv_qty
+    @@ Tezos_clic.prefix "of"
+    @@ Tezos_clic.param
+         ~name:"ticket"
+         ~desc:"A ticket hash"
+         ticket_hash_parameter
+    @@ Tezos_clic.prefix "from"
     @@ wallet_param ~name:"source" ~desc:"An alias for a tz4 address"
-    @@ prefix "to"
+    @@ Tezos_clic.prefix "to"
     @@ tezos_pkh_param ~name:"destination" ~desc:"A L1 public key hash"
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun counter qty ticket_hash signer destination cctxt ->
       let open Lwt_result_syntax in
       let open Tx_rollup_l2_batch.V1 in
@@ -781,14 +802,14 @@ let withdraw () =
       return_unit)
 
 let sign_transaction () =
-  command
+  Tezos_clic.command
     ~desc:"sign a transaction"
-    (args2
-       (switch ~doc:"aggregate signature" ~long:"aggregate" ())
+    (Tezos_clic.args2
+       (Tezos_clic.switch ~doc:"aggregate signature" ~long:"aggregate" ())
        signature_arg)
-    (prefixes ["sign"; "transaction"]
-    @@ transaction_param @@ prefix "with"
-    @@ seq_of_param bls_sk_uri_param)
+    (Tezos_clic.prefixes ["sign"; "transaction"]
+    @@ transaction_param @@ Tezos_clic.prefix "with"
+    @@ Tezos_clic.seq_of_param bls_sk_uri_param)
     (fun (aggregate, aggregated_signature)
          transactions
          sks_uri
@@ -803,7 +824,9 @@ let sign_transaction () =
         in
         let*? aggregated_signature = aggregate_signature signatures in
 
-        let*! () = cctxt#message "@[%a@]" Bls.pp aggregated_signature in
+        let*! () =
+          cctxt#message "@[%a@]" Signature.Bls.pp aggregated_signature
+        in
         return_unit
       else
         let*! () =
@@ -811,13 +834,13 @@ let sign_transaction () =
             "@[%a@]"
             (Format.pp_print_list
                ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";")
-               Bls.pp)
+               Signature.Bls.pp)
             signatures
         in
         return_unit)
 
 let display_answer (cctxt : #Configuration.tx_client_context) :
-    RPC_context.generic_call_result -> unit Lwt.t = function
+    Tezos_rpc.Context.generic_call_result -> unit Lwt.t = function
   | `Json (`Ok json) -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
   | `Binary (`Ok binary) -> cctxt#answer "%a" Hex.pp (Hex.of_string binary)
   | `Json (`Error (Some error)) ->
@@ -894,60 +917,62 @@ let call_with_file_or_json meth url maybe_file
 
 let rpc_commands () =
   let group =
-    {Clic.name = "rpc"; title = "Commands for the low level RPC layer"}
+    {Tezos_clic.name = "rpc"; title = "Commands for the low level RPC layer"}
   in
   [
-    command
+    Tezos_clic.command
       ~group
       ~desc:"Call an RPC with the GET method."
-      no_options
-      (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["rpc"; "get"]
+      @@ Tezos_clic.string ~name:"url" ~desc:"the RPC URL"
+      @@ Tezos_clic.stop)
       (fun () -> call `GET);
-    command
+    Tezos_clic.command
       ~group
       ~desc:"Call an RPC with the POST method."
-      no_options
-      (prefixes ["rpc"; "post"]
-      @@ string ~name:"url" ~desc:"the RPC URL"
-      @@ stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["rpc"; "post"]
+      @@ Tezos_clic.string ~name:"url" ~desc:"the RPC URL"
+      @@ Tezos_clic.stop)
       (fun () -> call `POST);
-    command
+    Tezos_clic.command
       ~group
       ~desc:
         "Call an RPC with the POST method, providing input data via the \
          command line."
-      no_options
-      (prefixes ["rpc"; "post"]
-      @@ string ~name:"url" ~desc:"the RPC URL"
-      @@ prefix "with"
-      @@ string
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["rpc"; "post"]
+      @@ Tezos_clic.string ~name:"url" ~desc:"the RPC URL"
+      @@ Tezos_clic.prefix "with"
+      @@ Tezos_clic.string
            ~name:"input"
            ~desc:
              "the raw JSON input to the RPC\n\
               For instance, use `{}` to send the empty document.\n\
               Alternatively, use `file:path` to read the JSON data from a file."
-      @@ stop)
+      @@ Tezos_clic.stop)
       (fun () -> call_with_file_or_json `POST);
   ]
 
 let get_message_proof () =
   let open Lwt_result_syntax in
-  command
+  Tezos_clic.command
     ~desc:
       "returns the proof for a given block identifier and a message position \
        for the according inbox"
-    no_options
-    (prefixes ["get"; "proof"; "for"; "message"; "at"; "position"]
-    @@ param
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["get"; "proof"; "for"; "message"; "at"; "position"]
+    @@ Tezos_clic.param
          ~name:"position"
          ~desc:"message position in the inbox"
          non_negative_param
-    @@ prefixes ["in"; "block"]
-    @@ param
+    @@ Tezos_clic.prefixes ["in"; "block"]
+    @@ Tezos_clic.param
          ~name:"block"
          ~desc:"block from which the message's proof is requested"
          block_id_param
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun () message_position block (cctxt : #Configuration.tx_client_context) ->
       RPC.get_message_proof cctxt block ~message_position >>=? fun proof ->
       let json =

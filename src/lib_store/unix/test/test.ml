@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert = Lib_test.Assert
+(* Several of the tests take the additional [SLOW_TEST] environment variable.
+   We group those tests in this here executable for simplicity. *)
 
 let () =
   let speed =
@@ -40,12 +41,6 @@ let () =
      Alcotest_lwt.run
        "tezos-store"
        [
-         Test_cemented_store.tests;
-         Test_block_store.tests;
-         Test_store.tests;
-         Test_consistency.tests;
-         Test_protocol_store.tests;
-         Test_testchain.tests;
          Test_snapshots.tests speed;
          Test_reconstruct.tests speed;
          Test_history_mode_switch.tests speed;

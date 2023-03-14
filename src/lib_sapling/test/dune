@@ -16,10 +16,12 @@
   data-encoding
   tezos-base-test-helpers
   alcotest-lwt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_sapling
-  -open Tezos_crypto
   -open Tezos_stdlib
   -open Data_encoding
   -open Tezos_base_test_helpers)
@@ -63,7 +65,8 @@
   tezos-hacl)
  (js_of_ocaml)
  (link_flags
-  (:standard -linkall))
+  (:standard)
+  (-linkall))
  (modules test_js))
 
 (rule

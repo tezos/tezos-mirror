@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-rpc
   resto-cohttp
   uri)
  (flags
@@ -21,6 +22,7 @@
  (libraries
   tezos-base
   resto-cohttp-client
+  tezos-rpc
   tezos-rpc-http)
  (flags
   (:standard)
@@ -37,6 +39,7 @@
   tezos-base
   cohttp-lwt-unix
   resto-cohttp-client
+  tezos-rpc
   tezos-rpc-http-client)
  (flags
   (:standard)
@@ -59,7 +62,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
-  -open Tezos_rpc
   -open Tezos_rpc_http)
- (modules RPC_server RPC_logging RPC_middleware)
- (private_modules RPC_logging))
+ (modules RPC_server RPC_middleware))

@@ -5,11 +5,16 @@
  (names
   test_shell
   test_synchronisation_heuristic_fuzzy
-  test_prevalidation
+  test_shell_operation
   test_prevalidation_t
   test_prevalidator_classification
   test_prevalidator_classification_operations
   test_prevalidator_pending_operations
+  legacy_test_prevalidation
+  legacy_test_prevalidation_t
+  legacy_test_prevalidator_classification
+  legacy_test_prevalidator_classification_operations
+  legacy_test_prevalidator_pending_operations
   test_peer_validator)
  (libraries
   tezos-base
@@ -31,6 +36,9 @@
   tezos-event-logging-test-helpers
   tezos-test-helpers
   alcotest-lwt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -47,7 +55,8 @@
   -open Tezos_shell_services
   -open Tezos_stdlib_unix
   -open Tezos_validation
-  -open Tezos_event_logging_test_helpers))
+  -open Tezos_event_logging_test_helpers
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)
@@ -62,7 +71,7 @@
 (rule
  (alias runtest)
  (package tezos-shell)
- (action (run %{dep:./test_prevalidation.exe})))
+ (action (run %{dep:./test_shell_operation.exe})))
 
 (rule
  (alias runtest)
@@ -83,6 +92,32 @@
  (alias runtest)
  (package tezos-shell)
  (action (run %{dep:./test_prevalidator_pending_operations.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./legacy_test_prevalidation.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./legacy_test_prevalidation_t.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./legacy_test_prevalidator_classification.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action
+  (run %{dep:./legacy_test_prevalidator_classification_operations.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./legacy_test_prevalidator_pending_operations.exe})))
 
 (rule
  (alias runtest)

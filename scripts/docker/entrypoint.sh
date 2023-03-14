@@ -9,7 +9,10 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
 : "${NODE_HOST:="node"}"
 : "${NODE_RPC_PORT:="8732"}"
-: "${NODE_RPC_ADDR:="localhost"}"
+# This is the bind address INSIDE the docker so as long as there
+# is no explicit port redirection, it is not exposed to the
+# outside world.
+: "${NODE_RPC_ADDR:="[::]"}"
 
 : "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
 
@@ -33,56 +36,50 @@ command=${1:-octez-node}
 shift 1
 
 case $command in
-    tezos-*)
-        >&2 echo "Warning: The executable with name $command has been renamed to $(echo "$command" | sed 's/^tezos-/octez-/'). The name $command is now deprecated, and it will be removed in a future release. Please update your scripts to use the new name."
-        ;;
-esac
-
-case $command in
-    octez-node|tezos-node)
+    octez-node)
         launch_node "$@"
         ;;
-    octez-upgrade-storage|tezos-upgrade-storage)
+    octez-upgrade-storage)
         upgrade_node_storage
         ;;
-    octez-snapshot-import|tezos-snapshot-import)
+    octez-snapshot-import)
         snapshot_import "$@"
         ;;
-    octez-baker|tezos-baker)
+    octez-baker)
         launch_baker "$@"
         ;;
-    octez-baker-test|tezos-baker-test)
+    octez-baker-test)
         launch_baker_test "$@"
         ;;
-    octez-endorser|tezos-endorser)
+    octez-endorser)
         launch_endorser "$@"
         ;;
-    octez-endorser-test|tezos-endorser-test)
+    octez-endorser-test)
         launch_endorser_test "$@"
         ;;
-    octez-accuser|tezos-accuser)
+    octez-accuser)
         launch_accuser "$@"
         ;;
-    octez-accuser-test|tezos-accuser-test)
+    octez-accuser-test)
         launch_accuser_test "$@"
         ;;
-    octez-client|tezos-client)
+    octez-client)
         configure_client
         exec "$client" "$@"
         ;;
-    octez-admin-client|tezos-admin-client)
+    octez-admin-client)
         configure_client
         exec "$admin_client" "$@"
         ;;
-    octez-signer|tezos-signer)
+    octez-signer)
         exec "$signer" "$@"
         ;;
     *)
         cat <<EOF
 Available commands:
 
-The following are wrappers around the tezos binaries.
-To call the tezos binaries directly you must override the
+The following are wrappers around the octez binaries.
+To call the octez binaries directly you must override the
 entrypoint using --entrypoint . All binaries are in
 $BIN_DIR and the tezos data in $DATA_DIR
 
@@ -92,7 +89,7 @@ You can specify the network with argument --network, for instance:
 
 Daemons:
 - octez-node [args]
-  Initialize a new identity and run the tezos node.
+  Initialize a new identity and run the octez node.
 
 - octez-baker [keys]
 - octez-baker-test [keys]

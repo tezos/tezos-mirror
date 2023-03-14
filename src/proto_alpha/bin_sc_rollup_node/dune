@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_node_alpha)
- (public_name octez-sc-rollup-node-alpha)
- (package octez-sc-rollup-node-alpha)
+ (public_name octez-smart-rollup-node-alpha)
+ (package octez-smart-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -22,27 +22,36 @@
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-server
+  tezos-workers
   tezos_dal_node_services
+  tezos_dal_node_lib
   tezos-shell-services
-  tezos-sc-rollup-alpha
+  tezos-smart-rollup-alpha
+  tezos-smart-rollup-layer2-alpha
   tezos-layer2-utils-alpha
   tezos_layer2_store
+  tezos-tree-encoding
   data-encoding
   irmin-pack
   irmin-pack.unix
   irmin
-  ringo
-  ringo-lwt
+  aches
+  aches-lwt
   tezos-injector-alpha
-  tezos-scoru-wasm)
+  tezos-scoru-wasm
+  tezos-scoru-wasm-fast
+  tezos-crypto-dal
+  prometheus-app
+  octez-node-config)
  (link_flags
   (:standard)
-  (:include %{workspace_root}/static-link-flags.sexp))
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
+  -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_clic
   -open Tezos_client_commands
   -open Tezos_stdlib_unix
   -open Tezos_client_base
@@ -51,9 +60,12 @@
   -open Tezos_protocol_alpha
   -open Tezos_protocol_plugin_alpha
   -open Tezos_protocol_alpha_parameters
-  -open Tezos_rpc
+  -open Tezos_workers
+  -open Tezos_dal_node_lib
   -open Tezos_shell_services
-  -open Tezos_sc_rollup_alpha
+  -open Tezos_smart_rollup_alpha
+  -open Tezos_smart_rollup_layer2_alpha
   -open Tezos_layer2_utils_alpha
   -open Tezos_layer2_store
-  -open Tezos_injector_alpha))
+  -open Tezos_injector_alpha
+  -open Tezos_crypto_dal))

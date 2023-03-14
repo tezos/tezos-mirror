@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Shell_namespace.ns "encoding"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 (* Helpers for encodings of fixed-size values (hence constant-time) *)
 module Shared_constant_time = struct
   type config = unit
@@ -65,9 +69,7 @@ let fixed_size_shared :
     unit ->
     Tezos_benchmark.Benchmark.t =
  fun ?(check = fun () -> ()) ~name ~generator ~make_bench () ->
-  let free_variable =
-    Free_variable.of_string (Format.asprintf "%s_const" name)
-  in
+  let free_variable = fv (Format.asprintf "%s_const" name) in
   let model =
     Model.make
       ~conv:(fun () -> ())
@@ -82,9 +84,9 @@ let fixed_size_shared :
       ~model:(Model.unknown_const1 ~const:free_variable)
   in
   let module Bench : Benchmark.S = struct
-    let name = name
+    let name = ns name
 
-    let info = Format.asprintf "Benchmarking %s" name
+    let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
     let tags = ["encoding"]
 
@@ -95,7 +97,10 @@ let fixed_size_shared :
       let generator () = generator rng_state in
       List.repeat bench_num (make_bench generator)
 
-    let () = Registration.register_for_codegen name (Model.For_codegen codegen)
+    let () =
+      Registration.register_for_codegen
+        (Namespace.basename name)
+        (Model.For_codegen codegen)
 
     let models = [("encoding", model); ("codegen", codegen)]
   end in
@@ -103,8 +108,8 @@ let fixed_size_shared :
 
 (* Generic function to cook benchmarks for linear-time encodings *)
 let linear_shared ?(check = fun () -> ()) ~name ~generator ~make_bench () =
-  let const = Free_variable.of_string (Format.asprintf "%s_const" name) in
-  let coeff = Free_variable.of_string (Format.asprintf "%s_coeff" name) in
+  let const = fv (Format.asprintf "%s_const" name) in
+  let coeff = fv (Format.asprintf "%s_coeff" name) in
   let model =
     Model.make
       ~conv:(fun {Shared_linear.bytes} -> (bytes, ()))
@@ -120,9 +125,9 @@ let linear_shared ?(check = fun () -> ()) ~name ~generator ~make_bench () =
       ~model:(Model.affine ~intercept:const ~coeff)
   in
   let module Bench : Benchmark.S = struct
-    let name = name
+    let name = ns name
 
-    let info = Format.asprintf "Benchmarking %s" name
+    let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
     let tags = ["encoding"]
 
@@ -133,7 +138,10 @@ let linear_shared ?(check = fun () -> ()) ~name ~generator ~make_bench () =
       let generator () = generator rng_state in
       List.repeat bench_num (make_bench generator)
 
-    let () = Registration.register_for_codegen name (Model.For_codegen codegen)
+    let () =
+      Registration.register_for_codegen
+        (Namespace.basename name)
+        (Model.For_codegen codegen)
 
     let models = [("encoding", model); ("codegen", codegen)]
   end in
@@ -142,8 +150,8 @@ let linear_shared ?(check = fun () -> ()) ~name ~generator ~make_bench () =
 (* Generic function to cook benchmarks for nlogn-time encodings *)
 let nsqrtn_shared_with_intercept ~name ~generator ~make_bench
     ~generator_intercept ~make_bench_intercept =
-  let const = Free_variable.of_string (Format.asprintf "%s_const" name) in
-  let coeff = Free_variable.of_string (Format.asprintf "%s_coeff" name) in
+  let const = fv (Format.asprintf "%s_const" name) in
+  let coeff = fv (Format.asprintf "%s_coeff" name) in
   let model =
     Model.make
       ~conv:(fun {Shared_linear.bytes} -> (bytes, ()))
@@ -159,9 +167,9 @@ let nsqrtn_shared_with_intercept ~name ~generator ~make_bench
       ~model:(Model.nsqrtn_const ~intercept:const ~coeff)
   in
   let module Bench : Benchmark.S = struct
-    let name = name
+    let name = ns name
 
-    let info = Format.asprintf "Benchmarking %s" name
+    let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
     let tags = ["encoding"]
 
@@ -171,14 +179,18 @@ let nsqrtn_shared_with_intercept ~name ~generator ~make_bench
       let generator () = generator rng_state in
       List.repeat bench_num (make_bench generator)
 
-    let () = Registration.register_for_codegen name (Model.For_codegen codegen)
+    let () =
+      Registration.register_for_codegen
+        (Namespace.basename name)
+        (Model.For_codegen codegen)
 
     let models = [("encoding", model); ("codegen", codegen)]
   end in
   let module Bench_intercept : Benchmark.S = struct
-    let name = name ^ "_intercept"
+    let name = ns (name ^ "_intercept")
 
-    let info = Format.asprintf "Benchmarking %s (intercept case)" name
+    let info =
+      Format.asprintf "Benchmarking %a (intercept case)" Namespace.pp name
 
     let tags = ["encoding"]
 
@@ -188,7 +200,10 @@ let nsqrtn_shared_with_intercept ~name ~generator ~make_bench
       let generator () = generator_intercept rng_state in
       List.repeat bench_num (make_bench_intercept generator)
 
-    let () = Registration.register_for_codegen name (Model.For_codegen codegen)
+    let () =
+      Registration.register_for_codegen
+        (Namespace.basename name)
+        (Model.For_codegen codegen)
 
     let models = [("encoding", model); ("codegen", codegen)]
   end in

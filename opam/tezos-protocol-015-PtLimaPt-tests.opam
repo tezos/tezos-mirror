@@ -9,6 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-base" {with-test}
   "tezos-protocol-015-PtLimaPt" {with-test}
@@ -20,15 +21,16 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-benchmark-015-PtLimaPt" {with-test}
   "tezos-benchmark-type-inference-015-PtLimaPt" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.18" }
-  "tezt" {with-test}
-  "tezos-context" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
+  "tezt" { with-test & >= "3.0.0" }
+  "tezos-context" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
   "tezos-client-base" {with-test}
   "tezos-protocol-environment" {with-test}
   "tezos-stdlib-unix" {with-test}
   "tezos-stdlib" {with-test}
+  "tezos-scoru-wasm" {with-test}
   "tezt-tezos" {with-test}
 ]
 build: [

@@ -25,23 +25,56 @@
 
 let ( // ) = Filename.concat
 
-type error += Existing_index_dir of string
+type error +=
+  | Existing_index_dir of string
+  | Cannot_resolve_block_alias of string * string
+
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "storage"]
+
+  let integrity_info =
+    declare_3
+      ~section
+      ~name:"integrity_info"
+      ~msg:
+        "running integrity check on inodes for block {block_hash} (level \
+         {block_level}) with context hash {context_hash}"
+      ~level:Notice
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+      ("block_level", Data_encoding.int32)
+      ~pp3:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
+end
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"existingIndexDir"
+    ~id:"main.storage.existing_index_dir"
     ~title:"Existing context/index directory"
     ~description:"The index directory cannot be overwritten"
     ~pp:(fun ppf path ->
       Format.fprintf ppf "Existing index directory '%s'." path)
     Data_encoding.(obj1 (req "indexdir_path" string))
     (function Existing_index_dir path -> Some path | _ -> None)
-    (fun path -> Existing_index_dir path)
+    (fun path -> Existing_index_dir path) ;
+  register_error_kind
+    `Permanent
+    ~id:"main.storage.cannot_resolve_block_alias"
+    ~title:"Cannot resolve block alias"
+    ~description:"Cannot resolve block alias"
+    ~pp:(fun ppf (alias, error) ->
+      Format.fprintf ppf "Failed to resolve the block alias %s: %s" alias error)
+    Data_encoding.(obj2 (req "alias" string) (req "error" string))
+    (function
+      | Cannot_resolve_block_alias (alias, error) -> Some (alias, error)
+      | _ -> None)
+    (fun (alias, error) -> Cannot_resolve_block_alias (alias, error))
 
 module Term = struct
   open Cmdliner
-  open Node_shared_arg.Term
 
   let ( let+ ) t f = Term.(const f $ t)
 
@@ -51,9 +84,9 @@ module Term = struct
     let open Lwt_result_syntax in
     let+ config =
       Option.filter Sys.file_exists config_file
-      |> Option.map_es Node_config_file.read
+      |> Option.map_es Config_file.read
     in
-    Option.value ~default:Node_config_file.default_config config
+    Option.value ~default:Config_file.default_config config
 
   let ensure_context_dir context_dir =
     let open Lwt_result_syntax in
@@ -62,20 +95,19 @@ module Term = struct
         let*! b = Lwt_unix.file_exists context_dir in
         if not b then
           tzfail
-            (Node_data_version.Invalid_data_dir
-               {data_dir = context_dir; msg = None})
+            (Data_version.Invalid_data_dir {data_dir = context_dir; msg = None})
         else
           let pack = context_dir // "store.0.suffix" in
           let*! b = Lwt_unix.file_exists pack in
           if not b then
             tzfail
-              (Node_data_version.Invalid_data_dir
+              (Data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
           else return_unit)
       (function
         | Unix.Unix_error _ ->
             tzfail
-              (Node_data_version.Invalid_data_dir
+              (Data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
         | exc -> raise exc)
 
@@ -83,29 +115,35 @@ module Term = struct
     let open Lwt_result_syntax in
     let* cfg = read_config_file config_file in
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
-    let context_dir = Node_data_version.context_dir data_dir in
+    let context_dir = Data_version.context_dir data_dir in
     let* () = ensure_context_dir context_dir in
     return context_dir
 
   let integrity_check config_file data_dir auto_repair =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      let*! () = Context.Checks.Pack.Integrity_check.run ~root ~auto_repair in
+      let*! () =
+        Tezos_context.Context.Checks.Pack.Integrity_check.run
+          ~root
+          ~auto_repair
+          ~always:false
+          ~heads:None
+      in
       return_unit)
 
   let stat_index config_file data_dir =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      Context.Checks.Index.Stat.run ~root ;
+      Tezos_context.Context.Checks.Index.Stat.run ~root ;
       return_unit)
 
   let stat_pack config_file data_dir =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      let*! () = Context.Checks.Pack.Stat.run ~root in
+      let*! () = Tezos_context.Context.Checks.Pack.Stat.run ~root in
       return_unit)
 
   let index_dir_exists context_dir output =
@@ -115,72 +153,128 @@ module Term = struct
     if not b then return_unit else tzfail (Existing_index_dir index_dir)
 
   let reconstruct_index config_file data_dir output index_log_size =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let* () = index_dir_exists root output in
-      Context.Checks.Pack.Reconstruct_index.run ~root ~output ~index_log_size () ;
+      Tezos_context.Context.Checks.Pack.Reconstruct_index.run
+        ~root
+        ~output
+        ~index_log_size
+        () ;
       return_unit)
 
-  let to_context_hash chain_store (hash : Block_hash.t) =
+  let resolve_block chain_store block =
     let open Lwt_result_syntax in
-    let* block = Store.Block.read_block chain_store hash in
-    return (Store.Block.context_hash block)
-
-  let current_head config_file data_dir block =
-    let open Lwt_result_syntax in
-    let* cfg = read_config_file config_file in
-    let ({genesis; _} : Node_config_file.blockchain_network) =
-      cfg.blockchain_network
-    in
-    let data_dir = Option.value ~default:cfg.data_dir data_dir in
-    let store_dir = Node_data_version.store_dir data_dir in
-    let context_dir = Node_data_version.context_dir data_dir in
-    let* store =
-      Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
-    in
-    let genesis = cfg.blockchain_network.genesis in
-    let chain_id = Chain_id.of_block_hash genesis.block in
-    let* chain_store = Store.get_chain_store store chain_id in
-    let to_context_hash = to_context_hash chain_store in
-    let* block_hash =
-      match block with
-      | Some block -> Lwt.return (Block_hash.of_b58check block)
-      | None ->
-          let*! head = Store.Chain.current_head chain_store in
-          return (Store.Block.hash head)
-    in
-    let* context_hash = to_context_hash block_hash in
-    let*! () = Store.close_store store in
-    return (Context_hash.to_b58check context_hash)
+    match block with
+    | Some block -> (
+        match Block_services.parse_block block with
+        | Error err -> tzfail (Cannot_resolve_block_alias (block, err))
+        | Ok block -> Store.Chain.block_of_identifier chain_store block)
+    | None ->
+        let*! current_head = Store.Chain.current_head chain_store in
+        return current_head
 
   let integrity_check_inodes config_file data_dir block =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* root = root config_file data_dir in
-      let* head = current_head config_file data_dir block in
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let actual_data_dir =
+        Option.value ~default:Config_file.default_data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:
+            Filename.Infix.(
+              actual_data_dir // Data_version.default_config_file_name)
+          config_file
+      in
+      let* node_config = Config_file.read config_file in
+      let ({genesis; _} : Config_file.blockchain_network) =
+        node_config.blockchain_network
+      in
+      let chain_id = Chain_id.of_block_hash genesis.block in
+      let data_dir =
+        (* The --data-dir argument overrides the potentially given
+           configuration file. *)
+        match data_dir with
+        | Some data_dir -> data_dir
+        | None -> node_config.data_dir
+      in
+      let* () = Data_version.ensure_data_dir genesis data_dir in
+      let context_dir = Data_version.context_dir data_dir in
+      let store_dir = Data_version.store_dir data_dir in
+      let* store =
+        Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+      in
+      let* chain_store = Store.get_chain_store store chain_id in
+      let* block = resolve_block chain_store block in
+      let*! () = Store.close_store store in
+      let context_hash = Store.Block.context_hash block in
+      let context_hash_str = Context_hash.to_b58check context_hash in
       let*! () =
-        Context.Checks.Pack.Integrity_check_inodes.run
-          ~root
-          ~heads:(Some [head])
+        Event.(
+          emit
+            integrity_info
+            (Store.Block.hash block, Store.Block.level block, context_hash))
+      in
+      let*! () =
+        Tezos_context.Context.Checks.Pack.Integrity_check_inodes.run
+          ~root:context_dir
+          ~heads:(Some [context_hash_str])
       in
       return_unit)
 
   let check_index config_file data_dir auto_repair =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      Context.Checks.Pack.Integrity_check_index.run ~root ~auto_repair () ;
+      Tezos_context.Context.Checks.Pack.Integrity_check_index.run
+        ~root
+        ~auto_repair
+        () ;
       return_unit)
 
-  let find_head config_file data_dir head =
-    Node_shared_arg.process_command
+  let find_head config_file data_dir =
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* head = current_head config_file data_dir head in
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let actual_data_dir =
+        Option.value ~default:Config_file.default_data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:
+            Filename.Infix.(
+              actual_data_dir // Data_version.default_config_file_name)
+          config_file
+      in
+      let* node_config = Config_file.read config_file in
+      let ({genesis; _} : Config_file.blockchain_network) =
+        node_config.blockchain_network
+      in
+      let chain_id = Chain_id.of_block_hash genesis.block in
+      let data_dir =
+        (* The --data-dir argument overrides the potentially given
+           configuration file. *)
+        match data_dir with
+        | Some data_dir -> data_dir
+        | None -> node_config.data_dir
+      in
+      let* () = Data_version.ensure_data_dir genesis data_dir in
+      let context_dir = Data_version.context_dir data_dir in
+      let store_dir = Data_version.store_dir data_dir in
+      let* store =
+        Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+      in
+      let* chain_store = Store.get_chain_store store chain_id in
+      let*! head = Store.Chain.current_head chain_store in
+      let*! () = Store.close_store store in
+      let head_context_hash = Store.Block.context_hash head in
       (* This output isn't particularly useful for most users,
           it will typically be used to inspect context
           directories using Irmin tooling *)
-      let () = print_endline head in
+      let () = Format.printf "%a@." Context_hash.pp head_context_hash in
       return_unit)
 
   let auto_repair =
@@ -214,14 +308,14 @@ module Term = struct
            ~docv:"ENTRIES"
            ["index-log-size"]
 
-  let head =
+  let block =
     let open Cmdliner.Arg in
     value
     & opt (some string) None
       @@ info
-           ~doc:"Head; option for integrity-check-inodes."
-           ~docv:"HEAD"
-           ["head"; "h"]
+           ~doc:"Block; option for integrity-check-inodes."
+           ~docv:"BLOCK"
+           ["block"; "b"]
 
   let setup_logs =
     let+ style_renderer = Fmt_cli.style_renderer ()
@@ -251,26 +345,33 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> integrity_check)
-            $ setup_logs $ config_file $ data_dir $ auto_repair));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ auto_repair));
       Cmd.v
         (Cmd.info
            ~doc:"print high-level statistics about the index store"
            "stat-index")
         Term.(
           ret
-            (const (fun () -> stat_index) $ setup_logs $ config_file $ data_dir));
+            (const (fun () -> stat_index)
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir));
       Cmd.v
         (Cmd.info
            ~doc:"print high-level statistics about the pack file"
            "stat-pack")
         Term.(
-          ret (const (fun () -> stat_pack) $ setup_logs $ config_file $ data_dir));
+          ret
+            (const (fun () -> stat_pack)
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir));
       Cmd.v
         (Cmd.info ~doc:"reconstruct index from pack file" "reconstruct-index")
         Term.(
           ret
             (const (fun () -> reconstruct_index)
-            $ setup_logs $ config_file $ data_dir $ dest $ index_log_size));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ dest $ index_log_size));
       Cmd.v
         (Cmd.info
            ~doc:
@@ -281,7 +382,8 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> integrity_check_inodes)
-            $ setup_logs $ config_file $ data_dir $ head));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ block));
       Cmd.v
         (Cmd.info
            ~doc:"checks the index for corruptions"
@@ -289,7 +391,8 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> check_index)
-            $ setup_logs $ config_file $ data_dir $ auto_repair));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ auto_repair));
       Cmd.v
         (Cmd.info
            ~doc:"prints the current head's context commit hash"
@@ -297,7 +400,8 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> find_head)
-            $ setup_logs $ config_file $ data_dir $ head));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir));
     ]
 end
 
@@ -313,7 +417,7 @@ module Manpage = struct
          versions.";
     ]
 
-  let man = commands @ Node_shared_arg.Manpage.bugs
+  let man = commands @ Shared_arg.Manpage.bugs
 
   let info =
     Cmdliner.Cmd.info

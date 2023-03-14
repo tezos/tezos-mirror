@@ -1,0 +1,5 @@
+ocaml-check:
+  extends:
+    - .build
+  needs: [trigger]
+  script: dune build ${COVERAGE_OPTIONS} @check

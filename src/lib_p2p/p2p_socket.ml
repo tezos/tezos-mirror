@@ -24,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO test `close ~wait:true`. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4603
+
+   test `close ~wait:true`.
+*)
 module Events = P2p_events.P2p_socket
 
 module Crypto = struct
@@ -34,7 +37,7 @@ module Crypto = struct
   let header_length = 2
 
   (* The size of extra data added by encryption. *)
-  let tag_length = Crypto_box.tag_length
+  let tag_length = Tezos_crypto.Crypto_box.tag_length
 
   (* The number of bytes added by encryption + header *)
   let extrabytes = header_length + tag_length
@@ -42,9 +45,9 @@ module Crypto = struct
   let max_content_length = bufsize - extrabytes
 
   type data = {
-    channel_key : Crypto_box.channel_key;
-    mutable local_nonce : Crypto_box.nonce;
-    mutable remote_nonce : Crypto_box.nonce;
+    channel_key : Tezos_crypto.Crypto_box.channel_key;
+    mutable local_nonce : Tezos_crypto.Crypto_box.nonce;
+    mutable remote_nonce : Tezos_crypto.Crypto_box.nonce;
   }
 
   (* We do the following assumptions on the NaCl library.  Note that
@@ -66,8 +69,13 @@ module Crypto = struct
     let payload_length = header_length + encrypted_length in
     let tag = Bytes.create tag_length in
     let local_nonce = cryptobox_data.local_nonce in
-    cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
-    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce tag msg ;
+    cryptobox_data.local_nonce <-
+      Tezos_crypto.Crypto_box.increment_nonce local_nonce ;
+    Tezos_crypto.Crypto_box.fast_box_noalloc
+      cryptobox_data.channel_key
+      local_nonce
+      tag
+      msg ;
     let payload = Bytes.create payload_length in
     TzEndian.set_uint16 payload 0 encrypted_length ;
     Bytes.blit tag 0 payload header_length tag_length ;
@@ -92,9 +100,10 @@ module Crypto = struct
     let msg = Bytes.create msg_length in
     let* () = read_full ?canceler fd @@ mk_buffer_safe msg in
     let remote_nonce = cryptobox_data.remote_nonce in
-    cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
+    cryptobox_data.remote_nonce <-
+      Tezos_crypto.Crypto_box.increment_nonce remote_nonce ;
     match
-      Crypto_box.fast_box_open_noalloc
+      Tezos_crypto.Crypto_box.fast_box_open_noalloc
         cryptobox_data.channel_key
         remote_nonce
         tag
@@ -118,9 +127,9 @@ let check_binary_chunks_size size =
 module Connection_message = struct
   type t = {
     port : int option;
-    public_key : Crypto_box.public_key;
-    proof_of_work_stamp : Crypto_box.nonce;
-    message_nonce : Crypto_box.nonce;
+    public_key : Tezos_crypto.Crypto_box.public_key;
+    proof_of_work_stamp : Tezos_crypto.Crypto_box.nonce;
+    message_nonce : Tezos_crypto.Crypto_box.nonce;
     version : Network_version.t;
   }
 
@@ -135,9 +144,9 @@ module Connection_message = struct
         {port; public_key; proof_of_work_stamp; message_nonce; version})
       (obj5
          (req "port" uint16)
-         (req "pubkey" Crypto_box.public_key_encoding)
-         (req "proof_of_work_stamp" Crypto_box.nonce_encoding)
-         (req "message_nonce" Crypto_box.nonce_encoding)
+         (req "pubkey" Tezos_crypto.Crypto_box.public_key_encoding)
+         (req "proof_of_work_stamp" Tezos_crypto.Crypto_box.nonce_encoding)
+         (req "message_nonce" Tezos_crypto.Crypto_box.nonce_encoding)
          (req "version" Network_version.encoding))
 
   let write ~canceler fd message =
@@ -363,7 +372,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     ((remote_addr, remote_socket_port) as point) ?advertised_port identity
     announced_version metadata_config =
   let open Lwt_result_syntax in
-  let local_nonce_seed = Crypto_box.random_nonce () in
+  let local_nonce_seed = Tezos_crypto.Crypto_box.random_nonce () in
   let*! () = Events.(emit sending_authentication) point in
   let* sent_msg =
     Connection_message.write
@@ -382,7 +391,9 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       ~canceler
       (P2p_io_scheduler.to_readable scheduled_conn)
   in
-  (* TODO: make the below bytes-to-string copy-conversion unnecessary.
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4604
+
+     make the below bytes-to-string copy-conversion unnecessary.
      This requires making the consumer of the [recv_msg] value
      ([Crypto_box.generate_nonces]) able to work with strings directly. *)
   let recv_msg = Bytes.of_string recv_msg in
@@ -390,7 +401,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     if incoming then msg.port else Some remote_socket_port
   in
   let id_point = (remote_addr, remote_listening_port) in
-  let remote_peer_id = Crypto_box.hash msg.public_key in
+  let remote_peer_id = Tezos_crypto.Crypto_box.hash msg.public_key in
   let* () =
     fail_unless
       (remote_peer_id <> identity.P2p_identity.peer_id)
@@ -398,17 +409,19 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
   in
   let* () =
     fail_unless
-      (Crypto_box.check_proof_of_work
+      (Tezos_crypto.Crypto_box.check_proof_of_work
          msg.public_key
          msg.proof_of_work_stamp
          proof_of_work_target)
       (P2p_errors.Not_enough_proof_of_work remote_peer_id)
   in
   let channel_key =
-    Crypto_box.precompute identity.P2p_identity.secret_key msg.public_key
+    Tezos_crypto.Crypto_box.precompute
+      identity.P2p_identity.secret_key
+      msg.public_key
   in
   let local_nonce, remote_nonce =
-    Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
+    Tezos_crypto.Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
   in
   let cryptobox_data = {Crypto.channel_key; local_nonce; remote_nonce} in
   let local_metadata = metadata_config.P2p_params.conn_meta_value () in
@@ -520,13 +533,17 @@ module Reader = struct
     st.worker <-
       Lwt_utils.worker
         "reader"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop st None)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
 
   let shutdown st = Error_monad.cancel_with_exceptions st.canceler
 end
+
+type 'msg encoded_message = bytes list
+
+let copy_encoded_message = List.map Bytes.copy
 
 module Writer = struct
   type ('msg, 'meta) t = {
@@ -558,7 +575,7 @@ module Writer = struct
     in
     loop buf
 
-  let encode_message st msg =
+  let encode_message (st : ('msg, _) t) msg =
     match Data_encoding.Binary.to_bytes st.encoding msg with
     | Error we ->
         Result_syntax.tzfail
@@ -656,7 +673,7 @@ module Writer = struct
     st.worker <-
       Lwt_utils.worker
         "writer"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
@@ -768,11 +785,18 @@ let write_sync {writer; _} msg =
       in
       waiter)
 
-let write_now {writer; _} msg =
+let encode {writer : ('msg, _) Writer.t; _} msg =
+  Writer.encode_message writer msg
+
+let write_encoded_now {writer; _} buf =
   let open Result_syntax in
-  let* buf = Writer.encode_message writer msg in
   try Ok (Lwt_pipe.Maybe_bounded.push_now writer.messages (buf, None))
   with Lwt_pipe.Closed -> tzfail P2p_errors.Connection_closed
+
+let write_now t msg =
+  let open Result_syntax in
+  let* buf = encode t msg in
+  write_encoded_now t buf
 
 let rec split_bytes size bytes =
   if Bytes.length bytes <= size then [bytes]
@@ -818,13 +842,15 @@ module Internal_for_tests = struct
   let raw_write_sync = raw_write_sync
 
   let mock_authenticated_connection default_metadata =
-    let secret_key, public_key, _pkh = Crypto_box.random_keypair () in
+    let secret_key, public_key, _pkh =
+      Tezos_crypto.Crypto_box.random_keypair ()
+    in
     let cryptobox_data =
       Crypto.
         {
-          channel_key = Crypto_box.precompute secret_key public_key;
-          local_nonce = Crypto_box.zero_nonce;
-          remote_nonce = Crypto_box.zero_nonce;
+          channel_key = Tezos_crypto.Crypto_box.precompute secret_key public_key;
+          local_nonce = Tezos_crypto.Crypto_box.zero_nonce;
+          remote_nonce = Tezos_crypto.Crypto_box.zero_nonce;
         }
     in
     let scheduled_conn =

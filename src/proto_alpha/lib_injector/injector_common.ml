@@ -50,6 +50,36 @@ let reorg_encoding block_encoding =
        (req "old_chain" (list block_encoding))
        (req "new_chain" (list block_encoding))
 
+let fetch_tezos_shell_header ~find_in_cache (cctxt : #full) hash :
+    (Block_header.shell_header, error trace) result Lwt.t =
+  let open Lwt_syntax in
+  let errors = ref None in
+  let fetch hash =
+    let* shell_header =
+      Tezos_shell_services.Shell_services.Blocks.Header.shell_header
+        cctxt
+        ~chain:cctxt#chain
+        ~block:(`Hash (hash, 0))
+        ()
+    in
+    match shell_header with
+    | Error errs ->
+        errors := Some errs ;
+        return_none
+    | Ok shell_header -> return_some shell_header
+  in
+  let+ shell_header = find_in_cache hash fetch in
+  match (shell_header, !errors) with
+  | None, None ->
+      (* This should not happen if {!find_in_cache} behaves correctly,
+         i.e. calls {!fetch} for cache misses. *)
+      error_with
+        "Fetching Tezos block %a failed unexpectedly"
+        Block_hash.pp
+        hash
+  | None, Some errs -> Error errs
+  | Some shell_header, _ -> Ok shell_header
+
 let fetch_tezos_block ~find_in_cache (cctxt : #full) hash :
     (Alpha_block_services.block_info, error trace) result Lwt.t =
   let open Lwt_syntax in

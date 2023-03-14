@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,4 +30,6 @@ let () =
   Test_daemon.register () ;
   Test_retry.register () ;
   Test_diff.register () ;
+  Test_process.register () ;
+  Test_michelson_script.register () ;
   Test.run ()

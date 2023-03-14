@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_crypto.S.HASH with type t = Crypto_box.Public_key_hash.t
+include
+  Tezos_crypto.Intfs.HASH
+    with type t = Tezos_crypto.Crypto_box.Public_key_hash.t

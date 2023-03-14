@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Clic
 
 module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 
@@ -36,20 +35,20 @@ module ContractAlias : sig
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'wallet)) params ->
-    (string * Contract.t -> 'a, 'wallet) params
+    ('a, (#Client_context.wallet as 'wallet)) Tezos_clic.params ->
+    (string * Contract.t -> 'a, 'wallet) Tezos_clic.params
 
   val destination_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'wallet)) params ->
-    (string * Contract.t -> 'a, 'wallet) params
+    ('a, (#Client_context.wallet as 'wallet)) Tezos_clic.params ->
+    (string * Contract.t -> 'a, 'wallet) Tezos_clic.params
 
   val destination_arg :
     ?name:string ->
     ?doc:string ->
     unit ->
-    ((string * Contract.t) option, #Client_context.wallet) Clic.arg
+    ((string * Contract.t) option, #Client_context.wallet) Tezos_clic.arg
 
   val rev_find :
     #Client_context.wallet -> Contract.t -> string option tzresult Lwt.t

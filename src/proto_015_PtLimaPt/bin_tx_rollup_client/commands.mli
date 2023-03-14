@@ -27,4 +27,4 @@
    rollup client. These commands may depend on the client
    configuration. *)
 
-val all : unit -> Configuration.tx_client_context Clic.command list
+val all : unit -> Configuration.tx_client_context Tezos_clic.command list

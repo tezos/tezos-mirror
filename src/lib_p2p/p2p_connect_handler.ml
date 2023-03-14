@@ -38,8 +38,8 @@ type config = {
   identity : P2p_identity.t;
   connection_timeout : Time.System.Span.t;
   authentication_timeout : Time.System.Span.t;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
-  proof_of_work_target : Crypto_box.pow_target;
+  reconnection_config : Point_reconnection_config.t;
+  proof_of_work_target : Tezos_crypto.Crypto_box.pow_target;
   listening_port : P2p_addr.port option;
   advertised_port : P2p_addr.port option;
 }
@@ -65,7 +65,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
       (** [P2p_fd.connect] *)
   socket_authenticate :
     canceler:Lwt_canceler.t ->
-    proof_of_work_target:Crypto_box.pow_target ->
+    proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->
     incoming:bool ->
     P2p_io_scheduler.connection ->
     P2p_point.Id.t ->
@@ -699,7 +699,7 @@ module Internal_for_tests = struct
       (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
     socket_authenticate :
       canceler:Lwt_canceler.t ->
-      proof_of_work_target:Crypto_box.pow_target ->
+      proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->
       incoming:bool ->
       P2p_io_scheduler.connection ->
       P2p_point.Id.t ->
@@ -768,10 +768,8 @@ module Internal_for_tests = struct
     let identity = P2p_identity.generate_with_pow_target_0 () in
     let connection_timeout = Time.System.Span.of_seconds_exn 10. in
     let authentication_timeout = Time.System.Span.of_seconds_exn 5. in
-    let reconnection_config =
-      P2p_point_state.Info.default_reconnection_config
-    in
-    let proof_of_work_target = Crypto_box.make_pow_target 0. in
+    let reconnection_config = Point_reconnection_config.default in
+    let proof_of_work_target = Tezos_crypto.Crypto_box.make_pow_target 0. in
     let listening_port = Some 9732 in
     let advertised_port = None in
     {

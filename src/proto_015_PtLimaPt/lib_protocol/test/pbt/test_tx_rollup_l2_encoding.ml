@@ -31,7 +31,7 @@
     Subject:      Tx rollup l2 encoding
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Protocol.Indexable
 open Protocol.Tx_rollup_l2_batch
 open Protocol.Tx_rollup_l2_apply
@@ -47,7 +47,7 @@ let l2_address, bls_pk =
     `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
     |> Hex.to_bytes_exn
   in
-  let pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
+  let pkh, public_key, _secret_key = Signature.Bls.generate_key ~seed:ikm () in
   (pkh, public_key)
 
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
@@ -74,7 +74,7 @@ let idx_l2_address_gen =
   oneof [idx_l2_address_idx_gen; return idx_l2_address_value]
 
 let public_key_hash =
-  Signature.Public_key_hash.of_b58check_exn
+  Signature.V0.Public_key_hash.of_b58check_exn
     "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let public_key_hash_gen =
@@ -87,7 +87,9 @@ let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2592
      we could introduce a bit more randomness here *)
   let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
-  let ticketer_pkh = Signature.Public_key_hash.of_b58check_exn ticketer_b58 in
+  let ticketer_pkh =
+    Signature.V0.Public_key_hash.of_b58check_exn ticketer_b58
+  in
   let ticketer = Protocol.Alpha_context.Contract.Implicit ticketer_pkh in
   Tx_rollup_l2_helpers.make_unit_ticket_key ticketer l2_address
 

@@ -30,7 +30,7 @@
     the protocol. *)
 
 type validation_store = {
-  context_hash : Context_hash.t;
+  resulting_context_hash : Context_hash.t;
   timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
@@ -73,7 +73,12 @@ type ops_metadata =
   | No_metadata_hash of operation_metadata list list
   | Metadata_hash of (operation_metadata * Operation_metadata_hash.t) list list
 
+module Shell_header_hash : Tezos_crypto.Intfs.HASH
+
 type result = {
+  shell_header_hash : Shell_header_hash.t;
+      (** This field is used as a (local) unique identifier for blocks
+          in order to implement the preapply cache mechanism. *)
   validation_store : validation_store;
   block_metadata : bytes * Block_metadata_hash.t option;
   ops_metadata : ops_metadata;
@@ -105,6 +110,8 @@ type apply_environment = {
       (** header of the predecessor block being validated *)
   predecessor_context : Tezos_protocol_environment.Context.t;
       (** context associated to the predecessor block *)
+  predecessor_resulting_context_hash : Context_hash.t;
+      (** predecessor block resulting context hash *)
   predecessor_block_metadata_hash : Block_metadata_hash.t option;
       (** hash of block header metadata of the predecessor block *)
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
@@ -113,12 +120,9 @@ type apply_environment = {
       (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;
       (** user activated protocol overrides *)
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
       (** size limit for operation metadata that should be written on disk *)
 }
-
-(** Default size limit for operation metadata *)
-val default_operation_metadata_size_limit : int option
 
 (** [apply env header ops] gets the protocol [P] of the context of the
     predecessor block and calls successively:
@@ -144,9 +148,10 @@ val apply :
   apply_result tzresult Lwt.t
 
 (** [precheck chain_id ~predecessor_block_header
-   ~predecessor_block_hash ~predecessor_context ~cache header ops]
-   gets the protocol [P] of the context of the predecessor block and
-   calls successively:
+    ~predecessor_block_hash ~predecessor_context
+    ~predecessor_resulting_context_hash ~cache header ops] gets the
+    protocol [P] of the context of the predecessor block and calls
+    successively:
    1. [P.begin_validate]
    2. [P.validate_operation]
    3. [P.finalize_validation] *)
@@ -155,6 +160,7 @@ val precheck :
   predecessor_block_header:Block_header.t ->
   predecessor_block_hash:Block_hash.t ->
   predecessor_context:Tezos_protocol_environment.Context.t ->
+  predecessor_resulting_context_hash:Context_hash.t ->
   cache:Tezos_protocol_environment.Context.source_of_cache ->
   Block_header.t ->
   Operation.t list list ->
@@ -164,12 +170,13 @@ val preapply :
   chain_id:Chain_id.t ->
   user_activated_upgrades:Tezos_base.User_activated.upgrades ->
   user_activated_protocol_overrides:Tezos_base.User_activated.protocol_overrides ->
-  operation_metadata_size_limit:int option ->
+  operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   timestamp:Time.Protocol.t ->
   protocol_data:bytes ->
   live_blocks:Block_hash.Set.t ->
   live_operations:Operation_hash.Set.t ->
   predecessor_context:Tezos_protocol_environment.Context.t ->
+  predecessor_resulting_context_hash:Context_hash.t ->
   predecessor_shell_header:Block_header.shell_header ->
   predecessor_hash:Block_hash.t ->
   predecessor_max_operations_ttl:int ->

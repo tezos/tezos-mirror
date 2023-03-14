@@ -27,6 +27,10 @@ module Context = Tezos_protocol_environment.Context
 module Shell_monad = Tezos_error_monad.Error_monad
 module Key_map = Io_helpers.Key_map
 
+let ns = Namespace.make Shell_namespace.ns "io"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 module Helpers = struct
   (* Samples keys in an alphabet of [card] elements. *)
   let sample_key ~card =
@@ -230,9 +234,9 @@ module Context_size_dependent_shared = struct
             (depth, (storage_bytes, ())))
       ~model:
         (Model.bilinear_affine
-           ~intercept:(Free_variable.of_string "read_latency")
-           ~coeff1:(Free_variable.of_string "depth")
-           ~coeff2:(Free_variable.of_string "storage_bytes"))
+           ~intercept:(fv "read_latency")
+           ~coeff1:(fv "depth")
+           ~coeff2:(fv "storage_bytes"))
 
   let models = [("io_read", read_access)]
 end
@@ -243,7 +247,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
   (* ----------------------------------------------------------------------- *)
   (* Benchmark def *)
 
-  let name = "CONTEXT_SIZE_DEPENDENT_READ"
+  let name = ns "CONTEXT_SIZE_DEPENDENT_READ"
 
   let info =
     "Benchmarking the read accesses with contexts of various sizes (with fixed \
@@ -289,7 +293,9 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
         }
     in
     let with_context f =
-      let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
+      let base_dir =
+        Filename.temp_file ?temp_dir:cfg.temp_dir (Namespace.basename name) ""
+      in
       Io_helpers.prepare_base_dir base_dir ;
       let context, index =
         Helpers.prepare_random_context
@@ -328,7 +334,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
   (* ----------------------------------------------------------------------- *)
   (* Benchmark def *)
 
-  let name = "CONTEXT_SIZE_DEPENDENT_WRITE"
+  let name = ns "CONTEXT_SIZE_DEPENDENT_WRITE"
 
   let info =
     "Benchmarking the write accesses with contexts of various sizes (with \
@@ -369,7 +375,9 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
         }
     in
     let with_context f =
-      let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
+      let base_dir =
+        Filename.temp_file ?temp_dir:cfg.temp_dir (Namespace.basename name) ""
+      in
       Io_helpers.prepare_base_dir base_dir ;
       let context, index =
         Helpers.prepare_random_context
@@ -546,7 +554,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       in
       (target_key, value_size, key_set, directories)
 
-  let name = "IRMIN_PACK_READ"
+  let name = ns "IRMIN_PACK_READ"
 
   let info = "Benchmarking read accesses in irmin-pack directories"
 
@@ -579,9 +587,9 @@ module Irmin_pack_read_bench : Benchmark.S = struct
             (depth, (storage_bytes, ())))
       ~model:
         (Model.bilinear_affine
-           ~intercept:(Free_variable.of_string "read_latency")
-           ~coeff1:(Free_variable.of_string "depth")
-           ~coeff2:(Free_variable.of_string "storage_bytes"))
+           ~intercept:(fv "read_latency")
+           ~coeff1:(fv "depth")
+           ~coeff2:(fv "storage_bytes"))
 
   let models = [("io_read", read_access)]
 
@@ -633,7 +641,9 @@ module Irmin_pack_read_bench : Benchmark.S = struct
         }
     in
     let with_context f =
-      let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
+      let base_dir =
+        Filename.temp_file ?temp_dir:cfg.temp_dir (Namespace.basename name) ""
+      in
       Io_helpers.prepare_base_dir base_dir ;
       let context, index =
         Helpers.prepare_random_context
@@ -713,7 +723,7 @@ module Irmin_pack_write_bench : Benchmark.S = struct
         key_set,
         total_keys_in_pack )
 
-  let name = "IRMIN_PACK_WRITE"
+  let name = ns "IRMIN_PACK_WRITE"
 
   let info = "Benchmarking write accesses in irmin-pack directories"
 
@@ -758,9 +768,9 @@ module Irmin_pack_write_bench : Benchmark.S = struct
             (keys_written, (storage_bytes, ())))
       ~model:
         (Model.bilinear_affine
-           ~intercept:(Free_variable.of_string "write_latency")
-           ~coeff1:(Free_variable.of_string "keys_written")
-           ~coeff2:(Free_variable.of_string "storage_bytes"))
+           ~intercept:(fv "write_latency")
+           ~coeff1:(fv "keys_written")
+           ~coeff2:(fv "storage_bytes"))
 
   let models = [("io_write", write_access)]
 
@@ -791,7 +801,9 @@ module Irmin_pack_write_bench : Benchmark.S = struct
       (insertions + total_keys_in_pack)
       Io_stats.pp
       stats ;
-    let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
+    let base_dir =
+      Filename.temp_file ?temp_dir:cfg.temp_dir (Namespace.basename name) ""
+    in
     let value_size =
       Base_samplers.sample_in_interval rng_state ~range:cfg.storage_chunks
       * cfg.storage_chunk_bytes
@@ -875,7 +887,7 @@ module Read_random_key_bench : Benchmark.S = struct
          (req "existing_context" (tup2 string Context_hash.encoding))
          (req "subdirectory" (list string)))
 
-  let name = "READ_RANDOM_KEY"
+  let name = ns "READ_RANDOM_KEY"
 
   let info = "Benchmarking random read accesses in a subdirectory"
 
@@ -907,9 +919,9 @@ module Read_random_key_bench : Benchmark.S = struct
         | Read_random_key {depth; storage_bytes} -> (depth, (storage_bytes, ())))
       ~model:
         (Model.bilinear_affine
-           ~intercept:(Free_variable.of_string "read_latency")
-           ~coeff1:(Free_variable.of_string "depth")
-           ~coeff2:(Free_variable.of_string "storage_bytes"))
+           ~intercept:(fv "read_latency")
+           ~coeff1:(fv "depth")
+           ~coeff2:(fv "storage_bytes"))
 
   let models = [("io_read", read_access)]
 
@@ -1022,7 +1034,7 @@ module Write_random_keys_bench : Benchmark.S = struct
          (req "temp_dir" (option string))
          (req "subdirectory" (list string)))
 
-  let name = "WRITE_RANDOM_KEYS"
+  let name = ns "WRITE_RANDOM_KEYS"
 
   let info = "Benchmarking random read accesses in a subdirectory"
 
@@ -1058,9 +1070,9 @@ module Write_random_keys_bench : Benchmark.S = struct
             (keys_written, (storage_bytes, ())))
       ~model:
         (Model.bilinear_affine
-           ~intercept:(Free_variable.of_string "write_latency")
-           ~coeff1:(Free_variable.of_string "keys_written")
-           ~coeff2:(Free_variable.of_string "storage_bytes"))
+           ~intercept:(fv "write_latency")
+           ~coeff1:(fv "keys_written")
+           ~coeff2:(fv "storage_bytes"))
 
   let models = [("io_write", write_access)]
 
@@ -1087,7 +1099,11 @@ module Write_random_keys_bench : Benchmark.S = struct
     let with_context f =
       let target_base_dir =
         let temp_dir = Option.value cfg.temp_dir ~default:"/tmp" in
-        Format.asprintf "%s/%s_%d" temp_dir name (Random.int 65536)
+        Format.asprintf
+          "%s/%s_%d"
+          temp_dir
+          (Namespace.basename name)
+          (Random.int 65536)
       in
       Io_helpers.copy_rec source_base_dir target_base_dir ;
       Format.eprintf "Finished copying original context to %s@." target_base_dir ;

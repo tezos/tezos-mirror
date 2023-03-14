@@ -201,8 +201,8 @@ module Types = struct
       conv
         (fun pkhu -> pkhu)
         (fun w -> w)
-        (encoding_to_scalar Signature.Public_key_hash.encoding)
-        (encoding_of_scalar Signature.Public_key_hash.encoding)
+        (encoding_to_scalar Tezos_crypto.Signature.V0.Public_key_hash.encoding)
+        (encoding_of_scalar Tezos_crypto.Signature.V0.Public_key_hash.encoding)
         scalar_encoding
 
     let amount_encoding ~safety = Bounded_e.encoding ~safety Bound.bound_amount
@@ -330,12 +330,10 @@ end) : sig
 
   (** Map associating every circuit identifier to a boolean representing
       whether the circuit can be part of a private batch *)
-  val circuits : bool Plonk.Main_protocol.SMap.t
+  val circuits : bool Plonk.SMap.t
 
   (** Commitment to the circuits  *)
-  val public_parameters :
-    Plonk.Main_protocol.verifier_public_parameters
-    * Plonk.Main_protocol.transcript
+  val public_parameters : Environment.Plonk.public_parameters
 
   module Internal_for_tests : sig
     val true_op : Zk_rollup.Operation.t
@@ -348,13 +346,13 @@ end) : sig
   end
 end = struct
   open Protocol.Alpha_context
-  module SMap = Plonk.Main_protocol.SMap
+  module SMap = Plonk.SMap
   module Dummy = Types.P.Dummy
   module T = Types.P
   module VC = V (LibCircuit)
 
   let srs =
-    let open Bls12_381_polynomial.Polynomial in
+    let open Bls12_381_polynomial in
     (Srs.generate_insecure 8 1, Srs.generate_insecure 1 1)
 
   let dummy_l1_dst =
@@ -415,14 +413,16 @@ end = struct
   let circuits =
     SMap.(add "op" false @@ add batch_name true @@ add "fee" false empty)
 
-  let public_parameters, _prover_pp =
-    let (ppp, vpp), t =
-      Plonk.Main_protocol.setup_multi_circuits
-        ~zero_knowledge:false
-        (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
-        ~srs
+  let public_parameters =
+    let dummy_transcript = Bytes.empty in
+    let verifier_public_parameters =
+      snd
+      @@ Plonk.Main_protocol.setup
+           ~zero_knowledge:false
+           (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
+           ~srs
     in
-    ((vpp, t), ppp)
+    (verifier_public_parameters, dummy_transcript)
 
   let _insert s x m =
     match SMap.find_opt s m with
@@ -445,7 +445,7 @@ end = struct
              {id; amount = Z.zero});
           l1_dst =
             Data_encoding.Binary.of_bytes_exn
-              Signature.Public_key_hash.encoding
+              Tezos_crypto.Signature.V0.Public_key_hash.encoding
               dummy_l1_dst;
           rollup_id =
             Data_encoding.Binary.of_bytes_exn

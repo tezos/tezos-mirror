@@ -28,36 +28,42 @@
 
 open Alpha_context
 
-(** [validate_data_availability ctxt endorsement] ensures the
-   [endorsement] is valid and cannot prevent an operation containing
-   [endorsement] to be refused on top of [ctxt]. If an [Error _] is
-   returned, the [endorsement] is not valid. *)
-val validate_data_availability : t -> Dal.Endorsement.t -> unit tzresult
+(** [validate_attestation ctxt op] ensures that [op.attestation] is
+   valid and prevents an operation containing [op.attestation]
+   to be refused on top of [ctxt]. If an [Error _] is returned, the
+   [op.attestation] is not valid. *)
+val validate_attestation : t -> Dal.Attestation.operation -> unit tzresult
 
-(** [apply_data_availability ctxt endorsement ~endorser] applies
-   [endorsement] into the [ctxt] assuming [endorser] issued those
-   endorsements. *)
-val apply_data_availability :
-  t ->
-  Dal.Endorsement.t ->
-  endorser:Signature.Public_key_hash.t ->
-  t tzresult Lwt.t
+(** [apply_attestation ctxt op] applies [op.attestation] into the
+   [ctxt] assuming [op.attestor] issued those attestations. *)
+val apply_attestation : t -> Dal.Attestation.operation -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
-   valid and cannot prevent an operation containing [slot_header] to be
+   valid and prevents an operation containing [slot_header] to be
    refused on top of [ctxt]. If an [Error _] is returned, the [slot_header]
    is not valid. *)
-val validate_publish_slot_header : t -> Dal.Slot.Header.t -> unit tzresult
+val validate_publish_slot_header :
+  t -> Dal.Operations.Publish_slot_header.t -> unit tzresult
 
 (** [apply_publish_slot_header ctxt slot_header] applies the publication of
    slot header [slot_header] on top of [ctxt]. Fails if the slot contains
    already a slot header. *)
-val apply_publish_slot_header : t -> Dal.Slot.Header.t -> t tzresult
+val apply_publish_slot_header :
+  t -> Dal.Operations.Publish_slot_header.t -> (t * Dal.Slot.Header.t) tzresult
 
-(** [dal_finalisation ctxt] should be executed at block finalisation
-   time. A set of slots available at level [ctxt.current_level - lag]
-   is returned encapsulated into the endorsement data-structure.
+(** [finalisation ctxt] should be executed at block finalisation
+   time. A set of slots attested at level [ctxt.current_level - lag]
+   is returned encapsulated into the attestation data-structure.
 
    [lag] is a parametric constant specific to the data-availability
    layer.  *)
-val dal_finalisation : t -> (t * Dal.Endorsement.t option) tzresult Lwt.t
+val finalisation : t -> (t * Dal.Attestation.t option) tzresult Lwt.t
+
+(** [initialize ctxt ~level] should be executed at block
+   initialisation time. It allows to cache the committee for [level]
+   in memory so that every time we need to use this committee, there
+   is no need to recompute it again. *)
+val initialisation : t -> level:Level.t -> t tzresult Lwt.t
+
+(** [compute_committee ctxt level] computes the DAL committee for [level]. *)
+val compute_committee : t -> Level.t -> Dal.Attestation.committee tzresult Lwt.t

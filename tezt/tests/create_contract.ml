@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -39,16 +40,16 @@ let test_call_contract_that_creates_contract =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"originate_contract.tz"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:(Tez.of_int 200)
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/originate_contract.tz"
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "originate_contract"]
+      protocol
   in
   let* () =
     Client.transfer

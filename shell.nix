@@ -4,12 +4,18 @@
 
 let
   opam-nix-integration = import (
-    fetchTarball "https://github.com/vapourismo/opam-nix-integration/archive/2917c0d3a54fe7b376e2e974aa077b272f95190b.tar.gz"
+    fetchTarball {
+      url = "https://github.com/vapourismo/opam-nix-integration/archive/a1a4c9815d1286efe1299e1f66369bb1c3605ace.tar.gz";
+      sha256 = "159nrv8fn6zmg2hifgray5azxd8p9vbb28zda8svrdh2h60x962r";
+    }
   );
 
   pkgs =
     import
-      (fetchTarball "https://github.com/NixOS/nixpkgs/archive/ed8347c8841fcfbe2002638eae5305ac8fcd2316.tar.gz")
+      (fetchTarball {
+        url = "https://github.com/NixOS/nixpkgs/archive/6025d713d198ec296eaf27a1f2f78983eccce4d8.tar.gz";
+        sha256 = "0fa6nd1m5lr4fnliw21ppc4qdd4s85x448967333dvmslnvj35xi";
+      })
       { overlays = [ opam-nix-integration.overlay ]; };
 
   mkFrameworkFlags = frameworks:
@@ -51,7 +57,7 @@ let
 
   tezos-opam-repository-rev = builtins.readFile (
     pkgs.runCommand
-      "opam-repo-rev"
+      "tezos-opam-repo-rev"
       {
         src = ./scripts/version.sh;
       }
@@ -63,12 +69,13 @@ let
 
   tezos-opam-repository = fetchTarball "https://gitlab.com/tezos/opam-repository/-/archive/${tezos-opam-repository-rev}/opam-repository-${tezos-opam-repository-rev}.tar.gz";
 
-  common-overlay = final: prev: {
-    ocaml-base-compiler = prev.ocaml-base-compiler.override {
-      # Compile faster!
-      jobs = "$NIX_BUILD_CORES";
+  common-overlay = final: prev:
+    pkgs.lib.optionalAttrs (pkgs.lib.hasAttr "ocaml-base-compiler" prev) {
+      ocaml-base-compiler = prev.ocaml-base-compiler.override {
+        # Compile faster!
+        jobs = "$NIX_BUILD_CORES";
+      };
     };
-  };
 
   darwin-overlay = final: prev: {
     hacl-star-raw = prev.hacl-star-raw.overrideAttrs (old: {
@@ -112,19 +119,11 @@ let
 
       # Tweak the dependencies.
       (final: prev: {
-        conf-rust = prev.conf-rust.overrideAttrs (old: {
+        conf-rust-2021 = prev.conf-rust.overrideAttrs (old: {
           propagatedNativeBuildInputs =
             (old.propagatedNativeBuildInputs or [ ])
             ++
-            # Need Rust compiler - already fixed in upstream opam-repository
-            [ pkgs.rustc ];
-        });
-
-        tezos-rust-libs = prev.tezos-rust-libs.overrideAttrs (old: {
-          propagatedNativeBuildInputs =
-            (old.propagatedNativeBuildInputs or [ ])
-            ++
-            # Missing libiconv dependency
+            # Upstream conf-rust* packages don't request libiconv
             [ pkgs.libiconv ];
         });
       })
@@ -153,13 +152,20 @@ let
         cp ${tezos-opam-repository}/zcash-params/sapling-spend.params $out/share/zcash-params
       '';
 
+  opam-repository-rev = builtins.readFile (
+    pkgs.runCommand
+      "opam-repo-rev"
+      {
+        src = ./scripts/version.sh;
+      }
+      ''
+        . $src
+        echo -n $full_opam_repository_tag > $out
+      ''
+  );
+
   devPackageSet = pkgs.opam-nix-integration.makePackageSet {
-    repository = pkgs.fetchFromGitHub {
-      owner = "ocaml";
-      repo = "opam-repository";
-      rev = "fd912d3a713abbbca6378ff061b292eb7904d9c6";
-      sha256 = "sha256-/5UxMeCB26N7tD0hi42y3460BVALnX7AeY//7tNcLbA=";
-    };
+    repository = fetchTarball "https://github.com/ocaml/opam-repository/archive/${opam-repository-rev}.tar.gz";
 
     packageSelection = {
       packageConstraints = [

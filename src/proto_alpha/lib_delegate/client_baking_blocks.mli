@@ -45,13 +45,13 @@ val info :
   Block_services.block ->
   block_info tzresult Lwt.t
 
-val monitor_valid_blocks :
+val monitor_applied_blocks :
   #Protocol_client_context.rpc_context ->
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
   next_protocols:Protocol_hash.t list option ->
   unit ->
-  (block_info tzresult Lwt_stream.t * RPC_context.stopper) tzresult Lwt.t
+  (block_info tzresult Lwt_stream.t * Tezos_rpc.Context.stopper) tzresult Lwt.t
 
 val monitor_heads :
   #Protocol_client_context.rpc_context ->

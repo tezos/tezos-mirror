@@ -1,9 +1,10 @@
+# TODO #2170: search for old/preceding protocol name AND number, and adapt
+
 # You can set these variables from the command line.
 SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
-SPHINXPROJ    = Tezos
 SOURCEDIR     = .
-TMPDOCDIR        = /tmp/tezosdoc
+TMPDOCDIR        = /tmp/octezdoc
 BUILDDIR      = _build
 TOPBUILDDIR   = ../_build/default
 
@@ -13,17 +14,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = kathmandu lima
+NAMED_PROTOS  = lima mumbai
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-kathmandu_long = PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg
 lima_long     = PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW
+mumbai_long   = PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-kathmandu_short = 014-PtKathma
-lima_short    = 015-PtLimaPt
+lima_short    = PtLimaPt
+mumbai_short  = PtMumbai
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -41,22 +42,24 @@ full: odoc
 	${MAKE} html
 
 # Build the manuals for a given protocol
-%/tezos-client.html:
-	@../tezos-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-baker.html:
-	@../tezos-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-accuser.html:
-	@../tezos-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-client.html:
+	@../octez-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-baker.html:
+	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-accuser.html:
+	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
-	 $(PROTOCOLS:%=%/tezos-client.html) \
-	 $(PROTOCOLS:%=%/tezos-baker.html) \
-	 $(PROTOCOLS:%=%/tezos-accuser.html)
+	 $(PROTOCOLS:%=%/octez-client.html) \
+	 $(PROTOCOLS:%=%/octez-baker.html) \
+	 $(PROTOCOLS:%=%/octez-accuser.html)
 	# generic
-	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
-	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
-	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
-	@../tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
+	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
+	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
+	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
+	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
+	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
+		./scripts/man2txt.py > api/octez-node.txt
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
@@ -69,7 +72,9 @@ odoc: docexes
 odoc-lite: docexes
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
-	rsync --recursive --links --perms --exclude="src/proto_0*" \
+	rsync --recursive --links --perms \
+	  --include="src/proto_015*" --include="src/proto_016*" \
+	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
 	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
 	# The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
@@ -86,6 +91,10 @@ linkcheck: html
 	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
 		RESULT=$$?; cat $(BUILDDIR)/output.txt; exit $$RESULT
 
+.PHONY: fixlinkcheck
+fixlinkcheck:
+	@scripts/update_links.sh
+
 .PHONY: redirectcheck
 redirectcheck: html
 	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
@@ -94,8 +103,8 @@ redirectcheck: html
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) kathmandu
-	$(CHECKXREFS) -l lima
+	$(CHECKXREFS) lima
+	$(CHECKXREFS) -l mumbai
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -109,14 +118,14 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
 	scripts/test_doc_scripts.sh compile-release-sources-buster
-	scripts/test_doc_scripts.sh compile-master-sources-buster
+	scripts/test_doc_scripts.sh compile-sources-buster
 
 # build dune targets together to avoid concurrent dunes
 docexes:
 	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
 
 developer/metrics.csv:
-	../tezos-node dump-metrics > developer/metrics.csv
+	../octez-node dump-metrics > developer/metrics.csv
 
 $(ERRDOCEXE): docexes
 $(RPCDOCEXE): docexes
@@ -153,7 +162,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/kathmandu" || true
+	@ln -s active "$(BUILDDIR)/lima" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -197,4 +206,4 @@ lint: pylint pycodestyle lint_black
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html kathmandu/tezos-*.html lima/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt lima/octez-*.html mumbai/octez-*.html alpha/octez-*.html

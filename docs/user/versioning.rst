@@ -31,7 +31,7 @@ least two different versions. For example:
 
 ::
 
-   ./tezos-client rpc get /chains/main/mempool/pending_operations?version=0
+   ./octez-client rpc get /chains/main/mempool/pending_operations?version=0
 
 If the RPC is called with a bad version number (a negative or an
 unsupported version) the call fails with an error message like:

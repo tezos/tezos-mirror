@@ -63,7 +63,7 @@ type origin = Explicit | Wallet_pkh | Wallet_alias of string
 type source = {
   pkh : public_key_hash;
   pk : public_key;
-  sk : Signature.secret_key;
+  sk : Tezos_crypto.Signature.V0.secret_key;
 }
 
 type input_source =
@@ -84,12 +84,13 @@ type transfer = {
 
 type state = {
   current_head_on_start : Block_hash.t;
-  counters : (Block_hash.t * Z.t) Signature.Public_key_hash.Table.t;
+  counters :
+    (Block_hash.t * Z.t) Tezos_crypto.Signature.V0.Public_key_hash.Table.t;
   mutable pool : source_origin list;
   mutable pool_size : int;
       (** [Some l] if [single_op_per_pkh_per_block] is true *)
   mutable shuffled_pool : source list option;
-  mutable revealed : Signature.Public_key_hash.Set.t;
+  mutable revealed : Tezos_crypto.Signature.V0.Public_key_hash.Set.t;
   mutable last_block : Block_hash.t;
   mutable last_level : int;
   new_block_condition : unit Lwt_condition.t;
@@ -131,9 +132,9 @@ let input_source_encoding =
         ~title:"explicit"
         (Tag 0)
         (obj3
-           (req "pkh" Signature.Public_key_hash.encoding)
-           (req "pk" Signature.Public_key.encoding)
-           (req "sk" Signature.Secret_key.encoding))
+           (req "pkh" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
+           (req "pk" Tezos_crypto.Signature.V0.Public_key.encoding)
+           (req "sk" Tezos_crypto.Signature.V0.Secret_key.encoding))
         (function Explicit {pkh; pk; sk} -> Some (pkh, pk, sk) | _ -> None)
         (fun (pkh, pk, sk) -> Explicit {pkh; pk; sk});
       case
@@ -145,7 +146,7 @@ let input_source_encoding =
       case
         ~title:"pkh"
         (Tag 2)
-        (obj1 (req "pkh" Signature.Public_key_hash.encoding))
+        (obj1 (req "pkh" Tezos_crypto.Signature.V0.Public_key_hash.encoding))
         (function Wallet_pkh pkh -> Some pkh | _ -> None)
         (fun pkh -> Wallet_pkh pkh);
     ]
@@ -196,20 +197,20 @@ let parse_strategy s =
 let normalize_source cctxt =
   let sk_of_sk_uri sk_uri =
     match
-      Signature.Secret_key.of_b58check
-        (Uri.path (sk_uri : Client_keys.sk_uri :> Uri.t))
+      Tezos_crypto.Signature.V0.Secret_key.of_b58check
+        (Uri.path (sk_uri : Client_keys_v0.sk_uri :> Uri.t))
     with
     | Ok sk -> Lwt.return_some sk
     | Error _ -> (
-        Tezos_signer_backends.Encrypted.decrypt cctxt sk_uri >>= function
-        | Error _ -> Lwt.return_none
-        | Ok sk -> Lwt.return_some sk)
+        Tezos_signer_backends.Encrypted.decrypt cctxt sk_uri >|= function
+        | Error _ -> None
+        | Ok sk -> Tezos_crypto.Signature.V0.Of_V_latest.secret_key sk)
   in
   let key_from_alias alias =
     let warning msg alias =
       cctxt#warning msg alias >>= fun () -> Lwt.return_none
     in
-    (Client_keys.alias_keys cctxt alias >>= function
+    (Client_keys_v0.alias_keys cctxt alias >>= function
      | Error _ | Ok None -> warning "Alias \"%s\" not found in the wallet" alias
      | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
          warning
@@ -232,10 +233,10 @@ let normalize_source cctxt =
   in
   let key_from_wallet pkh =
     let warning msg pkh =
-      cctxt#warning msg Signature.Public_key_hash.pp pkh >>= fun () ->
-      Lwt.return_none
+      cctxt#warning msg Tezos_crypto.Signature.V0.Public_key_hash.pp pkh
+      >>= fun () -> Lwt.return_none
     in
-    (Client_keys.get_key cctxt pkh >>= function
+    (Client_keys_v0.get_key cctxt pkh >>= function
      | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
      | Ok (alias, pk, sk_uri) -> (
          sk_of_sk_uri sk_uri >>= function
@@ -243,7 +244,7 @@ let normalize_source cctxt =
              cctxt#warning
                "Cannot extract the secret key form the pkh \"%a\" (alias: \
                 \"%s\") of the wallet"
-               Signature.Public_key_hash.pp
+               Tezos_crypto.Signature.V0.Public_key_hash.pp
                pkh
                alias
              >>= fun () -> Lwt.return_none
@@ -305,7 +306,7 @@ let random_seed rng =
 
 let generate_fresh_source pool rng =
   let seed = random_seed rng in
-  let pkh, pk, sk = Signature.generate_key ~seed () in
+  let pkh, pk, sk = Tezos_crypto.Signature.V0.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
   pool.pool <- fresh :: pool.pool ;
   pool.pool_size <- pool.pool_size + 1 ;
@@ -391,7 +392,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     debug_msg (fun () ->
         cctxt#message
           "sample_transfer: invalid balance %a"
-          Signature.Public_key_hash.pp
+          Tezos_crypto.Signature.V0.Public_key_hash.pp
           src.pkh)
     >>= fun () ->
     (* Sampled source has zero balance: the transfer that created that
@@ -425,7 +426,11 @@ let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
       ({branch}, Contents_list contents)
   in
   let signature =
-    Some (Signature.sign ~watermark:Signature.Generic_operation sk bytes)
+    Some
+      (Tezos_crypto.Signature.V0.sign
+         ~watermark:Tezos_crypto.Signature.V0.Generic_operation
+         sk
+         bytes)
   in
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature}}
@@ -480,7 +485,9 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
              (List.map (fun src_org -> src_org.source) state.pool))) ;
   let freshest_counter =
     match
-      Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
+      Tezos_crypto.Signature.V0.Public_key_hash.Table.find
+        state.counters
+        transfer.src.pkh
     with
     | None ->
         (* This is the first operation we inject for this pkh: the counter given
@@ -497,14 +504,19 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
              given by the RPC. *)
           pcounter
   in
-  (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
-   return true
+  (if
+   Tezos_crypto.Signature.V0.Public_key_hash.Set.mem
+     transfer.src.pkh
+     state.revealed
+  then return true
   else (
     (* Either the [manager_key] RPC tells us the key is already
        revealed, or we immediately inject a reveal operation: in any
        case the key is revealed in the end. *)
     state.revealed <-
-      Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
+      Tezos_crypto.Signature.V0.Public_key_hash.Set.add
+        transfer.src.pkh
+        state.revealed ;
     Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
     >>=? fun pk_opt -> return (Option.is_some pk_opt)))
   >>=? fun already_revealed ->
@@ -528,21 +540,23 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
        {transfer with counter = Some transf_counter}
    in
    let list = Cons (reveal, Single manager_op) in
-   Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-   Signature.Public_key_hash.Table.add
+   Tezos_crypto.Signature.V0.Public_key_hash.Table.remove
+     state.counters
+     transfer.src.pkh ;
+   Tezos_crypto.Signature.V0.Public_key_hash.Table.add
      state.counters
      transfer.src.pkh
      (branch, transf_counter) ;
    (if !verbose then
     cctxt#message
       "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-      Signature.Public_key_hash.pp
+      Tezos_crypto.Signature.V0.Public_key_hash.pp
       transfer.src.pkh
       Z.pp_print
       reveal_counter
       Z.pp_print
       transf_counter
-      Signature.Public_key_hash.pp
+      Tezos_crypto.Signature.V0.Public_key_hash.pp
       transfer.dst
    else Lwt.return_unit)
    >>= fun () ->
@@ -559,19 +573,21 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
         {transfer with counter = Some transf_counter}
     in
     let list = Single manager_op in
-    Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-    Signature.Public_key_hash.Table.add
+    Tezos_crypto.Signature.V0.Public_key_hash.Table.remove
+      state.counters
+      transfer.src.pkh ;
+    Tezos_crypto.Signature.V0.Public_key_hash.Table.add
       state.counters
       transfer.src.pkh
       (branch, transf_counter) ;
     (if !verbose then
      cctxt#message
        "injecting transfer from %a (counter=%a) to %a"
-       Signature.Public_key_hash.pp
+       Tezos_crypto.Signature.V0.Public_key_hash.pp
        transfer.src.pkh
        Z.pp_print
        transf_counter
-       Signature.Public_key_hash.pp
+       Tezos_crypto.Signature.V0.Public_key_hash.pp
        transfer.dst
     else Lwt.return_unit)
     >>= fun () ->
@@ -780,7 +796,8 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
   Lwt.pick [loop (); heads_iteration]
 
 let group =
-  Clic.{name = "stresstest"; title = "Commands for stress-testing the network"}
+  Tezos_clic.
+    {name = "stresstest"; title = "Commands for stress-testing the network"}
 
 type pool_source =
   | From_string of {json : Ezjsonm.value}
@@ -790,7 +807,7 @@ let json_of_pool_source = function
   | From_string {json} | From_file {json; _} -> json
 
 let json_file_or_text_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
       | ["file"; path] ->
@@ -806,7 +823,7 @@ let json_file_or_text_parameter =
               failwith "Neither an existing file nor valid JSON: '%s'" p))
 
 let seed_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"seed"
     ~placeholder:"int"
@@ -819,7 +836,7 @@ let seed_arg =
          | i -> return i))
 
 let tps_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"tps"
     ~placeholder:"float"
@@ -834,7 +851,7 @@ let tps_arg =
          | f -> return f))
 
 let fresh_probability_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"fresh-probability"
     ~placeholder:"float in [0;1]"
@@ -858,7 +875,7 @@ let fresh_probability_arg =
          | f -> return f))
 
 let strategy_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"strategy"
     ~placeholder:"fixed:mutez | evaporation:[0;1]"
@@ -869,7 +886,7 @@ let strategy_arg =
          | Ok strategy -> return strategy))
 
 let gas_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   let gas_limit_kind =
     parameter (fun _ s ->
         try
@@ -890,7 +907,7 @@ let gas_limit_arg =
     gas_limit_kind
 
 let storage_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   let storage_limit_kind =
     parameter (fun _ s ->
         try
@@ -913,7 +930,7 @@ let storage_limit_arg =
     storage_limit_kind
 
 let transfers_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"transfers"
     ~placeholder:"integer"
@@ -927,7 +944,7 @@ let transfers_arg =
          | i -> return i))
 
 let single_op_per_pkh_per_block_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"single-op-per-pkh-per-block"
     ~doc:
       "ensure that the operations are not rejected by limiting the injection \
@@ -935,7 +952,7 @@ let single_op_per_pkh_per_block_arg =
     ()
 
 let level_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"level-limit"
     ~placeholder:"integer | +integer"
@@ -951,12 +968,12 @@ let level_limit_arg =
          | i -> if String.get s 0 = '+' then return (Rel i) else return (Abs i)))
 
 let verbose_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose"
     ~doc:"Display detailed logs of the injected operations"
     ()
 
-let debug_arg = Clic.switch ~long:"debug" ~doc:"Display debug logs" ()
+let debug_arg = Tezos_clic.switch ~long:"debug" ~doc:"Display debug logs" ()
 
 let set_option opt f x = Option.fold ~none:x ~some:(f x) opt
 
@@ -989,7 +1006,7 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
       Lwt_utils_unix.Json.write_file path json >>= catch_write_error
 
 let generate_random_transactions =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Generate random transactions"
@@ -1065,7 +1082,9 @@ let generate_random_transactions =
           (if !verbose then cctxt#message "all sources have been normalized"
           else Lwt.return_unit)
           >>= fun () ->
-          let counters = Signature.Public_key_hash.Table.create 1023 in
+          let counters =
+            Tezos_crypto.Signature.V0.Public_key_hash.Table.create 1023
+          in
           let rng = Random.State.make [|parameters.seed|] in
           Protocol_client_context.Alpha_block_services.header cctxt ()
           >>=? fun header_on_start ->
@@ -1083,7 +1102,7 @@ let generate_random_transactions =
                       ~rng
                       (List.map (fun src_org -> src_org.source) sources))
                 else None);
-              revealed = Signature.Public_key_hash.Set.empty;
+              revealed = Tezos_crypto.Signature.V0.Public_key_hash.Set.empty;
               last_block = current_head_on_start;
               last_level = Int32.to_int header_on_start.shell.level;
               new_block_condition = Lwt_condition.create ();
@@ -1116,7 +1135,7 @@ let generate_random_transactions =
                (fun _retcode -> save_injected_operations ())) ;
           launch cctxt parameters state rng save_pool)
 
+let commands = [generate_random_transactions]
+
 let commands network () =
-  match network with
-  | Some `Mainnet -> []
-  | Some `Testnet | None -> [generate_random_transactions]
+  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands

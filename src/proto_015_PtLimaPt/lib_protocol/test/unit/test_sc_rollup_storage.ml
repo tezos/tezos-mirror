@@ -76,7 +76,9 @@ let new_context () =
   let* ctxt, _stakers = new_context_with_stakers 1 in
   (* Mint some tez for staker accounts. *)
   let mint_tez_for ctxt pkh_str =
-    let pkh = Signature.Public_key_hash.of_b58check_exn pkh_str in
+    let pkh =
+      Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn pkh_str
+    in
     let contract = Contract_repr.Implicit pkh in
     let+ ctxt, _ =
       lift
@@ -427,7 +429,7 @@ let test_deposit_then_withdraw () =
   let* ctxt = new_context () in
   let* rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
   let staker =
-    Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
@@ -445,7 +447,7 @@ let test_withdraw_when_not_staked () =
   let* ctxt = new_context () in
   let* rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
   let staker =
-    Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   assert_fails_with
@@ -457,7 +459,7 @@ let test_withdrawing_twice () =
   let* ctxt = new_context () in
   let* rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
   let staker =
-    Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Timelock_samplers = Timelock
+let ns = Interpreter_model.ns
+
+let fv = Interpreter_model.fv
+
+module Timelock_samplers = Tezos_crypto.Timelock
 open Protocol
 
 (* ------------------------------------------------------------------------- *)
@@ -56,8 +61,9 @@ let eos = Script_typed_ir.(EmptyCell, EmptyCell)
 
 let info_and_name ~intercept ?(salt = "") s =
   let s = s ^ salt in
-  if intercept then (sf "Benchmark %s (intercept case)" s, s ^ "_intercept")
-  else (sf "Benchmark %s" s, s)
+  if intercept then
+    (sf "Benchmark %s (intercept case)" s, Namespace.make ns s "intercept")
+  else (sf "Benchmark %s" s, ns s)
 
 module Default_boilerplate = struct
   type workload = Interpreter_workload.t
@@ -642,7 +648,7 @@ module Registration_section = struct
 
   module Amplification = struct
     module Loop : Benchmark.S = struct
-      let name = "amplification_loop"
+      let name = ns "amplification_loop"
 
       let info = "Benchmarking the cost of an empty loop"
 
@@ -1462,6 +1468,9 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBig_map_mem
         ~stack_type:(int @$ big_map int unit @$ unit @$ bot)
         ~kinstr:(IBig_map_mem (dummy_loc, halt))
+        ~intercept_stack:
+          (let map = Script_big_map.empty int unit in
+           (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1612,6 +1621,187 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBytes_size
         ~stack_type:(bytes @$ bot)
         ~kinstr:(IBytes_size (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_benchmark
+        ~name:Interpreter_workload.N_IAnd_bytes
+        ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
+        ~stack_type:(bytes @$ bytes @$ bot)
+        ~kinstr:(IAnd_bytes (dummy_loc, halt))
+        ()
+
+    let stack_sampler_for_or_and_xor_on_bytes cfg rng_state =
+      let _, (module Samplers) =
+        make_default_samplers cfg.Default_config.sampler
+      in
+      fun () ->
+        (* We benchmark the worst cases: when the two bytes have
+               the same length *)
+        let bytes1 =
+          Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+        in
+        let bytes2 =
+          Bytes.init (Bytes.length bytes1) (fun _ ->
+              Char.chr (Random.State.int rng_state 256))
+        in
+        (bytes1, (bytes2, eos))
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IOr_bytes
+        ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
+        ~stack_type:(bytes @$ bytes @$ bot)
+        ~kinstr:(IOr_bytes (dummy_loc, halt))
+        ~stack_sampler:stack_sampler_for_or_and_xor_on_bytes
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IXor_bytes
+        ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
+        ~stack_type:(bytes @$ bytes @$ bot)
+        ~kinstr:(IXor_bytes (dummy_loc, halt))
+        ~stack_sampler:stack_sampler_for_or_and_xor_on_bytes
+        ()
+
+    let () =
+      simple_benchmark
+        ~name:Interpreter_workload.N_INot_bytes
+        ~intercept_stack:(Bytes.empty, eos)
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(INot_bytes (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_ILsl_bytes
+        ~intercept_stack:(Bytes.empty, (Script_int.one_n, eos))
+        ~stack_type:(bytes @$ nat @$ bot)
+        ~kinstr:(ILsl_bytes (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            (* Avoid [n mod 8 = 0] which runs faster than the others. *)
+            let n =
+              (* 0-63999 without multiples of 8 *)
+              let n = Random.State.int rng_state 56000 in
+              (n / 7 * 8) + (n mod 7) + 1
+            in
+            let shift = Script_int.(abs (of_int n)) in
+            (bytes, (shift, eos)))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_ILsr_bytes
+        ~intercept_stack:(Bytes.empty, (Script_int.one_n, eos))
+        ~stack_type:(bytes @$ nat @$ bot)
+        ~kinstr:(ILsr_bytes (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            (* No need of samples of shift > bytes * 8 which are equivalent with
+               the case of shift = bytes * 8 where LSR returns empty bytes immediately *)
+            (* Avoid [n mod 8 = 0] which runs faster than the others. *)
+            let n =
+              let n =
+                Random.State.int rng_state ((Bytes.length bytes * 7) + 1)
+              in
+              (n / 7 * 8) + (n mod 7) + 1
+            in
+            let shift = Script_int.(abs (of_int n)) in
+            (bytes, (shift, eos)))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IBytes_nat
+        ~stack_type:(nat @$ bot)
+        ~kinstr:(IBytes_nat (dummy_loc, halt))
+        ~intercept_stack:(Script_int.one_n, eos)
+          (* Avoid the optimized case of 0 *)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {cfg.sampler.base_parameters with int_size = {min = 0; max = 4096}}
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let nat =
+              Samplers.Random_value.value Script_typed_ir.nat_t rng_state
+            in
+            (nat, eos))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_INat_bytes
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(INat_bytes (dummy_loc, halt))
+        ~intercept_stack:(Bytes.empty, eos)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {
+              cfg.sampler.base_parameters with
+              bytes_size = {min = 0; max = 4096};
+            }
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            (bytes, eos))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IBytes_int
+        ~stack_type:(int @$ bot)
+        ~kinstr:(IBytes_int (dummy_loc, halt))
+        ~intercept_stack:(Script_int.one, eos)
+          (* Avoid the optimized case of 0 *)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {cfg.sampler.base_parameters with int_size = {min = 0; max = 4096}}
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let int =
+              Samplers.Random_value.value Script_typed_ir.int_t rng_state
+            in
+            (int, eos))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IInt_bytes
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(IInt_bytes (dummy_loc, halt))
+        ~intercept_stack:(Bytes.empty, eos)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {
+              cfg.sampler.base_parameters with
+              bytes_size = {min = 0; max = 4096};
+            }
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            (bytes, eos))
         ()
   end
 
@@ -2326,6 +2516,7 @@ module Registration_section = struct
         | Signature.Secp256k1 ->
             Interpreter_workload.N_ICheck_signature_secp256k1
         | Signature.P256 -> Interpreter_workload.N_ICheck_signature_p256
+        | Signature.Bls -> Interpreter_workload.N_ICheck_signature_bls
       in
       benchmark_with_stack_sampler
         ~intercept:for_intercept
@@ -2356,6 +2547,8 @@ module Registration_section = struct
     let () = check_signature Signature.Secp256k1
 
     let () = check_signature Signature.P256
+
+    let () = check_signature Signature.Bls
 
     let () =
       simple_benchmark
@@ -2841,21 +3034,21 @@ module Registration_section = struct
     let stack_type = ticket unit @$ cpair nat nat @$ bot
 
     let () =
-      let zero = Script_int.zero_n in
+      let one = Script_int.one_n in
       let ticket =
         {
           ticketer =
             Alpha_context.Contract.Implicit
               Environment.Signature.Public_key_hash.zero;
           contents = ();
-          amount = Ticket_amount.one;
+          amount = Ticket_amount.(add one one);
         }
       in
       benchmark_with_fixed_stack
         ~intercept:true
         ~name:Interpreter_workload.N_ISplit_ticket
         ~stack_type
-        ~stack:(ticket, ((zero, zero), eos))
+        ~stack:(ticket, ((one, one), eos))
         ~kinstr:split_ticket_instr
         ()
 
@@ -2867,11 +3060,15 @@ module Registration_section = struct
             make_default_samplers config.Default_config.sampler
           in
           fun () ->
-            let half_amount = Samplers.Random_value.value nat rng_state in
-            let half_amount = Script_int.add_n half_amount Script_int.one_n in
-            let amount = Script_int.add_n half_amount half_amount in
+            let x_amount =
+              Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
+            in
+            let y_amount =
+              Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
+            in
+            let amount = Script_int.add_n x_amount y_amount in
             let amount =
-              (* this is safe because half_amount > 0 *)
+              (* this is safe because x_amount > 0 and y_amount > 0 *)
               WithExceptions.Option.get ~loc:__LOC__
               @@ Ticket_amount.of_n amount
             in
@@ -2879,7 +3076,7 @@ module Registration_section = struct
             let ticket = {ticket with amount} in
             Ex_stack_and_kinstr
               {
-                stack = (ticket, ((half_amount, half_amount), eos));
+                stack = (ticket, ((x_amount, y_amount), eos));
                 stack_type;
                 kinstr = split_ticket_instr;
               })
@@ -3062,7 +3259,7 @@ module Registration_section = struct
           let open Alpha_context in
           let step_constants =
             {
-              source = Contract.Implicit Signature.Public_key_hash.zero;
+              source = Contract (Implicit Signature.Public_key_hash.zero);
               payer = Signature.Public_key_hash.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;
@@ -3177,7 +3374,8 @@ module Registration_section = struct
           let kbody = halt in
           fun () ->
             let cont =
-              KList_enter_body (kbody, [()], [], Some (list unit), 1, KNil)
+              KList_enter_body
+                (kbody, [()], Script_list.empty, Some (list unit), 1, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3199,8 +3397,7 @@ module Registration_section = struct
           fun () ->
             let ys = Samplers.Random_value.value (list unit) rng_state in
             let cont =
-              KList_enter_body
-                (kbody, [], ys.elements, Some (list unit), ys.length, KNil)
+              KList_enter_body (kbody, [], ys, Some (list unit), ys.length, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3221,7 +3418,8 @@ module Registration_section = struct
           let kbody = halt in
           fun () ->
             let cont =
-              KList_enter_body (kbody, [], [], Some (list unit), 1, KNil)
+              KList_enter_body
+                (kbody, [], Script_list.empty, Some (list unit), 1, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3242,7 +3440,8 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let kbody = halt in
           let cont =
-            KList_exit_body (kbody, [], [], Some (list unit), 1, KNil)
+            KList_exit_body
+              (kbody, [], Script_list.empty, Some (list unit), 1, KNil)
           in
           fun () ->
             Ex_stack_and_cont

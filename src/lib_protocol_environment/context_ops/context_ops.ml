@@ -203,6 +203,21 @@ let gc context_index context_hash =
   | Disk_index index -> Context.gc index context_hash
   | Memory_index index -> Tezos_context_memory.Context.gc index context_hash
 
+let wait_gc_completion context_index =
+  match context_index with
+  | Disk_index index -> Context.wait_gc_completion index
+  | Memory_index index -> Tezos_context_memory.Context.wait_gc_completion index
+
+let is_gc_allowed context_index =
+  match context_index with
+  | Disk_index index -> Context.is_gc_allowed index
+  | Memory_index index -> Tezos_context_memory.Context.is_gc_allowed index
+
+let split context_index =
+  match context_index with
+  | Disk_index index -> Context.split index
+  | Memory_index index -> Tezos_context_memory.Context.split index
+
 let sync = function
   | Disk_index index -> Context.sync index
   | Memory_index index -> Tezos_context_memory.Context.sync index
@@ -279,12 +294,6 @@ let exists context_index context_hash =
   match context_index with
   | Disk_index index -> Context.exists index context_hash
   | Memory_index index -> Tezos_context_memory.Context.exists index context_hash
-
-let retrieve_commit_info context_index header =
-  match context_index with
-  | Disk_index index -> Context.retrieve_commit_info index header
-  | Memory_index index ->
-      Tezos_context_memory.Context.retrieve_commit_info index header
 
 let close context_index =
   match context_index with

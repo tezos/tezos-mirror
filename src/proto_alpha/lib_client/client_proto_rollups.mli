@@ -28,9 +28,4 @@ open Alpha_context
 
 type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
 
-module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
-
-module ScRollup : sig
-  val origination_proof_exn :
-    boot_sector:string -> Sc_rollup.Kind.t -> Sc_rollup.wrapped_proof Lwt.t
-end
+module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t

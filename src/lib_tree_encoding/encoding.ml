@@ -134,13 +134,15 @@ let lazy_mapping to_key enc_value =
                 tree
                 (prefix [])
                 (Tree.select backend origin)
-          | None -> return tree
+          | None -> Tree.remove backend tree (prefix [])
         in
         List.fold_left_s
           (fun tree (k, v) ->
             let key = append_key prefix (to_key k) in
             let* tree = Tree.remove backend tree (key []) in
-            enc_value.encode backend v key tree)
+            match v with
+            | Some v -> enc_value.encode backend v key tree
+            | None -> Lwt.return tree)
           tree
           bindings);
   }

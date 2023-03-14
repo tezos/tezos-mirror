@@ -67,7 +67,9 @@ module OriginatedContractAlias = struct
             | Error c_errs -> Error (c_errs @ k_errs)))
 
   let destination_parameter () =
-    Clic.parameter ~autocomplete:RawContractAlias.autocomplete find_destination
+    Tezos_clic.parameter
+      ~autocomplete:RawContractAlias.autocomplete
+      find_destination
 
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =
@@ -79,7 +81,7 @@ module OriginatedContractAlias = struct
            Use 'text:literal' or 'alias:name' to force.";
         ]
     in
-    Clic.param ~name ~desc (destination_parameter ()) next
+    Tezos_clic.param ~name ~desc (destination_parameter ()) next
 
   let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
     let doc =
@@ -91,7 +93,7 @@ module OriginatedContractAlias = struct
            Use 'text:literal' or 'alias:name' to force.";
         ]
     in
-    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
+    Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 end
 
 module ContractAlias = struct
@@ -99,18 +101,18 @@ module ContractAlias = struct
     RawContractAlias.find_opt cctxt s >>=? function
     | Some v -> return v
     | None -> (
-        Client_keys.Public_key_hash.find_opt cctxt s >>=? function
+        Client_keys_v0.Public_key_hash.find_opt cctxt s >>=? function
         | Some v -> return (Contract.Implicit v)
         | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
-    Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
+    Client_keys_v0.Public_key_hash.find cctxt name >>=? fun v ->
     return (Contract.Implicit v)
 
   let rev_find cctxt (c : Contract.t) =
     match c with
     | Implicit hash -> (
-        Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
+        Client_keys_v0.Public_key_hash.rev_find cctxt hash >>=? function
         | Some name -> return_some ("key:" ^ name)
         | None -> return_none)
     | Originated _ -> RawContractAlias.rev_find cctxt c
@@ -121,7 +123,7 @@ module ContractAlias = struct
     | _ -> find cctxt s
 
   let autocomplete cctxt =
-    Client_keys.Public_key_hash.autocomplete cctxt >>=? fun keys ->
+    Client_keys_v0.Public_key_hash.autocomplete cctxt >>=? fun keys ->
     RawContractAlias.autocomplete cctxt >>=? fun contracts ->
     return (List.map (( ^ ) "key:") keys @ contracts)
 
@@ -131,13 +133,13 @@ module ContractAlias = struct
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
          Use 'key:name' to force the later."
     in
-    Clic.(param ~name ~desc (parameter ~autocomplete get_contract) next)
+    Tezos_clic.(param ~name ~desc (parameter ~autocomplete get_contract) next)
 
   let find_destination cctxt s =
     match String.split ~limit:1 ':' s with
     | ["alias"; alias] -> find cctxt alias
     | ["key"; text] ->
-        Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
+        Client_keys_v0.Public_key_hash.find cctxt text >>=? fun v ->
         return (Contract.Implicit v)
     | ["text"; text] -> ContractEntity.of_source text
     | _ -> (
@@ -149,10 +151,10 @@ module ContractAlias = struct
             | Error k_errs -> Lwt.return_error (c_errs @ k_errs)))
 
   let destination_parameter () =
-    Clic.parameter
+    Tezos_clic.parameter
       ~autocomplete:(fun cctxt ->
         autocomplete cctxt >>=? fun list1 ->
-        Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
+        Client_keys_v0.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
         return (list1 @ list2))
       find_destination
 
@@ -166,7 +168,7 @@ module ContractAlias = struct
            Use 'text:literal', 'alias:name', 'key:name' to force.";
         ]
     in
-    Clic.param ~name ~desc (destination_parameter ()) next
+    Tezos_clic.param ~name ~desc (destination_parameter ()) next
 
   let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
     let doc =
@@ -178,7 +180,7 @@ module ContractAlias = struct
            Use 'text:literal', 'alias:name', 'key:name' to force.";
         ]
     in
-    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
+    Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 
   let name cctxt contract =
     rev_find cctxt contract >>=? function
@@ -189,7 +191,7 @@ end
 let list_contracts cctxt =
   RawContractAlias.load cctxt >>=? fun raw_contracts ->
   let contracts = List.map (fun (n, v) -> ("", n, v)) raw_contracts in
-  Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
+  Client_keys_v0.Public_key_hash.load cctxt >>=? fun keys ->
   (* List accounts (implicit contracts of identities) *)
   List.map_es
     (fun (n, v) ->

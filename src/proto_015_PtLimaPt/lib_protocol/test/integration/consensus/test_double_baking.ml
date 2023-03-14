@@ -119,7 +119,7 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   >>=? fun blk_with_db_evidence ->
   Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
-    if Signature.Public_key_hash.( = ) e1.delegate baker1 then
+    if Tezos_crypto.Signature.V0.Public_key_hash.( = ) e1.delegate baker1 then
       (e1.delegate, e1.slots)
     else (e2.delegate, e2.slots)
   in
@@ -168,7 +168,7 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Block.bake blk_2 >>=? fun blk_b ->
   Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
-    if Signature.Public_key_hash.( = ) e1.delegate baker1 then
+    if Tezos_crypto.Signature.V0.Public_key_hash.( = ) e1.delegate baker1 then
       (e1.delegate, e1.slots)
     else (e2.delegate, e2.slots)
   in

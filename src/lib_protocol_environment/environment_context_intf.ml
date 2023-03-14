@@ -98,16 +98,20 @@ end
 module type CORE = sig
   type t
 
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
+  val set_protocol : t -> Tezos_crypto.Hashed.Protocol_hash.t -> t Lwt.t
 
-  val get_protocol : t -> Protocol_hash.t Lwt.t
+  val get_protocol : t -> Tezos_crypto.Hashed.Protocol_hash.t Lwt.t
 
   val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+    t ->
+    protocol:Tezos_crypto.Hashed.Protocol_hash.t ->
+    expiration:Time.Protocol.t ->
+    t Lwt.t
 
-  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
+  val set_hash_version :
+    t -> Tezos_crypto.Hashed.Context_hash.Version.t -> t tzresult Lwt.t
 
-  val get_hash_version : t -> Context_hash.Version.t
+  val get_hash_version : t -> Tezos_crypto.Hashed.Context_hash.Version.t
 end
 
 module type TREE_CORE = sig
@@ -127,7 +131,7 @@ module type TREE_CORE = sig
 
   val of_value : t -> value -> tree Lwt.t
 
-  val hash : tree -> Context_hash.t
+  val hash : tree -> Tezos_crypto.Hashed.Context_hash.t
 
   val equal : tree -> tree -> bool
 
@@ -312,6 +316,7 @@ end
 module V6 = V5
 module V7 = V6
 module V8 = V7
+module V9 = V8
 
 module type S = V7.S
 
@@ -323,6 +328,7 @@ module type Sigs = sig
   module V6 = V6
   module V7 = V7
   module V8 = V8
+  module V9 = V9
 
   module type VIEW = VIEW
 

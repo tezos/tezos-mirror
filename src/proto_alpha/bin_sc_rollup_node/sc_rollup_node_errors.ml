@@ -28,19 +28,22 @@ open Protocol.Alpha_context
 let tez_sym = "\xEA\x9C\xA9"
 
 type error +=
-  | Cannot_produce_proof of
-      Sc_rollup.Inbox.t * Sc_rollup.Inbox.History.t * Raw_level.t
+  | Cannot_produce_proof of Sc_rollup.Inbox.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Bad_minimal_fees of string
-  | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
+  | Disagree_with_cemented of {
+      inbox_level : Raw_level.t;
+      ours : Sc_rollup.Commitment.Hash.t option;
+      on_l1 : Sc_rollup.Commitment.Hash.t;
+    }
   | Unreliable_tezos_node_returning_inconsistent_game
   | Inconsistent_inbox of {
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
     }
-  | Missing_PVM_state of Block_hash.t * Raw_level.t
-  | Cannot_checkout_context of Block_hash.t * string option
-  | Cannot_retrieve_reveal of Sc_rollup.Input_hash.t
+  | Missing_PVM_state of Block_hash.t * Int32.t
+  | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
+  | No_batcher
 
 type error +=
   | Lost_game of
@@ -60,22 +63,34 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"internal.commitment_should_be_next_to_lcc"
-    ~title:
-      "Internal error: The next commitment should have the LCC as predecessor"
+    ~id:"internal.node_disagrees_with_cemented"
+    ~title:"Internal error: The node disagrees with a cemented commitment on L1"
     ~description:
-      "Internal error: The next commitment should have the LCC as predecessor"
-    ~pp:(fun ppf commitment ->
+      "Internal error: The node disagrees with a cemented commitment on L1"
+    ~pp:(fun ppf (inbox_level, ours, on_l1) ->
       Format.fprintf
         ppf
-        "invalid commitment '%a'"
-        Sc_rollup.Commitment.pp
-        commitment)
-    Data_encoding.(obj1 (req "commitment" Sc_rollup.Commitment.encoding))
+        "Internal error: The node has commitment %a for inbox level %a but \
+         this level is cemented on L1 with commitment %a"
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.pp_print_string ppf "[None]")
+           Sc_rollup.Commitment.Hash.pp)
+        ours
+        Raw_level.pp
+        inbox_level
+        Sc_rollup.Commitment.Hash.pp
+        on_l1)
+    Data_encoding.(
+      obj3
+        (req "inbox_level" Raw_level.encoding)
+        (req "ours" (option Sc_rollup.Commitment.Hash.encoding))
+        (req "on_l1" Sc_rollup.Commitment.Hash.encoding))
     (function
-      | Commitment_predecessor_should_be_LCC commitment -> Some commitment
+      | Disagree_with_cemented {inbox_level; ours; on_l1} ->
+          Some (inbox_level, ours, on_l1)
       | _ -> None)
-    (fun commitment -> Commitment_predecessor_should_be_LCC commitment) ;
+    (fun (inbox_level, ours, on_l1) ->
+      Disagree_with_cemented {inbox_level; ours; on_l1}) ;
 
   register_error_kind
     `Permanent
@@ -99,27 +114,21 @@ let () =
     ~description:
       "The rollup node is in a state that prevents it from producing \
        refutation proofs."
-    ~pp:(fun ppf (inbox, history, level) ->
+    ~pp:(fun ppf (inbox, level) ->
       Format.fprintf
         ppf
-        "cannot produce proof for inbox %a of level %a with history %a"
+        "cannot produce proof for inbox %a of level %a"
         Sc_rollup.Inbox.pp
         inbox
         Raw_level.pp
-        level
-        Sc_rollup.Inbox.History.pp
-        history)
+        level)
     Data_encoding.(
-      obj3
+      obj2
         (req "inbox" Sc_rollup.Inbox.encoding)
-        (req "history" Sc_rollup.Inbox.History.encoding)
         (req "level" Raw_level.encoding))
     (function
-      | Cannot_produce_proof (inbox, history, level) ->
-          Some (inbox, history, level)
-      | _ -> None)
-    (fun (inbox, history, level) ->
-      Cannot_produce_proof (inbox, history, level)) ;
+      | Cannot_produce_proof (inbox, level) -> Some (inbox, level) | _ -> None)
+    (fun (inbox, level) -> Cannot_produce_proof (inbox, level)) ;
 
   register_error_kind
     ~id:"sc_rollup.node.missing_mode_operators"
@@ -175,13 +184,11 @@ let () =
     ~pp:(fun ppf (block, level) ->
       Format.fprintf
         ppf
-        "Cannot retrieve PVM state for block %a at level %a"
+        "Cannot retrieve PVM state for block %a at level %ld"
         Block_hash.pp
         block
-        Raw_level.pp
         level)
-    Data_encoding.(
-      obj2 (req "block" Block_hash.encoding) (req "level" Raw_level.encoding))
+    Data_encoding.(obj2 (req "block" Block_hash.encoding) (req "level" int32))
     (function
       | Missing_PVM_state (block, level) -> Some (block, level) | _ -> None)
     (fun (block, level) -> Missing_PVM_state (block, level)) ;
@@ -198,14 +205,14 @@ let () =
         "The context %sfor block %a cannot be checkouted"
         (Option.fold
            ~none:""
-           ~some:(fun c -> Hex.(show (of_string c)))
+           ~some:Sc_rollup_context_hash.to_b58check
            context_hash)
         Block_hash.pp
         block)
     Data_encoding.(
       obj2
         (req "block" Block_hash.encoding)
-        (opt "context" (conv Bytes.of_string Bytes.to_string bytes)))
+        (opt "context" Sc_rollup_context_hash.encoding))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)
@@ -239,16 +246,12 @@ let () =
     (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed)) ;
 
   register_error_kind
+    ~id:"sc_rollup.node.no_batcher"
+    ~title:"No batcher for this node"
+    ~description:"This node does not have a batcher"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This rollup node does not have batcher.")
     `Permanent
-    ~id:"internal.cannot_retrieve_reveal"
-    ~title:"Internal error: Cannot retrieve reveal of hash"
-    ~description:"The rollup node cannot retrieve a reveal asked by the rollup."
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "The node cannot retrieve a reveal for hash %a"
-        Sc_rollup.Input_hash.pp
-        hash)
-    Data_encoding.(obj1 (req "hash" Sc_rollup.Input_hash.encoding))
-    (function Cannot_retrieve_reveal hash -> Some hash | _ -> None)
-    (fun hash -> Cannot_retrieve_reveal hash)
+    Data_encoding.unit
+    (function No_batcher -> Some () | _ -> None)
+    (fun () -> No_batcher)

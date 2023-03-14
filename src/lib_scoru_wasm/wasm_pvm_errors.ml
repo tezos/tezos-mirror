@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,6 +40,11 @@ type interpreter_error = {
   explanation : truncated_string option;
 }
 
+type fallback_cause =
+  | Decode_cause of interpreter_error
+  | Link_cause of truncated_string
+  | Init_cause of interpreter_error
+
 type t =
   | Decode_error of interpreter_error
   | Link_error of truncated_string
@@ -48,6 +54,7 @@ type t =
   | Unknown_error of truncated_string
   | Too_many_ticks
   | Too_many_reboots
+  | No_fallback_kernel of fallback_cause
 
 let decode_state_to_string_raw = function
   | Decode.Byte_vector_step -> "Byte_vector_step"
@@ -80,7 +87,8 @@ let init_state_to_string exn = init_state_to_string_raw exn |> truncate_message
 
 let durable_exn_explanation_raw = function
   | Durable.Invalid_key path -> Some ("Invalid_key: " ^ path)
-  | Durable.Not_found -> Some "Value not found"
+  | Durable.Value_not_found -> Some "Value not found"
+  | Durable.Tree_not_found -> Some "Tree not found"
   | Durable.Durable_empty | Durable_storage.Durable_empty ->
       Some "Empty durable storage"
   | _ -> None
@@ -113,6 +121,7 @@ let extract_interpreter_error exn =
   (* The locations are removed during encoding, they won't be usable in practice. *)
   | Binary_exn.Decode_error.Error (_, explanation)
   | Binary_exn.Encode_error.Error (_, explanation)
+  | Binary_exn.Floating_point.Error (_, explanation)
   | Valid.Invalid (_, explanation)
   | Eval.Link (_, explanation)
   | Eval.Trap (_, explanation)
@@ -149,8 +158,8 @@ let extract_interpreter_error exn =
           raw_exception;
           explanation = Some (truncate_message "Module must export memory 0");
         }
-  | Durable.Invalid_key _ | Durable.Not_found | Durable.Durable_empty
-  | Durable_storage.Durable_empty ->
+  | Durable.Invalid_key _ | Durable.Value_not_found | Durable.Tree_not_found
+  | Durable.Durable_empty | Durable_storage.Durable_empty ->
       `Interpreter {raw_exception; explanation = durable_exn_explanation exn}
   | _ -> `Unknown raw_exception
 
@@ -159,16 +168,41 @@ let invalid_state m = Invalid_state (truncate_message m)
 let truncated_string_encoding =
   Data_encoding.(conv (fun (Truncated s) -> s) (fun s -> Truncated s) string)
 
+let interpreter_error_encoding prefix =
+  let open Data_encoding in
+  conv
+    (fun {raw_exception; explanation} -> (raw_exception, explanation))
+    (fun (raw_exception, explanation) -> {raw_exception; explanation})
+    (obj2
+       (req (prefix ^ "_raw_exception") truncated_string_encoding)
+       (req (prefix ^ "_explanation") (option truncated_string_encoding)))
+
+let fallback_cause_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Decode_cause"
+        (interpreter_error_encoding "decode")
+        (function Decode_cause cause -> Some cause | _ -> None)
+        (fun cause -> Decode_cause cause);
+      case
+        (Tag 1)
+        ~title:"Link_cause"
+        (obj1 (req "link" truncated_string_encoding))
+        (function Link_cause cause -> Some cause | _ -> None)
+        (fun cause -> Link_cause cause);
+      case
+        (Tag 2)
+        ~title:"Init_cause"
+        (interpreter_error_encoding "init")
+        (function Init_cause cause -> Some cause | _ -> None)
+        (fun cause -> Init_cause cause);
+    ]
+
 let encoding =
   let open Data_encoding in
-  let interpreter_error_encoding prefix =
-    conv
-      (fun {raw_exception; explanation} -> (raw_exception, explanation))
-      (fun (raw_exception, explanation) -> {raw_exception; explanation})
-      (obj2
-         (req (prefix ^ "_raw_exception") truncated_string_encoding)
-         (req (prefix ^ "_explanation") (option truncated_string_encoding)))
-  in
   union
     [
       case
@@ -219,6 +253,12 @@ let encoding =
         (constant "too_many_reboots")
         (function Too_many_reboots -> Some () | _ -> None)
         (fun () -> Too_many_reboots);
+      case
+        (Tag 8)
+        ~title:"No_fallback_kernel"
+        (obj1 (req "no_kernel_fallback" fallback_cause_encoding))
+        (function No_fallback_kernel cause -> Some cause | _ -> None)
+        (fun cause -> No_fallback_kernel cause);
     ]
 
 let link_error kind ~module_name ~item_name =

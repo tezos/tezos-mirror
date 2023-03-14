@@ -215,12 +215,15 @@ module Tx_rollup : sig
 end
 
 module Dal : sig
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
+
   module Parameters : sig
     type t = {
-      number_of_shards : int;
-      redundancy_factor : int;
-      slot_size : int;
-      page_size : int;
+      feature_enabled : bool;
+      cryptobox : Cryptobox.parameters;
+      number_of_slots : int;
+      attestation_lag : int;
+      blocks_per_epoch : int;
     }
 
     val parameter_file : Protocol.t -> string Lwt.t
@@ -228,37 +231,166 @@ module Dal : sig
     val from_client : Client.t -> t Lwt.t
   end
 
-  module RPC : sig
-    (** [split_slot data] posts [data] on slot/split *)
-    val split_slot : string -> (Dal_node.t, string) RPC_core.t
+  (** Abstract version of a slot to deal with messages content which
+     are smaller than the expected size of a slot. *)
+  type slot
+
+  (** [make_slot ?padding content client] produces a slot. If
+     [padding=true] (which is the default), then the content is padded
+     to reach the expected size given by the [slot_size] field of
+     {!type:Cryptobox.parameters}. [client] is used to get the
+     corresponding parameters (see {!val: Parameters.from_client}). *)
+  val make_slot : ?padding:bool -> string -> Client.t -> slot Lwt.t
+
+  (** [content_of_slot slot] retrieves the original content of a slot
+     by removing the padding. *)
+  val content_of_slot : slot -> string
+
+  module RPC_legacy : sig
+    (** [split_slot data] posts [data] on slot/split; returns the
+        corresponding commitment and proof *)
+    val split_slot : slot -> (Dal_node.t, string * string) RPC_core.t
 
     (** [slot_content slot_header] gets slot/content of [slot_header] *)
-    val slot_content : string -> (Dal_node.t, string) RPC_core.t
+    val slot_content : string -> (Dal_node.t, slot) RPC_core.t
 
     (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
     val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
-
-    (** [stored_slot_headers slot_header] gets slot_headers stored for a given
-        block hash *)
-    val stored_slot_headers :
-      string -> (Dal_node.t, (int * string) list) RPC_core.t
 
     (** [shard ~slot_header ~shard_id] gets a shard from
         a given slot header and shard id *)
     val shard :
       slot_header:string -> shard_id:int -> (Dal_node.t, string) RPC_core.t
+
+    (** [shards ~slot_header shard_ids] gets a subset of shards from a given
+        slot header *)
+    val shards :
+      slot_header:string -> int list -> (Dal_node.t, string list) RPC_core.t
+
+    (** [dac_store_preimage ~payload ~pagination_scheme] posts a [payload] to
+        dac/store_preimage using a given [pagination_scheme]. It returnst the
+        base58 encoded root page hash, and the raw bytes that can
+        be used as contents of a rollup message to trigger the request of
+        the payload in a Wasm rollup. *)
+    val dac_store_preimage :
+      payload:string ->
+      pagination_scheme:string ->
+      (Dal_node.t, string * string) RPC_core.t
+
+    (** [dac_verify_signature data] requests the dal node to verify
+         the signature of the external message [data] via
+         the plugin/dac/verify_signature endpoint. The DAC committee
+         of the dal node must be the same that was used to produce the
+         [data]. *)
+    val dac_verify_signature : string -> (Dal_node.t, bool) RPC_core.t
   end
 
-  module Cryptobox = Tezos_crypto_dal.Cryptobox
+  module RPC : sig
+    include module type of RPC_legacy
 
-  val make : ?on_error:(string -> Cryptobox.t) -> Parameters.t -> Cryptobox.t
+    type commitment = string
+
+    type profile = Attestor of string
+
+    (** Information contained in a slot header fetched from the DAL node. *)
+    type slot_header = {
+      slot_level : int;
+      slot_index : int;
+      commitment : string;
+      status : string;
+    }
+
+    (** [slot_header_of_json json] decodes [json] as a slot header. The function
+        fails if the given [json] cannot be decoded. *)
+    val slot_header_of_json : JSON.t -> slot_header
+
+    (** [slot_header_of_json json_] similar to {!slot_header_of_json}, but
+        the input (and output) is expected to be a list. *)
+    val slot_headers_of_json : JSON.t -> slot_header list
+
+    (** Call RPC "POST /commitments" to store a slot and retrun the commitment
+        in case of success. *)
+    val post_commitment : slot -> (Dal_node.t, commitment) RPC_core.t
+
+    (** Call RPC "PATCH /commitments" to associate the given level and index to the slot
+        whose commitment is given. *)
+    val patch_commitment :
+      commitment ->
+      slot_level:int ->
+      slot_index:int ->
+      (Dal_node.t, unit) RPC_core.t
+
+    (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
+        content associated with the given commitment. *)
+    val get_commitment_slot : commitment -> (Dal_node.t, slot) RPC_core.t
+
+    type commitment_proof = string
+
+    (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
+       associated to a commitment. *)
+    val get_commitment_proof :
+      commitment -> (Dal_node.t, commitment_proof) RPC_core.t
+
+    (** Call RPC "GET
+        /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
+        the commitment associated to the given level and index. *)
+    val get_level_index_commitment :
+      slot_level:int -> slot_index:int -> (Dal_node.t, commitment) RPC_core.t
+
+    (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
+         the DAL node. *)
+    val patch_profile : profile -> (Dal_node.t, unit) RPC_core.t
+
+    (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
+         the DAL node. *)
+    val get_profiles : unit -> (Dal_node.t, profile list) RPC_core.t
+
+    (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
+        statuses know about the given commitment. The resulting list can be filtered by a
+        given header publication level and slot index. *)
+    val get_commitment_headers :
+      ?slot_level:int ->
+      ?slot_index:int ->
+      commitment ->
+      (Dal_node.t, slot_header list) RPC_core.t
+
+    (** Call RPC "GET /profile/<public_key_hash>/<level>/assigned-shard-indices" to
+        get shard ids assigned to the given public key hash at the given level. *)
+    val get_assigned_shard_indices :
+      level:int -> pkh:string -> (Dal_node.t, int list) RPC_core.t
+
+    (** Call RPC "GET /levels/<published_level>/headers?status" to get the known
+        headers with the given published level. *)
+    val get_published_level_headers :
+      ?status:string -> int -> (Dal_node.t, slot_header list) RPC_core.t
+  end
+
+  val make :
+    ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
   module Commitment : sig
     val dummy_commitment :
-      ?on_error:(string -> Cryptobox.commitment) ->
-      Parameters.t ->
+      ?on_error:(string -> Cryptobox.commitment * Cryptobox.commitment_proof) ->
       Cryptobox.t ->
       string ->
-      Cryptobox.commitment
+      Cryptobox.commitment * Cryptobox.commitment_proof
+
+    val to_string : Cryptobox.commitment -> string
+  end
+
+  module Committee : sig
+    type member = {attestor : string; first_shard_index : int; power : int}
+
+    type t = member list
+
+    val typ : t Check.typ
+
+    val at_level : Node.t -> level:int -> t Lwt.t
+  end
+
+  module Check : sig
+    type profiles = RPC.profile list
+
+    val profiles_typ : profiles Check.typ
   end
 end

@@ -23,98 +23,464 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
+let ns = Namespace.make Registration_helpers.ns "sc_rollup"
 
-(** A benchmark for estimating the gas cost of
-    {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This
-    value is used to consume the gas cost internally in
-    [Sc_rollup_storage.add_external_messages], when computing the number of
-    messages and their total size in bytes to be added to an inbox.
-*)
+let fv s = Free_variable.of_namespace (ns s)
 
-module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
-  let name = "Sc_rollup_update_num_and_size_of_messages"
+let ( -- ) min max : Base_samplers.range = {min; max}
 
-  let info =
-    "Estimating the cost of updating the number and total size of messages \
-     when adding a message to a sc_rollup inbox"
+(** This section contains preliminary definitions for building a pvm state from
+    scratch. *)
+module Pvm_state_generator = struct
+  module Context = Tezos_context_memory.Context_binary
 
-  let tags = ["scoru"]
+  module Wasm_context = struct
+    type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
+
+    module Tree = struct
+      include Context.Tree
+
+      type tree = Context.tree
+
+      type t = Context.t
+
+      type key = string list
+
+      type value = bytes
+
+      let select = function
+        | Tree t -> t
+        | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
+
+      let wrap t = Tree t
+    end
+
+    type tree = Context.tree
+
+    type proof = Context.Proof.tree Context.Proof.t
+
+    let verify_proof p f =
+      Lwt.map Result.to_option (Context.verify_tree_proof p f)
+
+    let produce_proof context tree step =
+      let open Lwt_syntax in
+      let* context = Context.add_tree context [] tree in
+      let* _hash = Context.commit ~time:Time.Protocol.epoch context in
+      let index = Context.index context in
+      match Context.Tree.kinded_key tree with
+      | Some k ->
+          let* p = Context.produce_tree_proof index k step in
+          return (Some p)
+      | None -> return None
+
+    let kinded_hash_to_state_hash = function
+      | `Value hash | `Node hash ->
+          Sc_rollup_repr.State_hash.context_hash_to_state_hash hash
+
+    let proof_before proof =
+      kinded_hash_to_state_hash proof.Context.Proof.before
+
+    let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
+
+    let proof_encoding =
+      let module Proof_encoding =
+        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding
+      in
+      Proof_encoding.V2.Tree2.tree_proof_encoding
+  end
+
+  let make_transaction value text contract =
+    let entrypoint = Entrypoint_repr.default in
+    let destination : Contract_hash.t =
+      Contract_hash.of_bytes_exn @@ Bytes.of_string contract
+    in
+    let open Tezos_micheline.Micheline in
+    let open Michelson_v1_primitives in
+    let unparsed_parameters =
+      strip_locations
+      @@ Prim
+           ( 0,
+             I_TICKET,
+             [
+               Prim
+                 (0, I_PAIR, [Int (0, Z.of_int32 value); String (1, text)], []);
+             ],
+             [] )
+    in
+    Sc_rollup_outbox_message_repr.{unparsed_parameters; entrypoint; destination}
+
+  let make_transactions ~rng_state ~max =
+    let open Base_samplers in
+    let n = sample_in_interval ~range:(0 -- max) rng_state in
+    Stdlib.List.init n (fun _ ->
+        let contract = uniform_string ~nbytes:20 rng_state in
+        let value =
+          Int32.of_int @@ sample_in_interval ~range:(-1000 -- 1000) rng_state
+        in
+        let text = string ~size:(0 -- 40) rng_state in
+        make_transaction value text contract)
+
+  let make_outbox_message ~nb_transactions ~rng_state =
+    let transactions = make_transactions ~rng_state ~max:nb_transactions in
+    Sc_rollup_outbox_message_repr.Atomic_transaction_batch {transactions}
+
+  let dummy_context =
+    let dummy = Context.init "/tmp" in
+    Context.empty @@ Lwt_main.run dummy
+
+  let empty_tree = Context.Tree.empty dummy_context
+
+  (* Build a pvm state from scratch. *)
+  let build_pvm_state rng_state ~nb_inbox_messages ~input_payload_size
+      ~nb_output_buffer_levels ~output_buffer_size ~nb_transactions ~tree_depth
+      ~tree_branching_factor =
+    let open Lwt_result_syntax in
+    let random_key () =
+      Base_samplers.readable_ascii_string ~size:(5 -- 5) rng_state
+    in
+    (* [gen_tree] Generates a tree for the given depth and branching factor.
+       This function is witten in CPS to avoid [stack-overflow] errors when
+       branching factor is 1 and tree depth is big. *)
+    let gen_tree () =
+      let bottom_tree =
+        let tree = empty_tree in
+        let key = [random_key ()] in
+        let value = Bytes.empty in
+        Context.Tree.add tree key value
+      in
+      let rec gen_tree tree_depth kont =
+        if tree_depth = 0 then kont bottom_tree
+        else
+          gen_tree
+            (tree_depth - 1)
+            (let rec kont' nb_subtrees acc_subtrees subtree =
+               let*! subtree = subtree in
+               let acc_subtrees = subtree :: acc_subtrees in
+               let nb_subtrees = nb_subtrees + 1 in
+               if nb_subtrees = tree_branching_factor then
+                 let tree = empty_tree in
+                 kont
+                 @@ List.fold_left_s
+                      (fun tree subtree ->
+                        let key = [random_key ()] in
+                        Context.Tree.add_tree tree key subtree)
+                      tree
+                      acc_subtrees
+               else gen_tree (tree_depth - 1) (kont' nb_subtrees acc_subtrees)
+             in
+             kont' 0 [])
+      in
+      gen_tree tree_depth Fun.id
+    in
+    (* Add trees of junk data in the [durable] and [wasm] parts
+       of the storage. *)
+    let*! durable_junk_tree = gen_tree () in
+    let*! wasm_junk_tree = gen_tree () in
+    let tree = empty_tree in
+    let*! tree = Context.Tree.add_tree tree ["durable"] durable_junk_tree in
+    let*! tree = Context.Tree.add_tree tree ["wasm"] wasm_junk_tree in
+    (* Create an output buffers and fill it with random batches of
+       transactions. *)
+    let open Tezos_webassembly_interpreter in
+    let open Tezos_scoru_wasm in
+    let module Index_Vector = Lazy_vector.Mutable.ZVector in
+    let module Level_Map = Lazy_map.Mutable.LwtInt32Map in
+    let output =
+      Level_Map.create
+        ~produce_value:(fun _ ->
+          Lwt.return @@ Index_Vector.create (Z.of_int output_buffer_size))
+        ()
+    in
+    let*! () =
+      let open Sc_rollup_outbox_message_repr in
+      List.iter_s
+        (fun l ->
+          let*! outbox = Level_Map.get (Int32.of_int l) output in
+          Lwt.return
+          @@ List.iter
+               (fun i ->
+                 let out = make_outbox_message ~nb_transactions ~rng_state in
+                 let outbox_message =
+                   Data_encoding.Binary.to_bytes_exn encoding out
+                 in
+                 Index_Vector.set (Z.of_int i) outbox_message outbox)
+               Misc.(0 --> (output_buffer_size - 1)))
+        Misc.(0 --> (nb_output_buffer_levels - 1))
+    in
+    let output = Output_buffer.Internal_for_tests.make output in
+    (* Create the input buffer. *)
+    let input = Index_Vector.create (Z.of_int nb_inbox_messages) in
+    let make_input_message (message_counter : int) : Input_buffer.message =
+      let open Base_samplers in
+      let random_payload () =
+        uniform_bytes ~nbytes:input_payload_size rng_state
+      in
+      {
+        raw_level = Int32.of_int message_counter;
+        message_counter = Z.of_int message_counter;
+        payload = random_payload ();
+      }
+    in
+    let () =
+      List.iter
+        (fun counter ->
+          Index_Vector.set (Z.of_int counter) (make_input_message counter) input)
+        Misc.(0 --> (nb_inbox_messages - 1))
+    in
+    (* Encode the buffers and update the state of the pvm. *)
+    let buffers = Eval.{input; output} in
+    let buffers_encoding = Wasm_pvm.durable_buffers_encoding in
+    let module Tree_encoding_runner =
+      Tezos_tree_encoding.Runner.Make (Wasm_context.Tree) in
+    let*! tree =
+      Tree_encoding_runner.encode
+        (Tezos_tree_encoding.option buffers_encoding)
+        (Some buffers)
+        tree
+    in
+    Lwt.return (dummy_context, output, tree)
+
+  let select_output ~output_buffer ~nb_output_buffer_levels ~output_buffer_size
+      rng_state =
+    let open Lwt_result_syntax in
+    let open Base_samplers in
+    (* Pick a level. *)
+    let outbox_level =
+      Int32.of_int
+      @@ sample_in_interval
+           ~range:(0 -- (nb_output_buffer_levels - 1))
+           rng_state
+    in
+    (* Pick a message. *)
+    let message_index =
+      Z.of_int
+      @@ sample_in_interval ~range:(0 -- (output_buffer_size - 1)) rng_state
+    in
+    let*! bytes_output_message =
+      Tezos_webassembly_interpreter.Output_buffer.get_message
+        output_buffer
+        {outbox_level; message_index}
+    in
+    let message =
+      Data_encoding.Binary.of_bytes_exn
+        Sc_rollup_outbox_message_repr.encoding
+        bytes_output_message
+    in
+    let*? outbox_level =
+      Environment.wrap_tzresult @@ Raw_level_repr.of_int32 outbox_level
+    in
+    (* Produce an output proof for the picked message, and return the proof
+       and its length. *)
+    return Sc_rollup_PVM_sig.{outbox_level; message_index; message}
+end
+
+(** This benchmark estimates the cost of verifying an output proof for the
+    Wasm PVM.
+    The inferred cost model is [c1 + c2 * proof_length]. *)
+module Sc_rollup_verify_output_proof_benchmark = struct
+  open Pvm_state_generator
+  module Full_Wasm =
+    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+
+  (* Benchmark starts here. *)
+
+  let name = ns "Sc_rollup_verify_output_proof_benchmark"
+
+  let info = "Estimating the cost of verifying an output proof"
+
+  let tags = ["sc_rollup"]
 
   type config = {
-    max_num_messages : int;
-    max_messages_size : int;
-    max_new_message_size : int;
+    nb_inbox_messages : int;
+    input_payload_size : int;
+    nb_output_buffer_levels : int;
+    output_buffer_size : int;
+    nb_transactions : int;
+    tree_depth : int;
+    tree_branching_factor : int;
   }
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {max_num_messages; max_messages_size; max_new_message_size} ->
-        (max_num_messages, max_messages_size, max_new_message_size))
-      (fun (max_num_messages, max_messages_size, max_new_message_size) ->
-        {max_num_messages; max_messages_size; max_new_message_size})
-      (obj3
-         (req "max_num_of_messages" int31)
-         (req "max_messages_size" int31)
-         (req "max_new_message_size" int31))
+      (fun {
+             nb_inbox_messages;
+             input_payload_size;
+             nb_output_buffer_levels;
+             output_buffer_size;
+             nb_transactions;
+             tree_depth;
+             tree_branching_factor;
+           } ->
+        ( nb_inbox_messages,
+          input_payload_size,
+          nb_output_buffer_levels,
+          output_buffer_size,
+          nb_transactions,
+          tree_depth,
+          tree_branching_factor ))
+      (fun ( nb_inbox_messages,
+             input_payload_size,
+             nb_output_buffer_levels,
+             output_buffer_size,
+             nb_transactions,
+             tree_depth,
+             tree_branching_factor ) ->
+        {
+          nb_inbox_messages : int;
+          input_payload_size : int;
+          nb_output_buffer_levels;
+          output_buffer_size;
+          nb_transactions;
+          tree_depth;
+          tree_branching_factor;
+        })
+      (obj7
+         (req "nb_inbox_messages" int31)
+         (req "input_payload_size" int31)
+         (req "nb_output_buffer_levels" int31)
+         (req "output_buffer_size" int31)
+         (req "nb_transactions" int31)
+         (req "tree_depth" int31)
+         (req "tree_branching_factor" int31))
 
+  (** The actual config used to generate the more accurate model in
+      [sc_rollup_costs.ml] is :
+      [{
+        nb_inbox_messages = 1000;
+        input_payload_size = 4096;
+        nb_output_buffer_levels = 10_000;
+        output_buffer_size = 100;
+        nb_transactions = 50;
+        tree_depth = 10;
+        tree_branching_factor = 4;
+      }]
+      With the config above, the benchmark takes more than an hour. The default
+      config is lighter and takes a few minutes.
+
+      The table below shows benchmarking results for different tree depths and
+      number of outbox levels of the pvm state. The branching factor of the
+      generated "junk" trees in this benchmark is 4 (i.e for a depth of 10 the
+      generated tree contains more than 1_000_000 nodes). A tree depth of more
+      than 10 or a number of outbox levels of more than 10000 reaches the
+      memory limit of a laptop with 16Gb of memory. All proofs generated by
+      these benchmarks are below 10kb.
+
+      +-----------+---------------+-------------------------+-----------------+
+      | Junk tree | Number of     | Inferred model          | Gas cost for a  |
+      | depth     | outbox levels |                         | proof 10kb long |
+      +-----------+---------------+-------------------------+-----------------+
+      | 5         | 1000          |  7.907*size + 99291.292 | 178361          |
+      +-----------+---------------+-------------------------+-----------------+
+      | 6         | 2000          |  9.510*size + 99516.012 | 194616          |
+      +-----------+---------------+-------------------------+-----------------+
+      | 7         | 4000          | 11.383*size + 95445.175 | 209275          |
+      +-----------+---------------+-------------------------+-----------------+
+      | 8         | 6000          | 11.316*size + 100760.29 | 213920          |
+      +-----------+---------------+-------------------------+-----------------+
+      | 9         | 8000          | 11.227*size + 98748.490 | 211018          |
+      +-----------+---------------+-------------------------+-----------------+
+      | 10        | 10000         | 11.680*size + 98707.082 | 215507          |
+      +-----------+---------------+-------------------------+-----------------+
+
+      The [nb_transactions] parameter is the max number of transactions in an
+      outbox message, it is set at 50 because a message with 50 transactions
+      approches the max size of an outbox message. Hence, this allows to
+      benchmark for various proof lengths. The [nb_inbox_messages] parameter is
+      set to correspond to the max number of messages in an inbox. And the
+      [input_payload_size] parameter is set to the biggest possible size of an
+      input message. These two parameters impact the number of nodes in the pvm
+      state and are stored in the "input" part of the state. We add data in this
+      "input" part because of its proximity with the "output" part in the pvm
+      state. *)
   let default_config =
     {
-      max_num_messages = 100;
-      max_messages_size = 1000;
-      max_new_message_size = 100;
+      nb_inbox_messages = 1000;
+      input_payload_size = 4096;
+      nb_output_buffer_levels = 10_000;
+      output_buffer_size = 100;
+      nb_transactions = 50;
+      tree_depth = 10;
+      tree_branching_factor = 4;
     }
 
-  type workload = unit
+  type workload = {proof_length : int}
 
-  let workload_encoding = Data_encoding.unit
+  let workload_encoding =
+    let open Data_encoding in
+    conv
+      (fun {proof_length} -> proof_length)
+      (fun proof_length -> {proof_length})
+      (obj1 (req "proof_length" int31))
 
-  let workload_to_vector () = Sparse_vec.String.of_list []
+  let workload_to_vector {proof_length} =
+    Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
 
-  let cost_update_num_and_size_ofmessages_model =
+  let verify_output_proof_model =
     Model.make
-      ~conv:(fun () -> ())
+      ~conv:(fun {proof_length} -> (proof_length, ()))
       ~model:
-        (Model.unknown_const2
-           ~const1:Builtin_benchmarks.timer_variable
-           ~const2:
-             (Free_variable.of_string "cost_update_num_and_size_of_messages"))
+        (Model.affine
+           ~intercept:(Free_variable.of_string "const")
+           ~coeff:(Free_variable.of_string "proof_length"))
 
-  let models = [("scoru", cost_update_num_and_size_ofmessages_model)]
+  let models = [("verify_output_proof", verify_output_proof_model)]
+
+  let pvm_state = ref None
 
   let benchmark rng_state conf () =
-    let num_messages =
-      Base_samplers.sample_in_interval
-        ~range:{min = 0; max = conf.max_num_messages}
-        rng_state
+    let nb_output_buffer_levels = conf.nb_output_buffer_levels in
+    let output_buffer_size = conf.output_buffer_size in
+    let prepare_benchmark_scenario () =
+      let open Lwt_result_syntax in
+      (* Build [pvm_state] and save it to be used for all benchmarks. The state
+         is large enough for each benchmark to be relatively random. *)
+      let*! context, output_buffer, initial_tree =
+        match !pvm_state with
+        | None ->
+            let res =
+              build_pvm_state
+                rng_state
+                ~nb_inbox_messages:conf.nb_inbox_messages
+                ~input_payload_size:conf.input_payload_size
+                ~nb_output_buffer_levels:conf.nb_output_buffer_levels
+                ~output_buffer_size:conf.output_buffer_size
+                ~nb_transactions:conf.nb_transactions
+                ~tree_depth:conf.tree_depth
+                ~tree_branching_factor:conf.tree_branching_factor
+            in
+            pvm_state := Some res ;
+            res
+        | Some pvm_state -> pvm_state
+      in
+      (* Select an output. *)
+      let* output =
+        select_output
+          ~output_buffer
+          ~nb_output_buffer_levels
+          ~output_buffer_size
+          rng_state
+      in
+      (* produce an output proof, and also return the length of its encoding.*)
+      let*! pf = Full_Wasm.produce_output_proof context initial_tree output in
+      match pf with
+      | Ok proof ->
+          let proof_length =
+            Data_encoding.Binary.length Full_Wasm.output_proof_encoding proof
+          in
+          return (proof, proof_length)
+      | Error _ -> assert false
     in
-    let total_messages_size =
-      Base_samplers.sample_in_interval
-        ~range:{min = 0; max = conf.max_messages_size}
-        rng_state
+
+    let output_proof, proof_length =
+      match Lwt_main.run @@ prepare_benchmark_scenario () with
+      | Ok (proof, len) -> (proof, len)
+      | Error _ -> assert false
     in
-    let new_message_size =
-      Base_samplers.sample_in_interval
-        ~range:{min = 0; max = conf.max_new_message_size}
-        rng_state
-    in
-    let new_external_message =
-      Base_samplers.uniform_string ~nbytes:new_message_size rng_state
-    in
-    let new_message =
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup_inbox_message_repr.(
-           serialize @@ External new_external_message)
-    in
-    let workload = () in
+    let workload = {proof_length} in
+
     let closure () =
-      ignore
-        (Sc_rollup_inbox_storage.Internal_for_tests
-         .update_num_and_size_of_messages
-           ~num_messages
-           ~total_messages_size
-           new_message)
+      ignore (Lwt_main.run @@ Full_Wasm.verify_output_proof output_proof)
     in
     Generator.Plain {workload; closure}
 
@@ -123,176 +489,154 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
 
   let () =
     Registration.register_for_codegen
-      name
-      (Model.For_codegen cost_update_num_and_size_ofmessages_model)
+      (Namespace.basename name)
+      (Model.For_codegen verify_output_proof_model)
 end
 
-(** A benchmark for estimating the gas cost of
-    {!Sc_rollup.Inbox.add_external_messages}.
+(** This benchmark estimates the cost of verifying an output proof for the
+    Wasm PVM.
+    The inferred cost model is [c1 + c2 * proof_length]. *)
+module Sc_rollup_deserialize_output_proof_benchmark = struct
+  open Pvm_state_generator
+  module Full_Wasm =
+    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
 
-    We assume that the cost (in gas) [cost(n, l)] of adding a message of size
-    [n] bytes, at level [l] since the origination of the rollup, satisfies the
-    equation [cost(n) = c_0 + c_1 * n + c_2 * log(l)], where [c_0], [c_1] and
-    [c_2] are the values to be benchmarked. We also assume that the cost of
-    adding messages [m_0, ..., m_k] to a rollup inbox is
-    [\sum_{i=0}^{k} cost(|m_i|, l)]. Thus, it suffices to estimate the cost of
-    adding a single message to the inbox.
-*)
+  (* Benchmark starts here. *)
 
-module Sc_rollup_add_external_messages_benchmark = struct
-  let name = "Sc_rollup_inbox_add_external_message"
+  let name = ns "Sc_rollup_deserialize_output_proof_benchmark"
 
-  let info = "Estimating the costs of adding a single message to a rollup inbox"
+  let info = "Estimating the cost of deserializing an output proof"
 
-  let tags = ["scoru"]
+  let tags = ["sc_rollup"]
 
-  type config = {max_length : int; max_level : int}
+  type config = {
+    nb_output_buffer_levels : int;
+    output_buffer_size : int;
+    nb_transactions : int;
+    tree_depth : int;
+  }
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {max_length; max_level} -> (max_length, max_level))
-      (fun (max_length, max_level) -> {max_length; max_level})
-      (obj2 (req "max_bytes" int31) (req "max_level" int31))
+      (fun {
+             nb_output_buffer_levels;
+             output_buffer_size;
+             nb_transactions;
+             tree_depth;
+           } ->
+        ( nb_output_buffer_levels,
+          output_buffer_size,
+          nb_transactions,
+          tree_depth ))
+      (fun ( nb_output_buffer_levels,
+             output_buffer_size,
+             nb_transactions,
+             tree_depth ) ->
+        {
+          nb_output_buffer_levels;
+          output_buffer_size;
+          nb_transactions;
+          tree_depth;
+        })
+      (obj4
+         (req "nb_output_buffer_levels" int31)
+         (req "output_buffer_size" int31)
+         (req "nb_transactions" int31)
+         (req "tree_depth" int31))
 
-  let default_config = {max_length = 1 lsl 16; max_level = 255}
+  let default_config =
+    {
+      nb_output_buffer_levels = 10_000;
+      output_buffer_size = 100;
+      nb_transactions = 50;
+      tree_depth = 10;
+    }
 
-  type workload = {message_length : int; level : int}
+  type workload = {proof_length : int}
 
   let workload_encoding =
     let open Data_encoding in
     conv
-      (fun {message_length; level} -> (message_length, level))
-      (fun (message_length, level) -> {message_length; level})
-      (obj2 (req "message_length" int31) (req "inbox_level" int31))
+      (fun {proof_length} -> proof_length)
+      (fun proof_length -> {proof_length})
+      (obj1 (req "proof_length" int31))
 
-  let workload_to_vector {message_length; level} =
-    Sparse_vec.String.of_list
-      [
-        ("message_length", float_of_int message_length);
-        ("inbox_level", float_of_int level);
-      ]
+  let workload_to_vector {proof_length} =
+    Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
 
-  let add_message_model =
+  let verify_output_proof_model =
     Model.make
-      ~conv:(fun {message_length; level} -> (message_length, (level, ())))
+      ~conv:(fun {proof_length} -> (proof_length, ()))
       ~model:
-        (Model.n_plus_logm
-           ~intercept:(Free_variable.of_string "cost_add_message_intercept")
-           ~linear_coeff:(Free_variable.of_string "cost_add_message_per_byte")
-           ~log_coeff:(Free_variable.of_string "cost_add_message_per_level"))
+        (Model.affine
+           ~intercept:(Free_variable.of_string "const")
+           ~coeff:(Free_variable.of_string "proof_length"))
 
-  let models = [("scoru", add_message_model)]
+  let models = [("deserialize_output_proof", verify_output_proof_model)]
+
+  let pvm_state = ref None
 
   let benchmark rng_state conf () =
-    let external_message =
-      Base_samplers.string rng_state ~size:{min = 1; max = conf.max_length}
-    in
-    let message =
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup_inbox_message_repr.(serialize @@ External external_message)
-    in
-    let last_level_int =
-      Base_samplers.sample_in_interval
-        ~range:{min = 1; max = conf.max_level}
-        rng_state
-    in
-    let last_level =
-      Raw_level_repr.of_int32_exn (Int32.of_int last_level_int)
-    in
-    let message_length = String.length (message :> string) in
-
-    let new_ctxt =
+    let prepared_benchmark_scenario =
+      let nb_output_buffer_levels = conf.nb_output_buffer_levels in
+      let output_buffer_size = conf.output_buffer_size in
+      let tree_depth = conf.tree_depth in
       let open Lwt_result_syntax in
-      let* block, _ = Context.init1 () in
-      let+ b = Incremental.begin_construction block in
-      let ctxt = Incremental.alpha_ctxt b in
-      (* Necessary to originate rollups. *)
-      let ctxt =
-        Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
+      (* Build [pvm_state] and save it to be used for all benchmarks. The state
+         is large enough for each benchmark to be relatively random. *)
+      let*! context, output_buffer, initial_tree =
+        match !pvm_state with
+        | Some pvm_state -> pvm_state
+        | None ->
+            let res =
+              build_pvm_state
+                rng_state
+                ~nb_inbox_messages:0
+                ~input_payload_size:0
+                ~nb_output_buffer_levels
+                ~output_buffer_size
+                ~nb_transactions:conf.nb_transactions
+                ~tree_depth
+                ~tree_branching_factor:2
+            in
+            pvm_state := Some res ;
+            res
       in
-      Alpha_context.Internal_for_tests.to_raw ctxt
-    in
-
-    let ctxt_with_rollup =
-      let open Lwt_result_syntax in
-      let* ctxt = new_ctxt in
-      let {Michelson_v1_parser.expanded; _}, _ =
-        Michelson_v1_parser.parse_expression "unit"
+      (* Select an output. *)
+      let* output =
+        select_output
+          ~output_buffer
+          ~nb_output_buffer_levels
+          ~output_buffer_size
+          rng_state
       in
-      let parameters_ty = Alpha_context.Script.lazy_expr expanded in
-      let boot_sector = "" in
-      let kind = Sc_rollups.Kind.Example_arith in
-      let*! genesis_commitment =
-        Sc_rollup_helpers.genesis_commitment_raw
-          ~boot_sector
-          ~origination_level:(Raw_context.current_level ctxt).level
-          kind
-      in
-      let+ rollup, _size, _genesis_hash, ctxt =
-        Lwt.map Environment.wrap_tzresult
-        @@ Sc_rollup_storage.originate
-             ctxt
-             ~kind
-             ~boot_sector
-             ~parameters_ty
-             ~genesis_commitment
-      in
-      (rollup, ctxt)
-    in
-
-    let add_message_and_increment_level ctxt rollup =
-      let open Lwt_result_syntax in
-      let+ inbox, _, ctxt =
-        Lwt.map Environment.wrap_tzresult
-        @@ Sc_rollup_inbox_storage.add_external_messages
-             ctxt
-             rollup
-             ["CAFEBABE"]
-      in
-      let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
-      (inbox, ctxt)
-    in
-
-    let prepare_benchmark_scenario () =
-      let open Lwt_result_syntax in
-      let rec add_messages_for_level ctxt inbox rollup =
-        if Raw_level_repr.((Raw_context.current_level ctxt).level > last_level)
-        then return (inbox, ctxt)
-        else
-          let* inbox, ctxt = add_message_and_increment_level ctxt rollup in
-          add_messages_for_level ctxt inbox rollup
-      in
-      let* rollup, ctxt = ctxt_with_rollup in
-      let*! inbox =
-        Sc_rollup_inbox_repr.empty
-          (Raw_context.recover ctxt)
-          rollup
-          (Raw_context.current_level ctxt).level
-      in
-      let* inbox, ctxt = add_messages_for_level ctxt inbox rollup in
-      let+ messages, _ctxt =
-        Lwt.return @@ Environment.wrap_tzresult
-        @@ Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt rollup
-      in
-      (inbox, ctxt, messages)
-    in
-
-    let inbox, ctxt, current_messages =
-      match Lwt_main.run @@ prepare_benchmark_scenario () with
-      | Ok result -> result
+      (* Produce an output proof, and return its encoding and the length of the
+         encoding. *)
+      let*! pf = Full_Wasm.produce_output_proof context initial_tree output in
+      match pf with
+      | Ok proof ->
+          let encoded_proof =
+            Data_encoding.Binary.to_bytes_exn
+              Full_Wasm.output_proof_encoding
+              proof
+          in
+          let proof_length = Bytes.length encoded_proof in
+          return (encoded_proof, proof_length)
       | Error _ -> assert false
     in
 
-    let workload = {message_length; level = last_level_int} in
+    let encoded_proof, proof_length =
+      prepared_benchmark_scenario |> Lwt_main.run
+      |> WithExceptions.Result.get_ok ~loc:__LOC__
+    in
+    let workload = {proof_length} in
+
     let closure () =
       ignore
-        (Sc_rollup_inbox_repr.add_messages_no_history
-           (Raw_context.recover ctxt)
-           inbox
-           last_level
-           [message]
-           current_messages)
+        (Data_encoding.Binary.of_bytes_exn
+           Full_Wasm.output_proof_encoding
+           encoded_proof)
     in
     Generator.Plain {workload; closure}
 
@@ -300,13 +644,14 @@ module Sc_rollup_add_external_messages_benchmark = struct
     List.repeat bench_num (benchmark rng_state config)
 
   let () =
-    Registration.register_for_codegen name (Model.For_codegen add_message_model)
+    Registration.register_for_codegen
+      (Namespace.basename name)
+      (Model.For_codegen verify_output_proof_model)
 end
 
 let () =
-  Registration_helpers.register
-    (module Sc_rollup_add_external_messages_benchmark)
+  Registration_helpers.register (module Sc_rollup_verify_output_proof_benchmark)
 
 let () =
   Registration_helpers.register
-    (module Sc_rollup_update_num_and_size_of_messages_benchmark)
+    (module Sc_rollup_deserialize_output_proof_benchmark)

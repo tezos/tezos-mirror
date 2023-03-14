@@ -23,12 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Shell_namespace.ns "bloomer"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 (* We use the same Bloom filter configuration as used in P2p_acl *)
 
 let const_time_model name =
-  Model.make
-    ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~const:(Free_variable.of_string name))
+  Model.make ~conv:(fun () -> ()) ~model:(Model.unknown_const1 ~const:(fv name))
 
 let make_bench name info model generator make_bench :
     Tezos_benchmark.Benchmark.t =
@@ -45,7 +47,7 @@ let make_bench name info model generator make_bench :
 
     let workload_to_vector () = Sparse_vec.String.of_list [("encoding", 1.)]
 
-    let name = name
+    let name = ns name
 
     let info = info
 
@@ -61,7 +63,7 @@ let make_bench name info model generator make_bench :
 
 let make_bloomer () =
   Bloomer.create
-    ~hash:(fun x -> Blake2B.(to_bytes (hash_string [x])))
+    ~hash:(fun x -> Tezos_crypto.Blake2B.(to_bytes (hash_string [x])))
     ~hashes:5
     ~countdown_bits:4
     ~index_bits:(Bits.numbits (2 * 1024 * 8 * 1024 / 4))

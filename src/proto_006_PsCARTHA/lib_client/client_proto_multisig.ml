@@ -131,8 +131,12 @@ let () =
       "A signature was given for a multisig contract that matched none of the \
        public keys of the contract signers"
     ~pp:(fun ppf s ->
-      Format.fprintf ppf "Invalid signature %s." (Signature.to_b58check s))
-    Data_encoding.(obj1 (req "invalid_signature" Signature.encoding))
+      Format.fprintf
+        ppf
+        "Invalid signature %s."
+        (Tezos_crypto.Signature.V0.to_b58check s))
+    Data_encoding.(
+      obj1 (req "invalid_signature" Tezos_crypto.Signature.V0.encoding))
     (function Invalid_signature s -> Some s | _ -> None)
     (fun s -> Invalid_signature s) ;
   register_error_kind
@@ -469,7 +473,7 @@ let action_to_expr ~loc = function
                  (bytes
                     ~loc
                     (Data_encoding.Binary.to_bytes_exn
-                       Signature.Public_key_hash.encoding
+                       Tezos_crypto.Signature.V0.Public_key_hash.encoding
                        delegate))))
   | Change_keys (threshold, keys) ->
       right
@@ -486,7 +490,7 @@ let action_to_expr ~loc = function
                       bytes
                         ~loc
                         (Data_encoding.Binary.to_bytes_exn
-                           Signature.Public_key.encoding
+                           Tezos_crypto.Signature.V0.Public_key.encoding
                            k))
                     keys))))
 
@@ -550,7 +554,7 @@ let action_of_expr e =
       @@ Change_delegate
            (Some
               (Data_encoding.Binary.of_bytes_exn
-                 Signature.Public_key_hash.encoding
+                 Tezos_crypto.Signature.V0.Public_key_hash.encoding
                  s))
   | Tezos_micheline.Micheline.Prim
       ( _,
@@ -577,14 +581,14 @@ let action_of_expr e =
           | Tezos_micheline.Micheline.Bytes (_, s) ->
               return
               @@ Data_encoding.Binary.of_bytes_exn
-                   Signature.Public_key.encoding
+                   Tezos_crypto.Signature.V0.Public_key.encoding
                    s
           | _ -> fail ())
         key_bytes
       >>=? fun keys -> return @@ Change_keys (threshold, keys)
   | _ -> fail ()
 
-type key_list = Signature.Public_key.t list
+type key_list = Tezos_crypto.Signature.V0.Public_key.t list
 
 (* The relevant information that we can get about a multisig smart contract *)
 type multisig_contract_information = {
@@ -613,7 +617,9 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
           List.map_es
             (function
               | String (_, key_str) ->
-                  return @@ Signature.Public_key.of_b58check_exn key_str
+                  return
+                  @@ Tezos_crypto.Signature.V0.Public_key.of_b58check_exn
+                       key_str
               | _ -> fail (Contract_has_unexpected_storage contract))
             key_nodes
           >>=? fun keys -> return {counter; threshold; keys}
@@ -625,7 +631,7 @@ let multisig_create_storage ~counter ~threshold ~keys () :
   let open Tezos_micheline.Micheline in
   List.map_es
     (fun key ->
-      let key_str = Signature.Public_key.to_b58check key in
+      let key_str = Tezos_crypto.Signature.V0.Public_key.to_b58check key in
       return (String (loc, key_str)))
     keys
   >>=? fun l ->
@@ -646,7 +652,10 @@ let multisig_create_param ~counter ~action ~optional_signatures () :
       match sig_opt with
       | None -> return @@ none ~loc ()
       | Some signature ->
-          return @@ some ~loc (String (loc, Signature.to_b58check signature)))
+          return
+          @@ some
+               ~loc
+               (String (loc, Tezos_crypto.Signature.V0.to_b58check signature)))
     optional_signatures
   >>=? fun l ->
   return @@ strip_locations
@@ -750,7 +759,7 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
   let opt_sigs_arr = Array.make nkeys None in
   let matching_key_found = ref false in
   let check_signature_against_key_number signature i key =
-    if Signature.check key signature bytes then (
+    if Tezos_crypto.Signature.V0.check key signature bytes then (
       matching_key_found := true ;
       opt_sigs_arr.(i) <- Some signature)
   in

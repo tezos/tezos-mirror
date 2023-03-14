@@ -194,7 +194,8 @@ let validate_operation ?expect_failure ?check_size st op =
   | None, Ok validation_state ->
       return {st with state = (validation_state, application_state)}
 
-let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
+let add_operation ?expect_failure ?expect_apply_failure ?allow_manager_failure
+    ?check_size st op =
   let open Lwt_result_syntax in
   let open Apply_results in
   let* st = validate_operation ?expect_failure ?check_size st op in
@@ -216,19 +217,22 @@ let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
           rev_tickets = metadata :: st.rev_tickets;
         }
       in
-      match (expect_apply_failure, metadata) with
-      | None, No_operation_metadata -> return st
-      | None, Operation_metadata result ->
-          let*? () = detect_script_failure result in
-          return st
-      | Some _, No_operation_metadata ->
-          failwith "Error expected while adding operation"
-      | Some f, Operation_metadata result -> (
-          match detect_script_failure result with
-          | Ok _ -> failwith "Error expected while adding operation"
-          | Error err ->
-              let* () = f err in
-              return st))
+      match allow_manager_failure with
+      | Some true -> return st
+      | None | Some false -> (
+          match (expect_apply_failure, metadata) with
+          | None, No_operation_metadata -> return st
+          | None, Operation_metadata result ->
+              let*? () = detect_script_failure result in
+              return st
+          | Some _, No_operation_metadata ->
+              failwith "Error expected while adding operation"
+          | Some f, Operation_metadata result -> (
+              match detect_script_failure result with
+              | Ok _ -> failwith "Error expected while adding operation"
+              | Error err ->
+                  let* () = f err in
+                  return st)))
 
 let finalize_validation_and_application (validation_state, application_state)
     shell_header =
@@ -277,5 +281,5 @@ let finalize_block st =
 let assert_validate_operation_fails expect_failure op block =
   let open Lwt_result_syntax in
   let* i = begin_construction block in
-  let* _i = validate_operation ~expect_failure i op in
+  let* (_i : incremental) = validate_operation ~expect_failure i op in
   return_unit

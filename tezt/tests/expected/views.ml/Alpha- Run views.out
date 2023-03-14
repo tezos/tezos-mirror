@@ -1,38 +1,26 @@
 
-./octez-client --mode mockup --base-dir '<masked>' --wait none originate contract register_calls transferring 0 from bootstrap1 running '
-parameter unit;
-storage (list address);
-code {
-       CDR ;
-       SOURCE ;
-       CONS ;
-       NIL operation ;
-       PAIR ;
-     };
-view "calls_count" unit nat { CDR ; SIZE };
-view "last_caller" unit (option address) { CDR ; IF_CONS { DIP { DROP } ; SOME } { NONE address } };
-' --init '{}' --burn-cap 1
+./octez-client --mode mockup --wait none originate contract view_registers_callers transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/view_registers_callers.tz --init '{}' --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1430.736 units (will add 100 for safety)
 Estimated storage: 409 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'ooRkfUHnsTEfQ8SKpGCSop6iptg4dosoRybUNnZ2DD1Zw4RSAFJ'
+Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for ooRkfUHnsTEfQ8SKpGCSop6iptg4dosoRybUNnZ2DD1Zw4RSAFJ to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
-    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000533
     Expected counter: 1
     Gas limit: 1531
     Storage limit: 429 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000533
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000533
       payload fees(the block proposer) ....... +ꜩ0.000533
     Origination:
-      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      From: [PUBLIC_KEY_HASH]
       Credit: ꜩ0
       Script:
         { parameter unit ;
@@ -47,67 +35,41 @@ This sequence of operations was run:
         No delegate for this contract
         This origination was successfully applied
         Originated contracts:
-          KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7
+          [CONTRACT_HASH]
         Storage size: 152 bytes
         Paid storage size diff: 152 bytes
         Consumed gas: 1430.736
         Balance updates:
-          tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.038
+          [PUBLIC_KEY_HASH] ... -ꜩ0.038
           storage fees ........................... +ꜩ0.038
-          tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.06425
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
           storage fees ........................... +ꜩ0.06425
 
-New contract KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 originated.
-Contract memorized as register_calls.
+New contract [CONTRACT_HASH] originated.
+Contract memorized as view_registers_callers.
 
-./octez-client --mode mockup --base-dir '<masked>' --wait none originate contract check_caller transferring 0 from bootstrap1 running '
-parameter address ;
-storage (option address) ;
-code {
-       CAR ;
-       DUP ;
-       UNIT ;
-       VIEW "calls_count" nat ;
-       IF_NONE { UNIT ; FAILWITH } {} ;
-       DIP {
-              UNIT ;
-              VIEW "last_caller" (option address) ;
-           } ;
-       PUSH nat 0 ;
-       /* Check if the caller address is consistent with given calls count. */
-       IFCMPEQ {
-                 IF_NONE { UNIT ; FAILWITH } { IF_NONE {} { UNIT ; FAILWITH }} ;
-                 NONE address ;
-               }
-               {
-                 IF_NONE { UNIT ; FAILWITH } { IF_NONE { UNIT ; FAILWITH } {}} ;
-                 SOME ;
-               } ;
-       NIL operation ;
-       PAIR ;
-     }
-   ' --init None --burn-cap 1
+./octez-client --mode mockup --wait none originate contract view_check_caller transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/view_check_caller.tz --init None --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1454.220 units (will add 100 for safety)
 Estimated storage: 465 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oojctTDMYh47PEbLRq7feuBf77DG8PcPD137Uqi6cCo9My6Wgva'
+Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oojctTDMYh47PEbLRq7feuBf77DG8PcPD137Uqi6cCo9My6Wgva to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
-    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000591
     Expected counter: 2
     Gas limit: 1555
     Storage limit: 485 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000591
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000591
       payload fees(the block proposer) ....... +ꜩ0.000591
     Origination:
-      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      From: [PUBLIC_KEY_HASH]
       Credit: ꜩ0
       Script:
         { parameter address ;
@@ -130,122 +92,122 @@ This sequence of operations was run:
         No delegate for this contract
         This origination was successfully applied
         Originated contracts:
-          KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3
+          [CONTRACT_HASH]
         Storage size: 208 bytes
         Paid storage size diff: 208 bytes
         Consumed gas: 1454.220
         Balance updates:
-          tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.052
+          [PUBLIC_KEY_HASH] ... -ꜩ0.052
           storage fees ........................... +ꜩ0.052
-          tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.06425
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
           storage fees ........................... +ꜩ0.06425
 
-New contract KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 originated.
-Contract memorized as check_caller.
+New contract [CONTRACT_HASH] originated.
+Contract memorized as view_check_caller.
 
-./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
+./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4413.514 units (will add 100 for safety)
+Estimated gas: 4413.814 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'opJoacsqxhcszPfYAgwpBGKqMfoyjZmu9CqBmmiiQtLQB5emLRa'
+Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for opJoacsqxhcszPfYAgwpBGKqMfoyjZmu9CqBmmiiQtLQB5emLRa to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
-    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000748
     Expected counter: 3
     Gas limit: 4514
     Storage limit: 0 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000748
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000748
       payload fees(the block proposer) ....... +ꜩ0.000748
     Transaction:
       Amount: ꜩ1
-      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-      To: KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3
-      Parameter: "KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
-      Consumed gas: 4414.159
+      Consumed gas: 4414.459
       Balance updates:
-        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
-        KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 ... +ꜩ1
+        [PUBLIC_KEY_HASH] ... -ꜩ1
+        [CONTRACT_HASH] ... +ꜩ1
 
 
-./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 --burn-cap 1
+./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 2117.241 units (will add 100 for safety)
+Estimated gas: 2117.251 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'onmjSitNnrxA6xCd4u2Ti6Kzyx8HJJoeYW6gs7rk5wdCZkgY2jE'
+Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for onmjSitNnrxA6xCd4u2Ti6Kzyx8HJJoeYW6gs7rk5wdCZkgY2jE to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
-    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000472
     Expected counter: 4
     Gas limit: 2218
     Storage limit: 47 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000472
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000472
       payload fees(the block proposer) ....... +ꜩ0.000472
     Transaction:
       Amount: ꜩ1
-      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-      To: KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
       This transaction was successfully applied
       Updated storage: { 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 }
       Storage size: 179 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 2117.929
+      Consumed gas: 2117.939
       Balance updates:
-        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
+        [PUBLIC_KEY_HASH] ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
-        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
-        KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 ... +ꜩ1
+        [PUBLIC_KEY_HASH] ... -ꜩ1
+        [CONTRACT_HASH] ... +ꜩ1
 
 
-./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
+./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4417.116 units (will add 100 for safety)
+Estimated gas: 4417.446 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oof17dNHXXM2Wc6Nv7iM6utwj7NPQPi1oSPdpFWu5PtafGYCAn9'
+Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oof17dNHXXM2Wc6Nv7iM6utwj7NPQPi1oSPdpFWu5PtafGYCAn9 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
-    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000748
     Expected counter: 5
     Gas limit: 4518
     Storage limit: 47 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000748
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000748
       payload fees(the block proposer) ....... +ꜩ0.000748
     Transaction:
       Amount: ꜩ1
-      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-      To: KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3
-      Parameter: "KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 4417.761
+      Consumed gas: 4418.091
       Balance updates:
-        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
+        [PUBLIC_KEY_HASH] ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
-        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
-        KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 ... +ꜩ1
+        [PUBLIC_KEY_HASH] ... -ꜩ1
+        [CONTRACT_HASH] ... +ꜩ1
 

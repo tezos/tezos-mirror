@@ -1,0 +1,4 @@
+# This contract drops any inbound ticket
+parameter (ticket %ticket string);
+storage unit;
+code { CDR ; NIL operation ; PAIR }

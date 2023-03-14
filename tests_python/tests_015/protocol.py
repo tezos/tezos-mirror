@@ -1,22 +1,18 @@
 import datetime
 from enum import Enum, auto
-from typing import Optional
 from copy import deepcopy
 from tools import constants, utils
 
 HASH = constants.LIMA
 DAEMON = constants.LIMA_DAEMON
 PARAMETERS = constants.LIMA_PARAMETERS
+NUMBER = constants.LIMA_NUMBER
 
 TENDERBAKE_PARAMETERS = deepcopy(PARAMETERS)
 TENDERBAKE_PARAMETERS['consensus_threshold'] = 45
 TENDERBAKE_PARAMETERS['consensus_committee_size'] = 67
 
 FOLDER = constants.LIMA_FOLDER
-
-PREV_HASH = constants.KATHMANDU
-PREV_DAEMON = constants.KATHMANDU_DAEMON
-PREV_PARAMETERS = constants.KATHMANDU_PARAMETERS
 
 
 def activate(
@@ -36,21 +32,15 @@ class Protocol(Enum):
     PREV = auto()
 
 
-def get_parameters(protocol: Optional[Protocol] = Protocol.CURRENT):
+def get_parameters():
     """
-    Args:
-      protocol (Protocol): protocol id (either CURRENT or PREV).
-                           Defaults to CURRENT
-
     Returns:
       A fresh copy of the protocol parameters w.r.t to protocol
     """
     # deepcopy call prevents any unforeseen and unwanted side effects
     # on the array parameters
     # e.g., bootstrap_accounts, commitments, endorsement_reward
-    return deepcopy(
-        dict((PARAMETERS if protocol is Protocol.CURRENT else PREV_PARAMETERS))
-    )
+    return deepcopy(dict((PARAMETERS)))
 
 
 def get_now(client) -> str:

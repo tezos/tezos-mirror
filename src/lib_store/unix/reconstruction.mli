@@ -53,9 +53,9 @@
 
 type failure_kind =
   | Nothing_to_reconstruct
-  | Context_hash_mismatch of Block_header.t * Context_hash.t * Context_hash.t
   | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
+  | Cannot_read_resulting_context_hash of Block_hash.t
 
 type error += Reconstruction_failure of failure_kind
 
@@ -74,6 +74,6 @@ val reconstruct :
   Genesis.t ->
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  operation_metadata_size_limit:int option ->
+  operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   progress_display_mode:Animation.progress_display_mode ->
   unit tzresult Lwt.t

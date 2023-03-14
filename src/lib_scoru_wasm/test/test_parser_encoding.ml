@@ -41,6 +41,7 @@ module Parser = Binary_parser_encodings
 module Utils = struct
   module V = Lazy_vector.Int32Vector
   module C = Chunked_byte_vector
+  include Encodings_util
   include Test_encodings_util
 end
 
@@ -164,9 +165,7 @@ module LazyVec = struct
   let gen_with_vec gen_vec =
     let open QCheck2.Gen in
     let* vector = gen_vec in
-    let* offset =
-      Lib_test.Qcheck2_helpers.int32_range_gen 0l (V.num_elements vector)
-    in
+    let* offset = Qcheck2_helpers.int32_range_gen 0l (V.num_elements vector) in
     return (Decode.LazyVec {vector; offset})
 
   let gen gen_values = gen_with_vec (Vec.gen gen_values)
@@ -338,9 +337,7 @@ module LazyStack = struct
   let gen gen_values =
     let open QCheck2.Gen in
     let* vector = Vec.gen gen_values in
-    let* length =
-      Lib_test.Qcheck2_helpers.int32_range_gen 0l (V.num_elements vector)
-    in
+    let* length = Qcheck2_helpers.int32_range_gen 0l (V.num_elements vector) in
     return (Decode.LazyStack {vector; length})
 
   let check eq_value (Decode.LazyStack {vector; length})

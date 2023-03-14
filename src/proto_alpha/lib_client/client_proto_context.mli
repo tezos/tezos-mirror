@@ -80,7 +80,7 @@ val register_global_constant :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -125,6 +125,26 @@ val get_balance :
   block:Shell_services.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
+
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_ticket_balance}. *)
+val get_contract_ticket_balance :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Ticket_token.unparsed_token ->
+  Z.t tzresult Lwt.t
+
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_all_ticket_balances}. *)
+val get_contract_all_ticket_balances :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract_hash.t ->
+  (Ticket_token.unparsed_token * Z.t) list tzresult Lwt.t
+
+val ticket_balances_encoding :
+  (Ticket_token.unparsed_token * Z.t) list Data_encoding.t
 
 (** Calls {!Tezos_protocol_alpha.Protocol.Delegate_services.frozen_deposits_limit}. *)
 val get_frozen_deposits_limit :
@@ -327,7 +347,7 @@ val transfer_with_script :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   ?replace_by_fees:bool ->
   unit ->
@@ -361,7 +381,7 @@ val transfer :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   ?replace_by_fees:bool ->
   unit ->
@@ -398,7 +418,7 @@ val reveal :
   Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key = {
-  pkh : Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -435,7 +455,7 @@ val activate_account :
 
 (** Activate an existing account,
     by calling {!Injection.inject_operation} with [activation code].
-    It fails if the account is unknown or if the account is not [Ed25519]. *)
+    It fails if the account is unknown or if the account is not [Signature.Ed25519]. *)
 val activate_existing_account :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -560,219 +580,6 @@ val contract_cache_size_limit :
   block:Shell_services.block ->
   int tzresult Lwt.t
 
-val originate_tx_rollup :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_origination Kind.manager contents
-  * Kind.tx_rollup_origination Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val submit_tx_rollup_batch :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?burn_limit:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  content:string ->
-  tx_rollup:Tx_rollup.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_submit_batch Kind.manager contents
-  * Kind.tx_rollup_submit_batch Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val submit_tx_rollup_commitment :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  level:Tx_rollup_level.t ->
-  inbox_merkle_root:Tx_rollup_inbox.Merkle.root ->
-  messages:Tx_rollup_message_result_hash.t list ->
-  predecessor:Tx_rollup_commitment_hash.t option ->
-  tx_rollup:Tx_rollup.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_commit Kind.manager contents
-  * Kind.tx_rollup_commit Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val submit_tx_rollup_finalize_commitment :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  tx_rollup:Tx_rollup.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_finalize_commitment Kind.manager contents
-  * Kind.tx_rollup_finalize_commitment Kind.manager
-    Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val submit_tx_rollup_remove_commitment :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  tx_rollup:Tx_rollup.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_remove_commitment Kind.manager contents
-  * Kind.tx_rollup_remove_commitment Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val submit_tx_rollup_rejection :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  level:Tx_rollup_level.t ->
-  tx_rollup:Tx_rollup.t ->
-  message:Tx_rollup_message.t ->
-  message_position:int ->
-  message_path:Tx_rollup_inbox.Merkle.path ->
-  message_result_hash:Tx_rollup_message_result_hash.t ->
-  message_result_path:Tx_rollup_commitment.Merkle.path ->
-  previous_context_hash:Context_hash.t ->
-  previous_withdraw_list_hash:Tx_rollup_withdraw_list_hash.t ->
-  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
-  proof:Tx_rollup_l2_proof.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_rejection Kind.manager contents
-  * Kind.tx_rollup_rejection Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val submit_tx_rollup_return_bond :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  tx_rollup:Tx_rollup.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_return_bond Kind.manager contents
-  * Kind.tx_rollup_return_bond Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
-val tx_rollup_dispatch_tickets :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  level:Tx_rollup_level.t ->
-  context_hash:Context_hash.t ->
-  message_position:int ->
-  message_result_path:Tx_rollup_commitment.Merkle.path ->
-  tickets_info:Tx_rollup_reveal.t list ->
-  tx_rollup:Tx_rollup.t ->
-  unit ->
-  (Operation_hash.t
-  * Kind.tx_rollup_dispatch_tickets Kind.manager contents
-  * Kind.tx_rollup_dispatch_tickets Kind.manager Apply_results.contents_result)
-  tzresult
-  Lwt.t
-
 val transfer_ticket :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -784,7 +591,7 @@ val transfer_ticket :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -802,6 +609,15 @@ val transfer_ticket :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup origination operation using
+    {!Injection.inject_operation}.
+
+    Originates a smart rollup of [kind] with the [boot_sector] using
+    [paramaters_ty]. Generates a unique smart rollup address returned
+    in the operation's receipt.
+
+    This is the only entry-point to create a smart rollup.
+*)
 val sc_rollup_originate :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -812,8 +628,8 @@ val sc_rollup_originate :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
@@ -822,13 +638,18 @@ val sc_rollup_originate :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  ( Operation_hash.t
-    * Kind.sc_rollup_originate Kind.manager contents
-    * Kind.sc_rollup_originate Kind.manager Apply_results.contents_result,
-    tztrace )
-  result
+  (Operation_hash.t
+  * Kind.sc_rollup_originate Kind.manager contents
+  * Kind.sc_rollup_originate Kind.manager Apply_results.contents_result)
+  tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup add messages operation using
+    {!Injection.inject_operation}.
+
+    Adds external messages to the smart rollup inbox shared with all
+    smart rollups.
+*)
 val sc_rollup_add_messages :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -839,10 +660,9 @@ val sc_rollup_add_messages :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
-  rollup:Alpha_context.Sc_rollup.t ->
   messages:string list ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -854,6 +674,13 @@ val sc_rollup_add_messages :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup cement commitment operation using
+    {!Injection.inject_operation}.
+
+    Cements a [commitment] for the smart rollup [rollup]. The commitment
+    now becomes unrefutable and we can execute outbox messages for the
+    committed PVM state (see {!sc_rollup_execute_outbox_message}).
+*)
 val sc_rollup_cement :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -864,8 +691,8 @@ val sc_rollup_cement :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   commitment:Alpha_context.Sc_rollup.Commitment.Hash.t ->
@@ -879,6 +706,14 @@ val sc_rollup_cement :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup publish commitment operation using
+    {!Injection.inject_operation}.
+
+    Publishes a [commitment] to announces the PVM state at the end of
+    a commitment period and the number of ticks executed.
+    If it is the first time [src_pk] publishes a commitment, a bond
+    is frozen.
+*)
 val sc_rollup_publish :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -889,8 +724,8 @@ val sc_rollup_publish :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   commitment:Alpha_context.Sc_rollup.Commitment.t ->
@@ -904,6 +739,12 @@ val sc_rollup_publish :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup execute outbox message operation using
+    {!Injection.inject_operation}.
+
+    Executes [output_proof] on the PVM commited state from the
+    [cemented_commitment]. Allows to perform L2->L1 communication.
+*)
 val sc_rollup_execute_outbox_message :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -914,8 +755,8 @@ val sc_rollup_execute_outbox_message :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Sc_rollup.t ->
   cemented_commitment:Sc_rollup.Commitment.Hash.t ->
@@ -924,14 +765,19 @@ val sc_rollup_execute_outbox_message :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  ( Operation_hash.t
-    * Kind.sc_rollup_execute_outbox_message Kind.manager contents
-    * Kind.sc_rollup_execute_outbox_message Kind.manager
-      Apply_results.contents_result,
-    tztrace )
-  result
+  (Operation_hash.t
+  * Kind.sc_rollup_execute_outbox_message Kind.manager contents
+  * Kind.sc_rollup_execute_outbox_message Kind.manager
+    Apply_results.contents_result)
+  tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup recover bond operation using
+    {!Injection.inject_operation}.
+
+    Allows to recover the bond frozen by the operation {!sc_rollup_publish}
+    of [src_pk], if the commitment is no longer subject to refutations.
+*)
 val sc_rollup_recover_bond :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -943,12 +789,13 @@ val sc_rollup_recover_bond :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   sc_rollup:Sc_rollup.t ->
+  staker:public_key_hash ->
   unit ->
   (Operation_hash.t
   * Kind.sc_rollup_recover_bond Kind.manager contents
@@ -956,6 +803,12 @@ val sc_rollup_recover_bond :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup refutation operation using
+    {!Injection.inject_operation}.
+
+    Either start a refutation game between [src_pk] and [oppononent] or
+    plays a move in an existing refutation game.
+*)
 val sc_rollup_refute :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -966,11 +819,11 @@ val sc_rollup_refute :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
-  refutation:Alpha_context.Sc_rollup.Game.refutation option ->
+  refutation:Alpha_context.Sc_rollup.Game.refutation ->
   opponent:Alpha_context.Sc_rollup.Staker.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -982,6 +835,12 @@ val sc_rollup_refute :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup timeout operation using
+    {!Injection.inject_operation}.
+
+    Timeouts the absent player from the refutation game between [alice]
+    and [bob].
+*)
 val sc_rollup_timeout :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -992,8 +851,8 @@ val sc_rollup_timeout :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   alice:Alpha_context.Sc_rollup.Staker.t ->
@@ -1008,7 +867,7 @@ val sc_rollup_timeout :
   tzresult
   Lwt.t
 
-val sc_rollup_dal_slot_subscribe :
+val zk_rollup_originate :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
@@ -1018,17 +877,72 @@ val sc_rollup_dal_slot_subscribe :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  ?counter:counter ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
-  rollup:Alpha_context.Sc_rollup.t ->
-  slot_index:int ->
+  public_parameters:Environment.Plonk.public_parameters ->
+  circuits_info:[`Fee | `Private | `Public] Zk_rollup.Account.SMap.t ->
+  init_state:Bls12_381.Fr.t array ->
+  nb_ops:int ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Operation_hash.t
-  * Kind.sc_rollup_dal_slot_subscribe Kind.manager contents
-  * Kind.sc_rollup_dal_slot_subscribe Kind.manager Apply_results.contents_result)
-  tzresult
+  ( Operation_hash.t
+    * Kind.zk_rollup_origination Kind.manager contents
+    * Kind.zk_rollup_origination Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t
+
+val zk_rollup_publish :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  zk_rollup:Zk_rollup.t ->
+  ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Operation_hash.t
+    * Kind.zk_rollup_publish Kind.manager contents
+    * Kind.zk_rollup_publish Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t
+
+val zk_rollup_update :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  zk_rollup:Zk_rollup.t ->
+  update:Zk_rollup.Update.t ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Operation_hash.t
+    * Kind.zk_rollup_update Kind.manager contents
+    * Kind.zk_rollup_update Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
   Lwt.t

@@ -9,6 +9,8 @@ import/export feature: snapshots.  This procedure allows to gather all
 the data necessary to bootstrap a node from a single file within few
 minutes.
 
+.. _importing_a_snapshot:
+
 Importing a snapshot
 --------------------
 
@@ -41,13 +43,13 @@ and predecessor, as well as the resulting chain state. The import
 process does the same checks, recomputing and checking all the hashes
 it encounters in the snapshot.
 
-To bootstrap a Tezos node from a file to an empty Tezos
+To bootstrap an Octez node from a file to an empty Tezos
 node directory (running this command from an already synchronised node
 will not work), run:
 
 .. code-block:: console
 
-   tezos-node snapshot import <FILE> --block <BLOCK_HASH> [--data-dir <NODE_DIR>]
+   octez-node snapshot import <FILE> --block <BLOCK_HASH> [--data-dir <NODE_DIR>]
 
 The ``--block <BLOCK_HASH>`` option argument aims to verify that the
 block contained in the snapshot is the one that you are expecting to
@@ -81,7 +83,7 @@ This information is displayed by the following command:
 
 .. code-block:: console
 
-   tezos-node snapshot info <FILE>
+   octez-node snapshot info <FILE>
 
 As can be seen in the snapshot information, a snapshot contains
 historical data corresponding to a given history mode, which can be:
@@ -116,7 +118,7 @@ point. This kind of snapshot can only be created from a ``full`` or an
 
 .. code-block:: console
 
-   tezos-node snapshot export --block <BLOCK>
+   octez-node snapshot export --block <BLOCK>
 
 The ``<BLOCK>`` hint can be given as a *block hash*, a *block level*,
 an alias (*head*, *savepoint* or *checkpoint*) and a relative block
@@ -132,7 +134,7 @@ snapshot file name can be given as an additional argument. For example:
 
 .. code-block:: console
 
-   tezos-node snapshot export recent_head_snapshot.full --block head
+   octez-node snapshot export recent_head_snapshot.full --block head
 
 Rolling export
 ~~~~~~~~~~~~~~
@@ -146,7 +148,7 @@ history.
 
 .. code-block:: console
 
-   tezos-node snapshot export <FILE>.rolling --block <BLOCK_HASH> --rolling
+   octez-node snapshot export <FILE>.rolling --block <BLOCK_HASH> --rolling
 
 Snapshot file format and IPFS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -166,13 +168,13 @@ represented as *cemented cycles* and will stay as it is for ever. Only
 the rest of the file contains data relative to the snapshot's target
 block, such as the current incomplete cycle and the block's associated
 ledger state. This canonical representation is well suited for
-distributing snapshots through `IPFS <https://ipfs.io/>`_.
+distributing snapshots through `IPFS <https://ipfs.tech/>`_.
 
 
 Export capabilities
 ~~~~~~~~~~~~~~~~~~~
 
-The following table recapitulate the different kind of snapshot that
+The following table recapitulates the different kinds of snapshots that
 can be exported from a given history mode node.
 
 +---------+---------------+-----------------+
@@ -192,6 +194,6 @@ There are several services providing node snapshots. They create snapshots
 of their nodes on a regular basis (usually daily) and make them available for
 download. These include:
 
-* `Giga Node <https://snapshots-tezos.giganode.io/>`_
 * `XTZ-Shots <https://xtz-shots.io/mainnet/>`_
 * `Lambs on acid <https://lambsonacid.nl/>`_
+* `Marigold snapshots <https://snapshots.tezos.marigold.dev/>`_

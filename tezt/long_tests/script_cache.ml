@@ -616,7 +616,7 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
   in
 
   let* block = RPC.Client.call client @@ RPC.get_chain_block_hash () in
-  let data = data block counter in
+  let data : RPC_core.data = Data (data block counter) in
   let* result =
     RPC.Client.call client
     @@ RPC.post_chain_block_helpers_scripts_simulate_operation ~data ()
@@ -922,7 +922,7 @@ let register ~executors ~protocols =
      check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
      check_cache_reloading_is_not_too_slow ~protocol ~executors ;
      check_simulation_takes_cache_into_account ~protocol ~executors) ;
-  Protocol.[Kathmandu; Alpha]
+  Protocol.[Alpha]
   |> List.iter @@ fun migrate_from ->
      check_simulation_close_to_protocol_user_activation
        ~executors

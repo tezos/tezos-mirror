@@ -228,7 +228,14 @@ struct
   module Nametbl = Hashtbl.MakeSeeded (struct
     type t = Name.t
 
+    (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+    [@@@ocaml.warning "-32"]
+
     let hash = Hashtbl.seeded_hash
+
+    let seeded_hash = Hashtbl.seeded_hash
+
+    [@@@ocaml.warning "+32"]
 
     let equal = Name.equal
   end)
@@ -716,7 +723,7 @@ struct
       w.worker <-
         Lwt_utils.worker
           full_name
-          ~on_event:Internal_event.Lwt_worker_event.on_event
+          ~on_event:Internal_event.Lwt_worker_logger.on_event
           ~run:(fun () -> worker_loop (module Handlers) w)
           ~cancel:(fun () -> Error_monad.cancel_with_exceptions w.canceler) ;
       return w

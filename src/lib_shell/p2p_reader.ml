@@ -39,9 +39,8 @@ type callback = {
   disconnection : P2p_peer.Id.t -> unit;
 }
 
-module Block_hash_cache : Ringo.CACHE_MAP with type key = Block_hash.t =
-  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-    (Block_hash)
+module Block_hash_cache : Aches.Vache.MAP with type key = Block_hash.t =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Block_hash)
 
 type chain_db = {
   chain_store : Store.Chain.t;
@@ -121,7 +120,7 @@ let read_block {disk; _} h =
       let* o = Store.Block.read_block_opt chain_store h in
       let* o =
         match o with
-        | None -> Store.Block.read_prechecked_block_opt chain_store h
+        | None -> Store.Block.read_validated_block_opt chain_store h
         | Some b -> Lwt.return_some b
       in
       Option.map_s (fun b -> Lwt.return (Store.Chain.chain_id chain_store, b)) o)
@@ -504,7 +503,7 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   state.worker <-
     Lwt_utils.worker
       (Format.asprintf "db_network_reader.%a" P2p_peer.Id.pp_short gid)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> worker_loop state)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions canceler) ;
   register state

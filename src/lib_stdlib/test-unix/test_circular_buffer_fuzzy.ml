@@ -35,7 +35,7 @@
    of the same interface. *)
 
 open Lwt.Syntax
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 module type S = sig
   type t

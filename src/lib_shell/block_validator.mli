@@ -28,9 +28,14 @@
 
 type t
 
-type limits = {
-  protocol_timeout : Time.System.Span.t;
-  operation_metadata_size_limit : int option;
+(** Type of a validated block *)
+type new_block = {
+  block : Store.Block.t;  (** The block itself. *)
+  resulting_context_hash : Context_hash.t;
+      (** The context hash resulting of [block]'s application.
+
+          It may be the same one as contained in its header depending
+          on the protocol expected semantics. *)
 }
 
 (** [create limits ddb bvp start_testchain] creates a
@@ -51,7 +56,7 @@ type limits = {
     This function is not supposed to fail. It is implemented this way
    because of the interface implemented by the [Worker] module. *)
 val create :
-  limits ->
+  Shell_limits.block_validator_limits ->
   Distributed_db.t ->
   Block_validator_process.t ->
   start_testchain:bool ->
@@ -100,7 +105,7 @@ val validate :
   t ->
   ?canceler:Lwt_canceler.t ->
   ?peer:P2p_peer.Id.t ->
-  ?notify_new_block:(Store.Block.t -> unit) ->
+  ?notify_new_block:(new_block -> unit) ->
   ?precheck_and_notify:bool ->
   Distributed_db.chain_db ->
   Block_hash.t ->
@@ -137,12 +142,25 @@ val fetch_and_compile_protocol :
   Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
-(** [context_garbage_collection bv chain_store context_hash] moves the
-   contexts below the give [context_hash] from the upper layer
-   to the lower layer. For full and rolling nodes, this is considered
-   as a garbage collection. *)
+(** [context_garbage_collection bv index chain_store context_hash
+    ~gc_lockfile_path] moves the contexts below the give
+    [context_hash] from the upper layer to the lower layer. For full
+    and rolling nodes, this is considered as a garbage
+    collection. When a garbage collection occurs in another process, a
+    lock, located at [gc_lockfile_path], is taken to ensure
+    synchronous GC calls. *)
 val context_garbage_collection :
-  t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
+  t ->
+  Context_ops.index ->
+  Context_hash.t ->
+  gc_lockfile_path:string ->
+  unit tzresult Lwt.t
+
+(** [context_split bv index] finishes and then starts a new chunk in
+    the context storage layout. This aims to be called at the dawn of
+    each cycle, to improve the disk footprint when running a garbage
+    collection. *)
+val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

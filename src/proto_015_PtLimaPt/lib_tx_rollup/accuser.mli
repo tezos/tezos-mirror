@@ -40,7 +40,7 @@ val build_rejection :
 (** [reject_bad_commitment ~source state commitment] injects a rejection
     operation with [source] if the [commitment] is rejectable. *)
 val reject_bad_commitment :
-  source:Signature.Public_key_hash.t ->
+  source:Tezos_crypto.Signature.V0.Public_key_hash.t ->
   State.t ->
   Tx_rollup_commitment.Full.t ->
   unit tzresult Lwt.t

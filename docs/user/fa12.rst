@@ -31,14 +31,14 @@ implements the standard, and both have been verified using the `Mi-Cho-Coq
 <https://gitlab.com/nomadic-labs/mi-cho-coq/>`_ framework (see related :gl:`merge
 request <nomadic-labs/mi-cho-coq!97>`).
 
-The ``tezos-client`` supports this standard with specific commands that allow
+The ``octez-client`` supports this standard with specific commands that allow
 the user to avoid calling FA1.2 contracts using entrypoints and forging
 Michelson arguments. Moreover, it supports calling `views
 <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`_
 (the ``get*`` entrypoints) offchain, without doing an explicit transaction that
 returns a value on a given contract.
 
-``tezos-client man fa1.2`` gives a complete list of the `built-in commands
+``octez-client man fa1.2`` gives a complete list of the `built-in commands
 <https://tezos.gitlab.io/alpha/cli-commands.html#client-manual>`_ to
 interact with FA1.2-compatible contracts, with details about the syntax of each
 one.
@@ -47,7 +47,7 @@ Checking whether a contract is FA1.2 compatible
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To check whether a contract has an FA1.2-compatible interface, use
-``tezos-client check contract <alias or KT1> implements fa1.2``. The underlying
+``octez-client check contract <alias or KT1> implements fa1.2``. The underlying
 function is actually used before invoking any FA1.2 command.
 
 Managing tokens
@@ -57,13 +57,13 @@ An FA1.2 contract features two main functionalities: transferring
 tokens from an address to another, and allowing another account to
 transfer an amount of tokens from its own address to any third party.
 
-- ``tezos-client from fa1.2 contract <fa1.2> transfer <amount> from
+- ``octez-client from fa1.2 contract <fa1.2> transfer <amount> from
   <sender> to <receiver>`` transfers a given ``amount`` of tokens from
   ``sender`` to ``receiver``. In that case ``sender`` is the caller of
   the contract. If ``--as <operator>`` is given to the command,
   operator becomes the caller of the contract (and must have allowance
   on ``sender``'s account, as explained).
-- ``tezos-client from fa1.2 contract <fa1.2> approve <amount> as
+- ``octez-client from fa1.2 contract <fa1.2> approve <amount> as
   <sender> from <operator>`` allows operator to transfer a given
   ``amount`` of tokens from ``sender`` to any other account: this is
   the allowance described above.
@@ -76,9 +76,9 @@ other account.
 Batch transfer of tokens
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-As for tez, ``tezos-client`` supports batch transfer of tokens from a single
+As for tez, ``octez-client`` supports batch transfer of tokens from a single
 source to multiple recipients on multiple FA1.2 contracts, using the command
-``tezos-client multiple fa1.2 transfers from <account> using <json>``.
+``octez-client multiple fa1.2 transfers from <account> using <json>``.
 
 To be on par with batch transactions, only one account can be the source of the
 transfer. However, thanks to the approval mechanism, this command takes an
@@ -99,9 +99,9 @@ transfers is the following:
     ..
    ]
 
-The complete schema can be inspected via ``tezos-codec describe
+The complete schema can be inspected via ``octez-codec describe
 <protocol_name>.fa1.2.token_transfer json schema`` (where ``<protocol_name>``
-can be replaced with e.g. ``alpha`` or ``014-PtKathma``).
+can be replaced with e.g. ``alpha`` or ``015-PtLimaPt``).
 
 
 View information
@@ -115,8 +115,8 @@ total supply of tokens of the contract. These entrypoints are implemented as
 they give back the requested information as a transaction on a given contract,
 assuming its parameter is compatible.
 
-``tezos-client`` supports calling these entrypoints completely
-offchain. One can get a balance using ``tezos-client from fa1.2
+``octez-client`` supports calling these entrypoints completely
+offchain. One can get a balance using ``octez-client from fa1.2
 contract <contract> get balance for <account>``, or the allowance
-using ``tezos-client from fa1.2 contract <contract> get allowance on
+using ``octez-client from fa1.2 contract <contract> get allowance on
 <owner> as <operator>``.

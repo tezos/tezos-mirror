@@ -74,7 +74,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal origination" else "Origination")
         Contract.pp
         source
-        Signature.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         manager
         Client_proto_args.tez_sym
         Tez.pp
@@ -107,7 +107,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
           Format.fprintf
             ppf
             "@,Delegate: %a"
-            Signature.Public_key_hash.pp
+            Signature.V0.Public_key_hash.pp
             delegate) ;
       if spendable then Format.fprintf ppf "@,Spendable by the manager" ;
       if delegatable then
@@ -121,7 +121,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal revelation" else "Revelation")
         Contract.pp
         source
-        Signature.Public_key.pp
+        Signature.V0.Public_key.pp
         key
         pp_result
         result
@@ -141,7 +141,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal Delegation" else "Delegation")
         Contract.pp
         source
-        Signature.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         pp_result
         result) ;
@@ -160,21 +160,21 @@ let pp_balance_updates ppf = function
               | Rewards (pkh, l) ->
                   Format.asprintf
                     "rewards(%a,%a)"
-                    Signature.Public_key_hash.pp
+                    Signature.V0.Public_key_hash.pp
                     pkh
                     Cycle.pp
                     l
               | Fees (pkh, l) ->
                   Format.asprintf
                     "fees(%a,%a)"
-                    Signature.Public_key_hash.pp
+                    Signature.V0.Public_key_hash.pp
                     pkh
                     Cycle.pp
                     l
               | Deposits (pkh, l) ->
                   Format.asprintf
                     "deposits(%a,%a)"
-                    Signature.Public_key_hash.pp
+                    Signature.V0.Public_key_hash.pp
                     pkh
                     Cycle.pp
                     l
@@ -431,7 +431,7 @@ let rec pp_contents_and_result_list :
          Account: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         id
         pp_balance_updates
         bus
@@ -449,7 +449,7 @@ let rec pp_contents_and_result_list :
         level
         pp_balance_updates
         balance_updates
-        Signature.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
         slots
@@ -458,7 +458,7 @@ let rec pp_contents_and_result_list :
       Format.fprintf
         ppf
         "@[<v 2>Proposals:@,From: %a@,Period: %a@,Protocols:@,  @[<v 0>%a@]@]"
-        Signature.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         source
         Voting_period.pp
         period
@@ -469,7 +469,7 @@ let rec pp_contents_and_result_list :
       Format.fprintf
         ppf
         "@[<v 2>Ballot:@,From: %a@,Period: %a@,Protocol: %a@,Vote: %a@]"
-        Signature.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         source
         Voting_period.pp
         period

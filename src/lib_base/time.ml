@@ -132,7 +132,7 @@ module Protocol = struct
     @@ splitted ~binary:int64 ~json:as_string_encoding
 
   let rpc_arg =
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:"date"
       ~descr:"A date in seconds from epoch"
       ~destruct:(function
@@ -191,7 +191,7 @@ module System = struct
            float
 
     let rpc_arg =
-      RPC_arg.make
+      Tezos_rpc.Arg.make
         ~name:"timespan"
         ~descr:"A span of time in seconds"
         ~destruct:(fun s ->
@@ -291,7 +291,7 @@ module System = struct
     @@ splitted ~binary ~json
 
   let rpc_arg =
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:"date"
       ~descr:"A date in seconds from epoch"
       ~destruct:(function

@@ -2,12 +2,16 @@ type available_memories =
   | No_memories_during_init
   | Available_memories of Instance.memory_inst Instance.Vector.t
 
+type reveal = Reveal_raw_data of string | Reveal_metadata
+
 type reveal_destination = {base : int32; max_bytes : int32}
+
+type ticks = Z.t
 
 type reveal_func =
   available_memories ->
   Values.value list ->
-  (Reveal.reveal * reveal_destination) Lwt.t
+  (reveal * reveal_destination, int32) result Lwt.t
 
 type host_func =
   | Host_func of
@@ -16,7 +20,7 @@ type host_func =
       Durable_storage.t ->
       available_memories ->
       Values.value list ->
-      (Durable_storage.t * Values.value list) Lwt.t)
+      (Durable_storage.t * Values.value list * ticks) Lwt.t)
   | Reveal_func of reveal_func
 
 module Registry = Map.Make (String)

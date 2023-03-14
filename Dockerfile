@@ -9,16 +9,7 @@ FROM ${BUILD_IMAGE}:${BUILD_IMAGE_VERSION} as builder
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as intermediate
 # Pull in built binaries
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-baker-* /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-accuser-* /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-client /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-admin-client /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-node /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-proxy-server /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-signer /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-tx-rollup-* /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-sc-rollup-* /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/octez-codec /home/tezos/bin/
+COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin/* /home/tezos/bin/
 # Add parameters for active protocols
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/parameters /home/tezos/scripts/
 # Add entrypoint scripts

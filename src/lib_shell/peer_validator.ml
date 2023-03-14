@@ -58,21 +58,14 @@ module Request = struct
           (locator.head_hash, Block_locator.estimated_length seed locator)
 end
 
-type limits = {
-  new_head_request_timeout : Time.System.Span.t;
-  block_header_timeout : Time.System.Span.t;
-  block_operations_timeout : Time.System.Span.t;
-  protocol_timeout : Time.System.Span.t;
-}
-
 module Types = struct
   type parameters = {
     chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
     (* callback to chain_validator *)
-    notify_new_block : Store.Block.t -> unit;
+    notify_new_block : Block_validator.new_block -> unit;
     notify_termination : unit -> unit;
-    limits : limits;
+    limits : Shell_limits.peer_validator_limits;
   }
 
   type state = {
@@ -266,10 +259,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
     tzfail Validation_errors.Known_invalid
   else if not valid_predecessor then (
     let*! () = Events.(emit missing_new_head_predecessor) block_received in
-    Distributed_db.Request.current_branch
-      pv.parameters.chain_db
-      ~peer:pv.peer_id
-      () ;
+    Distributed_db.Request.current_branch pv.parameters.chain_db pv.peer_id ;
     return_unit)
   else
     only_if_fitness_increases w header hash @@ function
@@ -325,7 +315,9 @@ let on_no_request w =
   Prometheus.Counter.inc_one metrics.on_no_request ;
   let timespan = pv.parameters.limits.new_head_request_timeout in
   let* () = Events.(emit no_new_head_from_peer) (pv.peer_id, timespan) in
-  Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
+  Distributed_db.Request.current_head_from_peer
+    pv.parameters.chain_db
+    pv.peer_id ;
   Lwt.return_unit
 
 let on_request (type a b) w (req : (a, b) Request.t) : (a, b) result Lwt.t =
@@ -390,10 +382,9 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
         in
         match fetched_and_compiled with
         | Ok _ ->
-            Distributed_db.Request.current_head
+            Distributed_db.Request.current_head_from_peer
               pv.parameters.chain_db
-              ~peer:pv.peer_id
-              () ;
+              pv.peer_id ;
             return_ok_unit
         | Error _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3061
@@ -481,9 +472,9 @@ let on_launch _ name parameters : (_, launch_error) result Lwt.t =
       last_validated_head = Store.Block.header genesis;
       last_advertised_head = Store.Block.header genesis;
     }
-  and notify_new_block block =
+  and notify_new_block ({block; _} as new_block) =
     pv.last_validated_head <- Store.Block.header block ;
-    parameters.notify_new_block block
+    parameters.notify_new_block new_block
   in
   Prometheus.Counter.inc_one metrics.connections ;
   Lwt.return (Ok pv)

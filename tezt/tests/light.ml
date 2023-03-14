@@ -53,11 +53,7 @@ let init_light ~protocol =
   let* () =
     Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
-  let level =
-    match protocol with
-    | Protocol.Alpha -> Node.get_level node0
-    | _ -> Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
-  in
+  let level = Node.get_level node0 in
   let () =
     Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in
@@ -285,11 +281,7 @@ let test_compare_light =
   let* vanilla = Client.init ~endpoint:(Node node) () in
   let clients = {vanilla; alternative = light_client} in
   let tz_log =
-    [
-      ("alpha.proxy_rpc", "debug");
-      ("light_mode", "debug");
-      ("proxy_getter", "debug");
-    ]
+    [("proxy_rpc", "debug"); ("light_mode", "debug"); ("proxy_getter", "debug")]
   in
   check_equivalence ~tz_log alt_mode clients
 

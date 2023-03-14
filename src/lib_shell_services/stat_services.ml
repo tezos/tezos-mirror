@@ -155,20 +155,20 @@ let proc_stat_encoding =
 
 module S = struct
   let gc =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Gets stats from the OCaml Garbage Collector"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:gc_stat_encoding
-      RPC_path.(root / "stats" / "gc")
+      Tezos_rpc.Path.(root / "stats" / "gc")
 
   let memory =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Gets memory usage stats"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:proc_stat_encoding
-      RPC_path.(root / "stats" / "memory")
+      Tezos_rpc.Path.(root / "stats" / "memory")
 end
 
-let gc ctxt = RPC_context.make_call S.gc ctxt () () ()
+let gc ctxt = Tezos_rpc.Context.make_call S.gc ctxt () () ()
 
-let memory ctxt = RPC_context.make_call S.memory ctxt () () ()
+let memory ctxt = Tezos_rpc.Context.make_call S.memory ctxt () () ()

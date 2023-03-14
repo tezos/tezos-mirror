@@ -88,14 +88,6 @@ let test_encodings () =
   test_encodings Invoice >>=? fun () ->
   test_encodings Initial_commitments >>=? fun () ->
   test_encodings Minted >>=? fun () ->
-  let nonce =
-    Origination_nonce.Internal_for_tests.initial Operation_hash.zero
-  in
-  let tx_rollup = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce in
-  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
-  test_encodings (Frozen_bonds (Contract.Implicit pkh, bond_id)) >>=? fun () ->
-  test_encodings Tx_rollup_rejection_punishments >>=? fun () ->
-  test_encodings Tx_rollup_rejection_rewards >>=? fun () ->
   test_encodings Sc_rollup_refutation_punishments >>=? fun () ->
   test_encodings Sc_rollup_refutation_rewards
 

@@ -28,7 +28,7 @@ type rpc_error =
   | Connection_failed of string
   | Bad_request of string
   | Forbidden
-  | Method_not_allowed of RPC_service.meth list
+  | Method_not_allowed of Tezos_rpc.Service.meth list
   | Unsupported_media_type of string option
   | Not_acceptable of {proposed : string; acceptable : string}
   | Unexpected_status_code of {
@@ -53,7 +53,11 @@ type rpc_error =
   | Redirect_without_location of string
 
 type error +=
-  | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}
+  | Request_failed of {
+      meth : Tezos_rpc.Service.meth;
+      uri : Uri.t;
+      error : rpc_error;
+    }
 
 let rpc_error_encoding =
   let open Data_encoding in
@@ -84,7 +88,7 @@ let rpc_error_encoding =
         ~title:"Method_not_allowed"
         (obj2
            (req "kind" (constant "method_not_allowed"))
-           (req "allowed" (list RPC_service.meth_encoding)))
+           (req "allowed" (list Tezos_rpc.Service.meth_encoding)))
         (function Method_not_allowed meths -> Some ((), meths) | _ -> None)
         (function (), meths -> Method_not_allowed meths);
       case
@@ -201,7 +205,7 @@ let pp_rpc_error ppf err =
         ppf
         "@[<v 2>The requested service only accepts the following method:@ %a@]"
         (Format.pp_print_list (fun ppf m ->
-             Format.pp_print_string ppf (RPC_service.string_of_meth m)))
+             Format.pp_print_string ppf (Tezos_rpc.Service.string_of_meth m)))
         meths
   | Unsupported_media_type None ->
       Format.fprintf
@@ -275,14 +279,14 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Rpc request failed:@  - meth: %s@  - uri: %s@  - error: %a@]"
-        (RPC_service.string_of_meth meth)
+        (Tezos_rpc.Service.string_of_meth meth)
         (Uri.to_string uri)
         pp_rpc_error
         error)
     Data_encoding.(
       obj3
-        (req "meth" RPC_service.meth_encoding)
-        (req "uri" RPC_encoding.uri_encoding)
+        (req "meth" Tezos_rpc.Service.meth_encoding)
+        (req "uri" Tezos_rpc.Encoding.uri_encoding)
         (req "error" rpc_error_encoding))
     (function
       | Request_failed {uri; error; meth} -> Some (meth, uri, error) | _ -> None)

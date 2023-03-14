@@ -34,7 +34,7 @@ let acceptable_pass _op = None
 type block_header_data = string
 
 let block_header_data_encoding =
-  Data_encoding.(obj1 (req "block_header_data" string))
+  Data_encoding.(obj1 (req "block_header_data" (string Plain)))
 
 type block_header = {
   shell : Block_header.shell_header;
@@ -83,15 +83,21 @@ type mode =
       timestamp : Time.t;
     }
 
-let version_number = "\001"
-
-let int64_to_bytes i =
-  let b = Bytes.make 8 '0' in
-  TzEndian.set_int64 b 0 i ;
-  b
-
+(* Same as genesis *)
 let fitness_from_level level =
-  [Bytes.of_string version_number; int64_to_bytes level]
+  let version_number = "\002" in
+  let int32_to_bytes i =
+    let b = Bytes.make 4 '\000' in
+    TzEndian.set_int32 b 0 i ;
+    b
+  in
+  [
+    Bytes.of_string version_number;
+    int32_to_bytes level ;
+    Bytes.empty ;
+    int32_to_bytes (-1l) ;
+    int32_to_bytes 0l ;
+  ]
 
 let begin_validation context _chain_id mode
     ~(predecessor : Block_header.shell_header) =
@@ -100,7 +106,7 @@ let begin_validation context _chain_id mode
     | Application block_header | Partial_validation block_header ->
         block_header.shell.fitness
     | Construction _ | Partial_construction _ ->
-        fitness_from_level Int64.(succ (of_int32 predecessor.level))
+        fitness_from_level Int32.(succ predecessor.level)
   in
   return {context; fitness}
 
@@ -119,9 +125,9 @@ let () =
     (function No_error -> Some () | _ -> None)
     (fun () -> No_error)
 
-let validate_operation ?check_signature:_ _state _oph _op = fail No_error
+let validate_operation ?check_signature:_ _state _oph _op = tzfail No_error
 
-let apply_operation _state _oph _op = fail No_error
+let apply_operation _state _oph _op = tzfail No_error
 
 let finalize_validation _state = return_unit
 
@@ -151,7 +157,7 @@ let init _chain_id context block_header =
 
 let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
     ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
-  return (fun _ -> fail No_error)
+  return (fun _ -> tzfail No_error)
 
 let rpc_services = RPC_directory.empty
 

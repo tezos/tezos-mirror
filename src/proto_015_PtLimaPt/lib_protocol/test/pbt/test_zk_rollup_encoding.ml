@@ -33,7 +33,7 @@
 
 open Protocol
 open QCheck2
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* Generators *)
 
@@ -66,9 +66,7 @@ let gen_zkr_account =
   let open Zk_rollup_account_repr in
   let* state = gen_l2_state in
   let public_parameters = Operator.public_parameters in
-  let circuits_info =
-    SMap.of_seq (Plonk.Main_protocol.SMap.to_seq Operator.circuits)
-  in
+  let circuits_info = SMap.of_seq (Plonk.SMap.to_seq Operator.circuits) in
   let* nb_ops = nat in
   let static =
     {
@@ -98,7 +96,7 @@ let gen_ticket_hash =
   Ticket_hash_repr.of_bytes_exn bytes
 
 let gen_pkh =
-  let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
+  let pkh, _, _ = Tezos_crypto.Signature.V0.generate_key ~algo:Ed25519 () in
   Gen.return pkh
 
 let gen_z =

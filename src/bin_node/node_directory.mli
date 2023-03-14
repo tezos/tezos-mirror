@@ -24,4 +24,4 @@
 (*****************************************************************************)
 
 val build_node_directory :
-  Node_config_file.t -> unit RPC_directory.t -> unit RPC_directory.t
+  Config_file.t -> unit Tezos_rpc.Directory.t -> unit Tezos_rpc.Directory.t

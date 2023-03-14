@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,39 +36,13 @@ type config = {
   peers_file : string;
   private_mode : bool;
   identity : P2p_identity.t;
-  proof_of_work_target : Crypto_box.pow_target;
+  proof_of_work_target : Tezos_crypto.Crypto_box.pow_target;
   trust_discovered_peers : bool;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
-}
-
-type limits = {
-  connection_timeout : Time.System.Span.t;
-  authentication_timeout : Time.System.Span.t;
-  greylist_timeout : Time.System.Span.t;
-  maintenance_idle_time : Time.System.Span.t;
-  min_connections : int;
-  expected_connections : int;
-  max_connections : int;
-  backlog : int;
-  max_incoming_connections : int;
-  max_download_speed : int option;
-  max_upload_speed : int option;
-  read_buffer_size : int;
-  read_queue_size : int option;
-  write_queue_size : int option;
-  incoming_app_message_queue_size : int option;
-  incoming_message_queue_size : int option;
-  outgoing_message_queue_size : int option;
-  max_known_peer_ids : (int * int) option;
-  max_known_points : (int * int) option;
-  peer_greylist_size : int;
-  ip_greylist_size_in_kilobytes : int;
-  ip_greylist_cleanup_delay : Time.System.Span.t;
-  swap_linger : Time.System.Span.t;
-  binary_chunks_size : int option;
+  reconnection_config : Point_reconnection_config.t;
 }
 
 let create_scheduler limits =
+  let open P2p_limits in
   let max_upload_speed = Option.map (( * ) 1024) limits.max_upload_speed in
   let max_download_speed = Option.map (( * ) 1024) limits.max_download_speed in
   P2p_io_scheduler.create
@@ -80,6 +54,7 @@ let create_scheduler limits =
     ()
 
 let create_connection_pool config limits meta_cfg log triggers =
+  let open P2p_limits in
   let pool_cfg =
     {
       P2p_pool.identity = config.identity;
@@ -97,6 +72,7 @@ let create_connection_pool config limits meta_cfg log triggers =
 
 let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
     triggers log answerer =
+  let open P2p_limits in
   let connect_handler_cfg =
     {
       P2p_connect_handler.identity = config.identity;
@@ -142,6 +118,7 @@ let may_create_discovery_worker _limits config pool =
   | _, _, _ -> None
 
 let create_maintenance_worker limits pool connect_handler config triggers log =
+  let open P2p_limits in
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
@@ -171,7 +148,7 @@ let may_create_welcome_worker config limits connect_handler =
   config.listening_port
   |> Option.map_es (fun port ->
          P2p_welcome.create
-           ~backlog:limits.backlog
+           ~backlog:limits.P2p_limits.backlog
            connect_handler
            ?addr:config.listening_addr
            port)
@@ -182,7 +159,7 @@ type ('msg, 'peer_meta, 'conn_meta) connection =
 module Real = struct
   type ('msg, 'peer_meta, 'conn_meta) net = {
     config : config;
-    limits : limits;
+    limits : P2p_limits.t;
     io_sched : P2p_io_scheduler.t;
     pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t;
     connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t;
@@ -212,7 +189,7 @@ module Real = struct
           in
           let proto_conf =
             {
-              P2p_protocol.swap_linger = limits.swap_linger;
+              P2p_protocol.swap_linger = limits.P2p_limits.swap_linger;
               pool;
               log;
               connect;
@@ -370,18 +347,56 @@ module Real = struct
           ((P2p_conn.info conn).peer_id, err) ;
         false
 
-  let broadcast {pool; _} msg =
+  (* Memoization of broadcast encoded [msg] inside a buffer [buf]. *)
+  (* For generalisation purposes, each connection has a `writer` that
+     defines a specific encoding for messages. Currently we use the
+     same encoding for every connection. It makes this simple
+     memoization possible but will need modifications if connections
+     have specialised encodings. *)
+  let broadcast_encode conn buff msg =
+    let open Result_syntax in
+    match !buff with
+    | None ->
+        let* encoded_msg = P2p_conn.encode conn msg in
+        buff := Some encoded_msg ;
+        return encoded_msg
+    | Some em -> return em
+
+  let send_conn ?alt conn buf alt_buf msg =
+    let open Result_syntax in
+    (* Silently discards Error P2p_errors.Connection_closed in case
+                  the pipe is closed. Shouldn't happen because
+       - no race conditions (no Lwt)
+       - the peer state is Running.
+
+       Also ignore if the message is dropped instead of being added
+       to the write queue. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4205
+       Ensure sent messages are actually sent.
+    *)
+    ignore
+    @@ let* encoded_msg =
+         match alt with
+         | None -> broadcast_encode conn buf msg
+         | Some (if_conn, then_msg) ->
+             if if_conn conn then broadcast_encode conn alt_buf then_msg
+             else broadcast_encode conn buf msg
+       in
+       P2p_conn.write_encoded_now
+         conn
+         (P2p_socket.copy_encoded_message encoded_msg)
+
+  let broadcast connections ?except ?alt msg =
+    let buf = ref None in
+    let alt_buf = ref None in
+    let send conn = send_conn ?alt conn buf alt_buf msg in
     P2p_peer.Table.iter
-      (fun _peer_id peer_info ->
-        match P2p_peer_state.get peer_info with
-        | Running {data = conn; _} ->
-            (* Silently discards Error P2p_errors.Connection_closed in case
-                the pipe is closed. Shouldn't happen because
-                - no race conditions (no Lwt)
-                - the peer state is Running. *)
-            ignore (P2p_conn.write_now conn msg : bool tzresult)
+      (fun _peer_id conn ->
+        match except with
+        | None -> send conn
+        | Some f when not (f conn) -> send conn
         | _ -> ())
-      (P2p_pool.connected_peer_ids pool) ;
+      connections ;
     Events.(emit__dont_wait__use_with_care broadcast) ()
 
   let fold_connections {pool; _} ~init ~f =
@@ -453,7 +468,6 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   send :
     ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit tzresult Lwt.t;
   try_send : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> bool;
-  broadcast : 'msg -> unit;
   pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option;
   connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t option;
   fold_connections :
@@ -481,6 +495,7 @@ let connect_handler net = net.connect_handler
 
 let check_limits =
   let open Result_syntax in
+  let open P2p_limits in
   let fail_1 v orig =
     if not (Ptime.Span.compare v Ptime.Span.zero <= 0) then return_unit
     else
@@ -538,7 +553,6 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       recv_any = Real.recv_any net;
       send = Real.send net;
       try_send = Real.try_send net;
-      broadcast = Real.broadcast net;
       pool = Some net.pool;
       connect_handler = Some net.connect_handler;
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
@@ -590,7 +604,6 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     iter_connections = (fun _f -> ());
     on_new_connection = (fun _f -> ());
     negotiated_version = (fun _ -> announced_version);
-    broadcast = ignore;
     pool = None;
     connect_handler = None;
     activate = (fun _ -> ());
@@ -637,7 +650,8 @@ let send net = net.send
 
 let try_send net = net.try_send
 
-let broadcast net = net.broadcast
+let broadcast connections ?except ?alt msg =
+  Real.broadcast connections ?except ?alt msg
 
 let fold_connections net = net.fold_connections
 
@@ -654,3 +668,9 @@ let greylist_peer net peer_id =
 let watcher net = Lwt_watcher.create_stream net.watcher
 
 let negotiated_version net = net.negotiated_version
+
+module Internal_for_tests = struct
+  let broadcast_conns (connections : ('a, 'b, 'c) P2p_conn.t P2p_peer.Table.t)
+      ?except ?alt msg =
+    broadcast connections ?except ?alt msg
+end

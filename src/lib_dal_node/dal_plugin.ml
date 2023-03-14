@@ -23,19 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type operation_application_result = Succeeded | Failed
+
+type slot_index = int
+
+type slot_header = {
+  published_level : int32;
+  slot_index : slot_index;
+  commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
+}
+
+type proto_parameters = {
+  feature_enable : bool;
+  number_of_slots : int;
+  attestation_lag : int;
+  attestation_threshold : int;
+  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
+  blocks_per_epoch : int32;
+}
+
 module type T = sig
   module Proto : Registered_protocol.T
+
+  type block_info
+
+  val block_info :
+    ?chain:Tezos_shell_services.Block_services.chain ->
+    ?block:Tezos_shell_services.Block_services.block ->
+    metadata:[`Always | `Never] ->
+    Client_context.full ->
+    block_info tzresult Lwt.t
 
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
+    proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    Tezos_shell_services.Block_services.block ->
+    block_info ->
+    (slot_header * operation_application_result) list tzresult Lwt.t
+
+  val get_committee :
     Client_context.full ->
-    (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
+    level:int32 ->
+    (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+
+  val attested_slot_headers :
+    Block_hash.t ->
+    block_info ->
+    number_of_slots:int ->
+    slot_index list tzresult
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5

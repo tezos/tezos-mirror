@@ -1,0 +1,8 @@
+# Long Tezt tests are not ran in the CI, but we want them to type-check so that
+# they can be built in the performance regression test framework executors.
+tezt:build-long:
+  extends:
+    - .build_template
+  stage: test
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-build-long

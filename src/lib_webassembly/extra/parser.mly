@@ -232,7 +232,7 @@ let vec_first_value v =
   (* This is obviously a nasty trick, but calling `Vector.get 0l` implies going
      into the Lwt monad. This is safe in the text parser since there won't be
      partial values that needs to be read fron the KV store. *)
-  Vector.loaded_bindings v |> List.hd |> snd
+  Vector.loaded_bindings v |> List.filter_map snd |> List.hd
 
 let eq_ty (FuncType (ins, out)) (FuncType (ins', out')) =
   vec_to_list ins = vec_to_list ins'

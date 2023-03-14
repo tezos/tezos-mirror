@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Lwt.Syntax
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 module type GEN = sig
   type 'a t

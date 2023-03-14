@@ -149,7 +149,7 @@ balance*. Let us first (re)define these and related concepts.
 
 - The *(maximal) staking balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
   balances of all accounts that have delegated to it.
-  It must be at least ``TOKENS_PER_ROLL`` tez, otherwise the delegate cannot be selected as a validator.
+  It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.
@@ -181,8 +181,8 @@ not the other way around.):
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
 Delegates can set an upper limit to their frozen deposits with the
-command ``tezos-client set deposits limit for <delegate> to
-<deposit_limit>``, and unset this limit with the command ``tezos-client
+command ``octez-client set deposits limit for <delegate> to
+<deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``. When emitting such a
 command in cycle ``c``, it affects the active stake for cycles starting
@@ -331,7 +331,7 @@ CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
 Regarding the concrete values for rewards, we first fix the total reward per
 level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 2``, ``total_rewards`` is 40 tez.
+Assuming ``blocks_per_minute = 4``, ``total_rewards`` is 20 tez.
 We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
@@ -343,16 +343,16 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 10`` tez,
-(maximum) ``bonus = 10`` tez, and ``endorsing_rewards = 20`` tez.
+Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 5`` tez,
+(maximum) ``bonus = 5`` tez, and ``endorsing_rewards = 10`` tez.
 The bonus per additional endorsement slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional endorsements included in a block). The rewards per
 endorsement slot are ``endorsing_rewards / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
-``10 / (7000 / 3) = 0.004286`` tez and an endorsing
-rewards per slot of ``20 / 7000 = 0.002857`` tez.
+``5 / (7000 / 3) = 0.002143`` tez and an endorsing
+rewards per slot of ``10 / 7000 = 0.001428`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
@@ -360,15 +360,15 @@ A. Also, B includes endorsements with endorsing power ``5251``. Then A receives
 the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
-Therefore B receives the bonus ``(5251 - 4667) * 0.004286 = 2.503`` tez. (Note
+Therefore B receives the bonus ``(5251 - 4667) * 0.002143 = 1.251512`` tez. (Note
 that B only included endorsements corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
 maximum 2333 extra endorsements it could have theoretically included.) Finally, consider some
 delegate C, whose active stake at some cycle is 5% of the total stake. Note that
 his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
 2,867,200`` slots. Assume also that the endorsing power of C's endorsements
-included during that cycle has been ``3,123,456`` slots. Given that this number is
+included during that cycle has been ``2,123,456`` slots. Given that this number is
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
-reward of ``2,867,200 * 0.002857 = 8191.59`` tez for that cycle.
+reward of ``2,867,200 * 0.001428 = 4094.3616`` tez for that cycle.
 
 .. _slashing_alpha:
 
@@ -380,7 +380,7 @@ validator does not reveal its nonce by the end of the cycle, it does not receive
 its endorsing rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or
 it double (pre)endorses (which means voting on two different proposals at the
-same level and round), the frozen deposit is slashed. The slashed amount for double baking
+same level and round), a part of the frozen deposit is slashed. The slashed amount for double baking
 is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double (pre)endorsing is
 a fixed percentage ``RATIO_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ENDORSEMENT``
 of the frozen deposit. The payload producer that includes the misbehavior
@@ -414,9 +414,9 @@ Consensus related protocol parameters
    * - ``CONSENSUS_THRESHOLD``
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
-     - 30s
-   * - ``DELAY_INCREMENT_PER_ROUND``
      - 15s
+   * - ``DELAY_INCREMENT_PER_ROUND``
+     - 8s
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
    * - ``FROZEN_DEPOSITS_PERCENTAGE``
@@ -428,11 +428,11 @@ Consensus related protocol parameters
    * - ``RATIO_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ENDORSEMENT``
      - 1/2
    * - ``BAKING_REWARD_FIXED_PORTION``
-     - 10 tez
+     - 5 tez
    * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.004286 tez
+     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.002143 tez
    * - ``ENDORSING_REWARD_PER_SLOT``
-     - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
+     - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.001428 tez
 
 These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
@@ -440,6 +440,11 @@ These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
 Shell-protocol interaction revisited
 ------------------------------------
+
+.. FIXME tezos/tezos#3914:
+
+   Integrate protocol-specific block parts in the blocks and ops
+   entry.
 
 :ref:`Recall<shell_proto_interact_alpha>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
 Namely, these two notions are the protocol-specific header and the fitness.

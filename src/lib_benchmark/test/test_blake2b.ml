@@ -45,7 +45,7 @@ let bench_opts =
     nsamples = 3000;
     bench_number = 100;
     minor_heap_size = `words (256 * 1024);
-    config_dir = None;
+    config_file = None;
   }
 
 (* Perform timing measurements, existentially pack it *)
@@ -75,7 +75,7 @@ let solution =
       let solver = Inference.Lasso {alpha = 1.0; positive = true} in
       (* Initialize Python to have access to Scikit's Lasso solver *)
       Pyinit.pyinit () ;
-      Inference.solve_problem problem solver
+      Inference.solve_problem ~is_constant_input:false problem solver
 
 (*
   Fourth and last step: exploiting results.
@@ -89,23 +89,32 @@ let () =
         List.assoc ~equal:String.equal "blake2b" Bench.models
         |> WithExceptions.Option.get ~loc:__LOC__
       in
-      let solution = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
+      let solution =
+        Codegen.
+          {
+            inference_model_name = "blake2b";
+            map = Free_variable.Map.of_seq (List.to_seq solution.mapping);
+            scores_list = [];
+          }
+      in
       (match
          Codegen.codegen
            (Model.For_codegen model)
            solution
            (module Costlang.Identity)
+           "blake2b_model"
        with
       | None -> assert false
-      | Some code ->
-          Format.printf "let blake2b_model = %a@." Codegen.pp_expr code) ;
+      | Some code -> Format.printf "%a@." Codegen.pp_model code) ;
       let module FPT = Fixed_point_transform.Apply (struct
         let options = {Fixed_point_transform.default_options with precision = 5}
       end) in
-      match Codegen.codegen (Model.For_codegen model) solution (module FPT) with
+      match
+        Codegen.codegen
+          (Model.For_codegen model)
+          solution
+          (module FPT)
+          "blake2b_model_fixed_point"
+      with
       | None -> assert false
-      | Some code ->
-          Format.printf
-            "let blake2b_model_fixed_point = %a@."
-            Codegen.pp_expr
-            code)
+      | Some code -> Format.printf "%a@." Codegen.pp_model code)

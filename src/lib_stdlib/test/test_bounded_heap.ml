@@ -29,7 +29,7 @@
     Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 module B = Bounded_heap.Make (Int)
 
 let take_nth_biggest n l =
@@ -65,13 +65,13 @@ let test_bounded_heap =
           ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
           Format.pp_print_int
       in
-      Lib_test.Qcheck2_helpers.qcheck_eq'
+      Qcheck2_helpers.qcheck_eq'
         ~pp:Format.pp_print_int
         ~eq:( = )
         ~actual:ln
         ~expected:sz
         ()
-      && Lib_test.Qcheck2_helpers.qcheck_eq'
+      && Qcheck2_helpers.qcheck_eq'
            ~pp:pp_list
            ~eq:( = )
            ~actual:contents

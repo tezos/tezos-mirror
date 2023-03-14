@@ -111,12 +111,13 @@ let is_activated () = !activated
 
 let close (_ : t) : unit tzresult Lwt.t = Lwt_result_syntax.return_unit
 
-let handle (type a) (_ : t) m ?section (f : unit -> a) =
+let should_handle ?section:_ (_ : t) _m = true
+
+let handle (type a) (_ : t) m ?section ev =
   let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
-  let ev = f () in
   let event =
     {
-      level = M.level ev;
+      level = M.level;
       section;
       name = M.name;
       message = Format.asprintf "%a" (M.pp ~short:false) ev;
@@ -216,10 +217,10 @@ let assert_has_events msg ?filter ?(strict = true) (pats : Pattern.t list) =
   else
     List.iter
       (fun pattern ->
-        Lib_test.Assert.check_any ~msg (Pattern.match_event pattern) events)
+        Assert.check_any ~msg (Pattern.match_event pattern) events)
       pats
 
 let assert_has_event msg ?filter ?(strict = true) (pattern : Pattern.t) =
   let log = get_events ?filter () in
   if strict then assert_has_events msg ?filter ~strict [pattern]
-  else Lib_test.Assert.check_any ~msg (Pattern.match_event pattern) log
+  else Assert.check_any ~msg (Pattern.match_event pattern) log

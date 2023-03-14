@@ -83,12 +83,12 @@ let store_block =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
-let store_prechecked_block =
+let store_validated_block =
   declare_1
     ~section
     ~level:Info
-    ~name:"store_prechecked_block"
-    ~msg:"prechecked block {block} was stored"
+    ~name:"store_validated_block"
+    ~msg:"validated block {block} was stored"
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
@@ -220,13 +220,22 @@ let start_context_gc =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
+let start_context_split =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"start_context_split"
+    ~msg:"splitting context into a new chunk at level {level}"
+    ~pp1:pp_int32
+    ("level", Data_encoding.int32)
+
 let context_gc_is_not_allowed =
   declare_0
     ~section
     ~level:Warning
     ~name:"gc_is_not_allowed"
     ~msg:
-      "garbage collection is not fully enable on this data directory: context \
+      "garbage collection is not fully enabled on this data directory: context \
        cannot be garbage collected. Please read the documentation or import a \
        snapshot to enable it"
     ()
@@ -465,3 +474,20 @@ let notify_merge_error =
        {errs}"
     ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
     ("errs", Error_monad.trace_encoding)
+
+let upgrade_store_failed =
+  declare_1
+    ~section
+    ~level:Internal_event.Error
+    ~name:"upgrade_store_failed"
+    ~msg:"store upgrade failed, cleaning up temporary files: {errs}"
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
+    ("errs", Error_monad.trace_encoding)
+
+let upgrade_store_started =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"upgrade_store_started"
+    ~msg:"upgrading the store"
+    ()

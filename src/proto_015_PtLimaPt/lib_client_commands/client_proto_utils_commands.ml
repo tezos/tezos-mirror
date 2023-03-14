@@ -25,10 +25,10 @@
 
 open Client_proto_utils
 
-let group = {Clic.name = "utilities"; title = "Utility Commands"}
+let group = {Tezos_clic.name = "utilities"; title = "Utility Commands"}
 
 let unsigned_block_header_param =
-  let open Clic in
+  let open Tezos_clic in
   param
     ~name:"unsigned block header"
     ~desc:"A hex or JSON encoded unsigned block header"
@@ -53,7 +53,7 @@ let unsigned_block_header_param =
                  try destruct enc json |> return with _ -> tzfail error)))
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let string_param ~name ~desc =
     param ~name ~desc Client_proto_args.string_parameter
   in
@@ -81,7 +81,7 @@ let commands () =
       (prefixes ["sign"; "message"]
       @@ string_param ~name:"message" ~desc:"message to sign"
       @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"src"
            ~desc:"name of the signer contract"
       @@ stop)
@@ -95,7 +95,9 @@ let commands () =
             ()
         in
         let* signature = sign_message cctxt ~src_sk ~block ~message in
-        let*! () = cctxt#message "Signature: %a" Signature.pp signature in
+        let*! () =
+          cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
+        in
         return_unit);
     command
       ~group
@@ -109,7 +111,7 @@ let commands () =
       (prefixes ["check"; "that"; "message"]
       @@ string_param ~name:"message" ~desc:"signed message"
       @@ prefixes ["was"; "signed"; "by"]
-      @@ Client_keys.Public_key.alias_param
+      @@ Client_keys_v0.Public_key.alias_param
            ~name:"signer"
            ~desc:"name of the signer contract"
       @@ prefixes ["to"; "produce"]
@@ -148,7 +150,7 @@ let commands () =
       no_options
       (prefixes ["sign"; "block"]
       @@ unsigned_block_header_param @@ prefixes ["for"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"signing delegate"
       @@ stop)
@@ -165,9 +167,9 @@ let commands () =
         let* chain_id =
           Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
         in
-        let* _, _, sk = Client_keys.get_key cctxt delegate in
+        let* _, _, sk = Client_keys_v0.get_key cctxt delegate in
         let* s =
-          Client_keys.sign
+          Client_keys_v0.sign
             cctxt
             ~watermark:
               (Protocol.Alpha_context.Block_header.to_watermark
@@ -175,6 +177,8 @@ let commands () =
             sk
             unsigned_header
         in
-        let*! () = cctxt#message "%a" Hex.pp (Signature.to_hex s) in
+        let*! () =
+          cctxt#message "%a" Hex.pp (Tezos_crypto.Signature.V0.to_hex s)
+        in
         return_unit);
   ]

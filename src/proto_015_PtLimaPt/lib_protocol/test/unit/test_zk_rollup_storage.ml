@@ -45,9 +45,9 @@ let batch_size = 10
 module ZKRU = struct
   include Alpha_context.Zk_rollup
 
-  type pkh = Signature.Public_key_hash.t
+  type pkh = Tezos_crypto.Signature.V0.Public_key_hash.t
 
-  let pkh_encoding = Signature.Public_key_hash.encoding
+  let pkh_encoding = Tezos_crypto.Signature.V0.Public_key_hash.encoding
 
   type ticket_hash = Alpha_context.Ticket_hash.t
 
@@ -114,9 +114,7 @@ module Raw_context_tests = struct
     let public_parameters = Operator.public_parameters in
     let state = Operator.init_state in
     let state_length = Array.length state in
-    let circuits_info =
-      SMap.of_seq @@ Plonk.Main_protocol.SMap.to_seq Operator.circuits
-    in
+    let circuits_info = SMap.of_seq @@ Plonk.SMap.to_seq Operator.circuits in
     let nb_ops = 1 in
     let* ctx, rollup, _size =
       Zk_rollup_storage.originate
@@ -141,7 +139,7 @@ module Raw_context_tests = struct
   let pending_list_append () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Signature.generate_key () in
+    let pkh, _, _ = Tezos_crypto.Signature.V0.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -170,7 +168,7 @@ module Raw_context_tests = struct
   let pending_list_append_errors () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Signature.generate_key () in
+    let pkh, _, _ = Tezos_crypto.Signature.V0.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.

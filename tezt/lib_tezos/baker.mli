@@ -29,8 +29,13 @@ type t
 (** See [Daemon.Make.name] *)
 val name : t -> string
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
@@ -46,7 +51,7 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 val wait_for_ready : t -> unit Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
@@ -55,7 +60,7 @@ val on_event : t -> (event -> unit) -> unit
 
     The resulting promise is fulfilled as soon as the baker has been spawned.  It
     continues running in the background.*)
-val run : t -> unit Lwt.t
+val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
@@ -108,7 +113,10 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     [--liquidity-baking-toggle-vote] is [None], then
     [--liquidity-baking-toggle-vote]
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
-    passed. The default value is [Some Pass]. *)
+    passed. The default value is [Some Pass].
+
+    [force_apply] is passed to the baker daemon through
+    the flag [--force_apply]. *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -118,6 +126,7 @@ val create :
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?force_apply:bool ->
   Node.t ->
   Client.t ->
   t
@@ -152,8 +161,10 @@ val create :
     baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [votefile] and [liquidity_baking_toggle_vote] are passed to the baker daemon
-    through the flags [--votefile] and [--liquidity-baking-toggle-vote]. *)
+    [votefile], [liquidity_baking_toggle_vote] and [force_apply] are
+    respectively passed to the baker daemon through the flags
+    [--votefile], [--liquidity-baking-toggle-vote] and
+    [--should-apply]. *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
@@ -163,6 +174,7 @@ val init :
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?force_apply:bool ->
   Node.t ->
   Client.t ->
   t Lwt.t

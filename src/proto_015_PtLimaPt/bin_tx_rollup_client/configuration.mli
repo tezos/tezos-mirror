@@ -43,7 +43,7 @@ val parse : string list -> (t * string list) tzresult Lwt.t
 (** [global_options ()] returns the list of options that have an
    influence on the configuration. *)
 val global_options :
-  unit -> (string option * string option * Uri.t option, 'a) Clic.options
+  unit -> (string option * string option * Uri.t option, 'a) Tezos_clic.options
 
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
     RPCs. Can be used for keys and RPCs related commands. *)
@@ -51,7 +51,7 @@ class type tx_client_context =
   object
     inherit Tezos_client_base.Client_context.io_wallet
 
-    inherit RPC_context.generic
+    inherit Tezos_rpc.Context.generic
   end
 
 (** Instance of [tx_client_context] for linux systems. Relies on

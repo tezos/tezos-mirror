@@ -31,8 +31,12 @@ open Tezos_benchmark
   First step: defining the benchmark.
 *)
 
+let ns = Namespace.make Namespace.root "example"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 module Blake2b_bench : Benchmark.S = struct
-  let name = "Blake2b_example"
+  let name = ns "Blake2b_example"
 
   let info = "Illustrating tezos-benchmark by benchmarking blake2b"
 
@@ -78,8 +82,8 @@ module Blake2b_bench : Benchmark.S = struct
           ~conv:(fun {nbytes} -> (nbytes, ()))
           ~model:
             (Model.affine
-               ~intercept:(Free_variable.of_string "blake2b_const")
-               ~coeff:(Free_variable.of_string "blake2b_ns_p_byte")) );
+               ~intercept:(fv "blake2b_const")
+               ~coeff:(fv "blake2b_ns_p_byte")) );
     ]
 
   let blake2b_benchmark rng_state config () =

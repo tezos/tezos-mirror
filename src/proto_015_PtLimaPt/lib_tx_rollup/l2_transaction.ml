@@ -38,13 +38,13 @@ let encoding =
     (fun (transaction, signatures) -> {transaction; signatures})
   @@ obj2
        (req "transaction" Tx_rollup_l2_batch.V1.transaction_encoding)
-       (req "signatures" (list Bls.encoding))
+       (req "signatures" (list Signature.Bls.encoding))
 
 let batch l =
   let contents = List.map (fun {transaction; _} -> transaction) l in
   let aggregated_signature =
     List.concat_map (fun {signatures; _} -> signatures) l
-    |> Bls.aggregate_signature_opt
+    |> Signature.Bls.aggregate_signature_opt
   in
   match aggregated_signature with
   | None -> error_with "Cannot aggregate signatures"
@@ -52,8 +52,8 @@ let batch l =
       ok Tx_rollup_l2_batch.(V1 V1.{contents; aggregated_signature})
 
 module Hash =
-  Blake2B.Make
-    (Base58)
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
     (struct
       let name = "tx_rollup_l2_transaction_hash"
 
@@ -64,7 +64,8 @@ module Hash =
       let size = None
     end)
 
-let () = Base58.check_encoded_prefix Hash.b58check_encoding "txL2" 54
+let () =
+  Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "txL2" 54
 
 type hash = Hash.t
 

@@ -1,0 +1,23 @@
+include:
+  # Stage: build
+  - .gitlab/ci/jobs/build/static_x86_64_experimental.yml
+  - .gitlab/ci/jobs/build/static_arm64_experimental.yml
+  - .gitlab/ci/jobs/build/arm64.yml
+  - .gitlab/ci/jobs/build/docker_amd64_experimental.yml
+  - .gitlab/ci/jobs/build/docker_arm64_experimental.yml
+
+  # Stage: test
+  - .gitlab/ci/jobs/test/ometrics_code_quality_default.yml
+
+  # Stage: test_coverage
+  - .gitlab/ci/jobs/coverage/coverage_default.yml
+
+  # Stage: doc
+  - .gitlab/ci/jobs/doc/publish.yml
+
+  # Stage: prepare_release
+  - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_release.yml
+
+  # Stage: publish_release
+  - .gitlab/ci/jobs/publish/deb_packages_unstable_amd64.yml
+  - .gitlab/ci/jobs/publish/rpm_packages_unstable_amd64.yml

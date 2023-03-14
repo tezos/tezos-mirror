@@ -54,7 +54,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         tez_sym
         Tez.pp
         amount
-        Contract.pp
+        Destination.pp
         source
         Destination.pp
         destination ;
@@ -70,7 +70,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
       Format.fprintf
         ppf
         "Origination:@,From: %a@,Credit: %s%a"
-        Contract.pp
+        Destination.pp
         source
         tez_sym
         Tez.pp
@@ -99,7 +99,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
             Signature.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
-      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
@@ -107,7 +107,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
       Format.fprintf
         ppf
         "Event:@,From: %a@,Type: %a"
-        Contract.pp
+        Destination.pp
         source
         pp_micheline_expr
         ty ;
@@ -316,30 +316,24 @@ let pp_manager_operation_content (type kind) source ppf
         source
   | Sc_rollup_originate
       {kind; boot_sector; origination_proof = _; parameters_ty} ->
-      let (module R : Sc_rollup.PVM.S) = Sc_rollup.Kind.pvm_of kind in
       Format.fprintf
         ppf
-        "Smart contract rollup origination:@,\
-         Kind: %s@,\
+        "Smart rollup origination:@,\
+         Kind: %a@,\
          Parameter type: %a@,\
-         Boot sector Blake2B hash: '%a'"
-        R.name
+         Kernel Blake2B hash: '%a'"
+        Sc_rollup.Kind.pp
+        kind
         pp_micheline_from_lazy_expr
         parameters_ty
-        Blake2B.pp
-        (Blake2B.hash_string [boot_sector])
-  | Sc_rollup_add_messages {rollup; messages = _} ->
-      Format.fprintf
-        ppf
-        "Smart contract rollup messages submission:@,Address: %a"
-        Sc_rollup.Address.pp
-        rollup
+        Tezos_crypto.Blake2B.pp
+        (Tezos_crypto.Blake2B.hash_string [boot_sector])
+  | Sc_rollup_add_messages {messages = _} ->
+      Format.pp_print_string ppf "Smart rollup messages submission:"
   | Sc_rollup_cement {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Smart contract rollup commitment cementing:@,\
-         Address: %a@,\
-         Commitment: %a"
+        "Smart rollup commitment cementing:@,Address: %a@,Commitment: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Commitment.Hash.pp
@@ -347,7 +341,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Smart contract rollup commitment publishing:@,\
+        "Smart rollup commitment publishing:@,\
          Address: %a@,\
          @[<v 2>Commitment:@,\
          %a@]"
@@ -358,22 +352,17 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
-        "Smart contract rollup refutation move:@,\
-         Address: %a@,\
-         Staker: %a@,\
-         Move: %a"
+        "Smart rollup refutation move:@,Address: %a@,Staker: %a@,Refutation: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Staker.pp
         opponent
-        (fun fmt -> function
-          | None -> Format.pp_print_string fmt "opening of the game"
-          | Some refutation -> Sc_rollup.Game.pp_refutation fmt refutation)
+        Sc_rollup.Game.pp_refutation
         refutation
   | Sc_rollup_timeout {rollup; stakers = {alice; bob}} ->
       Format.fprintf
         ppf
-        "Smart contract rollup refutation timeout:@,\
+        "Smart rollup refutation timeout:@,\
          Address: %a@,\
          First staker (Alice): %a@,\
          Second staker (Bob): %a"
@@ -387,41 +376,33 @@ let pp_manager_operation_content (type kind) source ppf
       {rollup; cemented_commitment; output_proof = _} ->
       Format.fprintf
         ppf
-        "Smart contract output message execution:@,\
+        "Smart rollup output message execution:@,\
          Address: %a@,\
          Cemented commitment: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Commitment.Hash.pp
         cemented_commitment
-  | Sc_rollup_recover_bond {sc_rollup} ->
+  | Sc_rollup_recover_bond {sc_rollup; staker} ->
       Format.fprintf
         ppf
-        "Smart contract bond retrieval:@,Address: %a@,From: %a"
+        "Smart rollup bond retrieval:@,Address: %a@,Staker: %a"
         Sc_rollup.Address.pp
         sc_rollup
-        Contract.pp
-        source
-  | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-      Format.fprintf
-        ppf
-        "Data availability slot subscription:@,\
-         Slot number: %a@,\
-         Smart contract rollup address: %a"
-        Dal.Slot_index.pp
-        slot_index
-        Sc_rollup.Address.pp
-        rollup
-  | Dal_publish_slot_header {slot_header} ->
+        Signature.Public_key_hash.pp
+        staker
+  | Dal_publish_slot_header operation ->
       Format.fprintf
         ppf
         "Data availability slot header publishing:@,Slot: %a"
-        Dal.Slot.Header.pp
-        slot_header
+        Dal.Operations.Publish_slot_header.pp
+        operation
   | Zk_rollup_origination _ ->
-      Format.fprintf ppf "Zk rollup origination:@,From: %a" Contract.pp source
+      Format.fprintf ppf "Epoxy origination:@,From: %a" Contract.pp source
   | Zk_rollup_publish _ ->
-      Format.fprintf ppf "Zk rollup publish:@,From: %a" Contract.pp source
+      Format.fprintf ppf "Epoxy publish:@,From: %a" Contract.pp source
+  | Zk_rollup_update _ ->
+      Format.fprintf ppf "Epoxy update:@,From: %a" Contract.pp source
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -475,8 +456,8 @@ let pp_balance_updates ppf balance_updates =
           | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
           | Tx_rollup_rejection_punishments -> "tx rollup rejection punishments"
           | Sc_rollup_refutation_punishments ->
-              "sc rollup refutation punishments"
-          | Sc_rollup_refutation_rewards -> "sc rollup refutation rewards"
+              "smart rollup refutation punishments"
+          | Sc_rollup_refutation_rewards -> "smart rollup refutation rewards"
         in
         let balance =
           match origin with
@@ -533,7 +514,7 @@ let pp_ticket_receipt ppf ticket_receipt =
       updates
   in
   let pp_item ppf {ticket_token; updates} =
-    let {ticketer; contents_type; contents} = ticket_token in
+    let Ticket_token.{ticketer; contents_type; contents} = ticket_token in
     Format.fprintf
       ppf
       "Ticketer: %a@,Content type: %a@,Content: %a@,%a"
@@ -555,6 +536,9 @@ let pp_ticket_receipt ppf ticket_receipt =
         (Format.pp_print_list pp_item)
         ticket_updates
 
+let pp_slot_header ppf slot_header =
+  Format.fprintf ppf "@,@[%a@]" Dal.Slot.Header.pp slot_header
+
 let pp_consumed_gas ppf consumed_gas =
   Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
 
@@ -568,13 +552,6 @@ let pp_paid_storage_size_diff ppf paid_storage_size_diff =
 let pp_storage_size ppf storage_size =
   if storage_size <> Z.zero then
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size)
-
-let pp_inbox_after ppf inbox_after =
-  Format.fprintf
-    ppf
-    "@,Resulting inbox state: %a"
-    Sc_rollup.Inbox.pp
-    inbox_after
 
 let pp_lazy_storage_diff ppf = function
   | None -> ()
@@ -656,9 +633,9 @@ let pp_transaction_result ppf = function
       pp_balance_updates ppf balance_updates ;
       Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
       pp_paid_storage_size_diff ppf paid_storage_size_diff
-  | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
+  | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
       pp_consumed_gas ppf consumed_gas ;
-      pp_inbox_after ppf inbox_after
+      pp_ticket_receipt ppf ticket_receipt
   | Transaction_to_zk_rollup_result
       {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
       pp_consumed_gas ppf consumed_gas ;
@@ -757,13 +734,16 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+        {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
+      =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
+    pp_ticket_receipt ppf ticket_receipt ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in
   let pp_dal_publish_slot_header_result
-      (Dal_publish_slot_header_result {consumed_gas}) =
+      (Dal_publish_slot_header_result {slot_header; consumed_gas}) =
+    pp_slot_header ppf slot_header ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_sc_rollup_originate_result
@@ -781,9 +761,8 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_add_messages_result
-      (Sc_rollup_add_messages_result {consumed_gas; inbox_after}) =
-    pp_consumed_gas ppf consumed_gas ;
-    pp_inbox_after ppf inbox_after
+      (Sc_rollup_add_messages_result {consumed_gas}) =
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_sc_rollup_cement_result
       (Sc_rollup_cement_result {consumed_gas; inbox_level}) =
@@ -828,20 +807,12 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_sc_rollup_execute_outbox_message_result
       (Sc_rollup_execute_outbox_message_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+        {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
+      =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates ppf balance_updates
-  in
-  let pp_sc_rollup_dal_slot_subscribe_result
-      (Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
-    Format.fprintf
-      ppf
-      "@,Registered slot index: %a"
-      Dal.Slot_index.pp
-      slot_index ;
-    Format.fprintf ppf "@,Registered level %a" Raw_level.pp level
+    pp_balance_updates ppf balance_updates ;
+    pp_ticket_receipt ppf ticket_receipt
   in
   let pp_sc_rollup_recover_bond_result
       (Sc_rollup_recover_bond_result {balance_updates; consumed_gas}) =
@@ -861,6 +832,13 @@ let pp_manager_operation_contents_result ppf op_result =
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
+    pp_balance_updates ppf balance_updates
+  in
+  let pp_zk_rollup_update_result
+      (Zk_rollup_update_result
+        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+    pp_consumed_gas ppf consumed_gas ;
+    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_balance_updates ppf balance_updates
   in
 
@@ -887,23 +865,20 @@ let pp_manager_operation_contents_result ppf op_result =
     | Tx_rollup_dispatch_tickets_result _ ->
         "transaction rollup tickets dispatch"
     | Transfer_ticket_result _ -> "tickets transfer"
-    | Sc_rollup_originate_result _ -> "smart contract rollup origination"
-    | Sc_rollup_add_messages_result _ ->
-        "smart contract rollup messages submission"
-    | Sc_rollup_cement_result _ -> "smart contract rollup commitment cementing"
-    | Sc_rollup_publish_result _ ->
-        "smart contract rollup commitment publishing"
-    | Sc_rollup_refute_result _ -> "smart contract rollup refutation move"
-    | Sc_rollup_timeout_result _ -> "smart contract rollup refutation timeout"
+    | Sc_rollup_originate_result _ -> "smart rollup origination"
+    | Sc_rollup_add_messages_result _ -> "smart rollup messages submission"
+    | Sc_rollup_cement_result _ -> "smart rollup commitment cementing"
+    | Sc_rollup_publish_result _ -> "smart rollup commitment publishing"
+    | Sc_rollup_refute_result _ -> "smart rollup refutation move"
+    | Sc_rollup_timeout_result _ -> "smart rollup refutation timeout"
     | Sc_rollup_execute_outbox_message_result _ ->
-        "smart contract output message execution"
-    | Sc_rollup_recover_bond_result _ -> "smart contract bond retrieval"
-    | Sc_rollup_dal_slot_subscribe_result _ ->
-        "data availability slot subscription"
+        "smart output message execution"
+    | Sc_rollup_recover_bond_result _ -> "smart rollup bond retrieval"
     | Dal_publish_slot_header_result _ ->
         "data availability slot header publishing"
-    | Zk_rollup_origination_result _ -> "zk rollup originate"
-    | Zk_rollup_publish_result _ -> "zk rollup publish"
+    | Zk_rollup_origination_result _ -> "epoxy originate"
+    | Zk_rollup_publish_result _ -> "epoxy publish"
+    | Zk_rollup_update_result _ -> "epoxy update"
   in
   let pp_manager_operation_contents_result (type kind) ppf
       (result : kind successful_manager_operation_result) =
@@ -943,12 +918,11 @@ let pp_manager_operation_contents_result ppf op_result =
         pp_sc_rollup_execute_outbox_message_result op
     | Sc_rollup_recover_bond_result _ as op ->
         pp_sc_rollup_recover_bond_result op
-    | Sc_rollup_dal_slot_subscribe_result _ as op ->
-        pp_sc_rollup_dal_slot_subscribe_result op
     | Dal_publish_slot_header_result _ as op ->
         pp_dal_publish_slot_header_result op
     | Zk_rollup_origination_result _ as op -> pp_zk_rollup_origination_result op
     | Zk_rollup_publish_result _ as op -> pp_zk_rollup_publish_result op
+    | Zk_rollup_update_result _ as op -> pp_zk_rollup_update_result op
   in
   pp_operation_result
     ~operation_name:manager_operation_name
@@ -999,7 +973,7 @@ let pp_manager_operation_result ppf
   Format.fprintf ppf "@[<v 2>Manager signed operations:" ;
   Format.fprintf ppf "@,From: %a" Signature.Public_key_hash.pp source ;
   Format.fprintf ppf "@,Fee to the baker: %s%a" tez_sym Tez.pp fee ;
-  Format.fprintf ppf "@,Expected counter: %a" Z.pp_print counter ;
+  Format.fprintf ppf "@,Expected counter: %a" Manager_counter.pp counter ;
   Format.fprintf ppf "@,Gas limit: %a" Gas.Arith.pp_integral gas_limit ;
   Format.fprintf ppf "@,Storage limit: %a bytes" Z.pp_print storage_limit ;
   pp_balance_updates ppf balance_updates ;
@@ -1088,10 +1062,10 @@ let pp_contents_and_result :
         Consensus_key.pp
         {delegate; consensus_pkh = consensus_key}
         endorsement_power
-  | Dal_slot_availability _, Dal_slot_availability_result {delegate} ->
+  | Dal_attestation _, Dal_attestation_result {delegate} ->
       Format.fprintf
         ppf
-        "@[<v 2>Slot availability:@,Delegate: %a@]"
+        "@[<v 2>Slot attestation:@,Delegate: %a@]"
         Signature.Public_key_hash.pp
         delegate
   | ( Double_endorsement_evidence {op1; op2},
@@ -1131,7 +1105,7 @@ let pp_contents_and_result :
          Account: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         id
         pp_balance_updates
         bus

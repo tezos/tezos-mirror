@@ -492,7 +492,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     Gas.consume ctxt Unparse_costs.unparse_data_cycle >>?= fun ctxt ->
     let non_terminal_recursion ctxt mode ty a =
       if Compare.Int.(stack_depth > 10_000) then
-        fail Script_tc_errors.Unparsing_too_many_recursive_calls
+        tzfail Script_tc_errors.Unparsing_too_many_recursive_calls
       else unparse_data_rec ctxt ~stack_depth:(stack_depth + 1) mode ty a
     in
     let loc = Micheline.dummy_location in
@@ -695,7 +695,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>?= fun ctxt ->
     let non_terminal_recursion ctxt mode code =
       if Compare.Int.(stack_depth > 10_000) then
-        fail Unparsing_too_many_recursive_calls
+        tzfail Unparsing_too_many_recursive_calls
       else unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) mode code
     in
     match code with

@@ -141,7 +141,7 @@ type t
 
 module Message = Distributed_db_message
 
-module Block_hash_cache : Ringo.CACHE_MAP with type key = Block_hash.t
+module Block_hash_cache : Aches.Vache.MAP with type key = Block_hash.t
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 

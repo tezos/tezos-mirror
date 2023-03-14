@@ -93,7 +93,11 @@ let get_next_baker_by_account pkh block =
   >>=? fun bakers ->
   (match List.hd bakers with
   | Some b -> return b
-  | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
+  | None ->
+      failwith
+        "No slots found for %a"
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        pkh)
   >>=? fun {
              Plugin.RPC.Baking_rights.delegate = pkh;
              consensus_key;
@@ -122,7 +126,7 @@ let get_next_baker_excluding excludes block =
          (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
            not
              (List.mem
-                ~equal:Signature.Public_key_hash.equal
+                ~equal:Tezos_crypto.Signature.V0.Public_key_hash.equal
                 consensus_key
                 excludes))
          bakers
@@ -199,7 +203,7 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Signature.sign
+      Tezos_crypto.Signature.V0.sign
         ~watermark:Block_header.(to_watermark (Block_header Chain_id.zero))
         signer_account.sk
         unsigned_bytes
@@ -445,15 +449,19 @@ let genesis_with_parameters parameters =
   >|=? fun {context; _} ->
   {
     hash;
-    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    header =
+      {
+        shell;
+        protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
+      };
     operations = [];
     context;
   }
 
 let validate_initial_accounts
     (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
-    minimal_stake =
+      (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option)
+      list) minimal_stake =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with minimal_stake to bake" ;
   (* Check there are at least minimal_stake tokens *)
@@ -642,7 +650,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
     (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
+      (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option)
+      list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -683,14 +692,19 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   in
   {
     hash;
-    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    header =
+      {
+        shell;
+        protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
+      };
     operations = [];
     context;
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
     (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
+      (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option)
+      list) =
   prepare_initial_context_params ?min_proposal_quorum initial_accounts
   >>=? fun (constants, shell, _hash) ->
   initial_alpha_context ?commitments constants shell initial_accounts

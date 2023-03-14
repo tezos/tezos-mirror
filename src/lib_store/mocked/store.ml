@@ -74,8 +74,9 @@ and chain_store = {
   (* Genesis is only on-disk: read-only except at creation *)
   genesis_block_data : block Stored_data.t;
   block_watcher : block Lwt_watcher.input;
+  validated_block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
-    (chain_store * block) RPC_directory.t Protocol_hash.Map.t
+    (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
     Protocol_hash.Table.t;
 }
 
@@ -83,13 +84,12 @@ and chain_state = {
   (* Following fields are not safe to update concurrently and must be
      manipulated carefuly: *)
   current_head_data : block_descriptor Stored_data.t;
-  alternate_heads_data : block_descriptor list Stored_data.t;
   cementing_highwatermark_data : int32 option Stored_data.t;
   target_data : block_descriptor option Stored_data.t;
   checkpoint_data : block_descriptor Stored_data.t;
   (* Following fields are safe to update directly *)
   protocol_levels_data :
-    Protocol_levels.activation_block Protocol_levels.t Stored_data.t;
+    Protocol_levels.protocol_info Protocol_levels.t Stored_data.t;
   invalid_blocks_data : invalid_block Block_hash.Map.t Stored_data.t;
   forked_chains_data : Block_hash.t Chain_id.Map.t Stored_data.t;
   (* In memory-only: *)
@@ -100,7 +100,7 @@ and chain_state = {
   live_operations : Operation_hash.Set.t;
   mutable live_data_cache :
     (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
-  prechecked_blocks : Block_repr.t Block_lru_cache.t;
+  validated_blocks : Block_repr.t Block_lru_cache.t;
 }
 
 and testchain = {forked_block : Block_hash.t; testchain_store : chain_store}
@@ -152,6 +152,33 @@ let locked_is_acceptable_block chain_state (hash, level) =
           Lwt.return @@ Block_hash.equal hash target_hash
         else Lwt.return_true
 
+let find_protocol_info chain_store ~protocol_level =
+  let open Lwt_syntax in
+  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
+      let* protocol_levels = Stored_data.get protocol_levels_data in
+      return (Protocol_levels.find protocol_level protocol_levels))
+
+let expect_predecessor_context_hash_exn chain_store protocol_level =
+  let open Lwt_syntax in
+  let* protocol_info = find_protocol_info chain_store ~protocol_level in
+  match protocol_info with
+  | Some {expect_predecessor_context; _} -> return expect_predecessor_context
+  | None ->
+      Format.ksprintf
+        Stdlib.failwith
+        "cannot find protocol info for level: %d"
+        protocol_level
+
+let expect_predecessor_context_hash chain_store ~protocol_level =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let*! b =
+        expect_predecessor_context_hash_exn chain_store protocol_level
+      in
+      return b)
+    (fun _ -> tzfail (Protocol_not_found {protocol_level}))
+
 module Block = struct
   type nonrec block = block
 
@@ -189,14 +216,12 @@ module Block = struct
     Shared.use chain_state (fun chain_state ->
         locked_is_known_invalid chain_state hash)
 
-  let is_known_prechecked {chain_state; _} hash =
-    let open Lwt_syntax in
-    Shared.use chain_state (fun {prechecked_blocks; _} ->
-        match Block_lru_cache.find_opt prechecked_blocks hash with
-        | None -> Lwt.return_false
-        | Some t -> (
-            let* o = t in
-            match o with None -> Lwt.return_false | Some _ -> Lwt.return_true))
+  let is_known_validated {chain_state; _} hash =
+    Shared.use chain_state (fun {validated_blocks; _} ->
+        Option.value ~default:Lwt.return_false
+        @@ Block_lru_cache.bind validated_blocks hash (function
+               | None -> Lwt.return_false
+               | Some _ -> Lwt.return_true))
 
   let is_known chain_store hash =
     let open Lwt_syntax in
@@ -326,15 +351,14 @@ module Block = struct
     let* current_head = current_head chain_store in
     locked_read_block_by_level_opt chain_store current_head level
 
-  let read_prechecked_block_opt {chain_state; _} hash =
-    Shared.use chain_state (fun {prechecked_blocks; _} ->
-        match Block_lru_cache.find_opt prechecked_blocks hash with
-        | None -> Lwt.return_none
-        | Some t -> t)
+  let read_validated_block_opt {chain_state; _} hash =
+    Shared.use chain_state (fun {validated_blocks; _} ->
+        Option.value ~default:Lwt.return_none
+        @@ Block_lru_cache.bind validated_blocks hash Lwt.return)
 
-  let read_prechecked_block chain_store hash =
+  let read_validated_block chain_store hash =
     let open Lwt_result_syntax in
-    let*! o = read_prechecked_block_opt chain_store hash in
+    let*! o = read_validated_block_opt chain_store hash in
     match o with
     | Some b -> return b
     | None -> tzfail (Block_not_found {hash; distance = 0})
@@ -370,7 +394,7 @@ module Block = struct
     let {
       Block_validation.validation_store =
         {
-          context_hash;
+          resulting_context_hash;
           timestamp = _;
           message;
           max_operations_ttl;
@@ -378,6 +402,7 @@ module Block = struct
         };
       block_metadata;
       ops_metadata;
+      shell_header_hash = _;
     } =
       validation_result
     in
@@ -466,12 +491,6 @@ module Block = struct
             known_invalid
             Store_errors.(Cannot_store_block (hash, Invalid_block))
         in
-        let* () =
-          fail_unless
-            (Context_hash.equal block_header.shell.context context_hash)
-            (Validation_errors.Inconsistent_hash
-               (context_hash, block_header.shell.context))
-        in
         let contents =
           {
             Block_repr.header = block_header;
@@ -499,13 +518,18 @@ module Block = struct
             }
         in
         let block = {Block_repr.hash; contents; metadata} in
-        let* () = Block_store.store_block chain_store.block_store block in
+        let* () =
+          Block_store.store_block
+            chain_store.block_store
+            block
+            resulting_context_hash
+        in
         let*! () =
           Store_events.(emit store_block) (hash, block_header.shell.level)
         in
         let*! () =
-          Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
-              Block_lru_cache.remove prechecked_blocks hash ;
+          Shared.use chain_store.chain_state (fun {validated_blocks; _} ->
+              Block_lru_cache.remove validated_blocks hash ;
               Lwt.return_unit)
         in
         Lwt_watcher.notify chain_store.block_watcher block ;
@@ -514,7 +538,7 @@ module Block = struct
           (chain_store, block) ;
         return_some block
 
-  let store_prechecked_block chain_store ~hash ~block_header ~operations =
+  let store_validated_block chain_store ~hash ~block_header ~operations =
     let open Lwt_result_syntax in
     let operations_length = List.length operations in
     let validation_passes = block_header.Block_header.shell.validation_passes in
@@ -540,14 +564,35 @@ module Block = struct
       }
     in
     let*! () =
-      Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
-          Block_lru_cache.replace prechecked_blocks hash (Lwt.return_some block) ;
+      Shared.use chain_store.chain_state (fun {validated_blocks; _} ->
+          Block_lru_cache.put validated_blocks hash (Lwt.return_some block) ;
           Lwt.return_unit)
     in
     let*! () =
-      Store_events.(emit store_prechecked_block) (hash, block_header.shell.level)
+      Store_events.(emit store_validated_block) (hash, block_header.shell.level)
     in
     return_unit
+
+  let resulting_context_hash chain_store block =
+    let open Lwt_result_syntax in
+    let* expect_predecessor_context =
+      expect_predecessor_context_hash
+        chain_store
+        ~protocol_level:(Block_repr.proto_level block)
+    in
+    let hash = Block_repr.hash block in
+    let* resulting_context_hash_opt =
+      Block_store.resulting_context_hash
+        ~expect_predecessor_context
+        chain_store.block_store
+        (Block (hash, 0))
+    in
+    match resulting_context_hash_opt with
+    | None ->
+        tzfail
+          (Resulting_context_hash_not_found
+             {hash; level = Block_repr.level block})
+    | Some resulting_context_hash -> return resulting_context_hash
 
   let context_exn chain_store block =
     let context_index = chain_store.global_store.context_index in
@@ -1068,8 +1113,8 @@ module Chain = struct
           in
           match Protocol_levels.find proto_level protocol_levels with
           | None -> Lwt.return_none
-          | Some {block; _} -> (
-              let block_activation_level = snd block in
+          | Some {activation_block; _} -> (
+              let block_activation_level = snd activation_block in
               (* proto level's lower bound found, now retrieving the upper bound *)
               let head_proto_level =
                 Block_repr.proto_level chain_state.current_head
@@ -1085,8 +1130,8 @@ module Chain = struct
                   Protocol_levels.find (succ proto_level) protocol_levels
                 with
                 | None -> Lwt.return_none
-                | Some {block; _} -> (
-                    let next_activation_level = snd block in
+                | Some {activation_block; _} -> (
+                    let next_activation_level = snd activation_block in
                     let last_level_in_protocol =
                       Int32.(pred next_activation_level)
                     in
@@ -1116,72 +1161,6 @@ module Chain = struct
         in
         Lwt.return_some l
 
-  (* Hypothesis:
-     \forall x. x \in current_head \union alternate_heads | new_head
-     is not a predecessor of x *)
-  let locked_update_and_trim_alternate_heads chain_store chain_state
-      ~new_checkpoint ~new_head =
-    let open Lwt_syntax in
-    let* prev_head_descr = Stored_data.get chain_state.current_head_data in
-    let* prev_alternate_heads =
-      Stored_data.get chain_state.alternate_heads_data
-    in
-    let new_head_descr = Block.descriptor new_head in
-    let* b =
-      is_ancestor chain_store ~head:new_head_descr ~ancestor:prev_head_descr
-    in
-    match b with
-    | true ->
-        (* If the new head is a successor of prev_head, do nothing
-           particular, just trim alternate heads which are anchored
-           below the checkpoint. *)
-        List.filter_s
-          (fun alternate_head ->
-            is_ancestor
-              chain_store
-              ~head:alternate_head
-              ~ancestor:new_checkpoint)
-          prev_alternate_heads
-    | false ->
-        (* If the new head is not a successor of prev_head. *)
-        (* 2 cases:
-           - new_head is a new branch => not a successor of any alternate_heads;
-           - new_head is a successor of a previous alternate head. *)
-        let* filtered_alternate_heads =
-          List.filter_s
-            (fun alternate_head ->
-              let* b =
-                is_ancestor
-                  chain_store
-                  ~head:new_head_descr
-                  ~ancestor:alternate_head
-              in
-              match b with
-              | true ->
-                  (* If the new head is a successor of a former
-                     alternate_head, remove it from the alternate heads,
-                     it will be updated as the current head *)
-                  Lwt.return_false
-              | false ->
-                  (* Only retain alternate_heads that are successor of the
-                     new_checkpoint *)
-                  is_ancestor
-                    chain_store
-                    ~head:alternate_head
-                    ~ancestor:new_checkpoint)
-            prev_alternate_heads
-        in
-        (* Promote prev_head as an alternate head *)
-        Lwt.return (prev_head_descr :: filtered_alternate_heads)
-
-  let locked_is_heads_predecessor chain_store chain_state ~new_head =
-    let open Lwt_syntax in
-    let* current_head_descr = Stored_data.get chain_state.current_head_data in
-    let* alternate_heads = Stored_data.get chain_state.alternate_heads_data in
-    List.exists_p
-      (fun head -> is_ancestor chain_store ~head ~ancestor:new_head)
-      (current_head_descr :: alternate_heads)
-
   let may_update_checkpoint_and_target chain_store ~new_head ~new_head_lafl
       ~checkpoint ~target =
     let open Lwt_result_syntax in
@@ -1209,13 +1188,6 @@ module Chain = struct
     let*! () = Store_events.(emit set_checkpoint) new_checkpoint in
     return_unit
 
-  let write_alternate_heads chain_state new_alternate_heads =
-    let open Lwt_result_syntax in
-    let* () =
-      Stored_data.write chain_state.alternate_heads_data new_alternate_heads
-    in
-    return_unit
-
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
@@ -1233,206 +1205,85 @@ module Chain = struct
             (Invalid_head_switch
                {checkpoint_level = snd checkpoint; given_head = new_head_descr})
         in
-        (* Check that the new_head is not a predecessor of existing heads *)
-        let*! is_heads_predecessor =
-          locked_is_heads_predecessor
+        (* Check that its predecessor exists and has metadata *)
+        let predecessor = Block.predecessor new_head in
+        let* new_head_metadata =
+          trace
+            Bad_head_invariant
+            (let* pred_block = Block.read_block chain_store predecessor in
+             (* check that prededecessor's block metadata are available *)
+             let* _pred_head_metadata =
+               Block.get_block_metadata chain_store pred_block
+             in
+             Block.get_block_metadata chain_store new_head)
+        in
+        let*! target = Stored_data.get chain_state.target_data in
+        let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
+        (* This write call will initialize the cementing
+           highwatermark when it is not yet set or do nothing
+           otherwise. *)
+        let*! lafl_block_opt =
+          Block.locked_read_block_by_level_opt
+            chain_store
+            new_head
+            new_head_lafl
+        in
+        let* new_checkpoint, new_target =
+          match lafl_block_opt with
+          | None ->
+              (* This case may occur when importing a rolling
+                 snapshot where the lafl block is not known.
+                 We may use the checkpoint instead. *)
+              return (checkpoint, target)
+          | Some lafl_block ->
+              may_update_checkpoint_and_target
+                chain_store
+                ~new_head:new_head_descr
+                ~new_head_lafl:(Block.descriptor lafl_block)
+                ~checkpoint
+                ~target
+        in
+        let* () =
+          if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
+            (* Remove potentially outdated invalid blocks if the
+               checkpoint changed *)
+            let* () =
+              Stored_data.update_with
+                chain_state.invalid_blocks_data
+                (fun invalid_blocks ->
+                  Lwt.return
+                    (Block_hash.Map.filter
+                       (fun _k {level; _} -> level > snd new_checkpoint)
+                       invalid_blocks))
+            in
+            write_checkpoint chain_state new_checkpoint
+          else return_unit
+        in
+        (* Update values on disk but not the cementing highwatermark
+           which will be updated by the merge finalizer. *)
+        let* () =
+          Stored_data.write chain_state.current_head_data new_head_descr
+        in
+        let* () = Stored_data.write chain_state.target_data new_target in
+        (* Update live_data *)
+        let*! live_blocks, live_operations =
+          locked_compute_live_blocks
+            ~update_cache:true
             chain_store
             chain_state
-            ~new_head:new_head_descr
+            new_head
+            new_head_metadata
         in
-        if is_heads_predecessor then
-          (* Do not raise an error: this might be caused by
-             intertwined [set_head] calls. *)
-          return (None, None)
-        else
-          (* Check that its predecessor exists and has metadata *)
-          let predecessor = Block.predecessor new_head in
-          let* new_head_metadata =
-            trace
-              Bad_head_invariant
-              (let* pred_block = Block.read_block chain_store predecessor in
-               (* check that prededecessor's block metadata are available *)
-               let* _pred_head_metadata =
-                 Block.get_block_metadata chain_store pred_block
-               in
-               Block.get_block_metadata chain_store new_head)
-          in
-          let*! target = Stored_data.get chain_state.target_data in
-          let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
-          (* This write call will initialize the cementing
-             highwatermark when it is not yet set or do nothing
-             otherwise. *)
-          let*! lafl_block_opt =
-            Block.locked_read_block_by_level_opt
-              chain_store
-              new_head
-              new_head_lafl
-          in
-          let* new_checkpoint, new_target =
-            match lafl_block_opt with
-            | None ->
-                (* This case may occur when importing a rolling
-                   snapshot where the lafl block is not known.
-                   We may use the checkpoint instead. *)
-                return (checkpoint, target)
-            | Some lafl_block ->
-                may_update_checkpoint_and_target
-                  chain_store
-                  ~new_head:new_head_descr
-                  ~new_head_lafl:(Block.descriptor lafl_block)
-                  ~checkpoint
-                  ~target
-          in
-          let*! new_alternate_heads =
-            locked_update_and_trim_alternate_heads
-              chain_store
-              chain_state
-              ~new_checkpoint
-              ~new_head
-          in
-          let* () =
-            if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
-              (* Remove potentially outdated invalid blocks if the
-                 checkpoint changed *)
-              let* () =
-                Stored_data.update_with
-                  chain_state.invalid_blocks_data
-                  (fun invalid_blocks ->
-                    Lwt.return
-                      (Block_hash.Map.filter
-                         (fun _k {level; _} -> level > snd new_checkpoint)
-                         invalid_blocks))
-              in
-              write_checkpoint chain_state new_checkpoint
-            else return_unit
-          in
-          (* Update values on disk but not the cementing highwatermark
-             which will be updated by the merge finalizer. *)
-          let* () =
-            Stored_data.write chain_state.current_head_data new_head_descr
-          in
-          let* () = write_alternate_heads chain_state new_alternate_heads in
-          let* () = Stored_data.write chain_state.target_data new_target in
-          (* Update live_data *)
-          let*! live_blocks, live_operations =
-            locked_compute_live_blocks
-              ~update_cache:true
-              chain_store
-              chain_state
-              new_head
-              new_head_metadata
-          in
-          let new_chain_state =
-            {
-              chain_state with
-              live_blocks;
-              live_operations;
-              current_head = new_head;
-            }
-          in
-          let*! () = Store_events.(emit set_head) new_head_descr in
-          return (Some new_chain_state, Some previous_head))
-
-  let known_heads chain_store =
-    let open Lwt_syntax in
-    Shared.use
-      chain_store.chain_state
-      (fun {current_head_data; alternate_heads_data; _} ->
-        let* current_head_descr = Stored_data.get current_head_data in
-        let* alternate_heads = Stored_data.get alternate_heads_data in
-        Lwt.return (current_head_descr :: alternate_heads))
-
-  (* TODO (later) check if that's ok *)
-  let locked_is_valid_for_checkpoint chain_store chain_state
-      (given_checkpoint_hash, given_checkpoint_level) =
-    let open Lwt_result_syntax in
-    let current_head = chain_state.current_head in
-    let* current_head_metadata =
-      Block.get_block_metadata chain_store current_head
-    in
-    let head_lafl = Block.last_allowed_fork_level current_head_metadata in
-    if Compare.Int32.(given_checkpoint_level <= head_lafl) then
-      (* Cannot set a checkpoint before the current head's last
-         allowed fork level *)
-      return_false
-    else
-      let*! b = Block.is_known_valid chain_store given_checkpoint_hash in
-      match b with
-      | false ->
-          (* Given checkpoint is in the future: valid *)
-          return_true
-      | true -> (
-          let* o =
-            read_ancestor_hash
-              chain_store
-              ~distance:Int32.(to_int (sub given_checkpoint_level head_lafl))
-              given_checkpoint_hash
-          in
-          match o with
-          | None ->
-              (* The last allowed fork level is unknown, thus different from current head's lafl *)
-              return_false
-          | Some ancestor -> (
-              let* o =
-                read_ancestor_hash
-                  chain_store
-                  ~distance:
-                    Int32.(to_int (sub (Block.level current_head) head_lafl))
-                  (Block.hash current_head)
-              in
-              match o with
-              | None -> tzfail Missing_last_allowed_fork_level_block
-              | Some lafl_hash -> return (Block_hash.equal lafl_hash ancestor)))
-
-  let is_valid_for_checkpoint chain_store given_checkpoint =
-    let open Lwt_syntax in
-    Shared.use chain_store.chain_state (fun chain_state ->
-        let* b =
-          Block.locked_is_known_invalid chain_state (fst given_checkpoint)
+        let new_chain_state =
+          {
+            chain_state with
+            live_blocks;
+            live_operations;
+            current_head = new_head;
+          }
         in
-        match b with
-        | true -> return_ok_false
-        | false ->
-            locked_is_valid_for_checkpoint
-              chain_store
-              chain_state
-              given_checkpoint)
-
-  let best_known_head_for_checkpoint chain_store ~checkpoint =
-    let open Lwt_result_syntax in
-    let _, checkpoint_level = checkpoint in
-    let*! current_head = current_head chain_store in
-    let* valid =
-      is_valid_for_checkpoint
-        chain_store
-        (Block.hash current_head, Block.level current_head)
-    in
-    if valid then return current_head
-    else
-      let find_valid_predecessor hash =
-        let* block = Block.read_block chain_store hash in
-        if Compare.Int32.(Block_repr.level block < checkpoint_level) then
-          return block
-        else
-          (* Read the checkpoint's predecessor *)
-          Block.read_block
-            chain_store
-            hash
-            ~distance:
-              (1
-              + (Int32.to_int
-                @@ Int32.sub (Block_repr.level block) checkpoint_level))
-      in
-      let*! heads = known_heads chain_store in
-      let*! genesis = genesis_block chain_store in
-      let best = genesis in
-      List.fold_left_es
-        (fun best (hash, _level) ->
-          let* pred = find_valid_predecessor hash in
-          if Fitness.(Block.fitness pred > Block.fitness best) then return pred
-          else return best)
-        best
-        heads
+        let*! () = Store_events.(emit set_head) new_head_descr in
+        return (Some new_chain_state, previous_head))
 
   let set_target chain_store new_target =
     let open Lwt_result_syntax in
@@ -1456,7 +1307,7 @@ module Chain = struct
               match b with
               | true -> tzfail (Cannot_set_target new_target)
               | false ->
-                  (* unknown block => new_target > all_heads *)
+                  (* unknown block => new_target > current_head *)
                   (* Write future-block as target, [set_head] will
                      update it correctly *)
                   let* () =
@@ -1469,96 +1320,31 @@ module Chain = struct
                 (Cannot_set_target new_target)
                 (* Do not store the target but update the chain data
                    according to the following cases:
-                   1. Target is below known heads: filter heads
-                      for which new_target is not an ancestor;
-                   2. Target is above all heads: filter heads
-                      that are not an ancestor of the new_target;
-                   3. Target has no head as ancestor:
-                      the new_target becomes the head.
-                      (Side-note: I think the last case is ok) *)
+                   1. Target is below current_head;
+                   2. Target has no head as ancestor:
+                      the new_target becomes the head. *)
                 (let*! current_head_descr =
                    Stored_data.get chain_state.current_head_data
                  in
-                 let*! alternate_heads =
-                   Stored_data.get chain_state.alternate_heads_data
+                 let*! is_target_an_ancestor_of_current_head =
+                   is_ancestor
+                     chain_store
+                     ~head:current_head_descr
+                     ~ancestor:new_target
                  in
-                 let all_heads = current_head_descr :: alternate_heads in
-                 let*! filtered_heads =
-                   List.filter_s
-                     (fun block ->
-                       is_ancestor chain_store ~head:block ~ancestor:new_target)
-                     all_heads
-                 in
-                 let find_best_head heads =
-                   assert (heads <> []) ;
-                   let first_alternate_head, alternate_heads =
-                     ( List.hd heads |> WithExceptions.Option.get ~loc:__LOC__,
-                       List.tl heads |> WithExceptions.Option.get ~loc:__LOC__
-                     )
-                   in
-                   let* first_block =
-                     Block.read_block chain_store (fst first_alternate_head)
-                   in
-                   let* best_head =
-                     List.fold_left_es
-                       (fun best alternate_head ->
-                         let* alternate_head =
-                           Block.read_block chain_store (fst alternate_head)
-                         in
-                         if
-                           Fitness.(
-                             Block.fitness best >= Block.fitness alternate_head)
-                         then return best
-                         else return alternate_head)
-                       first_block
-                       alternate_heads
-                   in
-                   return
-                     ( best_head,
-                       List.filter
-                         (fun (hash, _) ->
-                           not (Block_hash.equal (Block.hash best_head) hash))
-                         all_heads )
-                 in
-                 (* Case 1 *)
-                 let* new_current_head, new_alternate_heads, new_checkpoint =
-                   if filtered_heads <> [] then
-                     let* best_alternate_head, alternate_heads =
-                       find_best_head filtered_heads
-                     in
-                     return (best_alternate_head, alternate_heads, new_target)
+                 let* new_current_head, new_checkpoint =
+                   if is_target_an_ancestor_of_current_head then
+                     return (current_head_descr, new_target)
                    else
-                     (* Case 2 *)
-                     let*! filtered_heads =
-                       List.filter_s
-                         (fun block ->
-                           is_ancestor
-                             chain_store
-                             ~head:new_target
-                             ~ancestor:block)
-                         all_heads
+                     let* target_block =
+                       Block.read_block chain_store (fst new_target)
                      in
-                     if filtered_heads <> [] then
-                       let* best_alternate_head, alternate_heads =
-                         find_best_head filtered_heads
-                       in
-                       return (best_alternate_head, alternate_heads, new_target)
-                     else
-                       (* Case 3 *)
-                       let* target_block =
-                         Block.read_block chain_store (fst new_target)
-                       in
-                       return (target_block, [], new_target)
+                     return (Block.descriptor target_block, new_target)
                  in
                  let* () =
                    Stored_data.write
                      chain_state.current_head_data
-                     (Block_repr.descriptor new_current_head)
-                 in
-                 let* () =
-                   Stored_data.write
-                     chain_state.alternate_heads_data
-                     new_alternate_heads
+                     new_current_head
                  in
                  let* () =
                    Stored_data.write chain_state.checkpoint_data new_checkpoint
@@ -1571,8 +1357,7 @@ module Chain = struct
 
   (* Create / Load / Close *)
 
-  let create_chain_state ?target ~genesis_block ~genesis_protocol
-      ~genesis_commit_info chain_dir =
+  let create_chain_state ?target ~genesis_block ~genesis_protocol chain_dir =
     let open Lwt_result_syntax in
     let genesis_proto_level = Block_repr.proto_level genesis_block in
     let ((_, genesis_level) as genesis_descr) =
@@ -1584,6 +1369,12 @@ module Chain = struct
         ~some:(fun metadata -> Block.last_allowed_fork_level metadata)
         (Block_repr.metadata genesis_block)
     in
+    let expect_predecessor_context =
+      (* This depends on the genesis protocol. It should be false but
+         we cannot retrieved registered protocols due to unix
+         dependencies. *)
+      false
+    in
     let* protocol_levels_data =
       Stored_data.init
         (Naming.protocol_levels_file chain_dir)
@@ -1592,9 +1383,9 @@ module Chain = struct
             add
               genesis_proto_level
               {
-                block = genesis_descr;
                 protocol = genesis_protocol;
-                commit_info = genesis_commit_info;
+                activation_block = genesis_descr;
+                expect_predecessor_context;
               }
               empty)
     in
@@ -1602,9 +1393,6 @@ module Chain = struct
       Stored_data.init
         (Naming.current_head_file chain_dir)
         ~initial_data:genesis_descr
-    in
-    let* alternate_heads_data =
-      Stored_data.init (Naming.alternate_heads_file chain_dir) ~initial_data:[]
     in
     let* cementing_highwatermark_data =
       Stored_data.init
@@ -1635,11 +1423,10 @@ module Chain = struct
     let live_blocks = Block_hash.Set.singleton genesis_block.hash in
     let live_operations = Operation_hash.Set.empty in
     let live_data_cache = None in
-    let prechecked_blocks = Block_lru_cache.create 10 in
+    let validated_blocks = Block_lru_cache.create 10 in
     return
       {
         current_head_data;
-        alternate_heads_data;
         cementing_highwatermark_data;
         target_data;
         checkpoint_data;
@@ -1652,26 +1439,8 @@ module Chain = struct
         live_blocks;
         live_operations;
         live_data_cache;
-        prechecked_blocks;
+        validated_blocks;
       }
-
-  let get_commit_info index header =
-    let open Lwt_result_syntax in
-    protect
-      ~on_error:(fun err ->
-        Format.kasprintf
-          (fun e -> tzfail (Missing_commit_info e))
-          "%a"
-          Error_monad.pp_print_trace
-          err)
-      (fun () ->
-        let* tup = Context_ops.retrieve_commit_info index header in
-        return (Protocol_levels.commit_info_of_tuple tup))
-
-  let get_commit_info_opt index header =
-    let open Lwt_syntax in
-    let* r = get_commit_info index header in
-    match r with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none
 
   let create_chain_store ?block_cache_limit global_store chain_dir ?target
       ~chain_id ?(expiration = None) ?genesis_block ~genesis ~genesis_context
@@ -1691,18 +1460,12 @@ module Chain = struct
     let* () =
       Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
     in
-    let*! genesis_commit_info =
-      get_commit_info_opt
-        global_store.context_index
-        (Block.header genesis_block)
-    in
     let* chain_state =
       create_chain_state
         chain_dir
         ?target
         ~genesis_block
         ~genesis_protocol:genesis.Genesis.protocol
-        ~genesis_commit_info
     in
     let* genesis_block_data =
       Stored_data.init
@@ -1711,6 +1474,7 @@ module Chain = struct
     in
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
+    let validated_block_watcher = Lwt_watcher.create_input () in
     let block_rpc_directories = Protocol_hash.Table.create 7 in
     let chain_store : chain_store =
       {
@@ -1722,6 +1486,7 @@ module Chain = struct
         genesis_block_data;
         block_store;
         block_watcher;
+        validated_block_watcher;
         block_rpc_directories;
       }
     in
@@ -1754,21 +1519,13 @@ module Chain = struct
 
   (* Protocols *)
 
-  let compute_commit_info chain_store block =
-    let open Lwt_result_syntax in
-    let index = chain_store.global_store.context_index in
-    protect
-      ~on_error:(fun _ -> return_none)
-      (fun () ->
-        let* commit_info = get_commit_info index block in
-        return_some commit_info)
+  let expect_predecessor_context_hash chain_store ~protocol_level =
+    expect_predecessor_context_hash chain_store ~protocol_level
 
-  let set_protocol_level chain_store ~protocol_level (block, protocol_hash) =
+  let set_protocol_level chain_store ~protocol_level
+      (block, protocol_hash, expect_predecessor_context) =
     let open Lwt_result_syntax in
     Shared.locked_use chain_store.chain_state (fun {protocol_levels_data; _} ->
-        let* commit_info_opt =
-          compute_commit_info chain_store (Block.header block)
-        in
         let* () =
           Stored_data.update_with protocol_levels_data (fun protocol_levels ->
               Lwt.return
@@ -1776,9 +1533,9 @@ module Chain = struct
                   add
                     protocol_level
                     {
-                      block = Block.descriptor block;
                       protocol = protocol_hash;
-                      commit_info = commit_info_opt;
+                      activation_block = Block.descriptor block;
+                      expect_predecessor_context;
                     }
                     protocol_levels))
         in
@@ -1793,21 +1550,25 @@ module Chain = struct
         in
         return_unit)
 
+  let find_protocol_info chain_store ~protocol_level =
+    find_protocol_info chain_store ~protocol_level
+
   let find_activation_block chain_store ~protocol_level =
     let open Lwt_syntax in
-    Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
-        let* protocol_levels = Stored_data.get protocol_levels_data in
-        Lwt.return (Protocol_levels.find protocol_level protocol_levels))
+    let* protocol_info = find_protocol_info chain_store ~protocol_level in
+    match protocol_info with
+    | Some {activation_block; _} -> return_some activation_block
+    | None -> return_none
 
   let find_protocol chain_store ~protocol_level =
     let open Lwt_syntax in
-    let* o = find_activation_block chain_store ~protocol_level in
-    match o with
-    | None -> Lwt.return_none
-    | Some {Protocol_levels.protocol; _} -> Lwt.return_some protocol
+    let* protocol_info = find_protocol_info chain_store ~protocol_level in
+    match protocol_info with
+    | Some {protocol; _} -> return_some protocol
+    | None -> return_none
 
   let may_update_protocol_level chain_store ?pred ?protocol_level
-      (block, protocol_hash) =
+      ~expect_predecessor_context (block, protocol_hash) =
     let open Lwt_result_syntax in
     let* pred =
       match pred with
@@ -1821,25 +1582,62 @@ module Chain = struct
     if Compare.Int.(prev_proto_level < protocol_level) then
       let*! o = find_activation_block chain_store ~protocol_level in
       match o with
-      | Some {block = bh, _; _} ->
+      | Some (bh, _) ->
           if Block_hash.(bh <> Block.hash block) then
-            set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+            set_protocol_level
+              chain_store
+              ~protocol_level
+              (block, protocol_hash, expect_predecessor_context)
           else return_unit
       | None ->
-          set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+          set_protocol_level
+            chain_store
+            ~protocol_level
+            (block, protocol_hash, expect_predecessor_context)
     else return_unit
 
   let may_update_ancestor_protocol_level chain_store ~head =
     let open Lwt_result_syntax in
     let head_proto_level = Block.proto_level head in
-    let*! o =
-      find_activation_block chain_store ~protocol_level:head_proto_level
-    in
+    let*! o = find_protocol_info chain_store ~protocol_level:head_proto_level in
     match o with
-    | None -> return_unit
-    | Some {block; protocol; _} -> (
+    | None ->
+        (* If no activation block is registered for a given protocol
+           level, we search for the activation block. This activation
+           block is expected to be found above the savepoint. If not,
+           the savepoint will be considered as the activation
+           block. *)
         let*! _, savepoint_level = savepoint chain_store in
-        if Compare.Int32.(savepoint_level > snd block) then
+        let rec find_activation_block lower_bound block =
+          let*! pred = Block.read_predecessor_opt chain_store block in
+          match pred with
+          | None -> return block
+          | Some pred ->
+              let pred_proto_level = Block.proto_level pred in
+              if Compare.Int.(pred_proto_level <= Int.pred head_proto_level)
+              then return block
+              else if Compare.Int32.(Block.level pred <= lower_bound) then
+                return pred
+              else find_activation_block lower_bound pred
+        in
+        let* activation_block = find_activation_block savepoint_level head in
+        let protocol_level = Block.proto_level head in
+        (* The head must have an associated context stored. *)
+        let* context = Block.context chain_store head in
+        let*! activated_protocol = Context_ops.get_protocol context in
+        (* This depends on the protocol but registered protocols
+           cannot be retrieved due to unix dependencies. *)
+        let expected_predecessor_context = true in
+        set_protocol_level
+          chain_store
+          ~protocol_level
+          (activation_block, activated_protocol, expected_predecessor_context)
+    | Some
+        {Protocol_levels.protocol; activation_block; expect_predecessor_context}
+      -> (
+        let*! _, savepoint_level = savepoint chain_store in
+        let activation_block_level = snd activation_block in
+        if Compare.Int32.(savepoint_level > activation_block_level) then
           (* the block is too far in the past *)
           return_unit
         else
@@ -1847,13 +1645,13 @@ module Chain = struct
             is_ancestor
               chain_store
               ~head:(Block.descriptor head)
-              ~ancestor:block
+              ~ancestor:activation_block
           in
           match b with
           | true -> (* nothing to do *) return_unit
           | false -> (
               let distance =
-                Int32.(sub (Block.level head) (snd block) |> to_int)
+                Int32.(sub (Block.level head) activation_block_level |> to_int)
               in
               let*! o =
                 Block.read_block_opt chain_store ~distance (Block.hash head)
@@ -1861,11 +1659,17 @@ module Chain = struct
               match o with
               | None -> return_unit
               | Some ancestor ->
-                  may_update_protocol_level chain_store (ancestor, protocol)))
+                  may_update_protocol_level
+                    chain_store
+                    ~expect_predecessor_context
+                    (ancestor, protocol)))
 
   let all_protocol_levels chain_store =
     Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
         Stored_data.get protocol_levels_data)
+
+  let validated_watcher chain_store =
+    Lwt_watcher.create_stream chain_store.validated_block_watcher
 
   let watcher chain_store = Lwt_watcher.create_stream chain_store.block_watcher
 
@@ -1881,7 +1685,7 @@ module Chain = struct
         let* protocol =
           if Compare.Int32.(Block.level pred < save_point_level) then
             let* o =
-              find_activation_block
+              find_protocol_info
                 chain_store
                 ~protocol_level:(Block.proto_level pred)
             in
@@ -1915,6 +1719,10 @@ module Chain = struct
   (* Not implemented as both the store and context garbage collection
      are disabled in the mockup mode.*)
   let register_gc_callback _ _ = ()
+
+  (* Not implemented as both the store and context garbage collection
+     are disabled in the mockup mode.*)
+  let register_split_callback _ _ = ()
 end
 
 module Protocol = struct
@@ -2117,7 +1925,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
     Data_encoding.Json.construct chain_config_encoding chain_config
   in
   let* ( current_head,
-         alternate_heads,
          cementing_highwatermark,
          target,
          checkpoint,
@@ -2131,7 +1938,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
       (fun
         {
           current_head;
-          alternate_heads_data;
           cementing_highwatermark_data;
           target_data;
           checkpoint_data;
@@ -2142,7 +1948,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
           _;
         }
       ->
-        let* alternate_heads = Stored_data.get alternate_heads_data in
         let* cementing_highwatermark =
           Stored_data.get cementing_highwatermark_data
         in
@@ -2154,7 +1959,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
         let* caboose = Block_store.caboose block_store in
         Lwt.return
           ( current_head,
-            alternate_heads,
             cementing_highwatermark,
             target,
             checkpoint,
@@ -2164,18 +1968,16 @@ let rec make_pp_chain_store (chain_store : chain_store) =
             forked_chains,
             active_testchain ))
   in
-  let pp_protocol_level fmt
-      (proto_level, {Protocol_levels.block; protocol; commit_info}) =
+  let pp_proto_info fmt
+      (proto_level, {Protocol_levels.protocol; activation_block; _}) =
     Format.fprintf
       fmt
-      "proto level: %d, transition block: %a, protocol: %a, commit info: %a"
+      "proto level: %d, transition block: %a, protocol: %a"
       proto_level
       pp_block_descriptor
-      block
+      activation_block
       Protocol_hash.pp
       protocol
-      (option_pp ~default:"n/a" (fun fmt _ -> Format.fprintf fmt "available"))
-      commit_info
   in
   let make_pp_test_chain_opt = function
     | None -> Lwt.return (fun fmt () -> Format.fprintf fmt "n/a")
@@ -2188,10 +1990,9 @@ let rec make_pp_chain_store (chain_store : chain_store) =
       Format.fprintf
         fmt
         "@[<v 2>chain id: %a@ chain directory: %s@ chain config: %a@ current \
-         head: %a@ @[<v 2>alternate heads:@ %a@]@ checkpoint: %a@ cementing \
-         highwatermark: %a@ caboose: %a@ target: %a@ @[<v 2>protocol levels:@ \
-         %a@]@ @[<v 2>invalid blocks:@ %a@]@ @[<v 2>forked chains:@ %a@]@ @[<v \
-         2>active testchain: %a@]@]"
+         head: %a@ checkpoint: %a@ cementing highwatermark: %a@ caboose: %a@ \
+         target: %a@ @[<v 2>protocol levels:@ %a@]@ @[<v 2>invalid blocks:@ \
+         %a@]@ @[<v 2>forked chains:@ %a@]@ @[<v 2>active testchain: %a@]@]"
         Chain_id.pp
         chain_id
         (Naming.dir_path chain_dir)
@@ -2209,8 +2010,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
             (Block.last_allowed_fork_level metadata)
             (Block.max_operations_ttl metadata))
         current_head
-        (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_block_descriptor)
-        alternate_heads
         pp_block_descriptor
         checkpoint
         (fun fmt opt ->
@@ -2224,7 +2023,7 @@ let rec make_pp_chain_store (chain_store : chain_store) =
         caboose
         (option_pp ~default:"n/a" pp_block_descriptor)
         target
-        (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_protocol_level)
+        (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_proto_info)
         (Protocol_levels.bindings protocol_levels_data)
         (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
         (Block_hash.Map.bindings invalid_blocks_data |> List.map fst)
@@ -2264,3 +2063,5 @@ module Unsafe = struct
 
   let block_of_repr = Fun.id
 end
+
+let v_3_0_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit

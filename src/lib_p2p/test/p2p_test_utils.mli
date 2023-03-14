@@ -74,13 +74,14 @@ val addr : Ipaddr.V6.t ref
 
 val canceler : Lwt_canceler.t
 
-val proof_of_work_target : Crypto_box.pow_target
+val proof_of_work_target : Tezos_crypto.Crypto_box.pow_target
 
 val id1 : P2p_identity.t Lwt.t
 
 val id2 : P2p_identity.t Lwt.t
 
 val run_nodes :
+  ?port:int ->
   ((unit, unit) Process.Channel.t ->
   P2p_io_scheduler.t ->
   Ipaddr.V6.t ->
@@ -102,7 +103,7 @@ val raw_accept :
 
 val accept :
   ?id:P2p_identity.t Lwt.t ->
-  ?proof_of_work_target:Crypto_box.pow_target ->
+  ?proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->
   P2p_io_scheduler.t ->
   Lwt_unix.file_descr ->
   ( unit P2p_connection.Info.t * unit P2p_socket.authenticated_connection,
@@ -120,7 +121,7 @@ val raw_connect :
   Lwt.t
 
 val connect :
-  ?proof_of_work_target:Crypto_box.pow_target ->
+  ?proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->
   P2p_io_scheduler.t ->
   P2p_addr.t ->
   int ->

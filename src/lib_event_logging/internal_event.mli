@@ -122,7 +122,7 @@ module type EVENT_DEFINITION = sig
   val encoding : t Data_encoding.t
 
   (** Return the preferred {!level} for a given event instance. *)
-  val level : t -> level
+  val level : level
 end
 
 (** Events created with {!Make} provide the {!EVENT} API. *)
@@ -131,7 +131,7 @@ module type EVENT = sig
 
   (** Output an event of type {!t}, if no sinks are listening the
       function won't be applied. *)
-  val emit : ?section:Section.t -> (unit -> t) -> unit tzresult Lwt.t
+  val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
 end
 
 (** Build an event from an event-definition. *)
@@ -418,14 +418,14 @@ module type SINK = sig
       {!uri_scheme}). *)
   val configure : Uri.t -> t tzresult Lwt.t
 
+  (** Predicate deciding whether a sink should handle the event or
+      not. *)
+  val should_handle : ?section:Section.t -> t -> _ event_definition -> bool
+
   (** A sink's main function is to {!handle} incoming events from the
       code base. *)
   val handle :
-    t ->
-    'a event_definition ->
-    ?section:Section.t ->
-    (unit -> 'a) ->
-    unit tzresult Lwt.t
+    t -> 'a event_definition -> ?section:Section.t -> 'a -> unit tzresult Lwt.t
 
   (** A function to be called on graceful termination of processes
       (e.g. to flush file-descriptors, etc.). *)
@@ -457,58 +457,21 @@ end
 
 (** {3 Common Event Definitions } *)
 
-(** {!Error_event.t} is a generic event to emit values of type
-    {!Error_monad.error list}. *)
-module Error_event : sig
-  (** Errors mainly store {!Error_monad.error list} values. One can
-      attach a message and a severity (the default is [`Recoverable]
-      which corresponds to the {!Error} {!level}, while [`Fatal]
-      corresponds to {!Fatal}). *)
-  type t = {
-    message : string option;
-    severity : [`Fatal | `Recoverable];
-    trace : Error_monad.error list;
-  }
-
-  val make :
-    ?message:string ->
-    ?severity:[`Fatal | `Recoverable] ->
-    Error_monad.error list ->
-    unit ->
-    t
-
-  include EVENT with type t := t
-
-  (** [log_error_and_recover f] calls [f ()] and emits an {!Error_event.t}
-        event if it results in an error. It then continues in the [_ Lwt.t]
-        monad (e.g. there is no call to [Lwt.fail]). *)
-  val log_error_and_recover :
-    ?section:Section.t ->
-    ?message:string ->
-    ?severity:[`Fatal | `Recoverable] ->
-    (unit -> (unit, error list) result Lwt.t) ->
-    unit Lwt.t
-end
-
 (** The debug-event is meant for emitting (temporarily)
     semi-structured data in the event stream. *)
 module Debug_event : sig
   type t = {message : string; attachment : Data_encoding.Json.t}
 
-  val make : ?attach:Data_encoding.Json.t -> string -> unit -> t
+  val make : ?attach:Data_encoding.Json.t -> string -> t
 
   include EVENT with type t := t
 end
 
-(** The worker event is meant for use with {!Lwt_utils.worker}. *)
-module Lwt_worker_event : sig
-  type t = {name : string; event : [`Ended | `Failed of string | `Started]}
-
-  include EVENT with type t := t
-
-  (** [on_event msg status] emits an event of type [t] and matches
-        the signature required by {!Lwt_utils.worker}.  *)
-  val on_event : string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t
+(** The worker logger is meant for use with {!Lwt_utils.worker}. *)
+module Lwt_worker_logger : sig
+  (** [on_event status] emits an event of type [t] and matches
+      the signature required by {!Lwt_utils.worker}. *)
+  val on_event : string -> [`Started | `Ended | `Failed of string] -> unit Lwt.t
 end
 
 (** {3 Compatibility With Legacy Logging } *)
@@ -518,7 +481,11 @@ end
     into the event-logging framework.
     {b Please do not use for new modules.} *)
 module Legacy_logging : sig
-  module type LOG = sig
+  module Make : functor
+    (_ : sig
+       val name : string
+     end)
+    -> sig
     val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
     val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -542,67 +509,6 @@ module Legacy_logging : sig
     val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
     val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-  end
-
-  open Tezos_stdlib
-
-  type ('a, 'b) msgf =
-    (('a, Format.formatter, unit, 'b) format4 -> ?tags:Tag.set -> 'a) ->
-    ?tags:Tag.set ->
-    'b
-
-  type ('a, 'b) log = ('a, 'b) msgf -> 'b
-
-  module type SEMLOG = sig
-    module Tag = Tag
-
-    val debug : ('a, unit) log
-
-    val log_info : ('a, unit) log
-
-    val log_notice : ('a, unit) log
-
-    val warn : ('a, unit) log
-
-    val log_error : ('a, unit) log
-
-    val fatal_error : ('a, unit) log
-
-    val lwt_debug : ('a, unit Lwt.t) log
-
-    val lwt_log_info : ('a, unit Lwt.t) log
-
-    val lwt_log_notice : ('a, unit Lwt.t) log
-
-    val lwt_warn : ('a, unit Lwt.t) log
-
-    val lwt_log_error : ('a, unit Lwt.t) log
-
-    val lwt_fatal_error : ('a, unit Lwt.t) log
-
-    val event : string Tag.def
-
-    val exn : exn Tag.def
-  end
-
-  module Make : functor
-    (_ : sig
-       val name : string
-     end)
-    -> sig
-    module Event : EVENT
-
-    include LOG
-  end
-
-  module Make_semantic : functor
-    (_ : sig
-       val name : string
-     end)
-    -> sig
-    module Event : EVENT
-
-    include SEMLOG
   end
 end
 

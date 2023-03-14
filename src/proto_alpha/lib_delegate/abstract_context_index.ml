@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 type t = {
+  sync_fun : unit -> unit Lwt.t;
   checkout_fun :
     Context_hash.t -> Tezos_protocol_environment.Context.t option Lwt.t;
   finalize_fun : unit -> unit Lwt.t;
@@ -31,6 +32,7 @@ type t = {
 
 let abstract index =
   {
+    sync_fun = (fun () -> Context.sync index);
     checkout_fun = Shell_context.checkout index;
     finalize_fun = (fun () -> Context.close index);
   }

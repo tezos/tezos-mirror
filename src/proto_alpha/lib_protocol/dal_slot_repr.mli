@@ -23,6 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** To verify the proof of a page membership in its associated slot, the
+     Cryptobox module needs the following Dal parameters. These are part of the
+     protocol's parameters. See {!Default_parameters.default_dal}. *)
+type parameters = Dal.parameters = {
+  redundancy_factor : int;
+  page_size : int;
+  slot_size : int;
+  number_of_shards : int;
+}
+
+(** An encoding for values of type {!parameters}. *)
+val parameters_encoding : parameters Data_encoding.t
+
 (** Slot header representation for the data-availability layer.
 
     {1 Overview}
@@ -34,7 +47,7 @@
     The purpose of the data-availability layer is to increase the
    bandwidth of the layer 1 thanks to the distribution of "slots". A
    slot is never posted directly onto the layer 1 blocks but on the
-   data-availability layer. The producer of a slot sill has to post a
+   data-availability layer. The producer of a slot still has to post a
    slot header onto the layer 1. A slot header is an abstract datatype
    certifying that the corresponding slot has some maximum size
    (provided by the layer 1). In other words, the whole data contained
@@ -57,47 +70,45 @@ module Commitment : sig
   val zero : t
 end
 
-(** An `Index.t` is a possible value for a slot index. We assume this value
-    to be a positive 8-bit integer. Note that this is a hard constraint,
-    which is independent of protocol constants. If a choice is ever made to
-    increase the size of available slots in the protocol, we also need
-    to change this module to accommodate for higher values.
-*)
-module Index : sig
-  type t
+module Commitment_proof : sig
+  (** A slot commitment proof is provided via the environment. *)
+  type t = Dal.commitment_proof
 
   val encoding : t Data_encoding.t
 
-  val pp : Format.formatter -> t -> unit
-
+  (** A dummy value for a commitment proof. *)
   val zero : t
-
-  val max_value : t
-
-  (** [of_int n] constructs a`Slot_index.t` *)
-  val of_int : int -> t option
-
-  val to_int : t -> int
-
-  val compare : t -> t -> int
-
-  val equal : t -> t -> bool
 end
 
 module Header : sig
-  (** For Layer-1, a slot is described by the level at which it is published,
-    the slot's index (in the list of slots), and the slot's header
-    (KATE commitment hash). *)
-  type id = {published_level : Raw_level_repr.t; index : Index.t}
+  (** For Layer-1, a slot is identified by the level at which it is published
+      and the slot's index. *)
+  type id = {published_level : Raw_level_repr.t; index : Dal_slot_index_repr.t}
 
+  (** For Layer-1, a slot is described by its slot {!id} and the
+     slot's commitment. *)
   type t = {id : id; commitment : Commitment.t}
 
-  (** The encoding ensures the slot is always a non-negative number. *)
+  (** encoding for values of type {!id}. *)
+  val id_encoding : id Data_encoding.t
+
+  (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
 
+  (** pretty-printer for values of type {!id}. *)
+  val pp_id : Format.formatter -> id -> unit
+
+  (** pretty-printer for values of type {!t}. *)
   val pp : Format.formatter -> t -> unit
 
+  (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
+
+  (** [verify_commitment cryptobox commitment commitment_proof] check
+     that for the given commitment, the commitment proof is correct
+     using the [cryptbox] primitives. *)
+  val verify_commitment :
+    Dal.t -> Commitment.t -> Commitment_proof.t -> bool tzresult
 end
 
 (** A DAL slot is decomposed to a successive list of pages with fixed content
@@ -107,7 +118,9 @@ end
 module Page : sig
   type content = Bytes.t
 
-  type slot_index = Index.t
+  type slot_index = Dal_slot_index_repr.t
+
+  val pages_per_slot : Dal.parameters -> int
 
   module Index : sig
     type t = int
@@ -126,18 +139,22 @@ module Page : sig
   (** Encoding for page contents. *)
   val content_encoding : content Data_encoding.t
 
-  (** A page is identified by its slot id and by its own index in the list
+  (** A page is identified by its slot ID and by its own index in the list
      of pages of the slot. *)
   type t = {slot_id : Header.id; page_index : Index.t}
 
   type proof = Dal.page_proof
 
+  (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
 
+  (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
 
+  (** encoding for values of type {!proof}. *)
   val proof_encoding : proof Data_encoding.t
 
+  (** pretty-printer for values of type {!t}. *)
   val pp : Format.formatter -> t -> unit
 end
 
@@ -171,27 +188,38 @@ module Slot_market : sig
   val candidates : t -> Header.t list
 end
 
-(** This module provides an abstract data structure (type {!t}) that represents a
-    skip list used to store successive DAL slots confirmed on L1. There is one
-    slot per cell in the skip list. The slots are sorted in increasing order by
-    level, and by slot index, for the slots of the same level.
+(** This module provides an abstract data structure (type {!t}) that represents
+    a skip list used to store successive DAL slots confirmed/attested on
+    L1. There is one slot per cell in the skip list. The slots are sorted in
+    increasing order by level, and by slot index, for the slots of the same
+    level.
 
     This module also defines a bounded history cache (type {History_cache.t})
     that allows to remember recent values of a skip list of type {!t}
     (indexed by the skip lists' hashes). This structure is meant to be
     maintained and used by the rollup node to produce refutation proofs
     involving DAL slot inputs.
+
+    Note on terminology: "confirmed slot" is another name for "attested slot".
 *)
 module History : sig
   (** Abstract representation of a skip list specialized for
        confirmed slot headers. *)
   type t
 
+  module Pointer_hash : S.HASH
+
+  (** Type of hashes of history. *)
+  type hash = Pointer_hash.t
+
   (** Encoding of the datatype. *)
   val encoding : t Data_encoding.t
 
   (** First cell of this skip list. *)
   val genesis : t
+
+  (** Returns the hash of an history. *)
+  val hash : t -> hash
 
   (** The [History_cache.t] structure is basically a bounded lookup table of
       {!t} skip lists. (See {!Bounded_history_repr.S}). In the L1 layer, the
@@ -200,7 +228,8 @@ module History : sig
       to participate in all potential refutation games occurring during the
       challenge period. Indeed, the successive recent skip-lists stored in
       the cache are needed to produce proofs involving slots' pages. *)
-  module History_cache : Bounded_history_repr.S
+  module History_cache :
+    Bounded_history_repr.S with type key = hash and type value = t
 
   (** [add_confirmed_slots hist cache slot_headers] updates the given structure
       [hist] with the list of [slot_headers]. The given [cache] is also updated to
@@ -239,23 +268,12 @@ module History : sig
   (** Encoding for {!proof}. *)
   val proof_encoding : proof Data_encoding.t
 
-  (** Pretty-printer for {!proof}. *)
-  val pp_proof : Format.formatter -> proof -> unit
+  (** Pretty-printer for {!proof}. If [serialized] is [false] it will print
+      the abstracted proof representation, otherwise if it's [true] it will
+      print the serialized version of the proof (i.e. a sequence of bytes). *)
+  val pp_proof : serialized:bool -> Format.formatter -> proof -> unit
 
-  (** To verify the proof of a page membership in its associated slot, the
-     Cryptobox module needs the following Dal parameters. These are part of the
-     protocol's parameters. See {!Default_parameters.default_dal}. *)
-  type dal_parameters = Dal.parameters = {
-    redundancy_factor : int;
-    page_size : int;
-    slot_size : int;
-    number_of_shards : int;
-  }
-
-  (** An encoding for values of type {!dal_parameters}. *)
-  val dal_parameters_encoding : dal_parameters Data_encoding.t
-
-  (** [produce_proof dal_parameters page_id page_info slots_hist hist_cache]
+  (** [produce_proof dal_parameters page_id page_info ~get_history slots_hist]
       produces a proof that either:
       - there exists a confirmed slot in the skip list that contains
         the page identified by [page_id] whose data and slot inclusion proof
@@ -273,11 +291,11 @@ module History : sig
       the candidate slot (if any).
   *)
   val produce_proof :
-    dal_parameters ->
+    parameters ->
     Page.t ->
     page_info:(Page.content * Page.proof) option ->
+    get_history:(hash -> t option Lwt.t) ->
     t ->
-    History_cache.t ->
     (proof * Page.content option) tzresult Lwt.t
 
   (** [verify_proof dal_params page_id snapshot proof] verifies that the given
@@ -291,15 +309,21 @@ module History : sig
       the candidate slot (if any).
   *)
   val verify_proof :
-    dal_parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
+    parameters -> Page.t -> t -> proof -> Page.content option tzresult
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 
-  type error += Dal_proof_error of string
+  type error +=
+    | Dal_proof_error of string
+    | Unexpected_page_size of {expected_size : int; page_size : int}
 
   module Internal_for_tests : sig
     val content : t -> Header.t
 
+    (** [proof_statement_is serialized_proof expected] will return [true] if
+        the deserialized proof and the [expected] proof shape match and [false]
+        otherwise.
+        Note that it will also return [false] if deserialization fails.  *)
     val proof_statement_is : proof -> [`Confirmed | `Unconfirmed] -> bool
   end
 end

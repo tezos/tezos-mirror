@@ -98,6 +98,13 @@ let require b s pos msg = if not b then error s pos msg
 let guard f s =
   try f s with EOS -> error s (len s) "unexpected end of section or function"
 
+let guard_float ~allow_floats f s =
+  if allow_floats then f s
+  else
+    Floating_point.error
+      (region s (pos s) (pos s))
+      "float instructions are forbidden"
+
 let get = guard get
 
 let get_string n = guard (get_string n)
@@ -294,14 +301,14 @@ let byte_vector_step vecs s =
 
 open Types
 
-let num_type s =
+let num_type ~allow_floats s =
   let open Lwt.Syntax in
   let+ x = vs7 s in
   match x with
   | -0x01 -> I32Type
   | -0x02 -> I64Type
-  | -0x03 -> F32Type
-  | -0x04 -> F64Type
+  | -0x03 -> guard_float ~allow_floats (fun _ -> F32Type) s
+  | -0x04 -> guard_float ~allow_floats (fun _ -> F64Type) s
   | _ -> error s (pos s - 1) "malformed number type"
 
 let vec_type s =
@@ -319,12 +326,12 @@ let ref_type s =
   | -0x11 -> ExternRefType
   | _ -> error s (pos s - 1) "malformed reference type"
 
-let value_type s =
+let value_type ~allow_floats s =
   let open Lwt.Syntax in
   let* x = peek s in
   match x with
   | Some n when n >= -0x04 land 0x7f ->
-      let+ x = num_type s in
+      let+ x = num_type ~allow_floats s in
       NumType x
   | Some n when n >= -0x0f land 0x7f ->
       let+ x = vec_type s in
@@ -359,9 +366,9 @@ let mutability s =
   | 1 -> Mutable
   | _ -> error s (pos s - 1) "malformed mutability"
 
-let global_type s =
+let global_type ~allow_floats s =
   let open Lwt.Syntax in
-  let* t = value_type s in
+  let* t = value_type ~allow_floats s in
   let+ mut = mutability s in
   GlobalType (t, mut)
 
@@ -385,7 +392,7 @@ let memop s =
   let+ offset = vu32 s in
   (Int32.to_int align, offset)
 
-let block_type s =
+let block_type ~allow_floats s =
   let open Lwt.Syntax in
   let* x = peek s in
   match x with
@@ -393,7 +400,7 @@ let block_type s =
       skip 1 s ;
       Lwt.return @@ ValBlockType None
   | Some b when b land 0xc0 = 0x40 ->
-      let+ x = value_type s in
+      let+ x = value_type ~allow_floats s in
       ValBlockType (Some x)
   | _ ->
       let+ x = at vs33 s in
@@ -444,8 +451,10 @@ type instr_block_kont =
   | IKIf1 of block_type * int  (** If parsing step. *)
   | IKIf2 of block_type * int * block_label  (** If .. else parsing step. *)
 
-let instr s pos tag =
+let instr ~allow_floats s pos tag =
   let open Lwt.Syntax in
+  let return_float_f f = guard_float ~allow_floats f s in
+  let return_float v = guard_float ~allow_floats (fun _ -> Lwt.return v) s in
   match tag with
   (* These tags corresponds to resp. block, loop and if, and are now handled
      directly by the main step loop (see `IKBlock`, `IKLoop` and `IKIf1`. *)
@@ -478,7 +487,7 @@ let instr s pos tag =
   | 0x1a -> Lwt.return drop
   | 0x1b -> Lwt.return @@ select None
   | 0x1c ->
-      let+ x = vec value_type s in
+      let+ x = vec (value_type ~allow_floats) s in
       select (Some x)
   | (0x1d | 0x1e | 0x1f) as b -> illegal s pos b
   | 0x20 ->
@@ -510,9 +519,11 @@ let instr s pos tag =
       let+ a, o = memop s in
       i64_load a o
   | 0x2a ->
+      return_float_f @@ fun s ->
       let+ a, o = memop s in
       f32_load a o
   | 0x2b ->
+      return_float_f @@ fun s ->
       let+ a, o = memop s in
       f64_load a o
   | 0x2c ->
@@ -552,9 +563,11 @@ let instr s pos tag =
       let+ a, o = memop s in
       i64_store a o
   | 0x38 ->
+      return_float_f @@ fun s ->
       let+ a, o = memop s in
       f32_store a o
   | 0x39 ->
+      return_float_f @@ fun s ->
       let+ a, o = memop s in
       f64_store a o
   | 0x3a ->
@@ -585,9 +598,11 @@ let instr s pos tag =
       let+ x = at vs64 s in
       i64_const x
   | 0x43 ->
+      return_float_f @@ fun s ->
       let+ x = at f32 s in
       f32_const x
   | 0x44 ->
+      return_float_f @@ fun s ->
       let+ x = at f64 s in
       f64_const x
   | 0x45 -> Lwt.return i32_eqz
@@ -612,18 +627,18 @@ let instr s pos tag =
   | 0x58 -> Lwt.return i64_le_u
   | 0x59 -> Lwt.return i64_ge_s
   | 0x5a -> Lwt.return i64_ge_u
-  | 0x5b -> Lwt.return f32_eq
-  | 0x5c -> Lwt.return f32_ne
-  | 0x5d -> Lwt.return f32_lt
-  | 0x5e -> Lwt.return f32_gt
-  | 0x5f -> Lwt.return f32_le
-  | 0x60 -> Lwt.return f32_ge
-  | 0x61 -> Lwt.return f64_eq
-  | 0x62 -> Lwt.return f64_ne
-  | 0x63 -> Lwt.return f64_lt
-  | 0x64 -> Lwt.return f64_gt
-  | 0x65 -> Lwt.return f64_le
-  | 0x66 -> Lwt.return f64_ge
+  | 0x5b -> return_float f32_eq
+  | 0x5c -> return_float f32_ne
+  | 0x5d -> return_float f32_lt
+  | 0x5e -> return_float f32_gt
+  | 0x5f -> return_float f32_le
+  | 0x60 -> return_float f32_ge
+  | 0x61 -> return_float f64_eq
+  | 0x62 -> return_float f64_ne
+  | 0x63 -> return_float f64_lt
+  | 0x64 -> return_float f64_gt
+  | 0x65 -> return_float f64_le
+  | 0x66 -> return_float f64_ge
   | 0x67 -> Lwt.return i32_clz
   | 0x68 -> Lwt.return i32_ctz
   | 0x69 -> Lwt.return i32_popcnt
@@ -660,34 +675,34 @@ let instr s pos tag =
   | 0x88 -> Lwt.return i64_shr_u
   | 0x89 -> Lwt.return i64_rotl
   | 0x8a -> Lwt.return i64_rotr
-  | 0x8b -> Lwt.return f32_abs
-  | 0x8c -> Lwt.return f32_neg
-  | 0x8d -> Lwt.return f32_ceil
-  | 0x8e -> Lwt.return f32_floor
-  | 0x8f -> Lwt.return f32_trunc
-  | 0x90 -> Lwt.return f32_nearest
-  | 0x91 -> Lwt.return f32_sqrt
-  | 0x92 -> Lwt.return f32_add
-  | 0x93 -> Lwt.return f32_sub
-  | 0x94 -> Lwt.return f32_mul
-  | 0x95 -> Lwt.return f32_div
-  | 0x96 -> Lwt.return f32_min
-  | 0x97 -> Lwt.return f32_max
-  | 0x98 -> Lwt.return f32_copysign
-  | 0x99 -> Lwt.return f64_abs
-  | 0x9a -> Lwt.return f64_neg
-  | 0x9b -> Lwt.return f64_ceil
-  | 0x9c -> Lwt.return f64_floor
-  | 0x9d -> Lwt.return f64_trunc
-  | 0x9e -> Lwt.return f64_nearest
-  | 0x9f -> Lwt.return f64_sqrt
-  | 0xa0 -> Lwt.return f64_add
-  | 0xa1 -> Lwt.return f64_sub
-  | 0xa2 -> Lwt.return f64_mul
-  | 0xa3 -> Lwt.return f64_div
-  | 0xa4 -> Lwt.return f64_min
-  | 0xa5 -> Lwt.return f64_max
-  | 0xa6 -> Lwt.return f64_copysign
+  | 0x8b -> return_float f32_abs
+  | 0x8c -> return_float f32_neg
+  | 0x8d -> return_float f32_ceil
+  | 0x8e -> return_float f32_floor
+  | 0x8f -> return_float f32_trunc
+  | 0x90 -> return_float f32_nearest
+  | 0x91 -> return_float f32_sqrt
+  | 0x92 -> return_float f32_add
+  | 0x93 -> return_float f32_sub
+  | 0x94 -> return_float f32_mul
+  | 0x95 -> return_float f32_div
+  | 0x96 -> return_float f32_min
+  | 0x97 -> return_float f32_max
+  | 0x98 -> return_float f32_copysign
+  | 0x99 -> return_float f64_abs
+  | 0x9a -> return_float f64_neg
+  | 0x9b -> return_float f64_ceil
+  | 0x9c -> return_float f64_floor
+  | 0x9d -> return_float f64_trunc
+  | 0x9e -> return_float f64_nearest
+  | 0x9f -> return_float f64_sqrt
+  | 0xa0 -> return_float f64_add
+  | 0xa1 -> return_float f64_sub
+  | 0xa2 -> return_float f64_mul
+  | 0xa3 -> return_float f64_div
+  | 0xa4 -> return_float f64_min
+  | 0xa5 -> return_float f64_max
+  | 0xa6 -> return_float f64_copysign
   | 0xa7 -> Lwt.return i32_wrap_i64
   | 0xa8 -> Lwt.return i32_trunc_f32_s
   | 0xa9 -> Lwt.return i32_trunc_f32_u
@@ -699,20 +714,20 @@ let instr s pos tag =
   | 0xaf -> Lwt.return i64_trunc_f32_u
   | 0xb0 -> Lwt.return i64_trunc_f64_s
   | 0xb1 -> Lwt.return i64_trunc_f64_u
-  | 0xb2 -> Lwt.return f32_convert_i32_s
-  | 0xb3 -> Lwt.return f32_convert_i32_u
-  | 0xb4 -> Lwt.return f32_convert_i64_s
-  | 0xb5 -> Lwt.return f32_convert_i64_u
-  | 0xb6 -> Lwt.return f32_demote_f64
-  | 0xb7 -> Lwt.return f64_convert_i32_s
-  | 0xb8 -> Lwt.return f64_convert_i32_u
-  | 0xb9 -> Lwt.return f64_convert_i64_s
-  | 0xba -> Lwt.return f64_convert_i64_u
-  | 0xbb -> Lwt.return f64_promote_f32
+  | 0xb2 -> return_float f32_convert_i32_s
+  | 0xb3 -> return_float f32_convert_i32_u
+  | 0xb4 -> return_float f32_convert_i64_s
+  | 0xb5 -> return_float f32_convert_i64_u
+  | 0xb6 -> return_float f32_demote_f64
+  | 0xb7 -> return_float f64_convert_i32_s
+  | 0xb8 -> return_float f64_convert_i32_u
+  | 0xb9 -> return_float f64_convert_i64_s
+  | 0xba -> return_float f64_convert_i64_u
+  | 0xbb -> return_float f64_promote_f32
   | 0xbc -> Lwt.return i32_reinterpret_f32
   | 0xbd -> Lwt.return i64_reinterpret_f64
-  | 0xbe -> Lwt.return f32_reinterpret_i32
-  | 0xbf -> Lwt.return f64_reinterpret_i64
+  | 0xbe -> return_float f32_reinterpret_i32
+  | 0xbf -> return_float f64_reinterpret_i64
   | 0xc0 -> Lwt.return i32_extend8_s
   | 0xc1 -> Lwt.return i32_extend16_s
   | 0xc2 -> Lwt.return i64_extend8_s
@@ -826,8 +841,8 @@ let instr s pos tag =
       | 0x10l -> Lwt.return i16x8_splat
       | 0x11l -> Lwt.return i32x4_splat
       | 0x12l -> Lwt.return i64x2_splat
-      | 0x13l -> Lwt.return f32x4_splat
-      | 0x14l -> Lwt.return f64x2_splat
+      | 0x13l -> return_float f32x4_splat
+      | 0x14l -> return_float f64x2_splat
       | 0x15l ->
           let+ i = u8 s in
           i8x16_extract_lane_s i
@@ -859,15 +874,19 @@ let instr s pos tag =
           let+ i = u8 s in
           i64x2_replace_lane i
       | 0x1fl ->
+          return_float_f @@ fun s ->
           let+ i = u8 s in
           f32x4_extract_lane i
       | 0x20l ->
+          return_float_f @@ fun s ->
           let+ i = u8 s in
           f32x4_replace_lane i
       | 0x21l ->
+          return_float_f @@ fun s ->
           let+ i = u8 s in
           f64x2_extract_lane i
       | 0x22l ->
+          return_float_f @@ fun s ->
           let+ i = u8 s in
           f64x2_replace_lane i
       | 0x23l -> Lwt.return i8x16_eq
@@ -900,18 +919,18 @@ let instr s pos tag =
       | 0x3el -> Lwt.return i32x4_le_u
       | 0x3fl -> Lwt.return i32x4_ge_s
       | 0x40l -> Lwt.return i32x4_ge_u
-      | 0x41l -> Lwt.return f32x4_eq
-      | 0x42l -> Lwt.return f32x4_ne
-      | 0x43l -> Lwt.return f32x4_lt
-      | 0x44l -> Lwt.return f32x4_gt
-      | 0x45l -> Lwt.return f32x4_le
-      | 0x46l -> Lwt.return f32x4_ge
-      | 0x47l -> Lwt.return f64x2_eq
-      | 0x48l -> Lwt.return f64x2_ne
-      | 0x49l -> Lwt.return f64x2_lt
-      | 0x4al -> Lwt.return f64x2_gt
-      | 0x4bl -> Lwt.return f64x2_le
-      | 0x4cl -> Lwt.return f64x2_ge
+      | 0x41l -> return_float f32x4_eq
+      | 0x42l -> return_float f32x4_ne
+      | 0x43l -> return_float f32x4_lt
+      | 0x44l -> return_float f32x4_gt
+      | 0x45l -> return_float f32x4_le
+      | 0x46l -> return_float f32x4_ge
+      | 0x47l -> return_float f64x2_eq
+      | 0x48l -> return_float f64x2_ne
+      | 0x49l -> return_float f64x2_lt
+      | 0x4al -> return_float f64x2_gt
+      | 0x4bl -> return_float f64x2_le
+      | 0x4cl -> return_float f64x2_ge
       | 0x4dl -> Lwt.return v128_not
       | 0x4el -> Lwt.return v128_and
       | 0x4fl -> Lwt.return v128_andnot
@@ -957,8 +976,8 @@ let instr s pos tag =
       | 0x5dl ->
           let+ a, o = memop s in
           v128_load64_zero a o
-      | 0x5el -> Lwt.return f32x4_demote_f64x2_zero
-      | 0x5fl -> Lwt.return f64x2_promote_low_f32x4
+      | 0x5el -> return_float f32x4_demote_f64x2_zero
+      | 0x5fl -> return_float f64x2_promote_low_f32x4
       | 0x60l -> Lwt.return i8x16_abs
       | 0x61l -> Lwt.return i8x16_neg
       | 0x62l -> Lwt.return i8x16_popcnt
@@ -966,10 +985,10 @@ let instr s pos tag =
       | 0x64l -> Lwt.return i8x16_bitmask
       | 0x65l -> Lwt.return i8x16_narrow_i16x8_s
       | 0x66l -> Lwt.return i8x16_narrow_i16x8_u
-      | 0x67l -> Lwt.return f32x4_ceil
-      | 0x68l -> Lwt.return f32x4_floor
-      | 0x69l -> Lwt.return f32x4_trunc
-      | 0x6al -> Lwt.return f32x4_nearest
+      | 0x67l -> return_float f32x4_ceil
+      | 0x68l -> return_float f32x4_floor
+      | 0x69l -> return_float f32x4_trunc
+      | 0x6al -> return_float f32x4_nearest
       | 0x6bl -> Lwt.return i8x16_shl
       | 0x6cl -> Lwt.return i8x16_shr_s
       | 0x6dl -> Lwt.return i8x16_shr_u
@@ -1069,40 +1088,40 @@ let instr s pos tag =
       | 0xddl -> Lwt.return i64x2_extmul_high_i32x4_s
       | 0xdel -> Lwt.return i64x2_extmul_low_i32x4_u
       | 0xdfl -> Lwt.return i64x2_extmul_high_i32x4_u
-      | 0xe0l -> Lwt.return f32x4_abs
-      | 0xe1l -> Lwt.return f32x4_neg
-      | 0xe3l -> Lwt.return f32x4_sqrt
-      | 0xe4l -> Lwt.return f32x4_add
-      | 0xe5l -> Lwt.return f32x4_sub
-      | 0xe6l -> Lwt.return f32x4_mul
-      | 0xe7l -> Lwt.return f32x4_div
-      | 0xe8l -> Lwt.return f32x4_min
-      | 0xe9l -> Lwt.return f32x4_max
-      | 0xeal -> Lwt.return f32x4_pmin
-      | 0xebl -> Lwt.return f32x4_pmax
-      | 0xecl -> Lwt.return f64x2_abs
-      | 0xedl -> Lwt.return f64x2_neg
-      | 0xefl -> Lwt.return f64x2_sqrt
-      | 0xf0l -> Lwt.return f64x2_add
-      | 0xf1l -> Lwt.return f64x2_sub
-      | 0xf2l -> Lwt.return f64x2_mul
-      | 0xf3l -> Lwt.return f64x2_div
-      | 0xf4l -> Lwt.return f64x2_min
-      | 0xf5l -> Lwt.return f64x2_max
-      | 0xf6l -> Lwt.return f64x2_pmin
-      | 0xf7l -> Lwt.return f64x2_pmax
+      | 0xe0l -> return_float f32x4_abs
+      | 0xe1l -> return_float f32x4_neg
+      | 0xe3l -> return_float f32x4_sqrt
+      | 0xe4l -> return_float f32x4_add
+      | 0xe5l -> return_float f32x4_sub
+      | 0xe6l -> return_float f32x4_mul
+      | 0xe7l -> return_float f32x4_div
+      | 0xe8l -> return_float f32x4_min
+      | 0xe9l -> return_float f32x4_max
+      | 0xeal -> return_float f32x4_pmin
+      | 0xebl -> return_float f32x4_pmax
+      | 0xecl -> return_float f64x2_abs
+      | 0xedl -> return_float f64x2_neg
+      | 0xefl -> return_float f64x2_sqrt
+      | 0xf0l -> return_float f64x2_add
+      | 0xf1l -> return_float f64x2_sub
+      | 0xf2l -> return_float f64x2_mul
+      | 0xf3l -> return_float f64x2_div
+      | 0xf4l -> return_float f64x2_min
+      | 0xf5l -> return_float f64x2_max
+      | 0xf6l -> return_float f64x2_pmin
+      | 0xf7l -> return_float f64x2_pmax
       | 0xf8l -> Lwt.return i32x4_trunc_sat_f32x4_s
       | 0xf9l -> Lwt.return i32x4_trunc_sat_f32x4_u
       | 0xfal -> Lwt.return f32x4_convert_i32x4_s
       | 0xfbl -> Lwt.return f32x4_convert_i32x4_u
       | 0xfcl -> Lwt.return i32x4_trunc_sat_f64x2_s_zero
       | 0xfdl -> Lwt.return i32x4_trunc_sat_f64x2_u_zero
-      | 0xfel -> Lwt.return f64x2_convert_low_i32x4_s
-      | 0xffl -> Lwt.return f64x2_convert_low_i32x4_u
+      | 0xfel -> return_float f64x2_convert_low_i32x4_s
+      | 0xffl -> return_float f64x2_convert_low_i32x4_u
       | n -> illegal s pos (I32.to_int_u n))
   | b -> illegal s pos b
 
-let instr_block_step s allocs cont =
+let instr_block_step ~allow_floats s allocs cont =
   let open Lwt.Syntax in
   let* cont, stack = pop_at_most 3 cont in
   match cont with
@@ -1148,7 +1167,7 @@ let instr_block_step s allocs cont =
           let* tag = op s in
           match tag with
           | 0x02 ->
-              let* bt = block_type s in
+              let* bt = block_type ~allow_floats s in
               push_rev_values
                 (IKNext (alloc_block allocs)
                 :: IKBlock (bt, pos)
@@ -1156,7 +1175,7 @@ let instr_block_step s allocs cont =
                 stack
               |> Lwt.return
           | 0x03 ->
-              let* bt = block_type s in
+              let* bt = block_type ~allow_floats s in
               push_rev_values
                 (IKNext (alloc_block allocs)
                 :: IKLoop (bt, pos)
@@ -1164,7 +1183,7 @@ let instr_block_step s allocs cont =
                 stack
               |> Lwt.return
           | 0x04 ->
-              let* bt = block_type s in
+              let* bt = block_type ~allow_floats s in
               push_rev_values
                 (IKNext (alloc_block allocs)
                 :: IKIf1 (bt, pos)
@@ -1172,7 +1191,7 @@ let instr_block_step s allocs cont =
                 stack
               |> Lwt.return
           | _ ->
-              let* i = instr s pos tag in
+              let* i = instr ~allow_floats s pos tag in
               let e = Source.(i @@ region s pos pos) in
               let+ () = add_to_block allocs lbl e in
               push_rev_values (IKNext lbl :: ks) stack))
@@ -1190,7 +1209,7 @@ type block_kont =
   | BlockParse of instr_block_kont lazy_stack
   | BlockStop of block_label
 
-let block_step s allocs =
+let block_step ~allow_floats s allocs =
   let open Lwt.Syntax in
   function
   | BlockStart ->
@@ -1203,10 +1222,10 @@ let block_step s allocs =
         match head with
         | IKStop lbl -> Lwt.return (BlockStop lbl)
         | _ ->
-            let+ kont = instr_block_step s allocs kont in
+            let+ kont = instr_block_step ~allow_floats s allocs kont in
             BlockParse kont
       else
-        let+ kont = instr_block_step s allocs kont in
+        let+ kont = instr_block_step ~allow_floats s allocs kont in
         BlockParse kont
   | BlockStop _ -> raise (Step_error Block_step)
 
@@ -1328,7 +1347,7 @@ type func_type_kont =
   | FKOut of value_type Vector.t * value_type lazy_vec_kont
   | FKStop of func_type
 
-let func_type_step s =
+let func_type_step ~allow_floats s =
   let open Lwt.Syntax in
   function
   | FKStart ->
@@ -1340,13 +1359,13 @@ let func_type_step s =
       let+ len = len32 s in
       FKOut (ins, init_lazy_vec (Int32.of_int len))
   | FKIns ins ->
-      let+ vt = value_type s in
+      let+ vt = value_type ~allow_floats s in
       FKIns (lazy_vec_step vt ins)
   | FKOut (ins, (LazyVec {vector = out; _} as out_vec))
     when is_end_of_vec out_vec ->
       Lwt.return @@ FKStop (FuncType (ins, out))
   | FKOut (ins, out_vec) ->
-      let+ vt = value_type s in
+      let+ vt = value_type ~allow_floats s in
       FKOut (ins, lazy_vec_step vt out_vec)
   | FKStop _ -> raise (Step_error Func_type_step)
 (* cannot reduce *)
@@ -1355,7 +1374,7 @@ let func_type_step s =
 
 (* Import section *)
 
-let import_desc s =
+let import_desc ~allow_floats s =
   let open Lwt.Syntax in
   let* x = u8 s in
   match x with
@@ -1369,7 +1388,7 @@ let import_desc s =
       let+ x = memory_type s in
       MemoryImport x
   | 0x03 ->
-      let+ x = global_type s in
+      let+ x = global_type ~allow_floats s in
       GlobalImport x
   | _ -> error s (pos s - 1) "malformed import kind"
 
@@ -1381,7 +1400,7 @@ type import_kont =
       (** Import item name parsing UTF8 char per char step. *)
   | ImpKStop of import'  (** Import final step. *)
 
-let import_step s =
+let import_step ~allow_floats s =
   let open Lwt.Syntax in
   function
   | ImpKStart -> Lwt.return @@ ImpKModuleName NKStart
@@ -1391,7 +1410,7 @@ let import_step s =
       let+ x = name_step s nk in
       ImpKModuleName x
   | ImpKItemName (module_name, NKStop item_name) ->
-      let+ idesc = at import_desc s in
+      let+ idesc = at (import_desc ~allow_floats) s in
       ImpKStop {module_name; item_name; idesc}
   | ImpKItemName (module_name, nk) ->
       let+ x = name_step s nk in
@@ -1462,10 +1481,10 @@ let start_section s = section `StartSection (opt (at start) true) None s
 
 (* Code section *)
 
-let local s =
+let local ~allow_floats s =
   let open Lwt.Syntax in
   let* n = vu32 s in
-  let+ t = value_type s in
+  let+ t = value_type ~allow_floats s in
   (n, t)
 
 (** Code section parsing. *)
@@ -1498,7 +1517,7 @@ let at' left s x =
   let right = pos s in
   Source.(x @@ region s left right)
 
-let code_step s allocs =
+let code_step ~allow_floats s allocs =
   let open Lwt.Syntax in
   function
   | CKStart ->
@@ -1538,7 +1557,7 @@ let code_step s allocs =
         }
       |> Lwt.return
   | CKLocalsParse {left; size; pos; vec_kont; locals_size} ->
-      let* local = local s in
+      let* local = local ~allow_floats s in
       (* small enough to fit in a tick *)
       let locals_size =
         I64.add locals_size (I64_convert.extend_i32_u (fst local))
@@ -1591,7 +1610,7 @@ let code_step s allocs =
       in
       CKStop func |> Lwt.return
   | CKBody {left; size; locals; const_kont} ->
-      let+ const_kont = block_step s allocs const_kont in
+      let+ const_kont = block_step ~allow_floats s allocs const_kont in
       CKBody {left; size; locals; const_kont}
   (* final step, cannot reduce *)
   | CKStop _ -> raise (Step_error Code_step)
@@ -1738,7 +1757,7 @@ let ek_start s =
         }
   | _ -> error s (pos s - 1) "malformed elements segment kind"
 
-let elem_step s allocs =
+let elem_step ~allow_floats s allocs =
   let open Lwt.Syntax in
   function
   | EKStart -> ek_start s
@@ -1775,7 +1794,7 @@ let elem_step s allocs =
           }
   | EKMode
       {left; index; index_kind; early_ref_type; offset_kont = left_offset, k} ->
-      let+ k' = block_step s allocs k in
+      let+ k' = block_step ~allow_floats s allocs k in
       EKMode
         {
           left;
@@ -1811,7 +1830,7 @@ let elem_step s allocs =
         }
       |> Lwt.return
   | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, k} ->
-      let+ k' = block_step s allocs k in
+      let+ k' = block_step ~allow_floats s allocs k in
       EKInitConst {mode; ref_type; einit_vec; einit_kont = (left, k')}
   (* Final step, cannot reduce *)
   | EKStop _ -> raise (Step_error Elem_step)
@@ -1850,7 +1869,7 @@ let data_start s =
       DKMode {left; index; offset_kont = (left_offset, BlockStart)}
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
-let data_step s allocs =
+let data_step ~allow_floats s allocs =
   let open Lwt.Syntax in
   function
   | DKStart -> data_start s
@@ -1861,7 +1880,7 @@ let data_step s allocs =
       let dmode = Source.(Active {index; offset} @@ region s left right) in
       DKInit {dmode; init_kont = VKStart} |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, k} ->
-      let+ k' = block_step s allocs k in
+      let+ k' = block_step ~allow_floats s allocs k in
       DKMode {left; index; offset_kont = (left_offset, k')}
   | DKInit {dmode; init_kont = VKStop dinit} ->
       DKStop {dmode; dinit} |> Lwt.return
@@ -2053,7 +2072,7 @@ let tag_of_field : type t repr. (t, repr) field_type -> section_tag = function
 
 let vec_field ty (LazyVec {vector; _}) = VecField (ty, vector)
 
-let module_step bytes state =
+let module_step ~allow_floats bytes state =
   let open Lwt.Syntax in
   let s = {name = state.stream_name; bytes; pos = state.stream_pos} in
   let next module_kont =
@@ -2214,7 +2233,7 @@ let module_step bytes state =
           (* small enough to fit in a tick *)
           next @@ MKField (ty, size, lazy_vec_step f vec)
       | GlobalField ->
-          let* gtype = global_type s in
+          let* gtype = global_type ~allow_floats s in
           next @@ MKGlobal (gtype, pos s, BlockStart, size, vec)
       | ExportField -> next @@ MKExport (ExpKStart, pos s, size, vec)
       | ElemField -> next @@ MKElem (EKStart, pos s, size, vec)
@@ -2226,13 +2245,13 @@ let module_step bytes state =
       let f = Source.(func_type @@ region s left (pos s)) in
       next @@ MKField (TypeField, size, lazy_vec_step f vec)
   | MKTypes (k, pos, size, curr_vec) ->
-      let* x = func_type_step s k in
+      let* x = func_type_step ~allow_floats s k in
       next @@ MKTypes (x, pos, size, curr_vec)
   | MKImport (ImpKStop import, left, size, vec) ->
       let f = Source.(import @@ region s left (pos s)) in
       next @@ MKField (ImportField, size, lazy_vec_step f vec)
   | MKImport (k, pos, size, curr_vec) ->
-      let* x = import_step s k in
+      let* x = import_step ~allow_floats s k in
       next @@ MKImport (x, pos, size, curr_vec)
   | MKExport (ExpKStop import, left, size, vec) ->
       let f = Source.(import @@ region s left (pos s)) in
@@ -2246,24 +2265,24 @@ let module_step bytes state =
       let f = Source.({gtype; ginit} @@ region s left (pos s)) in
       next @@ MKField (GlobalField, size, lazy_vec_step f vec)
   | MKGlobal (ty, pos, k, size, curr_vec) ->
-      let* k = block_step s allocs k in
+      let* k = block_step ~allow_floats s allocs k in
       next @@ MKGlobal (ty, pos, k, size, curr_vec)
   | MKElem (EKStop elem, left, size, vec) ->
       let elem = Source.(elem @@ region s left (pos s)) in
       next @@ MKField (ElemField, size, lazy_vec_step elem vec)
   | MKElem (elem_kont, pos, size, curr_vec) ->
-      let* elem_kont = elem_step s allocs elem_kont in
+      let* elem_kont = elem_step ~allow_floats s allocs elem_kont in
       next @@ MKElem (elem_kont, pos, size, curr_vec)
   | MKData (DKStop data, left, size, vec) ->
       let data = Source.(data @@ region s left (pos s)) in
       next @@ MKField (DataField, size, lazy_vec_step data vec)
   | MKData (data_kont, pos, size, curr_vec) ->
-      let* data_kont = data_step s allocs data_kont in
+      let* data_kont = data_step ~allow_floats s allocs data_kont in
       next @@ MKData (data_kont, pos, size, curr_vec)
   | MKCode (CKStop func, _, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
-      let* code_kont = code_step s allocs code_kont in
+      let* code_kont = code_step ~allow_floats s allocs code_kont in
       next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
       ( _ft,
@@ -2421,17 +2440,17 @@ let initial_decode_kont ~name =
     stream_name = name;
   }
 
-let module_ name bytes =
+let module_ ~allow_floats name bytes =
   let open Lwt.Syntax in
   let rec loop = function
     | {module_kont = MKStop m; _} -> Lwt.return m
     | k ->
-        let* next_state = module_step bytes k in
+        let* next_state = module_step ~allow_floats bytes k in
         loop next_state
   in
   loop @@ initial_decode_kont ~name
 
-let decode ~name ~bytes = module_ name bytes
+let decode ~allow_floats ~name ~bytes = module_ ~allow_floats name bytes
 
 let all_custom tag s =
   let open Lwt.Syntax in

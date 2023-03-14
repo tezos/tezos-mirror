@@ -161,7 +161,7 @@ let update_level node current_level =
           pending :: node.persistent_state.pending_level)
     pending
 
-let handle_event node {name; value} =
+let handle_event node {name; value; timestamp = _} =
   match name with
   | "tx_rollup_node_is_ready.v0" -> set_ready node
   | "tx_rollup_node_tezos_block_processed.v0" -> (
@@ -198,34 +198,6 @@ let wait_for_tezos_level node level =
         "tx_rollup_node_tezos_block_processed.v0"
         ~where:("level >= " ^ string_of_int level)
         promise
-
-let wait_for_full ?where node name filter =
-  let promise, resolver = Lwt.task () in
-  let current_events =
-    String_map.find_opt name node.one_shot_event_handlers
-    |> Option.value ~default:[]
-  in
-  node.one_shot_event_handlers <-
-    String_map.add
-      name
-      (Event_handler {filter; resolver} :: current_events)
-      node.one_shot_event_handlers ;
-  let* result = promise in
-  match result with
-  | None ->
-      raise (Terminated_before_event {daemon = node.name; event = name; where})
-  | Some x -> return x
-
-let event_from_full_event_filter filter json =
-  let raw = get_event_from_full_event json in
-  (* If [json] does not match the correct JSON structure, it
-     will be filtered out, which will result in ignoring
-     the current event.
-     @see raw_event_from_event *)
-  Option.bind raw (fun {value; _} -> filter value)
-
-let wait_for ?where node name filter =
-  wait_for_full ?where node name (event_from_full_event_filter filter)
 
 let create ~protocol ?runner ?data_dir ?(addr = "127.0.0.1")
     ?(dormant_mode = false) ?color ?event_pipe ?name mode ~rollup_id
@@ -393,12 +365,8 @@ end
 
 module Client = struct
   let raw_tx_node_rpc node ~url =
-    let* rpc = RPC.Curl.get () in
-    match rpc with
-    | None -> assert false
-    | Some curl ->
-        let url = Printf.sprintf "%s/%s" (rpc_addr node) url in
-        curl ~url
+    let url = Printf.sprintf "%s/%s" (rpc_addr node) url in
+    Runnable.run (RPC.Curl.get url)
 
   let get_inbox ~tx_node ~block =
     let parse_l2_context_hash json =

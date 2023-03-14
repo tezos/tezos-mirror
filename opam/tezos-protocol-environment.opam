@@ -14,15 +14,15 @@ depends: [
   "tezos-crypto"
   "tezos-lwt-result-stdlib"
   "tezos-scoru-wasm"
-  "data-encoding" { >= "0.6" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "bls12-381" { >= "5.0.0" & < "5.1.0" }
-  "tezos-plonk" { >= "0.1.2" }
+  "tezos-plonk" { >= "1.0.1" & < "2.0.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "tezos-crypto-dal"
   "class_group_vdf" { >= "0.0.4" }
-  "ringo" { >= "0.9" & < "1.0.0" }
-  "ringo-lwt" { >= "0.9" }
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
   "tezos-base"
   "tezos-sapling"
   "tezos-micheline"
@@ -30,7 +30,7 @@ depends: [
   "tezos-event-logging"
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-test-helpers" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "lwt" { with-test & >= "5.6.0" }
 ]
 build: [

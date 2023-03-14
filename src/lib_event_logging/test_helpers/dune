@@ -18,4 +18,5 @@
   (:standard)
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
-  -open Tezos_event_logging))
+  -open Tezos_event_logging
+  -open Tezos_test_helpers))

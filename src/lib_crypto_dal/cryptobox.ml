@@ -26,8 +26,8 @@
 open Error_monad
 include Cryptobox_intf
 module Base58 = Tezos_crypto.Base58
-module Srs_g1 = Bls12_381_polynomial.Polynomial.Srs_g1
-module Srs_g2 = Bls12_381_polynomial.Polynomial.Srs_g2
+module Srs_g1 = Bls12_381_polynomial.Srs.Srs_g1
+module Srs_g2 = Bls12_381_polynomial.Srs.Srs_g2
 
 type error += Failed_to_load_trusted_setup of string
 
@@ -111,15 +111,13 @@ type srs = {
 module Inner = struct
   (* Scalars are elements of the prime field Fr from BLS. *)
   module Scalar = Bls12_381.Fr
-  module Polynomial = Bls12_381_polynomial.Polynomial
+  module Polynomials = Bls12_381_polynomial.Polynomial
 
   (* Operations on vector of scalars *)
-  module Evaluations = Polynomial.Evaluations
+  module Evaluations = Bls12_381_polynomial.Evaluations
 
   (* Domains for the Fast Fourier Transform (FTT). *)
-  module Domains = Polynomial.Domain
-  module Polynomials = Polynomial.Polynomial
-  module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
+  module Domains = Bls12_381_polynomial.Domain
 
   type slot = bytes
 
@@ -137,11 +135,9 @@ module Inner = struct
 
   type page_proof = Bls12_381.G1.t
 
-  type page = {index : int; content : bytes}
+  type page = bytes
 
   type share = Scalar.t array
-
-  type _shards_map = share IntMap.t
 
   type shard = {index : int; share : share}
 
@@ -150,7 +146,11 @@ module Inner = struct
   module Encoding = struct
     open Data_encoding
 
-    let fr_encoding = conv Bls12_381.Fr.to_bytes Bls12_381.Fr.of_bytes_exn bytes
+    let fr_encoding =
+      conv
+        Bls12_381.Fr.to_bytes
+        Bls12_381.Fr.of_bytes_exn
+        (Fixed.bytes Bls12_381.Fr.size_in_bytes)
 
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/3391
 
@@ -163,8 +163,6 @@ module Inner = struct
 
     let _proof_shards_encoding = g1_encoding
 
-    let commitment_proof_encoding = g1_encoding
-
     let _proof_single_encoding = g1_encoding
 
     let page_proof_encoding = g1_encoding
@@ -176,12 +174,6 @@ module Inner = struct
         (fun {index; share} -> (index, share))
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
-
-    let shards_encoding =
-      conv
-        IntMap.bindings
-        (fun bindings -> IntMap.of_seq (List.to_seq bindings))
-        (list (tup2 int31 share_encoding))
 
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
@@ -257,14 +249,35 @@ module Inner = struct
     end)
   end
 
-  include Commitment
+  module Commitment_proof = struct
+    let zero = Bls12_381.G1.zero
+
+    let to_bytes = Bls12_381.G1.to_compressed_bytes
+
+    let of_bytes_exn bytes =
+      match Bls12_381.G1.of_compressed_bytes_opt bytes with
+      | None ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Unexpected data (DAL commitment proof)"
+      | Some proof -> proof
+
+    (* We divide by two because we use the compressed representation. *)
+    let size = Bls12_381.G1.size_in_bytes / 2
+
+    let raw_encoding =
+      let open Data_encoding in
+      conv to_bytes of_bytes_exn (Fixed.bytes size)
+
+    let encoding = raw_encoding
+  end
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
   let scalar_bytes_amount = Scalar.size_in_bytes - 1
 
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
-  let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
+  let make_domain n = Domains.build_power_of_two Z.(log2up (of_int n))
 
   type t = {
     redundancy_factor : int;
@@ -281,7 +294,7 @@ module Inner = struct
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
     shard_size : int;
     (* Length of a shard in terms of scalar elements. *)
-    nb_pages : int;
+    pages_per_slot : int;
     (* Number of slot pages. *)
     page_length : int;
     remaining_bytes : int;
@@ -297,6 +310,7 @@ module Inner = struct
   let ensure_validity t =
     let open Result_syntax in
     let srs_size = Srs_g1.size t.srs.raw.srs_g1 in
+    let srs_size_g2 = Srs_g2.size t.srs.raw.srs_g2 in
     let is_pow_of_two x =
       let logx = Z.(log2 (of_int x)) in
       1 lsl logx = x
@@ -309,22 +323,36 @@ module Inner = struct
       (* According to the specification the lengths of a slot page are
          in MiB *)
       fail (`Fail "Wrong slot size: expected MiB")
+    else if not (t.page_size >= 32 && t.page_size <= t.slot_size) then
+      (* The size of a page must be greater than 31 bytes (32 > 31 is the next
+         power of two), the size in bytes of a scalar element, and less than
+         [t.slot_size]. *)
+      fail (`Fail "Wrong page size")
     else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
     then
       (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
          multiplicative group of Fr, because the FFTs operate on such groups. *)
       fail (`Fail "Wrong computed size for n")
     else if t.k > srs_size then
+      (* the committed polynomials have degree t.k - 1 at most,
+         so t.k coefficients. *)
       fail
         (`Fail
           (Format.asprintf
-             "SRS size is too small. Expected more than %d. Got %d"
+             "SRS on G1 size is too small. Expected more than %d. Got %d"
              t.k
              srs_size))
+    else if t.k > Srs_g2.size t.srs.raw.srs_g2 then
+      fail
+        (`Fail
+          (Format.asprintf
+             "SRS on G2 size is too small. Expected more than %d. Got %d"
+             t.k
+             srs_size_g2))
     else return t
 
   let slot_as_polynomial_length ~slot_size =
-    1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount))
+    1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
   type parameters = {
     redundancy_factor : int;
@@ -346,9 +374,13 @@ module Inner = struct
          (req "slot_size" int31)
          (req "number_of_shards" uint16))
 
+  let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
-  let make {redundancy_factor; slot_size; page_size; number_of_shards} =
+  let make
+      ({redundancy_factor; slot_size; page_size; number_of_shards} as
+      parameters) =
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
@@ -381,7 +413,7 @@ module Inner = struct
         domain_2k = make_domain (2 * k);
         domain_n = make_domain n;
         shard_size;
-        nb_pages = slot_size / page_size;
+        pages_per_slot = pages_per_slot parameters;
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
         evaluations_log;
@@ -391,6 +423,10 @@ module Inner = struct
       }
     in
     ensure_validity t
+
+  let parameters
+      ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
+    {redundancy_factor; slot_size; page_size; number_of_shards}
 
   let polynomial_degree = Polynomials.degree
 
@@ -412,19 +448,21 @@ module Inner = struct
     else
       let offset = ref 0 in
       let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
-      for page = 0 to t.nb_pages - 1 do
+      for page = 0 to t.pages_per_slot - 1 do
         for elt = 0 to t.page_length - 1 do
-          if !offset > t.slot_size then ()
+          (* [!offset >= t.slot_size] because we don't want to read past
+             the buffer [slot] bounds. *)
+          if !offset >= t.slot_size then ()
           else if elt = t.page_length - 1 then (
             let dst = Bytes.create t.remaining_bytes in
             Bytes.blit slot !offset dst 0 t.remaining_bytes ;
             offset := !offset + t.remaining_bytes ;
-            res.((elt * t.nb_pages) + page) <- Scalar.of_bytes_exn dst)
+            res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst)
           else
             let dst = Bytes.create scalar_bytes_amount in
             Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
             offset := !offset + scalar_bytes_amount ;
-            res.((elt * t.nb_pages) + page) <- Scalar.of_bytes_exn dst
+            res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst
         done
       done ;
       Ok res
@@ -436,7 +474,7 @@ module Inner = struct
 
   let eval_coset t eval slot offset page =
     for elt = 0 to t.page_length - 1 do
-      let idx = (elt * t.nb_pages) + page in
+      let idx = (elt * t.pages_per_slot) + page in
       let coeff = Scalar.to_bytes (Array.get eval idx) in
       if elt = t.page_length - 1 then (
         Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
@@ -449,68 +487,64 @@ module Inner = struct
   (* The pages are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_to_bytes t p =
-    let eval = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
+    let eval =
+      Evaluations.evaluation_fft t.domain_k p |> Evaluations.to_array
+    in
     let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
-    for page = 0 to t.nb_pages - 1 do
+    for page = 0 to t.pages_per_slot - 1 do
       eval_coset t eval slot offset page
     done ;
     slot
 
-  let encode t p = Evaluations.(evaluation_fft t.domain_n p |> to_array)
+  let encode t p =
+    Evaluations.evaluation_fft t.domain_n p |> Evaluations.to_array
 
   (* The shards are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let shards_from_polynomial t p =
     let codeword = encode t p in
     let len_shard = t.n / t.number_of_shards in
-    let rec loop i map =
-      if i = t.number_of_shards then map
+    let rec loop index seq =
+      if index = t.number_of_shards then seq
       else
-        let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
         for j = 0 to len_shard - 1 do
-          shard.(j) <- codeword.((t.number_of_shards * j) + i)
+          share.(j) <- codeword.((t.number_of_shards * j) + index)
         done ;
-        loop (i + 1) (IntMap.add i shard map)
+        loop (index + 1) (Seq.cons {index; share} seq)
     in
-    loop 0 IntMap.empty
+    loop 0 Seq.empty
 
   (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
   let compute_n t eval_a' shards =
     let w = Domains.get t.domain_n 1 in
     let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
-    let open Result_syntax in
-    let c = ref 0 in
-    let* () =
-      IntMap.iter_e
-        (fun z_i arr ->
-          if !c >= t.k then Ok ()
-          else
-            let rec loop j =
-              match j with
-              | j when j = Array.length arr -> Ok ()
-              | _ -> (
-                  let c_i = arr.(j) in
-                  let z_i = (t.number_of_shards * j) + z_i in
-                  let x_i = Scalar.pow w (Z.of_int z_i) in
-                  let tmp = Evaluations.get eval_a' z_i in
-                  Scalar.mul_inplace tmp tmp x_i ;
-                  match Scalar.inverse_exn_inplace tmp tmp with
-                  | exception _ -> Error (`Invert_zero "can't inverse element")
-                  | () ->
-                      Scalar.mul_inplace tmp tmp c_i ;
-                      n_poly.(z_i) <- tmp ;
-                      c := !c + 1 ;
-                      loop (j + 1))
-            in
-            loop 0)
-        shards
-    in
-    Ok n_poly
+    Seq.iter
+      (fun {index; share} ->
+        for j = 0 to Array.length share - 1 do
+          let c_i = share.(j) in
+          let z_i = (t.number_of_shards * j) + index in
+          let x_i = Scalar.pow w (Z.of_int z_i) in
+          let tmp = Evaluations.get eval_a' z_i in
+          Scalar.mul_inplace tmp tmp x_i ;
+          (* The call below never fails by construction, so we don't
+             catch exceptions *)
+          Scalar.inverse_exn_inplace tmp tmp ;
+          Scalar.mul_inplace tmp tmp c_i ;
+          n_poly.(z_i) <- tmp
+        done)
+      shards ;
+    n_poly
+
+  let encoded_share_size t =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
+       Improve shard size computation *)
+    let share_scalar_len = t.n / t.number_of_shards in
+    (share_scalar_len * Scalar.size_in_bytes) + 4
 
   let polynomial_from_shards t shards =
-    let open Result_syntax in
-    if t.k > IntMap.cardinal shards * t.shard_size then
+    if t.k > Seq.length shards * t.shard_size then
       Error
         (`Not_enough_shards
           (Printf.sprintf
@@ -540,31 +574,28 @@ module Inner = struct
          This also reduces the depth of the recursion tree of the poly_mul
          function from log(k) to log(number_of_shards), so that the decoding time
          reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
-      let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
-      let f1, f2 =
-        IntMap.bindings shards
+      let mul acc i =
+        Polynomials.mul_xn
+          acc
+          t.shard_size
+          (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)))
+      in
+
+      let partition_products seq =
+        Seq.fold_left
+          (fun (l, r) {index; _} -> (mul r index, l))
+          (Polynomials.one, Polynomials.one)
+          seq
+      in
+
+      let shards =
         (* We always consider the first k codeword vector components. *)
-        |> Tezos_stdlib.TzList.take_n (t.k / t.shard_size)
-        |> split
+        Seq.take (t.k / t.shard_size) shards
       in
-      let f11, f12 = split f1 in
-      let f21, f22 = split f2 in
 
-      let prod =
-        List.fold_left
-          (fun acc (i, _) ->
-            Polynomials.mul_xn
-              acc
-              t.shard_size
-              (Scalar.negate (Domains.get t.domain_n (i * t.shard_size))))
-          Polynomials.one
-      in
-      let p11 = prod f11 in
-      let p12 = prod f12 in
-      let p21 = prod f21 in
-      let p22 = prod f22 in
+      let p1, p2 = partition_products shards in
 
-      let a_poly = fft_mul t.domain_2k [p11; p12; p21; p22] in
+      let a_poly = fft_mul t.domain_2k [p1; p2] in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
@@ -573,7 +604,7 @@ module Inner = struct
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
       (* 4. Computing N(x). *)
-      let* n_poly = compute_n t eval_a' shards in
+      let n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
       let b = Evaluations.interpolation_fft2 t.domain_n n_poly in
@@ -589,7 +620,7 @@ module Inner = struct
   let commit t p = Srs_g1.pippenger t.srs.raw.srs_g1 p
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
-     SRS's length - 1. We take d = k - 1 since we don't want to commit
+     SRS's length - 1. We take d = t.k - 1 since we don't want to commit
      polynomials with degree greater than polynomials to be erasure-encoded.
 
      We consider the bilinear groups (G_1, G_2, G_T) with G_1=<g> and G_2=<h>.
@@ -597,24 +628,43 @@ module Inner = struct
      that can be committed
      - Verify: checks if e(commit(p), commit(X^{d-n})) = e(commit(p X^{d-n}), h)
      using the commitments for p and p X^{d-n}, and computing the commitment for
-     X^{d-n} on G_2.*)
+     X^{d-n} on G_2. *)
 
-  let prove_commitment t p =
-    commit t Polynomials.(mul (of_coefficients [(Scalar.(copy one), 0)]) p)
+  (* Proves that degree(p) < t.k *)
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4192
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3389
-
-     Generalize this function to pass the degree in parameter. *)
-  let verify_commitment t cm proof =
-    let open Bls12_381 in
-    let check =
-      match Srs_g2.get t.srs.raw.srs_g2 0 with
-      | exception Invalid_argument _ -> false
-      | commit_xk ->
-          Pairing.pairing_check
-            [(cm, commit_xk); (proof, G2.(negate (copy one)))]
+     Generalize this function to pass the slot_size in parameter. *)
+  let prove_commitment (t : t) p =
+    let max_allowed_committed_poly_degree = t.k - 1 in
+    let max_committable_degree = Srs_g1.size t.srs.raw.srs_g1 - 1 in
+    let offset_monomial_degree =
+      max_committable_degree - max_allowed_committed_poly_degree
     in
-    check
+    (* Note: this reallocates a buffer of size (Srs_g1.size t.srs.raw.srs_g1)
+       (2^21 elements in practice), so roughly 100MB. We can get rid of the
+       allocation by giving an offset for the SRS in Pippenger. *)
+    let p_with_offset =
+      Polynomials.mul_xn p offset_monomial_degree Scalar.(copy zero)
+    in
+    (* proof = commit(p X^offset_monomial_degree), with deg p < t.k *)
+    commit t p_with_offset
+
+  (* Verifies that the degree of the committed polynomial is < t.k *)
+  let verify_commitment (t : t) cm proof =
+    let max_allowed_committed_poly_degree = t.k - 1 in
+    let max_committable_degree = Srs_g1.size t.srs.raw.srs_g1 - 1 in
+    let offset_monomial_degree =
+      max_committable_degree - max_allowed_committed_poly_degree
+    in
+    let committed_offset_monomial =
+      (* This [get] cannot raise since
+         [offset_monomial_degree <= t.k <= Srs_g2.size t.srs.raw.srs_g2]. *)
+      Srs_g2.get t.srs.raw.srs_g2 offset_monomial_degree
+    in
+    let open Bls12_381 in
+    (* checking that cm * committed_offset_monomial = proof *)
+    Pairing.pairing_check
+      [(cm, committed_offset_monomial); (proof, G2.(negate (copy one)))]
 
   let inverse domain =
     let n = Array.length domain in
@@ -642,7 +692,7 @@ module Inner = struct
       let log_inf = Z.log2 (Z.of_int ratio) in
       if 1 lsl log_inf < ratio then log_inf else log_inf + 1
     in
-    let domain = Domains.build ~log:k |> Domains.inverse |> inverse in
+    let domain = Domains.build_power_of_two k |> Domains.inverse |> inverse in
     let precompute_srsj j =
       let quotient = (degree - j) / l in
       let padding = diff_next_power_of_two (2 * quotient) in
@@ -709,7 +759,7 @@ module Inner = struct
     G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
     let hl = Array.sub sum 0 (Array.length domain2m / 2) in
 
-    let phidomain = Domains.build ~log:chunk_count in
+    let phidomain = Domains.build_power_of_two chunk_count in
     let phidomain = inverse (Domains.inverse phidomain) in
     (* Kate amortized FFT *)
     G1.fft ~domain:phidomain ~points:hl
@@ -775,8 +825,8 @@ module Inner = struct
       (Polynomials.to_dense_coefficients p)
 
   let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
-    let d_n = Domains.build ~log:t.evaluations_log in
-    let domain = Domains.build ~log:t.evaluations_per_proof_log in
+    let d_n = Domains.build_power_of_two t.evaluations_log in
+    let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
     verify
       t
       cm
@@ -803,7 +853,7 @@ module Inner = struct
         ])
 
   let prove_page t p page_index =
-    if page_index < 0 || page_index >= t.nb_pages then
+    if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
       let l = 1 lsl Z.(log2up (of_int t.page_length)) in
@@ -815,43 +865,50 @@ module Inner = struct
 
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
-  let verify_page t cm {index = slot_page_index; content = slot_page} proof =
-    if slot_page_index < 0 || slot_page_index >= t.nb_pages then
+  let verify_page t cm ~page_index page proof =
+    if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
-      let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
-      let slot_page_evaluations =
-        Array.init
-          (1 lsl Z.(log2up (of_int t.page_length)))
-          (function
-            | i when i < t.page_length - 1 ->
-                let dst = Bytes.create scalar_bytes_amount in
-                Bytes.blit
-                  slot_page
-                  (i * scalar_bytes_amount)
-                  dst
-                  0
-                  scalar_bytes_amount ;
-                Scalar.of_bytes_exn dst
-            | i when i = t.page_length - 1 ->
-                let dst = Bytes.create t.remaining_bytes in
-                Bytes.blit
-                  slot_page
-                  (i * scalar_bytes_amount)
-                  dst
-                  0
-                  t.remaining_bytes ;
-                Scalar.of_bytes_exn dst
-            | _ -> Scalar.(copy zero))
-      in
-      Ok
-        (verify
-           t
-           cm
-           t.srs.kate_amortized_srs_g2_pages
-           domain
-           (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
-           proof)
+      let expected_page_length = t.page_size in
+      let got_page_length = Bytes.length page in
+      if expected_page_length <> got_page_length then
+        Error `Page_length_mismatch
+      else
+        let domain =
+          Domains.build_power_of_two Z.(log2up (of_int t.page_length))
+        in
+        let slot_page_evaluations =
+          Array.init
+            (1 lsl Z.(log2up (of_int t.page_length)))
+            (function
+              | i when i < t.page_length - 1 ->
+                  let dst = Bytes.create scalar_bytes_amount in
+                  Bytes.blit
+                    page
+                    (i * scalar_bytes_amount)
+                    dst
+                    0
+                    scalar_bytes_amount ;
+                  Scalar.of_bytes_exn dst
+              | i when i = t.page_length - 1 ->
+                  let dst = Bytes.create t.remaining_bytes in
+                  Bytes.blit
+                    page
+                    (i * scalar_bytes_amount)
+                    dst
+                    0
+                    t.remaining_bytes ;
+                  Scalar.of_bytes_exn dst
+              | _ -> Scalar.(copy zero))
+        in
+        Ok
+          (verify
+             t
+             cm
+             t.srs.kate_amortized_srs_g2_pages
+             domain
+             (Domains.get t.domain_k page_index, slot_page_evaluations)
+             proof)
 end
 
 include Inner
@@ -864,17 +921,38 @@ module Internal_for_tests = struct
       Bls12_381.Fr.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let srs_g1 = Srs_g1.generate_insecure size secret in
-    let srs_g2 = Srs_g2.generate_insecure size secret in
+    let srs_g1 = Srs_g1.generate_insecure (size + 1) secret in
+    let srs_g2 = Srs_g2.generate_insecure (size + 1) secret in
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
+end
 
-  let parameters (t : t) =
-    {
-      redundancy_factor = t.redundancy_factor;
-      slot_size = t.slot_size;
-      page_size = t.page_size;
-      number_of_shards = t.number_of_shards;
-    }
+module Config = struct
+  type t = {activated : bool; srs_size : int option}
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {activated; srs_size} -> (activated, srs_size))
+      (fun (activated, srs_size) -> {activated; srs_size})
+      (obj2 (req "activated" bool) (req "srs_size" (option int31)))
+
+  let default = {activated = false; srs_size = None}
+
+  let init_dal ~find_srs_files dal_config =
+    let open Lwt_result_syntax in
+    if dal_config.activated then
+      let* initialisation_parameters =
+        match dal_config.srs_size with
+        | None ->
+            let*? g1_path, g2_path = find_srs_files () in
+            initialisation_parameters_from_files ~g1_path ~g2_path
+        | Some slot_size ->
+            return
+              (Internal_for_tests.initialisation_parameters_from_slot_size
+                 ~slot_size)
+      in
+      Lwt.return (load_parameters initialisation_parameters)
+    else return_unit
 end

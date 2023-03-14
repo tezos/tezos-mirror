@@ -45,22 +45,22 @@ Shell RPCs
 The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 11.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi.json (version 15.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Kathmandu RPCs
---------------
+Lima RPCs
+---------
 
-The OpenAPI specification for RPCs which are specific to the Kathmandu (``PtKathma``)
+The OpenAPI specification for RPCs which are specific to the Lima (``PtLimaPt``)
 protocol can be found at:
 
-- `kathmandu-openapi.json (version 14.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/kathmandu-openapi.json>`_
+- `lima-openapi.json (version 15.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/lima-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Kathmandu protocol can be found at:
+and specific to the Lima protocol can be found at:
 
-- `kathmandu-mempool-openapi.json (version 14.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/kathmandu-mempool-openapi.json>`_
+- `lima-mempool-openapi.json (version 15.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/lima-mempool-openapi.json>`_
 
 .. _openapi_generate:
 
@@ -68,7 +68,7 @@ How to Generate
 ---------------
 
 To generate the above files, run the ``src/bin_openapi/generate.sh`` script
-from the root of the Tezos repository.
+from the root of the Octez repository.
 It will start a sandbox node, activate the protocol,
 get the RPC specifications from this node and convert them to OpenAPI specifications.
 

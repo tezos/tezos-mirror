@@ -29,7 +29,7 @@ open Client_proto_args
 
 let group =
   {
-    Clic.name = "tokens";
+    Tezos_clic.name = "tokens";
     title = "Commands for managing FA1.2-compatible smart contracts";
   }
 
@@ -46,15 +46,16 @@ let from_param () =
 let to_param () = alias_param ~name:"to" ~desc:"name or address of the receiver"
 
 let amount_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"amount"
     ~desc:"number of tokens"
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
          try
            let v = Z.of_string s in
            assert (Compare.Z.(v >= Z.zero)) ;
            Lwt_result_syntax.return v
-         with _ -> failwith "invalid amount (must be a non-negative number)"))
+         with _ ->
+           cctxt#error "invalid amount (must be a non-negative number)"))
 
 let tez_amount_arg =
   tez_arg ~default:"0" ~parameter:"tez-amount" ~doc:"amount in \xEA\x9C\xA9"
@@ -72,14 +73,14 @@ let payer_arg =
     ()
 
 let callback_entrypoint_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"Entrypoint the view should use to callback to"
     ~long:"callback-entrypoint"
     ~placeholder:"name"
     string_parameter
 
 let contract_call_options =
-  Clic.args9
+  Tezos_clic.args9
     tez_amount_arg
     fee_arg
     Client_proto_context_commands.dry_run_switch
@@ -91,7 +92,7 @@ let contract_call_options =
     fee_parameter_args
 
 let contract_view_options =
-  Clic.args10
+  Tezos_clic.args10
     callback_entrypoint_arg
     tez_amount_arg
     fee_arg
@@ -104,24 +105,25 @@ let contract_view_options =
     fee_parameter_args
 
 let view_options =
-  Clic.args3
+  Tezos_clic.args3
     run_gas_limit_arg
     payer_arg
     (unparsing_mode_arg ~default:"Readable")
 
 let dummy_callback = Contract.Implicit Signature.Public_key_hash.zero
 
-let get_contract_caller_keys cctxt (caller : Contract.t) =
+let get_contract_caller_keys (cctxt : #Client_context.full)
+    (caller : Contract.t) =
   let open Lwt_result_syntax in
   match caller with
   | Originated _ ->
-      failwith "only implicit accounts can be the source of a contract call"
+      cctxt#error "only implicit accounts can be the source of a contract call"
   | Implicit source ->
       let* _, caller_pk, caller_sk = Client_keys.get_key cctxt source in
       return (source, caller_pk, caller_sk)
 
-let commands_ro () : #Protocol_client_context.full Clic.command list =
-  Clic.
+let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
+  Tezos_clic.
     [
       command
         ~group
@@ -448,14 +450,14 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           return_unit);
     ]
 
-let commands_rw () : #Protocol_client_context.full Clic.command list =
+let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
   let open Client_proto_args in
-  Clic.
+  Tezos_clic.
     [
       command
         ~group
         ~desc:"Transfer tokens between two given accounts"
-        (Clic.args10
+        (Tezos_clic.args10
            as_arg
            tez_amount_arg
            fee_arg
@@ -598,8 +600,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              ~name:"src"
              ~desc:"name or address of the source of the transfers"
         @@ prefix "using"
-        @@ param
-             ~name:"transfers.json"
+        @@ json_encoded_param
+             ~name:"transfers"
              ~desc:
                (Format.sprintf
                   "List of token transfers to inject from the source contract \
@@ -612,7 +614,29 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                    \"storage-limit\". The complete schema can be inspected via \
                    `tezos-codec describe %s.fa1.2.token_transfer json schema`."
                   Protocol.name)
-             json_parameter
+             ~pp_error:(fun json fmt exn ->
+               match (json, exn) with
+               | `A lj, Data_encoding.Json.Cannot_destruct ([`Index n], exn) ->
+                   Format.fprintf
+                     fmt
+                     "Invalid transfer at index %i: %a %a"
+                     n
+                     (fun ppf -> Data_encoding.Json.print_error ppf)
+                     exn
+                     (Format.pp_print_option Data_encoding.Json.pp)
+                     (List.nth_opt lj n)
+               | _, (Data_encoding.Json.Cannot_destruct _ as exn) ->
+                   Format.fprintf
+                     fmt
+                     "Invalid transfer file: %a %a"
+                     (fun ppf -> Data_encoding.Json.print_error ppf)
+                     exn
+                     Data_encoding.Json.pp
+                     json
+               | _, exn -> raise exn
+               (* this case can't happen because only `Cannot_destruct` error are
+                  given to this pp *))
+             (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
         @@ stop)
         (fun ( fee,
                as_address,
@@ -624,16 +648,12 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                no_print_source,
                fee_parameter )
              src
-             operations_json
+             operations
              cctxt ->
           let open Lwt_result_syntax in
           let caller = Option.value ~default:src as_address in
-          match
-            Data_encoding.Json.destruct
-              (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
-              operations_json
-          with
-          | [] -> failwith "Empty operation list"
+          match operations with
+          | [] -> cctxt#error "Empty operation list"
           | operations ->
               let* source, src_pk, src_sk =
                 get_contract_caller_keys cctxt caller
@@ -665,33 +685,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   cctxt
                   errors
               in
-              return_unit
-          | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
-            -> (
-              match (path, operations_json) with
-              | [`Index n], `A lj -> (
-                  match List.nth_opt lj n with
-                  | Some j ->
-                      failwith
-                        "Invalid transfer at index %i: %a %a"
-                        n
-                        (fun ppf -> Data_encoding.Json.print_error ppf)
-                        exn2
-                        Data_encoding.Json.pp
-                        j
-                  | _ ->
-                      failwith
-                        "Invalid transfer at index %i: %a"
-                        n
-                        (fun ppf -> Data_encoding.Json.print_error ppf)
-                        exn2)
-              | _ ->
-                  failwith
-                    "Invalid transfer file: %a %a"
-                    (fun ppf -> Data_encoding.Json.print_error ppf)
-                    exn
-                    Data_encoding.Json.pp
-                    operations_json));
+              return_unit);
     ]
 
 let commands () = commands_ro () @ commands_rw ()

@@ -31,11 +31,11 @@ type t
 val create :
   Store.t ->
   Distributed_db.t ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
+  Shell_limits.peer_validator_limits ->
+  Shell_limits.block_validator_limits ->
   Block_validator_process.t ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
+  Shell_limits.prevalidator_limits ->
+  Shell_limits.chain_validator_limits ->
   start_testchain:bool ->
   t tzresult Lwt.t
 

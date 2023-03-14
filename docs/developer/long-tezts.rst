@@ -108,7 +108,7 @@ Example
 -------
 
 See :src:`tezt/long_tests/prt_client.ml`, which is a very simple test
-that measures how long it takes for ``tezos-client`` to load.  It uses
+that measures how long it takes for ``octez-client`` to load.  It uses
 ``Long_test.time_lwt`` to measure how long it takes for
 ``Client.version`` to run and to emit alerts if this time is
 significantly higher than usual. It also defines a graph of this time.

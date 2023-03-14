@@ -447,7 +447,7 @@ module Machine = struct
           pure ())
         ()
         env.implicit_accounts
-      >>= fun _ ->
+      >>= fun () ->
       get_tzbtc_balance env.cpmm_contract env state
       >>= fun cpmm_tzbtc_balance ->
       assert (specs.cpmm_min_tzbtc_balance <= cpmm_tzbtc_balance) ;
@@ -516,9 +516,9 @@ end
 let initial_xtz_repartition accounts_balances =
   let distributed_xtz = List.fold_left Int64.add 0L accounts_balances in
   let bootstrap1_xtz = Int64.sub total_xtz distributed_xtz in
-  let initial_balances = bootstrap1_xtz :: accounts_balances in
-  let n = List.length initial_balances in
-  (n, initial_balances)
+  let bootstrap_balances = bootstrap1_xtz :: accounts_balances in
+  let n = List.length bootstrap_balances in
+  (n, bootstrap_balances)
 
 (* --------------------------------------------------------------------------- *)
 
@@ -699,7 +699,7 @@ module MachineBuilder = struct
        >>= fun op -> bake ~invariant ~baker:env.holder [op] env state
       else pure state)
       >>= fun state ->
-      check_state_satisfies_specs env state specs >>= fun _ -> pure (state, env)
+      check_state_satisfies_specs env state specs >>= fun () -> pure (state, env)
   end
 end
 
@@ -854,11 +854,11 @@ module ConcreteBaseMachine :
 
   let init ~invariant ?subsidy accounts_balances =
     let liquidity_baking_subsidy = Option.map Tez.of_mutez_exn subsidy in
-    let n, initial_balances = initial_xtz_repartition accounts_balances in
+    let n, bootstrap_balances = initial_xtz_repartition accounts_balances in
     Context.init_n
       n
       ~consensus_threshold:0
-      ~initial_balances
+      ~bootstrap_balances
       ~cost_per_byte:Tez.zero
       ~endorsing_reward_per_slot:Tez.zero
       ~baking_reward_bonus_per_slot:Tez.zero
@@ -1181,9 +1181,9 @@ module SymbolicBaseMachine :
   end)
 
   let init ~invariant:_ ?(subsidy = default_subsidy) accounts_balances =
-    let _, initial_balances = initial_xtz_repartition accounts_balances in
+    let _, bootstrap_balances = initial_xtz_repartition accounts_balances in
     let len = Int64.of_int (List.length accounts_balances) in
-    match initial_balances with
+    match bootstrap_balances with
     | holder_xtz :: accounts ->
         let xtz_cpmm =
           Int64.(

@@ -111,7 +111,7 @@ module type ENCODER = sig
 
   val encoding : t Data_encoding.t
 
-  val rpc_arg : t RPC_arg.t
+  val rpc_arg : t Tezos_rpc.Arg.t
 end
 
 module type PVSS = sig
@@ -236,7 +236,7 @@ module type INDEXES = sig
   end
 
   module WeakRingTable : sig
-    include Ringo.CACHE_MAP with type key = t
+    include Aches.Vache.MAP with type key = t
 
     val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
   end
@@ -450,6 +450,29 @@ module type AGGREGATE_SIGNATURE = sig
   (** [agregate_signature_opt sig_list] creates an aggregated signature using
       the list of signatures [sig_list]. *)
   val aggregate_signature_opt : t list -> t option
+end
+
+module type SPLIT_SIGNATURE = sig
+  include SIGNATURE
+
+  (** A signature prefix potentially carries data. *)
+  type prefix
+
+  (** A splitted signature is a binary representation of a signature with a
+      fixed 64 bytes suffix and a possible prefix. *)
+  type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+  (** [split_signature s] splits the signature [s] into [{prefix; suffix}] where
+      suffix is the fixed 64 bytes suffix of [s] and prefix are the remaining
+      preceding bytes if any. *)
+  val split_signature : t -> splitted
+
+  (** [of_splitted s] reconstructs a signature from a splitted one, if
+      possible. *)
+  val of_splitted : splitted -> t option
+
+  (** Encoding for signature prefixes. *)
+  val prefix_encoding : prefix Data_encoding.t
 end
 
 module type FIELD = sig

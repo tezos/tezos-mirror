@@ -37,4 +37,4 @@ val of_string_exn : string -> t
 
 val to_string : t -> string
 
-val rpc_arg : t RPC_arg.t
+val rpc_arg : t Tezos_rpc.Arg.t

@@ -11,23 +11,23 @@ participants that need to agree for the action to be approved is
 called the multisig *threshold*.
 
 On Tezos, a way to run a multisig is by using a smart contract. Such a
-multisig contract has built-in support in the ``tezos-client`` and has
+multisig contract has built-in support in the ``octez-client`` and has
 been formally verified using the `Mi-Cho-Coq <https://gitlab.com/nomadic-labs/mi-cho-coq/>`_ framework.
 
-Interacting with a multisig contract using ``tezos-client``
+Interacting with a multisig contract using ``octez-client``
 -----------------------------------------------------------
 
 The recommended way to create and use a multisig contract is via
-the ``tezos-client`` built-in commands for the multisig contract. The command
-``tezos-client man multisig`` gives a complete list of
+the ``octez-client`` built-in commands for the multisig contract. The command
+``octez-client man multisig`` gives a complete list of
 multisig-related commands with details about the syntax of each
 command.
 
 Originating a new multisig contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To originate a new generic multisig contract, use the ``tezos-client
-deploy multisig`` command. It is similar to ``tezos-client originate
+To originate a new generic multisig contract, use the ``octez-client
+deploy multisig`` command. It is similar to ``octez-client originate
 contract`` with the following differences:
 
 - no script is given because the script of the generic multisig
@@ -44,26 +44,26 @@ first bootstrap account:
 
 ::
 
-   $ tezos-client gen keys alice
-   $ tezos-client gen keys bob
-   $ tezos-client gen keys charlie
-   $ tezos-client transfer 100 from bootstrap1 to alice --burn-cap 1
-   $ tezos-client transfer 100 from bootstrap1 to bob --burn-cap 1
-   $ tezos-client transfer 100 from bootstrap1 to charlie --burn-cap 1
-   $ tezos-client deploy multisig msig transferring 100 from bootstrap1 with threshold 2 on public keys alice bob charlie --burn-cap 1
+   $ octez-client gen keys alice
+   $ octez-client gen keys bob
+   $ octez-client gen keys charlie
+   $ octez-client transfer 100 from bootstrap1 to alice --burn-cap 1
+   $ octez-client transfer 100 from bootstrap1 to bob --burn-cap 1
+   $ octez-client transfer 100 from bootstrap1 to charlie --burn-cap 1
+   $ octez-client deploy multisig msig transferring 100 from bootstrap1 with threshold 2 on public keys alice bob charlie --burn-cap 1
 
 
 Preparing a transaction
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``tezos-client prepare multisig transaction`` commands are used to
+The ``octez-client prepare multisig transaction`` commands are used to
 obtain the byte sequence corresponding to a possible action and that
 needs to be signed.
 
 To avoid writing Michelson lambdas, special cases for a single
 transfer or delegate change have their own commands.
 
-By default the ``tezos-client prepare multisig transaction`` commands
+By default the ``octez-client prepare multisig transaction`` commands
 display not only the byte sequence to sign but also a cryptographic
 hash (this can be useful when signing with a hardware signer), the
 threshold and the participant public keys. To obtain the byte sequence
@@ -73,7 +73,7 @@ multisig to Bob they will need to sign a transaction. They can call
 
 ::
 
-   $ tezos-client prepare multisig transaction on msig transferring 10 to bob
+   $ octez-client prepare multisig transaction on msig transferring 10 to bob
 
 This command will give them the byte sequence they need to sign, its
 cryptographic hash, the threshold (which is 2 in this case), and the
@@ -82,26 +82,26 @@ public keys of Alice, Bob, and Charlie.
 Signing an action
 ~~~~~~~~~~~~~~~~~
 
-There are two equivalent ways to sign an action with ``tezos-client``:
+There are two equivalent ways to sign an action with ``octez-client``:
 
-- preparing the action with one of the ``tezos-client prepare multisig
-  transaction`` commands and then signing it using the ``tezos-client
+- preparing the action with one of the ``octez-client prepare multisig
+  transaction`` commands and then signing it using the ``octez-client
   sign bytes`` command,
-- or directly using one of the ``tezos-client sign multisig
+- or directly using one of the ``octez-client sign multisig
   transaction`` commands that combine these two steps.
 
 For example, Alice can sign the transfer to Bob using
 
 ::
 
-   $ TO_SIGN=$(tezos-client prepare multisig transaction on msig transferring 10 to bob --bytes-only)
-   $ ALICE_S_SIGNATURE=$(tezos-client sign bytes "$TO_SIGN" for alice | cut -d ' ' -f 2)
+   $ TO_SIGN=$(octez-client prepare multisig transaction on msig transferring 10 to bob --bytes-only)
+   $ ALICE_S_SIGNATURE=$(octez-client sign bytes "$TO_SIGN" for alice | cut -d ' ' -f 2)
 
 and Charlie can sign the same transfer using
 
 ::
 
-   $ CHARLIE_S_SIGNATURE=$(tezos-client sign multisig transaction on msig transferring 10 to bob using secret key charlie)
+   $ CHARLIE_S_SIGNATURE=$(octez-client sign multisig transaction on msig transferring 10 to bob using secret key charlie)
 
 Acting on the multisig contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -110,17 +110,17 @@ Once a user has gathered enough signatures to act on the multisig
 contract, there are again two equivalent ways of sending the
 signatures:
 
-- preparing the action with one of the ``tezos-client prepare multisig
+- preparing the action with one of the ``octez-client prepare multisig
   transaction`` commands and then using the produced byte sequence
-  in the ``tezos-client run transaction`` command,
+  in the ``octez-client run transaction`` command,
 - or directly using one of the following commands depending on the action:
 
 
-  - ``tezos-client from multisig contract <multisig> transfer``
-  - ``tezos-client from multisig contract <multisig> run lambda``
-  - ``tezos-client set delegate of multisig contract``
-  - ``tezos-client withdraw delegate of multisig contract``
-  - ``tezos-client set threshold of multisig contract``
+  - ``octez-client from multisig contract <multisig> transfer``
+  - ``octez-client from multisig contract <multisig> run lambda``
+  - ``octez-client set delegate of multisig contract``
+  - ``octez-client withdraw delegate of multisig contract``
+  - ``octez-client set threshold of multisig contract``
 
 
 For example, if Alice sends her signature to Charlie, he can perform
@@ -128,20 +128,20 @@ the multi-signed transfer of ꜩ10 to Bob using either:
 
 ::
 
-   $ tezos-client run transaction "$TO_SIGN" on multisig contract msig on behalf of charlie with signatures "$ALICE_S_SIGNATURE" "$CHARLIE_S_SIGNATURE"
+   $ octez-client run transaction "$TO_SIGN" on multisig contract msig on behalf of charlie with signatures "$ALICE_S_SIGNATURE" "$CHARLIE_S_SIGNATURE"
 
 or
 
 ::
 
-   $ tezos-client from multisig contract msig transfer 10 to bob on behalf of charlie with signatures "$ALICE_S_SIGNATURE" "$CHARLIE_S_SIGNATURE"
+   $ octez-client from multisig contract msig transfer 10 to bob on behalf of charlie with signatures "$ALICE_S_SIGNATURE" "$CHARLIE_S_SIGNATURE"
 
 
 Supported versions of the multisig contract
 -------------------------------------------
 
 Two main versions of the multisig contract are supported by
-``tezos-client``. They are called the generic multisig contract and
+``octez-client``. They are called the generic multisig contract and
 the legacy multisig contract.
 
 The generic multisig contract
@@ -164,7 +164,7 @@ following features:
 The legacy multisig contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``tezos-client`` also supports
+The ``octez-client`` also supports
 :src:`a legacy version<tests_python/contracts_alpha/mini_scenarios/legacy_multisig.tz>` of the multisig contract which has the following
 limitations:
 
@@ -190,12 +190,12 @@ multisig contract.
 Listing supported hashes
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-For security reasons, ``tezos-client`` will not interact with unknown
+For security reasons, ``octez-client`` will not interact with unknown
 scripts even if their interface matches one of the supported
 multisig contracts. To check if a script is one of the supported ones,
 it stores a list of script hashes that can be printed by
-``tezos-client show supported multisig hashes``. The script originated
-by the ``tezos-client deploy multisig`` command is always one of the
+``octez-client show supported multisig hashes``. The script originated
+by the ``octez-client deploy multisig`` command is always one of the
 supported multisig contracts.
 
 Interacting with a multisig contract directly
@@ -203,7 +203,7 @@ Interacting with a multisig contract directly
 
 The following subsections describe in detail the low-level API of a
 built-in multisig contract, allowing one to originate and use in
-situations where ``tezos-client`` cannot be used e.g., when
+situations where ``octez-client`` cannot be used e.g., when
 interacting with the chain from a web browser or in a mobile
 application. In particular, this interface is typically useful when
 developing multisig support in another Tezos wallet.

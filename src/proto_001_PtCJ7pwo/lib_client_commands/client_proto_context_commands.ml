@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.printer) = function
@@ -45,17 +45,17 @@ let report_michelson_errors ?(no_print_source = false) ~msg
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group

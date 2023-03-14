@@ -81,7 +81,9 @@ let run_manager_operations_and_check_proto_error ~expected_proto_error
     (Ezjsonm.value_to_string ~minify:false op_json) ;
   let* response =
     RPC.(
-      call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+      call_json
+        node
+        (post_chain_block_helpers_scripts_run_operation (Data op_json)))
   in
   check_response_contains_proto_error ~expected_proto_error response ;
   unit
@@ -135,7 +137,8 @@ let test_run_proposals =
   Log.info "%s" (Ezjsonm.value_to_string ~minify:false op_json) ;
   Log.info "Call the [run_operation] RPC on this operation." ;
   let* _output =
-    RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+    RPC.(
+      call node (post_chain_block_helpers_scripts_run_operation (Data op_json)))
   in
   unit
 
@@ -208,7 +211,7 @@ let test_batch_inconsistent_sources protocols =
       let* response =
         RPC.call_json
           node
-          (RPC.post_chain_block_helpers_scripts_run_operation batch_json)
+          (RPC.post_chain_block_helpers_scripts_run_operation (Data batch_json))
       in
       check_response_contains_proto_error ~expected_proto_error response ;
       unit)
@@ -372,7 +375,9 @@ let test_bad_revelations =
     let* op_json = Operation.make_run_operation_input op client in
     let* response =
       RPC.(
-        call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+        call_json
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     check_response_contains_proto_error
       ~expected_proto_error:incorrect_reveal_position_error
@@ -394,7 +399,9 @@ let test_bad_revelations =
     let* op_json = Operation.make_run_operation_input op client in
     let* response =
       RPC.(
-        call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+        call_json
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     check_response_contains_proto_error
       ~expected_proto_error:inconsistent_hash_error
@@ -413,7 +420,9 @@ let test_bad_revelations =
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* output =
-      RPC.call node (RPC.post_chain_block_helpers_scripts_run_operation op_json)
+      RPC.call
+        node
+        (RPC.post_chain_block_helpers_scripts_run_operation (Data op_json))
     in
     let operation_result =
       JSON.(output |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
@@ -490,7 +499,10 @@ let test_correct_batch =
     (Ezjsonm.value_to_string ~minify:false batch_json) ;
   Log.info "Call the [run_operation] RPC on the batch." ;
   let* _output =
-    RPC.(call node (post_chain_block_helpers_scripts_run_operation batch_json))
+    RPC.(
+      call
+        node
+        (post_chain_block_helpers_scripts_run_operation (Data batch_json)))
   in
   unit
 
@@ -539,7 +551,8 @@ let test_misc_manager_ops_from_fresh_account =
   in
   let* _run_operation_output =
     let* op_json = Operation.make_run_operation_input reveal_op client in
-    RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+    RPC.(
+      call node (post_chain_block_helpers_scripts_run_operation (Data op_json)))
   in
   Log.info "Inject the crafted revelation and bake a block to apply it." ;
   let* _oph = Operation.inject reveal_op client in
@@ -557,7 +570,10 @@ let test_misc_manager_ops_from_fresh_account =
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* _output =
-      RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+      RPC.(
+        call
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     unit
   in
@@ -572,11 +588,72 @@ let test_misc_manager_ops_from_fresh_account =
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* _output =
-      RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+      RPC.(
+        call
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     unit
   in
   unit
+
+let test_fail_inject_signed_arbitrary_operation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Test that failing_noop operations are never validated"
+    ~tags:(run_operation_tags @ ["failing_noop"])
+  @@ fun protocol ->
+  Log.info "Initialize a node and a client." ;
+  let* _node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  [
+    ("bootstrap1", "msg1", None);
+    ("bootstrap2", "msg2", None);
+    ("bootstrap3", "msg3", Some "head");
+    ("bootstrap4", "msg4", Some "head");
+  ]
+  |> Lwt_list.iter_s @@ fun (src, message, branch) ->
+     let* signature = Client.sign_message client ?branch message ~src in
+     let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
+     let* head_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
+     let arbitrary =
+       match protocol with
+       | Protocol.Lima -> message
+       | Protocol.Mumbai | Protocol.Alpha -> Hex.(of_string message |> show)
+     in
+     let (op_json : JSON.u) =
+       `O
+         [
+           ( "operation",
+             `O
+               [
+                 ("branch", `String head_hash);
+                 ( "contents",
+                   `A
+                     [
+                       `O
+                         [
+                           ("kind", `String "failing_noop");
+                           ("arbitrary", `String arbitrary);
+                         ];
+                     ] );
+                 ("signature", `String signature);
+               ] );
+           ("chain_id", `String chain_id);
+         ]
+     in
+     let*? process =
+       RPC.Client.spawn client
+       @@ RPC.post_chain_block_helpers_scripts_run_operation (Data op_json)
+     in
+     let msg = rex "A failing_noop operation can never be validated" in
+     let* () = Process.check_error ~msg process in
+     unit
 
 let register ~protocols =
   test_run_proposals protocols ;
@@ -584,4 +661,5 @@ let register ~protocols =
   test_inconsistent_counters protocols ;
   test_bad_revelations protocols ;
   test_correct_batch protocols ;
-  test_misc_manager_ops_from_fresh_account protocols
+  test_misc_manager_ops_from_fresh_account protocols ;
+  test_fail_inject_signed_arbitrary_operation protocols

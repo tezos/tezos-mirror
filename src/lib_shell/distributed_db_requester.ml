@@ -207,7 +207,7 @@ module Block_header_storage = struct
     let* b = Store.Block.is_known_valid chain_store hash in
     match b with
     | true -> Lwt.return_true
-    | false -> Store.Block.is_known_prechecked chain_store hash
+    | false -> Store.Block.is_known_validated chain_store hash
 
   let read chain_store h =
     let open Lwt_result_syntax in
@@ -215,7 +215,7 @@ module Block_header_storage = struct
       let*! r = Store.Block.read_block chain_store h in
       match r with
       | Ok b -> return b
-      | Error _ -> Store.Block.read_prechecked_block chain_store h
+      | Error _ -> Store.Block.read_validated_block chain_store h
     in
     return (Store.Block.header b)
 
@@ -225,7 +225,7 @@ module Block_header_storage = struct
       let* o = Store.Block.read_block_opt chain_store h in
       match o with
       | Some b -> Lwt.return_some b
-      | None -> Store.Block.read_prechecked_block_opt chain_store h
+      | None -> Store.Block.read_validated_block_opt chain_store h
     in
     Lwt.return (Option.map Store.Block.header b)
 end
@@ -259,7 +259,14 @@ module Raw_block_header =
 module Operations_table = Hashtbl.MakeSeeded (struct
   type t = Block_hash.t * int
 
+  (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+  [@@@ocaml.warning "-32"]
+
   let hash = Hashtbl.seeded_hash
+
+  let seeded_hash = Hashtbl.seeded_hash
+
+  [@@@ocaml.warning "+32"]
 
   let equal (b1, i1) (b2, i2) = Block_hash.equal b1 b2 && i1 = i2
 end)

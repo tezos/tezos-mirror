@@ -69,7 +69,6 @@ module Manager_operation = struct
            make sc_rollup_timeout_case;
            make sc_rollup_execute_outbox_message_case;
            make sc_rollup_recover_bond_case;
-           make sc_rollup_dal_slot_subscribe_case;
          ]
 
   let get_case :
@@ -105,9 +104,9 @@ module Manager_operation = struct
     | Sc_rollup_execute_outbox_message _ ->
         sc_rollup_execute_outbox_message_case
     | Sc_rollup_recover_bond _ -> sc_rollup_recover_bond_case
-    | Sc_rollup_dal_slot_subscribe _ -> sc_rollup_dal_slot_subscribe_case
     | Zk_rollup_origination _ -> zk_rollup_origination_case
     | Zk_rollup_publish _ -> zk_rollup_publish_case
+    | Zk_rollup_update _ -> zk_rollup_update_case
 
   let pp_kind ppf op =
     let open Operation.Encoding.Manager_operations in
@@ -160,13 +159,11 @@ module Manager_operation = struct
           level
           (Format.pp_print_list pp_rollup_reveal)
           tickets_info
-    | Sc_rollup_add_messages {rollup; messages} ->
+    | Sc_rollup_add_messages {messages} ->
         Format.fprintf
           ppf
-          "publishing %d messages to rollup %a inbox"
+          "publishing %d messages to smart rollups' inbox"
           (List.length messages)
-          Sc_rollup.Address.pp
-          rollup
     | Sc_rollup_cement {rollup; commitment} ->
         Format.fprintf
           ppf
@@ -188,8 +185,8 @@ module Manager_operation = struct
 end
 
 module Hash =
-  Blake2B.Make
-    (Base58)
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
     (struct
       let name = "manager_operation_hash"
 
@@ -200,7 +197,8 @@ module Hash =
       let size = None
     end)
 
-let () = Base58.check_encoded_prefix Hash.b58check_encoding "mop" 53
+let () =
+  Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "mop" 53
 
 type hash = Hash.t
 

@@ -1,7 +1,7 @@
 Usage example
 =============
 
-We present a typical benchmark workflow using ``tezos-snoop``.
+We present a typical benchmark workflow using ``octez-snoop``.
 We'll consider the case of the ``blake2b`` hashing function, which
 is used among other things to hash blocks, operations and contexts:
 
@@ -19,7 +19,7 @@ Step 1: Defining the benchmark
 Benchmarks correspond to OCaml modules implementing the ``Benchmark.S`` signature.
 These must then be registered via the ``Registration.register`` function.
 Of course, for this registration to happen, the file containing the benchmark
-and the call to ``Registration.register`` should be linked with ``tezos-snoop``.
+and the call to ``Registration.register`` should be linked with ``octez-snoop``.
 See :doc:`snoop_arch` for complementary details.
 
 We'll define the benchmark module chunk by chunk and describe each part.
@@ -163,7 +163,7 @@ for this benchmark) but to execute this closure ``100000`` times (through ``--ns
 
 .. code-block:: shell
 
-   tezos-snoop benchmark TIMER_LATENCY and save to timer.workload --bench-num 1 --nsamples 100000
+   octez-snoop benchmark TIMER_LATENCY and save to timer.workload --bench-num 1 --nsamples 100000
 
 The tool returns the following on standard output:
 
@@ -195,7 +195,7 @@ zero. One could also run many benchmarks with fewer samples per benchmark:
 
 .. code-block:: shell
 
-   tezos-snoop benchmark TIMER_LATENCY and save to timer.workload --bench-num 1000 --nsamples 100
+   octez-snoop benchmark TIMER_LATENCY and save to timer.workload --bench-num 1000 --nsamples 100
 
 This yields on standard output:
 
@@ -240,7 +240,7 @@ If not specified, the PRNG will self-initialize using an unknown seed.
 
 .. code-block:: shell
 
-   tezos-snoop benchmark Blake2b_example and save to blake2b.workload --bench-num 500 --nsamples 3000 --determinizer percentile@50 --seed 12897
+   octez-snoop benchmark Blake2b_example and save to blake2b.workload --bench-num 500 --nsamples 3000 --determinizer percentile@50 --seed 12897
 
 Here's the output:
 
@@ -272,7 +272,7 @@ It is possible to remove outliers from the raw benchmark data. The command is th
 
 .. code-block:: shell
 
-   tezos-snoop remove outliers from data ./blake2b.workload above 3 sigmas and save to blake2b-cleaned.workload
+   octez-snoop remove outliers from data ./blake2b.workload above 3 sigmas and save to blake2b-cleaned.workload
 
 In this particular example, the data seems clean though:
 
@@ -297,7 +297,7 @@ At the time of writing, the tool offloads the regression problem to the `scikit-
 
 .. code-block:: shell
 
-   tezos-snoop infer parameters for model blake2b on data blake2b.workload using lasso --lasso-positive --dump-csv blake2b.csv --save-solution blake2b.sol --plot
+   octez-snoop infer parameters for model blake2b on data blake2b.workload using lasso --lasso-positive --dump-csv blake2b.csv --save-solution blake2b.sol --plot
 
 ::
 
@@ -357,7 +357,7 @@ but the principle is similar.
 
 .. code-block:: shell
 
-   tezos-snoop generate code using solution blake2b.sol and model blake2b_codegen
+   octez-snoop generate code using solution blake2b.sol and model blake2b_codegen
 
 By default, the tool produces integer code by casting floating point constant to integers.
 The tool produces the following code on ``stdout``:
@@ -383,7 +383,7 @@ Calling the tool:
 
 .. code-block:: shell
 
-   tezos-snoop generate code using solution blake2b.sol and model blake2b_codegen --fixed-point codegen_params.json
+   octez-snoop generate code using solution blake2b.sol and model blake2b_codegen --fixed-point codegen_params.json
 
 We get:
 

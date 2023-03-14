@@ -31,7 +31,7 @@
    Subject:      Test the synchronisation heuristic with a reference implementation
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* Interface implemented by the synchronisation heuristic. *)
 

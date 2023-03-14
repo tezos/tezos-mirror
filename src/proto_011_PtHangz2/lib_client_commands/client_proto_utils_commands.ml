@@ -25,10 +25,10 @@
 
 open Client_proto_utils
 
-let group = {Clic.name = "utilities"; title = "Utility Commands"}
+let group = {Tezos_clic.name = "utilities"; title = "Utility Commands"}
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let string_param ~name ~desc =
     param ~name ~desc Client_proto_args.string_parameter
   in
@@ -56,7 +56,7 @@ let commands () =
       (prefixes ["sign"; "message"]
       @@ string_param ~name:"message" ~desc:"message to sign"
       @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"src"
            ~desc:"name of the signer contract"
       @@ stop)
@@ -64,8 +64,8 @@ let commands () =
         Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:block_head ()
         >>=? fun block ->
         sign_message cctxt ~src_sk ~block ~message >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
-        return_unit);
+        cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
+        >>= fun () -> return_unit);
     command
       ~group
       ~desc:
@@ -78,7 +78,7 @@ let commands () =
       (prefixes ["check"; "that"; "message"]
       @@ string_param ~name:"message" ~desc:"signed message"
       @@ prefixes ["was"; "signed"; "by"]
-      @@ Client_keys.Public_key.alias_param
+      @@ Client_keys_v0.Public_key.alias_param
            ~name:"signer"
            ~desc:"name of the signer contract"
       @@ prefixes ["to"; "produce"]

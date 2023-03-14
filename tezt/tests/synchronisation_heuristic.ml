@@ -71,7 +71,7 @@ let check_node_synchronization_state =
   Protocol.register_test
     ~__FILE__
     ~title:"check synchronization state"
-    ~tags:["bootstrap"; "node"; "sync"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "node"; "sync"]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
@@ -156,7 +156,7 @@ let check_prevalidator_start =
   Protocol.register_test
     ~__FILE__
     ~title:"Check prevalidator start"
-    ~tags:["bootstrap"; "node"; "prevalidator"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "node"; "prevalidator"]
   @@ fun protocol ->
   let init_node threshold = Node.init [Synchronisation_threshold threshold] in
   let* node1 = init_node 0 in
@@ -215,7 +215,7 @@ let test_threshold_zero =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold zero"
-    ~tags:["bootstrap"; "threshold"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info "Setup network" ;
   let* node, client =
@@ -227,7 +227,7 @@ let test_threshold_zero =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
 
   Log.info "Check that the node is bootstrapped" ;
   let* () = check_sync_state client Synced in
@@ -263,7 +263,7 @@ let test_threshold_one =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
 
   Log.info "Check synchronisation state of first peer" ;
   let* () = check_sync_state client Synced in
@@ -287,7 +287,7 @@ let test_threshold_two =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold two"
-    ~tags:["bootstrap"; "threshold"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -299,7 +299,7 @@ let test_threshold_two =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
 
   Log.info "Add nodes and connect in clique" ;
 
@@ -353,7 +353,7 @@ let test_threshold_stuck =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold stuck"
-    ~tags:["bootstrap"; "threshold"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   let sync_latency = 3 in
 
@@ -373,7 +373,7 @@ let test_threshold_stuck =
   let* baker = Baker.init ~protocol node client in
 
   Log.info "Bake a few blocks and kill baker" ;
-  let* (_ : int) = Node.wait_for_level node (Node.get_level node + 3) in
+  let* (level : int) = Node.wait_for_level node (Node.get_level node + 3) in
   let* () = Baker.terminate baker in
 
   Log.info "Add two additional peers" ;
@@ -392,10 +392,15 @@ let test_threshold_stuck =
       ()
   in
 
+  Log.info "Delay until sync_latency has expired" ;
+  let* () = Lwt_unix.sleep (float_of_int (2 * sync_latency)) in
+
+  Log.info "Connect nodes." ;
   let* () = connect_clique client [node; node1; node2] in
 
-  Log.info "Delay until until sync_latency has expired" ;
-  let* () = Lwt_unix.sleep (float_of_int (2 * sync_latency)) in
+  Log.info "Wait for nodes 1 and 2 to catch up." ;
+  let* _lvl1 = Node.wait_for_level node1 level
+  and* _lvl2 = Node.wait_for_level node2 level in
 
   Log.info "Check that additional peers are bootstrapped and stuck" ;
   let* () = check_sync_state client1 Stuck in
@@ -409,7 +414,7 @@ let test_threshold_split_view =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold split view"
-    ~tags:["bootstrap"; "threshold"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info
     "Add two peers with threshold zero, and one with threshold 2 and a high \
@@ -441,7 +446,7 @@ let test_threshold_split_view =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
   let* () = connect_clique client [node; node1; node2] in
 
   Log.info "Test that all nodes bootstrap" ;
@@ -475,7 +480,7 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:["bootstrap"; "threshold"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in
@@ -491,7 +496,7 @@ let test_many_nodes_bootstrap =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
   let* node1, client1 =
     Client.init_with_protocol
       ~nodes_args:

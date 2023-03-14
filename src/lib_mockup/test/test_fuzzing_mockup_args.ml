@@ -31,7 +31,7 @@
 *)
 
 open Tezos_mockup_registration.Mockup_args
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 let chain_id_gen = QCheck2.Gen.(map Chain_id.of_string string)
 
@@ -39,7 +39,7 @@ let chain_id_gen = QCheck2.Gen.(map Chain_id.of_string string)
 let test_config_file_has_priority_over_default_value from_config_file_val =
   let expected = from_config_file_val in
   let actual = Chain_id.choose ~from_config_file:(Some from_config_file_val) in
-  let pp = Tezos_crypto.Chain_id.pp in
+  let pp = Tezos_crypto.Hashed.Chain_id.pp in
   qcheck_eq' ~pp ~expected ~actual ()
 
 let test_prioritize_config_file =

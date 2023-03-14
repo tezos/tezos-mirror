@@ -28,7 +28,7 @@ manifest: $(foreach file, $(SOURCE), _build/$(file))
 # Used in the CI.
 .PHONY: check
 check: all
-	@git diff HEAD --exit-code || ( \
+	@git status | grep "nothing to commit" > /dev/null || ( \
 	  echo "Repository not clean after 'make -C manifest'."; \
 	  echo "You should not edit generated dune and .opam files directly."; \
 	  echo "Edit manifest/main.ml instead."; \

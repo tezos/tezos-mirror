@@ -35,7 +35,7 @@ type validator_environment = {
       (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;
       (** user activated protocol overrides *)
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
       (** size limit for operation metadata that should be written on disk *)
 }
 
@@ -53,13 +53,18 @@ type validator_kind =
       protocol_root : string;
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
+      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
     }
       -> validator_kind
+
+type simple_kind = External_process | Single_process
 
 (** Internal representation of the block validator process *)
 type t
 
 val init : validator_environment -> validator_kind -> t tzresult Lwt.t
+
+val kind : t -> simple_kind
 
 (** [close vp] closes the given [vp]. In the case of an [External]
    validator process, we first ask the validator to shutdown. If it is
@@ -110,10 +115,19 @@ val precheck_block :
   Operation.t trace trace ->
   unit tzresult Lwt.t
 
-(** [context_garbage_collection context_index context_hash] removes
-    contexts that are below [context_hash] in the context tree. *)
+(** [context_garbage_collection bvp context_index context_hash]
+    removes contexts that are below [context_hash] in the context
+    tree. *)
 val context_garbage_collection :
-  t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
+  t ->
+  Context_ops.index ->
+  Context_hash.t ->
+  gc_lockfile_path:string ->
+  unit tzresult Lwt.t
+
+(** [context_split bvp context_index] splits the context storage
+    layout into a new chunk. *)
+val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 

@@ -71,7 +71,7 @@ let make_output address amount memo = Core.Forge.Output.{address; amount; memo}
 
 let dummy_input anti_replay ctx dummy_witness root =
   let rcm = Core.Rcm.random () in
-  let seed = Hacl.Rand.gen 32 in
+  let seed = Tezos_crypto.Hacl.Rand.gen 32 in
   let sk = Core.Spending_key.of_seed seed in
   let vk = Core.Viewing_key.of_sk sk in
   let addr = Core.Viewing_key.dummy_address () in
@@ -112,7 +112,7 @@ let create_dummy_inputs n state anti_replay ctx =
 let dummy_output pctx ~memo_size =
   let addr = Core.Viewing_key.dummy_address () in
   let amount = 0L in
-  let o = make_output addr amount (Hacl.Rand.gen memo_size) in
+  let o = make_output addr amount (Tezos_crypto.Hacl.Rand.gen memo_size) in
   let rcm = Core.Rcm.random () in
   let esk = Core.DH.esk_random () in
   let cv_o, proof_o = Core.Proving.output_proof pctx esk addr rcm ~amount in

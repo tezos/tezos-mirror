@@ -5,20 +5,13 @@ endif
 
 last_proto_name := $(shell find ${CI_PROJECT_DIR}/src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $$NF}' | sort -r | head -1)
 last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^0*//')
-$(eval new_proto_version=$(shell echo $$(($(last_proto_version)+1))))
-new_proto_version := $(shell if [ "${new_proto_version}" -lt "100" ]; then echo 0${new_proto_version}; else echo ${new_proto_version}; fi)
+new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
+new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
 .PHONY: test-protocol-compiles
 test-protocol-compiles:
 	cd ${CI_PROJECT_DIR} && \
 		dune build @runtest_compile_protocol
-
-.PHONY: test-static-binaries
-test-static-binaries:
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		sudo cp -a ../octez-binaries/x86_64/* ../ && \
-		$(MAKE) -C ../ build-parameters && \
-		poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
 
 .PHONY: test-pytest
 test-pytest:
@@ -35,11 +28,13 @@ endif
 		poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800 ${TESTS} && \
 		./../scripts/ci/merge_coverage.sh
 
+.PHONY: test-pytest-check-regression-files
+test-pytest-check-regression-files:
+	cd ${CI_PROJECT_DIR}/tests_python && \
+		poetry run pytest --on-unknown-regression-files check
+
 .PHONY: test-tezt
 test-tezt:
-ifndef TESTS
-	$(error TESTS is undefined)
-endif
 	cd ${CI_PROJECT_DIR} && \
 		dune exec tezt/tests/main.exe -- ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 4 --retry 1 && \
 		./scripts/ci/merge_coverage.sh
@@ -165,7 +160,7 @@ doc-linkcheck:
 
 .PHONY: opam-release
 opam-release:
-	cd ${CI_PROJECT_DIR} ; \
+	cd ${CI_PROJECT_DIR} && \
 		./scripts/ci/opam-release.sh
 
 .PHONY: gitlab-release

@@ -39,7 +39,8 @@
       ["<section-prefix>:<level-threshold>"] which can be used to setup more
       precise filters. ["level-at-least=info"] is understood as
       ["section-prefix=:info"] (the empty section prefix matches all
-      sections).
+      sections). To exclude completely a section from the log stream that the
+      sink will output, you can use the special level-threshold "none".
     - ["format"] the output format used;
       acceptable values are ["one-per-line"] (the default),
       ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The
@@ -57,18 +58,26 @@
 
     Examples:
 
-    - ["export TEZOS_EVENTS_CONFIG=file-descriptor-path:///the/path/to/write.log?format=one-per-line&level-at-least=notice&with-pid=true&chmod=0o640"]:
+    - [export TEZOS_EVENTS_CONFIG="file-descriptor-path:///the/path/to/write.log?format=one-per-line&section-prefix=p2p.maintenance:none&with-pid=true&chmod=0o640"]:
+      By default all executables will write all log events of level at least [Info]
+      to a file ["/the/path/to/write-XXXX.log"] where ["XXXX"] is the
+      process ID, the file will be also readable by the user's group ([0o640]).
+      The maintenance module will be excluded from the stream.
+    - [export TEZOS_EVENTS_CONFIG="file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"]:
+      Write only sections validator and rpc at debug level but exclude all other
+      sections from the stream.
+    - [export TEZOS_EVENTS_CONFIG="file-descriptor-path:///the/path/to/write.log?format=one-per-line&level-at-least=notice&with-pid=true&chmod=0o640"]:
       Executables will write all log events of level at least [Notice]
       to a file ["/the/path/to/write-XXXX.log"] where ["XXXX"] is the
       process ID, the file will be also readable by the user's group ([0o640]).
     - ["export TEZOS_EVENTS_CONFIG=file-descriptor-stderr://?format=netstring"]
       Executables will write to [stderr].
-    - ["export TEZOS_EVENTS_CONFIG=file-descriptor-path:///dev/fd/4?format=netstring"]
+    - [export TEZOS_EVENTS_CONFIG="file-descriptor-path:///dev/fd/4?format=netstring"]
       Executables will write to the [4] file-descriptor likely opened
       by a parent monitoring process (non-standard feature available
       on mainstream UNIX hosts, e.g. Linux and MacOSX).
 
-    - ["export TEZOS_EVENT_HOSTNAME=hostname"]
+    - [export TEZOS_EVENT_HOSTNAME="hostname"]
       The [hostname] will be used in the JSON representation of the event.
       By default, it is the hostname given by [Unix.gethostname ()].
 

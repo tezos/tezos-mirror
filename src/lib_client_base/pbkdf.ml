@@ -25,7 +25,7 @@ module type S = sig
     password:Bytes.t -> salt:Bytes.t -> count:int -> dk_len:int32 -> Bytes.t
 end
 
-module Make (H : Hacl.Hash.S) : S = struct
+module Make (H : Tezos_crypto.Hacl.Hash.S) : S = struct
   let pbkdf2 ~password ~salt ~count ~dk_len =
     if count <= 0 then invalid_arg "count must be a positive integer" ;
     if dk_len <= 0l then
@@ -52,8 +52,8 @@ module Make (H : Hacl.Hash.S) : S = struct
     Bytes.concat Bytes.empty (loop [Bytes.sub (block l) 0 r] (l - 1))
 end
 
-module SHA256 = Make (Hacl.Hash.SHA256)
-module SHA512 = Make (Hacl.Hash.SHA512)
+module SHA256 = Make (Tezos_crypto.Hacl.Hash.SHA256)
+module SHA512 = Make (Tezos_crypto.Hacl.Hash.SHA512)
 
 (* Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are met:

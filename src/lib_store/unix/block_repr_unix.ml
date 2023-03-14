@@ -195,3 +195,15 @@ let raw_get_last_allowed_fork_level block_bytes total_block_length =
       else metadata_offset + 1
     in
     Some (Bytes.get_int32_be block_bytes lafl_offset)
+
+let fitness_length_offset =
+  predecessor_offset + Block_hash.size + 8 (* timestamp *) + 1
+  (* validation pass *) + 32 (* operation list list hash *)
+
+let raw_get_context block_bytes =
+  let fitness_length = Bytes.get_int32_be block_bytes fitness_length_offset in
+  let context_offset =
+    fitness_length_offset + 4 + Int32.to_int fitness_length
+  in
+  Context_hash.of_bytes_exn
+    (Bytes.sub block_bytes context_offset Context_hash.size)

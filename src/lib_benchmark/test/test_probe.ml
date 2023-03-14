@@ -25,6 +25,8 @@
 
 open Tezos_benchmark
 
+let ns = Namespace.make Namespace.root "test_probe"
+
 (* A silly scenario to illustrate With_probe benchmarks *)
 
 module Aspect = struct
@@ -43,7 +45,7 @@ type workload = Blake2b of {nbytes : int} | Sha256 of {nbytes : int}
 type config = {max_bytes : int}
 
 module Probing_bench = struct
-  let name = "Probing_test"
+  let name = ns "Probing_test"
 
   let info = "Testing probing benchmarks"
 
@@ -137,7 +139,7 @@ let bench_opts =
     nsamples = 30;
     bench_number = 10;
     minor_heap_size = `words (256 * 1024);
-    config_dir = None;
+    config_file = None;
   }
 
 (* Perform timing measurements *)
@@ -147,3 +149,5 @@ let do_bench () =
   true
 
 let tests = [Test.tztest_assert "probing bench" `Quick do_bench]
+
+let () = Alcotest_lwt.run "tezos-benchmark" [("probe", tests)] |> Lwt_main.run

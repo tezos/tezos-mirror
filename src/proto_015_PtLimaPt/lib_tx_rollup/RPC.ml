@@ -113,7 +113,7 @@ module Arg = struct
               |> Result.map Indexable.forget
           | None -> Error ("Cannot parse index or " ^ kind))
     in
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~descr:
         (Format.sprintf "An index or an L2 %s in the rollup in b58check." kind)
       ~name:(kind ^ "_indexable")
@@ -134,24 +134,24 @@ module Arg = struct
       ~construct:Ticket_hash.to_b58check
       ~destruct:Ticket_hash.of_b58check_opt
 
-  let block_id : block_id RPC_arg.t =
-    RPC_arg.make
+  let block_id : block_id Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
       ~descr:"An L2 block identifier."
       ~name:"block_id"
       ~construct:construct_block_id
       ~destruct:destruct_block_id
       ()
 
-  let context_id : context_id RPC_arg.t =
-    RPC_arg.make
+  let context_id : context_id Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
       ~descr:"An L2 block or context identifier."
       ~name:"context_id"
       ~construct:construct_context_id
       ~destruct:destruct_context_id
       ()
 
-  let l2_transaction : L2_transaction.hash RPC_arg.t =
-    RPC_arg.make
+  let l2_transaction : L2_transaction.hash Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
       ~descr:"An L2 transaction identifier."
       ~name:"l2_transaction_hash"
       ~construct:L2_transaction.Hash.to_b58check
@@ -225,14 +225,14 @@ module Block = struct
   open Lwt_result_syntax
 
   let format_query =
-    let open RPC_query in
+    let open Tezos_rpc.Query in
     query (fun format -> format)
     |+ field
          ~descr:
            "Whether to return the L2 block in raw format (raw) or as a more \
             human readable version (fancy, default)."
          "format"
-         (RPC_arg.make
+         (Tezos_rpc.Arg.make
             ~name:"format"
             ~destruct:(function
               | "raw" -> Ok `Raw
@@ -249,44 +249,45 @@ module Block = struct
          (fun format -> format)
     |> seal
 
-  let path : (unit * block_id) RPC_path.context = RPC_path.(open_root)
+  let path : (unit * block_id) Tezos_rpc.Path.context =
+    Tezos_rpc.Path.(open_root)
 
-  let prefix = RPC_path.(open_root / "block" /: Arg.block_id)
+  let prefix = Tezos_rpc.Path.(open_root / "block" /: Arg.block_id)
 
-  let directory : (State.t * block_id) RPC_directory.t ref =
-    ref RPC_directory.empty
+  let directory : (State.t * block_id) Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
 
   let register service f =
-    directory := RPC_directory.register !directory service f
+    directory := Tezos_rpc.Directory.register !directory service f
 
-  let register0 service f = register (RPC_service.subst0 service) f
+  let register0 service f = register (Tezos_rpc.Service.subst0 service) f
 
-  let register1 service f = register (RPC_service.subst1 service) f
+  let register1 service f = register (Tezos_rpc.Service.subst1 service) f
 
   let export_service s =
-    let p = RPC_path.prefix prefix path in
-    RPC_service.prefix p s
+    let p = Tezos_rpc.Path.prefix prefix path in
+    Tezos_rpc.Service.prefix p s
 
   let block =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get the L2 block in the tx-rollup-node"
       ~query:format_query
       ~output:(Data_encoding.option Encodings.any_block)
       path
 
   let header =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get the L2 block header in the tx-rollup-node"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Encodings.header)
-      RPC_path.(path / "header")
+      Tezos_rpc.Path.(path / "header")
 
   let inbox =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get the tx-rollup-node inbox for a given block"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.(option Inbox.encoding)
-      RPC_path.(path / "inbox")
+      Tezos_rpc.Path.(path / "inbox")
 
   let block_of_id state block_id =
     let open Lwt_syntax in
@@ -297,12 +298,12 @@ module Block = struct
     | `Level l -> State.get_level_l2_block state l
 
   let proof =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the merkle proof for a given message for a given block inbox"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.(option Protocol.Tx_rollup_l2_proof.encoding)
-      RPC_path.(path / "proof" / "message" /: RPC_arg.int)
+      Tezos_rpc.Path.(path / "proof" / "message" /: Tezos_rpc.Arg.int)
 
   let () =
     register0 block @@ fun (state, block_id) style () ->
@@ -379,36 +380,40 @@ module Block = struct
 
   let build_directory state =
     !directory
-    |> RPC_directory.map (fun ((), block_id) -> Lwt.return (state, block_id))
-    |> RPC_directory.prefix RPC_path.(open_root / "block" /: Arg.block_id)
+    |> Tezos_rpc.Directory.map (fun ((), block_id) ->
+           Lwt.return (state, block_id))
+    |> Tezos_rpc.Directory.prefix
+         Tezos_rpc.Path.(open_root / "block" /: Arg.block_id)
 end
 
 module Context_RPC = struct
   open Lwt_result_syntax
 
-  let path : (unit * context_id) RPC_path.context = RPC_path.open_root
+  let path : (unit * context_id) Tezos_rpc.Path.context =
+    Tezos_rpc.Path.open_root
 
-  let prefix = RPC_path.(open_root / "context" /: Arg.context_id)
+  let prefix = Tezos_rpc.Path.(open_root / "context" /: Arg.context_id)
 
-  let directory : Context.t RPC_directory.t ref = ref RPC_directory.empty
+  let directory : Context.t Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
 
   let register service f =
-    directory := RPC_directory.register !directory service f
+    directory := Tezos_rpc.Directory.register !directory service f
 
-  let register0 service f = register (RPC_service.subst0 service) f
+  let register0 service f = register (Tezos_rpc.Service.subst0 service) f
 
-  let register1 service f = register (RPC_service.subst1 service) f
+  let register1 service f = register (Tezos_rpc.Service.subst1 service) f
 
-  let register2 service f = register (RPC_service.subst2 service) f
+  let register2 service f = register (Tezos_rpc.Service.subst2 service) f
 
   let export_service s =
-    let p = RPC_path.prefix prefix path in
-    RPC_service.prefix p s
+    let p = Tezos_rpc.Path.prefix prefix path in
+    Tezos_rpc.Service.prefix p s
 
   type address_metadata = {
     index : Tx_rollup_l2_context_sig.address_index;
     counter : int64;
-    public_key : Bls.Public_key.t;
+    public_key : Signature.Bls.Public_key.t;
   }
 
   let address_metadata_encoding =
@@ -419,89 +424,90 @@ module Context_RPC = struct
       @@ obj3
            (req "index" Tx_rollup_l2_address.Indexable.index_encoding)
            (req "counter" int64)
-           (req "public_key" Bls.Public_key.encoding))
+           (req "public_key" Signature.Bls.Public_key.encoding))
 
   let balance =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get the balance for an l2-address and a ticket"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Tx_rollup_l2_qty.encoding
-      RPC_path.(
+      Tezos_rpc.Path.(
         path / "tickets" /: Arg.ticket_indexable / "balance"
         /: Arg.address_indexable)
 
   let tickets_count =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the number of tickets that have been involved in the transaction \
          rollup."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.int32
-      RPC_path.(path / "count" / "tickets")
+      Tezos_rpc.Path.(path / "count" / "tickets")
 
   let addresses_count =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the number of addresses that have been involved in the \
          transaction rollup."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.int32
-      RPC_path.(path / "count" / "addresses")
+      Tezos_rpc.Path.(path / "count" / "addresses")
 
   let ticket_index =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the index for the given ticket hash, or null if the ticket is not \
          known by the rollup."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:
         (Data_encoding.option
            Tx_rollup_l2_context_sig.Ticket_indexable.index_encoding)
-      RPC_path.(path / "tickets" /: Arg.ticket_indexable / "index")
+      Tezos_rpc.Path.(path / "tickets" /: Arg.ticket_indexable / "index")
 
   let address_metadata =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the metadata associated to a given address, or null if the \
          address has not performed any transfer or withdraw on the rollup."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option address_metadata_encoding)
-      RPC_path.(path / "addresses" /: Arg.address_indexable / "metadata")
+      Tezos_rpc.Path.(path / "addresses" /: Arg.address_indexable / "metadata")
 
   let address_index =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the index for the given address, or null if the address is not \
          known by the rollup."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:
         (Data_encoding.option Tx_rollup_l2_address.Indexable.index_encoding)
-      RPC_path.(path / "addresses" /: Arg.address_indexable / "index")
+      Tezos_rpc.Path.(path / "addresses" /: Arg.address_indexable / "index")
 
   let address_counter =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get the current counter for the given address."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.int64
-      RPC_path.(path / "addresses" /: Arg.address_indexable / "counter")
+      Tezos_rpc.Path.(path / "addresses" /: Arg.address_indexable / "counter")
 
   let address_public_key =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get the BLS public key associated to the given address, or null if \
          the address has not performed any transfer or withdraw on the rollup."
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Bls.Public_key.encoding)
-      RPC_path.(path / "addresses" /: Arg.address_indexable / "public_key")
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.option Signature.Bls.Public_key.encoding)
+      Tezos_rpc.Path.(
+        path / "addresses" /: Arg.address_indexable / "public_key")
 
   let ticket =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Get a ticket from its hash (or index), or null if the ticket is not \
          known by the rollup"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.(option Ticket.encoding)
-      RPC_path.(path / "tickets" /: Arg.ticket_indexable)
+      Tezos_rpc.Path.(path / "tickets" /: Arg.ticket_indexable)
 
   let get_index ?(check_index = false) (context : Context.t)
       (i : (_, _) Indexable.t) get count =
@@ -599,7 +605,7 @@ module Context_RPC = struct
 
   let build_directory state =
     !directory
-    |> RPC_directory.map (fun ((), context_id) ->
+    |> Tezos_rpc.Directory.map (fun ((), context_id) ->
            let open Lwt_syntax in
            let* context_hash = context_of_id state context_id in
            let context_hash =
@@ -610,32 +616,34 @@ module Context_RPC = struct
              | Some ch -> ch
            in
            Context.checkout_exn state.State.context_index context_hash)
-    |> RPC_directory.prefix RPC_path.(open_root / "context" /: Arg.context_id)
+    |> Tezos_rpc.Directory.prefix
+         Tezos_rpc.Path.(open_root / "context" /: Arg.context_id)
 end
 
 module Injection = struct
-  let path : unit RPC_path.context = RPC_path.(open_root / "queue")
+  let path : unit Tezos_rpc.Path.context = Tezos_rpc.Path.(open_root / "queue")
 
-  let prefix = RPC_path.(open_root)
+  let prefix = Tezos_rpc.Path.(open_root)
 
-  let directory : unit RPC_directory.t ref = ref RPC_directory.empty
+  let directory : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty
 
   let register service f =
-    directory := RPC_directory.register !directory service f
+    directory := Tezos_rpc.Directory.register !directory service f
 
-  let register0 service f = register (RPC_service.subst0 service) f
+  let register0 service f = register (Tezos_rpc.Service.subst0 service) f
 
-  let register1 service f = register (RPC_service.subst1 service) f
+  let register1 service f = register (Tezos_rpc.Service.subst1 service) f
 
-  let export_service s = RPC_service.prefix prefix s
+  let export_service s = Tezos_rpc.Service.prefix prefix s
 
   let build_directory _state =
     if Batcher.active () then !directory
-    else (* No queue/batching RPC if batcher is inactive *)
-      RPC_directory.empty
+    else
+      (* No queue/batching RPC if batcher is inactive *)
+      Tezos_rpc.Directory.empty
 
   let inject_query =
-    let open RPC_query in
+    let open Tezos_rpc.Query in
     query (fun eager_batch ->
         object
           method eager_batch = eager_batch
@@ -644,24 +652,24 @@ module Injection = struct
     |> seal
 
   let inject_transaction =
-    RPC_service.post_service
+    Tezos_rpc.Service.post_service
       ~description:"Inject an L2 transaction in the queue of the rollup node."
       ~query:inject_query
       ~input:L2_transaction.encoding
       ~output:L2_transaction.Hash.encoding
-      RPC_path.(path / "injection" / "transaction")
+      Tezos_rpc.Path.(path / "injection" / "transaction")
 
   let get_transaction =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Retrieve an L2 transaction in the queue."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option L2_transaction.encoding)
-      RPC_path.(path / "transaction" /: Arg.l2_transaction)
+      Tezos_rpc.Path.(path / "transaction" /: Arg.l2_transaction)
 
   let get_queue =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get the whole queue of L2 transactions."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.list L2_transaction.encoding)
       path
 
@@ -683,34 +691,36 @@ module Injection = struct
 end
 
 module Monitor = struct
-  let path : unit RPC_path.context = RPC_path.open_root
+  let path : unit Tezos_rpc.Path.context = Tezos_rpc.Path.open_root
 
-  let prefix = RPC_path.(open_root / "monitor")
+  let prefix = Tezos_rpc.Path.(open_root / "monitor")
 
-  let directory : State.t RPC_directory.t ref = ref RPC_directory.empty
+  let directory : State.t Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
 
   let gen_register service f =
-    directory := RPC_directory.gen_register !directory service f
+    directory := Tezos_rpc.Directory.gen_register !directory service f
 
-  let gen_register0 service f = gen_register (RPC_service.subst0 service) f
+  let gen_register0 service f =
+    gen_register (Tezos_rpc.Service.subst0 service) f
 
   let export_service s =
-    let p = RPC_path.prefix prefix path in
-    RPC_service.prefix p s
+    let p = Tezos_rpc.Path.prefix prefix path in
+    Tezos_rpc.Service.prefix p s
 
   let build_directory state =
     !directory
-    |> RPC_directory.map (fun () -> Lwt.return state)
-    |> RPC_directory.prefix prefix
+    |> Tezos_rpc.Directory.map (fun () -> Lwt.return state)
+    |> Tezos_rpc.Directory.prefix prefix
 
   let synchronized =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Wait for the node to have synchronized its L2 chain with the L1 \
          chain, streaming its progress."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Encodings.synchronization_result
-      RPC_path.(path / "synchronized")
+      Tezos_rpc.Path.(path / "synchronized")
 
   let () =
     gen_register0 synchronized (fun state () () ->
@@ -739,13 +749,13 @@ module Monitor = struct
             Some result
         in
         let shutdown () = Lwt_watcher.shutdown stopper in
-        RPC_answer.return_stream {next; shutdown})
+        Tezos_rpc.Answer.return_stream {next; shutdown})
 end
 
 let register state =
   List.fold_left
-    (fun dir f -> RPC_directory.merge dir (f state))
-    RPC_directory.empty
+    (fun dir f -> Tezos_rpc.Directory.merge dir (f state))
+    Tezos_rpc.Directory.empty
     [
       Block.build_directory;
       Context_RPC.build_directory;
@@ -798,7 +808,7 @@ let balance ctxt (block : block_id) ticket tz4 =
     | Ok v -> v
     | _ -> assert false
   in
-  RPC_context.make_call3
+  Tezos_rpc.Context.make_call3
     Context_RPC.(export_service balance)
     ctxt
     block
@@ -814,7 +824,7 @@ let counter ctxt (block : block_id) tz4 =
     | _ -> assert false
   in
   let tz4 = Indexable.from_value tz4 in
-  RPC_context.make_call2
+  Tezos_rpc.Context.make_call2
     Context_RPC.(export_service address_counter)
     ctxt
     block
@@ -823,12 +833,12 @@ let counter ctxt (block : block_id) tz4 =
     ()
 
 let inbox ctxt block =
-  RPC_context.make_call1 Block.(export_service inbox) ctxt block () ()
+  Tezos_rpc.Context.make_call1 Block.(export_service inbox) ctxt block () ()
 
 let raw_block ctxt block =
   let open Lwt_result_syntax in
   let+ raw_block =
-    RPC_context.make_call1 Block.(export_service block) ctxt block `Raw ()
+    Tezos_rpc.Context.make_call1 Block.(export_service block) ctxt block `Raw ()
   in
   Option.map
     (function Encodings.Raw b, metadata -> (b, metadata) | _ -> assert false)
@@ -837,7 +847,12 @@ let raw_block ctxt block =
 let block ctxt block =
   let open Lwt_result_syntax in
   let+ raw_block =
-    RPC_context.make_call1 Block.(export_service block) ctxt block `Fancy ()
+    Tezos_rpc.Context.make_call1
+      Block.(export_service block)
+      ctxt
+      block
+      `Fancy
+      ()
   in
   Option.map
     (function
@@ -845,10 +860,10 @@ let block ctxt block =
     raw_block
 
 let get_queue ctxt =
-  RPC_context.make_call Injection.(export_service get_queue) ctxt () () ()
+  Tezos_rpc.Context.make_call Injection.(export_service get_queue) ctxt () () ()
 
 let get_transaction ctxt hash =
-  RPC_context.make_call1
+  Tezos_rpc.Context.make_call1
     Injection.(export_service get_transaction)
     ctxt
     hash
@@ -856,7 +871,7 @@ let get_transaction ctxt hash =
     ()
 
 let inject_transaction ctxt ?(eager_batch = false) transaction =
-  RPC_context.make_call
+  Tezos_rpc.Context.make_call
     Injection.(export_service inject_transaction)
     ctxt
     ()
@@ -866,7 +881,7 @@ let inject_transaction ctxt ?(eager_batch = false) transaction =
     transaction
 
 let get_message_proof ctxt block ~message_position =
-  RPC_context.make_call2
+  Tezos_rpc.Context.make_call2
     Block.(export_service proof)
     ctxt
     block
@@ -875,7 +890,7 @@ let get_message_proof ctxt block ~message_position =
     ()
 
 let monitor_synchronized ctxt =
-  RPC_context.make_streamed_call
+  Tezos_rpc.Context.make_streamed_call
     Monitor.(export_service synchronized)
     ctxt
     ()

@@ -23,10 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Registration_helpers.ns "tx_rollup"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 module Inbox_add_message : Benchmark.S = struct
   open Tx_rollup_inbox_repr
 
-  let name = "Inbox_add_message"
+  let name = ns "Inbox_add_message"
 
   let info = "Benchmark for Merkle.add_message"
 
@@ -78,10 +82,7 @@ module Inbox_add_message : Benchmark.S = struct
     let conv (messages, _) = (List.length messages, ()) in
     [
       ( "tx_rollup",
-        Model.make
-          ~conv
-          ~model:(Model.logn ~coeff:(Free_variable.of_string "n_message_coeff"))
-      );
+        Model.make ~conv ~model:(Model.logn ~coeff:(fv "n_message_coeff")) );
     ]
 
   let create_benchmarks ~rng_state ~bench_num ({max_messages} : config) =
@@ -110,7 +111,7 @@ end
 module Commitment_full_compact_bench : Benchmark.S = struct
   open Tx_rollup_commitment_repr
 
-  let name = "Commitment_full_compact_bench"
+  let name = ns "Commitment_full_compact_bench"
 
   let info = "Benchmark for Tx_rollup_commitment_repr.Full.compact"
 
@@ -143,9 +144,8 @@ module Commitment_full_compact_bench : Benchmark.S = struct
           ~conv
           ~model:
             (Model.affine
-               ~intercept:
-                 (Free_variable.of_string "full_compact_bench_intercept")
-               ~coeff:(Free_variable.of_string "n_messages_coeff")) );
+               ~intercept:(fv "full_compact_bench_intercept")
+               ~coeff:(fv "n_messages_coeff")) );
     ]
 
   let create_benchmarks ~rng_state ~bench_num ({max_messages} : config) =
@@ -250,7 +250,7 @@ let unique_ticket_id =
 
 let gen_l2_account rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  Bls.generate_key ~seed ()
+  Signature.Bls.generate_key ~seed ()
 
 let hash_key_exn ctxt ~ticketer ~typ ~contents ~owner =
   let ticketer = Micheline.root @@ Expr.from_string ticketer in
@@ -539,7 +539,7 @@ let create_proof store max_withdrawals msg =
   return proof
 
 module Verify_proof_compute_bench : Benchmark.S = struct
-  let name = "Tx_rollup_verify_proof"
+  let name = ns "Tx_rollup_verify_proof"
 
   let info = "Benchmark for Tx_rollup.verify_proof"
 
@@ -580,8 +580,8 @@ module Verify_proof_compute_bench : Benchmark.S = struct
           ~conv
           ~model:
             (Model.bilinear
-               ~coeff1:(Free_variable.of_string "proof_size_coeff")
-               ~coeff2:(Free_variable.of_string "message_size_coeff")) );
+               ~coeff1:(fv "proof_size_coeff")
+               ~coeff2:(fv "message_size_coeff")) );
     ]
 
   let proof_size proof =

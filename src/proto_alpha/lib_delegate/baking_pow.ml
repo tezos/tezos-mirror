@@ -59,7 +59,7 @@ let init_proof_of_work_nonce () =
 (* This was used before November 2018 *)
 (* (\* Random proof of work *\)
  * let generate_proof_of_work_nonce () =
- *   Rand.generate Alpha_context.Constants.proof_of_work_nonce_size *)
+ *   Tezos_crypto.Rand.generate Alpha_context.Constants.proof_of_work_nonce_size *)
 
 let empty_proof_of_work_nonce =
   Bytes.make Constants_repr.proof_of_work_nonce_size '\000'

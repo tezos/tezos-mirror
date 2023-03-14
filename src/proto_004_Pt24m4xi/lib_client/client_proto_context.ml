@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 open Alpha_client_context
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
     =
@@ -73,7 +73,7 @@ let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source
   >>=? fun src_pkh ->
-  Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+  Client_keys_v0.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
 
 type period_info = {

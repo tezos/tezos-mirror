@@ -1,0 +1,37 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_wasmer)
+ (public_name tezos-wasmer)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ctypes
+  ctypes.foreign
+  lwt
+  lwt.unix)
+ (preprocess (pps ppx_deriving.show))
+ (flags
+  (:standard)
+  -w -9-27)
+ (ctypes
+  (external_library_name wasmer)
+  (build_flags_resolver
+   (vendored
+    (c_flags
+     :standard
+     -Wno-discarded-qualifiers
+     -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs
+     -Wno-incompatible-pointer-types)
+    (c_library_flags
+     :standard
+     -lwasmer
+     -L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs)))
+  (headers (include wasmer.h))
+  (type_description (instance Types) (functor Api_types_desc))
+  (function_description
+   (concurrency unlocked)
+   (instance Functions)
+   (functor Api_funcs_desc))
+  (generated_types Api_types)
+  (generated_entry_point Api)))

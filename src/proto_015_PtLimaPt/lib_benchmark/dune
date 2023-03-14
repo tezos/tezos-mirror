@@ -30,6 +30,5 @@
   -open Tezos_benchmark
   -open Tezos_benchmark_type_inference_015_PtLimaPt
   -open Tezos_protocol_015_PtLimaPt
-  -open Tezos_crypto
   -open Tezos_015_PtLimaPt_test_helpers)
  (private_modules kernel rules state_space))

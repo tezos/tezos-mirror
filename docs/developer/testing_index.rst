@@ -1,11 +1,11 @@
-Testing in Tezos
+Testing in Octez
 ================
 
-Testing is important to ensure the quality of the Tezos codebase by
-detecting bugs and avoiding regressions. Tezos and its
+Testing is important to ensure the quality of the Octez codebase by
+detecting bugs and avoiding regressions. Octez and its
 components use a variety of tools and frameworks for testing.
 
-This page groups the documentation helping developers to design, write, and execute tests on the Tezos codebase.
+This page groups the documentation helping developers to design, write, and execute tests on the Octez codebase.
 It covers different kinds of tests (Unit, Integration, etc.) and the associated tools and frameworks.
 It also includes tutorials for testing more specific parts such as protocol code.
 

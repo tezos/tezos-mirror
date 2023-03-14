@@ -12,8 +12,8 @@
   tezos-plonk
   tezos-crypto-dal
   class_group_vdf
-  ringo
-  ringo-lwt
+  aches
+  aches-lwt
   tezos-base
   tezos-sapling
   tezos-protocol-environment.sigs

@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
-open Client_keys
+open Tezos_clic
+open Client_keys_v0
 open Tezos_sapling.Core.Client
 
 let json_switch = switch ~long:"json" ~doc:"Use JSON format" ()
@@ -38,7 +38,7 @@ let save_json_to_file json file =
 
 let group =
   {
-    Clic.name = "sapling";
+    Tezos_clic.name = "sapling";
     title = "Commands for working with Sapling transactions";
   }
 
@@ -47,14 +47,15 @@ let keys_of_implicit_account cctxt (source : Protocol.Alpha_context.Contract.t)
   match source with
   | Originated _ -> assert false
   | Implicit src ->
-      Client_keys.get_key cctxt src >>=? fun (_, pk, sk) -> return (src, pk, sk)
+      Client_keys_v0.get_key cctxt src >>=? fun (_, pk, sk) ->
+      return (src, pk, sk)
 
 let viewing_key_of_string s =
   let exception Unknown_sapling_address in
   let encoding = Viewing_key.address_b58check_encoding in
   WithExceptions.Option.to_exn
     ~none:Unknown_sapling_address
-    (Base58.simple_decode encoding s)
+    (Tezos_crypto.Base58.simple_decode encoding s)
 
 (** All signatures are done with an anti-replay string.
     In Tezos' protocol this string is set to be chain_id + KT1. **)
@@ -71,7 +72,9 @@ let bound_data_of_public_key_hash cctxt dst =
   let open Tezos_micheline in
   let open Protocol.Michelson_v1_primitives in
   let pkh_bytes =
-    Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding dst
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_crypto.Signature.V0.Public_key_hash.encoding
+      dst
   in
   let micheline_bytes = Micheline.(Bytes (0, pkh_bytes) |> strip_locations) in
   let micheline_pkh_type =
@@ -114,7 +117,7 @@ let do_sapling_transfer cctxt ?message contract src_name amount dst =
     anti_replay
 
 let message_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"message"
     ~placeholder:""
@@ -122,7 +125,7 @@ let message_arg =
     (parameter (fun _ x -> return @@ Bytes.of_string x))
 
 let memo_size_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"memo-size"
     ~placeholder:"memo-size"
@@ -164,7 +167,7 @@ let shield_cmd =
          ~name:"src-tz"
          ~desc:"Transparent source account."
     @@ prefix "to"
-    @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
+    @@ Tezos_clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ prefix "using"
     @@ OriginatedContractAlias.destination_param
          ~name:"sapling contract"
@@ -319,7 +322,7 @@ let unshield_cmd =
 let sapling_transaction_file = "sapling_transaction"
 
 let file_arg default_filename =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"file"
     ~placeholder:default_filename
@@ -356,7 +359,7 @@ let forge_shielded_cmd =
          ~name:"src-sap"
          ~desc:"Sapling account of source."
     @@ prefix "to"
-    @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
+    @@ Tezos_clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ prefix "using"
     @@ OriginatedContractAlias.destination_param
          ~name:"sapling contract"
@@ -420,7 +423,9 @@ let submit_shielded_cmd =
     (prefixes ["sapling"; "submit"]
     (* TODO: Add a dedicated abstracted Clic element to parse filenames,
        potentially using Sys.file_exists *)
-    @@ Clic.string ~name:"file" ~desc:"Filename of the forged transaction."
+    @@ Tezos_clic.string
+         ~name:"file"
+         ~desc:"Filename of the forged transaction."
     @@ prefix "from"
     @@ ContractAlias.destination_param
          ~name:"alias-tz"
@@ -503,7 +508,7 @@ let for_contract_arg =
     ()
 
 let unencrypted_switch () =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"unencrypted"
     ~doc:"Do not encrypt the key on-disk (for testing and debugging)."
     ()
@@ -562,7 +567,7 @@ let import_key_cmd =
     (args3
        (Sapling_key.force_switch ())
        (unencrypted_switch ())
-       (Clic.arg
+       (Tezos_clic.arg
           ~long:"mnemonic"
           ~placeholder:"mnemonic"
           ~doc:"Mnemonic as an option, only used for testing and debugging."
@@ -595,13 +600,13 @@ let import_key_cmd =
 
 let commands () =
   let child_index_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"child-index"
       ~desc:"Index of the child to derive."
       Client_proto_args.int_parameter
   in
   let index_arg =
-    Clic.arg
+    Tezos_clic.arg
       ~doc:"index of the address to generate"
       ~long:"address-index"
       ~placeholder:"idx"
@@ -661,7 +666,9 @@ let commands () =
         Wallet.new_address cctxt name index_opt
         >>=? fun (_, corrected_index, address) ->
         let address_b58 =
-          Base58.simple_encode Viewing_key.address_b58check_encoding address
+          Tezos_crypto.Base58.simple_encode
+            Viewing_key.address_b58check_encoding
+            address
         in
         cctxt#message
           "Generated address:@.%s@.at index %Ld"
@@ -674,7 +681,7 @@ let commands () =
       no_options
       (prefixes ["sapling"; "export"; "key"]
       @@ Sapling_key.alias_param @@ prefix "in"
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"file"
            ~desc:"Filename."
            Client_proto_args.string_parameter
@@ -686,7 +693,7 @@ let commands () =
       ~group
       ~desc:"Get balance associated with given sapling key and contract"
       (args1
-         (Clic.switch
+         (Tezos_clic.switch
             ~doc:"Print the collection of non-spent inputs."
             ~short:'v'
             ~long:"verbose"

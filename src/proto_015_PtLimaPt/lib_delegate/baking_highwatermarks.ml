@@ -100,9 +100,9 @@ let () =
     (fun highwatermark -> Block_previously_endorsed highwatermark)
 
 module DelegateMap = Map.Make (struct
-  type t = Signature.Public_key_hash.t
+  type t = Tezos_crypto.Signature.V0.Public_key_hash.t
 
-  let compare = Signature.Public_key_hash.compare
+  let compare = Tezos_crypto.Signature.V0.Public_key_hash.compare
 end)
 
 let highwatermark_delegate_map_encoding =
@@ -113,7 +113,7 @@ let highwatermark_delegate_map_encoding =
       fun l -> List.fold_left (fun map (k, v) -> add k v map) empty l)
     (list
        (obj2
-          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
           (req "highwatermark" highwatermark_encoding)))
 
 type highwatermarks = {

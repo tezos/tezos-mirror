@@ -54,18 +54,19 @@ let default_http_port =
   | None -> "6732"
   | Some port -> port
 
-open Tezos_clic
-
 let group =
-  {Clic.name = "signer"; title = "Commands specific to the signing daemon"}
+  {
+    Tezos_clic.name = "signer";
+    title = "Commands specific to the signing daemon";
+  }
 
 let magic_bytes_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"values allowed for the magic bytes, defaults to any"
     ~short:'M'
     ~long:"magic-bytes"
     ~placeholder:"0xHH,0xHH,..."
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          Lwt.return
            (List.map_e
               (fun s ->
@@ -78,7 +79,7 @@ let magic_bytes_arg =
               (String.split_no_empty ',' s))))
 
 let high_watermark_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~doc:
       "high watermark restriction\n\
        Stores the highest level signed for blocks and endorsements for each \
@@ -89,12 +90,12 @@ let high_watermark_switch =
     ()
 
 let pidfile_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"write process id in file"
     ~short:'P'
     ~long:"pidfile"
     ~placeholder:"filename"
-    (Clic.parameter (fun _ s -> Lwt.return_ok s))
+    (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
 
 let may_setup_pidfile pidfile_opt f =
   match pidfile_opt with
@@ -106,8 +107,9 @@ let may_setup_pidfile pidfile_opt f =
         ~filename:pidfile
         f
 
-let commands base_dir require_auth : Client_context.full Clic.command list =
-  let open Clic in
+let commands base_dir require_auth : Client_context.full Tezos_clic.command list
+    =
+  let open Tezos_clic in
   let open Lwt_result_syntax in
   Tezos_signer_backends_unix.Ledger.commands ()
   @ Client_keys_commands.commands None
@@ -291,14 +293,14 @@ let commands base_dir require_auth : Client_context.full Clic.command list =
              ~name:"pk"
              ~desc:"full public key (Base58 encoded)"
              (parameter (fun _ s ->
-                  Lwt.return (Signature.Public_key.of_b58check s)))
+                  Lwt.return (Tezos_crypto.Signature.Public_key.of_b58check s)))
         @@ stop)
         (fun name key cctxt ->
-          let pkh = Signature.Public_key.hash key in
+          let pkh = Tezos_crypto.Signature.Public_key.hash key in
           let name =
             match name with
             | Some name -> name
-            | None -> Signature.Public_key_hash.to_b58check pkh
+            | None -> Tezos_crypto.Signature.Public_key_hash.to_b58check pkh
           in
           Handler.Authorized_key.add ~force:false cctxt name key);
     ]
@@ -307,11 +309,11 @@ let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
 let default_base_dir = Filename.concat home ".tezos-signer"
 
-let string_parameter () : (string, _) Clic.parameter =
-  Clic.parameter (fun _ x -> Lwt.return_ok x)
+let string_parameter () : (string, _) Tezos_clic.parameter =
+  Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
 
 let base_dir_arg () =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"base-dir"
     ~short:'d'
     ~placeholder:"path"
@@ -322,14 +324,14 @@ let base_dir_arg () =
     (string_parameter ())
 
 let require_auth_arg () =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"require-authentication"
     ~short:'A'
     ~doc:"Require a signature from the caller to sign."
     ()
 
 let password_filename_arg () =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"password-filename"
     ~short:'f'
     ~placeholder:"filename"
@@ -337,7 +339,10 @@ let password_filename_arg () =
     (string_parameter ())
 
 let global_options () =
-  Clic.args3 (base_dir_arg ()) (require_auth_arg ()) (password_filename_arg ())
+  Tezos_clic.args3
+    (base_dir_arg ())
+    (require_auth_arg ())
+    (password_filename_arg ())
 
 module Signer_config = struct
   type t = string option * bool * string option
@@ -347,7 +352,7 @@ module Signer_config = struct
   let parse_config_args ctx argv =
     let open Lwt_result_syntax in
     let* (base_dir, require_auth, password_filename), remaining =
-      Clic.parse_global_options (global_options ()) ctx argv
+      Tezos_clic.parse_global_options (global_options ()) ctx argv
     in
     return
       ( {

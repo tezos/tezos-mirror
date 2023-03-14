@@ -27,10 +27,15 @@
 module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 
+(* Export mode used to export snapshot. Tar is seleceted by
+   default.
+   FIXME: test over Raw formats as well. *)
+let export_mode = Snapshots.Tar
+
 let equal_history_mode ?loc ?msg hm1 hm2 =
   let eq = ( = ) in
   let pp = Tezos_shell_services.History_mode.pp in
-  Lib_test.Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
+  Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
 
 let check_flags descr store expected_head =
   let open Lwt_result_syntax in
@@ -83,7 +88,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
             genesis
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
-            ~operation_metadata_size_limit:None
+            ~operation_metadata_size_limit:Unlimited
             ~progress_display_mode:Animation.Auto
         in
         return_false)
@@ -202,17 +207,15 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
         let last_hash = Store.Block.hash last in
         let snapshot_path = store_dir // "snapshot.full" in
         let chain_name = Distributed_db_version.Name.of_string "test" in
-        (*FIXME test over Raw formats as well *)
         let* () =
           Snapshots.export
-            Snapshots.Tar
+            export_mode
             ~rolling:false
             ~block:(`Hash (last_hash, 0))
             ~store_dir
             ~context_dir
             ~chain_name
             ~snapshot_path
-            ~on_disk:false
             ~progress_display_mode:Animation.Auto
             genesis
         in
@@ -227,8 +230,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~configured_history_mode:None
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
-            ~operation_metadata_size_limit:None
-            ~in_memory:true
+            ~operation_metadata_size_limit:Unlimited
             ~progress_display_mode:Animation.Auto
             genesis
         in
@@ -240,7 +242,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             genesis
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
-            ~operation_metadata_size_limit:None
+            ~operation_metadata_size_limit:Unlimited
             ~progress_display_mode:Animation.Auto
         in
         return_false)

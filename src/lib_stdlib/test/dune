@@ -9,7 +9,8 @@
   test_tzString
   test_fallbackArray
   test_functionalArray
-  test_hash_queue)
+  test_hash_queue
+  test_tzBytes)
  (modes native js)
  (libraries
   tezos-stdlib
@@ -18,9 +19,13 @@
   tezos-test-helpers
   qcheck-alcotest)
  (js_of_ocaml)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
-  -open Tezos_stdlib))
+  -open Tezos_stdlib
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)
@@ -58,6 +63,11 @@
  (action (run %{dep:./test_hash_queue.exe})))
 
 (rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_tzBytes.exe})))
+
+(rule
  (alias runtest_js)
  (package tezos-stdlib)
  (action (run node %{dep:./test_bits.bc.js})))
@@ -91,3 +101,8 @@
  (alias runtest_js)
  (package tezos-stdlib)
  (action (run node %{dep:./test_hash_queue.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_tzBytes.bc.js})))

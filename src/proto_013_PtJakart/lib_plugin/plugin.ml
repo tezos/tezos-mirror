@@ -243,14 +243,15 @@ module Mempool = struct
   type state = {
     grandparent_level_start : Alpha_context.Timestamp.t option;
     round_zero_duration : Period.t option;
-    op_prechecked_managers : manager_op_info Signature.Public_key_hash.Map.t;
+    op_prechecked_managers :
+      manager_op_info Tezos_crypto.Signature.V0.Public_key_hash.Map.t;
         (** All managers that are the source of manager operations
             prechecked in the mempool. Each manager in the map is associated to
             a record of type [manager_op_info] (See for record details above).
             Each manager in the map should be accessible
             with an operation hash in [operation_hash_to_manager]. *)
     operation_hash_to_manager :
-      Signature.Public_key_hash.t Operation_hash.Map.t;
+      Tezos_crypto.Signature.V0.Public_key_hash.t Operation_hash.Map.t;
         (** Map of operation hash to manager used to remove a manager from
             [op_prechecked_managers] with an operation hash. Each manager in the
             map should also be in [op_prechecked_managers]. *)
@@ -272,7 +273,8 @@ module Mempool = struct
     {
       grandparent_level_start = None;
       round_zero_duration = None;
-      op_prechecked_managers = Signature.Public_key_hash.Map.empty;
+      op_prechecked_managers =
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.empty;
       operation_hash_to_manager = Operation_hash.Map.empty;
       prechecked_operations_count = 0;
       ops_prechecked = ManagerOpWeightSet.empty;
@@ -352,7 +354,7 @@ module Mempool = struct
         in
         let removed_op = ref None in
         let op_prechecked_managers =
-          Signature.Public_key_hash.Map.update
+          Tezos_crypto.Signature.V0.Public_key_hash.Map.update
             source
             (function
               | None -> None
@@ -539,7 +541,7 @@ module Mempool = struct
 
   let check_manager_restriction config filter_state source ~fee ~gas_limit =
     match
-      Signature.Public_key_hash.Map.find
+      Tezos_crypto.Signature.V0.Public_key_hash.Map.find
         source
         filter_state.op_prechecked_managers
     with
@@ -1131,7 +1133,7 @@ module Mempool = struct
       filter_state with
       op_prechecked_managers =
         (* Manager not seen yet, record it for next ops *)
-        Signature.Public_key_hash.Map.add
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.add
           source
           info
           filter_state.op_prechecked_managers;
@@ -1584,11 +1586,11 @@ module RPC = struct
     | Some protocol_data -> ok {shell = op.shell; protocol_data}
     | None -> error Cannot_parse_operation
 
-  let path = RPC_path.(open_root / "helpers")
+  let path = Tezos_rpc.Path.(open_root / "helpers")
 
   module Registration = struct
     let patched_services =
-      ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
+      ref (RPC_directory.empty : Updater.rpc_context Tezos_rpc.Directory.t)
 
     let register0_fullctxt ~chunked s f =
       patched_services :=
@@ -1685,7 +1687,7 @@ module RPC = struct
     module S = struct
       open Data_encoding
 
-      let path = RPC_path.(path / "scripts")
+      let path = Tezos_rpc.Path.(path / "scripts")
 
       let run_code_input_encoding =
         merge_objs
@@ -1769,45 +1771,45 @@ module RPC = struct
           (obj1 (opt "level" Script_int.n_encoding))
 
       let run_code =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Run a piece of code in the current context"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:run_code_input_encoding
           ~output:run_code_output_encoding
-          RPC_path.(path / "run_code")
+          Tezos_rpc.Path.(path / "run_code")
 
       let trace_code =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Run a piece of code in the current context, keeping a trace"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:trace_code_input_encoding
           ~output:trace_code_output_encoding
-          RPC_path.(path / "trace_code")
+          Tezos_rpc.Path.(path / "trace_code")
 
       let run_tzip4_view =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Simulate a call to a view following the TZIP-4 standard. See \
              https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints."
           ~input:run_tzip4_view_encoding
           ~output:(obj1 (req "data" Script.expr_encoding))
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           (* This path should be deprecated in the future *)
-          RPC_path.(path / "run_view")
+          Tezos_rpc.Path.(path / "run_view")
 
       let run_script_view =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Simulate a call to a michelson view"
           ~input:run_script_view_encoding
           ~output:(obj1 (req "data" Script.expr_encoding))
-          ~query:RPC_query.empty
-          RPC_path.(path / "run_script_view")
+          ~query:Tezos_rpc.Query.empty
+          Tezos_rpc.Path.(path / "run_script_view")
 
       let typecheck_code =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Typecheck a piece of code in the current context"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj4
                (req "program" Script.expr_encoding)
@@ -1818,12 +1820,12 @@ module RPC = struct
             (obj2
                (req "type_map" Script_tc_errors_registration.type_map_enc)
                (req "gas" Gas.encoding))
-          RPC_path.(path / "typecheck_code")
+          Tezos_rpc.Path.(path / "typecheck_code")
 
       let script_size =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Compute the size of a script in the current context"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj4
                (req "program" Script.expr_encoding)
@@ -1831,14 +1833,14 @@ module RPC = struct
                (opt "gas" Gas.Arith.z_integral_encoding)
                (opt "legacy" bool))
           ~output:(obj1 (req "script_size" int31))
-          RPC_path.(path / "script_size")
+          Tezos_rpc.Path.(path / "script_size")
 
       let typecheck_data =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Check that some data expression is well formed and of a given \
              type in the current context"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj4
                (req "data" Script.expr_encoding)
@@ -1846,10 +1848,10 @@ module RPC = struct
                (opt "gas" Gas.Arith.z_integral_encoding)
                (opt "legacy" bool))
           ~output:(obj1 (req "gas" Gas.encoding))
-          RPC_path.(path / "typecheck_data")
+          Tezos_rpc.Path.(path / "typecheck_data")
 
       let pack_data =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Computes the serialized version of some data expression using the \
              same algorithm as script instruction PACK"
@@ -1859,11 +1861,11 @@ module RPC = struct
                (req "type" Script.expr_encoding)
                (opt "gas" Gas.Arith.z_integral_encoding))
           ~output:(obj2 (req "packed" bytes) (req "gas" Gas.encoding))
-          ~query:RPC_query.empty
-          RPC_path.(path / "pack_data")
+          ~query:Tezos_rpc.Query.empty
+          Tezos_rpc.Path.(path / "pack_data")
 
       let normalize_data =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Normalizes some data expression using the requested unparsing mode"
           ~input:
@@ -1873,11 +1875,11 @@ module RPC = struct
                (req "unparsing_mode" unparsing_mode_encoding)
                (opt "legacy" bool))
           ~output:(obj1 (req "normalized" Script.expr_encoding))
-          ~query:RPC_query.empty
-          RPC_path.(path / "normalize_data")
+          ~query:Tezos_rpc.Query.empty
+          Tezos_rpc.Path.(path / "normalize_data")
 
       let normalize_script =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Normalizes a Michelson script using the requested unparsing mode"
           ~input:
@@ -1885,35 +1887,35 @@ module RPC = struct
                (req "script" Script.expr_encoding)
                (req "unparsing_mode" unparsing_mode_encoding))
           ~output:(obj1 (req "normalized" Script.expr_encoding))
-          ~query:RPC_query.empty
-          RPC_path.(path / "normalize_script")
+          ~query:Tezos_rpc.Query.empty
+          Tezos_rpc.Path.(path / "normalize_script")
 
       let normalize_type =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Normalizes some Michelson type by expanding `pair a b c` as `pair \
              a (pair b c)"
           ~input:(obj1 (req "type" Script.expr_encoding))
           ~output:(obj1 (req "normalized" Script.expr_encoding))
-          ~query:RPC_query.empty
-          RPC_path.(path / "normalize_type")
+          ~query:Tezos_rpc.Query.empty
+          Tezos_rpc.Path.(path / "normalize_type")
 
       let run_operation =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Run an operation with the context of the given block and without \
              signature checks. Return the operation application result, \
              including the consumed gas."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj2
                (req "operation" Operation.encoding)
                (req "chain_id" Chain_id.encoding))
           ~output:Apply_results.operation_data_and_metadata_encoding
-          RPC_path.(path / "run_operation")
+          Tezos_rpc.Path.(path / "run_operation")
 
       let simulate_query =
-        let open RPC_query in
+        let open Tezos_rpc.Query in
         query (fun successor_level ->
             object
               method successor_level = successor_level
@@ -1927,7 +1929,7 @@ module RPC = struct
         |> seal
 
       let simulate_operation =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:
             "Simulate running an operation at some future moment (based on the \
              number of blocks given in the `latency` argument), and return the \
@@ -1944,12 +1946,12 @@ module RPC = struct
                (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
           ~output:Apply_results.operation_data_and_metadata_encoding
-          RPC_path.(path / "simulate_operation")
+          Tezos_rpc.Path.(path / "simulate_operation")
 
       let simulate_tx_rollup_operation =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Simulate a tx rollup operation"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj4
                (opt "blocks_before_activation" int32)
@@ -1957,23 +1959,23 @@ module RPC = struct
                (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
           ~output:Apply_results.operation_data_and_metadata_encoding
-          RPC_path.(path / "simulate_tx_rollup_operation")
+          Tezos_rpc.Path.(path / "simulate_tx_rollup_operation")
 
       let entrypoint_type =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Return the type of the given entrypoint"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj2
                (req "script" Script.expr_encoding)
                (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
           ~output:(obj1 (req "entrypoint_type" Script.expr_encoding))
-          RPC_path.(path / "entrypoint")
+          Tezos_rpc.Path.(path / "entrypoint")
 
       let list_entrypoints =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Return the list of entrypoints of the given script"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:(obj1 (req "script" Script.expr_encoding))
           ~output:
             (obj2
@@ -1987,7 +1989,7 @@ module RPC = struct
                               Michelson_v1_primitives.prim_encoding))))
                   [])
                (req "entrypoints" (assoc Script.expr_encoding)))
-          RPC_path.(path / "entrypoints")
+          Tezos_rpc.Path.(path / "entrypoints")
     end
 
     module type UNPARSING_MODE = sig
@@ -2221,7 +2223,7 @@ module RPC = struct
       let operation : _ operation = {shell; protocol_data} in
       let hash = Operation.hash {shell; protocol_data} in
       let ctxt = Origination_nonce.init ctxt hash in
-      let payload_producer = Signature.Public_key_hash.zero in
+      let payload_producer = Tezos_crypto.Signature.V0.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
@@ -3039,7 +3041,7 @@ module RPC = struct
     module S = struct
       let path =
         (RPC_path.(open_root / "context" / "contracts")
-          : RPC_context.t RPC_path.context)
+          : RPC_context.t Tezos_rpc.Path.context)
 
       let get_storage_normalized =
         let open Data_encoding in
@@ -3298,23 +3300,23 @@ module RPC = struct
     module S = struct
       open Data_encoding
 
-      let path = RPC_path.(path / "forge")
+      let path = Tezos_rpc.Path.(path / "forge")
 
       let operations =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Forge an operation"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:Operation.unsigned_encoding
           ~output:bytes
-          RPC_path.(path / "operations")
+          Tezos_rpc.Path.(path / "operations")
 
       let empty_proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
       let protocol_data =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Forge the protocol-specific part of a block header"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj5
                (req "payload_hash" Block_payload_hash.encoding)
@@ -3330,53 +3332,53 @@ module RPC = struct
                    liquidity_baking_toggle_vote_encoding
                    LB_pass))
           ~output:(obj1 (req "protocol_data" bytes))
-          RPC_path.(path / "protocol_data")
+          Tezos_rpc.Path.(path / "protocol_data")
 
       module Tx_rollup = struct
         open Data_encoding
 
-        let path = RPC_path.(path / "tx_rollup")
+        let path = Tezos_rpc.Path.(path / "tx_rollup")
 
         module Inbox = struct
-          let path = RPC_path.(path / "inbox")
+          let path = Tezos_rpc.Path.(path / "inbox")
 
           let message_hash =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:"Compute the hash of a message"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:(obj1 (req "message" Tx_rollup_message.encoding))
               ~output:(obj1 (req "hash" Tx_rollup_message_hash.encoding))
-              RPC_path.(path / "message_hash")
+              Tezos_rpc.Path.(path / "message_hash")
 
           let merkle_tree_hash =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:"Compute the merkle tree hash of an inbox"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:
                 (obj1
                    (req "message_hashes" (list Tx_rollup_message_hash.encoding)))
               ~output:(obj1 (req "hash" Tx_rollup_inbox.Merkle.root_encoding))
-              RPC_path.(path / "merkle_tree_hash")
+              Tezos_rpc.Path.(path / "merkle_tree_hash")
 
           let merkle_tree_path =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:"Compute a path of an inbox message in a merkle tree"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:
                 (obj2
                    (req "message_hashes" (list Tx_rollup_message_hash.encoding))
                    (req "position" int16))
               ~output:(obj1 (req "path" Tx_rollup_inbox.Merkle.path_encoding))
-              RPC_path.(path / "merkle_tree_path")
+              Tezos_rpc.Path.(path / "merkle_tree_path")
         end
 
         module Commitment = struct
-          let path = RPC_path.(path / "commitment")
+          let path = Tezos_rpc.Path.(path / "commitment")
 
           let merkle_tree_hash =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:"Compute the merkle tree hash of a commitment"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:
                 (obj1
                    (req
@@ -3384,14 +3386,14 @@ module RPC = struct
                       (list Tx_rollup_message_result_hash.encoding)))
               ~output:
                 (obj1 (req "hash" Tx_rollup_commitment.Merkle_hash.encoding))
-              RPC_path.(path / "merkle_tree_hash")
+              Tezos_rpc.Path.(path / "merkle_tree_hash")
 
           let merkle_tree_path =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:
                 "Compute a path of a message result hash in the commitment \
                  merkle tree"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:
                 (obj2
                    (req
@@ -3400,28 +3402,28 @@ module RPC = struct
                    (req "position" int16))
               ~output:
                 (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
-              RPC_path.(path / "merkle_tree_path")
+              Tezos_rpc.Path.(path / "merkle_tree_path")
 
           let message_result_hash =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:"Compute the message result hash"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:Tx_rollup_message_result.encoding
               ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
-              RPC_path.(path / "message_result_hash")
+              Tezos_rpc.Path.(path / "message_result_hash")
         end
 
         module Withdraw = struct
-          let path = RPC_path.(path / "withdraw")
+          let path = Tezos_rpc.Path.(path / "withdraw")
 
           let withdraw_list_hash =
-            RPC_service.post_service
+            Tezos_rpc.Service.post_service
               ~description:"Compute the hash of a withdraw list"
-              ~query:RPC_query.empty
+              ~query:Tezos_rpc.Query.empty
               ~input:
                 (obj1 (req "withdraw_list" (list Tx_rollup_withdraw.encoding)))
               ~output:(obj1 (req "hash" Tx_rollup_withdraw_list_hash.encoding))
-              RPC_path.(path / "withdraw_list_hash")
+              Tezos_rpc.Path.(path / "withdraw_list_hash")
         end
       end
     end
@@ -3660,26 +3662,26 @@ module RPC = struct
     module S = struct
       open Data_encoding
 
-      let path = RPC_path.(path / "parse")
+      let path = Tezos_rpc.Path.(path / "parse")
 
       let operations =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Parse operations"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:
             (obj2
                (req "operations" (list (dynamic_size Operation.raw_encoding)))
                (opt "check_signature" bool))
           ~output:(list (dynamic_size Operation.encoding))
-          RPC_path.(path / "operations")
+          Tezos_rpc.Path.(path / "operations")
 
       let block =
-        RPC_service.post_service
+        Tezos_rpc.Service.post_service
           ~description:"Parse a block"
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.Query.empty
           ~input:Block_header.raw_encoding
           ~output:Block_header.protocol_data_encoding
-          RPC_path.(path / "block")
+          Tezos_rpc.Path.(path / "block")
     end
 
     let parse_protocol_data protocol_data =
@@ -3761,7 +3763,7 @@ module RPC = struct
   module Baking_rights = struct
     type t = {
       level : Raw_level.t;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       round : int;
       timestamp : Timestamp.t option;
     }
@@ -3775,7 +3777,7 @@ module RPC = struct
           {level; delegate; round; timestamp})
         (obj4
            (req "level" Raw_level.encoding)
-           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "round" uint16)
            (opt "estimated_time" Timestamp.encoding))
 
@@ -3789,7 +3791,7 @@ module RPC = struct
       type baking_rights_query = {
         levels : Raw_level.t list;
         cycle : Cycle.t option;
-        delegates : Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
         max_round : int option;
         all : bool;
       }
@@ -3844,7 +3846,7 @@ module RPC = struct
         if Compare.Int.(round > max_round) then return (List.rev acc)
         else
           let (Misc.LCons (pk, next)) = l in
-          let delegate = Signature.Public_key.hash pk in
+          let delegate = Tezos_crypto.Signature.V0.Public_key.hash pk in
           estimated_time
             round_durations
             ~current_level
@@ -3863,13 +3865,16 @@ module RPC = struct
       @@ List.fold_left
            (fun (acc, previous) r ->
              if
-               Signature.Public_key_hash.Set.exists
-                 (Signature.Public_key_hash.equal r.delegate)
+               Tezos_crypto.Signature.V0.Public_key_hash.Set.exists
+                 (Tezos_crypto.Signature.V0.Public_key_hash.equal r.delegate)
                  previous
              then (acc, previous)
              else
-               (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
-           ([], Signature.Public_key_hash.Set.empty)
+               ( r :: acc,
+                 Tezos_crypto.Signature.V0.Public_key_hash.Set.add
+                   r.delegate
+                   previous ))
+           ([], Tezos_crypto.Signature.V0.Public_key_hash.Set.empty)
            rights
 
     let register () =
@@ -3903,7 +3908,7 @@ module RPC = struct
           | _ :: _ as delegates ->
               let is_requested p =
                 List.exists
-                  (Signature.Public_key_hash.equal p.delegate)
+                  (Tezos_crypto.Signature.V0.Public_key_hash.equal p.delegate)
                   delegates
               in
               List.filter is_requested rights)
@@ -3920,7 +3925,7 @@ module RPC = struct
 
   module Endorsing_rights = struct
     type delegate_rights = {
-      delegate : Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       first_slot : Slot.t;
       endorsing_power : int;
     }
@@ -3939,7 +3944,7 @@ module RPC = struct
         (fun (delegate, first_slot, endorsing_power) ->
           {delegate; first_slot; endorsing_power})
         (obj3
-           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "first_slot" Slot.encoding)
            (req "endorsing_power" uint16))
 
@@ -3963,7 +3968,7 @@ module RPC = struct
       type endorsing_rights_query = {
         levels : Raw_level.t list;
         cycle : Cycle.t option;
-        delegates : Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
       }
 
       let endorsing_rights_query =
@@ -4041,7 +4046,8 @@ module RPC = struct
                 (fun rights_at_level ->
                   let is_requested p =
                     List.exists
-                      (Signature.Public_key_hash.equal p.delegate)
+                      (Tezos_crypto.Signature.V0.Public_key_hash.equal
+                         p.delegate)
                       delegates
                   in
                   match
@@ -4064,7 +4070,7 @@ module RPC = struct
   module Validators = struct
     type t = {
       level : Raw_level.t;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       slots : Slot.t list;
     }
 
@@ -4075,7 +4081,7 @@ module RPC = struct
         (fun (level, delegate, slots) -> {level; delegate; slots})
         (obj3
            (req "level" Raw_level.encoding)
-           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "slots" (list Slot.encoding)))
 
     module S = struct
@@ -4085,7 +4091,7 @@ module RPC = struct
 
       type validators_query = {
         levels : Raw_level.t list;
-        delegates : Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
       }
 
       let validators_query =
@@ -4135,7 +4141,7 @@ module RPC = struct
           | _ :: _ as delegates ->
               let is_requested p =
                 List.exists
-                  (Signature.Public_key_hash.equal p.delegate)
+                  (Tezos_crypto.Signature.V0.Public_key_hash.equal p.delegate)
                   delegates
               in
               List.filter is_requested rights)
@@ -4149,41 +4155,41 @@ module RPC = struct
 
     type level_query = {offset : int32}
 
-    let level_query : level_query RPC_query.t =
-      let open RPC_query in
+    let level_query : level_query Tezos_rpc.Query.t =
+      let open Tezos_rpc.Query in
       query (fun offset -> {offset})
-      |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
+      |+ field "offset" Tezos_rpc.Arg.int32 0l (fun t -> t.offset)
       |> seal
 
     let current_level =
-      RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:
           "Returns the level of the interrogated block, or the one of a block \
            located `offset` blocks after it in the chain. For instance, the \
            next block if `offset` is 1. The offset cannot be negative."
         ~query:level_query
         ~output:Level.encoding
-        RPC_path.(path / "current_level")
+        Tezos_rpc.Path.(path / "current_level")
 
     let levels_in_current_cycle =
-      RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Levels of a cycle"
         ~query:level_query
         ~output:
           (obj2
              (req "first" Raw_level.encoding)
              (req "last" Raw_level.encoding))
-        RPC_path.(path / "levels_in_current_cycle")
+        Tezos_rpc.Path.(path / "levels_in_current_cycle")
 
     let round =
-      RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:
           "Returns the round of the interrogated block, or the one of a block \
            located `offset` blocks after in the chain (or before when \
            negative). For instance, the next block if `offset` is 1."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:Round.encoding
-        RPC_path.(path / "round")
+        Tezos_rpc.Path.(path / "round")
   end
 
   type Environment.Error_monad.error += Negative_level_offset
@@ -4244,5 +4250,5 @@ module RPC = struct
 
   let rpc_services =
     register () ;
-    RPC_directory.merge rpc_services !Registration.patched_services
+    Tezos_rpc.Directory.merge rpc_services !Registration.patched_services
 end

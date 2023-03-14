@@ -25,23 +25,13 @@
 
 include Plonk.Main_protocol
 
+type transcript = bytes
+
 type public_parameters = verifier_public_parameters * transcript
+
+let transcript_encoding = Data_encoding.bytes
 
 let public_parameters_encoding =
   Data_encoding.tup2 verifier_public_parameters_encoding transcript_encoding
 
 let scalar_array_encoding = Data_encoding.array scalar_encoding
-
-let verify pp ~public_inputs proof =
-  Result.value ~default:false
-  @@ Tezos_lwt_result_stdlib.Lwtreslib.Bare.Result.catch (fun () ->
-         fst @@ verify pp ~public_inputs proof)
-
-let verify_multi_circuits pp ~public_inputs proof =
-  Result.value ~default:false
-  @@ Tezos_lwt_result_stdlib.Lwtreslib.Bare.Result.catch (fun () ->
-         fst
-         @@ verify_multi_circuits
-              pp
-              ~public_inputs:(SMap.of_list public_inputs)
-              proof)

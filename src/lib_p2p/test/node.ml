@@ -70,21 +70,28 @@ module Event = struct
   let bye = declare_0 ~section ~name:"bye" ~msg:"Bye." ~level:Info ()
 end
 
-type message = Ping
+type message = Ping | BigPing of Operation_hash.t list
 
 let msg_config : message P2p_params.message_config =
+  let open Data_encoding in
+  let case ?max_length ~tag ~title encoding unwrap wrap =
+    P2p_params.Encoding {tag; title; encoding; wrap; unwrap; max_length}
+  in
   {
     encoding =
       [
-        P2p_params.Encoding
-          {
-            tag = 0x10;
-            title = "Ping";
-            encoding = Data_encoding.empty;
-            wrap = (function () -> Ping);
-            unwrap = (function Ping -> Some ());
-            max_length = None;
-          };
+        case
+          ~tag:0x10
+          ~title:"Ping"
+          empty
+          (function Ping -> Some () | _ -> None)
+          (fun () -> Ping);
+        case
+          ~tag:0x11
+          ~title:"BigPing"
+          (list Operation_hash.encoding)
+          (function BigPing l -> Some l | _ -> None)
+          (fun l -> BigPing l);
       ];
     chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
     distributed_db_versions = Distributed_db_version.[zero; one];
@@ -151,7 +158,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
       trusted_points
   in
-  let proof_of_work_target = Crypto_box.make_pow_target 0. in
+  let proof_of_work_target = Tezos_crypto.Crypto_box.make_pow_target 0. in
   let identity = P2p_identity.generate_with_pow_target_0 () in
   let private_mode = false in
   let nb_points = List.length trusted_points in
@@ -164,7 +171,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         listening_port = Some port;
         advertised_port = Some port;
         private_mode;
-        reconnection_config = P2p_point_state.Info.default_reconnection_config;
+        reconnection_config = Point_reconnection_config.default;
         min_connections = unopt min_connections;
         max_connections = unopt max_connections;
         max_incoming_connections = unopt max_incoming_connections;
@@ -239,8 +246,15 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
                 Lwt.return_unit)
               trusted_points
           in
-          let* welcome =
+          let*! welcome =
             P2p_welcome.create ~backlog:10 connect_handler ~addr port
+          in
+          let* welcome =
+            match welcome with
+            | Ok w -> Lwt.return @@ Ok w
+            | Error _ ->
+                let*! () = Lwt_unix.sleep 2. in
+                P2p_welcome.create ~backlog:10 connect_handler ~addr port
           in
           P2p_welcome.activate welcome ;
           let*! () = Event.(emit node_ready) port in
@@ -278,6 +292,52 @@ let select_nth_point n points =
     | x :: xs -> loop (pred n) (x :: acc) xs
   in
   loop n [] points
+
+let gen_points npoints ?port addr =
+  match port with
+  | Some port ->
+      let ports = port -- (port + npoints - 1) in
+      List.map (fun port -> (addr, port)) ports
+  | None ->
+      let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
+      let rec loop i ports =
+        if i <= 0 then ports
+        else
+          try
+            let main_socket = Unix.(socket PF_INET6 SOCK_STREAM 0) in
+            try
+              Unix.setsockopt main_socket Unix.SO_REUSEPORT true ;
+              Unix.setsockopt main_socket Unix.SO_REUSEADDR true ;
+              Unix.set_close_on_exec main_socket ;
+              Unix.bind
+                main_socket
+                (ADDR_INET
+                   ( uaddr,
+                     match port with
+                     | None -> 0
+                     | Some port -> port + (npoints - i) )) ;
+              Unix.listen main_socket 50 ;
+              let port =
+                match Unix.getsockname main_socket with
+                | ADDR_UNIX _ -> assert false
+                | ADDR_INET (_, port) -> port
+              in
+              Unix.close main_socket ;
+              loop (i - 1) (port :: ports)
+            with
+            | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
+              when port = None ->
+                Unix.close main_socket ;
+                loop i ports
+            | Unix.Unix_error (e, _, _) ->
+                Unix.close main_socket ;
+                Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
+          with Unix.Unix_error (e, _, _) ->
+            Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
+      in
+
+      let ports = loop npoints [] in
+      List.map (fun port -> (addr, port)) ports
 
 (**Detach one process per id in [points], each with a p2p_pool and a
    welcome worker.

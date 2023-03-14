@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Kathmandu for kathmandunet), the protocol
+network is activated (such as Lima for limanet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -48,21 +48,6 @@ On Limanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
-Kathmandunet
-============
-
-- Built-in network alias: ``kathmandunet`` (see :ref:`builtin_networks`)
-
-  * Available from version 14.0.
-
-Kathmandunet is a test network which runs the Kathmandu protocol.
-Kathmandunet will run until Kathmandu is refused through the amendment process
-or (accepted and then) replaced by another protocol on Mainnet.
-
-On Kathmandunet, some constants differ from Mainnet.
-This results in a faster chain than Mainnet.
-See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
-
 Future Networks
 ===============
 
@@ -91,7 +76,13 @@ An external description of the various test networks available can be found on h
 Old Networks
 ============
 
-.. _ithacanet:
+Kathmandunet
+------------
+
+Kathmandunet was a test network running the Kathmandu protocol.
+Following the activation of the Lima protocol replacing Kathmandunet on Mainnet,
+Kathmandunet stopped being maintained in December 2022 (the bootstrap baker
+is no longer producing blocks).
 
 Jakartanet
 ----------
@@ -100,6 +91,8 @@ Jakartanet was a test network running the Jakarta protocol.
 Following the activation of the Kathmandu protocol replacing Jakarta on Mainnet,
 Jakartanet stopped being maintained in October 2022 (the bootstrap baker
 is no longer producing blocks).
+
+.. _ithacanet:
 
 Ithacanet
 ---------

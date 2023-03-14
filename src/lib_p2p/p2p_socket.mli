@@ -65,7 +65,7 @@ val info : ('msg, 'meta) t -> 'meta P2p_connection.Info.t
     [authenticate]. *)
 val local_metadata : ('msg, 'meta) t -> 'meta
 
-(** [local_metadata t] returns the remote metadata, communicated by the
+(** [remote_metadata t] returns the remote metadata, communicated by the
     remote host when the session was established. *)
 val remote_metadata : ('msg, 'meta) t -> 'meta
 
@@ -75,8 +75,8 @@ val private_node : ('msg, 'meta) t -> bool
 
     These should be used together
     to implement the session establishment protocol. Session establishment
-    proceeds in three synchronous, symmetric, steps. First two steps are
-    implemented by [authenticate]. Third step is implemented by either [accept]
+    proceeds in three synchronous, symmetric, steps. The first two steps are
+    implemented by [authenticate]. The third step is implemented by either [accept]
     or [nack].
 
     1. Hosts send each other an authentication message. The message contains
@@ -108,7 +108,7 @@ val private_node : ('msg, 'meta) t -> bool
     - [P2p_errors.Connection_closed] if the remote peer closes the connection *)
 val authenticate :
   canceler:Lwt_canceler.t ->
-  proof_of_work_target:Crypto_box.pow_target ->
+  proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->
   incoming:bool ->
   P2p_io_scheduler.connection ->
   P2p_point.Id.t ->
@@ -160,6 +160,24 @@ val write : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
     [conn]'s internal write queue, [Ok false] if [msg] has been
     dropped, or fails with a corresponding error otherwise. *)
 val write_now : ('msg, 'meta) t -> 'msg -> bool tzresult
+
+(** type of an encoded_message parameterized by the type of message
+    it can be encoded from *)
+type 'msg encoded_message
+
+(** Copies and encoded message in a newly allocated one *)
+val copy_encoded_message : 'msg encoded_message -> 'msg encoded_message
+
+(** Encodes a message to be used with [write_encoded_now].*)
+val encode : ('msg, 'meta) t -> 'msg -> 'msg encoded_message tzresult
+
+(** Similar to [write_now conn msg] but with a preencoded message.
+    [msg] will be overwritten and should not be used after this
+    invocation.
+    It will fail if called on a closed connection with the
+    `P2p_errors.Connection_closed` error.
+*)
+val write_encoded_now : ('msg, 'meta) t -> 'msg encoded_message -> bool tzresult
 
 (** [write_sync conn msg] returns when [msg] has been successfully
     sent to the remote end of [conn], or fails accordingly. *)

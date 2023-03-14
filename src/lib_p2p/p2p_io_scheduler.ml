@@ -270,7 +270,7 @@ module Scheduler (IO : IO) = struct
     st.worker <-
       Lwt_utils.worker
         IO.name
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st

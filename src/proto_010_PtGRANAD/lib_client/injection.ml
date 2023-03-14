@@ -181,7 +181,11 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
     pp_print_cut ppf ()
   in
   let hash_pp l =
-    fprintf ppf "%s" (Base58.raw_encode Blake2B.(hash_bytes l |> to_string))
+    fprintf
+      ppf
+      "%s"
+      (Tezos_crypto.Base58.raw_encode
+         Tezos_crypto.Blake2B.(hash_bytes l |> to_string))
   in
   item (fun ppf () ->
       pp_print_text ppf "Branch: " ;
@@ -190,9 +194,10 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       fprintf
         ppf
         "Watermark: `%a` (0x%s)"
-        Signature.pp_watermark
+        Tezos_crypto.Signature.V0.pp_watermark
         watermark
-        (Hex.of_bytes (Signature.bytes_of_watermark watermark) |> Hex.show)) ;
+        (Hex.of_bytes (Tezos_crypto.Signature.V0.bytes_of_watermark watermark)
+        |> Hex.show)) ;
   item (fun ppf () ->
       pp_print_text ppf "Operation bytes: " ;
       TzString.fold_left (* We split the bytes into lines for display: *)
@@ -215,7 +220,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       pp_print_text
         ppf
         "Blake 2B Hash (ledger-style, with operation watermark): " ;
-      hash_pp [Signature.bytes_of_watermark watermark; bytes]) ;
+      hash_pp [Tezos_crypto.Signature.V0.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
       Operation.unsigned_encoding
@@ -240,8 +245,9 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | Some src_sk ->
       let watermark =
         match contents with
-        | Single (Endorsement _) -> Signature.(Endorsement chain_id)
-        | _ -> Signature.Generic_operation
+        | Single (Endorsement _) ->
+            Tezos_crypto.Signature.V0.(Endorsement chain_id)
+        | _ -> Tezos_crypto.Signature.V0.Generic_operation
       in
       (if verbose_signing then
        cctxt#message
@@ -249,14 +255,14 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
          (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
       else Lwt.return_unit)
       >>= fun () ->
-      Client_keys.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
+      Client_keys_v0.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
       return_some signature)
   >>=? fun signature ->
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = Bytes.length bytes + Signature.size in
+  let size = Bytes.length bytes + Tezos_crypto.Signature.V0.size in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -598,7 +604,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
-            + Signature.size
+            + Tezos_crypto.Signature.V0.size
           else
             Data_encoding.Binary.length
               Operation.contents_encoding

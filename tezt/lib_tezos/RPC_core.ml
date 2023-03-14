@@ -27,6 +27,8 @@ open Base
 
 type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
 
+type data = Client.data
+
 let show_verb = function
   | GET -> "GET"
   | PUT -> "PUT"
@@ -45,14 +47,16 @@ type ('endpoint, 'result) t = {
   verb : verb;
   path : string list;
   query_string : (string * string) list;
-  data : JSON.u option;
+  data : Client.data option;
   decode : JSON.t -> 'result;
   get_host : 'endpoint -> string;
   get_port : 'endpoint -> int;
+  get_scheme : 'endpoint -> string;
 }
 
-let make ?data ?(query_string = []) ~get_host ~get_port verb path decode =
-  {verb; path; query_string; data; decode; get_host; get_port}
+let make ?data ?(query_string = []) ~get_host ~get_port ~get_scheme verb path
+    decode =
+  {verb; path; query_string; data; decode; get_host; get_port; get_scheme}
 
 let decode_raw ?(origin = "RPC response") rpc raw =
   rpc.decode (JSON.parse ~origin raw)
@@ -61,9 +65,17 @@ let decode rpc json = rpc.decode json
 
 type 'a response = {body : 'a; code : int}
 
+let check_string_response ?(body_rex = "") ~code (response : string response) =
+  Check.(
+    (code = response.code)
+      int
+      ~error_msg:"Unexpected HTTP status: expecting %L, got %R.") ;
+  Check.(response.body =~ rex body_rex)
+    ~error_msg:"Unexpected HTTP body: expecting a pattern %R, got a body %L."
+
 let make_uri endpoint rpc =
   Uri.make
-    ~scheme:"http"
+    ~scheme:(rpc.get_scheme endpoint)
     ~host:(rpc.get_host endpoint)
     ~port:(rpc.get_port endpoint)
     ~path:(String.concat "/" rpc.path)
@@ -90,7 +102,10 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
       ~headers:(Cohttp.Header.of_list headers)
       ?body:
         (Option.map
-           (fun body -> Cohttp_lwt.Body.of_string (JSON.encode_u body))
+           (function
+             | Client.Data body ->
+                 Cohttp_lwt.Body.of_string (JSON.encode_u body)
+             | File filename -> Cohttp_lwt.Body.of_string (read_file filename))
            rpc.data)
       (cohttp_of_verb rpc.verb)
       uri
@@ -188,6 +203,21 @@ module Client = struct
         rpc
     in
     return (rpc.decode json)
+
+  let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client {verb; path; _} =
+    Client.rpc_schema
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?protocol_hash
+      verb
+      path
+      client
 
   let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?endpoint ?hooks ?env ?protocol_hash client

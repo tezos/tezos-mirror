@@ -27,6 +27,6 @@
     The effect is protocol-dependent. *)
 val migrate_mockup :
   cctxt:Tezos_client_base.Client_context.full ->
-  protocol_hash:Tezos_base.TzPervasives.Protocol_hash.t option ->
-  next_protocol_hash:Tezos_base.TzPervasives.Protocol_hash.t ->
+  protocol_hash:Protocol_hash.t option ->
+  next_protocol_hash:Protocol_hash.t ->
   unit tzresult Lwt.t

@@ -28,13 +28,8 @@
 open Block_validator_worker_state
 open Block_validator_errors
 
-type limits = {
-  protocol_timeout : Time.System.Span.t;
-  operation_metadata_size_limit : int option;
-}
-
 type validation_result =
-  | Already_commited
+  | Already_committed
   | Outdated_block
   | Validated
   | Validation_error of error trace
@@ -43,9 +38,13 @@ type validation_result =
   | Validation_error_after_precheck of error trace
   | Precheck_failed of error trace
 
+type new_block = {
+  block : Store.Block.t;
+  resulting_context_hash : Context_hash.t;
+}
+
 module Block_hash_ring =
-  (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
-    (Block_hash)
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
 
 module Name = struct
   type t = unit
@@ -63,12 +62,16 @@ module Types = struct
   type state = {
     protocol_validator : Protocol_validator.t;
     validation_process : Block_validator_process.t;
-    limits : limits;
+    limits : Shell_limits.block_validator_limits;
     start_testchain : bool;
     invalid_blocks_after_precheck : error trace Block_hash_ring.t;
   }
 
-  type parameters = limits * bool * Distributed_db.t * Block_validator_process.t
+  type parameters =
+    Shell_limits.block_validator_limits
+    * bool
+    * Distributed_db.t
+    * Block_validator_process.t
 end
 
 module Request = struct
@@ -76,7 +79,7 @@ module Request = struct
 
   type validation_request = {
     chain_db : Distributed_db.chain_db;
-    notify_new_block : Store.Block.t -> unit;
+    notify_new_block : new_block -> unit;
     canceler : Lwt_canceler.t option;
     peer : P2p_peer.Id.t option;
     hash : Block_hash.t;
@@ -176,7 +179,7 @@ let on_validation_request w
   let chain_store = Distributed_db.chain_store chain_db in
   let*! b = Store.Block.is_known_valid chain_store hash in
   match b with
-  | true -> return Already_commited
+  | true -> return Already_committed
   | false -> (
       let*! r =
         match
@@ -267,9 +270,14 @@ let on_validation_request w
                       in
                       match o with
                       | Some block ->
-                          notify_new_block block ;
+                          notify_new_block
+                            {
+                              block;
+                              resulting_context_hash =
+                                result.validation_store.resulting_context_hash;
+                            } ;
                           return Validated
-                      | None -> return Already_commited)))
+                      | None -> return Already_committed)))
       in
       match r with
       | Ok r -> return r
@@ -364,7 +372,7 @@ let on_completion :
   let open Lwt_syntax in
   Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
   match (request, v) with
-  | Request.Request_validation {hash; _}, Already_commited ->
+  | Request.Request_validation {hash; _}, Already_committed ->
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
       let* () = Events.(emit previously_validated) hash in
       Lwt.return_unit
@@ -453,14 +461,14 @@ type block_validity =
 
 let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
     ?(precheck_and_notify = false) chain_db hash (header : Block_header.t)
-    operations : block_validity Lwt.t =
+    operations =
   let open Lwt_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let* b = Store.Block.is_known_valid chain_store hash in
   match b with
   | true ->
       let* () = Events.(emit previously_validated) hash in
-      Lwt.return Valid
+      return Valid
   | false -> (
       let* r =
         let open Lwt_result_syntax in
@@ -502,16 +510,16 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
              })
       in
       match r with
-      | Ok (Validated | Already_commited | Outdated_block) -> Lwt.return Valid
+      | Ok (Validated | Already_committed | Outdated_block) -> return Valid
       | Ok (Validation_error_after_precheck errs) ->
-          Lwt.return (Invalid_after_precheck errs)
+          return (Invalid_after_precheck errs)
       | Ok (Precheck_failed errs)
       | Ok (Validation_error errs)
       | Error (Request_error errs) ->
-          Lwt.return (Invalid errs)
-      | Error (Closed None) -> Lwt.return (Invalid [Worker_types.Terminated])
-      | Error (Closed (Some errs)) -> Lwt.return (Invalid errs)
-      | Error (Any exn) -> Lwt.return (Invalid [Exn exn])
+          return (Invalid errs)
+      | Error (Closed None) -> return (Invalid [Worker_types.Terminated])
+      | Error (Closed (Some errs)) -> return (Invalid errs)
+      | Error (Any exn) -> return (Invalid [Exn exn])
       | _ ->
           (* preapplication cases *)
           assert false)
@@ -543,12 +551,17 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
       (* validation cases *)
       assert false
 
-let context_garbage_collection w index context_hash =
+let context_garbage_collection w index context_hash ~gc_lockfile_path =
   let bv = Worker.state w in
   Block_validator_process.context_garbage_collection
     bv.validation_process
     index
     context_hash
+    ~gc_lockfile_path
+
+let context_split w index =
+  let bv = Worker.state w in
+  Block_validator_process.context_split bv.validation_process index
 
 let fetch_and_compile_protocol w =
   let bv = Worker.state w in

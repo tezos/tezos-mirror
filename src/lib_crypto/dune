@@ -16,7 +16,7 @@
   secp256k1-internal
   tezos-error-monad
   tezos-rpc
-  ringo
+  aches
   zarith
   zarith_stubs_js
   bls12-381
@@ -27,5 +27,4 @@
   -open Tezos_stdlib
   -open Data_encoding
   -open Tezos_error_monad
-  -open Tezos_error_monad.TzLwtreslib
-  -open Tezos_rpc))
+  -open Tezos_error_monad.TzLwtreslib))

@@ -54,9 +54,9 @@
 
 (** Type for sparse block locators (/à la/ Bitcoin). *)
 type t = {
-  head_hash : Block_hash.t;
+  head_hash : Tezos_crypto.Hashed.Block_hash.t;
   head_header : Block_header.t;
-  history : Block_hash.t list;
+  history : Tezos_crypto.Hashed.Block_hash.t list;
 }
 
 val pp : Format.formatter -> t -> unit
@@ -82,10 +82,13 @@ val estimated_length : seed -> t -> int
    sparse block.  The sparse block locator contains at most [size + 1]
    elements, including the caboose. *)
 val compute :
-  get_predecessor:(Block_hash.t -> int -> Block_hash.t option Lwt.t) ->
-  caboose:Block_hash.t ->
+  get_predecessor:
+    (Tezos_crypto.Hashed.Block_hash.t ->
+    int ->
+    Tezos_crypto.Hashed.Block_hash.t option Lwt.t) ->
+  caboose:Tezos_crypto.Hashed.Block_hash.t ->
   size:int ->
-  Block_hash.t ->
+  Tezos_crypto.Hashed.Block_hash.t ->
   Block_header.t ->
   seed ->
   t Lwt.t
@@ -94,8 +97,8 @@ val compute :
    locator, and the expected difference of level between the two
    blocks (or an upper bounds when [strict_step = false]). *)
 type step = {
-  block : Block_hash.t;
-  predecessor : Block_hash.t;
+  block : Tezos_crypto.Hashed.Block_hash.t;
+  predecessor : Tezos_crypto.Hashed.Block_hash.t;
   step : int;
   strict_step : bool;
 }
@@ -115,7 +118,11 @@ val to_steps : seed -> t -> step list
    [predecessor] of the last step as [save_point] and its field
    [strict] to [false]. *)
 val to_steps_truncate :
-  limit:int -> save_point:Block_hash.t -> seed -> t -> step list
+  limit:int ->
+  save_point:Tezos_crypto.Hashed.Block_hash.t ->
+  seed ->
+  t ->
+  step list
 
 (** A block can either be known valid, invalid or unknown. *)
 type validity = Unknown | Known_valid | Known_invalid
@@ -135,4 +142,6 @@ type validity = Unknown | Known_valid | Known_invalid
     - [(Unknown, (h, hist))] when no block is known valid nor invalid
    (w.r.t.  [is_known]), where [(h, hist)] is the given [locator]. *)
 val unknown_prefix :
-  is_known:(Block_hash.t -> validity Lwt.t) -> t -> (validity * t) Lwt.t
+  is_known:(Tezos_crypto.Hashed.Block_hash.t -> validity Lwt.t) ->
+  t ->
+  (validity * t) Lwt.t

@@ -1,0 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_016_PtMumbai_mockup_simulator)
+ (public_name tezos-baking-016-PtMumbai.mockup-simulator)
+ (libraries
+  tezos-base
+  tezos-protocol-016-PtMumbai
+  tezos-client-016-PtMumbai
+  tezos-client-commands
+  tezos-baking-016-PtMumbai
+  tezos-stdlib-unix
+  tezos-client-base-unix
+  tezos-protocol-016-PtMumbai.parameters
+  tezos-mockup
+  tezos-mockup-proxy
+  tezos-mockup-commands
+  tezos-baking-016-PtMumbai.tenderbrute)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai.Protocol
+  -open Tezos_client_016_PtMumbai
+  -open Tezos_client_commands
+  -open Tezos_baking_016_PtMumbai
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_016_PtMumbai_parameters
+  -open Tenderbrute_016_PtMumbai))

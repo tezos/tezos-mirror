@@ -17,8 +17,9 @@
  (libraries
   octez-protocol-compiler.native)
  (link_flags
-  (:standard -linkall)
-  (:include %{workspace_root}/static-link-flags.sexp))
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (-linkall))
  (modules Main_native))
 
 (executable
@@ -51,8 +52,9 @@
   tezos-base.unix
   tezos-stdlib-unix)
  (link_flags
-  (:standard -linkall)
-  (:include %{workspace_root}/static-link-flags.sexp))
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

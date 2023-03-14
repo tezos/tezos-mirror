@@ -59,8 +59,13 @@ val init :
   unit ->
   t Lwt.t
 
-(** Send SIGTERM (or SIGKILL) to a signer and wait for it to terminate. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** Register an event handler that logs all events.
 
@@ -80,7 +85,7 @@ val log_events : t -> unit
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Add a callback to be called whenever the node emits an event.
 

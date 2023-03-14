@@ -41,7 +41,25 @@ type problem =
     }
   | Degenerate of {predicted : matrix; measured : matrix}
 
-type solution = {mapping : (Free_variable.t * float) list; weights : matrix}
+(* R2 score is uninformative when the input is constant. (e.g. constant model)
+   We use `None` for the R2 score of such models. *)
+type scores = {r2_score : float option; rmse_score : float}
+
+let scores_to_csv_column (model_name, bench_name) scores =
+  let name = model_name ^ "-" ^ Namespace.to_string bench_name in
+  let table =
+    (match scores.r2_score with
+    | None -> []
+    | Some f -> [("R2_score-" ^ name, Float.to_string f)])
+    @ [("RMSE_score-" ^ name, Float.to_string scores.rmse_score)]
+  in
+  [List.map fst table; List.map snd table]
+
+type solution = {
+  mapping : (Free_variable.t * float) list;
+  weights : matrix;
+  scores : scores;
+}
 
 type solver =
   | Ridge of {alpha : float}
@@ -289,15 +307,14 @@ let to_scipy m =
   let rows = Maths.row_dim m in
   Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
 
+let median_of_output output =
+  (* Scipy's functions expect a column vector on output. *)
+  Matrix.of_col
+  @@ map_rows
+       (fun row -> Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
+       output
+
 let wrap_python_solver ~input ~output solver =
-  (* Scipy's solvers expect a column vector on output. *)
-  let output =
-    Matrix.of_col
-    @@ map_rows
-         (fun row ->
-           Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
-         output
-  in
   let input = to_scipy input in
   let output = to_scipy output in
   solver input output |> of_scipy
@@ -314,17 +331,44 @@ let nnls ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
       Scikit.LinearModel.nnls ~input ~output)
 
-let solve_problem : problem -> solver -> solution =
- fun problem solver ->
+let predict_output ~input ~weights =
+  let input = to_scipy input in
+  let weights = to_scipy weights in
+  Scikit.predict_output ~input ~weights
+
+let r2_score ~output ~prediction =
+  let output = to_scipy output in
+  Scikit.r2_score ~output ~prediction
+
+let rmse_score ~output ~prediction =
+  let output = to_scipy output in
+  Scikit.rmse_score ~output ~prediction
+
+let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
+ fun problem ~is_constant_input solver ->
+  let calculate_scores ~output ~prediction =
+    let r2_score =
+      if is_constant_input then None else r2_score ~output ~prediction
+    in
+    let rmse_score = rmse_score ~output ~prediction in
+    {r2_score; rmse_score}
+  in
   match problem with
-  | Degenerate _ -> {mapping = []; weights = empty_matrix}
+  | Degenerate {predicted; measured} ->
+      let prediction = to_scipy predicted |> Scikit_matrix.to_numpy in
+      let output = median_of_output measured in
+      let scores = calculate_scores ~output ~prediction in
+      {mapping = []; weights = empty_matrix; scores}
   | Non_degenerate {input; output; nmap; _} ->
+      let output = median_of_output output in
       let weights =
         match solver with
         | Ridge {alpha} -> ridge ~alpha ~input ~output
         | Lasso {alpha; positive} -> lasso ~alpha ~positive ~input ~output
         | NNLS -> nnls ~input ~output
       in
+      let prediction = predict_output ~input ~weights in
+      let scores = calculate_scores ~output ~prediction in
       let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
         let cols = Maths.col_dim weights in
@@ -345,4 +389,4 @@ let solve_problem : problem -> solver -> solution =
             nmap
             []
         in
-        {mapping; weights}
+        {mapping; weights; scores}

@@ -26,7 +26,7 @@
 open Protocol.Alpha_context
 
 (** Hash with b58check encoding mop(53), for hashes of L1 manager operations *)
-module Hash : S.HASH
+module Hash : Tezos_crypto.Intfs.HASH
 
 (** Alias for L1 operations hashes *)
 type hash = Hash.t

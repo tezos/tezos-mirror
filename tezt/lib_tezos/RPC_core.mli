@@ -34,6 +34,9 @@ type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
     ['result] is the type of values returned by the RPC after decoding. *)
 type ('endpoint, 'result) t
 
+(** Data type for RPCs. *)
+type data = Client.data
+
 (** Make an RPC description.
 
     Usage: [make ~get_host ~get_port verb path decode]
@@ -53,19 +56,23 @@ type ('endpoint, 'result) t
       If you do not want to define it, use [Fun.id] (to return a [JSON.t])
       or [ignore] (to ignore the response body).
 
-    - [get_host] and [get_port] are callbacks to extract host and port from the
-      endpoint to build the targeted url.
+    - [get_host], [get_port] and [get_scheme] are callbacks to extract host, port and
+      scheme from the endpoint to build the targeted url.
 
     Use one of the [call] functions below to actually call the RPC. *)
 val make :
-  ?data:JSON.u ->
+  ?data:data ->
   ?query_string:(string * string) list ->
   get_host:('endpoint -> string) ->
   get_port:('endpoint -> int) ->
+  get_scheme:('endpoint -> string) ->
   verb ->
   string list ->
   (JSON.t -> 'result) ->
   ('endpoint, 'result) t
+
+(** [make_uri endpoint rpc] returns the URI of the RPC [rpc] at [endpoint]. *)
+val make_uri : 'endpoint -> ('endpoint, 'result) t -> Uri.t
 
 (** Parse and decode a response body using the decode function of an RPC description.
 
@@ -81,6 +88,15 @@ type 'a response = {
   body : 'a;  (** Response body. *)
   code : int;  (** Status code (e.g. 200 for OK, 404 for Not Found). *)
 }
+
+(** [check_string_response ?body_rex ~code response] verifies that the given
+    response's body  and HTTP status match the expected ones using
+    the facilities provided by module {!val:Check}.
+
+    The function checks exact equality for the HTTP status and for regular
+    expression matching for the body (if provided).  *)
+val check_string_response :
+  ?body_rex:string -> code:int -> string response -> unit
 
 (** Call an RPC.
 
@@ -184,6 +200,20 @@ module Client : sig
 
   (** Call an RPC, but do not decode the client output, only parse it. *)
   val call_json :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    Client.t ->
+    'result t ->
+    JSON.t Lwt.t
+
+  (** Get the schema of an RPC as JSON. *)
+  val schema :
     ?log_command:bool ->
     ?log_status_on_exit:bool ->
     ?log_output:bool ->

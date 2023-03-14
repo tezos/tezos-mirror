@@ -28,11 +28,6 @@ include module type of struct
 end
 
 module Error_monad = Tezos_error_monad.Error_monad
-
-include module type of Tezos_rpc
-
-include module type of Tezos_crypto
-
 module Data_encoding = Data_encoding
 
 (** The following modules are part of [TzLwtreslib]. We just remove
@@ -71,6 +66,12 @@ module String : sig
   module Set : Tezos_error_monad.TzLwtreslib.Set.S with type elt = t
 end
 
+module Bytes : sig
+  include module type of Bytes
+
+  include module type of Tezos_stdlib.TzBytes
+end
+
 module Time = Time
 module Fitness = Fitness
 module User_activated = User_activated
@@ -91,6 +92,20 @@ module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
+module Block_hash = Tezos_crypto.Hashed.Block_hash
+module Block_metadata_hash = Tezos_crypto.Hashed.Block_metadata_hash
+module Chain_id = Tezos_crypto.Hashed.Chain_id
+module Context_hash = Tezos_crypto.Hashed.Context_hash
+module Operation_hash = Tezos_crypto.Hashed.Operation_hash
+module Operation_list_hash = Tezos_crypto.Hashed.Operation_list_hash
+module Operation_list_list_hash = Tezos_crypto.Hashed.Operation_list_list_hash
+module Operation_metadata_hash = Tezos_crypto.Hashed.Operation_metadata_hash
+module Operation_metadata_list_hash =
+  Tezos_crypto.Hashed.Operation_metadata_list_hash
+module Operation_metadata_list_list_hash =
+  Tezos_crypto.Hashed.Operation_metadata_list_list_hash
+module Protocol_hash = Tezos_crypto.Hashed.Protocol_hash
+module Signature = Tezos_crypto.Signature
 
 include module type of Utils.Infix
 

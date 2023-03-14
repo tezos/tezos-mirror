@@ -1,0 +1,80 @@
+.template__code_quality:
+  variables:
+    CODE_QUALITY_REPORT: "_reports/gl-code-quality-report.json"
+
+.test_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage
+  stage: test
+  before_script:
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+  retry: 2
+
+# Merge coverage files after the execution
+.template__coverage_files:
+  extends: .template__coverage
+  artifacts:
+    name: "coverage-files-$CI_JOB_ID"
+    paths:
+      - $BISECT_FILE
+    expire_in: 1 day
+    when: on_success
+
+# Definition for the environment to run all integration tests.
+# This is also used by Tezt tests.
+# In general we do not have to run make, which takes a while,
+# because the binaries have been produced by the build job and are
+# in the cache. But if they are not, we need to build them.
+# Ideally we should also check that the baker / accuser / endorser
+# exist (some tests use them) but their actual name depend on the protocol.
+.integration_template:
+  extends:
+    - .test_template
+    - .template__coverage_files
+  dependencies: ["build_x86_64"]
+  # Start immediately after 'build_x86_64' and don't wait for
+  # intermediate stages to succeed
+  needs: ["build_x86_64"]
+
+# definition for the environment to run all integration tests
+# integration tests are run only on x86_64 architectures (for now)
+.pytest_template:
+  extends:
+    - .test_template
+  dependencies: ["build_x86_64"]
+  # Start immediately after 'build_x86_64' and don't wait for
+  # intermediate stages to succeed
+  needs: ["build_x86_64"]
+  before_script:
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+    - mkdir tests_python/tmp
+    - cd tests_python
+
+
+.pytest_integration:
+  extends:
+    - .pytest_template
+    - .template__coverage_files
+  # the number of jobs have been choosen to give jobs of maximal
+  # length ~10 minutes and to accommodate the addition of new protocol
+  # test suites without increasing wall time of the test stage.
+  variables:
+    TESTS: ""
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-pytest
+  artifacts:
+    paths:
+      - tests_python/tmp/
+      - tests_python/reports/*.xml
+      - $BISECT_FILE
+    reports:
+      junit: tests_python/reports/*.xml
+    expire_in: 7 day
+    when: always

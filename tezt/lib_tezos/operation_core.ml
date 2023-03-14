@@ -45,35 +45,53 @@ let make ~branch ~signer ~kind contents =
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
 
-let raw t client =
+let raw ?protocol t client =
   match t.raw with
-  | None ->
-      let* raw =
-        RPC.Client.call client
-        @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
-        |> Lwt.map JSON.as_string
-      in
-      t.raw <- Some (`Hex raw) ;
-      return (`Hex raw)
+  | None -> (
+      match protocol with
+      | None ->
+          let* raw =
+            RPC.Client.call client
+            @@ RPC.post_chain_block_helpers_forge_operations
+                 ~data:(Data (json t))
+                 ()
+            |> Lwt.map JSON.as_string
+          in
+          t.raw <- Some (`Hex raw) ;
+          return (`Hex raw)
+      | Some p -> (
+          let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+          match Data_encoding.Registration.find name with
+          | None -> Test.fail "%s encoding was not found" name
+          | Some registered -> (
+              match
+                Data_encoding.Registration.bytes_of_json registered (json t)
+              with
+              | None ->
+                  Test.fail
+                    "encoding of %s with %s failed"
+                    (Ezjsonm.to_string (json t))
+                    name
+              | Some bytes -> return (Hex.of_bytes bytes))))
   | Some raw -> return raw
 
-let hex ?signature t client =
-  let* (`Hex raw) = raw t client in
+let hex ?protocol ?signature t client =
+  let* (`Hex raw) = raw ?protocol t client in
   match signature with
   | None -> return (`Hex raw)
   | Some signature ->
       let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
       return (`Hex (raw ^ signature))
 
-let sign ({kind; signer; _} as t) client =
+let sign ?protocol ({kind; signer; _} as t) client =
   let watermark =
     match kind with
     | Consensus {chain_id} ->
         Tezos_crypto.Signature.Endorsement
-          (Tezos_crypto.Chain_id.of_b58check_exn chain_id)
+          (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
     | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
-  let* hex = hex t client in
+  let* hex = hex ?protocol t client in
   let bytes = Hex.to_bytes hex in
   return (Account.sign_bytes ~watermark ~signer bytes)
 
@@ -86,19 +104,18 @@ let to_raw_operation t client : Tezos_operation.t Lwt.t =
   return Tezos_operation.{shell = {branch}; proto = Hex.to_bytes_exn raw}
 
 let hash t client : [`OpHash of string] Lwt.t =
-  let open Tezos_base.TzPervasives in
   let* op = to_raw_operation t client in
   let hash = Tezos_operation.hash op in
-  return (`OpHash (Operation_hash.to_string hash))
+  return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_string hash))
 
-let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
-    [`OpHash of string] Lwt.t =
+let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
+    client : [`OpHash of string] Lwt.t =
   let* signature =
     match signature with
     | None -> sign t client
     | Some signature -> return signature
   in
-  let* (`Hex op) = hex ~signature t client in
+  let* (`Hex op) = hex ?protocol ~signature t client in
   let inject_rpc =
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
@@ -112,7 +129,7 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let runnable = RPC.Client.spawn client @@ inject_rpc (`String op) in
+  let runnable = RPC.Client.spawn client @@ inject_rpc (Data (`String op)) in
   match error with
   | None ->
       let* () = waiter in
@@ -123,11 +140,11 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
       let* () = Process.check_error ~msg process in
       hash t client
 
-let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
-    [`OpHash of string] list Lwt.t =
+let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
+    ?use_tmp_file t client : [`OpHash of string] list Lwt.t =
   let forge op =
-    let* signature = sign op client in
-    hex ~signature op client
+    let* signature = sign ?protocol op client in
+    hex ?protocol ~signature op client
   in
   let* ops = Lwt_list.map_s forge t in
   let waiter =
@@ -139,7 +156,9 @@ let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let rpc = RPC.post_private_injection_operations ~force ~ops () in
+  let rpc =
+    RPC.post_private_injection_operations ?use_tmp_file ~force ~ops ()
+  in
   match error with
   | None ->
       let* ophs = RPC.Client.call client rpc in
@@ -173,24 +192,25 @@ let make_run_operation_input ?chain_id t client =
       ])
 
 module Consensus = struct
-  type t = Slot_availability of {endorsement : bool array}
+  type t = Dal_attestation of {attestation : bool array; level : int}
 
-  let slot_availability ~endorsement = Slot_availability {endorsement}
+  let dal_attestation ~attestation ~level = Dal_attestation {attestation; level}
 
   let json signer = function
-    | Slot_availability {endorsement} ->
-        let string_of_bool_vector endorsement =
+    | Dal_attestation {attestation; level} ->
+        let string_of_bool_vector attestation =
           let aux (acc, n) b =
             let bit = if b then 1 else 0 in
             (acc lor (bit lsl n), n + 1)
           in
-          Array.fold_left aux (0, 0) endorsement |> fst |> string_of_int
+          Array.fold_left aux (0, 0) attestation |> fst |> string_of_int
         in
         `O
           [
-            ("kind", Ezjsonm.string "dal_slot_availability");
-            ("endorser", Ezjsonm.string signer.Account.public_key_hash);
-            ("endorsement", Ezjsonm.string (string_of_bool_vector endorsement));
+            ("kind", Ezjsonm.string "dal_attestation");
+            ("attestor", Ezjsonm.string signer.Account.public_key_hash);
+            ("attestation", Ezjsonm.string (string_of_bool_vector attestation));
+            ("level", Ezjsonm.int level);
           ]
 
   let operation ?branch ?chain_id ~signer consensus_operation client =
@@ -271,6 +291,11 @@ module Manager = struct
       Tezos_crypto_dal.Cryptobox.Commitment.encoding
       commitment
 
+  let json_of_commitment_proof proof =
+    Data_encoding.Json.construct
+      Tezos_crypto_dal.Cryptobox.Commitment_proof.encoding
+      proof
+
   let get_next_counter ?(source = Constant.bootstrap1) client =
     let* counter_json =
       RPC.Client.call client
@@ -297,10 +322,15 @@ module Manager = struct
     | Proof of sc_rollup_proof
     | Dissection of sc_rollup_dissection_chunk list
 
-  type sc_rollup_refutation = {
-    choice_tick : int;
-    refutation_step : sc_rollup_game_refutation_step;
-  }
+  type sc_rollup_refutation =
+    | Start of {
+        player_commitment_hash : string;
+        opponent_commitment_hash : string;
+      }
+    | Move of {
+        choice_tick : int;
+        refutation_step : sc_rollup_game_refutation_step;
+      }
 
   let json_of_sc_rollup_dissection ~dissection =
     Ezjsonm.list
@@ -313,18 +343,31 @@ module Manager = struct
 
   let json_payload_binding_of_sc_rollup_refutation sc_rollup opponent refutation
       =
-    let json_of_refutation_step {choice_tick; refutation_step} =
-      let step =
-        match refutation_step with
-        | Proof proof -> proof
-        | Dissection dissection -> json_of_sc_rollup_dissection ~dissection
-      in
-      `O [("choice", json_of_int_as_string choice_tick); ("step", step)]
+    let json_of_refutation_step = function
+      | Start {player_commitment_hash; opponent_commitment_hash} ->
+          `O
+            [
+              ("refutation_kind", `String "start");
+              ("player_commitment_hash", `String player_commitment_hash);
+              ("opponent_commitment_hash", `String opponent_commitment_hash);
+            ]
+      | Move {choice_tick; refutation_step} ->
+          let step =
+            match refutation_step with
+            | Proof proof -> proof
+            | Dissection dissection -> json_of_sc_rollup_dissection ~dissection
+          in
+          `O
+            [
+              ("refutation_kind", `String "move");
+              ("choice", json_of_int_as_string choice_tick);
+              ("step", step);
+            ]
     in
-    let refutation = json_of_option json_of_refutation_step refutation in
+    let refutation = json_of_refutation_step refutation in
     strip_null_fields
       [
-        ("kind", `String "sc_rollup_refute");
+        ("kind", `String "smart_rollup_refute");
         ("rollup", `String sc_rollup);
         ("opponent", `String opponent);
         ("refutation", refutation);
@@ -339,18 +382,19 @@ module Manager = struct
         dest : string;
         parameters : transfer_parameters option;
       }
+    | Origination of {code : JSON.u; storage : JSON.u; balance : int}
     | Dal_publish_slot_header of {
         level : int;
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
+        proof : Tezos_crypto_dal.Cryptobox.commitment_proof;
       }
-    | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
     | Sc_rollup_refute of {
         (* See details in {!Operation_repr} module. *)
         sc_rollup : string;
         opponent : string;
-        refutation : sc_rollup_refutation option;
+        refutation : sc_rollup_refutation;
       }
 
   let reveal account = Reveal account
@@ -362,15 +406,15 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let dal_publish_slot_header ~level ~index ~commitment =
-    Dal_publish_slot_header {level; index; commitment}
+  let dal_publish_slot_header ~level ~index ~commitment ~proof =
+    Dal_publish_slot_header {level; index; commitment; proof}
 
-  let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
-    Sc_rollup_dal_slot_subscribe {rollup; slot_index}
+  let origination ?(init_balance = 0) ~code ~init_storage () =
+    Origination {code; storage = init_storage; balance = init_balance}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
-  let sc_rollup_refute ?refutation ~sc_rollup ~opponent () =
+  let sc_rollup_refute ~refutation ~sc_rollup ~opponent () =
     Sc_rollup_refute {sc_rollup; opponent; refutation}
 
   type t = {
@@ -401,24 +445,26 @@ module Manager = struct
           ("destination", `String dest);
         ]
         @ parameters
-    | Dal_publish_slot_header {level; index; commitment} ->
+    | Origination {code; storage; balance} ->
+        let script = `O [("code", code); ("storage", storage)] in
+        [
+          ("kind", `String "origination");
+          ("balance", json_of_tez balance);
+          ("script", script);
+        ]
+    | Dal_publish_slot_header {level; index; commitment; proof} ->
         let slot_header =
           `O
             [
-              ("index", json_of_int index);
-              ("level", json_of_int level);
+              ("slot_index", json_of_int index);
+              ("published_level", json_of_int level);
               ("commitment", json_of_commitment commitment);
+              ("commitment_proof", json_of_commitment_proof proof);
             ]
         in
         [
           ("kind", `String "dal_publish_slot_header");
           ("slot_header", slot_header);
-        ]
-    | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-        [
-          ("kind", `String "sc_rollup_dal_slot_subscribe");
-          ("rollup", `String rollup);
-          ("slot_index", json_of_int slot_index);
         ]
     | Delegation {delegate} ->
         [("kind", `String "delegation"); ("delegate", json_of_account delegate)]
@@ -478,8 +524,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Reveal _ | Dal_publish_slot_header _ | Delegation _
-    | Sc_rollup_dal_slot_subscribe _ ->
+    | Reveal _ | Origination _ | Dal_publish_slot_header _ | Delegation _ ->
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in

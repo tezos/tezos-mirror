@@ -28,6 +28,8 @@
 
 let bench_config name = Files.working_dir // sf "%s.json" name
 
+let meta_config_file = Files.working_dir // "bench_config.json"
+
 let default_bench_num = 300
 
 let default_nsamples = 500
@@ -48,6 +50,9 @@ let ( .%{}<- ) json key value = Ezjsonm.update json key (Some value)
    config of a benchmark. *)
 
 let range min max = Ezjsonm.(dict [("min", int min); ("max", int max)])
+
+let bench_name_to_file_name bench_name =
+  String.split_on_char '/' bench_name |> String.concat "__"
 
 let interpreter_benchmark_config =
   let open Ezjsonm in
@@ -108,22 +113,30 @@ let patch_benchmark_config ~patches ~bench_name =
   | None -> return (No_patch, No_parameter_override)
   | Some (_regex, callback) -> callback ()
 
-let with_config_dir bench_name json_opt f =
+let with_config_dir snoop bench_name json_opt f =
   match json_opt with
   | None -> f None
   | Some json ->
       Log.info "Benchmark %s: using patched configuration" bench_name ;
-      let config_file = bench_config bench_name in
+      let config_file = bench_config (bench_name_to_file_name bench_name) in
       Files.write_json json config_file ;
-      let* () = f (Some Files.working_dir) in
+      let* () =
+        Snoop.write_config
+          ~benchmark:bench_name
+          ~bench_config:config_file
+          ~file:meta_config_file
+          snoop
+      in
+      let* () = f (Some meta_config_file) in
       rm_config ~file:config_file
 
 let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
   Lwt_list.iter_s
     (fun bench_name ->
       (* Check if target file exists, if it does we skip. *)
+      let bench_file_name = bench_name_to_file_name bench_name in
       let save_to =
-        Files.(working_dir // benchmark_results_dir // workload bench_name)
+        Files.(working_dir // benchmark_results_dir // workload bench_file_name)
       in
       let* exists = Lwt_unix.file_exists save_to in
       if exists then (
@@ -146,17 +159,19 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
           | Overriden_parameters {nsamples; bench_num} ->
               return (bench_num, nsamples, config)
         in
-        with_config_dir bench_name config (fun config_dir ->
+        with_config_dir snoop bench_name config (fun config_file ->
             Snoop.benchmark
               ~bench_name
               ~bench_num
               ~nsamples
               ~save_to:
                 Files.(
-                  working_dir // benchmark_results_dir // workload bench_name)
-              ?config_dir
+                  working_dir // benchmark_results_dir
+                  // workload bench_file_name)
+              ?config_file
               ~csv_dump:
-                Files.(working_dir // benchmark_results_dir // csv bench_name)
+                Files.(
+                  working_dir // benchmark_results_dir // csv bench_file_name)
               ~seed:87612786
               snoop))
     benchmarks
@@ -276,6 +291,18 @@ let perform_big_map_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
+let perform_skip_list_benchmarks snoop proto =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Skip_list; Proto proto] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
+let perform_sc_rollup_benchmarks snoop proto =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Sc_rollup; Proto proto] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
 let main protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
@@ -288,4 +315,6 @@ let main protocol =
   let* () = perform_encoding_benchmarks snoop protocol in
   let* () = perform_tx_rollup_benchmarks snoop protocol in
   let* () = perform_big_map_benchmarks snoop protocol in
-  perform_carbonated_map_benchmarks snoop protocol
+  let* () = perform_skip_list_benchmarks snoop protocol in
+  let* () = perform_carbonated_map_benchmarks snoop protocol in
+  perform_sc_rollup_benchmarks snoop protocol

@@ -73,7 +73,6 @@ let () =
       Unit_test.spec "tx rollup l2" Test_tx_rollup_l2.tests;
       Unit_test.spec "tx rollup l2 apply" Test_tx_rollup_l2_apply.tests;
       Unit_test.spec "liquidity baking" Test_liquidity_baking_repr.tests;
-      Unit_test.spec "sc rollup wasm" Test_sc_rollup_wasm.tests;
       Unit_test.spec "sc rollup arith" Test_sc_rollup_arith.tests;
       Unit_test.spec "merkle list" Test_merkle_list.tests;
       Unit_test.spec "sc rollup inbox" Test_sc_rollup_inbox.tests;
@@ -83,7 +82,6 @@ let () =
         Test_sc_rollup_management_protocol.tests;
       Unit_test.spec "Bond_id_repr.ml" Test_bond_id_repr.tests;
       Unit_test.spec "zk rollup storage" Test_zk_rollup_storage.tests;
-      Unit_test.spec "compare operations" Test_compare_operations.tests;
       Unit_test.spec "Delegate_consensus_key.ml" Test_consensus_key.tests;
     ]
   |> Lwt_main.run

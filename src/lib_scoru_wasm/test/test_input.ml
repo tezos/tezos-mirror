@@ -43,7 +43,6 @@ let write_input () =
     Input_buffer.enqueue
       input
       {
-        rtype = 1l;
         raw_level = 2l;
         message_counter = Z.of_int 2;
         payload = Bytes.of_string "hello";
@@ -53,7 +52,6 @@ let write_input () =
     Input_buffer.enqueue
       input
       {
-        rtype = 1l;
         raw_level = 2l;
         message_counter = Z.of_int 3;
         payload = Bytes.of_string "hello";
@@ -66,7 +64,6 @@ let write_input () =
         Input_buffer.enqueue
           input
           {
-            rtype = 1l;
             raw_level = 2l;
             message_counter = Z.of_int 2;
             payload = Bytes.of_string "hello";
@@ -83,12 +80,10 @@ let read_input () =
   let lim = Types.(MemoryType {min = 100l; max = Some 1000l}) in
   let memory = Memory.alloc lim in
   let input_buffer = Input_buffer.alloc () in
-  let output_buffer = Output_buffer.alloc () in
   let* () =
     Input_buffer.enqueue
       input_buffer
       {
-        rtype = 1l;
         raw_level = 2l;
         message_counter = Z.of_int 2;
         payload = Bytes.of_string "hello";
@@ -98,25 +93,17 @@ let read_input () =
   let* result =
     Host_funcs.Aux.read_input
       ~input_buffer
-      ~output_buffer
       ~memory
-      ~rtype_offset:0l
-      ~level_offset:4l
-      ~id_offset:10l
+      ~info_addr:4l
       ~dst:50l
-      ~max_bytes:36000l
+      ~max_bytes:3600l
   in
-  let* output_level, output_id = Output_buffer.get_id output_buffer in
-  assert (output_level = 2l) ;
-  assert (output_id = Z.of_int (-1)) ;
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
-  assert (result = 5) ;
-  let* m = Memory.load_bytes memory 0l 1 in
-  assert (m = "\001") ;
-  let* m = Memory.load_bytes memory 4l 1 in
-  assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 10l 1 in
-  assert (m = "\002") ;
+  assert (result = 5l) ;
+  let* m = Memory.load_bytes memory 4l 4 in
+  assert (m = "\002\000\000\000") ;
+  let* m = Memory.load_bytes memory 8l 4 in
+  assert (m = "\002\000\000\000") ;
   let* m = Memory.load_bytes memory 50l 5 in
   assert (m = "hello") ;
   Lwt.return @@ Result.return_unit
@@ -126,21 +113,17 @@ let read_input_no_messages () =
   let lim = Types.(MemoryType {min = 100l; max = Some 1000l}) in
   let memory = Memory.alloc lim in
   let input_buffer = Input_buffer.alloc () in
-  let output_buffer = Output_buffer.alloc () in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   let* result =
     Host_funcs.Aux.read_input
       ~input_buffer
-      ~output_buffer
       ~memory
-      ~rtype_offset:0l
-      ~level_offset:4l
-      ~id_offset:10l
+      ~info_addr:4l
       ~dst:50l
-      ~max_bytes:36000l
+      ~max_bytes:3600l
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
-  assert (result = 0) ;
+  assert (result = 0l) ;
   Lwt.return @@ Result.return_unit
 
 let test_host_fun () =
@@ -150,7 +133,6 @@ let test_host_fun () =
     Input_buffer.enqueue
       input
       {
-        rtype = 1l;
         raw_level = 2l;
         message_counter = Z.of_int 2;
         payload = Bytes.of_string "hello";
@@ -163,14 +145,7 @@ let test_host_fun () =
       module_inst.memories
   in
   let module_inst = {module_inst with memories} in
-  let values =
-    Values.
-      [
-        Num (I32 0l); Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l);
-      ]
-  in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
+  let values = Values.[Num (I32 4l); Num (I32 50l); Num (I32 3600l)] in
 
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
@@ -180,7 +155,7 @@ let test_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      host_funcs_registry
+      Host_funcs.all
       ~input
       Host_funcs.Internal_for_tests.read_input
       values
@@ -188,16 +163,137 @@ let test_host_fun () =
   let* module_inst = Instance.resolve_module_ref module_reg module_key in
   let* memory = Lazy_vector.Int32Vector.get 0l module_inst.memories in
   assert (Input_buffer.num_elements input = Z.zero) ;
-  let* m = Memory.load_bytes memory 0l 1 in
-  assert (m = "\001") ;
-  let* m = Memory.load_bytes memory 4l 1 in
-  assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 10l 1 in
-  assert (m = "\002") ;
+  let* m = Memory.load_bytes memory 4l 4 in
+  assert (m = "\002\000\000\000") ;
+  let* m = Memory.load_bytes memory 8l 4 in
+  assert (m = "\002\000\000\000") ;
   let* m = Memory.load_bytes memory 50l 5 in
   assert (m = "hello") ;
   assert (result = Values.[Num (I32 5l)]) ;
   Lwt.return @@ Result.return_unit
+
+let write_outside_bounds_doesnt_dequeue_gen info_addr input_addr input_max_bytes
+    =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let message =
+    {
+      Input_buffer.raw_level = 0l;
+      message_counter = Z.of_int 0;
+      payload = Bytes.of_string "hello";
+    }
+  in
+  let* () = Input_buffer.enqueue input_buffer message in
+  let input_buffer_size = Input_buffer.num_elements input_buffer in
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~memory
+      ~info_addr
+      ~dst:input_addr
+      ~max_bytes:input_max_bytes
+  in
+  assert (result = Host_funcs.Error.code Memory_invalid_access) ;
+  assert (Input_buffer.num_elements input_buffer = input_buffer_size) ;
+  let* dequeued_message = Input_buffer.dequeue input_buffer in
+  assert (message = dequeued_message) ;
+  return_ok_unit
+
+let test_write_input_info_invalid_address () =
+  (* The memory is allocated with only one page, this address would be on the
+     second page. *)
+  let address = Int64.(to_int32 (add Memory.page_size 100L)) in
+  write_outside_bounds_doesnt_dequeue_gen address 0l 100l
+
+let test_write_input_info_beyond_memory_bounds () =
+  (* The memory is allocated with only one page, this address would be the exact
+     one at the end of this page. The input would be written on the second page
+     too. *)
+  let address = Int64.(to_int32 (sub Memory.page_size 1L)) in
+  write_outside_bounds_doesnt_dequeue_gen address 0l 100l
+
+let test_write_input_invalid_address () =
+  (* The memory is allocated with only one page, this address would be on the
+     second page. *)
+  let address = Int64.(to_int32 (add Memory.page_size 100L)) in
+  write_outside_bounds_doesnt_dequeue_gen 0l address 100l
+
+let test_write_input_beyond_memory_bounds () =
+  (* The memory is allocated with only one page, this address would be at the
+     end of this page. *)
+  let address = Int64.(to_int32 (sub Memory.page_size 1L)) in
+  let length = 100l in
+  write_outside_bounds_doesnt_dequeue_gen 0l address length
+
+(* Note that this case should never happen, the size of messages in enforced by
+   the protocol. *)
+let test_read_input_too_big_payload () =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let message_size = Host_funcs.Aux.input_output_max_size * 2 in
+  let original_message = Bytes.make message_size 'a' in
+  let message =
+    {
+      Input_buffer.raw_level = 0l;
+      message_counter = Z.of_int 0;
+      payload = original_message;
+    }
+  in
+  let* () = Input_buffer.enqueue input_buffer message in
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~memory
+      ~info_addr:0l
+      ~dst:10l
+      ~max_bytes:(Int32.of_int Host_funcs.Aux.input_output_max_size)
+  in
+  assert (result = Int32.of_int Host_funcs.Aux.input_output_max_size) ;
+  let* message_in_memory = Partial_memory.load_bytes memory 10l message_size in
+  assert (not (Bytes.equal (Bytes.of_string message_in_memory) original_message)) ;
+  let expected_message = String.make Host_funcs.Aux.input_output_max_size 'a' in
+  assert (
+    String.equal
+      (String.sub message_in_memory 0 (Int32.to_int result))
+      expected_message) ;
+  return_ok_unit
+
+let test_read_input_max_size_above_limit () =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let message_size = Host_funcs.Aux.input_output_max_size * 2 in
+  let original_message = Bytes.make message_size 'a' in
+  let message =
+    {
+      Input_buffer.raw_level = 0l;
+      message_counter = Z.of_int 0;
+      payload = original_message;
+    }
+  in
+  let* () = Input_buffer.enqueue input_buffer message in
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~memory
+      ~info_addr:0l
+      ~dst:10l
+      ~max_bytes:(Int32.of_int message_size)
+  in
+  assert (result = Int32.of_int Host_funcs.Aux.input_output_max_size) ;
+  let* message_in_memory = Partial_memory.load_bytes memory 10l message_size in
+  assert (not (Bytes.equal (Bytes.of_string message_in_memory) original_message)) ;
+  let expected_message = String.make Host_funcs.Aux.input_output_max_size 'a' in
+  assert (
+    String.equal
+      (String.sub message_in_memory 0 (Int32.to_int result))
+      expected_message) ;
+  return_ok_unit
 
 let tests =
   [
@@ -205,4 +301,28 @@ let tests =
     tztest "Read input" `Quick read_input;
     tztest "Read input no messages" `Quick read_input_no_messages;
     tztest "Host read input" `Quick test_host_fun;
+    tztest
+      "Write input info at invalid address doesn't dequeue the input"
+      `Quick
+      test_write_input_info_invalid_address;
+    tztest
+      "Write input info beyond memory bounds doesn't dequeue the input"
+      `Quick
+      test_write_input_info_beyond_memory_bounds;
+    tztest
+      "Write input at invalid address doesn't dequeue the input"
+      `Quick
+      test_write_input_invalid_address;
+    tztest
+      "Write input beyond memory bounds doesn't dequeue the input"
+      `Quick
+      test_write_input_beyond_memory_bounds;
+    tztest
+      "Payload bigger than max size constant are truncated"
+      `Quick
+      test_read_input_too_big_payload;
+    tztest
+      "Payload bigger and expected max size constant are truncated"
+      `Quick
+      test_read_input_max_size_above_limit;
   ]

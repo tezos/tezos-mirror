@@ -39,7 +39,7 @@ let loop_module =
   (module
     (memory 1)
     (export "mem"(memory 0))
-    (func (export "kernel_next")
+    (func (export "kernel_run")
       (loop $my_loop
         br $my_loop)
     )
@@ -51,13 +51,11 @@ let noop_module =
   (module
     (memory 1)
     (export "mem"(memory 0))
-    (func (export "kernel_next")
+    (func (export "kernel_run")
       nop
     )
   )
 |}
-
-let origination_tick = Z.one
 
 let snapshot_tick = Z.one
 
@@ -69,10 +67,8 @@ let test_looping_kernel () =
 
   (* This module loops indefinitely. *)
   let*! loop_module_tree = initial_tree ~max_tick:max_nb_ticks loop_module in
-  let*! tree_snapshotted = eval_until_input_requested loop_module_tree in
-  let*! tree_with_dummy_input =
-    set_input_step "dummy_input" 0 tree_snapshotted
-  in
+  let*! loop_module_tree = eval_until_input_requested loop_module_tree in
+  let*! tree_with_dummy_input = set_empty_inbox_step 0l loop_module_tree in
   let* stuck, _ = eval_until_stuck tree_with_dummy_input in
   match stuck with
   | Too_many_ticks -> return_unit
@@ -89,39 +85,32 @@ let test_noop_kernel () =
   let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
   (* Adds one input tick, part of the maximum number of ticks per toplevel
      call. *)
-  let*! tree_with_dummy_input =
-    set_input_step "dummy_input" 0 tree_snapshotted
-  in
-  let*! tree = eval_until_input_requested tree_with_dummy_input in
+  let*! tree_with_dummy_input = set_empty_inbox_step 0l tree_snapshotted in
+  let*! tree = eval_to_snapshot tree_with_dummy_input in
   let*! info = Wasm.get_info tree in
-  (* off-by-one introduced by Gather_floppies*)
-  return
-    (assert (Z.(info.current_tick = of_int64 max_nb_ticks + origination_tick)))
+  (* Twice as much as max ticks, one to load the inbox, the other to execute. *)
+  return (assert (Z.(info.current_tick = of_int64 Int64.(mul 2L max_nb_ticks))))
 
 let test_stuck_in_decode_kernel () =
   let open Lwt_result_syntax in
-  (* For now the PVM will always do at least 2 ticks per toplevel calls: one for
-     the input tick, and another for the tick leading to the `Too_many_ticks`
-     state. *)
-  let max_nb_ticks = 2L in
+  (* The PVM needs at least [4] ticks to load the smallest inbox possible:
+     - 1 for Snapshot --> Collect
+     - 1 for SOL
+     - 1 for EOL
+     - 1 for Collect -> Padding *)
+  let max_nb_ticks = 4L in
 
   (* This module does a noop. *)
   let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
-  (* Eval until snapshot, which shouldn't take any tick since the default state
-     is Snapshot. *)
-  let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
-  (* Adds one input tick, part of the maximum number of ticks per toplevel
-     call. *)
-  let*! tree_with_dummy_input =
-    set_input_step "dummy_input" 0 tree_snapshotted
-  in
+  let*! noop_module_tree = eval_until_input_requested noop_module_tree in
+  (* Collect an inbox. *)
+  let*! tree_with_dummy_input = set_empty_inbox_step 0l noop_module_tree in
   (* Eval one tick *)
   let* stuck, tree = eval_until_stuck tree_with_dummy_input in
   assert (stuck = Too_many_ticks) ;
   let*! info = Wasm.get_info tree in
-  (* off-by-one introduced by Gather_floppies*)
-  return
-    (assert (Z.(info.current_tick = of_int64 max_nb_ticks + origination_tick)))
+  (* Twice as much as max ticks, one to load the inbox, the other to execute. *)
+  return (assert (Z.(info.current_tick = of_int64 Int64.(mul 2L max_nb_ticks))))
 
 let test_stuck_in_init_kernel () =
   let open Lwt_result_syntax in
@@ -129,14 +118,10 @@ let test_stuck_in_init_kernel () =
 
   (* This module does a noop. *)
   let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
-  (* Eval until snapshot, which shouldn't take any tick since the default state
-     is Snapshot. *)
-  let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
+  let*! noop_module_tree = eval_until_input_requested noop_module_tree in
   (* Adds one input tick, part of the maximum number of ticks per toplevel
      call. *)
-  let*! tree_with_dummy_input =
-    set_input_step "dummy_input" 0 tree_snapshotted
-  in
+  let*! tree_with_dummy_input = set_empty_inbox_step 0l noop_module_tree in
   (* go to first Init step *)
   let*! tree = eval_until_init tree_with_dummy_input in
   let*! stuck = Wasm.Internal_for_tests.is_stuck tree in
@@ -144,7 +129,11 @@ let test_stuck_in_init_kernel () =
 
   (* set maximum to next tick and eval one more time *)
   let*! info = Wasm.get_info tree in
-  let new_max_nb_ticks = info.current_tick in
+  let previous_max_nb_ticks = Z.of_int64 max_nb_ticks in
+  let new_max_nb_ticks =
+    (* Remove the input step ticks *)
+    Z.(succ (sub info.current_tick previous_max_nb_ticks))
+  in
   let*! tree = Wasm.Internal_for_tests.set_max_nb_ticks new_max_nb_ticks tree in
   let*! tree = Wasm.compute_step tree in
 
@@ -152,8 +141,8 @@ let test_stuck_in_init_kernel () =
   let*! info = Wasm.get_info tree in
   let*! stuck = Wasm.Internal_for_tests.is_stuck tree in
   assert (stuck = Some Too_many_ticks) ;
-  (* off-by-one introduced by Gather_floppies*)
-  return (assert (Z.(info.current_tick = new_max_nb_ticks + origination_tick)))
+  return
+    (assert (info.current_tick = Z.add previous_max_nb_ticks new_max_nb_ticks))
 
 let tests =
   [

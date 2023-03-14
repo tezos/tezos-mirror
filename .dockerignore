@@ -15,7 +15,6 @@ docs/api/tezos-admin-client.html
 
 tezos-node
 tezos-tx-rollup-*
-tezos-validator
 tezos-protocol-compiler
 tezos-client
 tezos-admin-client
@@ -24,11 +23,10 @@ tezos-endorser-*
 tezos-accuser-*
 tezos-proxy-server
 tezos-signer
-tezos-sc-rollup-node-*
-tezos-sc-rollup-client-*
+tezos-smart-rollup-node-*
+tezos-smart-rollup-client-*
 octez-node
 octez-tx-rollup-*
-octez-validator
 octez-protocol-compiler
 octez-client
 octez-admin-client
@@ -37,8 +35,8 @@ octez-endorser-*
 octez-accuser-*
 octez-proxy-server
 octez-signer
-octez-sc-rollup-node-*
-octez-sc-rollup-client-*
+octez-smart-rollup-node-*
+octez-smart-rollup-client-*
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src

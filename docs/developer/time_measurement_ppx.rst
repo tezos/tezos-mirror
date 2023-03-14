@@ -8,7 +8,7 @@ It is able to measure the time spent in the execution of annotated OCaml
 expressions and to log these measurements when desired. Since it uses
 ``Tezos_event_logging`` for the logging part, this PPX can easily be used
 together with ``Tezt`` framework to perform the benchmarking of specific
-parts of Tezos node.
+parts of Octez node.
 
 **This PPX is only intended to be used for tests. As the current runtime
 implementation performs memory allocation, an unwise usage could mess with
@@ -189,7 +189,7 @@ The PPX provides the handling of three attributes:
 
 Some of these attributes are used, for instance, in the implementation of the :ref:`performance regression test framework <performance_regression_test_fw>`.
 
-Instrumenting the tezos-node executable
+Instrumenting the octez-node executable
 ---------------------------------------
 
 A helper has been added in the ``Makefile``, so you just need to run the following

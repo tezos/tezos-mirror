@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
+open Tezos_clic
 
 let group = {name = "encoding"; title = "Commands to handle encodings"}
 
@@ -69,8 +69,8 @@ let bytes_parameter =
 
 let full_bytes_parameter =
   param
-    ~name:"hex"
-    ~desc:"Binary encoded data or name of file containing the data"
+    ~name:"data"
+    ~desc:"Hex-encoded binary-encoded data or name of file containing the data"
     bytes_parameter
 
 let format_arg =
@@ -195,11 +195,11 @@ let commands () =
         Lwt_result_syntax.return_unit);
     command
       ~group
-      ~desc:"Dump a json description of all registered encodings."
+      ~desc:"Dump a JSON description of all registered encodings."
       (args1
       @@ switch
            ~doc:
-             "Output json descriptions without extraneous whitespace characters"
+             "Output JSON descriptions without extraneous whitespace characters"
            ~long:"compact"
            ())
       (fixed ["dump"; "encodings"])
@@ -226,6 +226,37 @@ let commands () =
                           ]))))
         in
         Lwt_result_syntax.return_unit);
+    command
+      ~group
+      ~desc:"Dump a JSON description of a given registered encoding."
+      (args1
+      @@ switch
+           ~doc:
+             "Output JSON description without extraneous whitespace characters"
+           ~long:"compact"
+           ())
+      (prefix "dump" @@ prefix "encoding"
+      @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
+      @@ stop)
+      (fun minify registered_encoding (cctxt : #Client_context.printer) ->
+        let* () =
+          cctxt#message
+            "%s"
+            (Json.to_string
+               ~minify
+               (`O
+                 [
+                   ( "json",
+                     Json.construct
+                       Json.schema_encoding
+                       (Registration.json_schema registered_encoding) );
+                   ( "binary",
+                     Json.construct
+                       Binary_schema.encoding
+                       (Registration.binary_schema registered_encoding) );
+                 ]))
+        in
+        Lwt_result_syntax.return_unit);
     (* JSON -> Binary *)
     command
       ~group
@@ -236,11 +267,11 @@ let commands () =
       (prefix "encode"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefix "from"
-      @@ param ~name:"json" ~desc:"JSON file or data" json_parameter
+      @@ param ~name:"data" ~desc:"JSON file or data" json_parameter
       @@ stop)
-      (fun () registered_encoding json (cctxt : #Client_context.printer) ->
+      (fun () registered_encoding data (cctxt : #Client_context.printer) ->
         match
-          Data_encoding.Registration.bytes_of_json registered_encoding json
+          Data_encoding.Registration.bytes_of_json registered_encoding data
         with
         | exception exn ->
             cctxt#error "%a" (fun ppf exn -> Json.print_error ppf exn) exn
@@ -296,16 +327,16 @@ let commands () =
       (prefix "display"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefixes ["from"; "json"]
-      @@ param ~name:"json" ~desc:"JSON file or data" json_parameter
+      @@ param ~name:"data" ~desc:"JSON file or data" json_parameter
       @@ stop)
-      (fun () registered_encoding json (cctxt : #Client_context.printer) ->
+      (fun () registered_encoding data (cctxt : #Client_context.printer) ->
         let pp_json fmt json =
           Data_encoding.Registration.json_pretty_printer
             registered_encoding
             fmt
             json
         in
-        let* () = cctxt#message "%a" pp_json json in
+        let* () = cctxt#message "%a" pp_json data in
         Lwt_result_syntax.return_unit);
     command
       ~group
@@ -369,8 +400,10 @@ let commands () =
       (args1 format_arg)
       (prefix "slice"
       @@ param
-           ~name:"hex"
-           ~desc:"Binary encoded data or name of file containing the data"
+           ~name:"data"
+           ~desc:
+             "Hex-encoded binary-encoded data or name of file containing the \
+              data"
            bytes_parameter
       @@ prefixes ["with"; "encoding"]
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter

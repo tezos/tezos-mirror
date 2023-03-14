@@ -33,7 +33,7 @@
 
 open Protocol
 open QCheck2
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* Generators *)
 
@@ -66,9 +66,7 @@ let gen_zkr_account =
   let open Zk_rollup_account_repr in
   let* state = gen_l2_state in
   let public_parameters = Operator.public_parameters in
-  let circuits_info =
-    SMap.of_seq (Plonk.Main_protocol.SMap.to_seq Operator.circuits)
-  in
+  let circuits_info = SMap.of_seq (Plonk.SMap.to_seq Operator.circuits) in
   let* nb_ops = nat in
   let static =
     {

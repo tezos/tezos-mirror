@@ -23,11 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type neighbor = {addr : string; port : int}
+
+type dac = {
+  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+  threshold : int;
+  reveal_data_dir : string;
+}
+
 type t = {
   use_unsafe_srs : bool;
   data_dir : string;
   rpc_addr : string;
   rpc_port : int;
+  neighbors : neighbor list;
+  dac : dac;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -42,16 +52,55 @@ let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 10732
 
+let default_neighbors = []
+
+let default_dac_threshold = 0
+
+let default_dac_addresses = []
+
+let default_reveal_data_dir =
+  Filename.concat
+    (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
+    "wasm_2_0_0"
+
+let default_dac =
+  {
+    addresses = default_dac_addresses;
+    threshold = default_dac_threshold;
+    reveal_data_dir = default_reveal_data_dir;
+  }
+
 let default_use_unsafe_srs = false
+
+let neighbor_encoding : neighbor Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {addr; port} -> (addr, port))
+    (fun (addr, port) -> {addr; port})
+    (obj2 (req "rpc-addr" string) (req "rpc-port" int16))
+
+let dac_encoding : dac Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {addresses; threshold; reveal_data_dir} ->
+      (addresses, threshold, reveal_data_dir))
+    (fun (addresses, threshold, reveal_data_dir) ->
+      {addresses; threshold; reveal_data_dir})
+    (obj3
+       (req
+          "addresses"
+          (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
+       (req "threshold" uint8)
+       (req "reveal-data-dir" string))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port})
-    (obj4
+    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors; dac} ->
+      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors, dac))
+    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors, dac) ->
+      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors; dac})
+    (obj6
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -63,7 +112,17 @@ let encoding : t Data_encoding.t =
           string
           default_data_dir)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port))
+       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+       (dft
+          "neighbors"
+          ~description:"DAL Neighbors"
+          (list neighbor_encoding)
+          default_neighbors)
+       (dft
+          "dac"
+          ~description:"Data Availability Committee"
+          dac_encoding
+          default_dac))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
@@ -108,4 +167,5 @@ let load ~data_dir =
         fail e
     | Error e -> fail e
   in
-  Data_encoding.Json.destruct encoding json
+  let config = Data_encoding.Json.destruct encoding json in
+  {config with data_dir}

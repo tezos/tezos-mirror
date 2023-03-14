@@ -30,7 +30,7 @@ open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
 open Client_proto_rollups
-open Client_keys
+open Client_keys_v0
 open Client_proto_args
 
 let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
@@ -43,10 +43,10 @@ let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
   return_unit
 
 let encrypted_switch =
-  Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
+  Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let normalize_types_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"normalize-types"
     ~doc:
       "Whether types should be normalized (annotations removed, combs \
@@ -80,20 +80,20 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> return_some data
 
 let block_hash_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       try Lwt_result_syntax.return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let tez_of_string_exn index field s =
   let open Lwt_result_syntax in
@@ -112,7 +112,7 @@ let tez_of_opt_string_exn index field s =
 let check_smart_contract = Managed_contract.check_smart_contract
 
 let commands_ro () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -297,9 +297,9 @@ let commands_ro () =
          contract (deprecated)."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ OriginatedContractAlias.destination_param
            ~name:"src"
@@ -327,13 +327,13 @@ let commands_ro () =
       ~desc:"Get a value in a big map."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "element"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"key"
            ~desc:"the key to look for"
-           (Clic.parameter (fun _ s ->
+           (Tezos_clic.parameter (fun _ s ->
                 Lwt_result_syntax.return (Script_expr_hash.of_b58check_exn s)))
       @@ prefixes ["of"; "big"; "map"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"big_map"
            ~desc:"identifier of the big_map"
            int_parameter
@@ -409,7 +409,7 @@ let commands_ro () =
       ~desc:"Get the type of an entrypoint of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"entrypoint"
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
@@ -740,27 +740,27 @@ let commands_ro () =
 (* ----------------------------------------------------------------------------*)
 
 let dry_run_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"dry-run"
     ~short:'D'
     ~doc:"don't inject the operation, just display it"
     ()
 
 let verbose_signing_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose-signing"
     ~doc:"display extra information before signing the operation"
     ()
 
 let simulate_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"simulation"
     ~doc:
       "Simulate the execution of the command, without needing any signatures."
     ()
 
 let force_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"force"
     ~doc:
       "Inject the operation even if the simulation results in a failure. This \
@@ -808,7 +808,7 @@ let transfer_command amount (source : Contract.t) destination
         let* source =
           Managed_contract.get_contract_manager cctxt contract_hash
         in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         Managed_contract.transfer
           cctxt
           ~chain:cctxt#chain
@@ -833,7 +833,7 @@ let transfer_command amount (source : Contract.t) destination
           ?counter
           ()
     | Implicit source ->
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         transfer
           cctxt
           ~chain:cctxt#chain
@@ -914,7 +914,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   return (Annotated_manager_operation.Annotated_manager_operation operation)
 
 let commands_network network () =
-  let open Clic in
+  let open Tezos_clic in
   match network with
   | Some `Testnet | None ->
       [
@@ -971,7 +971,7 @@ let commands_network network () =
           @@ Public_key_hash.alias_param @@ prefixes ["with"]
           @@ param
                ~name:"code"
-               (Clic.parameter (fun _ctx code ->
+               (Tezos_clic.parameter (fun _ctx code ->
                     match
                       Blinded_public_key_hash.activation_code_of_hex code
                     with
@@ -997,7 +997,7 @@ let commands_network network () =
 let commands_rw () =
   let open Client_proto_programs in
   let open Tezos_micheline in
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -1025,7 +1025,7 @@ let commands_rw () =
             let* source =
               Managed_contract.get_contract_manager cctxt contract
             in
-            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+            let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
             let*! errors =
               Managed_contract.set_delegate
                 cctxt
@@ -1056,7 +1056,7 @@ let commands_rw () =
             in
             return_unit
         | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+            let* _, src_pk, manager_sk = Client_keys_v0.get_key cctxt mgr in
             let* (_ : _ Injection.result) =
               set_delegate
                 cctxt
@@ -1090,7 +1090,7 @@ let commands_rw () =
             let* source =
               Managed_contract.get_contract_manager cctxt contract
             in
-            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+            let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
             let*! errors =
               Managed_contract.set_delegate
                 cctxt
@@ -1116,7 +1116,7 @@ let commands_rw () =
             in
             return_unit
         | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+            let* _, src_pk, manager_sk = Client_keys_v0.get_key cctxt mgr in
             let*! (_ : _ Injection.result tzresult) =
               set_delegate
                 cctxt
@@ -1143,7 +1143,7 @@ let commands_rw () =
          gas_limit_arg
          storage_limit_arg
          delegate_arg
-         (Client_keys.force_switch ())
+         (Client_keys_v0.force_switch ())
          init_arg
          no_print_source_flag
          fee_parameter_args)
@@ -1154,7 +1154,7 @@ let commands_rw () =
       @@ prefix "transferring"
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "running"
@@ -1184,7 +1184,7 @@ let commands_rw () =
         let* {expanded = code; _} =
           Lwt.return (Micheline_parser.no_parsing_error program)
         in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let*! errors =
           originate_contract
             cctxt
@@ -1312,7 +1312,7 @@ let commands_rw () =
                   Managed_contract.get_contract_manager cctxt contract
               | Implicit source -> return source
             in
-            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+            let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
             let* contents = List.mapi_ep prepare operations in
             let (Manager_list contents) =
               Annotated_manager_operation.manager_of_list contents
@@ -1461,7 +1461,7 @@ let commands_rw () =
              "Michelson expression to register. Note the value is not \
               typechecked before registration."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the account registering the global constant"
       @@ stop)
@@ -1476,7 +1476,7 @@ let commands_rw () =
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let*! errors =
           register_global_constant
             cctxt
@@ -1573,13 +1573,13 @@ let commands_rw () =
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           reveal
             cctxt
@@ -1606,7 +1606,7 @@ let commands_rw () =
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter) src_pkh cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt src_pkh in
         let*! r =
           register_as_delegate
             cctxt
@@ -1644,11 +1644,11 @@ let commands_rw () =
            (name_pk, consensus_pk)
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt src_pkh in
         let* consensus_pk =
           match consensus_pk with
           | Some pk -> return pk
-          | None -> Client_keys.public_key name_pk
+          | None -> Client_keys_v0.public_key name_pk
         in
         let*! r =
           register_as_delegate
@@ -1689,12 +1689,12 @@ let commands_rw () =
            cctxt ->
         let open Lwt_result_syntax in
         let* _, delegate_pk, delegate_sk =
-          Client_keys.get_key cctxt delegate_pkh
+          Client_keys_v0.get_key cctxt delegate_pkh
         in
         let* consensus_pk =
           match consensus_pk with
           | Some pk -> return pk
-          | None -> Client_keys.public_key name_pk
+          | None -> Client_keys_v0.public_key name_pk
         in
         let*! r =
           update_consensus_key
@@ -1718,12 +1718,12 @@ let commands_rw () =
       (prefixes ["drain"; "delegate"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ Public_key_hash.source_param ~name:"dest" ~desc:"the consensus key"
       @@ stop)
       (fun (dry_run, verbose_signing) delegate_pkh consensus_pkh cctxt ->
         let open Lwt_result_syntax in
         let* _, _consensus_pk, consensus_sk =
-          Client_keys.get_key cctxt consensus_pkh
+          Client_keys_v0.get_key cctxt consensus_pkh
         in
         let*! r =
           drain_delegate
@@ -1746,9 +1746,11 @@ let commands_rw () =
       (prefixes ["drain"; "delegate"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the destination key"
+      @@ Public_key_hash.source_param ~name:"dest" ~desc:"the destination key"
       @@ prefixes ["with"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ Public_key_hash.source_param
+           ~name:"consensus_key"
+           ~desc:"the consensus key"
       @@ stop)
       (fun (dry_run, verbose_signing)
            delegate_pkh
@@ -1757,7 +1759,7 @@ let commands_rw () =
            cctxt ->
         let open Lwt_result_syntax in
         let* _, _consensus_pk, consensus_sk =
-          Client_keys.get_key cctxt consensus_pkh
+          Client_keys_v0.get_key cctxt consensus_pkh
         in
         let*! r =
           drain_delegate
@@ -1834,7 +1836,7 @@ let commands_rw () =
             ~long:"force"
             ()))
       (prefixes ["submit"; "proposals"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"the delegate who makes the proposal"
       @@ seq_of_param
@@ -1851,7 +1853,7 @@ let commands_rw () =
            proposals
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* src_name, _src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
+        let* src_name, _src_pk, src_sk = Client_keys_v0.get_key cctxt src_pkh in
         let* info =
           get_period_info
           (* Find period info of the successor, because the operation will
@@ -1933,7 +1935,7 @@ let commands_rw () =
             error
               "Public-key-hash `%a` from account `%s` does not appear to have \
                voting rights."
-              Signature.Public_key_hash.pp
+              Tezos_crypto.Signature.V0.Public_key_hash.pp
               src_pkh
               src_name ;
           if !errors <> [] then
@@ -2010,7 +2012,7 @@ let commands_rw () =
             ~long:"force"
             ()))
       (prefixes ["submit"; "ballot"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"the delegate who votes"
       @@ param
@@ -2041,7 +2043,7 @@ let commands_rw () =
            ballot
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* src_name, _src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
+        let* src_name, _src_pk, src_sk = Client_keys_v0.get_key cctxt src_pkh in
         let* info =
           get_period_info
           (* Find period info of the successor, because the operation will
@@ -2094,7 +2096,7 @@ let commands_rw () =
             (if force then cctxt#warning else cctxt#error)
               "Public-key-hash `%a` from account `%s` does not appear to have \
                voting rights."
-              Signature.Public_key_hash.pp
+              Tezos_crypto.Signature.V0.Public_key_hash.pp
               src_pkh
               src_name
         in
@@ -2141,7 +2143,7 @@ let commands_rw () =
               Contract.pp
               contract
         | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+            let* _, src_pk, manager_sk = Client_keys_v0.get_key cctxt mgr in
             let* (_ : _ Injection.result) =
               set_deposits_limit
                 cctxt
@@ -2184,7 +2186,7 @@ let commands_rw () =
               Contract.pp
               contract
         | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+            let* _, src_pk, manager_sk = Client_keys_v0.get_key cctxt mgr in
             let* (_ : _ Injection.result) =
               set_deposits_limit
                 cctxt
@@ -2229,7 +2231,7 @@ let commands_rw () =
            payer
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* _, src_pk, manager_sk = Client_keys.get_key cctxt payer in
+        let* _, src_pk, manager_sk = Client_keys_v0.get_key cctxt payer in
         let* (_ : _ Injection.result) =
           increase_paid_storage
             cctxt
@@ -2267,7 +2269,7 @@ let commands_rw () =
            ~name:"tx_rollup"
            ~desc:"Fresh name for a transaction rollup"
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account originating the transaction rollup."
       @@ stop)
@@ -2283,7 +2285,7 @@ let commands_rw () =
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* {level = head_level; _} =
           Protocol_client_context.Alpha_block_services.Header.shell_header
             cctxt
@@ -2337,7 +2339,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["submit"; "tx"; "rollup"; "batch"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"batch"
            ~desc:
              "Bytes representation (hexadecimal string) of the batch. Must be \
@@ -2347,7 +2349,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup receiving the batch."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account submitting the transaction rollup batches."
       @@ stop)
@@ -2363,7 +2365,7 @@ let commands_rw () =
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           submit_tx_rollup_batch
             cctxt
@@ -2408,7 +2410,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Transaction rollup address committed to."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account committing to the transaction rollup."
       @@ prefixes ["for"; "level"]
@@ -2436,7 +2438,7 @@ let commands_rw () =
            messages
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           submit_tx_rollup_commitment
             cctxt
@@ -2476,7 +2478,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup that have its commitment finalized."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account finalizing the commitment."
       @@ stop)
@@ -2491,7 +2493,7 @@ let commands_rw () =
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           submit_tx_rollup_finalize_commitment
             cctxt
@@ -2524,7 +2526,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account that owns the bond."
       @@ prefixes ["for"; "tx"; "rollup"]
@@ -2541,7 +2543,7 @@ let commands_rw () =
            tx_rollup
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           submit_tx_rollup_return_bond
             cctxt
@@ -2577,7 +2579,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup that have its commitment removed."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the account removing the commitment."
       @@ stop)
@@ -2592,7 +2594,7 @@ let commands_rw () =
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           submit_tx_rollup_remove_commitment
             cctxt
@@ -2636,7 +2638,7 @@ let commands_rw () =
       @@ Tx_rollup.message_result_path_param
            ~usage:"Disputed message result path."
       @@ prefixes ["for"; "message"; "at"; "position"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"message position"
            ~desc:
              "Position of the message in the inbox with the result being \
@@ -2672,7 +2674,7 @@ let commands_rw () =
            ~usage:
              "Proof that the disputed message result provided is incorrect."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account rejecting the commitment."
       @@ stop)
@@ -2697,7 +2699,7 @@ let commands_rw () =
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           submit_tx_rollup_rejection
             cctxt
@@ -2750,7 +2752,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup which have some tickets dispatched."
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"source"
            ~desc:"Account used to dispatch tickets."
       @@ prefixes ["at"; "level"]
@@ -2759,7 +2761,7 @@ let commands_rw () =
              "Level of the finalized commitment that includes the message \
               result whose withdrawals will be dispatched."
       @@ prefixes ["for"; "the"; "message"; "at"; "index"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"message index"
            ~desc:"Index of the message whose withdrawals will be dispatched."
            non_negative_parameter
@@ -2792,7 +2794,7 @@ let commands_rw () =
            tickets_info
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           tx_rollup_dispatch_tickets
             cctxt
@@ -2832,7 +2834,7 @@ let commands_rw () =
       (prefix "transfer"
       @@ non_negative_z_param ~name:"qty" ~desc:"Amount of tickets to transfer."
       @@ prefixes ["tickets"; "from"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"tickets owner"
            ~desc:"Implicit account owning the tickets."
       @@ prefix "to"
@@ -2840,17 +2842,17 @@ let commands_rw () =
            ~name:"recipient contract"
            ~desc:"Contract receiving the tickets."
       @@ prefixes ["with"; "entrypoint"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"entrypoint"
            ~desc:"Entrypoint to use on the receiving contract."
            entrypoint_parameter
       @@ prefixes ["and"; "contents"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"tickets content"
            ~desc:"Content of the tickets."
            Client_proto_args.string_parameter
       @@ prefixes ["and"; "type"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"tickets type"
            ~desc:"Type of the tickets."
            Client_proto_args.string_parameter
@@ -2875,7 +2877,7 @@ let commands_rw () =
            ticketer
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         match Ticket_amount.of_zint amount with
         | Some amount ->
             let* _res =
@@ -2916,7 +2918,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["originate"; "sc"; "rollup"; "from"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the account originating the smart-contract rollup."
       @@ prefixes ["of"; "kind"]
@@ -2950,7 +2952,7 @@ let commands_rw () =
            boot_sector
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
@@ -2997,7 +2999,7 @@ let commands_rw () =
               messages>|file:<json_file>)."
            Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["to"]
@@ -3028,7 +3030,7 @@ let commands_rw () =
                     "Could not read list of messages (expected list of bytes)"
               | messages -> return messages)
         in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           sc_rollup_add_messages
             cctxt
@@ -3063,7 +3065,7 @@ let commands_rw () =
          fee_parameter_args)
       (prefixes ["publish"; "commitment"]
       @@ prefixes ["from"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -3109,7 +3111,7 @@ let commands_rw () =
            number_of_ticks
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let commitment : Alpha_context.Sc_rollup.Commitment.t =
           {compressed_state; inbox_level; predecessor; number_of_ticks}
         in
@@ -3151,7 +3153,7 @@ let commands_rw () =
            ~desc:"The hash of the commitment to be cemented for a sc rollup."
            Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -3174,7 +3176,7 @@ let commands_rw () =
            rollup
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           sc_rollup_cement
             cctxt
@@ -3215,11 +3217,11 @@ let commands_rw () =
               dispute has timed-out."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"staker"
            ~desc:"One of the players involved in the dispute."
       @@ prefixes ["from"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ stop)
@@ -3251,7 +3253,7 @@ let commands_rw () =
                  rollup."
           | Some (_, alice, bob) -> return (alice, bob)
         in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           sc_rollup_timeout
             cctxt
@@ -3312,7 +3314,7 @@ let commands_rw () =
               resides."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"source"
            ~desc:"The account used for executing the outbox message."
       @@ prefixes ["for"; "commitment"; "hash"]
@@ -3340,7 +3342,7 @@ let commands_rw () =
            output_proof
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           sc_rollup_execute_outbox_message
             cctxt
@@ -3375,11 +3377,11 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Client_keys_v0.Public_key_hash.source_param
            ~name:"src"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "sc"; "rollup"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"smart contract rollup address"
            ~desc:"The address of the smart-contract rollup of the bond."
            Sc_rollup_params.sc_rollup_address_parameter
@@ -3395,7 +3397,7 @@ let commands_rw () =
            sc_rollup
            cctxt ->
         let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source in
         let* _res =
           sc_rollup_recover_bond
             cctxt

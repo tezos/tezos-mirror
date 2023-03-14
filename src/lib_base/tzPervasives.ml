@@ -25,8 +25,6 @@
 
 include Tezos_stdlib
 module Error_monad = Tezos_error_monad.Error_monad
-include Tezos_rpc
-include Tezos_crypto
 include Tezos_micheline
 module Data_encoding = Data_encoding
 include Tezos_error_monad.TzLwtreslib
@@ -45,11 +43,31 @@ module String = struct
 
     let equal = String.equal
 
+    (* in OCaml 5, the interface of the [Hashtbl.MakeSeeded] functor has changed:
+       it expects the seeded hash function to be called [seeded_hash]. This will
+       reduce the amount of boilerplate in the long run, but in the transitionary
+       period it increases it instead: we need to expose both [hash] and
+       [seeded_hash] to be compatible with both versions of the compiler.
+
+       Depending on which OCaml compiler (4 or 5) is used, either of the hashing
+       function ([hash] or [seeded_hash]) is used. The other function is unused.
+       Thus we also need to suppress the associated warning. *)
+    [@@@ocaml.warning "-32"]
+
     let hash = Hashtbl.seeded_hash
+
+    let seeded_hash = Hashtbl.seeded_hash
+
+    [@@@ocaml.warning "+32"]
   end)
 
   module Map = Tezos_error_monad.TzLwtreslib.Map.Make (String)
   module Set = Tezos_error_monad.TzLwtreslib.Set.Make (String)
+end
+
+module Bytes = struct
+  include Bytes
+  include Tezos_stdlib.TzBytes
 end
 
 module Time = Time
@@ -72,6 +90,8 @@ module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
+include Tezos_crypto.Hashed
+module Signature = Tezos_crypto.Signature
 include Utils.Infix
 include Error_monad
 

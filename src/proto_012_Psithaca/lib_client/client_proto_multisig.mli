@@ -83,7 +83,7 @@ val originate_multisig :
   balance:Tez.t ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
@@ -109,10 +109,10 @@ val call_multisig :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   multisig_contract:Contract.t ->
   action:multisig_action ->
-  signatures:Signature.t list ->
+  signatures:Tezos_crypto.Signature.V0.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
@@ -135,10 +135,10 @@ val call_multisig_on_bytes :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   multisig_contract:Contract.t ->
   bytes:Bytes.t ->
-  signatures:Signature.t list ->
+  signatures:Tezos_crypto.Signature.V0.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->

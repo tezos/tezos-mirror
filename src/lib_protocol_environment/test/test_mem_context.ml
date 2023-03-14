@@ -39,7 +39,7 @@
                    \-- block3b
 *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 let create_block2 ctxt =
   let open Lwt_syntax in
@@ -175,14 +175,6 @@ let test_replay {genesis = ctxt0; _} =
   Assert.String.Option.equal ~loc:__LOC__ (Some "Juillet") (c juillet) ;
   Lwt.return_unit
 
-let fold_keys s root ~init ~f =
-  Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
-      match Context.Tree.kind v with
-      | `Value -> f (root @ k) acc
-      | `Tree -> Lwt.return acc)
-
-let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
-
 (** Restore the context at [genesis] and fold upon a context a series
     of key prefixes using {!Context.fold}.
 *)
@@ -193,21 +185,21 @@ let test_fold_keys {genesis = ctxt; _} =
   let* ctxt = Context.add ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre") in
   let* ctxt = Context.add ctxt ["f"] (Bytes.of_string "Avril") in
   let* ctxt = Context.add ctxt ["g"; "h"] (Bytes.of_string "Avril") in
-  let* l = keys ctxt [] in
+  let* l = Test_mem_context_common.keys ctxt [] in
   Assert.String.List_list.equal
     ~loc:__LOC__
     [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]; ["f"]; ["g"; "h"]]
     (List.sort compare l) ;
-  let* l = keys ctxt ["a"] in
+  let* l = Test_mem_context_common.keys ctxt ["a"] in
   Assert.String.List_list.equal
     ~loc:__LOC__
     [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]]
     (List.sort compare l) ;
-  let* l = keys ctxt ["f"] in
+  let* l = Test_mem_context_common.keys ctxt ["f"] in
   Assert.String.List_list.equal ~loc:__LOC__ [] l ;
-  let* l = keys ctxt ["g"] in
+  let* l = Test_mem_context_common.keys ctxt ["g"] in
   Assert.String.List_list.equal ~loc:__LOC__ [["g"; "h"]] l ;
-  let* l = keys ctxt ["i"] in
+  let* l = Test_mem_context_common.keys ctxt ["i"] in
   Assert.String.List_list.equal ~loc:__LOC__ [] l ;
   Lwt.return_unit
 
@@ -289,7 +281,8 @@ let test_fold_order {genesis = ctxt; _} =
      nice to test this on a checkout as well, but [Context] doesn't
      expose the right hooks (yet?). *)
   let* bs =
-    fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+    Test_mem_context_common.fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc ->
+        Lwt.return (k :: acc))
   in
   let bs = List.rev bs in
   Assert.String.List_list.equal ~loc:__LOC__ (List.map fst bindings) bs ;
@@ -404,8 +397,6 @@ module PP = struct
   let domain ppf d = Format.fprintf ppf "[%a]" domain d
 end
 
-let domain ctxt = keys ctxt []
-
 let check_eq_domains d1 d2 =
   Assert.equal ~eq:StringListSet.equal ~pp:PP.domain d1 d2
 
@@ -420,7 +411,7 @@ let test_domain0 () =
   let* ctxt = Context.add ctxt k2 b0 in
   let* ctxt = Context.add ctxt k3 b0 in
   let expected_domain = [k1; k2; k3] |> StringListSet.of_list in
-  let* actual_domain = domain ctxt in
+  let* actual_domain = Test_mem_context_common.domain ctxt in
   let actual_domain = StringListSet.of_list actual_domain in
   check_eq_domains expected_domain actual_domain ;
   Lwt.return_unit
@@ -434,7 +425,7 @@ let test_domain1 () =
   let* ctxt = Context.add ctxt k1 b0 in
   let* ctxt = Context.add ctxt k2 b0 in
   let expected_domain = [k1; k2] |> StringListSet.of_list in
-  let* actual_domain = domain ctxt in
+  let* actual_domain = Test_mem_context_common.domain ctxt in
   let actual_domain = StringListSet.of_list actual_domain in
   check_eq_domains expected_domain actual_domain ;
   Lwt.return_unit
@@ -452,7 +443,7 @@ let test_domain2 () =
   let* ctxt = Context.add ctxt k3 b0 in
   let* ctxt = Context.add ctxt k4 b0 in
   let expected_domain = [k1; k2; k3; k4] |> StringListSet.of_list in
-  let* actual_domain = domain ctxt in
+  let* actual_domain = Test_mem_context_common.domain ctxt in
   let actual_domain = StringListSet.of_list actual_domain in
   check_eq_domains expected_domain actual_domain ;
   Lwt.return_unit
@@ -485,3 +476,7 @@ let tests =
   @ List.map
       (fun (n, f) -> Alcotest_lwt.test_case n `Quick (fun _ _ -> f ()))
       domain_tests
+
+let () =
+  Alcotest_lwt.run "tezos-shell-context" [("mem_context", tests)]
+  |> Lwt_main.run

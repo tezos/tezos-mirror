@@ -15,7 +15,8 @@
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding
   test_carbonated_map
-  test_zk_rollup_encoding)
+  test_zk_rollup_encoding
+  test_compare_operations)
  (libraries
   tezos-base
   tezos-micheline
@@ -29,12 +30,16 @@
   tezos-benchmark
   tezos-benchmark-015-PtLimaPt
   tezos-benchmark-type-inference-015-PtLimaPt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
   -open Tezos_client_015_PtLimaPt
   -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_test_helpers
   -open Tezos_015_PtLimaPt_test_helpers
   -open Tezos_benchmark_015_PtLimaPt
   -open Tezos_benchmark_type_inference_015_PtLimaPt))
@@ -104,6 +109,11 @@
  (package tezos-protocol-015-PtLimaPt-tests)
  (action (run %{dep:./test_zk_rollup_encoding.exe})))
 
+(rule
+ (alias runtest)
+ (package tezos-protocol-015-PtLimaPt-tests)
+ (action (run %{dep:./test_compare_operations.exe})))
+
 (rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
 
 (rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
@@ -129,3 +139,5 @@
 (rule (alias runtest3) (action (run %{exe:test_carbonated_map.exe})))
 
 (rule (alias runtest3) (action (run %{exe:test_zk_rollup_encoding.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_compare_operations.exe})))

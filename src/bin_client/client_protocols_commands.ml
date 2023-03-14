@@ -23,17 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group = {Clic.name = "protocols"; title = "Commands for managing protocols"}
+let group =
+  {Tezos_clic.name = "protocols"; title = "Commands for managing protocols"}
 
 let proto_param ~name ~desc t =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc
-    (Clic.parameter (fun _ str -> Lwt.return (Protocol_hash.of_b58check str)))
+    (Tezos_clic.parameter (fun _ str ->
+         Lwt.return (Protocol_hash.of_b58check str)))
     t
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let open Lwt_result_syntax in
   let check_dir _ dn =
     if Sys.is_directory dn then return dn

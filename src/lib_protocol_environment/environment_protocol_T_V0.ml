@@ -81,7 +81,7 @@ module type T = sig
   val current_context : validation_state -> context tzresult Lwt.t
 
   val begin_partial_application :
-    chain_id:Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     ancestor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_fitness:Fitness.t ->
@@ -89,7 +89,7 @@ module type T = sig
     validation_state tzresult Lwt.t
 
   val begin_application :
-    chain_id:Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     predecessor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_fitness:Fitness.t ->
@@ -97,12 +97,12 @@ module type T = sig
     validation_state tzresult Lwt.t
 
   val begin_construction :
-    chain_id:Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     predecessor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
     predecessor_fitness:Fitness.t ->
-    predecessor:Block_hash.t ->
+    predecessor:Tezos_crypto.Hashed.Block_hash.t ->
     timestamp:Time.Protocol.t ->
     ?protocol_data:block_header_data ->
     unit ->
@@ -117,7 +117,7 @@ module type T = sig
     validation_state ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
-  val rpc_services : rpc_context RPC_directory.t
+  val rpc_services : rpc_context Tezos_rpc.Directory.t
 
   val init :
     context -> Block_header.shell_header -> validation_result tzresult Lwt.t

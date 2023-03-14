@@ -1,7 +1,7 @@
 How to contribute to Octez
 ==========================
 
-The purpose of this document is to help contributors participate to
+The purpose of this document is to help developers contribute to
 Octez.
 
 Introduction
@@ -21,14 +21,16 @@ first and always make sure
 to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
 the architecture (e.g. *ARM64*), the operating system (e.g. *Debian
-Stretch*), the network you are connected to (e.g. *Carthagenet*), the
-binary or component (e.g. *tezos-node crashes* or *rpc X returns Y
+Stretch*), the network you are connected to (e.g. *Ghostnet*), the
+binary or component (e.g. *octez-node crashes* or *rpc X returns Y
 while Z was expected*).
 
-Going further
-~~~~~~~~~~~~~
+Other useful contributions consist in inspecting existing issues and adding details, suggesting workarounds, etc.
 
-You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
+Fixing typos
+~~~~~~~~~~~~
+
+You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository, or within *comments* or *docstrings* within the code.
 Small tweaks like these can be contributed without creating a merge request and commits can rather be pushed directly to the ``typo-doc`` branch in the ``tezos/tezos`` repository. This branch is regularly merged into the master branch, e.g., every one or two weeks.
 (If the branch has been automatically deleted following a merge, just create it again.)
 This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
@@ -38,13 +40,23 @@ The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
 If you don't have enough permissions to push to the branch above, you can  still make commits in your own fork of the Octez repository, and ask for them to be cherry-picked on the typo/train on the ``#documentation`` channel on the Tezos Dev Slack space.
 Alternatively, you may of course create your own MRs for submitting your changes, without using the typo train.
 
-To directly contribute to the *codebase*, expertise in a few areas is necessary.
+Other non-code contributions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you acquired a good expertise level in using, configuring, or overcoming problems with the various Octez executables, you may bring useful contributions by providing assistance to others via the different channels (Slack,  StackExchange, etc.) listed in the :doc:`technical support page <../introduction/support>`.
+
+If you want to shape the future of Octez, you may consider contributing to Tezos Improvement Proposals (TZIPs), that specify new features or define standards. These are located in the `TZIP repo <https://gitlab.com/tezos/tzip/>`__.
+
+Going further
+~~~~~~~~~~~~~
+
+To directly contribute to the *code* itself, expertise in a few areas is necessary.
 
 First, make sure that you are proficient enough in OCaml. The community
 website https://ocaml.org gives a few useful pointers for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
-For a more specific explanation of GADT usage in Tezos you can check out
+For a more specific explanation of GADT usage in Octez you can check out
 :doc:`gadt`.
 
 Then, if you don’t know much about the Lwt library, that’s what you want
@@ -81,6 +93,8 @@ There are many ways to use Git, here is ours.
 We mostly use merge requests (aka MRs) for contributing to the master branch,
 meaning that nobody should be pushing into the master branch directly. Once a
 merge request is ready, it is reviewed and approved, then merged with a merge commit.
+
+Therefore, you can bring useful contributions both by creating your own MRs and by reviewing MRs submitted by others.
 
 We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviews/index.html#semi-linear-history-merge-requests>`_,
 which means that merge requests are only
@@ -214,7 +228,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    into account the impact on :ref:`RPC security <rpc_security>`.
 -  If you modify the user API (e.g. add or change a configuration parameter or
    a command-line option), update the corresponding documentation. In
-   particular, for configuration parameters of the Tezos node, update the node
+   particular, for configuration parameters of the Octez node, update the node
    configuration :doc:`documentation <../user/node-configuration>` and the
    documentation of the modified component(s), usually referred by that page.
 -  If your MR introduces new dependencies, follow the
@@ -566,7 +580,7 @@ description what was tested and how so that **reviewers can reproduce it**.
 Code Review
 -----------
 
-At Tezos all the code is peer reviewed before getting committed in the
+All code is peer reviewed before getting committed in the
 master branch by the :doc:`Octez merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.

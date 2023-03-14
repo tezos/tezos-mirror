@@ -37,10 +37,10 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~name
       ~msg:("[{signer}: {tags}] " ^ msg)
       ~level
-      ("signer", Signature.Public_key_hash.encoding)
+      ("signer", Tezos_crypto.Signature.V0.Public_key_hash.encoding)
       ("tags", Tags.encoding)
       enc1
-      ~pp1:Signature.Public_key_hash.pp_short
+      ~pp1:Tezos_crypto.Signature.V0.Public_key_hash.pp_short
       ~pp2:Tags.pp
       ?pp3:pp1
 
@@ -50,11 +50,11 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~name
       ~msg:("[{signer}: {tags}] " ^ msg)
       ~level
-      ("signer", Signature.Public_key_hash.encoding)
+      ("signer", Tezos_crypto.Signature.V0.Public_key_hash.encoding)
       ("tags", Tags.encoding)
       enc1
       enc2
-      ~pp1:Signature.Public_key_hash.pp_short
+      ~pp1:Tezos_crypto.Signature.V0.Public_key_hash.pp_short
       ~pp2:Tags.pp
       ?pp3:pp1
       ?pp4:pp2
@@ -65,12 +65,12 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~name
       ~msg:("[{signer}: {tags}] " ^ msg)
       ~level
-      ("signer", Signature.Public_key_hash.encoding)
+      ("signer", Tezos_crypto.Signature.V0.Public_key_hash.encoding)
       ("tags", Tags.encoding)
       enc1
       enc2
       enc3
-      ~pp1:Signature.Public_key_hash.pp_short
+      ~pp1:Tezos_crypto.Signature.V0.Public_key_hash.pp_short
       ~pp2:Tags.pp
       ?pp3:pp1
       ?pp4:pp2

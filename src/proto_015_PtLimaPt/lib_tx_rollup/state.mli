@@ -33,7 +33,7 @@ open Injector_common
     data. *)
 
 module Tezos_blocks_cache :
-  Ringo_lwt.Sigs.CACHE_MAP_OPT with type key = Block_hash.t
+  Aches_lwt.Lache.MAP_OPTION with type key = Block_hash.t
 
 (** Information about the rollup that is kept in the state. *)
 type rollup_info = Stores.rollup_info = {

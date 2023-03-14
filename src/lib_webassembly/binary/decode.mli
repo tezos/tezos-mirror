@@ -297,15 +297,26 @@ val make_stream : name:string -> bytes:Chunked_byte_vector.t -> stream
     (generally the name of the file that contains said input). *)
 val initial_decode_kont : name:string -> decode_kont
 
-(** [module_step stream kont] takes one step of parsing from a
-   continuation and returns a new continuation. Fails when the
-   continuation of the module is [MKStop] since it cannot reduce. *)
-val module_step : Chunked_byte_vector.t -> decode_kont -> decode_kont Lwt.t
+(** [module_step ~allow_floats stream kont] takes one step of parsing from a
+    continuation and returns a new continuation. Fails when the continuation of
+    the module is [MKStop] since it cannot reduce.
+
+    @raise Floating_point.Error if it decodes a float instruction or type and
+      [allow_floats] is false.
+*)
+val module_step :
+  allow_floats:bool -> Chunked_byte_vector.t -> decode_kont -> decode_kont Lwt.t
 
 (** [decode ~name ~bytes] decodes a module [name] from its [bytes] encoding.
 
-    @raise Code on parsing errors. *)
-val decode : name:string -> bytes:Chunked_byte_vector.t -> Ast.module_ Lwt.t
+    @raise Code on parsing errors.
+    @raise Floating_point.Error if it decodes a float instruction or type and
+      [allow_floats] is false. *)
+val decode :
+  allow_floats:bool ->
+  name:string ->
+  bytes:Chunked_byte_vector.t ->
+  Ast.module_ Lwt.t
 
 (** [decode ~name ~bytes] decodes a custom section of name [name] from its
     [bytes] encoding.

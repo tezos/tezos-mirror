@@ -126,7 +126,7 @@ type t = {
   chain_db : Distributed_db.chain_db;
   locator : Block_locator.t;
   block_validator : Block_validator.t;
-  notify_new_block : Store.Block.t -> unit;
+  notify_new_block : Block_validator.new_block -> unit;
   fetched_headers : (Block_hash.t * Block_header.t) list Lwt_pipe.Bounded.t;
   fetched_blocks :
     (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
@@ -587,7 +587,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          peer_id
          Block_hash.pp_short
          locator.Block_locator.head_hash)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
@@ -598,7 +598,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          peer_id
          Block_hash.pp_short
          locator.head_hash)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline.validation_worker <-
@@ -609,7 +609,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          peer_id
          Block_hash.pp_short
          locator.head_hash)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> validation_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline

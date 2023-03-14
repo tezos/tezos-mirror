@@ -93,6 +93,8 @@ echo "Fixing versioned links in docs"
 cd docs/${label}
 sed -i.old -e s/_alpha:/_${label}:/g \
        -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
+       -e s,tezos-protocol-alpha/,tezos-protocol-${version}-${short_hash}/,g \
+       -e s,raw_protocol_alpha/,raw_protocol_${version}_${short_hash}/,g \
        -e s/_alpha\>/_${label}\>/g \
        -e s/_alpha\`/_${label}\`/g \
        -e s/-alpha.html/-${label}.html/g \

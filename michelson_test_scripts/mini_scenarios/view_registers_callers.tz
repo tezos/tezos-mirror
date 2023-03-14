@@ -1,0 +1,13 @@
+/* This contract registers all SOURCE addresses that ever call it. It has views
+   that return registered callers count and the last caller address respectively. */
+parameter unit;
+storage (list address);
+code {
+       CDR ;
+       SOURCE ;
+       CONS ;
+       NIL operation ;
+       PAIR ;
+     };
+view "calls_count" unit nat { CDR ; SIZE };
+view "last_caller" unit (option address) { CDR ; IF_CONS { DIP { DROP } ; SOME } { NONE address } };

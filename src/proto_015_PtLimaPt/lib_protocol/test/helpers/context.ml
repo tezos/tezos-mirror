@@ -44,13 +44,13 @@ let rpc_ctxt =
   object
     method call_proto_service0
         : 'm 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             Environment.RPC_context.t,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'q ->
           'i ->
@@ -62,13 +62,13 @@ let rpc_ctxt =
 
     method call_proto_service1
         : 'm 'a 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             Environment.RPC_context.t * 'a,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'a ->
           'q ->
@@ -81,13 +81,13 @@ let rpc_ctxt =
 
     method call_proto_service2
         : 'm 'a 'b 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             (Environment.RPC_context.t * 'a) * 'b,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'a ->
           'b ->
@@ -101,13 +101,13 @@ let rpc_ctxt =
 
     method call_proto_service3
         : 'm 'a 'b 'c 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             ((Environment.RPC_context.t * 'a) * 'b) * 'c,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'a ->
           'b ->
@@ -131,6 +131,16 @@ let get_endorser ctxt =
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
   (endorser.delegate, endorser.slots)
 
+let get_endorser_slot ctxt pkh =
+  get_endorsers ctxt >|=? fun endorsers ->
+  List.find_map
+    (function
+      | {Plugin.RPC.Validators.delegate; slots; _} ->
+          if Tezos_crypto.Signature.V0.Public_key_hash.(delegate = pkh) then
+            Some slots
+          else None)
+    endorsers
+
 let get_endorser_n ctxt n =
   Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun endorsers ->
   let endorser =
@@ -143,7 +153,7 @@ let get_endorsing_power_for_delegate ctxt ?levels pkh =
   let rec find_slots_for_delegate = function
     | [] -> return 0
     | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
-        if Signature.Public_key_hash.equal delegate pkh then
+        if Tezos_crypto.Signature.V0.Public_key_hash.equal delegate pkh then
           return (List.length slots)
         else find_slots_for_delegate t
   in
@@ -166,7 +176,8 @@ let get_baker ctxt ~round =
 let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+       (fun baker' ->
+         Tezos_crypto.Signature.V0.Public_key_hash.( <> ) baker baker')
        bakers
 
 let get_first_different_bakers ctxt =
@@ -340,8 +351,9 @@ module Delegate = struct
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Alpha_context.Vote.delegate_info;
-    active_consensus_key : Signature.Public_key_hash.t;
-    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+    active_consensus_key : Tezos_crypto.Signature.V0.Public_key_hash.t;
+    pending_consensus_keys :
+      (Cycle.t * Tezos_crypto.Signature.V0.Public_key_hash.t) list;
   }
 
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
@@ -512,6 +524,18 @@ let init2 = init_gen T2
 
 let init3 = init_gen T3
 
+let create_bootstrap_accounts n =
+  let accounts = Account.generate_accounts n in
+  let open Tezos_protocol_015_PtLimaPt_parameters in
+  List.fold_left
+    (fun (boostrap_account, contracts) (account, tez, delegate_to) ->
+      ( Default_parameters.make_bootstrap_account
+          (Account.(account.pkh), Account.(account.pk), tez, delegate_to, None)
+        :: boostrap_account,
+        Alpha_context.Contract.Implicit Account.(account.pkh) :: contracts ))
+    ([], [])
+    accounts
+
 let init_with_constants_gen tup constants =
   let n = tup_n tup in
   let accounts = Account.generate_accounts n in
@@ -539,6 +563,19 @@ let init_with_constants_n consts n = init_with_constants_gen (TList n) consts
 let init_with_constants1 = init_with_constants_gen T1
 
 let init_with_constants2 = init_with_constants_gen T2
+
+let init_with_parameters_gen tup parameters =
+  let n = tup_n tup in
+  let bootstrap_accounts, contracts = create_bootstrap_accounts n in
+  let parameters = Parameters.{parameters with bootstrap_accounts} in
+  Block.genesis_with_parameters parameters >|=? fun blk ->
+  (blk, tup_get tup contracts)
+
+let init_with_parameters_n params n = init_with_parameters_gen (TList n) params
+
+let init_with_parameters1 = init_with_parameters_gen T1
+
+let init_with_parameters2 = init_with_parameters_gen T2
 
 let default_raw_context () =
   let initial_accounts =

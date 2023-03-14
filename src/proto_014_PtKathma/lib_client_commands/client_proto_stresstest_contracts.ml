@@ -161,7 +161,7 @@ let select (smart_contracts : t) (q : float) : invocation_parameters option =
   go smart_contracts q
 
 let originate_command =
-  let open Clic in
+  let open Tezos_clic in
   let open Client_proto_context in
   let open Client_proto_contracts in
   let open Client_proto_context_commands in
@@ -179,7 +179,7 @@ let originate_command =
       | Originated _ ->
           failwith "only implicit accounts can be the source of an origination"
       | Implicit source ->
-          Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+          Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
           let originate_one (scontract : smart_contract) =
             let fee_parameter =
               {

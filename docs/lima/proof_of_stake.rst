@@ -42,7 +42,7 @@ proportional with their delegated stake, which includes the balances
 of all the accounts that delegate to it, and also the balance of the
 delegate itself. To participate in consensus or in governance, a
 delegate needs to have at least a minimal stake, which is given by the
-``TOKENS_PER_ROLL`` :ref:`protocol constant
+``MINIMAL_STAKE`` :ref:`protocol constant
 <protocol_constants_lima>`.
 
 Delegates place security deposits that may be forfeited in case they do not
@@ -53,6 +53,7 @@ from the delegates' own balance.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_lima:
 
 A delegate can be marked as either active or passive. A passive
@@ -71,6 +72,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_lima:
 
 Random seed
@@ -82,6 +84,7 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _snapshots:
 .. _snapshots_lima:
 
 Stake snapshots
@@ -102,8 +105,9 @@ At the end of cycle ``n-1-PRESERVED_CYCLES``, the snapshot for cycle
 PRNG having as seed the :ref:`random seed<random_seed_lima>` for
 cycle ``n``.
 
-Only the stake of active delegates with the minimal stake of ``TOKENS_PER_ROLL`` is snapshot.
+Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE`` is snapshot.
 
+.. _rights:
 .. _rights_lima:
 
 Slot selection
@@ -135,6 +139,7 @@ simple procedure which has as its initial state: the level, the
 :ref:`random seed<random_seed_lima>` for the cycle to which the
 level belongs, and the slot.
 
+.. _ps_constants:
 .. _ps_constants_lima:
 
 Proof-of-stake parameters
@@ -150,7 +155,7 @@ Proof-of-stake parameters
      - 8192 blocks
    * - ``PRESERVED_CYCLES``
      - 5 cycles
-   * - ``TOKENS_PER_ROLL``
+   * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
    * - ``BLOCKS_PER_STAKE_SNAPSHOT``
      - 512 blocks

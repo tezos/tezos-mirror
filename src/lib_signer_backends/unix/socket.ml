@@ -33,7 +33,9 @@ let unix_scheme = "unix"
 
 module Make (P : sig
   val authenticate :
-    Signature.Public_key_hash.t list -> Bytes.t -> Signature.t tzresult Lwt.t
+    Tezos_crypto.Signature.Public_key_hash.t list ->
+    Bytes.t ->
+    Tezos_crypto.Signature.t tzresult Lwt.t
 end) =
 struct
   open P
@@ -100,7 +102,8 @@ struct
     let msg =
       match watermark with
       | None -> msg
-      | Some watermark -> Bytes.cat (Signature.bytes_of_watermark watermark) msg
+      | Some watermark ->
+          Bytes.cat (Tezos_crypto.Signature.bytes_of_watermark watermark) msg
     in
     with_signer_operation path pkh msg Sign_request Sign.Response.encoding
 
@@ -166,7 +169,7 @@ struct
       match Uri.get_query_param uri "pkh" with
       | None -> error_with "Missing the query parameter: 'pkh=tz1...'"
       | Some key ->
-          let+ key = Signature.Public_key_hash.of_b58check key in
+          let+ key = Tezos_crypto.Signature.Public_key_hash.of_b58check key in
           (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
 
     let parse uri = parse uri |> record_trace (Invalid_uri uri) |> Lwt.return
@@ -184,7 +187,7 @@ struct
     let public_key_hash uri =
       let open Lwt_result_syntax in
       let* pk = public_key uri in
-      return (Signature.Public_key.hash pk, Some pk)
+      return (Tezos_crypto.Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 
@@ -229,7 +232,7 @@ struct
       | Some path, Some port ->
           let pkh = Uri.path uri in
           let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in
-          let+ pkh = Signature.Public_key_hash.of_b58check pkh in
+          let+ pkh = Tezos_crypto.Signature.Public_key_hash.of_b58check pkh in
           let tcp_socket =
             Tezos_base_unix.Socket.Tcp
               (path, string_of_int port, [Lwt_unix.AI_SOCKTYPE SOCK_STREAM])
@@ -251,7 +254,7 @@ struct
     let public_key_hash uri =
       let open Lwt_result_syntax in
       let* pk = public_key uri in
-      return (Signature.Public_key.hash pk, Some pk)
+      return (Tezos_crypto.Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 

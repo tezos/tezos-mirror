@@ -77,11 +77,11 @@ end = struct
     >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
     bake ~policy:(By_round 0) b1 >>=? fun b2_A ->
-    Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun e ->
-    let operations = if include_endorsement then [Operation.pack e] else [] in
+    Op.endorsement b1 >>=? fun e ->
+    let operations = if include_endorsement then [e] else [] in
     bake ~policy:(By_round block_round) ~operations b1 >>=? fun b2_B ->
-    Op.preendorsement ~endorsed_block:b2_A (B b1) () >>=? fun op1 ->
-    Op.preendorsement ~endorsed_block:b2_B (B b1) () >>=? fun op2 ->
+    Op.raw_preendorsement b2_A >>=? fun op1 ->
+    Op.raw_preendorsement b2_B >>=? fun op2 ->
     let op = mk_evidence (B genesis) op1 op2 in
     bake b1 ~operations:[op] >>= fun res -> invalid_denunciation loc res
 
@@ -119,7 +119,7 @@ end = struct
   let unexpected_success loc _ _ _ _ _ =
     Alcotest.fail (loc ^ ": Test should not succeed")
 
-  let expected_success _loc baker pred bbad (d1, _) (d2, _) =
+  let expected_success _loc baker pred bbad d1 d2 =
     (* same preendorsers in case denunciation succeeds*)
     Assert.equal_pkh ~loc:__LOC__ d1 d2 >>=? fun () ->
     Context.get_constants (B pred)
@@ -199,17 +199,15 @@ end = struct
     Op.transaction (B genesis) addr addr Tez.one_mutez >>=? fun trans ->
     bake ~policy:(By_round 0) blk >>=? fun head_A ->
     bake ~policy:(By_round 0) blk ~operations:[trans] >>=? fun head_B ->
-    pick_endorsers (B head_A) >>=? fun (d1, d2) ->
+    pick_endorsers (B head_A) >>=? fun ((d1, _slots1), (d2, _slots2)) ->
     (* default: d1 = d2 *)
-    Op.preendorsement ~delegate:d1 ~endorsed_block:head_A (B blk) ()
-    >>=? fun op1 ->
-    Op.preendorsement ~delegate:d2 ~endorsed_block:head_B (B blk) ()
-    >>=? fun op2 ->
+    Op.raw_preendorsement ~delegate:d1 head_A >>=? fun op1 ->
+    Op.raw_preendorsement ~delegate:d2 head_B >>=? fun op2 ->
     let op1, op2 = order_preendorsements ~correct_order:true op1 op2 in
     (* bake `nb_blocks_before_denunciation` before double preend. denunciation *)
     bake_n nb_blocks_before_denunciation blk >>=? fun blk ->
     let op : Operation.packed = Op.double_preendorsement (B blk) op1 op2 in
-    Context.get_baker (B blk) ~round:0 >>=? fun baker ->
+    Context.get_baker (B blk) ~round:Round.zero >>=? fun baker ->
     bake ~policy:(By_account baker) blk ~operations:[op] >>= function
     | Ok new_head ->
         test_expected_ok loc baker blk new_head d1 d2 >>=? fun () ->
@@ -316,10 +314,8 @@ end = struct
     Block.bake blk_1 >>=? fun blk_a ->
     Block.bake blk_2 >>=? fun blk_b ->
     Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
-    Op.preendorsement ~endorsed_block:blk_a (B blk_1) ()
-    >>=? fun preendorsement_a ->
-    Op.preendorsement ~endorsed_block:blk_b (B blk_2) ()
-    >>=? fun preendorsement_b ->
+    Op.raw_preendorsement blk_a >>=? fun preendorsement_a ->
+    Op.raw_preendorsement blk_b >>=? fun preendorsement_b ->
     let operation =
       double_preendorsement (B genesis) preendorsement_a preendorsement_b
     in
@@ -328,7 +324,8 @@ end = struct
     in
     Context.get_bakers (B blk_a) >>=? fun bakers ->
     let baker = Context.get_first_different_baker delegate bakers in
-    Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+    Context.Delegate.full_balance (B blk_a) baker
+    >>=? fun (_full_balance : Tez.t) ->
     Block.bake
       ~policy:(By_account baker)
       ~operations:[operation; operation2]

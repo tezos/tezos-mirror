@@ -103,16 +103,25 @@ val base_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run node] launches the given smart contract rollup node. *)
-val run : t -> unit Lwt.t
+(** [run node arguments ] launches the given smart contract rollup node
+    with the given arguments . *)
+val run : t -> string list -> unit Lwt.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Send SIGTERM to a sc node and wait for it to terminate. With [kill] set,
-    a SIGKILL is sent instead of a SIGTERM. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Returns [None] if node is already terminated or returns the node process if
+    it still running. *)
+val process : t -> Process.t option
+
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** Run [octez-sc-rollup-node-alpha config init ?loser_mode rollup_address].
     Returns the name of the resulting configuration file. *)
@@ -151,9 +160,11 @@ val wait_for_ready : t -> unit Lwt.t
    passed. *)
 val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
 
-(** [import sc_node ~pvm_name ~filename] makes the contents of
-    [filename] available as raw data chunks to the rollup assuming
-    that it runs according to a given [pvm_name].
-    Returns the hash of the first of these chunks.
-    The implementation is PVM-dependent. *)
-val import : t -> pvm_name:string -> filename:string -> string Lwt.t
+(** [wait_for ?where sc_node event_name filter] waits for the SCORU node
+    [sc_node] to emit an event named [name] (usually this is the name the event
+    is declared with, concatenated with [".v0"]). [wait_for] continues to wait
+    until an event which satisfies the [filter] (i.e. for which the function
+    returns [Some _]) is produced, in which case the result of the filter is
+    returned. [where], if present, should describe the constraint that [filter]
+    applies. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t

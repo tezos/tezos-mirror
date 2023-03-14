@@ -195,14 +195,14 @@ let test_wrapper =
   in
   let init = "{" ^ String.concat ";" entries_s ^ "}" in
   let* _ =
-    Client.originate_contract
-      ~alias:"originated_contract_advanced"
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_all.tz"
       ~init
       ~burn_cap:Tez.(of_int 9999999)
       client
+      ["mini_scenarios"; "big_map_all"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* actual_all_values =

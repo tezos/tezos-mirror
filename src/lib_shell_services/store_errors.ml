@@ -25,8 +25,10 @@
 
 type error +=
   | Block_not_found of {hash : Block_hash.t; distance : int}
+  | Resulting_context_hash_not_found of {hash : Block_hash.t; level : int32}
   | Bad_level of {head_level : Int32.t; given_level : Int32.t}
   | Block_metadata_not_found of Block_hash.t
+  | Protocol_not_found of {protocol_level : int}
   | Cannot_switch_history_mode of {
       previous_mode : History_mode.t;
       next_mode : History_mode.t;
@@ -44,7 +46,7 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"store.not_found"
+    ~id:"store.block_not_found"
     ~title:"Block not found"
     ~description:"Block not found"
     ~pp:(fun ppf (block_hash, distance) ->
@@ -55,10 +57,28 @@ let () =
         Block_hash.pp
         block_hash)
     Data_encoding.(
-      obj1 (req "block_not_found" @@ tup2 Block_hash.encoding int8))
+      obj1 (req "block_not_found" @@ tup2 Block_hash.encoding int31))
     (function
       | Block_not_found {hash; distance} -> Some (hash, distance) | _ -> None)
     (fun (hash, distance) -> Block_not_found {hash; distance}) ;
+  register_error_kind
+    `Permanent
+    ~id:"store.resulting_context_hash_not_found"
+    ~title:"Resulting context hash not found"
+    ~description:"Resulting context hash not found"
+    ~pp:(fun ppf (block_hash, level) ->
+      Format.fprintf
+        ppf
+        "Cannot find the resulting context hash for the block %a (level: %ld)."
+        Block_hash.pp
+        block_hash
+        level)
+    Data_encoding.(
+      obj1 (req "block_not_found" @@ tup2 Block_hash.encoding int32))
+    (function
+      | Resulting_context_hash_not_found {hash; level} -> Some (hash, level)
+      | _ -> None)
+    (fun (hash, level) -> Resulting_context_hash_not_found {hash; level}) ;
   register_error_kind
     `Permanent
     ~id:"store.bad_level"
@@ -92,7 +112,18 @@ let () =
     (fun block_hash -> Block_metadata_not_found block_hash) ;
   register_error_kind
     `Permanent
-    ~id:"node_config_file.cannot_switch_history_mode"
+    ~id:"store.protocol_not_found"
+    ~title:"Protocol not found"
+    ~description:"Protocol not found"
+    ~pp:(fun ppf protocol_level ->
+      Format.fprintf ppf "Unable to find protocol %d." protocol_level)
+    Data_encoding.(obj1 (req "protocol_level" int31))
+    (function
+      | Protocol_not_found {protocol_level} -> Some protocol_level | _ -> None)
+    (fun protocol_level -> Protocol_not_found {protocol_level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"config_file.cannot_switch_history_mode"
     ~title:"Cannot switch history mode"
     ~description:"Cannot switch history mode."
     ~pp:(fun ppf (prev, next) ->
@@ -342,7 +373,6 @@ type error +=
   | Cannot_load_testchain of string
   | Missing_activation_block of Block_hash.t * Protocol_hash.t * History_mode.t
   | Inconsistent_protocol_commit_info of Block_hash.t * Protocol_hash.t
-  | Missing_stored_data of string
   | Failed_to_get_live_blocks of Block_hash.t
   | Target_mismatch
   | Bad_head_invariant
@@ -907,19 +937,6 @@ let () =
     (function
       | Inconsistent_protocol_commit_info (bh, ph) -> Some (bh, ph) | _ -> None)
     (fun (bh, ph) -> Inconsistent_protocol_commit_info (bh, ph)) ;
-  Error_monad.register_error_kind
-    `Temporary
-    ~id:"store.missing_stored_data"
-    ~title:"Missing stored data"
-    ~description:"Failed to load stored data"
-    ~pp:(fun ppf path ->
-      Format.fprintf
-        ppf
-        "Failed to load on-disk data: no corresponding data found in file %s."
-        path)
-    Data_encoding.(obj1 (req "path" string))
-    (function Missing_stored_data path -> Some path | _ -> None)
-    (fun path -> Missing_stored_data path) ;
   Error_monad.register_error_kind
     `Permanent
     ~id:"store.failed_to_get_live_blocks"

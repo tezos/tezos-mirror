@@ -116,7 +116,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -125,7 +125,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -134,7 +134,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
     end
@@ -145,7 +145,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -154,7 +154,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -163,7 +163,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
     end
@@ -174,7 +174,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
     end
@@ -191,12 +191,21 @@ val raw_bytes :
   JSON.t Lwt.t
 
 module Curl : sig
-  (** [get ()] returns [Some curl] where [curl ~url] returns the raw response obtained
-      by curl when requesting [url]. Returns [None] if [curl] cannot be found. *)
-  val get : unit -> (url:string -> JSON.t Lwt.t) option Lwt.t
+  (** [get url] returns a runnable requesting [url] with curl.
 
-  (** [post data] returns [Some curl] where [curl ~url data] returns the raw
-      response obtained by curl when posting the data to [url]. Returns [None] if
-      [curl] cannot be found. *)
-  val post : unit -> (url:string -> JSON.t -> JSON.t Lwt.t) option Lwt.t
+      The response is parsed and returned as JSON.
+
+      Fails if [curl] is not found in path.
+  *)
+  val get : ?args:string list -> string -> JSON.t Runnable.process
+
+  (** Same as [get] but does not parse the returned value *)
+  val get_raw : ?args:string list -> string -> string Runnable.process
+
+  (** [post url data] returns a runnable posting [data] to [url] with curl.
+
+      The response is parsed and returned as JSON.
+
+      Fails if [curl] is not found in path. *)
+  val post : ?args:string list -> string -> JSON.t -> JSON.t Runnable.process
 end

@@ -32,9 +32,9 @@ struct
   module Make
       (RPC_client : RPC_client.S) (P : sig
         val authenticate :
-          Signature.Public_key_hash.t list ->
+          Tezos_crypto.Signature.Public_key_hash.t list ->
           Bytes.t ->
-          Signature.t tzresult Lwt.t
+          Tezos_crypto.Signature.t tzresult Lwt.t
 
         val logger : RPC_client.logger
       end) =
@@ -106,7 +106,9 @@ struct
             let path = String.sub path 0 i in
             return (Uri.with_path uri path, pkh)
       in
-      let* pkh = Lwt.return (Signature.Public_key_hash.of_b58check pkh) in
+      let* pkh =
+        Lwt.return (Tezos_crypto.Signature.Public_key_hash.of_b58check pkh)
+      in
       return (base, pkh)
 
     let public_key uri =
@@ -130,7 +132,7 @@ struct
     let public_key_hash uri =
       let open Lwt_result_syntax in
       let* pk = public_key uri in
-      return (Signature.Public_key.hash pk, Some pk)
+      return (Tezos_crypto.Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 
@@ -164,7 +166,7 @@ struct
         match watermark with
         | None -> msg
         | Some watermark ->
-            Bytes.cat (Signature.bytes_of_watermark watermark) msg
+            Bytes.cat (Tezos_crypto.Signature.bytes_of_watermark watermark) msg
       in
       let* signature = get_signature base pkh msg in
       RPC_client.call_service
@@ -221,7 +223,7 @@ struct
       in
       match r with
       | Ok ans -> return ans
-      | Error (RPC_context.Not_found _ :: _) -> return_false
+      | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_false
       | Error _ as res -> Lwt.return res
   end
 

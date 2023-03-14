@@ -3,12 +3,12 @@ Command Line Interface
 **********************
 
 This document is a prettier output of the documentation produced by
-the command ``man`` of the different Tezos binaries. You can obtain similar pages
-using shell commands such as (:ref:`indicating the appropriate protocol <tezos_client_protocol>`):
+the command ``man`` of the different Octez binaries. You can obtain similar pages
+using shell commands such as (:ref:`indicating the appropriate protocol <octez_client_protocol>`):
 
 ::
 
-   tezos-client -protocol <protocol_hash> man -verbosity 3
+   octez-client -protocol <protocol_hash> man -verbosity 3
 
 The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
@@ -20,7 +20,7 @@ Client manual
 =============
 
 .. raw:: html
-         :file: tezos-client.html
+         :file: octez-client.html
 
 
 .. _baker_manual_alpha:
@@ -29,7 +29,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker.html
+         :file: octez-baker.html
 
 
 .. _accuser_manual_alpha:
@@ -38,4 +38,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser.html
+         :file: octez-accuser.html

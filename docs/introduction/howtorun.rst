@@ -1,6 +1,6 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-How to run Tezos
+How to run Octez
 ================
 
 In this section, we discuss how to take part in the protocol that runs
@@ -12,7 +12,7 @@ The second way allows to participate more actively in the protocol, by baking bl
 
 To learn more about the protocol refer to :doc:`this page <../active/protocol_overview>`.
 
-No matter how you decide to run Tezos, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
+No matter how you decide to run Octez, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
 This is especially important for bakers, as baking nodes desynchronized from the correct time of day have caused operational problems in the past by "baking in the future".
 
 .. _delegating_coins:
@@ -30,7 +30,7 @@ achieved by the following command:
 
 ::
 
-   tezos-client set delegate for <implicit_account> to <delegate>
+   octez-client set delegate for <implicit_account> to <delegate>
 
 where ``<implicit_account>`` is the address or alias of the implicit
 account to delegate and ``<delegate>`` is the address or alias of the
@@ -40,7 +40,7 @@ To stop a delegation, the following command can be used:
 
 ::
 
-   tezos-client withdraw delegate from <implicit_account>
+   octez-client withdraw delegate from <implicit_account>
 
 
 
@@ -50,7 +50,7 @@ origination using the ``--delegate`` option:
 
 ::
 
-    tezos-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script> --delegate <delegate> --burn-cap <cap>
+    octez-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script> --delegate <delegate> --burn-cap <cap>
 
 
 Once the contract is originated, the only way to stop or modify its
@@ -101,7 +101,7 @@ frozen deposits with the following command:
 
 ::
 
-   tezos-client set deposits limit for <delegate> to <limit>
+   octez-client set deposits limit for <delegate> to <limit>
 
 
 On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
@@ -119,7 +119,7 @@ Register and check your rights
 To run a delegate, you first need to register as one using
 your implicit account::
 
-   tezos-client register key bob as delegate
+   octez-client register key bob as delegate
 
 Once registered, you need to wait ``preserved_cycles + 2 = 7`` cycles
 for your rights to be considered.
@@ -129,7 +129,7 @@ cycle, up to 5 cycles in the future.
 
 ::
 
-   tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1_xxxxxxxxxxx\&max_round=2
+   octez-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1_xxxxxxxxxxx\&max_round=2
 
 Sometimes there is no consensus at a round, so it is worth considering also
 baking rights at higher rounds, like 2 in the example above.
@@ -169,7 +169,7 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   tezos-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+   octez-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
@@ -186,8 +186,12 @@ Note that ``--liquidity-baking-toggle-vote`` must be placed
 
 .. note::
 
+   It is possible to bake and endorse using a dedicated :ref:`consensus_key` instead of the delegate's key.
+
+.. note::
+
    In protocols before Ithaca, a separate daemon, the endorser, is responsible for emitting endorsements.
-   In these protocols, one needs to run the daemon ``tezos-endorser-NNN-*`` to endorse.
+   In these protocols, one needs to run the daemon ``octez-endorser-NNN-*`` to endorse.
 
 Accuser
 ~~~~~~~
@@ -205,7 +209,7 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
 ::
 
-   tezos-accuser-alpha run
+   octez-accuser-alpha run
 
 
 Docker
@@ -217,14 +221,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-014-PtKathma``, you can
+For instance, if the name is ``mainnet_baker-PtLimaPt``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-014-PtKathma
+    docker logs mainnet_baker-PtLimaPt
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-014-PtKathma -f
+    docker logs mainnet_baker-PtLimaPt -f
 
 This allows you to know if you baked.
 You should see lines such as::

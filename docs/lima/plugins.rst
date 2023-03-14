@@ -35,6 +35,7 @@ In turn protocol plugins may, for example:
 - implement some common operations that are customized for each
   protocol (e.g., :ref:`prevalidator_filters_lima`).
 
+.. _prevalidator_filters:
 .. _prevalidator_filters_lima:
 
 Prevalidator filters
@@ -54,6 +55,7 @@ The interface of the prevalidator plugin is described at the :package-api:`mempo
 
 The different kinds of prevalidator filters are described below.
 
+.. _fees_filter:
 .. _fees_filter_lima:
 
 Fees filter
@@ -71,6 +73,7 @@ configuration of your node.
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
+.. _consensus_filter:
 .. _consensus_filter_lima:
 
 Consensus filter
@@ -102,13 +105,21 @@ This filtering strategy is implemented in the ``prefilter`` (see
 Prechecking of manager operations
 .................................
 
+.. FIXME tezos/tezos#3938:
+
+   This section doesn't make much sense after the pipelining project
+   has plugged validate into the plugin for Lima. Parts of this
+   section be integrated into plugin.rst, and the relevant definitions
+   should point to the validation entry.
+
 The aim of the ``precheck`` filter is to avoid fully executing manager operations
 before deciding whether to gossip them to the network.
 
 The detailed description of this feature is given in
 :doc:`./precheck`. For operations other than manager operations, the
-``precheck`` filter is a no-op, which entails that these operations need to be
-fully executed to decide their propagation (see :doc:`../shell/prevalidation`).
+``precheck`` filter is a no-op, which entails that these operations
+need to be fully executed to decide their propagation (see
+:doc:`../shell/prevalidation`).
 
 
 One manager operation per manager per block
@@ -120,11 +131,6 @@ increased the chain's fitness), only one operation per manager is propagated.
 All other received operations originating from the same manager will be classified
 as ``Branch_delayed`` and will not be propagated.
 
-This criterion is used only by the prevalidator to decide the propagation of
-operations. A baker can still include several operations originating from the same
-manager in a single block, provided that it gets them in time (note that they can be
-propagated by nodes using different versions or implementations).
-
 Alternatively, a user can inject an operation with the same
 manager and the same counter, but with a higher fee to replace an already existing
 operation in the prevalidator. Only one of the two operations will be eventually
@@ -134,11 +140,11 @@ by a factor (currently fixed to 5%). In case of successful replacement, the old
 operation is re-classified as ``Outdated``.
 
 Concretely, a user can replace a successfully prechecked manager operation in the
-mempool, with the help of ``tezos-client``, using two methods :
+mempool, with the help of ``octez-client``, using two methods :
 
 - manually provide a higher fee to bump the "fee/gas limit" ratio by at least 5% for the new
   operation,
-- via option ``--replace``: In this case, ``tezos-client`` will automatically
+- via option ``--replace``: In this case, ``octez-client`` will automatically
   compute the minimal amount of fee for the second operation to be able to
   replace the one in the mempool.
 
@@ -198,6 +204,7 @@ to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
 
+.. _active_filter_rpc:
 .. _active_filter_rpc_lima:
 
 Filters RPCs
@@ -223,9 +230,9 @@ The following parameters can be thus inspected and modified:
 For example, each command below modifies the provided parameter and resets all
 the others to their default values::
 
-   tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
-   tezos-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
-   tezos-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
 
 Changing filters default configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

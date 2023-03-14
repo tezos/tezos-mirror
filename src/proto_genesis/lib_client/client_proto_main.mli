@@ -30,5 +30,5 @@ val bake :
   ?timestamp:Time.Protocol.t ->
   Shell_services.block ->
   Data.Command.t ->
-  Client_keys.sk_uri ->
+  Client_keys_v0.sk_uri ->
   Block_hash.t tzresult Lwt.t

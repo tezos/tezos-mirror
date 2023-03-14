@@ -33,20 +33,17 @@ open Client_proto_rollups
 open Client_keys
 open Client_proto_args
 
-let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
-    ~origination_level =
+let save_zk_rollup ~force (cctxt : #Client_context.full) alias_name rollup =
   let open Lwt_result_syntax in
-  let* () =
-    TxRollupAlias.add ~force cctxt alias_name {rollup; origination_level}
-  in
-  let*! () = cctxt#message "Transaction rollup memorized as %s" alias_name in
+  let* () = EpoxyAlias.add ~force cctxt alias_name rollup in
+  let*! () = cctxt#message "Epoxy rollup memorized as %s" alias_name in
   return_unit
 
 let encrypted_switch =
-  Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
+  Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let normalize_types_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"normalize-types"
     ~doc:
       "Whether types should be normalized (annotations removed, combs \
@@ -80,39 +77,39 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> return_some data
 
 let block_hash_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try Lwt_result_syntax.return (Block_hash.of_b58check_exn s)
-      with _ -> failwith "Parameter '%s' is an invalid block hash" s)
+      with _ -> cctxt#error "Parameter '%s' is an invalid block hash" s)
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
-let tez_of_string_exn index field s =
+let tez_of_string_exn (cctxt : #Client_context.full) index field s =
   let open Lwt_result_syntax in
   match Tez.of_string s with
   | Some t -> return t
   | None ->
-      failwith
+      cctxt#error
         "Invalid \xEA\x9C\xA9 notation at entry %i, field \"%s\": %s"
         index
         field
         s
 
-let tez_of_opt_string_exn index field s =
-  Option.map_es (tez_of_string_exn index field) s
+let tez_of_opt_string_exn (cctxt : #Client_context.full) index field s =
+  Option.map_es (tez_of_string_exn cctxt index field) s
 
 let check_smart_contract = Managed_contract.check_smart_contract
 
 let commands_ro () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -297,9 +294,9 @@ let commands_ro () =
          contract (deprecated)."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ OriginatedContractAlias.destination_param
            ~name:"src"
@@ -327,13 +324,13 @@ let commands_ro () =
       ~desc:"Get a value in a big map."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "element"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"key"
            ~desc:"the key to look for"
-           (Clic.parameter (fun _ s ->
+           (Tezos_clic.parameter (fun _ s ->
                 Lwt_result_syntax.return (Script_expr_hash.of_b58check_exn s)))
       @@ prefixes ["of"; "big"; "map"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"big_map"
            ~desc:"identifier of the big_map"
            int_parameter
@@ -409,7 +406,7 @@ let commands_ro () =
       ~desc:"Get the type of an entrypoint of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"entrypoint"
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
@@ -516,6 +513,87 @@ let commands_ro () =
             in
             return_unit);
     command
+      ~group
+      ~desc:
+        "Get contract's balance of ticket with specified ticketer, content \
+         type, and content."
+      no_options
+      (prefixes ["get"; "ticket"; "balance"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"Source contract."
+      @@ prefixes ["with"; "ticketer"]
+      @@ ContractAlias.destination_param
+           ~name:"ticketer"
+           ~desc:"Ticketer contract of the ticket."
+      @@ prefixes ["and"; "type"]
+      @@ Tezos_clic.param
+           ~name:"ticket content type"
+           ~desc:"Type of the content of the ticket."
+           data_parameter
+      @@ prefixes ["and"; "content"]
+      @@ Tezos_clic.param
+           ~name:"ticket content"
+           ~desc:"Content of the ticket."
+           data_parameter
+      @@ stop)
+      (fun () contract ticketer content_type content cctxt ->
+        let open Lwt_result_syntax in
+        let* balance =
+          get_contract_ticket_balance
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+            Ticket_token.
+              {
+                ticketer;
+                contents_type = content_type.expanded;
+                contents = content.expanded;
+              }
+        in
+        let*! () = cctxt#answer "%a" Z.pp_print balance in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the complete list of tickets owned by a given contract."
+      no_options
+      (prefixes ["get"; "all"; "ticket"; "balances"; "for"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"Source contract."
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* ticket_balances =
+          get_contract_all_ticket_balances
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        let pp_ticket_balance ppf
+            (Ticket_token.{ticketer; contents_type; contents}, amount) =
+          Format.fprintf
+            ppf
+            "@[<v 0>Ticketer: %a@,Content type: %a@,Content: %a@,Amount: %a@]"
+            Contract.pp
+            ticketer
+            Michelson_v1_printer.print_expr
+            contents_type
+            Michelson_v1_printer.print_expr
+            contents
+            Z.pp_print
+            amount
+        in
+        let*! () =
+          cctxt#answer
+            "%a"
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.@.")
+               pp_ticket_balance)
+            ticket_balances
+        in
+        return_unit);
+    command
       ~desc:"Get receipt for past operation"
       (args1
          (default_arg
@@ -528,9 +606,9 @@ let commands_ro () =
       @@ param
            ~name:"operation"
            ~desc:"Operation to be looked up"
-           (parameter (fun _ x ->
+           (parameter (fun (cctxt : #Client_context.full) x ->
                 match Operation_hash.of_b58check_opt x with
-                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | None -> cctxt#error "Invalid operation hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ stop)
       (fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
@@ -740,27 +818,27 @@ let commands_ro () =
 (* ----------------------------------------------------------------------------*)
 
 let dry_run_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"dry-run"
     ~short:'D'
     ~doc:"don't inject the operation, just display it"
     ()
 
 let verbose_signing_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose-signing"
     ~doc:"display extra information before signing the operation"
     ()
 
 let simulate_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"simulation"
     ~doc:
       "Simulate the execution of the command, without needing any signatures."
     ()
 
 let force_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"force"
     ~doc:
       "Inject the operation even if the simulation results in a failure. This \
@@ -876,8 +954,8 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
       cctxt
       batch.destination
   in
-  let* amount = tez_of_string_exn index "amount" batch.amount in
-  let* batch_fee = tez_of_opt_string_exn index "fee" batch.fee in
+  let* amount = tez_of_string_exn cctxt index "amount" batch.amount in
+  let* batch_fee = tez_of_opt_string_exn cctxt index "fee" batch.fee in
   let fee = Option.either batch_fee fee in
   let arg = Option.either batch.arg arg in
   let gas_limit = Option.either batch.gas_limit gas_limit in
@@ -914,7 +992,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   return (Annotated_manager_operation.Annotated_manager_operation operation)
 
 let commands_network network () =
-  let open Clic in
+  let open Tezos_clic in
   match network with
   | Some `Testnet | None ->
       [
@@ -924,42 +1002,28 @@ let commands_network network () =
           (args2 (Secret_key.force_switch ()) encrypted_switch)
           (prefixes ["activate"; "account"]
           @@ Secret_key.fresh_alias_param @@ prefixes ["with"]
-          @@ param
+          @@ Client_proto_args.json_encoded_param
                ~name:"activation_key"
                ~desc:
                  "Activate an Alphanet/Zeronet faucet account from the JSON \
                   (file or directly inlined)."
-               json_parameter
+               Client_proto_context.activation_key_encoding
           @@ stop)
-          (fun (force, encrypted) name activation_json cctxt ->
+          (fun (force, encrypted) name activation_key cctxt ->
             let open Lwt_result_syntax in
             let* name = Secret_key.of_fresh cctxt force name in
-            match
-              Data_encoding.Json.destruct
-                Client_proto_context.activation_key_encoding
-                activation_json
-            with
-            | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-                Format.kasprintf
-                  (fun s -> failwith "%s" s)
-                  "Invalid activation file: %a %a"
-                  (fun ppf -> Data_encoding.Json.print_error ppf)
-                  exn
-                  Data_encoding.Json.pp
-                  activation_json
-            | key ->
-                let* _res =
-                  activate_account
-                    cctxt
-                    ~chain:cctxt#chain
-                    ~block:cctxt#block
-                    ?confirmations:cctxt#confirmations
-                    ~encrypted
-                    ~force
-                    key
-                    name
-                in
-                return_unit);
+            let* _res =
+              activate_account
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~encrypted
+                ~force
+                activation_key
+                name
+            in
+            return_unit);
       ]
   | Some `Mainnet ->
       [
@@ -971,12 +1035,12 @@ let commands_network network () =
           @@ Public_key_hash.alias_param @@ prefixes ["with"]
           @@ param
                ~name:"code"
-               (Clic.parameter (fun _ctx code ->
+               (Tezos_clic.parameter (fun (cctxt : #Client_context.full) code ->
                     match
                       Blinded_public_key_hash.activation_code_of_hex code
                     with
                     | Some c -> Lwt_result_syntax.return c
-                    | None -> failwith "Hexadecimal parsing failure"))
+                    | None -> cctxt#error "Hexadecimal parsing failure"))
                ~desc:"Activation code obtained from the Tezos foundation."
           @@ stop)
           (fun dry_run (name, _pkh) code cctxt ->
@@ -997,7 +1061,7 @@ let commands_network network () =
 let commands_rw () =
   let open Client_proto_programs in
   let open Tezos_micheline in
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -1242,7 +1306,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "using"
-      @@ param
+      @@ json_encoded_param
            ~name:"transfers.json"
            ~desc:
              "List of operations originating from the source contract in JSON \
@@ -1251,7 +1315,30 @@ let commands_rw () =
               \"amount\": qty (, <field>: <val> ...) } (, ...) ]', where an \
               optional <field> can either be \"fee\", \"gas-limit\", \
               \"storage-limit\", \"arg\", or \"entrypoint\"."
-           json_parameter
+           ~pp_error:(fun json fmt exn ->
+             match (json, exn) with
+             | `A lj, Data_encoding.Json.Cannot_destruct ([`Index n], exn) ->
+                 Format.fprintf
+                   fmt
+                   "Invalid transfer at index %i: %a %a"
+                   n
+                   (fun ppf -> Data_encoding.Json.print_error ppf)
+                   exn
+                   (Format.pp_print_option Data_encoding.Json.pp)
+                   (List.nth_opt lj n)
+             | _, (Data_encoding.Json.Cannot_destruct _ as exn) ->
+                 Format.fprintf
+                   fmt
+                   "Invalid transfer file: %a %a"
+                   (fun ppf -> Data_encoding.Json.print_error ppf)
+                   exn
+                   Data_encoding.Json.pp
+                   json
+             | _, exn -> raise exn
+             (* this case can't happen because only `Cannot_destruct` error are
+                given to this pp *))
+           (Data_encoding.list
+              Client_proto_context.batch_transfer_operation_encoding)
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -1267,7 +1354,7 @@ let commands_rw () =
              entrypoint,
              replace_by_fees )
            source
-           operations_json
+           operations
            cctxt ->
         (* When --force is used we want to inject the transfer even if it fails.
            In that case we cannot rely on simulation to compute limits and fees
@@ -1298,13 +1385,8 @@ let commands_rw () =
             source
             i
         in
-        match
-          Data_encoding.Json.destruct
-            (Data_encoding.list
-               Client_proto_context.batch_transfer_operation_encoding)
-            operations_json
-        with
-        | [] -> failwith "Empty operation list"
+        match operations with
+        | [] -> cctxt#error "Empty operation list"
         | operations ->
             let* source =
               match source with
@@ -1350,33 +1432,240 @@ let commands_rw () =
                 cctxt
                 errors
             in
-            return_unit
-        | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
-          -> (
-            match (path, operations_json) with
-            | [`Index n], `A lj -> (
-                match List.nth_opt lj n with
-                | Some j ->
-                    failwith
-                      "Invalid transfer at index %i: %a %a"
-                      n
-                      (fun ppf -> Data_encoding.Json.print_error ppf)
-                      exn2
-                      Data_encoding.Json.pp
-                      j
-                | _ ->
-                    failwith
-                      "Invalid transfer at index %i: %a"
-                      n
-                      (fun ppf -> Data_encoding.Json.print_error ppf)
-                      exn2)
-            | _ ->
-                failwith
-                  "Invalid transfer file: %a %a"
-                  (fun ppf -> Data_encoding.Json.print_error ppf)
-                  exn
-                  Data_encoding.Json.pp
-                  operations_json));
+            return_unit);
+    command
+      ~group
+      ~desc:"Execute an Epoxy origination operation.\n"
+      (args13
+         force_switch
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         fee_parameter_args
+         default_entrypoint_arg
+         replace_by_fees_arg)
+      (prefixes ["originate"; "epoxy"]
+      @@ EpoxyAlias.fresh_alias_param
+           ~name:"epoxy"
+           ~desc:"Fresh name for an Epoxy rollup"
+      @@ prefix "from"
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "public_parameters"
+      @@ param
+           ~name:"public_parameters"
+           ~desc:"public_parameters"
+           Zk_rollup_params.plonk_public_parameters_parameter
+      @@ prefix "init_state"
+      @@ param
+           ~name:"init_state"
+           ~desc:"init_state"
+           Zk_rollup_params.state_parameter
+      @@ prefix "circuits_info"
+      @@ param
+           ~name:"circuits_info"
+           ~desc:"circuits_info"
+           Zk_rollup_params.circuits_info_parameter
+      @@ prefix "nb_ops"
+      @@ param ~name:"nb_ops" ~desc:"nb_ops" int_parameter
+      @@ stop)
+      (fun ( force,
+             fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             gas_limit,
+             storage_limit,
+             counter,
+             _arg,
+             _no_print_source,
+             fee_parameter,
+             _entrypoint,
+             _replace_by_fees )
+           alias
+           source
+           public_parameters
+           init_state
+           circuits_info
+           nb_ops
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, _, res =
+          zk_rollup_originate
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ~public_parameters
+            ~circuits_info
+            ~init_state
+            ~nb_ops
+            ()
+        in
+        let*? res =
+          match res with
+          | Apply_results.Manager_operation_result
+              {
+                operation_result =
+                  Apply_operation_result.Applied
+                    (Apply_results.Zk_rollup_origination_result
+                      {originated_zk_rollup; _});
+                _;
+              } ->
+              Ok originated_zk_rollup
+          | _ -> error_with "Epoxy rollup was not correctly originated"
+        in
+        let* alias_name = EpoxyAlias.of_fresh cctxt force alias in
+        save_zk_rollup ~force cctxt alias_name res);
+    command
+      ~group
+      ~desc:"Execute an Epoxy publish operation.\n"
+      (args12
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         fee_parameter_args
+         default_entrypoint_arg
+         replace_by_fees_arg)
+      (prefixes ["epoxy"; "publish"; "from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "rollup"
+      @@ param ~name:"rollup" ~desc:"rollup" Zk_rollup_params.address_parameter
+      @@ prefix "ops"
+      @@ param ~name:"ops" ~desc:"ops" Zk_rollup_params.operations_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             gas_limit,
+             storage_limit,
+             counter,
+             _arg,
+             _no_print_source,
+             fee_parameter,
+             _entrypoint,
+             _replace_by_fees )
+           source
+           zk_rollup
+           ops
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _res =
+          zk_rollup_publish
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ~zk_rollup
+            ~ops
+            ()
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Execute an Epoxy update operation.\n"
+      (args12
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         fee_parameter_args
+         default_entrypoint_arg
+         replace_by_fees_arg)
+      (prefixes ["epoxy"; "update"; "from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "rollup"
+      @@ param ~name:"rollup" ~desc:"rollup" Zk_rollup_params.address_parameter
+      @@ prefix "update"
+      @@ param ~name:"update" ~desc:"update" Zk_rollup_params.update_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             gas_limit,
+             storage_limit,
+             counter,
+             _arg,
+             _no_print_source,
+             fee_parameter,
+             _entrypoint,
+             _replace_by_fees )
+           source
+           zk_rollup
+           update
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _res =
+          zk_rollup_update
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ~zk_rollup
+            ~update
+            ()
+        in
+        return_unit);
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
@@ -1718,7 +2007,7 @@ let commands_rw () =
       (prefixes ["drain"; "delegate"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ Public_key_hash.source_param ~name:"dest" ~desc:"the consensus key"
       @@ stop)
       (fun (dry_run, verbose_signing) delegate_pkh consensus_pkh cctxt ->
         let open Lwt_result_syntax in
@@ -1746,9 +2035,11 @@ let commands_rw () =
       (prefixes ["drain"; "delegate"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the destination key"
+      @@ Public_key_hash.source_param ~name:"dest" ~desc:"the destination key"
       @@ prefixes ["with"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ Public_key_hash.source_param
+           ~name:"consensus_key"
+           ~desc:"the consensus key"
       @@ stop)
       (fun (dry_run, verbose_signing)
            delegate_pkh
@@ -1801,9 +2092,9 @@ let commands_rw () =
       @@ param
            ~name:"operation"
            ~desc:"Operation to be included"
-           (parameter (fun _ x ->
+           (parameter (fun (cctxt : #Client_context.full) x ->
                 match Operation_hash.of_b58check_opt x with
-                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | None -> cctxt#error "Invalid operation hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ prefixes ["to"; "be"; "included"]
       @@ stop)
@@ -1841,10 +2132,9 @@ let commands_rw () =
            (param
               ~name:"proposal"
               ~desc:"the protocol hash proposal to be submitted"
-              (parameter (fun _ x ->
+              (parameter (fun (cctxt : #Client_context.full) x ->
                    match Protocol_hash.of_b58check_opt x with
-                   | None ->
-                       Error_monad.failwith "Invalid proposal hash: '%s'" x
+                   | None -> cctxt#error "Invalid proposal hash: '%s'" x
                    | Some hash -> Lwt_result_syntax.return hash))))
       (fun (dry_run, verbose_signing, force)
            src_pkh
@@ -1996,7 +2286,7 @@ let commands_rw () =
                     |> String.map (function '\n' | '\t' -> ' ' | c -> c))
               | el -> cctxt#message "Error:@ %a" pp_print_trace el
             in
-            failwith "Failed to submit proposals");
+            cctxt#error "Failed to submit proposals");
     command
       ~group
       ~desc:"Submit a ballot"
@@ -2016,9 +2306,9 @@ let commands_rw () =
       @@ param
            ~name:"proposal"
            ~desc:"the protocol hash proposal to vote for"
-           (parameter (fun _ x ->
+           (parameter (fun (cctxt : #Client_context.full) x ->
                 match Protocol_hash.of_b58check_opt x with
-                | None -> failwith "Invalid proposal hash: '%s'" x
+                | None -> cctxt#error "Invalid proposal hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ param
            ~name:"ballot"
@@ -2026,14 +2316,14 @@ let commands_rw () =
            (parameter
               ~autocomplete:(fun _ ->
                 Lwt_result_syntax.return ["yea"; "nay"; "pass"])
-              (fun _ s ->
+              (fun (cctxt : #Client_context.full) s ->
                 let open Lwt_result_syntax in
                 (* We should have [Vote.of_string]. *)
                 match String.lowercase_ascii s with
                 | "yay" | "yea" -> return Vote.Yay
                 | "nay" -> return Vote.Nay
                 | "pass" -> return Vote.Pass
-                | s -> failwith "Invalid ballot: '%s'" s))
+                | s -> cctxt#error "Invalid ballot: '%s'" s))
       @@ stop)
       (fun (verbose_signing, dry_run, force)
            src_pkh
@@ -2252,575 +2542,9 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Launch a new transaction rollup."
-      (args8
-         force_switch
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg)
-      (prefixes ["originate"; "tx"; "rollup"]
-      @@ TxRollupAlias.fresh_alias_param
-           ~name:"tx_rollup"
-           ~desc:"Fresh name for a transaction rollup"
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"Account originating the transaction rollup."
-      @@ stop)
-      (fun ( force,
-             fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter )
-           alias
-           source
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* {level = head_level; _} =
-          Protocol_client_context.Alpha_block_services.Header.shell_header
-            cctxt
-            ()
-        in
-        let* _, _, res =
-          originate_tx_rollup
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ()
-        in
-        let*? res =
-          match res with
-          | Apply_results.Manager_operation_result
-              {
-                operation_result =
-                  Apply_operation_result.Applied
-                    (Apply_results.Tx_rollup_origination_result
-                      {originated_tx_rollup; _});
-                _;
-              } ->
-              Ok originated_tx_rollup
-          | _ -> error_with "transaction rollup was not correctly originated"
-        in
-        let* alias_name = TxRollupAlias.of_fresh cctxt force alias in
-        (* Approximate origination level, needs to be <= actual origination
-           level *)
-        let origination_level = Some head_level in
-        save_tx_rollup ~force cctxt alias_name res ~origination_level);
-    command
-      ~group
-      ~desc:"Submit a batch of transaction rollup operations."
-      (args7
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "batch"]
-      @@ Clic.param
-           ~name:"batch"
-           ~desc:
-             "Bytes representation (hexadecimal string) of the batch. Must be \
-              prefixed by '0x'."
-           bytes_parameter
-      @@ prefix "to"
-      @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup receiving the batch."
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"Account submitting the transaction rollup batches."
-      @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter )
-           content
-           tx_rollup
-           source
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          submit_tx_rollup_batch
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~tx_rollup
-            ~content:(Bytes.to_string content)
-            ()
-        in
-        return_unit);
-    command
-      ~group
       ~desc:
-        "Commit to a transaction rollup for an inbox and level.\n\n\
-         The provided list of message result hash must be ordered in the same \
-         way the messages were ordered in the inbox."
-      (args8
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg
-         (Tx_rollup.commitment_hash_arg
-            ~long:"predecessor-hash"
-            ~usage:
-              "Predecessor commitment hash, empty for the first commitment."
-            ()))
-      (prefixes ["commit"; "to"; "tx"; "rollup"]
-      @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Transaction rollup address committed to."
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"Account committing to the transaction rollup."
-      @@ prefixes ["for"; "level"]
-      @@ Tx_rollup.level_param ~usage:"Level used for the commitment."
-      @@ prefixes ["with"; "inbox"; "hash"]
-      @@ Tx_rollup.inbox_root_hash_param ~usage:"Inbox used for the commitment."
-      @@ prefixes ["and"; "messages"; "result"; "hash"]
-      @@ seq_of_param
-           (Tx_rollup.message_result_hash_param
-              ~usage:
-                "Message result hash of a message from the inbox being \
-                 committed."))
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter,
-             predecessor )
-           tx_rollup
-           source
-           level
-           inbox_merkle_root
-           messages
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          submit_tx_rollup_commitment
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~tx_rollup
-            ~level
-            ~inbox_merkle_root
-            ~messages
-            ~predecessor
-            ()
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Finalize a commitment of a transaction rollup."
-      (args7
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         storage_limit_arg
-         fee_parameter_args
-         simulate_switch
-         counter_arg)
-      (prefixes ["finalize"; "commitment"; "of"; "tx"; "rollup"]
-      @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have its commitment finalized."
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"Account finalizing the commitment."
-      @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             storage_limit,
-             fee_parameter,
-             simulation,
-             counter )
-           tx_rollup
-           source
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          submit_tx_rollup_finalize_commitment
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~tx_rollup
-            ()
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Recover commitment bond from a transaction rollup."
-      (args7
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg)
-      (prefixes ["recover"; "bond"; "of"]
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"Account that owns the bond."
-      @@ prefixes ["for"; "tx"; "rollup"]
-      @@ Tx_rollup.tx_rollup_address_param ~usage:"Tx rollup of the bond."
-      @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter )
-           source
-           tx_rollup
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          submit_tx_rollup_return_bond
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~tx_rollup
-            ()
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Remove a commitment from a transaction rollup."
-      (args7
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg)
-      (prefixes ["remove"; "commitment"; "of"; "tx"; "rollup"]
-      @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have its commitment removed."
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"name of the account removing the commitment."
-      @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter )
-           tx_rollup
-           source
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          submit_tx_rollup_remove_commitment
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~tx_rollup
-            ()
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Reject a commitment of a transaction rollup."
-      (args7
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg)
-      (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
-      @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have one of its commitment rejected."
-      @@ prefixes ["at"; "level"]
-      @@ Tx_rollup.level_param ~usage:"Level of the commitment disputed."
-      @@ prefixes ["with"; "result"; "hash"]
-      @@ Tx_rollup.message_result_hash_param
-           ~usage:"Disputed message result hash."
-      @@ prefixes ["and"; "result"; "path"]
-      @@ Tx_rollup.message_result_path_param
-           ~usage:"Disputed message result path."
-      @@ prefixes ["for"; "message"; "at"; "position"]
-      @@ Clic.param
-           ~name:"message position"
-           ~desc:
-             "Position of the message in the inbox with the result being \
-              disputed."
-           non_negative_parameter
-      @@ prefixes ["with"; "content"]
-      @@ Tx_rollup.message_param
-           ~usage:"Message content with the result being disputed."
-      @@ prefixes ["and"; "path"]
-      @@ Tx_rollup.message_path_param
-           ~usage:"Path of the message with the result being disputed."
-      @@ prefixes ["with"; "agreed"; "context"; "hash"]
-      @@ Tx_rollup.context_hash_param
-           ~usage:
-             (Format.sprintf
-                "@[Context hash of the precedent message result in the \
-                 commitment.@,\
-                 @[This must be the context hash of the last message result \
-                 agreed on.@]@]")
-      @@ prefixes ["and"; "withdraw"; "list"; "hash"]
-      @@ Tx_rollup.withdraw_list_hash_param
-           ~usage:
-             (Format.sprintf
-                "@[Withdraw list hash of the precedent message result in the \
-                 commitment.@,\
-                 @[This must be the withdraw list hash of the last message \
-                 result agreed on.@]@]")
-      @@ prefixes ["and"; "result"; "path"]
-      @@ Tx_rollup.message_result_path_param
-           ~usage:"Precedent message result path."
-      @@ prefixes ["using"; "proof"]
-      @@ Tx_rollup.proof_param
-           ~usage:
-             "Proof that the disputed message result provided is incorrect."
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"Account rejecting the commitment."
-      @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter )
-           tx_rollup
-           level
-           rejected_message_result_hash
-           rejected_message_result_path
-           conflicting_message_position
-           conflicting_message
-           conflicting_message_path
-           previous_context_hash
-           previous_withdraw_list_hash
-           previous_message_result_path
-           proof
-           source
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          submit_tx_rollup_rejection
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~tx_rollup
-            ~level
-            ~message:conflicting_message
-            ~message_position:conflicting_message_position
-            ~message_path:conflicting_message_path
-            ~message_result_hash:rejected_message_result_hash
-            ~message_result_path:rejected_message_result_path
-            ~proof
-            ~previous_context_hash
-            ~previous_withdraw_list_hash
-            ~previous_message_result_path
-            ()
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:
-        "Dispatch tickets withdrawn from a transaction rollup to owners. The \
-         withdrawals are part of a finalized commitment of the transaction \
-         rollup. Owners are implicit accounts who can then transfer the \
-         tickets to smart contracts using the \"transfer tickets\" command. \
-         See transaction rollups documentation for more information.\n\n\
-         The provided list of ticket information must be ordered as in \
-         withdrawal list computed by the application of the message."
-      (args7
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args
-         storage_limit_arg
-         counter_arg)
-      (prefixes ["dispatch"; "tickets"; "of"; "tx"; "rollup"]
-      @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup which have some tickets dispatched."
-      @@ prefix "from"
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"source"
-           ~desc:"Account used to dispatch tickets."
-      @@ prefixes ["at"; "level"]
-      @@ Tx_rollup.level_param
-           ~usage:
-             "Level of the finalized commitment that includes the message \
-              result whose withdrawals will be dispatched."
-      @@ prefixes ["for"; "the"; "message"; "at"; "index"]
-      @@ Clic.param
-           ~name:"message index"
-           ~desc:"Index of the message whose withdrawals will be dispatched."
-           non_negative_parameter
-      @@ prefixes ["with"; "the"; "context"; "hash"]
-      @@ Tx_rollup.context_hash_param
-           ~usage:
-             "Context hash of the message result in the commitment whose \
-              withdrawals will be dispatched."
-      @@ prefixes ["and"; "path"]
-      @@ Tx_rollup.message_result_path_param
-           ~usage:
-             "Path of the message result whose withdrawals will be dispatched."
-      @@ prefixes ["and"; "tickets"; "info"]
-      @@ seq_of_param
-           (Tx_rollup.tickets_dispatch_info_param
-              ~usage:"Information needed to dispatch tickets to its owner."))
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             fee_parameter,
-             storage_limit,
-             counter )
-           tx_rollup
-           source
-           level
-           message_position
-           context_hash
-           message_result_path
-           tickets_info
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          tx_rollup_dispatch_tickets
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~level
-            ~context_hash
-            ~message_position
-            ~message_result_path
-            ~tickets_info
-            ~tx_rollup
-            ()
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Transfer tickets from an implicit account to a contract."
+        "Transfer tickets from an implicit account to a contract or another \
+         implicit account."
       (args7
          fee_arg
          dry_run_switch
@@ -2840,17 +2564,19 @@ let commands_rw () =
            ~name:"recipient contract"
            ~desc:"Contract receiving the tickets."
       @@ prefixes ["with"; "entrypoint"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"entrypoint"
-           ~desc:"Entrypoint to use on the receiving contract."
+           ~desc:
+             "Entrypoint to use on the receiving contract or implicit account. \
+              Needs to be \"default\" for implicit account destinations."
            entrypoint_parameter
       @@ prefixes ["and"; "contents"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"tickets content"
            ~desc:"Content of the tickets."
            Client_proto_args.string_parameter
       @@ prefixes ["and"; "type"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"tickets type"
            ~desc:"Type of the tickets."
            Client_proto_args.string_parameter
@@ -2906,7 +2632,7 @@ let commands_rw () =
         | None -> cctxt#error "ticket quantity should not be zero or negative");
     command
       ~group
-      ~desc:"Originate a new smart-contract rollup."
+      ~desc:"Originate a new smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -2915,26 +2641,26 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg)
-      (prefixes ["originate"; "sc"; "rollup"; "from"]
+      (prefixes ["originate"; "smart"; "rollup"; "from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
-           ~desc:"Name of the account originating the smart-contract rollup."
+           ~desc:"Name of the account originating the smart rollup."
       @@ prefixes ["of"; "kind"]
       @@ param
-           ~name:"sc_rollup_kind"
-           ~desc:"Kind of the smart-contract rollup to be originated."
+           ~name:"smart_rollup_kind"
+           ~desc:"Kind of the smart rollup to be originated."
            Sc_rollup_params.rollup_kind_parameter
       @@ prefixes ["of"; "type"]
       @@ param
            ~name:"parameters_type"
            ~desc:
-             "The interface of the smart-contract rollup including its \
-              entrypoints and their signatures."
+             "The interface of the smart rollup including its entrypoints and \
+              their signatures."
            data_parameter
-      @@ prefixes ["booting"; "with"]
+      @@ prefixes ["with"; "kernel"]
       @@ param
-           ~name:"boot_sector"
-           ~desc:"The initialization state for the smart-contract rollup."
+           ~name:"kernel"
+           ~desc:"The kernel for the smart rollup."
            Sc_rollup_params.boot_sector_parameter
       @@ stop)
       (fun ( fee,
@@ -2945,13 +2671,13 @@ let commands_rw () =
              storage_limit,
              counter )
            source
-           pvm
+           kind
            parameters_ty
            boot_sector
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
+        let (Packed (module R) as pvm) = Sc_rollup.Kind.pvm_of kind in
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
         let* boot_sector = boot_sector pvm in
@@ -2971,7 +2697,7 @@ let commands_rw () =
             ~src_pk
             ~src_sk
             ~fee_parameter
-            ~kind:(Sc_rollup.Kind.of_pvm pvm)
+            ~kind
             ~boot_sector
             ~parameters_ty
             ()
@@ -2979,43 +2705,40 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Send one or more messages to a smart-contract rollup."
-      (args7
+      ~desc:"Send one or more messages to a smart rollup."
+      (args8
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          fee_parameter_args
+         gas_limit_arg
          storage_limit_arg
          counter_arg)
-      (prefixes ["send"; "sc"; "rollup"; "message"]
+      (prefixes ["send"; "smart"; "rollup"; "message"]
       @@ param
            ~name:"messages"
            ~desc:
              "The message(s) to be sent to the rollup (syntax: \
-              bin:<path_to_binary_file>|text:<json list of string \
+              bin:<path_to_binary_file>|text:<json list of raw string \
+              messages>|hex:<json list of hex-encoded \
               messages>|file:<json_file>)."
            Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
-      @@ prefixes ["to"]
-      @@ param
-           ~name:"dst"
-           ~desc:"Address of the destination smart-contract rollup."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
              verbose_signing,
              simulation,
              fee_parameter,
+             gas_limit,
              storage_limit,
              counter )
            messages
            source
-           rollup
            cctxt ->
         let open Lwt_result_syntax in
         let* messages =
@@ -3024,9 +2747,23 @@ let commands_rw () =
           | `Json messages -> (
               match Data_encoding.(Json.destruct (list string) messages) with
               | exception _ ->
-                  failwith
+                  cctxt#error
                     "Could not read list of messages (expected list of bytes)"
-              | messages -> return messages)
+              | "raw" :: messages -> return messages
+              | "hex" :: messages ->
+                  let* messages =
+                    List.map_es
+                      (fun message ->
+                        match Hex.to_string (`Hex message) with
+                        | None ->
+                            cctxt#error
+                              "'%s' is not a valid hex encoded message"
+                              message
+                        | Some msg -> return [msg])
+                      messages
+                  in
+                  return @@ List.flatten messages
+              | _messages -> assert false)
         in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =
@@ -3037,12 +2774,12 @@ let commands_rw () =
             ?dry_run:(Some dry_run)
             ?verbose_signing:(Some verbose_signing)
             ?fee
+            ?gas_limit
             ?storage_limit
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
             ~source
-            ~rollup
             ~messages
             ~src_pk
             ~src_sk
@@ -3052,7 +2789,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Publish a commitment for a sc rollup"
+      ~desc:"Publish a commitment for a smart rollup"
       (args7
          fee_arg
          dry_run_switch
@@ -3066,17 +2803,15 @@ let commands_rw () =
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
-      @@ prefixes ["for"; "sc"; "rollup"]
-      @@ param
-           ~name:"sc_rollup"
+      @@ prefixes ["for"; "smart"; "rollup"]
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
-             "The address of the sc rollup where the commitment will be \
+             "The address of the smart rollup where the commitment will be \
               published."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"; "compressed"; "state"]
       @@ param
            ~name:"compressed_state"
-           ~desc:"The compressed state of the sc rollup for the commitment."
+           ~desc:"The compressed state of the smart rollup for the commitment."
            Sc_rollup_params.compressed_state_parameter
       @@ prefixes ["at"; "inbox"; "level"]
       @@ param
@@ -3136,7 +2871,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Cement a commitment for a sc rollup."
+      ~desc:"Cement a commitment for a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3148,19 +2883,17 @@ let commands_rw () =
       (prefixes ["cement"; "commitment"]
       @@ param
            ~name:"commitment"
-           ~desc:"The hash of the commitment to be cemented for a sc rollup."
+           ~desc:"The hash of the commitment to be cemented for a smart rollup."
            Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
-      @@ prefixes ["for"; "sc"; "rollup"]
-      @@ param
-           ~name:"sc_rollup"
+      @@ prefixes ["for"; "smart"; "rollup"]
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
-             "The address of the sc rollup where the commitment will be \
+             "The address of the smart rollup of which the commitment will be \
               cemented."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3198,7 +2931,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Timeout a staker from dispute on a smart-contract rollup."
+      ~desc:"Timeout a staker from dispute on a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3207,17 +2940,19 @@ let commands_rw () =
          storage_limit_arg
          counter_arg
          fee_parameter_args)
-      (prefixes ["timeout"; "dispute"; "on"; "sc"; "rollup"]
-      @@ param
-           ~name:"sc_rollup"
+      (prefixes ["timeout"; "dispute"; "on"; "smart"; "rollup"]
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
-             "The address of the smart-contract rollup where the staker of the \
-              dispute has timed-out."
-           Sc_rollup_params.sc_rollup_address_parameter
+             "The address of the smart rollup where the staker of the dispute \
+              has timed-out."
       @@ prefixes ["with"]
       @@ Client_keys.Public_key_hash.source_param
-           ~name:"staker"
-           ~desc:"One of the players involved in the dispute."
+           ~name:"staker1"
+           ~desc:"The staker that has timed out."
+      @@ prefixes ["against"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"staker2"
+           ~desc:"The opponent of this staker."
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
@@ -3231,20 +2966,29 @@ let commands_rw () =
              counter,
              fee_parameter )
            rollup
-           staker
+           staker1
+           staker2
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* game_info =
-          Plugin.RPC.Sc_rollup.ongoing_refutation_game
+        let* games =
+          Plugin.RPC.Sc_rollup.ongoing_refutation_games
             cctxt
             (cctxt#chain, cctxt#block)
             rollup
-            staker
-            ()
+            staker1
         in
         let* alice, bob =
-          match game_info with
+          let* answer =
+            List.find_es
+              (fun (_, alice, bob) ->
+                let stakers = Sc_rollup.Game.Index.make staker1 staker2 in
+                return
+                  Signature.Public_key_hash.(
+                    alice = stakers.alice && bob = stakers.bob))
+              games
+          in
+          match answer with
           | None ->
               cctxt#error
                 "Couldn't find an ongoing dispute for this staker on this \
@@ -3276,9 +3020,9 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"List originated smart-contract rollups."
+      ~desc:"List originated smart rollups."
       no_options
-      (prefixes ["list"; "sc"; "rollups"] @@ stop)
+      (prefixes ["list"; "smart"; "rollups"] @@ stop)
       (fun () (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
         let* rollups =
@@ -3294,7 +3038,7 @@ let commands_rw () =
     command
       ~group
       ~desc:
-        "Execute a message from a smart-contract rollup's outbox of a cemented \
+        "Execute a message from a smart rollup's outbox of a cemented \
          commitment."
       (args7
          fee_arg
@@ -3304,13 +3048,9 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg)
-      (prefixes ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"]
-      @@ param
-           ~name:"rollup"
-           ~desc:
-             "The address of the smart-contract rollup where the message \
-              resides."
-           Sc_rollup_params.sc_rollup_address_parameter
+      (prefixes ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"]
+      @@ Sc_rollup_params.sc_rollup_address_param
+           ~desc:"The address of the smart rollup where the message resides."
       @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
@@ -3365,7 +3105,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Recover commitment bond from a smart contract rollup."
+      ~desc:"Recover commitment bond from a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3376,13 +3116,15 @@ let commands_rw () =
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
       @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
+           ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
-      @@ prefixes ["for"; "sc"; "rollup"]
-      @@ Clic.param
-           ~name:"smart contract rollup address"
-           ~desc:"The address of the smart-contract rollup of the bond."
-           Sc_rollup_params.sc_rollup_address_parameter
+      @@ prefixes ["for"; "smart"; "rollup"]
+      @@ Sc_rollup_params.sc_rollup_address_param
+           ~desc:"The address of the smart rollup of the bond."
+      @@ prefixes ["from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"The implicit account that triggers the operation."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3391,8 +3133,9 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter )
-           source
+           staker
            sc_rollup
+           source
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -3413,6 +3156,7 @@ let commands_rw () =
             ~src_sk
             ~fee_parameter
             ~sc_rollup
+            ~staker
             ()
         in
         return_unit);

@@ -54,7 +54,7 @@ let pk_json (alias, _pkh, pk) =
 *)
 
 let sk_of_pk (pk_s : string) : string =
-  let open Tezos_crypto.Signature in
+  let open Tezos_crypto.Signature.V_latest in
   let pk = Public_key.of_b58check_exn pk_s in
   let pk_b = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
   let sk_b = Bytes.sub pk_b 0 33 in
@@ -202,6 +202,11 @@ let get_delegates (module P : Sigs.PROTOCOL) context
         let*? updated_staking_balance_acc =
           P.Tez.(staking_balance_acc +? staking_balance)
         in
+        let staking_balance_info =
+          ( P.Signature.To_latest.public_key_hash pkh,
+            P.Signature.To_latest.public_key pk,
+            staking_balance )
+        in
         (* Filter deactivated bakers if required *)
         if active_bakers_only then
           let* b = P.Delegate.deactivated ctxt pkh in
@@ -211,12 +216,11 @@ let get_delegates (module P : Sigs.PROTOCOL) context
           (* Consider the baker. *)
           | false ->
               return
-                ( (pkh, pk, staking_balance) :: key_list_acc,
+                ( staking_balance_info :: key_list_acc,
                   updated_staking_balance_acc )
         else
           return
-            ( (pkh, pk, staking_balance) :: key_list_acc,
-              updated_staking_balance_acc ))
+            (staking_balance_info :: key_list_acc, updated_staking_balance_acc))
   in
   return
   @@ filter_up_to_staking_share staking_share_opt total_stake P.Tez.to_mutez
@@ -302,8 +306,8 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
   return
   @@ List.mapi
        (fun i (pkh, pk, stake) ->
-         let pkh = Signature.Public_key_hash.to_b58check pkh in
-         let pk = Signature.Public_key.to_b58check pk in
+         let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+         let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
          let alias =
            List.find_map
              (fun (alias, pkh', _) ->

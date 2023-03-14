@@ -30,103 +30,265 @@
    Subject:      Checks client wallet commands
 *)
 
-let check_shown_account ~__LOC__ (expected : Account.aggregate_key)
-    (shown : Account.aggregate_key) =
-  if expected.aggregate_public_key_hash <> shown.aggregate_public_key_hash then
-    Test.fail
-      ~__LOC__
-      "Expecting %s, got %s as public key hash from the client "
-      expected.aggregate_public_key_hash
-      shown.aggregate_public_key_hash
-  else if expected.aggregate_public_key <> shown.aggregate_public_key then
-    Test.fail
-      ~__LOC__
-      "Expecting %s, got %s as public key from the client "
-      expected.aggregate_public_key
-      shown.aggregate_public_key
-  else if expected.aggregate_secret_key <> shown.aggregate_secret_key then
-    let (Unencrypted sk) = shown.aggregate_secret_key in
-    let (Unencrypted expected_sk) = shown.aggregate_secret_key in
-    Test.fail
-      ~__LOC__
-      "Expecting %s, got %s as secret key from the client "
-      expected_sk
-      sk
-  else return ()
+module BLS_aggregate_wallet = struct
+  let check_shown_account ~__LOC__ (expected : Account.aggregate_key)
+      (shown : Account.aggregate_key) =
+    if expected.aggregate_public_key_hash <> shown.aggregate_public_key_hash
+    then
+      Test.fail
+        ~__LOC__
+        "Expecting %s, got %s as public key hash from the client "
+        expected.aggregate_public_key_hash
+        shown.aggregate_public_key_hash
+    else if expected.aggregate_public_key <> shown.aggregate_public_key then
+      Test.fail
+        ~__LOC__
+        "Expecting %s, got %s as public key from the client "
+        expected.aggregate_public_key
+        shown.aggregate_public_key
+    else if expected.aggregate_secret_key <> shown.aggregate_secret_key then
+      let (Unencrypted sk) = shown.aggregate_secret_key in
+      let (Unencrypted expected_sk) = shown.aggregate_secret_key in
+      Test.fail
+        ~__LOC__
+        "Expecting %s, got %s as secret key from the client "
+        expected_sk
+        sk
+    else return ()
 
-let test_bls_import_secret_key () =
-  Test.register
-    ~__FILE__
-    ~tags:["client"; "keys"]
-    ~title:"Import BLS secret key"
-    (fun () ->
-      let* client = Client.init () in
-      let* () = Client.bls_import_secret_key Constant.tz4_account client in
-      let* shown_account =
-        Client.bls_show_address
-          ~alias:Constant.tz4_account.Account.aggregate_alias
-          client
-      in
-      check_shown_account ~__LOC__ Constant.tz4_account shown_account)
-
-let test_bls_show_address () =
-  Test.register
-    ~__FILE__
-    ~tags:["client"; "keys"]
-    ~title:"Shows the address of a registered BLS account"
-    (fun () ->
-      let* client = Client.init () in
-      let* () = Client.bls_import_secret_key Constant.tz4_account client in
-      let* shown_account =
-        Client.bls_show_address
-          ~alias:Constant.tz4_account.Account.aggregate_alias
-          client
-      in
-      check_shown_account ~__LOC__ Constant.tz4_account shown_account)
-
-let test_bls_gen_keys () =
-  Test.register
-    ~__FILE__
-    ~tags:["client"; "keys"]
-    ~title:"Generates new tz4 keys"
-    (fun () ->
-      let* client = Client.init () in
-      let* alias = Client.bls_gen_keys client in
-      let* _account = Client.bls_show_address ~alias client in
-      return ())
-
-let test_bls_list_keys () =
-  Test.register
-    ~__FILE__
-    ~tags:["client"; "keys"]
-    ~title:"Lists known BLS aliases in the client"
-    (fun () ->
-      let* client = Client.init () in
-      let Account.{aggregate_alias; aggregate_public_key_hash; _} =
-        Constant.tz4_account
-      in
-      let* () = Client.bls_import_secret_key Constant.tz4_account client in
-      let* maybe_keys = Client.bls_list_keys client in
-      let expected_keys = [(aggregate_alias, aggregate_public_key_hash)] in
-      if List.equal ( = ) expected_keys maybe_keys then return ()
-      else
-        let pp ppf l =
-          Format.pp_print_list
-            ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
-            (fun ppf (a, k) -> Format.fprintf ppf "%s: %s" a k)
-            ppf
-            l
+  let test_bls_import_secret_key () =
+    Test.register
+      ~__FILE__
+      ~tags:["aggregate"; "client"; "keys"]
+      ~title:"Import BLS secret key in aggregate wallet"
+      (fun () ->
+        let* client = Client.init () in
+        let* () =
+          Client.bls_import_secret_key Constant.aggregate_tz4_account client
         in
-        Test.fail
+        let* shown_account =
+          Client.bls_show_address
+            ~alias:Constant.aggregate_tz4_account.Account.aggregate_alias
+            client
+        in
+        check_shown_account
           ~__LOC__
-          "Expecting\n@[%a@]\ngot\n@[%a@]\nas keys from the client "
-          pp
-          expected_keys
-          pp
-          maybe_keys)
+          Constant.aggregate_tz4_account
+          shown_account)
+
+  let test_bls_show_address () =
+    Test.register
+      ~__FILE__
+      ~tags:["aggregate"; "client"; "keys"]
+      ~title:"Shows the address of a registered BLS account in aggregate wallet"
+      (fun () ->
+        let* client = Client.init () in
+        let* () =
+          Client.bls_import_secret_key Constant.aggregate_tz4_account client
+        in
+        let* shown_account =
+          Client.bls_show_address
+            ~alias:Constant.aggregate_tz4_account.Account.aggregate_alias
+            client
+        in
+        check_shown_account
+          ~__LOC__
+          Constant.aggregate_tz4_account
+          shown_account)
+
+  let test_bls_gen_keys () =
+    Test.register
+      ~__FILE__
+      ~tags:["aggregate"; "client"; "keys"]
+      ~title:"Generates new tz4 keys in aggregate wallet"
+      (fun () ->
+        let* client = Client.init () in
+        let* alias = Client.bls_gen_keys client in
+        let* _account = Client.bls_show_address ~alias client in
+        return ())
+
+  let test_bls_list_keys () =
+    Test.register
+      ~__FILE__
+      ~tags:["aggregate"; "client"; "keys"]
+      ~title:"Lists known BLS aliases in the client's aggregate wallet"
+      (fun () ->
+        let* client = Client.init () in
+        let Account.{aggregate_alias; aggregate_public_key_hash; _} =
+          Constant.aggregate_tz4_account
+        in
+        let* () =
+          Client.bls_import_secret_key Constant.aggregate_tz4_account client
+        in
+        let* maybe_keys = Client.bls_list_keys client in
+        let expected_keys = [(aggregate_alias, aggregate_public_key_hash)] in
+        if List.equal ( = ) expected_keys maybe_keys then return ()
+        else
+          let pp ppf l =
+            Format.pp_print_list
+              ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+              (fun ppf (a, k) -> Format.fprintf ppf "%s: %s" a k)
+              ppf
+              l
+          in
+          Test.fail
+            ~__LOC__
+            "Expecting\n@[%a@]\ngot\n@[%a@]\nas keys from the client "
+            pp
+            expected_keys
+            pp
+            maybe_keys)
+
+  let register_protocol_independent () =
+    test_bls_import_secret_key () ;
+    test_bls_show_address () ;
+    test_bls_gen_keys () ;
+    test_bls_list_keys ()
+end
+
+module BLS_normal_wallet = struct
+  let check_shown_account ~__LOC__ (expected : Account.key)
+      (shown : Account.key) =
+    if expected.public_key_hash <> shown.public_key_hash then
+      Test.fail
+        ~__LOC__
+        "Expecting %s, got %s as public key hash from the client "
+        expected.public_key_hash
+        shown.public_key_hash
+    else if expected.public_key <> shown.public_key then
+      Test.fail
+        ~__LOC__
+        "Expecting %s, got %s as public key from the client "
+        expected.public_key
+        shown.public_key
+    else if expected.secret_key <> shown.secret_key then
+      let (Unencrypted sk) = shown.secret_key in
+      let (Unencrypted expected_sk) = shown.secret_key in
+      Test.fail
+        ~__LOC__
+        "Expecting %s, got %s as secret key from the client "
+        expected_sk
+        sk
+    else return ()
+
+  let test_bls_import_secret_key () =
+    Test.register
+      ~__FILE__
+      ~tags:["bls"; "client"; "keys"]
+      ~title:"Import BLS secret key"
+      (fun () ->
+        let* client = Client.init () in
+        let* () = Client.import_secret_key client Constant.tz4_account in
+        let* shown_account =
+          Client.show_address ~alias:Constant.tz4_account.Account.alias client
+        in
+        check_shown_account ~__LOC__ Constant.tz4_account shown_account)
+
+  let test_bls_show_address () =
+    Test.register
+      ~__FILE__
+      ~tags:["bls"; "client"; "keys"]
+      ~title:"Shows the address of a registered BLS account"
+      (fun () ->
+        let* client = Client.init () in
+        let* () = Client.import_secret_key client Constant.tz4_account in
+        let* shown_account =
+          Client.show_address ~alias:Constant.tz4_account.Account.alias client
+        in
+        check_shown_account ~__LOC__ Constant.tz4_account shown_account)
+
+  let test_bls_gen_keys () =
+    Test.register
+      ~__FILE__
+      ~tags:["bls"; "client"; "keys"]
+      ~title:"Generates new tz4 keys"
+      (fun () ->
+        let* client = Client.init () in
+        let* alias = Client.gen_keys ~sig_alg:"bls" client in
+        let* _account = Client.show_address ~alias client in
+        return ())
+
+  let register_protocol_independent () =
+    test_bls_import_secret_key () ;
+    test_bls_show_address () ;
+    test_bls_gen_keys ()
+end
+
+module Wallet = struct
+  let test_duplicate_alias () =
+    Test.register
+      ~__FILE__
+      ~tags:["client"; "keys"; "duplicate"]
+      ~title:"Add a duplicate address"
+    @@ fun () ->
+    let* client = Client.init () in
+    let* (_ : string) = Client.gen_keys client ~alias:"foo" in
+    let* account_foo = Client.show_address client ~alias:"foo" in
+    let msg =
+      rex
+        "this public key hash is already aliased as foo, use --force to insert \
+         duplicate"
+    in
+    let* () =
+      Client.spawn_add_address client ~alias:"baz" ~src:account_foo.alias
+      |> Process.check_error ~msg
+    in
+    let* () =
+      Client.spawn_add_address
+        client
+        ~alias:"baz"
+        ~src:account_foo.public_key_hash
+      |> Process.check_error ~msg
+    in
+    let* _alias2 =
+      Client.add_address client ~force:true ~alias:"baz" ~src:"foo"
+    in
+    (* Check that we can read the secret key of [foo],
+       and that the original [foo] is equal to [baz]
+       (modulo the alias) *)
+    let* account_foo2 = Client.show_address ~alias:"foo" client in
+    let* account_baz = Client.show_address ~alias:"baz" client in
+    Check.(
+      (account_foo = account_foo2)
+        Account.key_typ
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    Check.(
+      (account_foo = {account_baz with alias = "foo"})
+        Account.key_typ
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    return ()
+
+  let test_remember_contract =
+    Protocol.register_test
+      ~__FILE__
+      ~tags:["client"; "contract"; "remember"]
+      ~title:"Test remember contract"
+    @@ fun protocol ->
+    let* client = Client.init_mockup ~protocol () in
+    [
+      ("test", "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc");
+      ("test-2", "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9");
+    ]
+    |> Lwt_list.iter_s @@ fun (alias, address) ->
+       let* () = Client.remember_contract client ~alias ~address in
+       let* () = Client.remember_contract client ~force:true ~alias ~address in
+       let* () =
+         Client.spawn_remember_contract client ~alias ~address
+         |> Process.check_error
+              ~msg:(rex ("The contract alias " ^ alias ^ " already exists"))
+       in
+       unit
+
+  let register_protocol_independent () = test_duplicate_alias ()
+
+  let register protocols = test_remember_contract protocols
+end
 
 let register_protocol_independent () =
-  test_bls_import_secret_key () ;
-  test_bls_show_address () ;
-  test_bls_gen_keys () ;
-  test_bls_list_keys ()
+  BLS_aggregate_wallet.register_protocol_independent () ;
+  BLS_normal_wallet.register_protocol_independent () ;
+  Wallet.register_protocol_independent ()
+
+let register ~protocols = Wallet.register protocols

@@ -39,8 +39,8 @@ tokens (and be the destinations of transactions).
 
   - An implicit account is a non programmable account, whose tokens
     are spendable and delegatable by a public key. Its address is
-    directly the public key hash, and starts with ``tz1``, ``tz2`` or
-    ``tz3``.
+    directly the public key hash, and starts with ``tz1``, ``tz2``,
+    ``tz3`` or ``tz4``.
   - A smart contract is a programmable account. A transaction to such
     an address can provide data, and can fail for reasons decided by
     its Michelson code. Its address is a unique hash that depends on
@@ -50,8 +50,7 @@ From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
 always succeed to receive tokens, and does nothing else.
 
-Another kind of addresses, prefixed by ``txr1`` and ``tz4``, are
-related to :doc:`transaction rollups <./transaction_rollups>`.
+Finally, addresses prefixed with ``scr1`` identify smart rollups.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -507,217 +506,35 @@ Core instructions
 Control structures
 ~~~~~~~~~~~~~~~~~~
 
--  ``FAILWITH``: Explicitly abort the current program.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : \_   ->   \_
-
-This special instruction aborts the current program exposing the top
-element of the stack in its error message (first rule below). It makes
-the output useless since all subsequent instructions will simply
-ignore their usual semantics to propagate the failure up to the main
-result (second rule below). Its type is thus completely generic.
-
-::
-
-    > FAILWITH / a : _  =>  [FAILED]
-    > _ / [FAILED]  =>  [FAILED]
-
--  ``{}``: Empty sequence.
-
-::
-
-    :: 'A   ->   'A
-
-    > {} / SA  =>  SA
-
--  ``{ I ; C }``: Sequence.
-
-::
-
-    :: 'A   ->   'C
-       iff   I :: [ 'A -> 'B ]
-             C :: [ 'B -> 'C ]
-
-    > I ; C / SA  =>  SC
-        where   I / SA  =>  SB
-        and   C / SB  =>  SC
-
--  ``IF bt bf``: Conditional branching.
-
-::
-
-    :: bool : 'A   ->   'B
-       iff   bt :: [ 'A -> 'B ]
-             bf :: [ 'A -> 'B ]
-
-    > IF bt bf / True : S  =>  bt / S
-    > IF bt bf / False : S  =>  bf / S
-
--  ``LOOP body``: A generic loop.
-
-::
-
-    :: bool : 'A   ->   'A
-       iff   body :: [ 'A -> bool : 'A ]
-
-    > LOOP body / True : S  =>  body ; LOOP body / S
-    > LOOP body / False : S  =>  S
-
--  ``LOOP_LEFT body``: A loop with an accumulator.
-
-::
-
-    :: (or 'a 'b) : 'A   ->  'b : 'A
-       iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
-
-    > LOOP_LEFT body / (Left a) : S  =>  body ; LOOP_LEFT body / a : S
-    > LOOP_LEFT body / (Right b) : S  =>  b : S
-
--  ``DIP code``: Runs code protecting the top element of the stack.
-
-::
-
-    :: 'b : 'A   ->   'b : 'C
-       iff   code :: [ 'A -> 'C ]
-
-    > DIP code / x : S  =>  x : S'
-        where    code / S  =>  S'
-
--  ``DIP n code``: Runs code protecting the ``n`` topmost elements of
-   the stack. In particular, ``DIP 0 code`` is equivalent to ``code``
-   and ``DIP 1 code`` is equivalent to ``DIP code``.
-
-::
-
-    :: 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'B
-       iff   code :: [ 'A -> 'B ]
-
-    > DIP n code / x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : S'
-        where    code / S  =>  S'
-
--  ``EXEC``: Execute a function from the stack.
-
-::
-
-    :: 'a : lambda 'a 'b : 'C   ->   'b : 'C
-
-    > EXEC / a : f : S  =>  r : S
-        where f / a : []  =>  r : []
-
--  ``APPLY``: Partially apply a tuplified function from the stack.
-   Values that are not both pushable and storable
-   (values of type ``operation``, ``contract _`` and ``big map _ _``)
-   cannot be captured by ``APPLY`` (cannot appear in ``'a``).
-
-::
-
-    :: 'a : lambda (pair 'a 'b) 'c : 'C   ->   lambda 'b 'c : 'C
-
-    > APPLY / a : f : S  => { PUSH 'a a ; PAIR ; f } : S
+-  ``FAILWITH``: Explicitly abort the current program (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH>`__).
+-  ``{}``: Empty sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOOP>`__).
+-  ``{ I ; C }``: Sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SEQ>`__).
+-  ``IF bt bf``: Conditional branching (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF>`__).
+-  ``LOOP body``: A generic loop (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP>`__).
+-  ``LOOP_LEFT body``: A loop with an accumulator (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP_LEFT>`__).
+-  ``DIP code``: Runs code protecting the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIP>`__).
+-  ``DIP n code``: Runs code protecting the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIPN>`__).
+-  ``EXEC``: Execute a function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EXEC>`__).
+-  ``APPLY``: Partially apply a tuplified function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-APPLY>`__).
 
 Stack operations
 ~~~~~~~~~~~~~~~~
 
--  ``DROP``: Drop the top element of the stack.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: _ : 'A   ->   'A
-
-    > DROP / _ : S  =>  S
-
-- ``DROP n``: Drop the `n` topmost elements of the stack. In
-  particular, ``DROP 0`` is a noop and ``DROP 1`` is equivalent to
-  ``DROP``.
-
-::
-
-   :: 'a{1} : ... : 'a{n} : 'A   ->   'A
-
-   > DROP n / x{1} : ... : x{n} : S  =>  S
-
--  ``DUP``: Duplicate the top element of the stack.
-
-::
-
-    :: 'a : 'A   ->   'a : 'a : 'A
-
-    > DUP / x : S  =>  x : x : S
-
--  ``DUP n``: Duplicate the N-th element of the stack. `DUP 1` is equivalent to `DUP`. `DUP 0` is rejected.
-
-::
-
-    DUP 1 :: 'a : 'A   ->   'a : 'a : 'A
-
-    DUP (n+1) :: 'a : 'A   ->   'b : 'a : 'A
-        iff DUP n :: 'A   ->    'b : 'A
-
-    > DUP 1 / x : S  =>  x : x : S
-
-    > DUP (n+1) / x : S  =>  y : x : S
-      iff DUP n / S  =>  y : S
-
-
--  ``SWAP``: Exchange the top two elements of the stack.
-
-::
-
-    :: 'a : 'b : 'A   ->   'b : 'a : 'A
-
-    > SWAP / x : y : S  =>  y : x : S
-
+-  ``DROP``: Drop the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DROP>`__).
+- ``DROP n``: Drop the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DROPN>`__).
+-  ``DUP``: Duplicate the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__).
+-  ``DUP n``: Duplicate the ``n``-th element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUPN>`__).
+-  ``SWAP``: Exchange the top two elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SWAP>`__).
 - ``DIG n``: Take the element at depth ``n`` of the stack and move it
-  on top. The element on top of the stack is at depth ``0`` so that
-  ``DIG 0`` is a no-op and ``DIG 1`` is equivalent to ``SWAP``.
-
-::
-
-    :: 'a{1} : ... : 'a{n} : 'b : 'A   ->   'b : 'a{1} : ... : 'a{n} : 'A
-
-    > DIG n / x{1} : ... : x{n} : y : S  =>  y : x{1} : ... : x{n} : S
-
-- ``DUG n``: Place the element on top of the stack at depth ``n``. The
-  element on top of the stack is at depth ``0`` so that ``DUG 0`` is a
-  no-op and ``DUG 1`` is equivalent to ``SWAP``.
-
-::
-
-    :: 'b : 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'b : 'A
-
-    > DUG n / y : x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : y : S
-
--  ``PUSH 'a x``: Push a constant value of a given type onto the stack.
-
-::
-
-    :: 'A   ->   'a : 'A
-       iff   x :: 'a
-
-    > PUSH 'a x / S  =>  x : S
-
--  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return
-   type `'b` onto the stack.
-
-::
-
-    :: 'A ->  (lambda 'a 'b) : 'A
-
-    > LAMBDA _ _ code / S  =>  code : S
-
-- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the
-   code, recursively, with the given parameter type `'a` and return
-   a value of type `'b` onto the stack (if it terminates before gas
-   exhaustion).
-
-::
-
-    :: 'A ->  (lambda 'a 'b) : 'A
-       iff code::'a: (lambda 'a 'b):[] -> 'b:[]
-
-    > LAMBDA_REC 'a 'b code / S  => {LAMBDA_REC 'a 'b code; code} : S
+  on top (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIG>`__).
+- ``DUG n``: Place the element on top of the stack at depth ``n`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUG>`__).
+-  ``PUSH 'a x``: Push a constant value of a given type onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PUSH>`__).
+-  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type ``'a`` and return type ``'b`` onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA>`__).
+- ``LAMBDA_REC 'a 'b code``: Push a recursive lambda onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA_REC>`__).
 
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
@@ -730,71 +547,16 @@ result of ``COMPARE`` is ``0`` if the top two elements of the stack are
 equal, negative if the first element in the stack is less than the
 second, and positive otherwise.
 
--  ``EQ``: Checks that the top element of the stack is equal to zero.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > EQ / 0 : S  =>  True : S
-    > EQ / v : S  =>  False : S
-        iff v <> 0
-
--  ``NEQ``: Checks that the top element of the stack is not equal to zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > NEQ / 0 : S  =>  False : S
-    > NEQ / v : S  =>  True : S
-        iff v <> 0
-
--  ``LT``: Checks that the top element of the stack is less than zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > LT / v : S  =>  True : S
-        iff  v < 0
-    > LT / v : S  =>  False : S
-        iff v >= 0
-
--  ``GT``: Checks that the top element of the stack is greater than zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > GT / v : S  =>  C / True : S
-        iff  v > 0
-    > GT / v : S  =>  C / False : S
-        iff v <= 0
-
+-  ``EQ``: Checks that the top element of the stack is equal to zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EQ>`__).
+-  ``NEQ``: Checks that the top element of the stack is not equal to zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEQ>`__).
+-  ``LT``: Checks that the top element of the stack is less than zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LT>`__).
+-  ``GT``: Checks that the top element of the stack is greater than zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GT>`__).
 -  ``LE``: Checks that the top element of the stack is less than or equal to
-   zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > LE / v : S  =>  True : S
-        iff  v <= 0
-    > LE / v : S  =>  False : S
-        iff v > 0
-
+   zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LE>`__).
 -  ``GE``: Checks that the top of the stack is greater than or equal to
-   zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > GE / v : S  =>  True : S
-        iff  v >= 0
-    > GE / v : S  =>  False : S
-        iff v < 0
+   zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GE>`__).
 
 Operations
 ----------
@@ -802,327 +564,61 @@ Operations
 Operations on unit
 ~~~~~~~~~~~~~~~~~~
 
--  ``UNIT``: Push a unit value onto the stack.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'A   ->   unit : 'A
-
-    > UNIT / S  =>  Unit : S
-
--  ``COMPARE``: Unit comparison
-
-::
-
-    :: unit : unit : 'S   ->   int : 'S
-
-    > COMPARE / Unit : Unit : S  =>  0 : S
+-  ``UNIT``: Push a unit value onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNIT>`__).
+-  ``COMPARE``: Unit comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on type never
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The type ``never`` is the type of forbidden values. The most prominent
-scenario in which ``never`` is used is when implementing a contract
-template with no additional entrypoint. A contract template defines a set
-of basic entrypoints, and its ``parameter`` declaration contains a type
-variable for additional entrypoints in some branch of an union type, or
-wrapped inside an option type. Letting this type variable be ``never`` in
-a particular implementation indicates that the contract template has not
-been extended, and turns the branch in the code that processes the
-additional entrypoints into a forbidden branch.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-Values of type ``never`` cannot occur in a well-typed program. However,
-they can be abstracted in the ``parameter`` declaration of a contract---or
-by using the ``LAMBDA`` operation---thus indicating that the corresponding
-branches in the code are forbidden. The type ``never`` also plays a role
-when introducing values of union or option type with ``LEFT never``,
-``RIGHT never``, or ``NONE never``. In such cases, the created values can
-be inspected with the operations ``IF_LEFT``, ``IF_RIGHT``, or
-``IF_NONE``, and the corresponding branches in the code are forbidden
-branches.
-
--  ``NEVER``: Close a forbidden branch.
-
-::
-
-    :: never : 'A  ->  'B
-
-- ``COMPARE``: Trivial comparison on type ``never``
-
-::
-
-   :: never : never : 'S   ->   int : 'S
+-  ``NEVER``: Close a forbidden branch (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEVER>`__).
+-  ``COMPARE``: Trivial comparison on type ``never`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 
 Operations on booleans
 ~~~~~~~~~~~~~~~~~~~~~~
 
--  ``OR``
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: bool : bool : 'S   ->   bool : 'S
-
-    > OR / x : y : S  =>  (x | y) : S
-
--  ``AND``
-
-::
-
-    :: bool : bool : 'S   ->   bool : 'S
-
-    > AND / x : y : S  =>  (x & y) : S
-
--  ``XOR``
-
-::
-
-    :: bool : bool : 'S   ->   bool : 'S
-
-    > XOR / x : y : S  =>  (x ^ y) : S
-
--  ``NOT``
-
-::
-
-    :: bool : 'S   ->   bool : 'S
-
-    > NOT / x : S  =>  ~x : S
-
--  ``COMPARE``: Boolean comparison
-
-::
-
-    :: bool : bool : 'S   ->   int : 'S
-
-    > COMPARE / False : False : S  =>  0 : S
-    > COMPARE / False : True : S  =>  -1 : S
-    > COMPARE / True : False : S  =>  1 : S
-    > COMPARE / True : True : S  =>  0 : S
+-  ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
+-  ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
+-  ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
+-  ``NOT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
+-  ``COMPARE``: Boolean comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on integers and natural numbers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Integers and naturals are arbitrary-precision, meaning that the only size
-limit is gas.
-
--  ``NEG``
-
-::
-
-    :: int : 'S   ->   int : 'S
-    :: nat : 'S   ->   int : 'S
-
-    > NEG / x : S  =>  -x : S
-
--  ``ABS``
-
-::
-
-    :: int : 'S   ->   nat : 'S
-
-    > ABS / x : S  =>  abs (x) : S
-
--  ``ISNAT``
-
-::
-
-    :: int : 'S   ->   option nat : 'S
-
-    > ISNAT / x : S  =>  Some (x) : S
-       iff x >= 0
-
-    > ISNAT / x : S  =>  None : S
-       iff x < 0
-
--  ``INT``
-
-::
-
-    :: nat : 'S   ->   int : 'S
-
-    > INT / x : S  =>  x : S
-
--  ``ADD``
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: int : nat : 'S   ->   int : 'S
-    :: nat : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > ADD / x : y : S  =>  (x + y) : S
-
--  ``SUB``
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: int : nat : 'S   ->   int : 'S
-    :: nat : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   int : 'S
-
-    > SUB / x : y : S  =>  (x - y) : S
-
--  ``MUL``
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: int : nat : 'S   ->   int : 'S
-    :: nat : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > MUL / x : y : S  =>  (x * y) : S
-
--  ``EDIV``: Perform Euclidean division
-
-::
-
-    :: int : int : 'S   ->   option (pair int nat) : 'S
-    :: int : nat : 'S   ->   option (pair int nat) : 'S
-    :: nat : int : 'S   ->   option (pair int nat) : 'S
-    :: nat : nat : 'S   ->   option (pair nat nat) : 'S
-
-    > EDIV / x : 0 : S  =>  None : S
-    > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
-        iff y <> 0
-
-Bitwise logical operators are also available on unsigned integers.
-
--  ``OR``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > OR / x : y : S  =>  (x | y) : S
-
--  ``AND``: (also available when the top operand is signed)
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-    :: int : nat : 'S   ->   nat : 'S
-
-    > AND / x : y : S  =>  (x & y) : S
-
--  ``XOR``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > XOR / x : y : S  =>  (x ^ y) : S
-
--  ``NOT``: Two's complement
-
-::
-
-    :: nat : 'S   ->   int : 'S
-    :: int : 'S   ->   int : 'S
-
-    > NOT / x : S  =>  ~x : S
-
-
-The return type of ``NOT`` is an ``int`` and not a ``nat``.  This is
-because the sign is also negated. The resulting integer is computed
-using two's complement. For instance, the boolean negation of ``0`` is
-``-1``. To get a natural back, a possibility is to use ``AND`` with an
-unsigned mask afterwards.
-
-
--  ``LSL``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > LSL / x : s : S  =>  (x << s) : S
-        iff   s <= 256
-    > LSL / x : s : S  =>  [FAILED]
-        iff   s > 256
-
--  ``LSR``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > LSR / x : s : S  =>  (x >> s) : S
-        iff   s <= 256
-    > LSR / x : s : S  =>  [FAILED]
-        iff   s > 256
-
--  ``COMPARE``: Integer/natural comparison
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   int : 'S
-
-    > COMPARE / x : y : S  =>  -1 : S
-        iff x < y
-    > COMPARE / x : y : S  =>  0 : S
-        iff x = y
-    > COMPARE / x : y : S  =>  1 : S
-        iff x > y
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
+-  ``NEG`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEG>`__).
+-  ``ABS`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ABS>`__).
+-  ``ISNAT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ISNAT>`__).
+-  ``INT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
+-  ``ADD`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``SUB`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
+-  ``MUL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
+-  ``EDIV``: Perform Euclidean division (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EDIV>`__).
+-  ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
+-  ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
+-  ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
+-  ``NOT``: Two's complement (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
+-  ``LSL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSL>`__).
+-  ``LSR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSR>`__).
+-  ``COMPARE``: Integer/natural comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
 
-Strings are mostly used for naming things without having to rely on
-external ID databases. They are restricted to the printable subset of
-7-bit ASCII, plus some escaped characters (see section on
-constants). So what can be done is basically use string constants as
-is, concatenate or splice them, and use them as keys.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-
--  ``CONCAT``: String concatenation.
-
-::
-
-    :: string : string : 'S   -> string : 'S
-
-    > CONCAT / s : t : S  =>  (s ^ t) : S
-
-    :: string list : 'S   -> string : 'S
-
-    > CONCAT / {} : S  =>  "" : S
-    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
-       where CONCAT / { <ss> } : S  =>  r : S
-
--  ``SIZE``: number of characters in a string.
-
-::
-
-     :: string : 'S   ->   nat : 'S
-
--  ``SLICE``: String access.
-
-::
-
-    :: nat : nat : string : 'S   ->  option string : 'S
-
-    > SLICE / offset : length : s : S  =>  Some ss : S
-       where ss is the substring of s at the given offset and of the given length
-         iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  None  : S
-         iff offset or (offset + length) are out of bounds
-
--  ``COMPARE``: Lexicographic comparison.
-
-::
-
-    :: string : string : 'S   ->   int : 'S
-
-    > COMPARE / s : t : S  =>  -1 : S
-        iff s < t
-    > COMPARE / s : t : S  =>  0 : S
-        iff s = t
-    > COMPARE / s : t : S  =>  1 : S
-        iff s > t
+-  ``CONCAT``: String concatenation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
+-  ``SIZE``: number of characters in a string (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``SLICE``: String access (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
+-  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on pairs and right combs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1891,7 +1387,9 @@ optional delegate, the initial amount taken from the current
 contract, and the initial storage of the originated contract.
 The contract is returned as a first class value (to be dropped, passed
 as parameter or stored). The ``CONTRACT 'p`` instruction will fail
-until it is actually originated.
+until it is actually originated. Note that since ``tz4`` addresses
+cannot be registered as delegates, the origination operation will fail
+if the delegate is a ``tz4``.
 
 -  ``TRANSFER_TOKENS``: Forge a transaction.
 
@@ -1917,6 +1415,7 @@ key hash of a registered delegate that is not the current delegate of
 the contract, then this operation sets the delegate of the contract to
 this registered delegate. The operation fails if ``kh`` is the current
 delegate of the contract or if ``kh`` is not a registered delegate.
+Note that ``tz4`` addresses cannot be registered as delegates.
 
 -  ``BALANCE``: Push the current amount of mutez held by the executing
    contract, including any mutez added by the calling transaction.
@@ -2136,6 +1635,95 @@ the wild and untyped outside world.
     > COMPARE / s : t : S  =>  1 : S
         iff s > t
 
+Bitwise logical operators are also available on bytes.
+
+-  ``OR``
+
+::
+
+    :: bytes : bytes : 'S   ->   bytes : 'S
+
+    > OR / x : y : S  =>  (x | y) : S
+
+-  ``AND``
+
+::
+
+    :: bytes : bytes : 'S   ->   bytes : 'S
+
+    > AND / x : y : S  =>  (x & y) : S
+
+-  ``XOR``
+
+::
+
+    :: bytes : bytes : 'S   ->   bytes : 'S
+
+    > XOR / x : y : S  =>  (x ^ y) : S
+
+-  ``NOT``
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
+    > NOT / x : S  =>  ~x : S
+
+Logical shifts are also available on bytes.
+
+-  ``LSL``
+
+::
+
+    :: bytes : nat : 'S   ->   bytes : 'S
+
+    > LSL / x : s : S  =>  (x << s) : S
+        iff   s <= 64000
+    > LSL / x : s : S  =>  [FAILED]
+        iff   s > 64000
+
+-  ``LSR``
+
+::
+
+    :: bytes : nat : 'S   ->   bytes : 'S
+
+    > LSR / x : s : S  =>  (x >> s) : S
+        iff   s <= 256
+    > LSR / x : s : S  =>  [FAILED]
+        iff   s > 256
+
+Bytes can be converted to natural numbers and integers.
+
+- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
+  The ``bytes`` are allowed to have leading zeros.
+  
+::
+
+    :: bytes : 'S   ->   nat : 'S
+
+    > NAT / s : S  =>  n : S
+        iff s is a big-endian encoding of natural number n
+
+- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
+  The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
+  
+::
+
+    :: bytes : 'S   ->   int : 'S
+
+    > INT / s : S  =>  z : S
+        iff s is a big-endian encoding of integer z
+  
+- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
+
+::
+
+    :: int : 'S -> bytes : 'S
+    :: nat : 'S -> bytes : 'S
+
+    > BYTES / n : S => s : S
+       iff s is the shortest big-endian encoding of natural number or integer n
 
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2998,6 +2586,8 @@ The instructions which accept at most one variable annotation are:
    CAST
    RENAME
    CHAIN_ID
+   NAT
+   BYTES
 
 The instructions which accept at most two variable annotations are:
 
@@ -3014,7 +2604,7 @@ annotations will see only their top-most stack type elements annotated.
 
 ::
 
-   UNPAIR @fist @second
+   UNPAIR @first @second
    :: pair 'a 'b : 'S
       ->  @first 'a : @second 'b : 'S
 
@@ -3581,7 +3171,7 @@ data include not only a description of the action to perform but also
 the address of the multisig contract and a counter that gets
 incremented at each successful call to the contract.
 
-The multisig commands of :ref:`Tezos command line client <client_manual_alpha>`
+The multisig commands of :ref:`Octez command line client <client_manual_alpha>`
 use this
 smart contract. Moreover, `functional correctness of this contract has
 been verified
@@ -3823,6 +3413,8 @@ Full grammar
       | SPLIT_TICKET
       | JOIN_TICKETS
       | OPEN_CHEST
+      | BYTES
+      | NAT
     <type> ::=
       | <comparable type>
       | option <type>

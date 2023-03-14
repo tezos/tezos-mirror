@@ -7,29 +7,29 @@ emitted operations
 big_map diff
   
 trace
-  - location: 43 (remaining gas: 1039937.232 units remaining)
+  - location: 43 (just consumed gas: 62.768)
     [ (Pair (Right (Left (Right Unit))) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
-  - location: 43 (remaining gas: 1039937.222 units remaining)
+  - location: 43 (just consumed gas: 0.010)
     [ (Right (Left (Right Unit)))
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
-  - location: 44 (remaining gas: 1039937.222 units remaining)
+  - location: 44 (just consumed gas: 0)
     [ (Left (Right Unit))
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
-  - location: 60 (remaining gas: 1039937.222 units remaining)
+  - location: 60 (just consumed gas: 0)
     [ (Right Unit)
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
-  - location: 62 (remaining gas: 1039937.212 units remaining)
+  - location: 62 (just consumed gas: 0.010)
     [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))
       (Right Unit) ]
-  - location: 63 (remaining gas: 1039937.202 units remaining)
+  - location: 63 (just consumed gas: 0.010)
     [ (Right Unit) ]
-  - location: 60 (remaining gas: 1039937.187 units remaining)
+  - location: 60 (just consumed gas: 0.015)
     [ (Right Unit) ]
-  - location: 44 (remaining gas: 1039937.172 units remaining)
+  - location: 44 (just consumed gas: 0.015)
     [ (Right Unit) ]
-  - location: 151 (remaining gas: 1039937.162 units remaining)
+  - location: 151 (just consumed gas: 0.010)
     [ {}
       (Right Unit) ]
-  - location: 153 (remaining gas: 1039937.152 units remaining)
+  - location: 153 (just consumed gas: 0.010)
     [ (Pair {} (Right Unit)) ]
 

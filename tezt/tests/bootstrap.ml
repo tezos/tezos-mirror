@@ -156,7 +156,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let bakes_during_kill = 7 + 16 in
   let last_cycle_being_merged = ref false in
   let on_starting_merge_event node =
-    Node.on_event node @@ fun Node.{name; value} ->
+    Node.on_event node @@ fun Node.{name; value; timestamp = _} ->
     if name = "start_merging_stores.v0" then
       let level = JSON.(value |> as_int) in
       if level = bakes_during_kill + 1 + bakes_before_kill - 16 then

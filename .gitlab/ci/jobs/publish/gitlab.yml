@@ -1,0 +1,14 @@
+include: .gitlab/ci/jobs/publish/common.yml
+
+gitlab:release:
+  # https://gitlab.com/tezos/docker-images/ci-release
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
+  stage: publish_release_gitlab
+  # Publish jobs are uninterruptible to avoid publishing partial results.
+  interruptible: false
+  dependencies:
+    - build:static-x86_64-linux-binaries
+    - build:static-arm64-linux-binaries
+    - docker:merge_manifests
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci gitlab-release

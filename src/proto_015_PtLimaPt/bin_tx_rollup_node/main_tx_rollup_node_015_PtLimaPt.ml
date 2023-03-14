@@ -26,7 +26,7 @@
 (*****************************************************************************)
 
 let force_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"force"
     ~doc:"Overwrites the configuration file when it exists."
     ()
@@ -45,49 +45,49 @@ let reconnection_delay_doc =
 
 let data_dir_arg =
   let doc = data_dir_doc in
-  Clic.arg
+  Tezos_clic.arg
     ~long:"data-dir"
     ~placeholder:"data_dir"
     ~doc
     Client_proto_args.string_parameter
 
 let operator_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"operator"
     ~placeholder:"operator"
     ~doc:"The operator of the rollup"
     ()
 
 let batch_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"batch-signer"
     ~placeholder:"batch-signer"
     ~doc:"The signer for submission of batches"
     ()
 
 let finalize_commitment_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"finalize-commitment-signer"
     ~placeholder:"finalize-commitment-signer"
     ~doc:"The signer for finalization of commitments"
     ()
 
 let remove_commitment_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"remove-commitment-signer"
     ~placeholder:"remove-commitment-signer"
     ~doc:"The signer for removals of commitments"
     ()
 
 let rejection_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"rejection-signer"
     ~placeholder:"rejection-signer"
     ~doc:"The signer for rejections"
     ()
 
 let dispatch_withdrawals_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"dispatch-withdrawals-signer"
     ~placeholder:"dispatch-withdrawals-signer"
     ~doc:"The signer for dispatch withdrawals"
@@ -95,7 +95,7 @@ let dispatch_withdrawals_signer_arg =
 
 let rollup_id_param =
   let open Client_proto_rollups in
-  Clic.parameter ~autocomplete:TxRollupAlias.autocomplete (fun cctxt s ->
+  Tezos_clic.parameter ~autocomplete:TxRollupAlias.autocomplete (fun cctxt s ->
       let from_alias s = TxRollupAlias.find cctxt s in
       let from_key s = TxRollupAlias.of_source s in
       Client_aliases.parse_alternatives
@@ -103,11 +103,11 @@ let rollup_id_param =
         s)
 
 let origination_level_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"origination-level"
     ~placeholder:"origination_level"
     ~doc:"The level of the block where the rollup was originated"
-    (Clic.parameter (fun _ str ->
+    (Tezos_clic.parameter (fun _ str ->
          match Int32.of_string_opt str with
          | None -> failwith "Invalid origination level"
          | Some l -> return l))
@@ -115,11 +115,11 @@ let origination_level_arg =
 let rpc_addr_arg =
   let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
   let doc = rpc_addr_doc default in
-  Clic.arg
+  Tezos_clic.arg
     ~long:"rpc-addr"
     ~placeholder:"address:port"
     ~doc
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          P2p_point.Id.of_string s
          |> Result.map_error (fun e -> [Exn (Failure e)])
          |> Lwt.return))
@@ -127,53 +127,53 @@ let rpc_addr_arg =
 let rpc_addr_opt_arg =
   let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
   let doc = rpc_addr_doc default in
-  Clic.arg
+  Tezos_clic.arg
     ~long:"rpc-addr"
     ~placeholder:"address:port"
     ~doc
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          P2p_point.Id.of_string s
          |> Result.map_error (fun e -> [Exn (Failure e)])
          |> Lwt.return))
 
 let cors_origins_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:
       "CORS origins allowed by the RPC server via Access-Control-Allow-Origin"
     ~placeholder:"c1, c2, ..."
     ~long:"cors-origins"
-  @@ Clic.parameter (fun _ctxt s ->
+  @@ Tezos_clic.parameter (fun _ctxt s ->
          String.split_no_empty ',' s |> List.map String.trim |> return)
 
 let cors_headers_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:
       "Header reported by Access-Control-Allow-Headers reported during CORS \
        preflighting"
     ~placeholder:"h1, h2, ..."
     ~long:"cors-headers"
-  @@ Clic.parameter (fun _ctxt s ->
+  @@ Tezos_clic.parameter (fun _ctxt s ->
          String.split_no_empty ',' s |> List.map String.trim |> return)
 
 let reconnection_delay_arg =
   let default = Node_config.default_reconnection_delay in
   let doc = reconnection_delay_doc default in
-  Clic.arg
+  Tezos_clic.arg
     ~long:"reconnection-delay"
     ~placeholder:"delay"
     ~doc
-    (Clic.parameter (fun _ p ->
+    (Tezos_clic.parameter (fun _ p ->
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
 let possible_modes = List.map Node_config.string_of_mode Node_config.modes
 
 let mode_parameter =
-  Clic.parameter
+  Tezos_clic.parameter
     ~autocomplete:(fun _ -> return possible_modes)
     (fun _ m -> Lwt.return (Node_config.mode_of_string m))
 
 let mode_param =
-  Clic.param
+  Tezos_clic.param
     ~name:"mode"
     ~desc:
       (Printf.sprintf
@@ -182,13 +182,13 @@ let mode_param =
     mode_parameter
 
 let allow_deposit_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~doc:"Allow the operator to make a first deposit for commitments"
     ~long:"allow-deposit"
     ()
 
 let group =
-  Clic.
+  Tezos_clic.
     {
       name = "tx_rollup.node";
       title = "Commands related to the transaction rollup node";
@@ -311,7 +311,7 @@ let patch_config_from_args config
     ok config
 
 let configuration_init_command =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
@@ -332,7 +332,7 @@ let configuration_init_command =
        reconnection_delay_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
-    @@ Clic.param
+    @@ Tezos_clic.param
          ~name:"rollup-id"
          ~desc:"address of the rollup"
          rollup_id_param
@@ -384,7 +384,7 @@ let configuration_init_command =
 
 let run_command =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Run the transaction rollup daemon."
@@ -403,7 +403,7 @@ let run_command =
        allow_deposit_arg
        reconnection_delay_arg)
     (prefix "run" @@ mode_param @@ prefix "for"
-    @@ Clic.param
+    @@ Tezos_clic.param
          ~name:"rollup-id"
          ~desc:"address of the rollup"
          rollup_id_param
@@ -479,7 +479,7 @@ let run_command =
 
 let tx_rollup_commands () =
   List.map
-    (Clic.map_command (new Protocol_client_context.wrap_full))
+    (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
     [configuration_init_command; run_command]
 
 let select_commands _ _ = return (tx_rollup_commands ())

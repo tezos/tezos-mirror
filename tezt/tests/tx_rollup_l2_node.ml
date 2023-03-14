@@ -88,11 +88,12 @@ let check_inbox_success (inbox : Tx_rollup_node.Inbox.t) =
       match result |->? "deposit_result" with
       | None ->
           (* Not a deposit, must be a batch *)
-          let results =
-            JSON.(
-              result |->? "batch_v1_result" |> Option.get |-> "results"
-              |> as_list)
+          let batch_result =
+            match result |->? "batch_v1_result" with
+            | Some r -> r
+            | None -> JSON.(result |-> "batch_v2_result")
           in
+          let results = JSON.(batch_result |-> "results" |> as_list) in
           List.iteri
             (fun j tr_json ->
               match JSON.(tr_json |=> 1 |> as_string_opt) with
@@ -578,7 +579,7 @@ let test_node_disconnect =
   let* () = Client.bake_for client in
   let* () = block_notify_promise in
   Log.info "Brutally killing Tezos node" ;
-  let* () = Node.terminate ~kill:true node in
+  let* () = Node.kill node in
   let* () = Lwt_unix.sleep 2. in
   let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node in
@@ -846,13 +847,6 @@ let get_ticket_hash_from_deposit (d : Tx_rollup_node.Inbox.message) : string =
 let get_ticket_hash_from_deposit_json inbox =
   JSON.(inbox |=> 0 |-> "message" |-> "deposit" |-> "ticket_hash" |> as_string)
 
-let choose_deposit_contract_by_protocol ~protocol =
-  match protocol with
-  | Protocol.Lima | Alpha ->
-      "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-  | _ ->
-      "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz"
-
 (* Checks that the a ticket can be transfered from the L1 to the rollup. *)
 let test_ticket_deposit_from_l1_to_l2 =
   Protocol.register_test
@@ -874,15 +868,15 @@ let test_ticket_deposit_from_l1_to_l2 =
           ~wallet_dir:(Client.base_dir client)
           tx_node
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
+      let* _alias, contract_id =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
+          ["mini_scenarios"; "tx_rollup_deposit"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info
@@ -1041,15 +1035,15 @@ let test_l2_to_l2_transaction =
           ~wallet_dir:(Client.base_dir client)
           tx_node
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
+      let* _alias, contract_id =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
+          ["mini_scenarios"; "tx_rollup_deposit"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info
@@ -1250,15 +1244,15 @@ let get_ticket_hash_from_op op =
     for a list of destination in [dests]. *)
 let make_deposit ~protocol ~source ~tx_rollup_hash ~tx_node ~client
     ?(dests = []) ~tickets_amount dest =
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"rollup_deposit"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:source
-      ~prg:(choose_deposit_contract_by_protocol ~protocol)
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
       client
+      ["mini_scenarios"; "tx_rollup_deposit"]
+      protocol
   in
   let* level = Client.level client in
   let* () = Client.bake_for_and_wait client in
@@ -2234,8 +2228,9 @@ let test_tickets_context =
         ~error_msg:"Ticket is %L but expected %R" ;
       unit)
 
-let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
-    ~finalize_commitment_signer ~dispatch_withdrawals_signer () =
+let test_round_trip ~title ?before_init
+    ?(withdraw_dest = Constant.bootstrap2.public_key_hash) ~originator ~operator
+    ~batch_signer ~finalize_commitment_signer ~dispatch_withdrawals_signer () =
   Protocol.register_test
     ~__FILE__
     ~title
@@ -2334,7 +2329,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
         craft_withdraw_and_sign
           tx_client
           ~signer:bls_key_2
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest:withdraw_dest
           ~ticket:ticket_id
           ~qty:5L
       in
@@ -2343,7 +2338,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
         craft_withdraw_and_sign
           tx_client
           ~signer:bls_key_1
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest:withdraw_dest
           ~ticket:ticket_id
           ~qty:10L
       in
@@ -2391,22 +2386,22 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       let* block = RPC.Client.call client @@ RPC.get_chain_block () in
       check_l1_block_contains_dispatch block ;
       Log.info "Originate contract to withdraw tickets" ;
-      let* withdraw_contract =
-        Client.originate_contract
-          ~alias:"withdraw_contract"
+      let* _alias, withdraw_contract =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:originator
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_withdraw.tz"
           ~init:"None"
           ~burn_cap:Tez.one
           client
+          ["mini_scenarios"; "tickets_receive_and_store"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info "Transfer the tickets to withdraw contract" ;
       let*! () =
-        Client.Tx_rollup.transfer_tickets
+        Client.transfer_tickets
           ~qty:15L
-          ~src:Constant.bootstrap2.public_key_hash
+          ~src:withdraw_dest
           ~destination:withdraw_contract
           ~entrypoint:"default"
           ~contents:{|"toru"|}
@@ -2426,6 +2421,30 @@ let test_withdrawals =
     ~batch_signer:Constant.bootstrap5.public_key_hash
     ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
     ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+    ()
+
+let test_withdrawals_tz4 =
+  let before_init client =
+    let* () = Client.import_secret_key client Constant.tz4_account in
+    let* () =
+      Client.transfer
+        ~amount:(Tez.of_int 1_000)
+        ~giver:Constant.bootstrap1.public_key_hash
+        ~receiver:Constant.tz4_account.alias
+        ~burn_cap:Tez.one
+        client
+    in
+    Client.bake_for_and_wait client
+  in
+  test_round_trip
+    ~title:"TX_rollup: dispatch withdrawals to tz4 account"
+    ~originator:Constant.bootstrap2.public_key_hash
+    ~operator:Constant.bootstrap1.public_key_hash
+    ~batch_signer:Constant.bootstrap5.public_key_hash
+    ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
+    ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+    ~before_init
+    ~withdraw_dest:Constant.tz4_account.public_key_hash
     ()
 
 let test_single_signer =
@@ -2712,12 +2731,17 @@ let test_withdraw_command =
           ~ticket:ticket_id
       in
       let* _ =
+        let dest =
+          match protocol with
+          | Lima -> Constant.bootstrap2.public_key_hash
+          | Mumbai | Alpha -> Constant.tz4_account.public_key_hash
+        in
         inject_withdraw
           ~counter:2L
           tx_client
           ~source:bls_key_1.aggregate_alias
           ~qty:1L
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest
           ~ticket:ticket_id
       in
       let* () = Client.bake_for_and_wait client in
@@ -2843,15 +2867,15 @@ let test_origination_deposit_same_block =
       let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
+      let* _alias, contract_id =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
+          ["mini_scenarios"; "tx_rollup_deposit"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info
@@ -2960,6 +2984,9 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
+  (match List.filter Protocol.(fun proto -> proto = Alpha) protocols with
+  | [] -> ()
+  | protocols -> test_withdrawals_tz4 protocols) ;
   test_single_signer protocols ;
   test_signer_reveals protocols ;
   test_accuser protocols ;

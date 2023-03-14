@@ -145,7 +145,7 @@ end
 (**/*)
 
 module Internal_for_tests : sig
-  module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t
+  module PeerFIFOCache : Aches.Vache.SET with type elt = P2p_peer.Id.t
 
   module IpTable : Hashtbl.S with type key = Ipaddr.V6.t
 end

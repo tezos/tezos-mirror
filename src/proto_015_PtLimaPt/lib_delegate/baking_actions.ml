@@ -205,7 +205,7 @@ let sign_block_header state proposer unsigned_block_header =
   >>=? function
   | false -> fail (Block_previously_baked {level; round})
   | true ->
-      Client_keys.sign
+      Client_keys_v0.sign
         cctxt
         proposer.secret_key_uri
         ~watermark:Block_header.(to_watermark (Block_header chain_id))
@@ -217,6 +217,11 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   let {predecessor; round; delegate = (consensus_key, _) as delegate; kind} =
     block_to_bake
   in
+  Events.(
+    emit
+      prepare_forging_block
+      (Int32.succ predecessor.shell.level, round, delegate))
+  >>= fun () ->
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let simulation_mode = state.global_state.validation_mode in
@@ -384,7 +389,7 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
            Operation.unsigned_encoding
            unsigned_operation
        in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+       Client_keys_v0.sign cctxt ~watermark sk_uri unsigned_operation_bytes
       else
         fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
       >>= function
@@ -472,7 +477,7 @@ let sign_endorsements state endorsements =
            Operation.unsigned_encoding
            unsigned_operation
        in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+       Client_keys_v0.sign cctxt ~watermark sk_uri unsigned_operation_bytes
       else fail (Baking_highwatermarks.Block_previously_endorsed {round; level}))
       >>= function
       | Error err ->
@@ -571,6 +576,11 @@ let update_to_level state level_update =
   let delegates = state.global_state.delegates in
   let new_level = new_level_proposal.block.shell.level in
   let chain = `Hash state.global_state.chain_id in
+  (* Sync the context to clean-up potential GC artifacts *)
+  (match state.global_state.validation_mode with
+  | Node -> Lwt.return_unit
+  | Local index -> index.sync_fun ())
+  >>= fun () ->
   (if Int32.(new_level = succ state.level_state.current_level) then
    return state.level_state.next_level_delegate_slots
   else

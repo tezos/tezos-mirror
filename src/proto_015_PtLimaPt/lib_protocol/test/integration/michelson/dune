@@ -14,7 +14,11 @@
   tezos-micheline
   tezos-benchmark-015-PtLimaPt
   tezos-benchmark-type-inference-015-PtLimaPt
+  tezos-protocol-plugin-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -25,10 +29,14 @@
   -open Tezos_client_015_PtLimaPt
   -open Tezos_micheline
   -open Tezos_benchmark_015_PtLimaPt
-  -open Tezos_benchmark_type_inference_015_PtLimaPt))
+  -open Tezos_benchmark_type_inference_015_PtLimaPt
+  -open Tezos_protocol_plugin_015_PtLimaPt))
 
 (rule
  (alias runtest)
  (package tezos-protocol-015-PtLimaPt-tests)
- (deps (glob_files contracts/*) (glob_files patched_contracts/*))
+ (deps
+  (glob_files contracts/*)
+  (glob_files patched_contracts/*)
+  (glob_files_rec ../../../../../../michelson_test_scripts/*))
  (action (run %{dep:./main.exe})))

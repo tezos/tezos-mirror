@@ -275,7 +275,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
     (* originated contract has not been created *)
     Context.Contract.balance (I i) orig_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
   else
     (* bootstrap is delegate, fee + origination burn have been debited *)
@@ -304,32 +304,28 @@ let undelegated_originated_bootstrap_contract () =
   | Some _ -> failwith "Bootstrap contract should be undelegated (%s)" __LOC__
 
 let delegated_implicit_bootstrap_contract () =
-  (* These values are fixed because we use a fixed RNG seed. *)
-  let from_pkh =
-    Signature.Public_key_hash.of_b58check_exn
-      "tz1TDZG4vFoA2xutZMYauUnS4HVucnAGQSpZ"
+  Account.generate_accounts 2 >>?= fun accounts ->
+  let to_pkh, from_pkh =
+    match accounts with
+    | [account1; account2] -> (account1.pkh, account2.pkh)
+    | _ -> assert false
   in
-  let to_pkh =
-    Signature.Public_key_hash.of_b58check_exn
-      "tz1MBWU1WkszFfkEER2pgn4ATKXE9ng7x1sR"
+  let bootstrap_delegations = [None; Some to_pkh] in
+  let bootstrap_accounts =
+    Account.make_bootstrap_accounts ~bootstrap_delegations accounts
   in
-  let bootstrap_delegations = [(from_pkh, to_pkh)] in
-  let rng_state = Random.State.make [|0|] in
-  Context.init2 ~rng_state ~bootstrap_delegations ()
-  >>=? fun (b, (contract1, _contract2)) ->
-  Block.bake b >>=? fun b ->
-  Context.Contract.delegate_opt (B b) contract1 >>=? fun delegate0 ->
-  (match delegate0 with
-  | Some contract when contract = to_pkh -> return_unit
-  | Some _ | None ->
-      failwith "Bootstrap contract should be delegated (%s)" __LOC__)
+  Block.genesis bootstrap_accounts >>=? fun b ->
+  (Context.Contract.delegate_opt (B b) (Implicit from_pkh) >>=? function
+   | Some pkh when pkh = to_pkh -> return_unit
+   | Some _ | None ->
+       failwith "Bootstrap contract should be delegated (%s)." __LOC__)
   >>=? fun () ->
   (* Test delegation amount *)
   Incremental.begin_construction b >>=? fun i ->
   let ctxt = Incremental.alpha_ctxt i in
-  Delegate.delegated_balance ctxt to_pkh >>= fun result ->
-  Lwt.return @@ Environment.wrap_tzresult result >>=? fun amount ->
-  Assert.equal_tez ~loc:__LOC__ amount (Tez.of_mutez_exn 4000000000000L)
+  Delegate.delegated_balance ctxt to_pkh >|= Environment.wrap_tzresult
+  >>=? fun amount ->
+  Assert.equal_tez ~loc:__LOC__ amount (Tez.of_mutez_exn 4_000_000_000_000L)
 
 let tests_bootstrap_contracts =
   [
@@ -489,7 +485,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
   Context.get_constants (I i)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
   cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
-  fee +? origination_burn >>?= fun _total_fee ->
+  fee +? origination_burn >>?= fun (_total_fee : Tez.t) ->
   (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   if fee > balance then expect_too_low_balance_error i op
@@ -505,7 +501,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
     (* originated contract has not been created *)
     Context.Contract.balance (I i) orig_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
 
 (** Delegation when delegate key is not assigned. Delegate account is
@@ -530,7 +526,7 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
     credit
   >>=? fun credit_contract ->
   Block.bake b ~operation:credit_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun () ->
   (* try to delegate *)
   Op.delegation
     ~force_reveal:true
@@ -553,7 +549,7 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
     (* implicit contract has no delegate *)
     Context.Contract.delegate (I i) impl_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
 
 (** Re-delegation when a delegate key was already assigned. If fees
@@ -579,7 +575,7 @@ let test_unregistered_delegate_key_switch_delegation ~fee () =
     credit
   >>=? fun init_credit ->
   Block.bake b ~operation:init_credit >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun () ->
   (* set and check the initial delegate *)
   Op.delegation
     ~force_reveal:true
@@ -620,7 +616,7 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   Op.transaction ~fee:Tez.zero (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake b ~operation:create_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* origination with delegate argument *)
   Context.Contract.balance (B b) bootstrap >>=? fun balance ->
   Op.contract_origination
@@ -643,7 +639,7 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
     >>=? fun () ->
     Context.Contract.balance (I i) orig_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
 
 (** Same as [unregistered_delegate_key_init_delegation] and credits
@@ -665,14 +661,14 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
     amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* initial credit for the delegated contract *)
   let credit = of_int 10 in
   credit +? amount >>?= fun balance ->
   Op.transaction ~fee:Tez.zero (B b) bootstrap impl_contract credit
   >>=? fun init_credit ->
   Block.bake ~operation:init_credit b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract balance >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract balance >>=? fun () ->
   (* try to delegate *)
   Op.delegation
     ~force_reveal:true
@@ -694,7 +690,7 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
     >>=? fun () ->
     Context.Contract.delegate (I i) impl_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
 
 (** Same as in [unregistered_delegate_key_switch_delegation] and
@@ -717,14 +713,14 @@ let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
     amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* initial credit for the delegated contract *)
   let credit = of_int 10 in
   credit +? amount >>?= fun balance ->
   Op.transaction ~fee:Tez.zero (B b) bootstrap impl_contract credit
   >>=? fun init_credit ->
   Block.bake ~operation:init_credit b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract balance >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract balance >>=? fun () ->
   (* set and check the initial delegate *)
   Op.delegation
     ~force_reveal:true
@@ -766,12 +762,12 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake b ~operation:create_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* debit + check balance *)
   Op.transaction ~force_reveal:true (B b) impl_contract bootstrap amount
   >>=? fun debit_contract ->
   Block.bake b ~operation:debit_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* origination with delegate argument *)
   Context.Contract.balance (B b) bootstrap >>=? fun balance ->
   Op.contract_origination
@@ -794,7 +790,7 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
     >>=? fun () ->
     Context.Contract.balance (I i) orig_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
 
 (** Same as in [unregistered_delegate_key_init_delegation] but credits
@@ -817,7 +813,7 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     amount
   >>=? fun create_contract ->
   Block.bake b ~operation:create_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* debit + check balance *)
   Op.transaction
     ~force_reveal:true
@@ -828,13 +824,13 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     amount
   >>=? fun debit_contract ->
   Block.bake b ~operation:debit_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* initial credit for the delegated contract *)
   let credit = of_int 10 in
   Op.transaction ~fee:Tez.zero (B b) bootstrap impl_contract credit
   >>=? fun credit_contract ->
   Block.bake b ~operation:credit_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun () ->
   (* try to delegate *)
   Op.delegation
     ~force_reveal:true
@@ -856,7 +852,7 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     >>=? fun () ->
     Context.Contract.delegate (I i) impl_contract >>= fun err ->
     Assert.error ~loc:__LOC__ err (function
-        | RPC_context.Not_found _ -> true
+        | Tezos_rpc.Context.Not_found _ -> true
         | _ -> false)
 
 (** Same as in [unregistered_delegate_key_switch_delegation] but
@@ -880,18 +876,18 @@ let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
     amount
   >>=? fun create_contract ->
   Block.bake b ~operation:create_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* debit + check balance *)
   Op.transaction ~force_reveal:true (B b) impl_contract bootstrap amount
   >>=? fun debit_contract ->
   Block.bake b ~operation:debit_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* delegation - initial credit for the delegated contract *)
   let credit = of_int 10 in
   Op.transaction ~fee:Tez.zero (B b) bootstrap impl_contract credit
   >>=? fun credit_contract ->
   Block.bake b ~operation:credit_contract >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract credit >>=? fun () ->
   (* set and check the initial delegate *)
   Op.delegation
     ~force_reveal:true
@@ -932,7 +928,7 @@ let test_failed_self_delegation_no_transaction () =
   let impl_contract = Contract.Implicit unregistered_pkh in
   (* check balance *)
   Context.Contract.balance (I i) impl_contract >>=? fun balance ->
-  Assert.equal_tez ~loc:__LOC__ Tez.zero balance >>=? fun _ ->
+  Assert.equal_tez ~loc:__LOC__ Tez.zero balance >>=? fun () ->
   (* self delegation fails *)
   Op.delegation (I i) impl_contract (Some unregistered_pkh)
   >>=? fun self_delegation ->
@@ -951,12 +947,12 @@ let test_failed_self_delegation_emptied_implicit_contract amount () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* empty implicit contract and check balance *)
   Op.transaction ~force_reveal:true (B b) impl_contract bootstrap amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* self delegation fails *)
   Op.delegation (B b) impl_contract (Some unregistered_pkh)
   >>=? fun self_delegation ->
@@ -977,7 +973,7 @@ let test_emptying_delegated_implicit_contract_fails amount () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* delegate the contract to the bootstrap *)
   Op.delegation
     ~force_reveal:true
@@ -1015,13 +1011,13 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* self delegation + verification *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some delegate_pkh)
   >>=? fun self_delegation ->
   Block.bake ~operation:self_delegation b >>=? fun b ->
   Context.Contract.delegate (B b) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun _ ->
+  Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun () ->
   (* create an implicit contract with no delegate *)
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -1032,9 +1028,9 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
   (* check no delegate for delegator contract *)
   Context.Contract.delegate (B b) delegator >>= fun err ->
   Assert.error ~loc:__LOC__ err (function
-      | RPC_context.Not_found _ -> true
+      | Tezos_rpc.Context.Not_found _ -> true
       | _ -> false)
-  >>=? fun _ ->
+  >>=? fun () ->
   (* delegation to the newly registered key *)
   Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
   >>=? fun delegation ->
@@ -1057,13 +1053,13 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* self delegation + verification *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some delegate_pkh)
   >>=? fun self_delegation ->
   Block.bake ~operation:self_delegation b >>=? fun b ->
   Context.Contract.delegate (B b) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun _ ->
+  Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun () ->
   (* create an implicit contract with bootstrap's account as delegate *)
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -1078,7 +1074,7 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
   (* test delegate of new contract is bootstrap *)
   Context.Contract.delegate (B b) delegator >>=? fun delegator_delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate bootstrap_manager.pkh
-  >>=? fun _ ->
+  >>=? fun () ->
   (* delegation with newly registered key *)
   Op.delegation (B b) delegator (Some delegate_account.pkh)
   >>=? fun delegation ->
@@ -1097,23 +1093,23 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* self delegation + verification *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some delegate_pkh)
   >>=? fun self_delegation ->
   Block.bake ~operation:self_delegation b >>=? fun b ->
   Context.Contract.delegate (B b) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun _ ->
+  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun () ->
   (* empty implicit contracts are usually deleted but they are kept if
      they were registered as delegates. we empty the contract in
      order to verify this. *)
   Op.transaction (B b) impl_contract bootstrap amount >>=? fun empty_contract ->
   Block.bake ~operation:empty_contract b >>=? fun b ->
   (* impl_contract is empty *)
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* verify self-delegation after contract is emptied *)
   Context.Contract.delegate (B b) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun _ ->
+  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun () ->
   (* create an implicit contract with no delegate *)
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -1124,9 +1120,9 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   (* check no delegate for delegator contract *)
   Context.Contract.delegate (B b) delegator >>= fun err ->
   Assert.error ~loc:__LOC__ err (function
-      | RPC_context.Not_found _ -> true
+      | Tezos_rpc.Context.Not_found _ -> true
       | _ -> false)
-  >>=? fun _ ->
+  >>=? fun () ->
   (* delegation to the newly registered key *)
   Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
   >>=? fun delegation ->
@@ -1150,20 +1146,20 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract amount
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract amount >>=? fun () ->
   (* self delegation + verification *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some delegate_pkh)
   >>=? fun self_delegation ->
   Block.bake ~operation:self_delegation b >>=? fun b ->
   Context.Contract.delegate (B b) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun _ ->
+  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun () ->
   (* empty implicit contracts are usually deleted but they are kept if
      they were registered as delegates. we empty the contract in
      order to verify this. *)
   Op.transaction (B b) impl_contract bootstrap amount >>=? fun empty_contract ->
   Block.bake ~operation:empty_contract b >>=? fun b ->
   (* impl_contract is empty *)
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* create an implicit contract with bootstrap's account as delegate *)
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -1178,7 +1174,7 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   (* test delegate of new contract is bootstrap *)
   Context.Contract.delegate (B b) delegator >>=? fun delegator_delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate bootstrap_manager.pkh
-  >>=? fun _ ->
+  >>=? fun () ->
   (* delegation with newly registered key *)
   Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
   >>=? fun delegation ->
@@ -1200,7 +1196,8 @@ let test_double_registration () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract Tez.one_mutez
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez
+  >>=? fun () ->
   (* self-delegation *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some pkh)
   >>=? fun self_delegation ->
@@ -1221,7 +1218,8 @@ let test_double_registration_when_empty () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract Tez.one_mutez
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez
+  >>=? fun () ->
   (* self delegation *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some pkh)
   >>=? fun self_delegation ->
@@ -1230,7 +1228,7 @@ let test_double_registration_when_empty () =
   Op.transaction (B b) impl_contract bootstrap Tez.one_mutez
   >>=? fun empty_contract ->
   Block.bake ~operation:empty_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* second self-delegation *)
   Op.delegation (B b) impl_contract (Some pkh) >>=? fun second_registration ->
   Incremental.begin_construction b >>=? fun i ->
@@ -1247,7 +1245,8 @@ let test_double_registration_when_recredited () =
   Op.transaction ~force_reveal:true (B b) bootstrap impl_contract Tez.one_mutez
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez
+  >>=? fun () ->
   (* self delegation *)
   Op.delegation ~force_reveal:true (B b) impl_contract (Some pkh)
   >>=? fun self_delegation ->
@@ -1256,12 +1255,13 @@ let test_double_registration_when_recredited () =
   Op.transaction ~force_reveal:true (B b) impl_contract bootstrap Tez.one_mutez
   >>=? fun empty_contract ->
   Block.bake ~operation:empty_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero >>=? fun () ->
   (* credit 1μꜩ+ check balance *)
   Op.transaction (B b) bootstrap impl_contract Tez.one_mutez
   >>=? fun create_contract ->
   Block.bake ~operation:create_contract b >>=? fun b ->
-  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez >>=? fun _ ->
+  Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.one_mutez
+  >>=? fun () ->
   (* second self-delegation *)
   Op.delegation (B b) impl_contract (Some pkh) >>=? fun second_registration ->
   Incremental.begin_construction b >>=? fun i ->
@@ -1364,8 +1364,50 @@ let test_registered_self_delegate_key_init_delegation () =
   Context.Contract.delegate (B b) contract >>=? fun delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun () -> return_unit
 
+let test_bls_account_cannot_self_delegate () =
+  let open Lwt_result_syntax in
+  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let {Account.pkh = tz4_pkh; pk = tz4_pk; _} =
+    Account.new_account ~algo:Bls ()
+  in
+  let tz4_contract = Alpha_context.Contract.Implicit tz4_pkh in
+  let* operation =
+    Op.transaction
+      ~force_reveal:true
+      (B b)
+      bootstrap
+      tz4_contract
+      (of_int 200_000)
+  in
+  let* b = Block.bake ~operation b in
+  let* operation = Op.revelation (B b) tz4_pk in
+  let* b = Block.bake ~operation b in
+  let* operation = Op.delegation (B b) tz4_contract (Some tz4_pkh) in
+  let* inc = Incremental.begin_construction b in
+  let tz4_pkh = match tz4_pkh with Bls pkh -> pkh | _ -> assert false in
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Contract_delegate_storage.Forbidden_tz4_delegate pkh);
+      ]
+      when Signature.Bls.Public_key_hash.(pkh = tz4_pkh) ->
+        return_unit
+    | err ->
+        failwith
+          "Error trace:@,\
+           %a does not match the \
+           [Contract_delegate_storage.Forbidden_tz4_delegate] error"
+          Error_monad.pp_print_trace
+          err
+  in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc operation
+  in
+  return_unit
+
 let tests_delegate_registration =
   [
+    Tztest.tztest "TEST" `Quick test_bls_account_cannot_self_delegate;
     (*** unregistered delegate key: no self-delegation ***)
     (* no token transfer, no self-delegation *)
     Tztest.tztest

@@ -9,6 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-clic"
   "tezos-client-base"
@@ -24,11 +25,13 @@ depends: [
   "tezos-dal-node-services"
   "tezos-layer2-store"
   "tezos-crypto-dal"
-  "irmin-pack" { >= "3.4.3" & < "3.5.0" }
-  "irmin" { >= "3.4.3" & < "3.5.0" }
+  "irmin-pack" { >= "3.5.2" & < "3.6.0" }
+  "irmin" { >= "3.5.2" & < "3.6.0" }
+  "tezos-dal-016-PtMumbai"
 ]
 depopts: [
   "tezos-dal-alpha"
+  "tezos-dac-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]

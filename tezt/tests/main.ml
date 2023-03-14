@@ -32,8 +32,6 @@
             other files.
 *)
 
-let protocols = Protocol.[Kathmandu; Lima; Alpha]
-
 let migrate_to = Protocol.Alpha
 
 let alpha_can_stitch_from_its_predecessor = false
@@ -42,22 +40,25 @@ let alpha_can_stitch_from_its_predecessor = false
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
+(* Tests that are protocol-independent.
+   They do not take a protocol as a parameter and thus need to be registered only once. *)
 let register_protocol_independent_tests () =
-  (* Tests that are protocol-independent.
-     They do not take a protocol as a parameter and thus need to be registered only once. *)
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
+  Client_chain_id.register_protocol_independent () ;
+  Config.register () ;
+  Demo_counter.register () ;
   Injection.register_protocol_independent () ;
+  Forge_block.register_protocol_independent () ;
   Light.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   P2p.register_protocol_independent () ;
   Proxy.register_protocol_independent () ;
-  Config.register () ;
-  Demo_counter.register ()
+  Rpc_tls.register_protocol_independent ()
 
+(* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
-  (* Tests related to protocol migration. *)
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
@@ -77,97 +78,131 @@ let register_protocol_migration_tests () =
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[migrate_from] ;
-  Iticket_migration.register ~migrate_from ~migrate_to
+    ~loser_protocols:[migrate_from]
 
-let register_protocol_agnostic_tests () =
-  (* Tests that are relatively protocol-agnostic.
-     We can run them on all protocols, or only one if the CI would be too slow. *)
+(* Tests related to one-off protocol migrations used in the past. *)
+let register_older_protocol_migration_tests () =
+  Iticket_migration.register
+    ~migrate_from:Protocol.Lima
+    ~migrate_to:Protocol.Mumbai
+
+(* Register tests that use [Protocol.register_test] and for which we rely on
+   [?supports] to decide which protocols the tests should run on.
+   As a consequence, all those tests should be registered with [Protocol.all]
+   as the list of protocols.
+
+   In the future, we could remove the [Protocol.t list] arguments from
+   [Protocol.register_test]. It would use [Protocol.all] directly instead.
+   Then we could remove the [~protocols] argument from all register functions. *)
+let register_protocol_tests_that_use_supports_correctly () =
+  let protocols = Protocol.all in
+  Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
-  Baker_test.register ~protocols:[Alpha] ;
+  Baker_test.register ~protocols ;
   Baking.register ~protocols ;
-  Baking.register_operations_pool ~protocols:[Kathmandu; Lima; Alpha] ;
-  Basic.register ~protocols:[Alpha] ;
-  Big_map_all.register ~protocols:[Alpha] ;
-  Bootstrap.register ~protocols:[Alpha] ;
+  Baking.register_operations_pool ~protocols ;
+  Basic.register ~protocols ;
+  Big_map_all.register ~protocols ;
+  Big_map_arity.register ~protocols ;
+  Bootstrap.register ~protocols ;
   Cache_cache.register protocols ;
-  Client_config.register ~protocols:[Alpha] ;
   Client_commands.register ~protocols ;
+  Client_config.register ~protocols ;
+  Client_fa12.register ~protocols ;
+  Client_keys.register ~protocols ;
   Client_run_view.register ~protocols ;
+  Comparable_datatype.register ~protocols ;
+  Contract_big_map_to_self.register ~protocols ;
+  Contract_entrypoints.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
+  Contract_hash_with_origination.register ~protocols ;
+  Contract_liquidity_baking.register ~protocols ;
+  Contract_non_regressions.register protocols ;
+  Contract_opcodes.register ~protocols ;
+  Contract_typecheck_contract.register ~protocols ;
+  Contract_typecheck_regression.register ~protocols ;
+  Contract_mini_scenarios.register ~protocols ;
   Create_contract.register ~protocols ;
-  Dal.register ~protocols:[Alpha] ;
   Deposits_limit.register ~protocols ;
-  Double_bake.register ~protocols:[Alpha] ;
+  Double_bake.register ~protocols ;
   Encoding.register ~protocols ;
-  Forge.register ~protocols:[Alpha] ;
-  Global_constants.register ~protocols:[Alpha] ;
-  Hash_data.register ~protocols:[Alpha] ;
-  Large_metadata.register ~protocols:[Alpha] ;
-  Light.register ~protocols:[Alpha] ;
+  Events.register ~protocols ;
+  Forge.register ~protocols ;
+  Gas_bound.register ~protocols ;
+  Ghostnet_dictator_migration.register ~protocols ;
+  Global_constants.register ~protocols ;
+  Large_metadata.register ~protocols ;
+  Light.register ~protocols ;
   Liquidity_baking_per_block_votes.register ~protocols ;
   Manager_operations.register ~protocols ;
   Mockup.register ~protocols ;
-  Mockup.register_global_constants ~protocols:[Alpha] ;
-  Monitor_operations.register ~protocols:[Alpha] ;
-  Multinode_snapshot.register ~protocols:[Alpha] ;
-  Consensus_key.register ~protocols:[Alpha] ;
-  Node_event_level.register ~protocols:[Alpha] ;
-  Normalize.register ~protocols:[Alpha] ;
+  Mockup.register_global_constants ~protocols ;
+  Monitor_operations.register ~protocols ;
+  Multinode_snapshot.register ~protocols ;
+  Node_cors.register ~protocols ;
+  Node_event_level.register ~protocols ;
+  Nonce_seed_revelation.register ~protocols ;
+  Normalize.register ~protocols ;
+  Operation_validation.register ~protocols ;
+  Operation_size.register ~protocols ;
+  Order_in_top_level.register ~protocols ;
+  P2p.register ~protocols ;
   Precheck.register ~protocols ;
   Prevalidator.register ~protocols ;
-  Protocol_limits.register ~protocols:[Alpha] ;
+  Protocol_limits.register ~protocols ;
   Proxy.register ~protocols ;
-  Proxy_server_test.register ~protocols:[Alpha] ;
-  P2p.register ~protocols:[Alpha] ;
-  Reject_malformed_micheline.register ~protocols:[Alpha] ;
-  Replace_by_fees.register ~protocols ;
-  Rpc_config_logging.register ~protocols:[Alpha] ;
+  Proxy_server_test.register ~protocols ;
   RPC_test.register protocols ;
+  Reject_malformed_micheline.register ~protocols ;
+  Replace_by_fees.register ~protocols ;
+  Retro.register ~protocols ;
+  Rpc_config_logging.register ~protocols ;
   Run_operation_RPC.register ~protocols ;
-  Run_script.register ~protocols:[Alpha] ;
+  Run_script.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
-  Sapling.register ~protocols:[Alpha] ;
+  Sapling.register ~protocols ;
+  Script_chain_id.register ~protocols ;
+  Script_execution_ordering.register ~protocols ;
+  Script_hash_regression.register ~protocols ;
+  Script_hash_multiple.register ~protocols ;
+  Script_manager_contracts.register ~protocols ;
   Self_address_transfer.register ~protocols ;
-  Signer_test.register ~protocols:[Alpha] ;
-  Stresstest_command.register ~protocols:[Alpha] ;
-  Synchronisation_heuristic.register ~protocols:[Alpha] ;
-  Tenderbake.register ~protocols:[Alpha] ;
-  Test_contract_bls12_381.register ~protocols:[Alpha] ;
-  Ticket_updates_in_receipt.register ~protocols:[Alpha] ;
-  Timelock.register ~protocols ;
-  Tickets.register ~protocols ;
-  Tx_rollup.register ~protocols ;
-  Tx_rollup_l2_node.register ~protocols ;
-  Tzip4_view.register ~protocols ;
-  Views.register [Alpha] ;
-  Retro.register ~protocols
-
-let register_K_plus_tests () =
-  (* Relies on a feature only available since K.
-     Move these to [register_protocol_agnostic_tests] once K is the smallest
-     protocol. *)
-  let protocols = Protocol.[Kathmandu; Alpha] in
-  Events.register ~protocols:[Alpha] ;
-  Ghostnet_dictator_migration.register ~protocols ;
-  Increase_paid_storage.register ~protocols ;
-  Operation_validation.register ~protocols ;
-  Sc_rollup.register ~protocols:[Alpha] ;
+  Script_conversion.register ~protocols ;
+  Script_illtyped.register ~protocols ;
+  Signer_test.register ~protocols ;
+  Stresstest_command.register ~protocols ;
+  Synchronisation_heuristic.register ~protocols ;
+  Tenderbake.register ~protocols ;
   Testnet_dictator.register ~protocols ;
+  Transfer.register ~protocols ;
+  Tickets.register ~protocols ;
+  Timelock.register ~protocols ;
+  Tzip4_view.register ~protocols ;
+  Used_paid_storage_spaces.register ~protocols ;
   Vdf_test.register ~protocols
 
-let register_L_plus_tests () =
-  (* Relies on a feature only available since L.
-     Move these to [register_protocol_agnostic_tests] once L is the smallest
-     protocol. *)
-  let protocols = Protocol.[Lima; Alpha] in
-  Used_paid_storage_spaces.register ~protocols
+(* Regression tests are not easy to maintain for multiple protocols because one needs
+   to update and maintain all the expected output files. Some of them, such as
+   those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
+   Some do not. Those that do not are declared here. *)
+let register_protocol_specific_because_regression_tests () =
+  Consensus_key.register ~protocols:[Alpha] ;
+  Dal.register ~protocols:[Alpha] ;
+  Hash_data.register ~protocols:[Alpha] ;
+  Increase_paid_storage.register ~protocols:[Alpha] ;
+  Sc_rollup.register ~protocols:[Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Alpha] ;
+  Ticket_receipt_and_rpc.register ~protocols:[Alpha] ;
+  Tx_rollup.register ~protocols:[Lima] ;
+  Tx_rollup_l2_node.register ~protocols:[Lima] ;
+  Views.register [Alpha] ;
+  Zk_rollup.register ~protocols:[Alpha]
 
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
-  register_protocol_agnostic_tests () ;
-  register_K_plus_tests () ;
-  register_L_plus_tests () ;
+  register_older_protocol_migration_tests () ;
+  register_protocol_tests_that_use_supports_correctly () ;
+  register_protocol_specific_because_regression_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

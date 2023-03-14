@@ -78,30 +78,42 @@ end) : S = struct
     Script_int.abs (Script_int.of_zint i)
 
   let signature rng_state =
-    let i = Random.State.int rng_state 4 in
+    let i = Random.State.int rng_state 5 in
     match i with
     | 0 -> (
-        let open Ed25519 in
+        let open Tezos_crypto.Signature.Ed25519 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
-        | Some s -> Signature.of_ed25519 s)
+        | Some s -> Tezos_crypto.Signature.of_ed25519 s)
     | 1 -> (
-        let open Secp256k1 in
+        let open Tezos_crypto.Signature.Secp256k1 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
-        | Some s -> Signature.of_secp256k1 s)
+        | Some s -> Tezos_crypto.Signature.of_secp256k1 s)
     | 2 -> (
-        let open P256 in
+        let open Tezos_crypto.Signature.P256 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
-        | Some s -> Signature.of_p256 s)
-    | _ -> (
-        let open Signature in
-        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
-        match of_bytes_opt bytes with None -> assert false | Some s -> s)
+        | Some s -> Tezos_crypto.Signature.of_p256 s)
+    | 3 ->
+        (* BLS checks that signatures are on the curve so we need to generate real
+           ones by signing a message. *)
+        let open Tezos_crypto.Signature.Bls in
+        let msg = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
+        let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
+        let _, _, sk = generate_key ~seed () in
+        Tezos_crypto.Signature.of_bls (sign sk msg)
+    | _ ->
+        let open Tezos_crypto.Signature in
+        let bytes =
+          Base_samplers.uniform_bytes
+            ~nbytes:Tezos_crypto.Signature.Ed25519.size
+            rng_state
+        in
+        Unknown bytes
 
   let string rng_state =
     let s =

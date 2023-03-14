@@ -28,7 +28,7 @@ open Alpha_context
 open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.printer) = function
@@ -45,28 +45,28 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> Lwt.return_some data
 
 let data_parameter =
-  Clic.parameter (fun _ data ->
+  Tezos_clic.parameter (fun _ data ->
       Lwt.return
         (Micheline_parser.no_parsing_error
         @@ Michelson_v1_parser.parse_expression data))
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -129,9 +129,9 @@ let commands () =
          contract."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)

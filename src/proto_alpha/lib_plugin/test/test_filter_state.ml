@@ -30,7 +30,7 @@
     Subject:      Unit tests the filter state functions of the plugin
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Plugin.Mempool
 open Test_utils
 
@@ -137,7 +137,7 @@ let test_remove_present =
       in
       let filter_state = add_manager_op initial_state oph op_info replacement in
       (* Remove [oph] from the state, in which it was present. *)
-      let filter_state = remove ~filter_state oph in
+      let filter_state = remove_operation filter_state oph in
       let (_ : bool) =
         (* Check that the state invariants are preserved and that
            [oph] has been removed. *)
@@ -160,7 +160,7 @@ let test_remove_present =
       (* Check that adding a fresh operation then removing it is the
          same as doing nothing except removing any replaced operation. *)
       let initial_state_without_replaced_op =
-        if should_replace then remove ~filter_state:initial_state oph_to_replace
+        if should_replace then remove_operation initial_state oph_to_replace
         else initial_state
       in
       qcheck_eq
@@ -180,7 +180,7 @@ let test_remove_unknown =
     (fun (initial_state, oph) ->
       assume
         (not (Operation_hash.Map.mem oph initial_state.prechecked_manager_ops)) ;
-      let filter_state = remove ~filter_state:initial_state oph in
+      let filter_state = remove_operation initial_state oph in
       qcheck_eq ~pp:pp_state ~eq:eq_state initial_state filter_state)
 
 let () =

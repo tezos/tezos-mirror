@@ -34,7 +34,7 @@
 open Protocol
 open Alpha_context
 open Script_typed_ir
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* Reference implementation *)
 
@@ -57,8 +57,9 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   | Bool_t, x, y -> normalize_compare @@ Compare.Bool.compare x y
   | Mutez_t, x, y -> normalize_compare @@ Tez.compare x y
   | Key_hash_t, x, y ->
-      normalize_compare @@ Signature.Public_key_hash.compare x y
-  | Key_t, x, y -> normalize_compare @@ Signature.Public_key.compare x y
+      normalize_compare @@ Tezos_crypto.Signature.V0.Public_key_hash.compare x y
+  | Key_t, x, y ->
+      normalize_compare @@ Tezos_crypto.Signature.V0.Public_key.compare x y
   | Int_t, x, y -> normalize_compare @@ Script_int.compare x y
   | Nat_t, x, y -> normalize_compare @@ Script_int.compare x y
   | Timestamp_t, x, y -> normalize_compare @@ Script_timestamp.compare x y
@@ -116,7 +117,7 @@ module Parameters = struct
 end
 
 module Crypto_samplers =
-Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
+Tezos_benchmark.Crypto_samplers.V0.Make_finite_key_pool (struct
   let size = 1000
 
   let algo = `Default

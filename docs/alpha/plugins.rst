@@ -97,10 +97,17 @@ block proposal as follows:
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
-
+.. _precheck_filter_alpha:
 
 Prechecking of manager operations
 .................................
+
+.. FIXME tezos/tezos#3938:
+
+   This section doesn't make much sense after the pipelining project
+   has plugged validate into the plugin for Lima. Parts of this
+   section be integrated into plugin.rst, and the relevant definitions
+   should point to the validation entry.
 
 The aim of the ``precheck`` filter is to avoid fully executing manager operations
 before deciding whether to gossip them to the network.
@@ -120,11 +127,6 @@ increased the chain's fitness), only one operation per manager is propagated.
 All other received operations originating from the same manager will be classified
 as ``Branch_delayed`` and will not be propagated.
 
-This criterion is used only by the prevalidator to decide the propagation of
-operations. A baker can still include several operations originating from the same
-manager in a single block, provided that it gets them in time (note that they can be
-propagated by nodes using different versions or implementations).
-
 Alternatively, a user can inject an operation with the same
 manager and the same counter, but with a higher fee to replace an already existing
 operation in the prevalidator. Only one of the two operations will be eventually
@@ -134,11 +136,11 @@ by a factor (currently fixed to 5%). In case of successful replacement, the old
 operation is re-classified as ``Outdated``.
 
 Concretely, a user can replace a successfully prechecked manager operation in the
-mempool, with the help of ``tezos-client``, using two methods :
+mempool, with the help of ``octez-client``, using two methods :
 
 - manually provide a higher fee to bump the "fee/gas limit" ratio by at least 5% for the new
   operation,
-- via option ``--replace``: In this case, ``tezos-client`` will automatically
+- via option ``--replace``: In this case, ``octez-client`` will automatically
   compute the minimal amount of fee for the second operation to be able to
   replace the one in the mempool.
 
@@ -223,9 +225,9 @@ The following parameters can be thus inspected and modified:
 For example, each command below modifies the provided parameter and resets all
 the others to their default values::
 
-   tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
-   tezos-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
-   tezos-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
 
 Changing filters default configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

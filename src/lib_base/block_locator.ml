@@ -25,9 +25,9 @@
 (*****************************************************************************)
 
 type t = {
-  head_hash : Block_hash.t;
+  head_hash : Tezos_crypto.Hashed.Block_hash.t;
   head_header : Block_header.t;
-  history : Block_hash.t list;
+  history : Tezos_crypto.Hashed.Block_hash.t list;
 }
 
 let pp ppf {head_hash; history; _} =
@@ -43,7 +43,7 @@ let pp ppf {head_hash; history; _} =
         Format.fprintf
           ppf
           "%a (%i)\n%a"
-          Block_hash.pp
+          Tezos_crypto.Hashed.Block_hash.pp
           hd
           acc
           pp_hash_list
@@ -52,7 +52,7 @@ let pp ppf {head_hash; history; _} =
   Format.fprintf
     ppf
     "%a (head)\n%a"
-    Block_hash.pp
+    Tezos_crypto.Hashed.Block_hash.pp
     head_hash
     pp_hash_list
     (history, -1, 1, repeats - 1)
@@ -61,7 +61,7 @@ let pp_short ppf {head_hash; history; _} =
   Format.fprintf
     ppf
     "head: %a, %d predecessors"
-    Block_hash.pp
+    Tezos_crypto.Hashed.Block_hash.pp
     head_hash
     (List.length history)
 
@@ -78,7 +78,9 @@ let encoding =
        encoding_inj
        (obj2
           (req "current_head" (dynamic_size Block_header.encoding))
-          (req "history" (Variable.list Block_hash.encoding)))
+          (req
+             "history"
+             (Variable.list Tezos_crypto.Hashed.Block_hash.encoding)))
 
 let bounded_encoding ~max_header_size ~max_length () =
   let open Data_encoding in
@@ -90,7 +92,9 @@ let bounded_encoding ~max_header_size ~max_length () =
           "current_head"
           (dynamic_size
              (Block_header.bounded_encoding ~max_size:max_header_size ())))
-       (req "history" (Variable.list ~max_length Block_hash.encoding)))
+       (req
+          "history"
+          (Variable.list ~max_length Tezos_crypto.Hashed.Block_hash.encoding)))
 
 type seed = {sender_id : P2p_peer.Id.t; receiver_id : P2p_peer.Id.t}
 
@@ -106,7 +110,7 @@ type seed = {sender_id : P2p_peer.Id.t; receiver_id : P2p_peer.Id.t}
 module Step : sig
   type state
 
-  val init : seed -> Block_hash.t -> state
+  val init : seed -> Tezos_crypto.Hashed.Block_hash.t -> state
 
   val next : state -> int * state
 end = struct
@@ -114,22 +118,23 @@ end = struct
      The seed is stored in a bigstring and should be mlocked *)
   type state = Int32.t * int * Bytes.t
 
-  let update st b = Hacl.Hash.SHA256.update st b
+  let update st b = Tezos_crypto.Hacl.Hash.SHA256.update st b
 
   let init seed head =
-    let open Hacl.Hash in
+    let open Tezos_crypto.Hacl.Hash in
     let st = SHA256.init () in
     List.iter
       (update st)
       [
         P2p_peer.Id.to_bytes seed.sender_id;
         P2p_peer.Id.to_bytes seed.receiver_id;
-        Block_hash.to_bytes head;
+        Tezos_crypto.Hashed.Block_hash.to_bytes head;
       ] ;
     (1l, 9, SHA256.finish st)
 
   let draw seed n =
-    (Int32.rem (TzEndian.get_int32 seed 0) n, Hacl.Hash.SHA256.digest seed)
+    ( Int32.rem (TzEndian.get_int32 seed 0) n,
+      Tezos_crypto.Hacl.Hash.SHA256.digest seed )
 
   let next (step, counter, seed) =
     let random_gap, seed =
@@ -166,8 +171,8 @@ let fold ~f ~init {head_hash; history; _} seed =
   loop state init (head_hash :: history)
 
 type step = {
-  block : Block_hash.t;
-  predecessor : Block_hash.t;
+  block : Tezos_crypto.Hashed.Block_hash.t;
+  predecessor : Tezos_crypto.Hashed.Block_hash.t;
   step : int;
   strict_step : bool;
 }
@@ -213,11 +218,12 @@ let compute ~get_predecessor ~caboose ~size head_hash head_header seed =
       let* o = get_predecessor current_block_hash step in
       match o with
       | None ->
-          if Block_hash.equal caboose current_block_hash then Lwt.return acc
+          if Tezos_crypto.Hashed.Block_hash.equal caboose current_block_hash
+          then Lwt.return acc
           else Lwt.return (caboose :: acc)
       | Some predecessor ->
-          if Block_hash.equal predecessor current_block_hash then
-            (* caboose or genesis reached *)
+          if Tezos_crypto.Hashed.Block_hash.equal predecessor current_block_hash
+          then (* caboose or genesis reached *)
             Lwt.return acc
           else loop (predecessor :: acc) (pred size) state predecessor
   in

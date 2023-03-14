@@ -1,0 +1,57 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names
+  test_consensus_filter
+  test_filter_state
+  test_plugin
+  test_conflict_handler)
+ (libraries
+  tezos-base
+  tezos-base-test-helpers
+  tezos-base.unix
+  alcotest-lwt
+  tezos-test-helpers
+  qcheck-alcotest
+  tezos-stdlib-unix
+  tezos-micheline
+  tezos-protocol-plugin-016-PtMumbai
+  tezos-protocol-016-PtMumbai
+  tezos-protocol-016-PtMumbai.parameters
+  tezos-016-PtMumbai-test-helpers)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Tezos_test_helpers
+  -open Tezos_micheline
+  -open Tezos_protocol_plugin_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai.Protocol
+  -open Tezos_protocol_016_PtMumbai_parameters
+  -open Tezos_016_PtMumbai_test_helpers))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-016-PtMumbai-tests)
+ (action (run %{dep:./test_consensus_filter.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-016-PtMumbai-tests)
+ (action (run %{dep:./test_filter_state.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-016-PtMumbai-tests)
+ (action (run %{dep:./test_plugin.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-016-PtMumbai-tests)
+ (action (run %{dep:./test_conflict_handler.exe})))

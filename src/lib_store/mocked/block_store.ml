@@ -39,8 +39,8 @@ end)
 
 type block_store = {
   genesis_block : Block_repr.t;
-  block_table : Block_repr.t Block_table.t;
-  level_table : Block_repr.t Level_table.t;
+  block_table : (Block_repr.t * Context_hash.t) Block_table.t;
+  level_table : (Block_repr.t * Context_hash.t) Level_table.t;
   mutable caboose : Store_types.block_descriptor;
 }
 
@@ -51,7 +51,7 @@ let genesis_block {genesis_block; _} = genesis_block
 let get_block_by_key (Block (hash, off)) {block_table; level_table; _} =
   match Block_table.find_opt block_table hash with
   | None -> None
-  | Some block as res ->
+  | Some (block, _) as res ->
       let off = Int32.of_int off in
       if off = 0l then res
       else
@@ -66,12 +66,11 @@ let mem block_store key =
 
 let read_block ~(read_metadata : bool) block_store key =
   ignore read_metadata ;
-  Lwt_result_syntax.return @@ get_block_by_key key block_store
+  Lwt_result.return (Option.map fst (get_block_by_key key block_store))
 
 let get_hash block_store key =
-  let open Lwt_result_syntax in
   let block_opt = get_block_by_key key block_store in
-  return (Option.map Block_repr.hash block_opt)
+  Lwt_result.return (Option.map (fun (b, _) -> Block_repr.hash b) block_opt)
 
 let read_block_metadata block_store key =
   let open Lwt_result_syntax in
@@ -80,11 +79,14 @@ let read_block_metadata block_store key =
   | None -> return None
   | Some block -> return (Block_repr.metadata block)
 
-let store_block block_store block =
+let resulting_context_hash block_store ~expect_predecessor_context:_ key =
+  Lwt_result.return (Option.map snd (get_block_by_key key block_store))
+
+let store_block block_store block resulting_context_hash =
   let level = Block_repr.level block in
   let hash = Block_repr.hash block in
-  Block_table.add block_store.block_table hash block ;
-  Level_table.add block_store.level_table level block ;
+  Block_table.add block_store.block_table hash (block, resulting_context_hash) ;
+  Level_table.add block_store.level_table level (block, resulting_context_hash) ;
   Lwt_result_syntax.return_unit
 
 let caboose {caboose; _} = Lwt.return caboose
@@ -99,7 +101,9 @@ let create ?block_cache_limit:_ _chain_dir ~genesis_block =
       caboose = (Block_repr.hash genesis_block, Block_repr.level genesis_block);
     }
   in
-  let* () = store_block block_store genesis_block in
+  let* () =
+    store_block block_store genesis_block (Block_repr.context genesis_block)
+  in
 
   return block_store
 

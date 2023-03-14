@@ -28,7 +28,7 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
   protocol (MR :gl:`!6042`)
 
 - Introduce a module Q, making a subset of Zarith.Q available to the
-  protocol (MR :gl:`!6042`)
+  protocol (MR :gl:`!6092`)
 
 - Generalise the Bounded module to support more datatypes. (MR :gl:`!6076`)
 
@@ -317,6 +317,10 @@ Minor Changes
   details about their implementation. (MR :gl:`!6318`)
 
 - Update gas for L. (MR :gl:`!6519`)
+
+- A new case has been added to the entrypoint encoding, with tag ``5``.
+  This corresponds to the ``deposit`` entrypoint used both by TORUs and
+  ZKRUs. (MR :gl:`!6045`)
 
 Internal
 --------

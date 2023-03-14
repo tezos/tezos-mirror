@@ -1,0 +1,20 @@
+# Warning: the documentation:linkcheck job must have at least the same
+# restrictions in the rules as documentation:build_all, otherwise the CI
+# may complain that documentation:linkcheck depends on documentation:build_all
+# which does not exist.
+documentation:build_all:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+  stage: build
+  needs: [trigger]
+  before_script:
+    - . $HOME/.venv/bin/activate
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-build-all
+  artifacts:
+    expose_as: 'Documentation - excluding old protocols'
+    paths:
+      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
+      - docs/_build/
+    expire_in: 1 week

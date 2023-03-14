@@ -4,7 +4,7 @@
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
 (executable
- (name test)
+ (name test_block_services)
  (modes native js)
  (libraries
   tezos-base
@@ -19,9 +19,9 @@
 (rule
  (alias runtest)
  (package tezos-shell-services)
- (action (run %{dep:./test.exe})))
+ (action (run %{dep:./test_block_services.exe})))
 
 (rule
  (alias runtest_js)
  (package tezos-shell-services)
- (action (run node %{dep:./test.bc.js})))
+ (action (run node %{dep:./test_block_services.bc.js})))

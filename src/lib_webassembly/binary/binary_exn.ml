@@ -8,3 +8,5 @@ exception EOS
 
 (** Encoder exceptions *)
 module Encode_error = Error.Make ()
+
+module Floating_point = Error.Make ()

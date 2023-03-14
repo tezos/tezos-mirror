@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"demo-noops\" end\ninclude Tezos_protocol_environment.V8.Make(Name)()\n")))
+   "module Name = struct let name = \"demo-noops\" end\ninclude Tezos_protocol_environment.V9.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_demo_noops)
@@ -56,7 +56,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Tezos_protocol_environment_demo_noops.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Tezos_protocol_environment_demo_noops.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
 
 (rule
  (targets tezos_protocol_demo_noops.ml)

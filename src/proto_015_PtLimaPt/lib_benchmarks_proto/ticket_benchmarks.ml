@@ -108,6 +108,8 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen compare_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Compare_ticket_hash_benchmark)
@@ -166,6 +168,8 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen compare_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Compare_key_contract_benchmark)
@@ -242,13 +246,20 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen size_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Has_tickets_type_benchmark)
 
 let ticket_sampler rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  let pkh, _, _ = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
+  let pkh, _, _ =
+    Tezos_crypto.Signature.V0.generate_key
+      ~algo:Tezos_crypto.Signature.V0.Ed25519
+      ~seed
+      ()
+  in
   let ticketer = Alpha_context.Contract.Implicit pkh in
   Script_typed_ir.
     {ticketer; contents = Script_int.zero; amount = Ticket_amount.one}
@@ -314,6 +325,8 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen size_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Collect_tickets_benchmark)

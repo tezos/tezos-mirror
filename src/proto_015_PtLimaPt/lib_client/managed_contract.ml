@@ -51,7 +51,7 @@ let get_contract_manager (cctxt : #full) contract =
   | Prim (_, D_Pair, Bytes (_, bytes) :: _, _) | Bytes (_, bytes) -> (
       match
         Data_encoding.Binary.of_bytes_opt
-          Signature.Public_key_hash.encoding
+          Tezos_crypto.Signature.V0.Public_key_hash.encoding
           bytes
       with
       | Some k -> return k
@@ -62,7 +62,7 @@ let get_contract_manager (cctxt : #full) contract =
              Transfer from scripted contract are currently only supported for \
              \"manager\" contract.")
   | Prim (_, D_Pair, String (_, value) :: _, _) | String (_, value) -> (
-      match Signature.Public_key_hash.of_b58check_opt value with
+      match Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_opt value with
       | Some k -> return k
       | None ->
           cctxt#error
@@ -89,7 +89,9 @@ let parse code =
 let build_lambda_for_set_delegate ~delegate =
   match delegate with
   | Some delegate ->
-      let (`Hex delegate) = Signature.Public_key_hash.to_hex delegate in
+      let (`Hex delegate) =
+        Tezos_crypto.Signature.V0.Public_key_hash.to_hex delegate
+      in
       Format.asprintf
         "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; SET_DELEGATE ; \
          CONS }"
@@ -104,7 +106,7 @@ let entrypoint_remove_delegate = Entrypoint.remove_delegate
 
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
-    (delegate : Signature.public_key_hash option) =
+    (delegate : Tezos_crypto.Signature.V0.public_key_hash option) =
   let entrypoint = entrypoint_do in
   (Michelson_v1_entrypoints.contract_entrypoint_type
      cctxt
@@ -139,7 +141,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
              match delegate with
              | Some delegate ->
                  let (`Hex delegate) =
-                   Signature.Public_key_hash.to_hex delegate
+                   Tezos_crypto.Signature.V0.Public_key_hash.to_hex delegate
                  in
                  "0x" ^ delegate
              | None -> "Unit"
@@ -160,7 +162,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~fee_parameter ?fee ~source ~src_pk
     ~src_sk contract (* the KT1 to delegate *)
-    (delegate : Signature.public_key_hash option) =
+    (delegate : Tezos_crypto.Signature.V0.public_key_hash option) =
   build_delegate_operation cctxt ~chain ~block ?fee contract delegate
   >>=? fun operation ->
   let operation = Annotated_manager_operation.Single_manager operation in
@@ -190,7 +192,9 @@ let t_unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.T_unit, [], []))
 
 let build_lambda_for_transfer_to_implicit ~destination ~amount =
-  let (`Hex destination) = Signature.Public_key_hash.to_hex destination in
+  let (`Hex destination) =
+    Tezos_crypto.Signature.V0.Public_key_hash.to_hex destination
+  in
   Format.asprintf
     "{ DROP ; NIL operation ;PUSH key_hash 0x%s; IMPLICIT_ACCOUNT;PUSH mutez \
      %Ld ;UNIT;TRANSFER_TOKENS ; CONS }"

@@ -279,7 +279,7 @@ module Raw_context_tests = struct
     let gen_root () =
       Data_encoding.Binary.of_bytes_exn
         Validator.Hash.encoding
-        (Hacl.Rand.gen 32)
+        (Tezos_crypto.Hacl.Rand.gen 32)
     in
     let roots_ctx =
       WithExceptions.List.init

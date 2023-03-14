@@ -29,7 +29,11 @@ type cors = Resto_cohttp.Cors.t = {
   allowed_origins : string list;
 }
 
-include Resto_cohttp_server.Server.Make (RPC_encoding) (RPC_logging)
+module RPC_logging = Internal_event.Legacy_logging.Make (struct
+  let name = "rpc_http_event"
+end)
+
+include Resto_cohttp_server.Server.Make (Tezos_rpc.Encoding) (RPC_logging)
 
 module Acl = struct
   include Resto_acl.Acl

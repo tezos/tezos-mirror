@@ -48,9 +48,17 @@
       - tx rollup commit
       - tx rollup withdraw
       - tx rollup reveal withdrawals
-      - smart contract rollup origination
+      - smart rollup origination
+      - smart rollup add messages
+      - smart rollup publish
+      - smart rollup cement
+      - smart rollup refute
+      - smart rollup timeout
+      - smart rollup execute outbox message
+      - smart rollup recover bond
       - zk rollup origination
       - zk rollup publish
+      - zk rollup update
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -70,7 +78,7 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
-  type dal_slot_availability = Dal_slot_availability_kind
+  type dal_attestation = Dal_attestation_kind
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -152,11 +160,11 @@ module Kind : sig
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
-  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
-
   type zk_rollup_origination = Zk_rollup_origination_kind
 
   type zk_rollup_publish = Zk_rollup_publish_kind
+
+  type zk_rollup_update = Zk_rollup_update_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -190,10 +198,9 @@ module Kind : sig
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
-    | Sc_rollup_dal_slot_subscribe_manager_kind
-        : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
+    | Zk_rollup_update_manager_kind : zk_rollup_update manager
 end
 
 type 'a consensus_operation_type =
@@ -221,7 +228,7 @@ val pp_consensus_content : Format.formatter -> consensus_content -> unit
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
-  | Dal_slot_availability of Chain_id.t
+  | Dal_attestation of Chain_id.t
 
 val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -268,9 +275,9 @@ and _ contents =
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
      Temporary operation to avoid modifying endorsement encoding. *)
-  | Dal_slot_availability :
-      Signature.Public_key_hash.t * Dal_endorsement_repr.t
-      -> Kind.dal_slot_availability contents
+  | Dal_attestation :
+      Dal_attestation_repr.operation
+      -> Kind.dal_attestation contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -354,7 +361,7 @@ and _ contents =
   | Manager_operation : {
       source : Signature.Public_key_hash.t;
       fee : Tez_repr.tez;
-      counter : counter;
+      counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
       gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
@@ -494,9 +501,8 @@ and _ manager_operation =
           (** The entrypoint of the smart contract address that should receive the tickets. *)
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header : {
-      slot_header : Dal_slot_repr.Header.t;
-    }
+  | Dal_publish_slot_header :
+      Dal_operations_repr.Publish_slot_header.t
       -> Kind.dal_publish_slot_header manager_operation
       (** [Sc_rollup_originate] allows an implicit account to originate a new
           smart contract rollup (initialized with a given boot sector).
@@ -507,14 +513,12 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
-      origination_proof : string;
+      origination_proof : Sc_rollup_proof_repr.serialized;
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
-  (* [Sc_rollup_add_messages] adds messages to a given rollup's
-      inbox. *)
+  (* [Sc_rollup_add_messages] adds messages to the smart rollups' inbox. *)
   | Sc_rollup_add_messages : {
-      rollup : Sc_rollup_repr.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation
@@ -531,7 +535,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
-      refutation : Sc_rollup_game_repr.refutation option;
+      refutation : Sc_rollup_game_repr.refutation;
     }
       -> Kind.sc_rollup_refute manager_operation
       (** [Sc_rollup_refute { rollup; opponent; refutation }] makes a move
@@ -560,18 +564,13 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
+      staker : Signature.Public_key_hash.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
-  | Sc_rollup_dal_slot_subscribe : {
-      rollup : Sc_rollup_repr.t;
-      slot_index : Dal_slot_repr.Index.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
-      circuits_info : bool Zk_rollup_account_repr.SMap.t;
-          (** Circuit names, alongside a boolean flag indicating
-              if they can be used for private ops. *)
+      circuits_info : [`Public | `Private | `Fee] Zk_rollup_account_repr.SMap.t;
+          (** Circuit names, alongside a tag indicating its kind. *)
       init_state : Zk_rollup_state_repr.t;
       nb_ops : int;
     }
@@ -582,13 +581,11 @@ and _ manager_operation =
           (* See {!Zk_rollup_apply} *)
     }
       -> Kind.zk_rollup_publish manager_operation
-
-(** Counters are used as anti-replay protection mechanism in
-    manager operations: each manager account stores a counter and
-    each manager operation declares a value for the counter. When
-    a manager operation is applied, the value of the counter of
-    its manager is checked and incremented. *)
-and counter = Z.t
+  | Zk_rollup_update : {
+      zk_rollup : Zk_rollup_repr.t;
+      update : Zk_rollup_update_repr.t;
+    }
+      -> Kind.zk_rollup_update manager_operation
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -677,7 +674,7 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Endorsement} and {!Preendorsement} > {!Dal_slot_availability} >
+   {!Endorsement} and {!Preendorsement} > {!Dal_attestation} >
    {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
@@ -693,7 +690,7 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    and comparing an {!Endorsement] to a {!Preendorsement}, the
    {!Endorsement} is better.
 
-   Two {!Dal_slot_availability} ops are compared in the lexicographic
+   Two {!Dal_attestation} ops are compared in the lexicographic
    order of the pair of their number of endorsed slots as available
    and their endorsers.
 
@@ -748,7 +745,7 @@ module Encoding : sig
 
   val endorsement_case : Kind.endorsement case
 
-  val dal_slot_availability_case : Kind.dal_slot_availability case
+  val dal_attestation_case : Kind.dal_attestation case
 
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
@@ -832,12 +829,11 @@ module Encoding : sig
   val sc_rollup_recover_bond_case :
     Kind.sc_rollup_recover_bond Kind.manager case
 
-  val sc_rollup_dal_slot_subscribe_case :
-    Kind.sc_rollup_dal_slot_subscribe Kind.manager case
-
   val zk_rollup_origination_case : Kind.zk_rollup_origination Kind.manager case
 
   val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
+
+  val zk_rollup_update_case : Kind.zk_rollup_update Kind.manager case
 
   module Manager_operations : sig
     type 'b case =
@@ -907,11 +903,10 @@ module Encoding : sig
 
     val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
 
-    val sc_rollup_dal_slot_subscribe_case :
-      Kind.sc_rollup_dal_slot_subscribe case
-
     val zk_rollup_origination_case : Kind.zk_rollup_origination case
 
     val zk_rollup_publish_case : Kind.zk_rollup_publish case
+
+    val zk_rollup_update_case : Kind.zk_rollup_update case
   end
 end

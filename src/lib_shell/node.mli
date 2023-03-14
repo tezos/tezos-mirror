@@ -32,7 +32,7 @@ type config = {
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
   store_root : string;
   context_root : string;
@@ -41,34 +41,27 @@ type config = {
     (Tezos_protocol_environment.Context.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t)
     option;
-  p2p : (P2p.config * P2p.limits) option;
+  p2p : (P2p.config * P2p_limits.t) option;
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;
       (** If [true], all non-empty mempools will be ignored. *)
   enable_testchain : bool;
       (** If [false], testchain related messages will be ignored. *)
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
-
-val default_peer_validator_limits : Peer_validator.limits
-
-val default_prevalidator_limits : Prevalidator.limits
-
-val default_block_validator_limits : Block_validator.limits
-
-val default_chain_validator_limits : Chain_validator.limits
 
 val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
   config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
+  Shell_limits.peer_validator_limits ->
+  Shell_limits.block_validator_limits ->
+  Shell_limits.prevalidator_limits ->
+  Shell_limits.chain_validator_limits ->
   History_mode.t option ->
   t tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 
-val build_rpc_directory : t -> unit RPC_directory.t
+val build_rpc_directory : t -> unit Tezos_rpc.Directory.t

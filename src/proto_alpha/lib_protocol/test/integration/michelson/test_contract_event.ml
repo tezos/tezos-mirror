@@ -36,8 +36,6 @@ open Lwt_result_syntax
               in correct order and expected format.
 *)
 
-let wrap m = m >|= Environment.wrap_tzresult
-
 (** Parse a Michelson contract from string. *)
 let originate_contract file storage src b =
   let load_file f =

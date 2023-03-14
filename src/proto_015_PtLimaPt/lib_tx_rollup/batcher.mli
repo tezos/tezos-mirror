@@ -28,7 +28,7 @@ open Alpha_context
 (** Initialize the internal state of the batcher. *)
 val init :
   rollup:Tx_rollup.t ->
-  signer:Signature.public_key_hash ->
+  signer:Tezos_crypto.Signature.V0.public_key_hash ->
   batch_burn_limit:Tez.t option ->
   Context.index ->
   Constants.t ->

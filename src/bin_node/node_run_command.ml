@@ -217,10 +217,10 @@ end
 
 open Filename.Infix
 
-let init_identity_file (config : Node_config_file.t) =
+let init_identity_file (config : Config_file.t) =
   let open Lwt_result_syntax in
   let identity_file =
-    config.data_dir // Node_data_version.default_identity_file_name
+    config.data_dir // Data_version.default_identity_file_name
   in
   if Sys.file_exists identity_file then
     let* identity = Node_identity_file.read identity_file in
@@ -235,7 +235,7 @@ let init_identity_file (config : Node_config_file.t) =
     return identity
 
 let init_node ?sandbox ?target ~identity ~singleprocess
-    ~force_history_mode_switch (config : Node_config_file.t) =
+    ~force_history_mode_switch (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* TODO "WARN" when pow is below our expectation. *)
   let*! () =
@@ -249,7 +249,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         let*! () = Event.(emit disabled_discovery_addr) () in
         return (None, None)
     | Some addr -> (
-        let* addrs = Node_config_file.resolve_discovery_addrs addr in
+        let* addrs = Config_file.resolve_discovery_addrs addr in
         match addrs with
         | [] -> failwith "Cannot resolve P2P discovery address: %S" addr
         | (addr, port) :: _ -> return (Some addr, Some port))
@@ -260,7 +260,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         let*! () = Event.(emit disabled_listen_addr) () in
         return (None, None)
     | Some addr -> (
-        let* addrs = Node_config_file.resolve_listening_addrs addr in
+        let* addrs = Config_file.resolve_listening_addrs addr in
         match addrs with
         | [] -> failwith "Cannot resolve P2P listening address: %S" addr
         | (addr, port) :: _ -> return (Some addr, Some port))
@@ -274,8 +274,8 @@ let init_node ?sandbox ?target ~identity ~singleprocess
     | None, Some _ -> return_none
     | _ ->
         let* trusted_points =
-          Node_config_file.resolve_bootstrap_addrs
-            (Node_config_file.bootstrap_peers config)
+          Config_file.resolve_bootstrap_addrs
+            (Config_file.bootstrap_peers config)
         in
         let advertised_port : P2p_addr.port option =
           Option.either config.p2p.advertised_net_port listening_port
@@ -288,13 +288,12 @@ let init_node ?sandbox ?target ~identity ~singleprocess
             discovery_addr;
             discovery_port;
             trusted_points;
-            peers_file =
-              config.data_dir // Node_data_version.default_peers_file_name;
+            peers_file = config.data_dir // Data_version.default_peers_file_name;
             private_mode = config.p2p.private_mode;
             reconnection_config = config.p2p.reconnection_config;
             identity;
             proof_of_work_target =
-              Crypto_box.make_pow_target config.p2p.expected_pow;
+              Tezos_crypto.Crypto_box.make_pow_target config.p2p.expected_pow;
             trust_discovered_peers = sandbox <> None;
           }
         in
@@ -329,13 +328,14 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         config.shell.block_validator_limits.operation_metadata_size_limit;
       patch_context;
       data_dir = config.data_dir;
-      store_root = Node_data_version.store_dir config.data_dir;
-      context_root = Node_data_version.context_dir config.data_dir;
-      protocol_root = Node_data_version.protocol_dir config.data_dir;
+      store_root = Data_version.store_dir config.data_dir;
+      context_root = Data_version.context_dir config.data_dir;
+      protocol_root = Data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
       target;
       enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
+      dal = config.dal;
     }
   in
   let* () =
@@ -366,7 +366,7 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let metric =
+let rpc_metrics =
   Prometheus.Summary.v_labels
     ~label_names:["endpoint"; "method"]
     ~help:"RPC endpoint call counts and sum of execution times."
@@ -374,17 +374,19 @@ let metric =
     ~subsystem:"rpc"
     "calls"
 
-let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
-    node (addr, port) =
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
+
+let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
+    (addr, port) =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
   let dir = Node_directory.build_node_directory config dir in
   let dir =
-    RPC_directory.register_describe_directory_service
+    Tezos_rpc.Directory.register_describe_directory_service
       dir
-      RPC_service.description_service
+      Tezos_rpc.Service.description_service
   in
   let mode =
     match rpc_config.tls with
@@ -404,31 +406,6 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
-  let transform_callback callback connection request body =
-    let open Lwt_result_syntax in
-    let do_call () = callback connection request body in
-    let cohttp_meth = Cohttp.Request.meth request in
-    let uri = Cohttp.Request.uri request in
-    let path = Uri.path uri in
-    let decoded = Resto.Utils.decode_split_path path in
-    let*! description =
-      let* resto_meth =
-        match cohttp_meth with
-        | #Resto.meth as meth -> Lwt.return_ok meth
-        | _ -> Lwt.return_error @@ `Method_not_allowed []
-      in
-      let* uri_desc = RPC_directory.lookup_uri_desc dir () resto_meth decoded in
-      Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
-    in
-    match description with
-    | Ok (uri, meth) ->
-        (* We update the metric only if the URI can succesfully
-           be matched in the directory tree. *)
-        Prometheus.Summary.(time (labels metric [uri; meth]) Sys.time do_call)
-    | Error _ ->
-        (* Otherwise, the call must be done anyway. *)
-        do_call ()
-  in
   let cors =
     RPC_server.
       {
@@ -443,7 +420,19 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
-  let callback = transform_callback (RPC_server.resto_callback server) in
+  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
+    let path = Cohttp_lwt.Request.uri req |> Uri.path in
+    if path = "/metrics" then
+      let*! response = Metrics_server.callback conn req body in
+      Lwt.return (`Response response)
+    else Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
+  in
+  let update_metrics uri meth =
+    Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)
+  in
+  let callback =
+    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
+  in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
@@ -456,12 +445,12 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
           tzfail (RPC_Port_already_in_use [(addr, port)])
       | exn -> fail_with_exn exn)
 
-let init_rpc (config : Node_config_file.t) node =
+let init_rpc (config : Config_file.t) node =
   let open Lwt_result_syntax in
   let media_types = config.rpc.media_type in
   List.concat_map_es
     (fun addr ->
-      let* addrs = Node_config_file.resolve_rpc_listening_addrs addr in
+      let* addrs = Config_file.resolve_rpc_listening_addrs addr in
       match addrs with
       | [] -> failwith "Cannot resolve listening address: %S" addr
       | addrs ->
@@ -474,13 +463,9 @@ let init_rpc (config : Node_config_file.t) node =
             addrs)
     config.rpc.listen_addrs
 
-module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
-
 let metrics_serve metrics_addrs =
   let open Lwt_result_syntax in
-  let* addrs =
-    List.map_ep Node_config_file.resolve_metrics_addrs metrics_addrs
-  in
+  let* addrs = List.map_ep Config_file.resolve_metrics_addrs metrics_addrs in
   let*! servers =
     List.map_p
       (fun (addr, port) ->
@@ -515,11 +500,9 @@ let init_zcash () =
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
 
-let init_dal dal_config = Node_config_file.init_dal dal_config
-
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
-    (config : Node_config_file.t) =
+    (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* Main loop *)
   let log_cfg =
@@ -537,11 +520,14 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
   let* () =
-    Node_data_version.ensure_data_dir ~mode:Is_compatible config.data_dir
+    Data_version.ensure_data_dir
+      ~mode:Is_compatible
+      config.blockchain_network.genesis
+      config.data_dir
   in
-  let* () = Node_config_validation.check ?ignore_testchain_warning config in
+  let* () = Config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
-  Updater.init (Node_data_version.protocol_dir config.data_dir) ;
+  Updater.init (Data_version.protocol_dir config.data_dir) ;
   let*! () =
     Event.(emit starting_node)
       ( config.blockchain_network.chain_name,
@@ -549,7 +535,10 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
-  let* () = init_dal config.dal in
+  let* () =
+    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
+    Tezos_crypto_dal.Cryptobox.Config.init_dal ~find_srs_files config.dal
+  in
   let*! node =
     init_node
       ?sandbox
@@ -614,7 +603,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
   let main_promise =
     let cli_warnings = ref [] in
     let* config =
-      Node_shared_arg.read_and_patch_config_file
+      Shared_arg.read_and_patch_config_file
         ~ignore_bootstrap_peers:
           (match sandbox with Some _ -> true | None -> false)
         ~emit:(fun event () ->
@@ -624,7 +613,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
     in
     let* () =
       match sandbox with
-      | Some _ when config.data_dir = Node_config_file.default_data_dir ->
+      | Some _ when config.data_dir = Config_file.default_data_dir ->
           failwith "Cannot use default data directory while in sandbox mode"
       | _ -> return_unit
     in
@@ -652,7 +641,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
     Lwt_lock_file.try_with_lock
       ~when_locked:(fun () ->
         failwith "Data directory is locked by another process")
-      ~filename:(Node_data_version.lock_file config.data_dir)
+      ~filename:(Data_version.lock_file config.data_dir)
     @@ fun () ->
     Lwt.catch
       (fun () ->
@@ -686,8 +675,7 @@ module Term = struct
        $(b,TEZOS_LOG='* -> debug')."
     in
     Arg.(
-      value & flag_all
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["v"])
+      value & flag_all & info ~docs:Shared_arg.Manpage.misc_section ~doc ["v"])
 
   let sandbox =
     let open Cmdliner in
@@ -705,7 +693,7 @@ module Term = struct
       value
       & opt (some non_dir_file) None
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"FILE.json"
           ["sandbox"])
@@ -720,7 +708,7 @@ module Term = struct
       value
       & opt (some string) None
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"<block_hash>,<level>"
           ["target"])
@@ -734,7 +722,7 @@ module Term = struct
     in
     Arg.(
       value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["singleprocess"])
+      & info ~docs:Shared_arg.Manpage.misc_section ~doc ["singleprocess"])
 
   let force_history_mode_switch =
     let open Cmdliner in
@@ -748,7 +736,7 @@ module Term = struct
     Arg.(
       value & flag
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ["force-history-mode-switch"])
 
@@ -756,7 +744,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ sandbox $ verbosity $ target $ singleprocess
-       $ force_history_mode_switch $ Node_shared_arg.Term.args))
+       $ force_history_mode_switch $ Shared_arg.Term.args))
 end
 
 module Manpage = struct
@@ -800,8 +788,8 @@ module Manpage = struct
     ]
 
   let man =
-    description @ Node_shared_arg.Manpage.args @ debug @ examples
-    @ Node_shared_arg.Manpage.bugs
+    description @ Shared_arg.Manpage.args @ debug @ examples
+    @ Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Run the Tezos node" ~man "run"
 end

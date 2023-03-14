@@ -25,14 +25,28 @@
 
 (** Tezos-specific extension for the [Regression] module. *)
 
-(** Hooks that replaces Tezos-specific values with constants.
-
-    They replace public key hashes, public keys, contract hashes, and timestamps.
-    They also remove command arguments: --base-dir, -d, --endpoint, -E, and
-    --sources. *)
-val hooks : Process.hooks
-
 (** [replace_variables log] returns [log] with all occurrences of variables
     such as contract addresses, hashes etc. that may change between different
     runs replaced by constants. *)
 val replace_variables : string -> string
+
+(** Custom Tezos-specific regression hooks that replaces Tezos-specific values
+    with constants.
+
+    [scrubbed_global_options] list of global options to scrub. Default: remove
+    global options [--base-dir], [-d], [--endpoint], [-E], and [--sources].
+
+    [replace_variables] is applied to the output and to the argument of each
+    global option not in [scrubbed_global_options]. Defaults to
+    {!replace_variables} that replaces key hashes, public keys, contract hashes,
+    and timestamps. *)
+val hooks_custom :
+  ?scrubbed_global_options:string list ->
+  ?replace_variables:(string -> string) ->
+  unit ->
+  Process.hooks
+
+(** Hooks that replaces Tezos-specific values with constants.
+
+    This is {!hooks_custom} with the default arguments. *)
+val hooks : Process.hooks

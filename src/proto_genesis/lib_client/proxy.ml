@@ -28,6 +28,33 @@ let msg : string =
    node. Hence this code should not be reached, because the RPC directory is \
    empty."
 
+module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
+  let split_key _ _ = None
+
+  let failure_is_permanent _ = false
+
+  let do_rpc (pgi : Tezos_proxy.Proxy.proxy_getter_input)
+      (key : Tezos_protocol_environment.Proxy_context.M.key) =
+    let chain = pgi.chain in
+    let block = pgi.block in
+    Tezos_proxy.Logger.emit
+      Tezos_proxy.Logger.proxy_block_rpc
+      ( Tezos_shell_services.Block_services.chain_to_string chain,
+        Tezos_shell_services.Block_services.to_string block,
+        key )
+    >>= fun () ->
+    Protocol_client_context.Genesis_block_services.Context.read
+      pgi.rpc_context
+      ~chain
+      ~block
+      key
+    >>=? fun (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context)
+      ->
+    Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
+    @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
+    >>= fun () -> return raw_context
+end
+
 let () =
   let open Tezos_proxy.Registration in
   let module M : Proxy_sig = struct
@@ -35,14 +62,18 @@ let () =
 
     let protocol_hash = Protocol.hash
 
-    let directory = RPC_directory.empty
+    let directory = Tezos_rpc.Directory.empty
 
-    let hash _ ?chain ?block _ =
-      ignore chain ;
-      ignore block ;
-      failwith "%s" msg
-
-    let init_env_rpc_context _ = failwith "%s" msg
+    let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
+        (hash : Context_hash.t) =
+      let open Lwt_result_syntax in
+      let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
+      let* (module ProxyDelegation) =
+        Tezos_proxy.Proxy_getter.make_delegate ctx p_rpc hash
+      in
+      return
+        (Tezos_protocol_environment.Proxy_context.empty
+        @@ Some (module ProxyDelegation))
 
     let merkle_tree _ _ _ = failwith "%s" msg
 

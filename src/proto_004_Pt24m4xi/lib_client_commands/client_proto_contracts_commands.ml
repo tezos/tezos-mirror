@@ -29,12 +29,12 @@ open Client_proto_contracts
 
 let group =
   {
-    Clic.name = "contracts";
+    Tezos_clic.name = "contracts";
     title = "Commands for managing the record of known contracts";
   }
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group

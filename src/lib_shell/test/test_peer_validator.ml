@@ -30,7 +30,7 @@
     Subject:      Unit tests for [Peer_validator]
 *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 (** [wrap f] create a mocked [chain_store], [Chain_db] and a
     [Peer_validator] that can be used by [f]. *)
@@ -73,7 +73,7 @@ let wrap
         {
           Block_validator_process.user_activated_upgrades = [];
           user_activated_protocol_overrides = [];
-          operation_metadata_size_limit = None;
+          operation_metadata_size_limit = Unlimited;
         }
       in
       let* block_validator_processs =
@@ -81,17 +81,17 @@ let wrap
       in
       let*! block_validator =
         Block_validator.create
-          Node.default_block_validator_limits
+          Shell_limits.default_block_validator_limits
           db
           block_validator_processs
           ~start_testchain:false
       in
       let*! pv =
         Peer_validator.create
-          Node.default_peer_validator_limits
+          Shell_limits.default_peer_validator_limits
           block_validator
           chain_db
-          Crypto_box.Public_key_hash.zero
+          Tezos_crypto.Crypto_box.Public_key_hash.zero
       in
       f chain_db genesis_header pv)
 

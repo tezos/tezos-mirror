@@ -74,7 +74,7 @@ let () =
     {|
 module Source = struct
   let hash =
-    Some (Tezos_crypto.Protocol_hash.of_b58check_exn %S)
+    Some (Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn %S)
   let sources = Tezos_base.Protocol.%a
 end
 @.|}

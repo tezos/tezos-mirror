@@ -24,13 +24,13 @@
 (*****************************************************************************)
 
 (** A [ready_ctx] value contains globally needed informations for a running dal
-    node. It is available when both cryptobox is initialized and dal plugin is
-    loaded. *)
+    node. It is available when both cryptobox is initialized and the plugins
+    for dal and dac have been loaded. *)
 type ready_ctxt = {
-  dal_constants : Cryptobox.t;
-  dal_parameters : Cryptobox.parameters;
-  plugin : (module Dal_plugin.T);
-  slot_header_store : Slot_headers_store.t;
+  cryptobox : Cryptobox.t;
+  proto_parameters : Dal_plugin.proto_parameters;
+  dal_plugin : (module Dal_plugin.T);
+  dac_plugin : (module Dac_plugin.T);
 }
 
 (** The status of the dal node *)
@@ -40,24 +40,25 @@ type status = Ready of ready_ctxt | Starting
     field are available through accessors *)
 type t
 
-(** [init config] creates a [t] with a status set to [Starting] with a given dal
-    node configuration.*)
-val init : Configuration.t -> t
+(** [init config store cctx] creates a [t] with a status set to [Starting]
+    using the given dal node configuration [config], node store [store],
+    and tezos node client context [cctx]. *)
+val init : Configuration.t -> Store.node_store -> Client_context.full -> t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt slot_header_store plugin dal_constants dal_params] updates
-    in place the status value to ready, and initializes the inner [ready_ctxt]
-    value with the given parameters.
+(** [set_ready ctxt ~dal_plugin ~dac_plugin cryptobox proto_parameters] updates
+    in place the status value to [Ready], and initializes the inner
+    [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  Slot_headers_store.t ->
-  (module Dal_plugin.T) ->
+  dal_plugin:(module Tezos_dal_node_lib.Dal_plugin.T) ->
+  dac_plugin:(module Tezos_dal_node_lib.Dac_plugin.T) ->
   Cryptobox.t ->
-  Cryptobox.parameters ->
+  Dal_plugin.proto_parameters ->
   unit
 
 type error += Node_not_ready
@@ -72,3 +73,20 @@ val get_config : t -> Configuration.t
 
 (** [get_status ctxt] returns the dal node status *)
 val get_status : t -> status
+
+(** [get_store ctxt] returns the dal node store. *)
+val get_store : t -> Store.node_store
+
+(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
+val get_tezos_node_cctxt : t -> Client_context.full
+
+(** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
+val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
+
+(** [fetch_assigned_shard_indicies ctxt ~level ~pkh] fetches from L1 the shard indices assigned to [pkh] at [level].
+    It internally caches the DAL committee with [level] as the key with FIFO strategy. *)
+val fetch_assigned_shard_indicies :
+  t ->
+  level:int32 ->
+  pkh:Tezos_crypto.Signature.Public_key_hash.t ->
+  int list tzresult Lwt.t

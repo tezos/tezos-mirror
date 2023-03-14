@@ -35,49 +35,36 @@ open Test_utils
 
 let count = Some 1000
 
-(** This test checks that the filter state is cleared (prechecked related
-    values are reseted) [on_flush] whether a [validation_state] is given or not
- *)
+(** This test checks that [flush] empties the filter state. *)
 let test_flush () =
   let l =
     QCheck2.Gen.generate
       ~n:(Option.value ~default:1 count)
-      (QCheck2.Gen.pair
-         Generators.filter_state_with_operation_gen
-         QCheck2.Gen.bool)
+      Generators.filter_state_with_operation_gen
   in
   List.iter_es
-    (fun ( (filter_state, (oph, (op_info : manager_op_info))),
-           with_validation_state ) ->
-      let filter_state = add_manager_op filter_state oph op_info `No_replace in
-      Context.init1 () >>= function
-      | Error e ->
-          failwith "Error at context initialisation: %a" pp_print_trace e
-      | Ok (b, _contract) -> (
-          let predecessor =
-            Block_header.
-              {shell = b.header.shell; protocol_data = Bytes.make 10 ' '}
-          in
-          (if with_validation_state then
-           Incremental.begin_construction b >>= function
-           | Error e ->
-               failwith
-                 "Error at begin_construction of the incremental state: %a"
-                 pp_print_trace
-                 e
-           | Ok inc -> return_some (Incremental.validation_state inc)
-          else return_none)
-          >>=? fun validation_state ->
-          on_flush default_config ?validation_state filter_state ~predecessor ()
-          >>= function
-          | Error e -> failwith "Error during on_flush: %a" pp_print_trace e
-          | Ok flushed_state ->
-              if eq_state flushed_state empty then return_unit
-              else
-                failwith
-                  "Flushed state is not empty : %a"
-                  pp_state
-                  flushed_state))
+    (fun (ops_state, (oph, (op_info : manager_op_info))) ->
+      let ops_state = add_manager_op ops_state oph op_info `No_replace in
+      let open Lwt_result_syntax in
+      let* block, _contract = Context.init1 () in
+      let* incremental = Incremental.begin_construction block in
+      let ctxt = Incremental.alpha_ctxt incremental in
+      let head = block.header.shell in
+      let round_durations = Alpha_context.Constants.round_durations ctxt in
+      let hard_gas_limit_per_block =
+        Alpha_context.Constants.hard_gas_limit_per_block ctxt
+      in
+      let* filter_state =
+        init_state ~head round_durations hard_gas_limit_per_block
+      in
+      let filter_state = {filter_state with ops_state} in
+      let* flushed_state = flush filter_state ~head in
+      if eq_state flushed_state.ops_state empty_ops_state then return_unit
+      else
+        failwith
+          "Flushed state is not empty : %a"
+          pp_state
+          flushed_state.ops_state)
     l
 
 let () =

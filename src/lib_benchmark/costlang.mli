@@ -47,7 +47,7 @@ module type S = sig
 
   val ( + ) : size repr -> size repr -> size repr
 
-  val ( - ) : size repr -> size repr -> size repr
+  val sat_sub : size repr -> size repr -> size repr
 
   val ( * ) : size repr -> size repr -> size repr
 

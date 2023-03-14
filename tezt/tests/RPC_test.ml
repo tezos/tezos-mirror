@@ -143,7 +143,7 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
   unit
 
 (* Test the contracts RPC. *)
-let test_contracts _test_mode_tag _protocol ?endpoint client =
+let test_contracts _test_mode_tag protocol ?endpoint client =
   let test_implicit_contract contract_id =
     let* _ =
       RPC.Client.call ?endpoint ~hooks client
@@ -290,7 +290,7 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.post_chain_block_context_contract_big_map_get
            ~id:contract_id
-           ~data:big_map_key
+           ~data:(Data big_map_key)
            ()
     in
     let* _ =
@@ -309,29 +309,29 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
   in
   (* A smart contract without any big map or entrypoints *)
   Log.info "Test simple originated contract" ;
-  let* originated_contract_simple =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
+  let* _alias, originated_contract_simple =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_simple in
   (* A smart contract with a big map and entrypoints *)
   Log.info "Test advanced originated contract" ;
-  let* originated_contract_advanced =
-    Client.originate_contract
-      ~alias:"originated_contract_advanced"
+  let* _alias, originated_contract_advanced =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_entrypoints.tz"
       ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "big_map_entrypoints"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_advanced in
@@ -344,7 +344,7 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.post_chain_block_context_contract_big_map_get
          ~id:originated_contract_advanced
-         ~data:unique_big_map_key
+         ~data:(Data unique_big_map_key)
          ()
   in
   let duplicate_big_map_key =
@@ -355,7 +355,7 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.post_chain_block_context_contract_big_map_get
          ~id:originated_contract_advanced
-         ~data:duplicate_big_map_key
+         ~data:(Data duplicate_big_map_key)
          ()
   in
   unit
@@ -628,11 +628,23 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_baking_rights
+         ~delegate:Constant.bootstrap5.public_key_hash
+         ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_current_level ()
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_endorsing_rights ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_endorsing_rights
+         ~delegate:Constant.bootstrap4.public_key_hash
+         ()
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
@@ -820,6 +832,67 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let* complete_mempool =
     Mempool.get_mempool ?endpoint ~hooks:mempool_hooks client
   in
+
+  let* consensus_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[0]
+      client
+  in
+  let expected_consensus_mempool =
+    {Mempool.empty with outdated = complete_mempool.outdated}
+  in
+  Check.(
+    (expected_consensus_mempool = consensus_mempool)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
+  let* manager_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[3]
+      client
+  in
+  let expected_manager_mempool =
+    {
+      Mempool.empty with
+      applied = complete_mempool.applied;
+      refused = complete_mempool.refused;
+      branch_refused = complete_mempool.branch_refused;
+      branch_delayed = complete_mempool.branch_delayed;
+    }
+  in
+  Check.(
+    (expected_manager_mempool = manager_mempool)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
+  let* consensus_manager_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[0; 3]
+      client
+  in
+  Check.(
+    (consensus_manager_mempool = complete_mempool)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
+  let* voting_anonymous_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[1; 2]
+      client
+  in
+  Check.(
+    (voting_anonymous_mempool = Mempool.empty)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
   let* _ =
     Lwt_list.iter_s
       (fun i ->
@@ -878,7 +951,9 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let post_and_get_filter config_str =
     let* _ =
       RPC.Client.call ?endpoint ~hooks:mempool_hooks client
-      @@ RPC.post_chain_mempool_filter ~data:(Ezjsonm.from_string config_str) ()
+      @@ RPC.post_chain_mempool_filter
+           ~data:(Data (Ezjsonm.from_string config_str))
+           ()
     in
     get_filter_variations ()
   in
@@ -982,9 +1057,17 @@ let test_workers _test_mode_tag _protocol ?endpoint client =
 
 let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let protocol_hash = Protocol.hash protocol in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_errors in
+  (* Turn off logging to avoid polluting the logs with the error schema *)
+  let* _ =
+    RPC.Client.call ?endpoint ~log_output:false client @@ RPC.get_errors
+  in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocols in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocol protocol_hash in
+  (* Turn off logging to avoid polluting the logs with full protocol
+     source code *)
+  let* _ =
+    RPC.Client.call ?endpoint ~log_output:false client
+    @@ RPC.get_protocol protocol_hash
+  in
   let* _ =
     RPC.Client.call ?endpoint client @@ RPC.get_fetch_protocol protocol_hash
   in
@@ -1010,13 +1093,62 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
     @@ RPC.get_chain_block_context_nonce block_level
   in
   let* _ =
-    (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_context_sc_rollup ()
-  in
-  let* _ =
     (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
     RPC.Client.call ?endpoint client
     @@ RPC.get_chain_block_context_raw ~ctxt_type:Bytes ~value_path:[] ()
+  in
+  let* delegates =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_raw
+         ~depth:2
+         ~ctxt_type:Bytes
+         ~value_path:["delegates"]
+         ()
+  in
+  Check.(
+    (JSON.unannotate delegates
+    = `O
+        [
+          ( "ed25519",
+            `O
+              [
+                ("02298c03ed7d454a101eb7022bc95f7e5f41ac78", `Null);
+                ("a9ceae0f8909125492a7c4700acc59274cc6c846", `Null);
+                ("c55cf02dbeecc978d9c84625dcae72bb77ea4fbd", `Null);
+                ("dac9f52543da1aed0bc1d6b46bf7c10db7014cd6", `Null);
+                ("e7670f32038107a59a2b9cfefae36ea21f5aa63c", `Null);
+              ] );
+        ])
+      json_u
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  let* () =
+    let spawn_get_chain_block_context_raw ?depth ~error_msg value_path =
+      let*? process =
+        RPC.Client.spawn ?endpoint client
+        @@ RPC.get_chain_block_context_raw
+             ?depth
+             ~ctxt_type:Bytes
+             ~value_path
+             ()
+      in
+      Process.check_error ~msg:(rex error_msg) process
+    in
+    let* () =
+      spawn_get_chain_block_context_raw
+        ["non-existent"]
+        ~error_msg:"No service found at this URL"
+    in
+    let* () =
+      spawn_get_chain_block_context_raw
+        ~depth:(-1)
+        []
+        ~error_msg:"Failed to parse argument 'depth' \\(\"-1\"\\)"
+    in
+    spawn_get_chain_block_context_raw
+      ~depth:0
+      ["non-existent"]
+      ~error_msg:"No service found at this URL"
   in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
@@ -1114,7 +1246,7 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   in
   unit
 
-let test_deprecated _test_mode_tag _protocol ?endpoint client =
+let test_deprecated _test_mode_tag protocol ?endpoint client =
   let check_rpc_not_found rpc =
     let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
     Process.check_error
@@ -1127,7 +1259,13 @@ let test_deprecated _test_mode_tag _protocol ?endpoint client =
 
   let implicit_account = Account.Bootstrap.keys.(0).public_key_hash in
   let make path =
-    RPC.make ~get_host:Node.rpc_host ~get_port:Node.rpc_port GET path Fun.id
+    RPC.make
+      ~get_host:Node.rpc_host
+      ~get_port:Node.rpc_port
+      ~get_scheme:Node.rpc_scheme
+      GET
+      path
+      Fun.id
   in
   let* () =
     check_rpc_not_found
@@ -1144,15 +1282,15 @@ let test_deprecated _test_mode_tag _protocol ?endpoint client =
          ]
   in
 
-  let* originated_account =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
+  let* _alias, originated_account =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   let* () =
     Lwt_list.iter_s

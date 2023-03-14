@@ -29,9 +29,9 @@ end) : sig
   module Make
       (RPC_client : RPC_client.S) (P : sig
         val authenticate :
-          Signature.Public_key_hash.t list ->
+          Tezos_crypto.Signature.Public_key_hash.t list ->
           Bytes.t ->
-          Signature.t tzresult Lwt.t
+          Tezos_crypto.Signature.t tzresult Lwt.t
 
         val logger : RPC_client.logger
       end) : Client_keys.SIGNER

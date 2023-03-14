@@ -31,7 +31,7 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8
+and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9
 
 let compare_version = Stdlib.compare
 
@@ -61,6 +61,7 @@ let module_name_of_env_version = function
   | V6 -> "V6"
   | V7 -> "V7"
   | V8 -> "V8"
+  | V9 -> "V9"
 
 let env_version_encoding =
   let open Data_encoding in
@@ -75,7 +76,8 @@ let env_version_encoding =
          | V5 -> 5
          | V6 -> 6
          | V7 -> 7
-         | V8 -> 8)
+         | V8 -> 8
+         | V9 -> 9)
        (function
          | 0 -> V0
          | 1 -> V1
@@ -86,6 +88,7 @@ let env_version_encoding =
          | 6 -> V6
          | 7 -> V7
          | 8 -> V8
+         | 9 -> V9
          | _ -> failwith "unexpected environment version")
        uint16
 
@@ -142,13 +145,13 @@ let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 
 let of_string_exn b = Data_encoding.Binary.of_string_exn encoding b
 
-let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
+let hash proto = Tezos_crypto.Hashed.Protocol_hash.hash_bytes [to_bytes proto]
 
-let hash_raw proto = Protocol_hash.hash_bytes [proto]
+let hash_raw proto = Tezos_crypto.Hashed.Protocol_hash.hash_bytes [proto]
 
 module Meta = struct
   type t = {
-    hash : Protocol_hash.t option;
+    hash : Tezos_crypto.Hashed.Protocol_hash.t option;
     expected_env_version : env_version option;
     modules : string list;
   }
@@ -169,7 +172,7 @@ module Meta = struct
          (opt
             "hash"
             ~description:"Used to force the hash of the protocol"
-            Protocol_hash.encoding)
+            Tezos_crypto.Hashed.Protocol_hash.encoding)
          (opt "expected_env_version" env_version_encoding)
          (req
             "modules"

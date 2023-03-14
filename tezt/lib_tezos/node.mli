@@ -80,6 +80,13 @@ type argument =
   | Media_type of media_type  (** [--media-type] *)
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
   | Metrics_addr of string  (** [--metrics-addr] *)
+  | Cors_origin of string  (** [--cors-origin] *)
+  | Disable_mempool  (** [--disable-mempool] *)
+
+(** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
+
+    Passed to [run] like commands through the [--rpc-tls] argument. *)
+type tls_config = {certificate_path : string; key_path : string}
 
 (** Tezos node states. *)
 type t
@@ -106,6 +113,8 @@ type t
     so if you do not call [config_init] or generate the configuration file
     through some other means, your node will not listen.
 
+    Default value for [allow_all_rpc] is [true].
+
     The argument list is a list of configuration options that the node
     should run with. It is passed to the first run of [octez-node config init].
     It is also passed to all runs of [octez-node run] that occur before
@@ -125,6 +134,8 @@ val create :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?rpc_tls:tls_config ->
+  ?allow_all_rpc:bool ->
   argument list ->
   t
 
@@ -183,11 +194,22 @@ val net_port : t -> int
 (** Get the network port given as [--advertised-net-port] to a node. *)
 val advertised_net_port : t -> int option
 
+(** Get the RPC scheme of a node.
+
+    Returns [https] if node is started with [--rpc-tls], otherwise [http] *)
+val rpc_scheme : t -> string
+
 (** Get the RPC host given as [--rpc-addr] to a node. *)
 val rpc_host : t -> string
 
-(** Get the RPC port given as [--rpc-addr] to a node. *)
+(** Get the RPC port given as [--rpc-port] to a node. *)
 val rpc_port : t -> int
+
+(** Get the node's RPC endpoint URI.
+
+    These are composed of the node's [--rpc-tls], [--rpc-addr]
+    and [--rpc-port] arguments. *)
+val rpc_endpoint : t -> string
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
@@ -211,8 +233,13 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** {2 Commands} *)
 
@@ -230,11 +257,11 @@ val show_history_mode : history_mode -> string
 (** Run [octez-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
 
-(** Run [octez-node config reset].
+(** Run [tezos-node config update]. *)
+val config_update : t -> argument list -> unit Lwt.t
 
-    Contrary to [config_init], this does not automatically adds
-    arguments that were passed to [create], only the [--data-dir]. *)
-val config_reset : t -> string list -> unit Lwt.t
+(** Run [tezos-node config reset]. *)
+val config_reset : t -> argument list -> unit Lwt.t
 
 (** Run [octez-node config show]. Returns the node configuration. *)
 val config_show : t -> JSON.t Lwt.t
@@ -286,13 +313,23 @@ end
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init : t -> argument list -> Process.t
 
+(** Same as [config_update], but do not wait for the process to exit. *)
+val spawn_config_update : t -> argument list -> Process.t
+
+(** Same as [config_reset], but do not wait for the process to exit. *)
+val spawn_config_reset : t -> argument list -> Process.t
+
 (** A snapshot history mode for exports *)
 type snapshot_history_mode = Rolling_history | Full_history
+
+(** A snapshot file format for exports *)
+type export_format = Tar | Raw
 
 (** Run [octez-node snapshot export]. *)
 val snapshot_export :
   ?history_mode:snapshot_history_mode ->
   ?export_level:int ->
+  ?export_format:export_format ->
   t ->
   string ->
   unit Lwt.t
@@ -301,6 +338,7 @@ val snapshot_export :
 val spawn_snapshot_export :
   ?history_mode:snapshot_history_mode ->
   ?export_level:int ->
+  ?export_format:export_format ->
   t ->
   string ->
   Process.t
@@ -310,6 +348,12 @@ val snapshot_import : ?reconstruct:bool -> t -> string -> unit Lwt.t
 
 (** Same as [snapshot_import], but do not wait for the process to exit. *)
 val spawn_snapshot_import : ?reconstruct:bool -> t -> string -> Process.t
+
+(** Run [octez-node reconstruct]. *)
+val reconstruct : t -> unit Lwt.t
+
+(** Same as [reconstruct], but do not wait for the process to exit. *)
+val spawn_reconstruct : t -> Process.t
 
 (** Spawn [octez-node run].
 
@@ -407,7 +451,7 @@ val wait_for_full :
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
@@ -453,6 +497,7 @@ val init :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?rpc_tls:tls_config ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?patch_config:(JSON.t -> JSON.t) ->

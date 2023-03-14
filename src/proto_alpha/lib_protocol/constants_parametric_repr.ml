@@ -28,8 +28,9 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  endorsement_lag : int;
-  availability_threshold : int;
+  attestation_lag : int;
+  attestation_threshold : int;
+  blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
 
@@ -39,33 +40,38 @@ let dal_encoding =
     (fun {
            feature_enable;
            number_of_slots;
-           endorsement_lag;
-           availability_threshold;
+           attestation_lag;
+           attestation_threshold;
            cryptobox_parameters;
+           blocks_per_epoch;
          } ->
       ( ( feature_enable,
           number_of_slots,
-          endorsement_lag,
-          availability_threshold ),
+          attestation_lag,
+          attestation_threshold,
+          blocks_per_epoch ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              number_of_slots,
-             endorsement_lag,
-             availability_threshold ),
+             attestation_lag,
+             attestation_threshold,
+             blocks_per_epoch ),
            cryptobox_parameters ) ->
       {
         feature_enable;
         number_of_slots;
-        endorsement_lag;
-        availability_threshold;
+        attestation_lag;
+        attestation_threshold;
+        blocks_per_epoch;
         cryptobox_parameters;
       })
     (merge_objs
-       (obj4
+       (obj5
           (req "feature_enable" bool)
           (req "number_of_slots" int16)
-          (req "endorsement_lag" int16)
-          (req "availability_threshold" int16))
+          (req "attestation_lag" int16)
+          (req "attestation_threshold" int16)
+          (req "blocks_per_epoch" int32))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
@@ -97,9 +103,9 @@ type tx_rollup = {
 
 type sc_rollup = {
   enable : bool;
+  arith_pvm_enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
-  max_number_of_messages_per_commitment_period : int;
   stake_amount : Tez_repr.t;
   commitment_period_in_blocks : int;
   max_lookahead_in_blocks : int32;
@@ -108,6 +114,7 @@ type sc_rollup = {
   number_of_sections_in_dissection : int;
   timeout_period_in_blocks : int;
   max_number_of_stored_cemented_commitments : int;
+  max_number_of_parallel_games : int;
 }
 
 type zk_rollup = {
@@ -238,35 +245,36 @@ let sc_rollup_encoding =
   conv
     (fun (c : sc_rollup) ->
       ( ( c.enable,
+          c.arith_pvm_enable,
           c.origination_size,
           c.challenge_window_in_blocks,
-          c.max_number_of_messages_per_commitment_period,
           c.stake_amount,
           c.commitment_period_in_blocks,
           c.max_lookahead_in_blocks,
           c.max_active_outbox_levels,
-          c.max_outbox_messages_per_level,
-          c.number_of_sections_in_dissection ),
-        (c.timeout_period_in_blocks, c.max_number_of_stored_cemented_commitments)
-      ))
+          c.max_outbox_messages_per_level ),
+        ( c.number_of_sections_in_dissection,
+          c.timeout_period_in_blocks,
+          c.max_number_of_stored_cemented_commitments,
+          c.max_number_of_parallel_games ) ))
     (fun ( ( sc_rollup_enable,
+             sc_rollup_arith_pvm_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
-             sc_rollup_max_number_of_messages_per_commitment_period,
              sc_rollup_stake_amount,
              sc_rollup_commitment_period_in_blocks,
              sc_rollup_max_lookahead_in_blocks,
              sc_rollup_max_active_outbox_levels,
-             sc_rollup_max_outbox_messages_per_level,
-             sc_rollup_number_of_sections_in_dissection ),
-           ( sc_rollup_timeout_period_in_blocks,
-             sc_rollup_max_number_of_cemented_commitments ) ) ->
+             sc_rollup_max_outbox_messages_per_level ),
+           ( sc_rollup_number_of_sections_in_dissection,
+             sc_rollup_timeout_period_in_blocks,
+             sc_rollup_max_number_of_cemented_commitments,
+             sc_rollup_max_number_of_parallel_games ) ) ->
       {
         enable = sc_rollup_enable;
+        arith_pvm_enable = sc_rollup_arith_pvm_enable;
         origination_size = sc_rollup_origination_size;
         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-        max_number_of_messages_per_commitment_period =
-          sc_rollup_max_number_of_messages_per_commitment_period;
         stake_amount = sc_rollup_stake_amount;
         commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
         max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
@@ -277,22 +285,24 @@ let sc_rollup_encoding =
         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
         max_number_of_stored_cemented_commitments =
           sc_rollup_max_number_of_cemented_commitments;
+        max_number_of_parallel_games = sc_rollup_max_number_of_parallel_games;
       })
     (merge_objs
-       (obj10
-          (req "sc_rollup_enable" bool)
-          (req "sc_rollup_origination_size" int31)
-          (req "sc_rollup_challenge_window_in_blocks" int31)
-          (req "sc_rollup_max_number_of_messages_per_commitment_period" int31)
-          (req "sc_rollup_stake_amount" Tez_repr.encoding)
-          (req "sc_rollup_commitment_period_in_blocks" int31)
-          (req "sc_rollup_max_lookahead_in_blocks" int32)
-          (req "sc_rollup_max_active_outbox_levels" int32)
-          (req "sc_rollup_max_outbox_messages_per_level" int31)
-          (req "sc_rollup_number_of_sections_in_dissection" uint8))
-       (obj2
-          (req "sc_rollup_timeout_period_in_blocks" int31)
-          (req "sc_rollup_max_number_of_cemented_commitments" int31)))
+       (obj9
+          (req "smart_rollup_enable" bool)
+          (req "smart_rollup_arith_pvm_enable" bool)
+          (req "smart_rollup_origination_size" int31)
+          (req "smart_rollup_challenge_window_in_blocks" int31)
+          (req "smart_rollup_stake_amount" Tez_repr.encoding)
+          (req "smart_rollup_commitment_period_in_blocks" int31)
+          (req "smart_rollup_max_lookahead_in_blocks" int32)
+          (req "smart_rollup_max_active_outbox_levels" int32)
+          (req "smart_rollup_max_outbox_messages_per_level" int31))
+       (obj4
+          (req "smart_rollup_number_of_sections_in_dissection" uint8)
+          (req "smart_rollup_timeout_period_in_blocks" int31)
+          (req "smart_rollup_max_number_of_cemented_commitments" int31)
+          (req "smart_rollup_max_number_of_parallel_games" int31)))
 
 let zk_rollup_encoding =
   let open Data_encoding in

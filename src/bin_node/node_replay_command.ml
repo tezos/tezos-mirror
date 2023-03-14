@@ -227,7 +227,13 @@ let replay_one_block strict main_chain_store validator_process block =
   if Store.Block.level block <= savepoint_level then
     tzfail Cannot_replay_below_savepoint
   else
-    let expected_context_hash = Store.Block.context_hash block in
+    let* protocol = Store.Block.protocol_hash main_chain_store block in
+    let* (module Proto) = Registered_protocol.get_result protocol in
+    let* expected_context_hash =
+      if Proto.expected_context_hash = Resulting_context then
+        return (Store.Block.context_hash block)
+      else Store.Block.resulting_context_hash main_chain_store block
+    in
     let* metadata = Store.Block.get_block_metadata main_chain_store block in
     let expected_block_receipt_bytes = Store.Block.block_metadata metadata in
     let expected_operation_receipts =
@@ -256,11 +262,12 @@ let replay_one_block strict main_chain_store validator_process block =
         (not
            (Context_hash.equal
               expected_context_hash
-              result.validation_store.context_hash))
+              result.validation_store.resulting_context_hash))
         (fun () ->
           let*! () =
             Event.(strict_emit ~strict inconsistent_context_hash)
-              (expected_context_hash, result.validation_store.context_hash)
+              ( expected_context_hash,
+                result.validation_store.resulting_context_hash )
           in
           return_unit)
     in
@@ -271,8 +278,6 @@ let replay_one_block strict main_chain_store validator_process block =
       when_
         (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
         (fun () ->
-          let* protocol = Store.Block.protocol_hash main_chain_store block in
-          let* (module Proto) = Registered_protocol.get_result protocol in
           let to_json block =
             Data_encoding.Json.construct Proto.block_header_metadata_encoding
             @@ Data_encoding.Binary.of_bytes_exn
@@ -347,11 +352,11 @@ let replay_one_block strict main_chain_store validator_process block =
           List.map (List.map fst) ops_metadata)
       check_receipt
 
-let replay ~singleprocess ~strict (config : Node_config_file.t) blocks =
+let replay ~singleprocess ~strict (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
-  let store_root = Node_data_version.store_dir config.data_dir in
-  let context_root = Node_data_version.context_dir config.data_dir in
-  let protocol_root = Node_data_version.protocol_dir config.data_dir in
+  let store_root = Data_version.store_dir config.data_dir in
+  let context_root = Data_version.context_dir config.data_dir in
+  let protocol_root = Data_version.protocol_dir config.data_dir in
   let genesis = config.blockchain_network.genesis in
   let (validator_env : Block_validator_process.validator_environment) =
     {
@@ -391,6 +396,7 @@ let replay ~singleprocess ~strict (config : Node_config_file.t) blocks =
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters = None;
+               dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
              })
       in
       let commit_genesis =
@@ -434,13 +440,17 @@ let replay ~singleprocess ~strict (config : Node_config_file.t) blocks =
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess ~strict (config : Node_config_file.t) blocks =
+let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
-  let* () = Node_data_version.ensure_data_dir config.data_dir in
+  let* () =
+    Data_version.ensure_data_dir
+      config.blockchain_network.genesis
+      config.data_dir
+  in
   Lwt_lock_file.try_with_lock
     ~when_locked:(fun () ->
       failwith "Data directory is locked by another process")
-    ~filename:(Node_data_version.lock_file config.data_dir)
+    ~filename:(Data_version.lock_file config.data_dir)
   @@ fun () ->
   (* Main loop *)
   let log_cfg =
@@ -454,7 +464,7 @@ let run ?verbosity ~singleprocess ~strict (config : Node_config_file.t) blocks =
       ~configuration:config.internal_events
       ()
   in
-  Updater.init (Node_data_version.protocol_dir config.data_dir) ;
+  Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
     @@ let*! res =
@@ -468,7 +478,7 @@ let check_data_dir dir =
   let* dir_exists = Lwt_unix.file_exists dir in
   fail_unless
     dir_exists
-    (Node_data_version.Invalid_data_dir
+    (Data_version.Invalid_data_dir
        {
          data_dir = dir;
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
@@ -481,9 +491,9 @@ let process verbosity singleprocess strict blocks args =
   in
   let run =
     let open Lwt_result_syntax in
-    let* data_dir = Node_shared_arg.read_data_dir args in
+    let* data_dir = Shared_arg.read_data_dir args in
     let* () = check_data_dir data_dir in
-    let* config = Node_shared_arg.read_and_patch_config_file args in
+    let* config = Shared_arg.read_and_patch_config_file args in
     run ?verbosity ~singleprocess ~strict config blocks
   in
   match Lwt_main.run run with
@@ -499,8 +509,7 @@ module Term = struct
        $(b,TEZOS_LOG='* -> debug')."
     in
     Arg.(
-      value & flag_all
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["v"])
+      value & flag_all & info ~docs:Shared_arg.Manpage.misc_section ~doc ["v"])
 
   let blocks =
     let open Cmdliner in
@@ -538,7 +547,7 @@ module Term = struct
       value
       & pos_all block [Block_services.Block (`Head 0)]
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"<level>|<block_hash>|<alias>"
           [])
@@ -560,13 +569,13 @@ module Term = struct
     in
     Arg.(
       value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["singleprocess"])
+      & info ~docs:Shared_arg.Manpage.misc_section ~doc ["singleprocess"])
 
   let term =
     Cmdliner.Term.(
       ret
         (const process $ verbosity $ singleprocess $ strict $ blocks
-       $ Node_shared_arg.Term.args))
+       $ Shared_arg.Term.args))
 end
 
 module Manpage = struct
@@ -606,8 +615,8 @@ module Manpage = struct
     ]
 
   let man =
-    description @ Node_shared_arg.Manpage.args @ debug @ examples
-    @ Node_shared_arg.Manpage.bugs
+    description @ Shared_arg.Manpage.args @ debug @ examples
+    @ Shared_arg.Manpage.bugs
 
   let info =
     Cmdliner.Cmd.info

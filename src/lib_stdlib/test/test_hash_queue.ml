@@ -29,7 +29,7 @@
     Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 module String = struct
   include String
@@ -142,16 +142,6 @@ let test_replace_above_capacity () =
     ~loc:__LOC__
     (Queue.find_opt q (mock_key 0))
 
-let test_filter () =
-  let q = init_queue 10 10 in
-  Queue.filter q (fun _ v -> v < 5) ;
-  Assert.Int.equal ~loc:__LOC__ 5 (Queue.length q)
-
-let test_filter_none () =
-  let q = init_queue 10 10 in
-  Queue.filter q (fun _ v -> v < 15) ;
-  Assert.Int.equal ~loc:__LOC__ 10 (Queue.length q)
-
 let test_clear () =
   let q = init_queue 10 10 in
   Queue.clear q ;
@@ -176,6 +166,27 @@ let test_elements () =
   let _, vs = gen_values 10 |> List.split in
   let elts = Queue.elements q in
   Assert.Int.List.equal ~loc:__LOC__ vs elts
+
+let test_keys () =
+  let q = init_queue 10 10 in
+  let ks, _ = gen_values 10 |> List.split in
+  let keys = Queue.keys q in
+  Assert.String.List.equal ~loc:__LOC__ ks keys
+
+let test_bindings () =
+  let q = init_queue 10 10 in
+  let bs = gen_values 10 in
+  let bndgs = Queue.bindings q in
+  let module Assert_bindings = Assert.Make_equalities (struct
+    type t = (string * int) list
+
+    let eq = Stdlib.( = )
+
+    let pp =
+      Format.pp_print_list (fun fmt (k, v) ->
+          Format.fprintf fmt "[%s -> %d]" k v)
+  end) in
+  Assert_bindings.equal ~loc:__LOC__ bs bndgs
 
 let test_take_replace_keep_order () =
   let q = init_queue 10 5 in
@@ -210,11 +221,11 @@ let () =
             `Quick,
             test_take_at_most_above_capacity );
           ("replace_above_capacity", `Quick, test_replace_above_capacity);
-          ("filter", `Quick, test_filter);
-          ("filter_none", `Quick, test_filter_none);
           ("clear", `Quick, test_clear);
           ("fold", `Quick, test_fold);
           ("elements", `Quick, test_elements);
+          ("keys", `Quick, test_keys);
+          ("bindings", `Quick, test_bindings);
           ("take_replace_keep_order", `Quick, test_take_replace_keep_order);
         ] );
     ]

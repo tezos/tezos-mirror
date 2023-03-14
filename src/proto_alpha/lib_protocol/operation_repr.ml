@@ -39,7 +39,7 @@ module Kind = struct
 
   type endorsement = endorsement_consensus_kind consensus
 
-  type dal_slot_availability = Dal_slot_availability_kind
+  type dal_attestation = Dal_attestation_kind
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -121,11 +121,11 @@ module Kind = struct
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
-  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
-
   type zk_rollup_origination = Zk_rollup_origination_kind
 
   type zk_rollup_publish = Zk_rollup_publish_kind
+
+  type zk_rollup_update = Zk_rollup_update_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -159,10 +159,9 @@ module Kind = struct
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
-    | Sc_rollup_dal_slot_subscribe_manager_kind
-        : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
+    | Zk_rollup_update_manager_kind : zk_rollup_update manager
 end
 
 type 'a consensus_operation_type =
@@ -217,20 +216,22 @@ let pp_consensus_content ppf content =
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
-  | Dal_slot_availability of Chain_id.t
+  | Dal_attestation of Chain_id.t
 
-let bytes_of_consensus_watermark = function
+let to_watermark = function
   | Preendorsement chain_id ->
-      Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
-  | Dal_slot_availability chain_id
-  (* We reuse the watermark of an endorsement. This is because this
+      Signature.Custom
+        (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
+  | Dal_attestation chain_id
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4479
+
+     We reuse the watermark of an endorsement. This is because this
      operation is temporary and aims to be merged with an endorsement
      later on. Moreover, there is a leak of abstraction with the shell
      which makes adding a new watermark a bit awkward. *)
   | Endorsement chain_id ->
-      Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
-
-let to_watermark w = Signature.Custom (bytes_of_consensus_watermark w)
+      Signature.Custom
+        (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
 
 let of_watermark = function
   | Signature.Custom b ->
@@ -238,15 +239,11 @@ let of_watermark = function
         match Bytes.get b 0 with
         | '\x12' ->
             Option.map
-              (fun chain_id -> Endorsement chain_id)
+              (fun chain_id -> Preendorsement chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | '\x13' ->
             Option.map
-              (fun chain_id -> Preendorsement chain_id)
-              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
-        | '\x14' ->
-            Option.map
-              (fun chain_id -> Dal_slot_availability chain_id)
+              (fun chain_id -> Endorsement chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -275,9 +272,9 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
-  | Dal_slot_availability :
-      Signature.Public_key_hash.t * Dal_endorsement_repr.t
-      -> Kind.dal_slot_availability contents
+  | Dal_attestation :
+      Dal_attestation_repr.operation
+      -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -330,7 +327,7 @@ and _ contents =
   | Manager_operation : {
       source : Signature.public_key_hash;
       fee : Tez_repr.tez;
-      counter : counter;
+      counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
       gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
@@ -425,19 +422,17 @@ and _ manager_operation =
       entrypoint : Entrypoint_repr.t;
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header : {
-      slot_header : Dal_slot_repr.Header.t;
-    }
+  | Dal_publish_slot_header :
+      Dal_operations_repr.Publish_slot_header.t
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
-      origination_proof : string;
+      origination_proof : Sc_rollup_proof_repr.serialized;
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
-      rollup : Sc_rollup_repr.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation
@@ -454,7 +449,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
-      refutation : Sc_rollup_game_repr.refutation option;
+      refutation : Sc_rollup_game_repr.refutation;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {
@@ -470,16 +465,12 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
+      staker : Signature.public_key_hash;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
-  | Sc_rollup_dal_slot_subscribe : {
-      rollup : Sc_rollup_repr.t;
-      slot_index : Dal_slot_repr.Index.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
-      circuits_info : bool Zk_rollup_account_repr.SMap.t;
+      circuits_info : [`Public | `Private | `Fee] Zk_rollup_account_repr.SMap.t;
       init_state : Zk_rollup_state_repr.t;
       nb_ops : int;
     }
@@ -489,8 +480,11 @@ and _ manager_operation =
       ops : (Zk_rollup_operation_repr.t * Zk_rollup_ticket_repr.t option) list;
     }
       -> Kind.zk_rollup_publish manager_operation
-
-and counter = Z.t
+  | Zk_rollup_update : {
+      zk_rollup : Zk_rollup_repr.t;
+      update : Zk_rollup_update_repr.t;
+    }
+      -> Kind.zk_rollup_update manager_operation
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function
@@ -523,10 +517,9 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_execute_outbox_message _ ->
       Kind.Sc_rollup_execute_outbox_message_manager_kind
   | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
-  | Sc_rollup_dal_slot_subscribe _ ->
-      Kind.Sc_rollup_dal_slot_subscribe_manager_kind
   | Zk_rollup_origination _ -> Kind.Zk_rollup_origination_manager_kind
   | Zk_rollup_publish _ -> Kind.Zk_rollup_publish_manager_kind
+  | Zk_rollup_update _ -> Kind.Zk_rollup_update_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -556,19 +549,24 @@ let to_list = function Contents_list l -> contents_list_to_list l
 (* This first version of of_list has the type (_, string) result expected by
    the conv_with_guard combinator of Data_encoding. For a more conventional
    return type see [of_list] below. *)
-let rec of_list_internal = function
+let of_list_internal contents =
+  let rec of_list_internal acc = function
+    | [] -> Ok acc
+    | Contents o :: os -> (
+        match (o, acc) with
+        | ( Manager_operation _,
+            Contents_list (Single (Manager_operation _) as rest) ) ->
+            (of_list_internal [@tailcall]) (Contents_list (Cons (o, rest))) os
+        | Manager_operation _, Contents_list (Cons _ as rest) ->
+            (of_list_internal [@tailcall]) (Contents_list (Cons (o, rest))) os
+        | _ ->
+            Error
+              "Operation list of length > 1 should only contain manager \
+               operations.")
+  in
+  match List.rev contents with
   | [] -> Error "Operation lists should not be empty."
-  | [Contents o] -> Ok (Contents_list (Single o))
-  | Contents o :: os -> (
-      of_list_internal os >>? fun (Contents_list os) ->
-      match (o, os) with
-      | Manager_operation _, Single (Manager_operation _) ->
-          Ok (Contents_list (Cons (o, os)))
-      | Manager_operation _, Cons _ -> Ok (Contents_list (Cons (o, os)))
-      | _ ->
-          Error
-            "Operation list of length > 1 should only contains manager \
-             operations.")
+  | Contents o :: os -> of_list_internal (Contents_list (Single o)) os
 
 type error += Contents_list_error of string (* `Permanent *)
 
@@ -618,9 +616,6 @@ let sc_rollup_execute_outbox_message_tag = sc_rollup_operation_tag_offset + 6
 
 let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
 
-let sc_rollup_operation_dal_slot_subscribe_tag =
-  sc_rollup_operation_tag_offset + 8
-
 let dal_offset = 230
 
 let dal_publish_slot_header_tag = dal_offset + 0
@@ -631,8 +626,17 @@ let zk_rollup_operation_create_tag = zk_rollup_operation_tag_offset + 0
 
 let zk_rollup_operation_publish_tag = zk_rollup_operation_tag_offset + 1
 
+let zk_rollup_operation_update_tag = zk_rollup_operation_tag_offset + 2
+
 module Encoding = struct
   open Data_encoding
+
+  (** These tags are reserved for future extensions: [fd] - [ff]. *)
+  let reserved_tag t = Compare.Int.(t >= 0xfd)
+
+  let signature_prefix_tag = 0xff
+
+  let () = assert (reserved_tag signature_prefix_tag)
 
   let case tag name args proj inj =
     case
@@ -810,12 +814,6 @@ module Encoding = struct
           inj = (fun () -> Tx_rollup_origination);
         }
 
-    let tx_rollup_batch_content =
-      (* The content of batches is a string, but stands for an immutable byte
-         sequence. JSON only allows unicode strings so we use the [bytes]
-         encoding which is in hexadecimal for JSON. *)
-      conv Bytes.of_string Bytes.to_string bytes
-
     let tx_rollup_submit_batch_case =
       MCase
         {
@@ -824,7 +822,7 @@ module Encoding = struct
           encoding =
             obj3
               (req "rollup" Tx_rollup_repr.encoding)
-              (req "content" tx_rollup_batch_content)
+              (req "content" (string Hex))
               (opt "burn_limit" Tez_repr.encoding);
           select =
             (function
@@ -1113,19 +1111,35 @@ module Encoding = struct
           inj = (fun (zk_rollup, ops) -> Zk_rollup_publish {zk_rollup; ops});
         }
 
-    let string_to_bytes_encoding =
-      Data_encoding.conv Bytes.of_string Bytes.to_string Data_encoding.bytes
+    let zk_rollup_update_case =
+      MCase
+        {
+          tag = zk_rollup_operation_update_tag;
+          name = "zk_rollup_update";
+          encoding =
+            obj2
+              (req "zk_rollup" Zk_rollup_repr.Address.encoding)
+              (req "update" Zk_rollup_update_repr.encoding);
+          select =
+            (function
+            | Manager (Zk_rollup_update _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Zk_rollup_update {zk_rollup; update} -> (zk_rollup, update));
+          inj =
+            (fun (zk_rollup, update) -> Zk_rollup_update {zk_rollup; update});
+        }
 
     let sc_rollup_originate_case =
       MCase
         {
           tag = sc_rollup_operation_origination_tag;
-          name = "sc_rollup_originate";
+          name = "smart_rollup_originate";
           encoding =
             obj4
               (req "pvm_kind" Sc_rollups.Kind.encoding)
-              (req "boot_sector" string_to_bytes_encoding)
-              (req "origination_proof" string_to_bytes_encoding)
+              (req "kernel" (string Hex))
+              (req "origination_proof" Sc_rollup_proof_repr.serialized_encoding)
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function
@@ -1146,40 +1160,36 @@ module Encoding = struct
         {
           tag = dal_publish_slot_header_tag;
           name = "dal_publish_slot_header";
-          encoding = obj1 (req "slot_header" Dal_slot_repr.Header.encoding);
+          encoding =
+            obj1
+              (req
+                 "slot_header"
+                 Dal_operations_repr.Publish_slot_header.encoding);
           select =
             (function
             | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);
-          proj =
-            (function Dal_publish_slot_header {slot_header} -> slot_header);
-          inj = (fun slot_header -> Dal_publish_slot_header {slot_header});
+          proj = (function Dal_publish_slot_header slot_header -> slot_header);
+          inj = (fun slot_header -> Dal_publish_slot_header slot_header);
         }
 
     let sc_rollup_add_messages_case =
       MCase
         {
           tag = sc_rollup_operation_add_message_tag;
-          name = "sc_rollup_add_messages";
-          encoding =
-            obj2
-              (req "rollup" Sc_rollup_repr.encoding)
-              (req "message" (list string));
+          name = "smart_rollup_add_messages";
+          encoding = obj1 (req "message" (list (string Hex)));
           select =
             (function
             | Manager (Sc_rollup_add_messages _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Sc_rollup_add_messages {rollup; messages} -> (rollup, messages));
-          inj =
-            (fun (rollup, messages) ->
-              Sc_rollup_add_messages {rollup; messages});
+          proj = (function Sc_rollup_add_messages {messages} -> messages);
+          inj = (fun messages -> Sc_rollup_add_messages {messages});
         }
 
     let sc_rollup_cement_case =
       MCase
         {
           tag = sc_rollup_operation_cement_tag;
-          name = "sc_rollup_cement";
+          name = "smart_rollup_cement";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1198,7 +1208,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_publish_tag;
-          name = "sc_rollup_publish";
+          name = "smart_rollup_publish";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1217,12 +1227,12 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_refute_tag;
-          name = "sc_rollup_refute";
+          name = "smart_rollup_refute";
           encoding =
             obj3
               (req "rollup" Sc_rollup_repr.encoding)
               (req "opponent" Sc_rollup_repr.Staker.encoding)
-              (opt "refutation" Sc_rollup_game_repr.refutation_encoding);
+              (req "refutation" Sc_rollup_game_repr.refutation_encoding);
           select =
             (function
             | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
@@ -1239,7 +1249,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_timeout_tag;
-          name = "sc_rollup_timeout";
+          name = "smart_rollup_timeout";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1257,14 +1267,14 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_execute_outbox_message_tag;
-          name = "sc_rollup_execute_outbox_message";
+          name = "smart_rollup_execute_outbox_message";
           encoding =
             obj3
               (req "rollup" Sc_rollup_repr.encoding)
               (req
                  "cemented_commitment"
                  Sc_rollup_commitment_repr.Hash.encoding)
-              (req "output_proof" Data_encoding.string);
+              (req "output_proof" (string Hex));
           select =
             (function
             | Manager (Sc_rollup_execute_outbox_message _ as op) -> Some op
@@ -1284,35 +1294,20 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_recover_bond_tag;
-          name = "sc_rollup_recover_bond";
-          encoding = obj1 (req "rollup" Sc_rollup_repr.Address.encoding);
+          name = "smart_rollup_recover_bond";
+          encoding =
+            obj2
+              (req "rollup" Sc_rollup_repr.Address.encoding)
+              (req "staker" Signature.Public_key_hash.encoding);
           select =
             (function
             | Manager (Sc_rollup_recover_bond _ as op) -> Some op | _ -> None);
-          proj = (function Sc_rollup_recover_bond {sc_rollup} -> sc_rollup);
-          inj = (fun sc_rollup -> Sc_rollup_recover_bond {sc_rollup});
-        }
-
-    let sc_rollup_dal_slot_subscribe_case =
-      MCase
-        {
-          tag = sc_rollup_operation_dal_slot_subscribe_tag;
-          name = "sc_rollup_dal_slot_subscribe";
-          encoding =
-            obj2
-              (req "rollup" Sc_rollup_repr.encoding)
-              (req "slot_index" Dal_slot_repr.Index.encoding);
-          select =
-            (function
-            | Manager (Sc_rollup_dal_slot_subscribe _ as op) -> Some op
-            | _ -> None);
           proj =
             (function
-            | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-                (rollup, slot_index));
+            | Sc_rollup_recover_bond {sc_rollup; staker} -> (sc_rollup, staker));
           inj =
-            (fun (rollup, slot_index) ->
-              Sc_rollup_dal_slot_subscribe {rollup; slot_index});
+            (fun (sc_rollup, staker) ->
+              Sc_rollup_recover_bond {sc_rollup; staker});
         }
   end
 
@@ -1413,26 +1408,27 @@ module Encoding = struct
                   @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
-  let dal_slot_availability_encoding =
-    obj2
-      (req "endorser" Signature.Public_key_hash.encoding)
-      (req "endorsement" Dal_endorsement_repr.encoding)
+  let dal_attestation_encoding =
+    obj3
+      (req "attestor" Signature.Public_key_hash.encoding)
+      (req "attestation" Dal_attestation_repr.encoding)
+      (req "level" Raw_level_repr.encoding)
 
-  let dal_slot_availability_case =
+  let dal_attestation_case =
     Case
       {
         tag = 22;
-        name = "dal_slot_availability";
-        encoding = dal_slot_availability_encoding;
+        name = "dal_attestation";
+        encoding = dal_attestation_encoding;
         select =
-          (function
-          | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
+          (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_slot_availability (endorser, endorsement)) ->
-            (endorser, endorsement));
+          (fun (Dal_attestation
+                 Dal_attestation_repr.{attestor; attestation; level}) ->
+            (attestor, attestation, level));
         inj =
-          (fun (endorser, endorsement) ->
-            Dal_slot_availability (endorser, endorsement));
+          (fun (attestor, attestation, level) ->
+            Dal_attestation Dal_attestation_repr.{attestor; attestation; level});
       }
 
   let seed_nonce_revelation_case =
@@ -1604,7 +1600,7 @@ module Encoding = struct
       {
         tag = 17;
         name = "failing_noop";
-        encoding = obj1 (req "arbitrary" Data_encoding.string);
+        encoding = obj1 (req "arbitrary" (string Hex));
         select =
           (function Contents (Failing_noop _ as op) -> Some op | _ -> None);
         proj = (function Failing_noop message -> message);
@@ -1615,7 +1611,7 @@ module Encoding = struct
     obj5
       (req "source" Signature.Public_key_hash.encoding)
       (req "fee" Tez_repr.encoding)
-      (req "counter" (check_size 10 n))
+      (req "counter" Manager_counter_repr.encoding_for_operation)
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
@@ -1761,11 +1757,6 @@ module Encoding = struct
       sc_rollup_operation_recover_bond_tag
       Manager_operations.sc_rollup_recover_bond_case
 
-  let sc_rollup_dal_slot_subscribe_case =
-    make_manager_case
-      sc_rollup_operation_dal_slot_subscribe_tag
-      Manager_operations.sc_rollup_dal_slot_subscribe_case
-
   let zk_rollup_origination_case =
     make_manager_case
       zk_rollup_operation_create_tag
@@ -1776,8 +1767,62 @@ module Encoding = struct
       zk_rollup_operation_publish_tag
       Manager_operations.zk_rollup_publish_case
 
+  let zk_rollup_update_case =
+    make_manager_case
+      zk_rollup_operation_update_tag
+      Manager_operations.zk_rollup_update_case
+
+  type packed_case = PCase : 'b case -> packed_case
+
+  let contents_cases =
+    [
+      PCase endorsement_case;
+      PCase preendorsement_case;
+      PCase dal_attestation_case;
+      PCase seed_nonce_revelation_case;
+      PCase vdf_revelation_case;
+      PCase double_endorsement_evidence_case;
+      PCase double_preendorsement_evidence_case;
+      PCase double_baking_evidence_case;
+      PCase activate_account_case;
+      PCase proposals_case;
+      PCase ballot_case;
+      PCase reveal_case;
+      PCase transaction_case;
+      PCase origination_case;
+      PCase delegation_case;
+      PCase set_deposits_limit_case;
+      PCase increase_paid_storage_case;
+      PCase update_consensus_key_case;
+      PCase drain_delegate_case;
+      PCase failing_noop_case;
+      PCase register_global_constant_case;
+      PCase tx_rollup_origination_case;
+      PCase tx_rollup_submit_batch_case;
+      PCase tx_rollup_commit_case;
+      PCase tx_rollup_return_bond_case;
+      PCase tx_rollup_finalize_commitment_case;
+      PCase tx_rollup_remove_commitment_case;
+      PCase tx_rollup_rejection_case;
+      PCase tx_rollup_dispatch_tickets_case;
+      PCase transfer_ticket_case;
+      PCase dal_publish_slot_header_case;
+      PCase sc_rollup_originate_case;
+      PCase sc_rollup_add_messages_case;
+      PCase sc_rollup_cement_case;
+      PCase sc_rollup_publish_case;
+      PCase sc_rollup_refute_case;
+      PCase sc_rollup_timeout_case;
+      PCase sc_rollup_execute_outbox_message_case;
+      PCase sc_rollup_recover_bond_case;
+      PCase zk_rollup_origination_case;
+      PCase zk_rollup_publish_case;
+      PCase zk_rollup_update_case;
+    ]
+
   let contents_encoding =
-    let make (Case {tag; name; encoding; select; proj; inj}) =
+    let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
+      assert (not @@ reserved_tag tag) ;
       case
         (Tag tag)
         name
@@ -1785,72 +1830,167 @@ module Encoding = struct
         (fun o -> match select o with None -> None | Some o -> Some (proj o))
         (fun x -> Contents (inj x))
     in
-    def "operation.alpha.contents"
-    @@ union
-         [
-           make endorsement_case;
-           make preendorsement_case;
-           make dal_slot_availability_case;
-           make seed_nonce_revelation_case;
-           make vdf_revelation_case;
-           make double_endorsement_evidence_case;
-           make double_preendorsement_evidence_case;
-           make double_baking_evidence_case;
-           make activate_account_case;
-           make proposals_case;
-           make ballot_case;
-           make reveal_case;
-           make transaction_case;
-           make origination_case;
-           make delegation_case;
-           make set_deposits_limit_case;
-           make increase_paid_storage_case;
-           make update_consensus_key_case;
-           make drain_delegate_case;
-           make failing_noop_case;
-           make register_global_constant_case;
-           make tx_rollup_origination_case;
-           make tx_rollup_submit_batch_case;
-           make tx_rollup_commit_case;
-           make tx_rollup_return_bond_case;
-           make tx_rollup_finalize_commitment_case;
-           make tx_rollup_remove_commitment_case;
-           make tx_rollup_rejection_case;
-           make tx_rollup_dispatch_tickets_case;
-           make transfer_ticket_case;
-           make dal_publish_slot_header_case;
-           make sc_rollup_originate_case;
-           make sc_rollup_add_messages_case;
-           make sc_rollup_cement_case;
-           make sc_rollup_publish_case;
-           make sc_rollup_refute_case;
-           make sc_rollup_timeout_case;
-           make sc_rollup_execute_outbox_message_case;
-           make sc_rollup_recover_bond_case;
-           make sc_rollup_dal_slot_subscribe_case;
-           make zk_rollup_origination_case;
-           make zk_rollup_publish_case;
-         ]
+    def "operation.alpha.contents" @@ union (List.map make contents_cases)
 
   let contents_list_encoding =
     conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
 
-  let optional_signature_encoding =
+  let protocol_data_json_encoding =
     conv
-      (function Some s -> s | None -> Signature.zero)
-      (fun s -> if Signature.equal s Signature.zero then None else Some s)
-      Signature.encoding
+      (fun (Operation_data {contents; signature}) ->
+        (Contents_list contents, signature))
+      (fun (Contents_list contents, signature) ->
+        Operation_data {contents; signature})
+      (obj2
+         (req "contents" (dynamic_size contents_list_encoding))
+         (opt "signature" Signature.encoding))
 
+  type contents_or_signature_prefix =
+    | Actual_contents of packed_contents
+    | Signature_prefix of Signature.prefix
+
+  let contents_or_signature_prefix_encoding =
+    let make_contents (PCase (Case {tag; name; encoding; select; proj; inj})) =
+      assert (not @@ reserved_tag tag) ;
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | Actual_contents o -> (
+              match select o with None -> None | Some o -> Some (proj o))
+          | _ -> None)
+        (fun x -> Actual_contents (Contents (inj x)))
+    in
+    def "operation.alpha.contents_or_signature_prefix"
+    @@ union
+    @@ case
+         (Tag signature_prefix_tag)
+         "signature_prefix"
+         (obj1 (req "signature_prefix" Signature.prefix_encoding))
+         (function Signature_prefix prefix -> Some prefix | _ -> None)
+         (fun prefix -> Signature_prefix prefix)
+       (* The case signature_prefix is added to the operation's contents so that
+          we can store the prefix of BLS signatures without breaking the
+          encoding of operations. *)
+       :: List.map make_contents contents_cases
+
+  let of_contents_and_signature_prefix contents_and_prefix =
+    let open Result_syntax in
+    let rec loop acc = function
+      | [] -> Ok acc
+      | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
+      | Actual_contents (Contents o) :: os -> (
+          match (o, acc) with
+          | ( Manager_operation _,
+              Contents_list (Single (Manager_operation _) as rest) ) ->
+              (loop [@tailcall]) (Contents_list (Cons (o, rest))) os
+          | Manager_operation _, Contents_list (Cons _ as rest) ->
+              (loop [@tailcall]) (Contents_list (Cons (o, rest))) os
+          | _ ->
+              Error
+                "Operation list of length > 1 should only contain manager \
+                 operations.")
+    in
+    let rev_contents, prefix =
+      match List.rev contents_and_prefix with
+      | Signature_prefix prefix :: rev_contents -> (rev_contents, Some prefix)
+      | rev_contents -> (rev_contents, None)
+    in
+    let+ packed_contents =
+      match rev_contents with
+      | [] -> Error "Operation lists should not be empty."
+      | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
+      | Actual_contents (Contents o) :: os -> loop (Contents_list (Single o)) os
+    in
+    (packed_contents, prefix)
+
+  let protocol_data_binary_encoding =
+    conv_with_guard
+      (fun (Operation_data {contents; signature}) ->
+        let contents_list =
+          List.map (fun c -> Actual_contents c)
+          @@ to_list (Contents_list contents)
+        in
+        let contents_and_signature_prefix, sig_suffix =
+          match signature with
+          | None -> (contents_list, Signature.(to_bytes zero))
+          | Some signature -> (
+              let {Signature.prefix; suffix} =
+                Signature.split_signature signature
+              in
+              match prefix with
+              | None -> (contents_list, suffix)
+              | Some prefix ->
+                  (contents_list @ [Signature_prefix prefix], suffix))
+        in
+        (contents_and_signature_prefix, sig_suffix))
+      (fun (contents_and_signature_prefix, suffix) ->
+        let open Result_syntax in
+        let* Contents_list contents, prefix =
+          of_contents_and_signature_prefix contents_and_signature_prefix
+        in
+        let+ signature =
+          Result.of_option ~error:"Invalid signature"
+          @@ Signature.of_splitted {Signature.prefix; suffix}
+        in
+        let signature =
+          match prefix with
+          | None ->
+              if Signature.(signature = zero) then None else Some signature
+          | Some _ -> Some signature
+        in
+        Operation_data {contents; signature})
+      (obj2
+         (req
+            "contents_and_signature_prefix"
+            (Variable.list contents_or_signature_prefix_encoding))
+         (req "signature_suffix" (Fixed.bytes Hex 64)))
+
+  (* The binary and JSON encodings are different for protocol data, because we
+     have to fit BLS signatures (which are 96 bytes long) in a backward
+     compatible manner with fixed size signatures of 64 bytes.
+
+     The JSON encoding is the same as in the previous protocols.
+
+     To support BLS signatures, we extract the prefix of the signature and fit
+     it inside the field [contents] while keeping the 64 bytes suffix in the
+     same place as the other signature kinds (i.e. at the end).
+
+     For instance the binary protocol data for a transfer operation signed by a
+     Ed25519 key would look like:
+
+     +----------------+------------+
+     |  Transaction   | signature  |
+     +----+------+----+------------+
+     | 6C |  ... | 00 | (64 bytes) |
+     +----+------+----+------------+
+
+     The same transfer signed by a BLS key would be instead:
+
+     +----------------+----------------------------+-------------------+
+     |  Transaction   |      signature prefix      | signature suffix  |
+     +----+------+----+----+----+------------------+-------------------+
+     | 6C |  ... | 00 | ff | 03 | (first 32 bytes) | (last 64 bytes)   |
+     +----+------+----+----+----+------------------+-------------------+
+
+     Which can also be viewed with an equivalent schema:
+
+     +----------------+----+---------------+--------------------------+
+     |  Transaction   | ff | signature tag |        signature         |
+     +----+------+----+----+---------------+--------------------------+
+     | 6C |  ... | 00 | ff |   03 (BLS)    | (96 bytes BLS signature) |
+     +----+------+----+----+---------------+--------------------------+
+
+     NOTE: BLS only supports the tagged format and Ed25519, Secp256k1 and P256
+     signatures only support the untagged one. The latter restriction is only
+     here to guarantee unicity of the binary representation for signatures.
+  *)
   let protocol_data_encoding =
     def "operation.alpha.contents_and_signature"
-    @@ conv
-         (fun (Operation_data {contents; signature}) ->
-           (Contents_list contents, signature))
-         (fun (Contents_list contents, signature) ->
-           Operation_data {contents; signature})
-         (obj2
-            (req "contents" contents_list_encoding)
-            (req "signature" optional_signature_encoding))
+    @@ splitted
+         ~json:protocol_data_json_encoding
+         ~binary:protocol_data_binary_encoding
 
   let operation_encoding =
     conv
@@ -1902,7 +2042,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Failing_noop _) -> None
   | Single (Preendorsement _) -> Some consensus_pass
   | Single (Endorsement _) -> Some consensus_pass
-  | Single (Dal_slot_availability _) -> Some consensus_pass
+  | Single (Dal_attestation _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
@@ -1963,7 +2103,7 @@ let () =
         ppf
         "An operation contents list has an unexpected shape: %s"
         s)
-    Data_encoding.(obj1 (req "message" string))
+    Data_encoding.(obj1 (req "message" (string Hex)))
     (function Contents_list_error s -> Some s | _ -> None)
     (fun s -> Contents_list_error s)
 
@@ -1992,9 +2132,9 @@ let check_signature (type kind) key chain_id
             ~watermark:(to_watermark (Endorsement chain_id))
             (Contents_list contents)
             signature
-      | Single (Dal_slot_availability _) as contents ->
+      | Single (Dal_attestation _) as contents ->
           check
-            ~watermark:(to_watermark (Dal_slot_availability chain_id))
+            ~watermark:(to_watermark (Dal_attestation chain_id))
             (Contents_list contents)
             signature
       | Single
@@ -2087,12 +2227,12 @@ let equal_manager_operation_kind :
   | Sc_rollup_execute_outbox_message _, _ -> None
   | Sc_rollup_recover_bond _, Sc_rollup_recover_bond _ -> Some Eq
   | Sc_rollup_recover_bond _, _ -> None
-  | Sc_rollup_dal_slot_subscribe _, Sc_rollup_dal_slot_subscribe _ -> Some Eq
-  | Sc_rollup_dal_slot_subscribe _, _ -> None
   | Zk_rollup_origination _, Zk_rollup_origination _ -> Some Eq
   | Zk_rollup_origination _, _ -> None
   | Zk_rollup_publish _, Zk_rollup_publish _ -> Some Eq
   | Zk_rollup_publish _, _ -> None
+  | Zk_rollup_update _, Zk_rollup_update _ -> Some Eq
+  | Zk_rollup_update _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
@@ -2102,8 +2242,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preendorsement _, _ -> None
   | Endorsement _, Endorsement _ -> Some Eq
   | Endorsement _, _ -> None
-  | Dal_slot_availability _, Dal_slot_availability _ -> Some Eq
-  | Dal_slot_availability _, _ -> None
+  | Dal_attestation _, Dal_attestation _ -> Some Eq
+  | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation _ -> Some Eq
@@ -2272,9 +2412,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     The [weight] of an {!Endorsement} or {!Preendorsement} depends on
    its {!endorsement_infos}.
 
-    The [weight] of a {!Dal_slot_availability} depends on the pair of
-   the size of its bitset, {!Dal_endorsement_repr.t}, and the
-   signature of its endorser {! Signature.Public_key_hash.t}.
+    The [weight] of a {!Dal_attestation} depends on the pair of
+   the size of its bitset, {!Dal_attestation_repr.t}, and the
+   signature of its attestor {! Signature.Public_key_hash.t}.
 
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
@@ -2304,8 +2444,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 type _ weight =
   | Weight_endorsement : endorsement_infos -> consensus_pass_type weight
   | Weight_preendorsement : endorsement_infos -> consensus_pass_type weight
-  | Weight_dal_slot_availability :
-      int * Signature.Public_key_hash.t
+  | Weight_dal_attestation :
+      (* attestor * num_attestations * level *)
+      (Signature.Public_key_hash.t * int * int32)
       -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
@@ -2405,12 +2546,14 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_endorsement
             (endorsement_infos_from_consensus_content consensus_content) )
-  | Single (Dal_slot_availability (endorser, endorsements)) ->
+  | Single (Dal_attestation Dal_attestation_repr.{attestor; attestation; level})
+    ->
       W
         ( Consensus,
-          Weight_dal_slot_availability
-            (Dal_endorsement_repr.occupied_size_in_bits endorsements, endorser)
-        )
+          Weight_dal_attestation
+            ( attestor,
+              Dal_attestation_repr.occupied_size_in_bits attestation,
+              Raw_level_repr.to_int32 level ) )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2537,16 +2680,19 @@ let compare_baking_infos infos1 infos2 =
     (infos1.round, infos1.bh_hash)
     (infos2.round, infos2.bh_hash)
 
-(** Two valid {!Dal_slot_availability} are compared in the
-   lexicographic order of their pairs of bitsets size and endorser
+(** Two valid {!Dal_attestation} are compared in the
+   lexicographic order of their pairs of bitsets size and attestor
    hash. *)
-let compare_dal_slot_availability (endorsements1, endorser1)
-    (endorsements2, endorser2) =
+let compare_dal_attestation (attestor1, endorsements1, level1)
+    (attestor2, endorsements2, level2) =
   compare_pair_in_lexico_order
-    ~cmp_fst:Compare.Int.compare
+    ~cmp_fst:
+      (compare_pair_in_lexico_order
+         ~cmp_fst:Compare.Int32.compare
+         ~cmp_snd:Compare.Int.compare)
     ~cmp_snd:Signature.Public_key_hash.compare
-    (endorsements1, endorser1)
-    (endorsements2, endorser2)
+    ((level1, endorsements1), attestor1)
+    ((level2, endorsements2), attestor2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
@@ -2556,9 +2702,9 @@ let compare_dal_slot_availability (endorsements1, endorser1)
    comparison on {!endorsement_infos} for {!Endorsement} and
    {!Preendorsement}: see {!endorsement_infos} for more details.
 
-    {!Dal_slot_availability} is smaller than the other kinds of
-   consensus operations. Two valid {!Dal_slot_availability} are
-   compared by {!compare_dal_slot_availability}. *)
+    {!Dal_attestation} is smaller than the other kinds of
+   consensus operations. Two valid {!Dal_attestation} are
+   compared by {!compare_dal_attestation}. *)
 let compare_consensus_weight w1 w2 =
   match (w1, w2) with
   | Weight_endorsement infos1, Weight_endorsement infos2 ->
@@ -2569,14 +2715,14 @@ let compare_consensus_weight w1 w2 =
       compare_endorsement_infos ~prioritized_position:Fstpos infos1 infos2
   | Weight_preendorsement infos1, Weight_endorsement infos2 ->
       compare_endorsement_infos ~prioritized_position:Sndpos infos1 infos2
-  | ( Weight_dal_slot_availability (size1, endorser1),
-      Weight_dal_slot_availability (size2, endorser2) ) ->
-      compare_dal_slot_availability (size1, endorser1) (size2, endorser2)
-  | ( Weight_dal_slot_availability _,
-      (Weight_endorsement _ | Weight_preendorsement _) ) ->
+  | ( Weight_dal_attestation (attestor1, size1, lvl1),
+      Weight_dal_attestation (attestor2, size2, lvl2) ) ->
+      compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
+  | Weight_dal_attestation _, (Weight_endorsement _ | Weight_preendorsement _)
+    ->
       -1
-  | ( (Weight_endorsement _ | Weight_preendorsement _),
-      Weight_dal_slot_availability _ ) ->
+  | (Weight_endorsement _ | Weight_preendorsement _), Weight_dal_attestation _
+    ->
       1
 
 (** {5 Comparison of valid voting operations} *)

@@ -114,7 +114,7 @@ module Id = struct
     conv addr_port_id_to_string addr_port_id_of_string_exn string
 
   let rpc_arg =
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:"point"
       ~descr:"A network point (ipv4:port or [ipv6]:port)."
       ~destruct:of_string
@@ -132,14 +132,21 @@ module Table = Hashtbl.MakeSeeded (struct
 
   let equal = Id.equal
 
+  (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+  [@@@ocaml.warning "-32"]
+
   let hash = Hashtbl.seeded_hash
+
+  let seeded_hash = Hashtbl.seeded_hash
+
+  [@@@ocaml.warning "+32"]
 end)
 
 module Filter = struct
   type t = Requested | Accepted | Running | Disconnected
 
   let rpc_arg =
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:"p2p.point.state_filter"
       ~destruct:(function
         | "requested" -> Ok Requested

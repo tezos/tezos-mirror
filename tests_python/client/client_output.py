@@ -95,7 +95,6 @@ class GetAddressesResult:
     """Result of 'list known addresses' operation."""
 
     def __init__(self, client_output: str):
-
         pattern = re.compile(r"^(\w+):\s*(\w+).*$", re.MULTILINE)
         self.wallet = dict(re.findall(pattern, client_output))
 
@@ -236,7 +235,6 @@ class HashResult:
     """Result of a 'hash data' command."""
 
     def __init__(self, client_output: str):
-
         pattern = r'''Raw packed data: ?(0x[0-9a-f]*)
 Script-expression-ID-Hash: ?(\w*)
 Raw Script-expression-ID-Hash: ?(\w*)
@@ -257,7 +255,6 @@ class SignBytesResult:
     """Result of a 'sign bytes ...' command."""
 
     def __init__(self, client_output: str):
-
         pattern = r'Signature: ?(\w*)\n'
         match = re.search(pattern, client_output)
         if match is None:
@@ -269,7 +266,6 @@ class SignMessageResult:
     """Result of a 'sign message ...' command."""
 
     def __init__(self, client_output: str):
-
         pattern = r'Signature: ?(\w*)\n'
         match = re.search(pattern, client_output)
         if match is None:
@@ -538,7 +534,6 @@ class CheckSignMessageResult:
     """Result of a 'check that message...' command."""
 
     def __init__(self, client_output: str):
-
         pattern = r'Signature check successful *\n'
         match = re.search(pattern, client_output)
         if match is None:

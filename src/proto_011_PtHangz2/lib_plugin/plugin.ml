@@ -908,7 +908,7 @@ module RPC = struct
       let operation : _ operation = {shell; protocol_data} in
       let hash = Operation.hash {shell; protocol_data} in
       let ctxt = Contract.init_origination_nonce ctxt hash in
-      let baker = Signature.Public_key_hash.zero in
+      let baker = Tezos_crypto.Signature.V0.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
@@ -1897,7 +1897,7 @@ module RPC = struct
   module Baking_rights = struct
     type t = {
       level : Raw_level.t;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       priority : int;
       timestamp : Timestamp.t option;
     }
@@ -1911,7 +1911,7 @@ module RPC = struct
           {level; delegate; priority; timestamp})
         (obj4
            (req "level" Raw_level.encoding)
-           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "priority" uint16)
            (opt "estimated_time" Timestamp.encoding))
 
@@ -1923,7 +1923,7 @@ module RPC = struct
       type baking_rights_query = {
         levels : Raw_level.t list;
         cycles : Cycle.t list;
-        delegates : Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
         max_priority : int option;
         all : bool;
       }
@@ -1971,7 +1971,7 @@ module RPC = struct
         if Compare.Int.(priority > max_prio) then return (List.rev acc)
         else
           let (Misc.LCons (pk, next)) = l in
-          let delegate = Signature.Public_key.hash pk in
+          let delegate = Tezos_crypto.Signature.V0.Public_key.hash pk in
           (match pred_timestamp with
           | None -> ok_none
           | Some pred_timestamp ->
@@ -2001,7 +2001,8 @@ module RPC = struct
               next () >>=? fun l ->
               match
                 List.partition
-                  (fun (pk', _) -> Signature.Public_key.equal pk pk')
+                  (fun (pk', _) ->
+                    Tezos_crypto.Signature.V0.Public_key.equal pk pk')
                   delegates
               with
               | [], _ -> loop l acc (priority + 1) delegates
@@ -2027,11 +2028,17 @@ module RPC = struct
       List.rev @@ fst
       @@ List.fold_left
            (fun (acc, previous) r ->
-             if Signature.Public_key_hash.Set.mem r.delegate previous then
-               (acc, previous)
+             if
+               Tezos_crypto.Signature.V0.Public_key_hash.Set.mem
+                 r.delegate
+                 previous
+             then (acc, previous)
              else
-               (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
-           ([], Signature.Public_key_hash.Set.empty)
+               ( r :: acc,
+                 Tezos_crypto.Signature.V0.Public_key_hash.Set.add
+                   r.delegate
+                   previous ))
+           ([], Tezos_crypto.Signature.V0.Public_key_hash.Set.empty)
            rights
 
     let register () =
@@ -2088,7 +2095,7 @@ module RPC = struct
   module Endorsing_rights = struct
     type t = {
       level : Raw_level.t;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       slots : int list;
       estimated_time : Time.t option;
     }
@@ -2102,7 +2109,7 @@ module RPC = struct
           {level; delegate; slots; estimated_time})
         (obj4
            (req "level" Raw_level.encoding)
-           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "slots" (list uint16))
            (opt "estimated_time" Timestamp.encoding))
 
@@ -2114,7 +2121,7 @@ module RPC = struct
       type endorsing_rights_query = {
         levels : Raw_level.t list;
         cycles : Cycle.t list;
-        delegates : Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
       }
 
       let endorsing_rights_query =
@@ -2169,7 +2176,7 @@ module RPC = struct
           | _ :: _ as delegates ->
               let is_requested p =
                 List.exists
-                  (Signature.Public_key_hash.equal p.delegate)
+                  (Tezos_crypto.Signature.V0.Public_key_hash.equal p.delegate)
                   delegates
               in
               List.filter is_requested rights)

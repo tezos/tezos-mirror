@@ -281,12 +281,6 @@ let check_value_size () =
     *)
     @ exs nsample show_address Address_t ": address_t"
     (*
-       Tx_rollup_l2_address_t
-       ======================
-    *)
-    @ (let show = Indexable.pp Tx_rollup_l2_address.pp in
-       exs nsample show Tx_rollup_l2_address_t ": tx_rollup_l2_t")
-    (*
        Bool_t
        ======
     *)
@@ -481,7 +475,7 @@ let check_value_size () =
         ======
     *)
     @ (let module P = struct
-         type 'a f = {apply : 'c. ('a boxed_list, 'c) ty -> ex list}
+         type 'a f = {apply : 'c. ('a Script_list.t, 'c) ty -> ex list}
        end in
       let on_list : type a. (a, _) ty -> a P.f -> ex list =
        fun ty f -> f.apply @@ is_ok @@ list_t dummy_loc ty
@@ -492,7 +486,9 @@ let check_value_size () =
           {
             apply =
               (fun ty ->
-                let show fmt l = Format.pp_print_list show_elt fmt l.elements in
+                let show fmt l =
+                  Format.pp_print_list show_elt fmt @@ Script_list.to_list l
+                in
                 exs nsample show ty ": list _");
           }
       in
@@ -637,6 +633,8 @@ let check_value_size () =
           - Chest_key_t ;
           - Chest_t ;
           - Lambda_t.
+          Missing because of language deprecation:
+          - Tx_rollup_l2_address_t.
     *)
     )
 
@@ -850,6 +848,12 @@ let check_kinstr_size () =
       Kinstr ("IAnd_int_nat", IAnd_int_nat (loc, halt ()));
       Kinstr ("IXor_nat", IXor_nat (loc, halt ()));
       Kinstr ("INot_int", INot_int (loc, halt ()));
+      Kinstr ("IAnd_bytes", IAnd_bytes (loc, halt ()));
+      Kinstr ("IOr_bytes", IOr_bytes (loc, halt ()));
+      Kinstr ("IXor_bytes", IXor_bytes (loc, halt ()));
+      Kinstr ("INot_bytes", INot_bytes (loc, halt ()));
+      Kinstr ("ILsl_bytes", ILsl_bytes (loc, halt ()));
+      Kinstr ("ILsr_bytes", ILsr_bytes (loc, halt ()));
       Kinstr
         ( "IIf",
           IIf

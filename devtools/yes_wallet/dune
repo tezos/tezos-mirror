@@ -11,8 +11,8 @@
   tezos-store
   tezos-shell-context
   tezos-context
-  tezos-protocol-014-PtKathma
   tezos-protocol-015-PtLimaPt
+  tezos-protocol-016-PtMumbai
   tezos-protocol-alpha)
  (library_flags (:standard -linkall))
  (flags
@@ -24,6 +24,9 @@
  (name yes_wallet)
  (libraries
   yes_wallet_lib)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Yes_wallet_lib)

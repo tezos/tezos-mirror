@@ -25,15 +25,13 @@
 
 module S = struct
   let config =
-    RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Return the runtime node configuration (this takes into account the \
          command-line arguments and the on-disk configuration file)"
-      ~query:RPC_query.empty
-      ~output:Node_config_file.encoding
-      RPC_path.(root / "config")
+      ~query:Tezos_rpc.Query.empty
+      ~output:Config_file.encoding
+      Tezos_rpc.Path.(root / "config")
 end
 
-open RPC_context
-
-let config ctxt = make_call S.config ctxt () ()
+let config ctxt = Tezos_rpc.Context.make_call S.config ctxt () ()

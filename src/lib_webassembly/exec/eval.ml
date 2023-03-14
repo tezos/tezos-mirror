@@ -358,12 +358,16 @@ type invoke_step_kont =
       concat_kont : value concat_kont;
     }
   | Inv_reveal_tick of {
-      reveal : Reveal.reveal;
+      reveal : Host_funcs.reveal;
       base_destination : int32;
       max_bytes : int32;
       code : code;
     }
-  | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+  | Inv_stop of {
+      code : code;
+      fresh_frame : ongoing frame_stack option;
+      remaining_ticks : Z.t;
+    }
 
 let vector_pop_map v f at =
   if 1l <= Vector.num_elements v then
@@ -412,17 +416,23 @@ type config = {
   step_kont : step_kont;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
-  module_reg : module_reg;
 }
 
 let frame inst locals = {inst; locals}
 
-let buffers ?(input = Input_buffer.alloc ()) ?(output = Output_buffer.alloc ())
-    () =
+let output_buffer_message_limit = Z.of_int32 100_000l
+
+let default_output_buffer () =
+  Output_buffer.alloc
+    ~last_level:(Some 0l)
+    ~validity_period:10l
+    ~message_limit:output_buffer_message_limit
+
+let buffers ?(input = Input_buffer.alloc ())
+    ?(output = default_output_buffer ()) () =
   {input; output}
 
-let config host_funcs ?frame_arity inst (module_reg : Instance.module_reg) vs es
-    =
+let config host_funcs ?frame_arity inst vs es =
   let frame = frame inst (Vector.empty ()) in
   let label_kont =
     label_kont
@@ -435,7 +445,6 @@ let config host_funcs ?frame_arity inst (module_reg : Instance.module_reg) vs es
     step_kont = SK_Start (frame_stack, Vector.empty ());
     host_funcs;
     stack_size_limit = 300;
-    module_reg;
   }
 
 let plain e = Plain e.it @@ e.at
@@ -499,10 +508,14 @@ let block_type inst bt =
 
 let vmtake n vs = match n with Some n -> Vector.split vs n |> fst | None -> vs
 
-let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
-  function
-  | Inv_stop _ ->
+let invoke_step ~init ?(durable = Durable_storage.empty)
+    (module_reg : module_reg) c buffers frame at = function
+  | Inv_stop {remaining_ticks; _} when remaining_ticks <= Z.zero ->
       raise (Evaluation_step_error (Invoke_step "Inv_stop cannot reduce"))
+  | Inv_stop stop ->
+      Lwt.return
+        ( durable,
+          Inv_stop {stop with remaining_ticks = Z.pred stop.remaining_ticks} )
   | Inv_start {func; code = vs, es} -> (
       let (FuncType (ins, out)) = func_type_of func in
       let n1, n2 =
@@ -529,14 +542,14 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
               let host_func = Host_funcs.lookup ~global_name c.host_funcs in
               let* args = Vector.to_list args in
               let args = List.rev args in
-              let* inst = resolve_module_ref c.module_reg frame.inst in
+              let* inst = resolve_module_ref module_reg frame.inst in
               let available_memories =
                 if not init then Host_funcs.Available_memories inst.memories
                 else Host_funcs.No_memories_during_init
               in
               match host_func with
               | Host_func f ->
-                  let+ durable, res =
+                  let+ durable, res, remaining_ticks =
                     f
                       buffers.input
                       buffers.output
@@ -545,18 +558,33 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                       args
                   in
                   let vs' = Vector.prepend_list res vs' in
-                  (durable, Inv_stop {code = (vs', es); fresh_frame = None})
-              | Reveal_func f ->
-                  let* reveal, {base; max_bytes} = f available_memories args in
-                  Lwt.return
-                    ( durable,
-                      Inv_reveal_tick
-                        {
-                          reveal;
-                          max_bytes;
-                          base_destination = base;
-                          code = (vs', es);
-                        } ))
+                  ( durable,
+                    Inv_stop
+                      {code = (vs', es); fresh_frame = None; remaining_ticks} )
+              | Reveal_func f -> (
+                  let* result = f available_memories args in
+                  match result with
+                  | Ok (reveal, {base; max_bytes}) ->
+                      Lwt.return
+                        ( durable,
+                          Inv_reveal_tick
+                            {
+                              reveal;
+                              max_bytes;
+                              base_destination = base;
+                              code = (vs', es);
+                            } )
+                  | Error err_code ->
+                      let err_code = Num (I32 err_code) in
+                      let vs' = Vector.prepend_list [err_code] vs' in
+                      Lwt.return
+                        ( durable,
+                          Inv_stop
+                            {
+                              code = (vs', es);
+                              fresh_frame = None;
+                              remaining_ticks = Z.zero;
+                            } )))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
       {
@@ -635,6 +663,7 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                                 (From_block (f.it.body, 0l) @@ f.at) );
                         };
                   };
+              remaining_ticks = Z.zero;
             } )
   | Inv_reveal_tick _ ->
       (* This is a reveal tick, not an evaluation tick. The PVM should
@@ -1312,12 +1341,13 @@ let push_admin_instr label es vs instr next stack =
 let label_step :
     init:bool ->
     Durable_storage.t ->
+    module_reg ->
     config ->
     buffers ->
     frame ->
     label_step_kont ->
     (Durable_storage.t * label_step_kont) Lwt.t =
- fun ~init durable c buffers frame label_kont ->
+ fun ~init durable module_reg c buffers frame label_kont ->
   match label_kont with
   | LS_Push_frame _ | LS_Modify_top _ ->
       raise (Evaluation_step_error Label_step)
@@ -1329,11 +1359,11 @@ let label_step :
           match e.it with
           | Plain e' ->
               let+ kont =
-                step_instr c.module_reg frame label vs e.at e' es stack
+                step_instr module_reg frame label vs e.at e' es stack
               in
               LS_Modify_top kont
           | From_block (Block_label b, i) ->
-              let* inst = resolve_module_ref c.module_reg frame.inst in
+              let* inst = resolve_module_ref module_reg frame.inst in
               let* block = Vector.get b inst.allocations.blocks in
               let length = Vector.num_elements block in
               if i = length then
@@ -1437,7 +1467,9 @@ let label_step :
   | LS_Consolidate_top (label', tick, es', stack) ->
       let+ tick = concat_step tick in
       (durable, LS_Consolidate_top (label', tick, es', stack))
-  | LS_Craft_frame (Label_stack (label, stack), Inv_stop {code; fresh_frame}) ->
+  | LS_Craft_frame
+      (Label_stack (label, stack), Inv_stop {code; fresh_frame; remaining_ticks})
+    when remaining_ticks <= Z.zero ->
       let label_kont = Label_stack ({label with label_code = code}, stack) in
       Lwt.return
         ( durable,
@@ -1446,7 +1478,7 @@ let label_step :
           | None -> LS_Modify_top label_kont )
   | LS_Craft_frame (label, istep) ->
       let+ durable, istep =
-        invoke_step ~init ~durable c buffers frame no_region istep
+        invoke_step ~init ~durable module_reg c buffers frame no_region istep
       in
       (durable, LS_Craft_frame (label, istep))
 
@@ -1455,7 +1487,7 @@ let label_step :
 let dup_frame {frame_arity; frame_specs = {inst; locals}; frame_label_kont} =
   {frame_arity; frame_specs = {inst; locals}; frame_label_kont}
 
-let frame_step ~init durable c buffers = function
+let frame_step ~init durable module_reg c buffers = function
   | SK_Result _ | SK_Trapped _ -> raise (Evaluation_step_error Frame_step)
   | SK_Start (frame, stack) ->
       let+ kont =
@@ -1516,18 +1548,21 @@ let frame_step ~init durable c buffers = function
       Lwt.return (durable, SK_Start (frame', Vector.cons frame stack))
   | SK_Next (frame, stack, istep) ->
       let+ durable, istep =
-        label_step ~init durable c buffers frame.frame_specs istep
+        label_step ~init durable module_reg c buffers frame.frame_specs istep
       in
       (durable, SK_Next (frame, stack, istep))
 
-let step ?(init = false) ?(durable = Durable_storage.empty) c buffers =
+let step ?(init = false) ?(durable = Durable_storage.empty) module_reg c buffers
+    =
   match c.step_kont with
   | SK_Result _ | SK_Trapped _ -> raise (Evaluation_step_error Eval_step)
   | kont ->
-      let+ durable, step_kont = frame_step ~init durable c buffers kont in
+      let+ durable, step_kont =
+        frame_step ~init durable module_reg c buffers kont
+      in
       (durable, {c with step_kont})
 
-let rec eval durable module_reg (c : config) buffers :
+let rec eval ?(init = false) durable module_reg (c : config) buffers :
     (Durable_storage.t * value list) Lwt.t =
   match c.step_kont with
   | SK_Result vs ->
@@ -1535,8 +1570,8 @@ let rec eval durable module_reg (c : config) buffers :
       (durable, values)
   | SK_Trapped {it = msg; at} -> Trap.error at msg
   | _ ->
-      let* durable, c = step ~init:false ~durable c buffers in
-      eval durable module_reg c buffers
+      let* durable, c = step ~init ~durable module_reg c buffers in
+      eval ~init durable module_reg c buffers
 
 type reveal_error =
   | Reveal_step
@@ -1553,28 +1588,7 @@ let is_reveal_tick = function
       Some reveal
   | _ -> None
 
-let reveal module_reg base_destination max_bytes frame payload =
-  let open Lwt.Syntax in
-  Lwt.catch
-    (fun () ->
-      let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ no_region) in
-      let payload_size = Bytes.length payload in
-      let revealed_bytes = min payload_size (Int32.to_int max_bytes) in
-      let payload = Bytes.sub payload 0 revealed_bytes in
-      let+ () =
-        Memory.store_bytes mem base_destination (Bytes.to_string payload)
-      in
-      Int32.of_int revealed_bytes)
-    (function
-      | ( Memory.Bounds (* Memory.store_bytes *)
-        | Lazy_map.UnexpectedAccess (* resolve_module_ref *) ) as exn ->
-          raise exn
-      | exn ->
-          let raw_exn = Printexc.to_string exn in
-          raise (Reveal_error (Reveal_payload_decoding raw_exn)))
-
-let reveal_step module_reg payload =
+let reveal_step reveal module_reg payload =
   let open Lwt.Syntax in
   function
   | {
@@ -1582,16 +1596,21 @@ let reveal_step module_reg payload =
         SK_Next (frame, top, LS_Craft_frame (label, Inv_reveal_tick inv));
       _;
     } as config ->
+      let* inst = resolve_module_ref module_reg frame.frame_specs.inst in
+      let* memory = memory inst (0l @@ no_region) in
       let+ bytes_count =
         reveal
-          module_reg
-          inv.base_destination
-          inv.max_bytes
-          frame.frame_specs
-          payload
+          ~memory
+          ~dst:inv.base_destination
+          ~max_bytes:inv.max_bytes
+          ~payload
       in
       let vs, es = inv.code in
       let vs = Vector.cons (Num (I32 bytes_count)) vs in
+      (* The number of bytes cannot be negative per construction. *)
+      let ticks_to_consume =
+        Tick_model.(of_int32_exn bytes_count * ticks_per_byte_written)
+      in
       {
         config with
         step_kont =
@@ -1599,15 +1618,21 @@ let reveal_step module_reg payload =
             ( frame,
               top,
               LS_Craft_frame
-                (label, Inv_stop {code = (vs, es); fresh_frame = None}) );
+                ( label,
+                  Inv_stop
+                    {
+                      code = (vs, es);
+                      fresh_frame = None;
+                      remaining_ticks = Tick_model.to_z ticks_to_consume;
+                    } ) );
       }
   | _ -> raise (Reveal_error Reveal_step)
 
 (* Functions & Constants *)
 
 let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
-    ?(output = Output_buffer.alloc ()) ?(durable = Durable_storage.empty)
-    host_funcs (func : func_inst) (vs : value list) :
+    ?(output = default_output_buffer ()) ?(durable = Durable_storage.empty)
+    ?(init = false) host_funcs (func : func_inst) (vs : value list) :
     (Durable_storage.t * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
@@ -1630,14 +1655,13 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
       host_funcs
       ~frame_arity:n
       inst
-      module_reg
       (Vector.of_list (List.rev vs))
       (Vector.singleton (Invoke func @@ at))
   in
   let buffers = buffers ~input ~output () in
   Lwt.catch
     (fun () ->
-      let+ durable, values = eval durable module_reg c buffers in
+      let+ durable, values = eval ~init durable module_reg c buffers in
       (durable, List.rev values))
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
@@ -1645,12 +1669,11 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
 
 type eval_const_kont = EC_Next of config | EC_Stop of value
 
-let eval_const_kont inst module_reg (const : const) =
+let eval_const_kont inst (const : const) =
   let c =
     config
       (Host_funcs.empty ())
       inst
-      module_reg
       (Vector.empty ())
       (Vector.singleton (From_block (const.it, 0l) @@ const.at))
   in
@@ -1658,14 +1681,14 @@ let eval_const_kont inst module_reg (const : const) =
 
 let eval_const_completed = function EC_Stop v -> Some v | _ -> None
 
-let eval_const_step buffers = function
+let eval_const_step module_reg buffers = function
   | EC_Next {step_kont = SK_Result vs; _} ->
       if Vector.num_elements vs = 1l then
         let+ v, _ = Vector.pop vs in
         EC_Stop v
       else Crash.error Source.no_region "wrong number of results on stack"
   | EC_Next c ->
-      let+ _, c = step ~init:true c buffers in
+      let+ _, c = step ~init:true module_reg c buffers in
       EC_Next c
   | EC_Stop _ -> raise (Init_step_error Eval_const)
 
@@ -1688,19 +1711,19 @@ let create_memory (mem : memory) : memory_inst =
 
 type create_global_kont = global_type * eval_const_kont
 
-let create_global_kont inst module_reg glob =
-  (glob.it.gtype, eval_const_kont inst module_reg glob.it.ginit)
+let create_global_kont inst glob =
+  (glob.it.gtype, eval_const_kont inst glob.it.ginit)
 
 let create_global_completed (gtype, kont) =
   match eval_const_completed kont with
   | Some v -> Some (Global.alloc gtype v)
   | None -> None
 
-let create_global_step buffers ((gtype, ekont) as kont) =
+let create_global_step module_reg buffers ((gtype, ekont) as kont) =
   match create_global_completed kont with
   | Some _ -> raise (Init_step_error Create_global_step)
   | None ->
-      let+ ekont = eval_const_step buffers ekont in
+      let+ ekont = eval_const_step module_reg buffers ekont in
       (gtype, ekont)
 
 let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
@@ -1953,12 +1976,12 @@ let create_elem_step ~module_reg buffers inst :
     create_elem_kont -> create_elem_kont Lwt.t =
  fun tick ->
   tick_map_step
-    (eval_const_kont inst module_reg)
+    (eval_const_kont inst)
     (fun x ->
       match eval_const_completed x with
       | Some x -> Some (as_ref x)
       | None -> None)
-    (eval_const_step buffers)
+    (eval_const_step module_reg buffers)
     tick
 
 type exports_acc = {exports : extern NameMap.t; exports_memory_0 : bool}
@@ -2003,12 +2026,11 @@ let section_next_init_kont :
             {exports = NameMap.create (); exports_memory_0 = false} )
 
 let section_inner_kont :
-    type kont a b.
-    module_key -> module_reg -> (kont, a, b) init_section -> a -> kont =
- fun self module_reg sec x ->
+    type kont a b. module_key -> (kont, a, b) init_section -> a -> kont =
+ fun self sec x ->
   match sec with
   | Func -> Either.Left x
-  | Global -> create_global_kont self module_reg x
+  | Global -> create_global_kont self x
   | Table -> Left x
   | Memory -> Left x
 
@@ -2041,7 +2063,7 @@ let section_inner_step :
   in
   function
   | Func -> lift_either (create_func module_reg self)
-  | Global -> create_global_step buffers
+  | Global -> create_global_step module_reg buffers
   | Table -> lift_either (fun x -> Lwt.return (create_table x))
   | Memory -> lift_either (fun x -> Lwt.return (create_memory x))
 
@@ -2102,7 +2124,7 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
   | IK_Aggregate (inst0, sec, tick) ->
       let+ tick =
         tick_map_step
-          (section_inner_kont self module_reg sec)
+          (section_inner_kont self sec)
           (section_inner_completed sec)
           (section_inner_step module_reg self buffers sec)
           tick
@@ -2194,8 +2216,7 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
   | IK_Join_admin (inst0, tick) -> (
       match join_completed tick with
       | Some res ->
-          Lwt.return
-            (IK_Eval (config host_funcs self module_reg (Vector.empty ()) res))
+          Lwt.return (IK_Eval (config host_funcs self (Vector.empty ()) res))
       | None ->
           let+ tick = join_step tick in
           IK_Join_admin (inst0, tick))
@@ -2205,7 +2226,7 @@ let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
       Lwt.return IK_Stop
   | IK_Eval {step_kont = SK_Trapped {it = msg; at}; _} -> Trap.error at msg
   | IK_Eval config ->
-      let+ _, config = step ~init:true config buffers in
+      let+ _, config = step ~init:true module_reg config buffers in
       IK_Eval config
   | IK_Stop -> raise (Init_step_error Init_step)
 

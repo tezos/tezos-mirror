@@ -49,7 +49,7 @@ let delegate_encoding =
       case
         ~title:"Public key hash"
         (Tag 0)
-        Signature.Public_key_hash.encoding
+        Tezos_crypto.Signature.V0.Public_key_hash.encoding
         (function `Pkh p -> Some p | _ -> None)
         (fun p -> `Pkh p);
       case

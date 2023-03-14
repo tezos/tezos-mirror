@@ -92,22 +92,32 @@ module Event = struct
   let section = ["node"; "main"]
 
   let cleaning_up_after_failure =
-    Internal_event.Simple.declare_1
+    declare_1
       ~section
       ~name:"cleaning_up_after_failure"
       ~msg:"cleaning up directory \"{directory}\" after failure."
-      ~level:Internal_event.Notice
+      ~level:Error
       ("directory", Data_encoding.string)
 
   let export_unspecified_hash =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"export_unspecified_hash"
       ~msg:
         "There is no block hash specified with the `--block` option. Using the \
          last checkpoint as the default value"
-      ~level:Internal_event.Notice
+      ~level:Notice
       ()
+
+  let overriding_config_file_arg =
+    declare_1
+      ~section
+      ~name:"overriding_config_file_arg"
+      ~msg:
+        "the data directory from the --config-file argument was overridden by \
+         the given --data-dir path: {path}"
+      ~level:Warning
+      ("path", Data_encoding.string)
 end
 
 module Term = struct
@@ -119,24 +129,41 @@ module Term = struct
         if Sys.file_exists path then return path
         else tzfail (Cannot_locate_file path)
 
-  let export args snapshot_path block export_format rolling on_disk_index
+  let export data_dir config_file snapshot_path block export_format rolling
       progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* data_dir = Node_shared_arg.read_data_dir args in
-      let* () =
-        fail_unless
-          (Sys.file_exists data_dir)
-          (Data_dir_not_found {path = data_dir})
+      let actual_data_dir =
+        Option.value ~default:Config_file.default_data_dir data_dir
       in
-      let* node_config = Node_shared_arg.read_and_patch_config_file args in
-      let ({genesis; chain_name; _} : Node_config_file.blockchain_network) =
+      let config_file =
+        Option.value
+          ~default:
+            Filename.Infix.(
+              actual_data_dir // Data_version.default_config_file_name)
+          config_file
+      in
+      let* node_config = Config_file.read config_file in
+      let ({genesis; chain_name; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      let* () = Node_data_version.ensure_data_dir data_dir in
-      let context_dir = Node_data_version.context_dir data_dir in
-      let store_dir = Node_data_version.store_dir data_dir in
+      let*! data_dir =
+        (* The --data-dir argument overrides the potentially given
+           configuration file. *)
+        match data_dir with
+        | Some data_dir ->
+            let*! () =
+              if not (String.equal data_dir node_config.data_dir) then
+                Event.(emit overriding_config_file_arg) data_dir
+              else Lwt.return_unit
+            in
+            Lwt.return data_dir
+        | None -> Lwt.return node_config.data_dir
+      in
+      let* () = Data_version.ensure_data_dir genesis data_dir in
+      let context_dir = Data_version.context_dir data_dir in
+      let store_dir = Data_version.store_dir data_dir in
       let* block =
         match block with
         | None ->
@@ -155,46 +182,67 @@ module Term = struct
         ~context_dir
         ~chain_name
         ~block
-        ~on_disk:on_disk_index
         ~progress_display_mode
         genesis
     in
-    Node_shared_arg.process_command run
+    Shared_arg.process_command run
 
-  let import args snapshot_path block disable_check reconstruct in_memory_index
-      sandbox_file progress_display_mode =
+  let import data_dir config_file operation_metadata_size_limit snapshot_path
+      block disable_check reconstruct sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let data_dir =
+      let actual_data_dir =
+        Option.value ~default:Config_file.default_data_dir data_dir
+      in
+      let config_file =
         Option.value
-          args.Node_shared_arg.data_dir
-          ~default:Node_config_file.default_data_dir
+          ~default:
+            Filename.Infix.(
+              actual_data_dir // Data_version.default_config_file_name)
+          config_file
+      in
+      let* node_config = Config_file.read config_file in
+      let*! data_dir =
+        (* The --data-dir argument overrides the potentially given
+           configuration file. *)
+        match data_dir with
+        | Some data_dir ->
+            let*! () =
+              if not (String.equal data_dir node_config.data_dir) then
+                Event.(emit overriding_config_file_arg) data_dir
+              else Lwt.return_unit
+            in
+            Lwt.return data_dir
+        | None -> Lwt.return node_config.data_dir
       in
       let*! existing_data_dir = Lwt_unix.file_exists data_dir in
-      let* node_config = Node_shared_arg.read_and_patch_config_file args in
-      let ({genesis; _} : Node_config_file.blockchain_network) =
+      let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
       let* snapshot_path = check_snapshot_path snapshot_path in
       let dir_cleaner () =
         let*! () = Event.(emit cleaning_up_after_failure) data_dir in
-        if existing_data_dir then
-          (* Remove only context and store if the import directory
-                 was previously existing. *)
-          let*! () =
-            Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
-          in
-          Lwt_utils_unix.remove_dir (Node_data_version.context_dir data_dir)
-        else Lwt_utils_unix.remove_dir data_dir
+        let*! () =
+          if existing_data_dir then
+            (* Remove only context and store if the import directory
+               was previously existing. *)
+            let*! () =
+              Lwt_utils_unix.remove_dir (Data_version.store_dir data_dir)
+            in
+            Lwt_utils_unix.remove_dir (Data_version.context_dir data_dir)
+          else Lwt_utils_unix.remove_dir data_dir
+        in
+        let lock_file = Data_version.lock_file data_dir in
+        let*! lock_file_exists = Lwt_unix.file_exists lock_file in
+        if lock_file_exists then Lwt_unix.unlink lock_file else Lwt.return_unit
       in
-      let* () = Node_config_file.write args.config_file node_config in
-      let* () = Node_data_version.ensure_data_dir ~mode:Is_bare data_dir in
+      let* () = Data_version.ensure_data_dir ~mode:Is_bare genesis data_dir in
       (* Lock only on snapshot import *)
       Lwt_lock_file.try_with_lock
         ~when_locked:(fun () ->
           failwith "Data directory is locked by another process")
-        ~filename:(Node_data_version.lock_file data_dir)
+        ~filename:(Data_version.lock_file data_dir)
       @@ fun () ->
       let* sandbox_parameters =
         match
@@ -210,8 +258,8 @@ module Term = struct
                 tzfail (Node_run_command.Invalid_sandbox_file filename)
             | Ok json -> return_some ("sandbox_parameter", json))
       in
-      let context_root = Node_data_version.context_dir data_dir in
-      let store_root = Node_data_version.store_dir data_dir in
+      let context_root = Data_version.context_dir data_dir in
+      let store_root = Data_version.store_dir data_dir in
       let patch_context =
         Patch_context.patch_context genesis sandbox_parameters
       in
@@ -247,11 +295,17 @@ module Term = struct
               ~operation_metadata_size_limit:
                 node_config.shell.block_validator_limits
                   .operation_metadata_size_limit
-              ~in_memory:in_memory_index
               ~progress_display_mode
               genesis)
       in
       if reconstruct then
+        let operation_metadata_size_limit =
+          Option.value
+            ~default:
+              node_config.shell.block_validator_limits
+                .operation_metadata_size_limit
+            operation_metadata_size_limit
+        in
         Reconstruction.reconstruct
           ~patch_context
           ~store_dir:store_root
@@ -261,27 +315,29 @@ module Term = struct
             node_config.blockchain_network.user_activated_upgrades
           ~user_activated_protocol_overrides:
             node_config.blockchain_network.user_activated_protocol_overrides
-          ~operation_metadata_size_limit:
-            node_config.shell.block_validator_limits
-              .operation_metadata_size_limit
+          ~operation_metadata_size_limit
           ~progress_display_mode
       else return_unit
     in
-    Node_shared_arg.process_command run
+    Shared_arg.process_command run
 
-  let get_info snapshot_path =
+  let get_info snapshot_path format_json =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let* snapshot_path = check_snapshot_path snapshot_path in
       let* snapshot_header = Snapshots.read_snapshot_header ~snapshot_path in
-      Format.printf
-        "@[<v 2>Snapshot information:@ %a@]@."
-        Snapshots.pp_snapshot_header
-        snapshot_header ;
+      if format_json then
+        let json = Snapshots.Snapshot_header.to_json snapshot_header in
+        Format.printf "@[<v 2>%a@]@." Data_encoding.Json.pp json
+      else
+        Format.printf
+          "@[<v 2>Snapshot information:@ %a@]@."
+          Snapshots.Snapshot_header.pp
+          snapshot_header ;
       return_unit
     in
-    Node_shared_arg.process_command run
+    Shared_arg.process_command run
 
   let file_arg =
     let open Cmdliner.Arg in
@@ -353,22 +409,6 @@ module Term = struct
     in
     Arg.(value & flag & info ~doc ["reconstruct"])
 
-  let in_memory_index =
-    let open Cmdliner in
-    let doc =
-      "Imports a snapshot with in-memory indexes to speed up the procedure. As \
-       a counter part, the import will requires more memory."
-    in
-    Arg.(value & flag & info ~doc ["in-memory"])
-
-  let on_disk_index =
-    let open Cmdliner in
-    let doc =
-      "Exports a snapshot with on-disk indexes, in order to use less memory. \
-       As a counter part, the export will requires more time."
-    in
-    Arg.(value & flag & info ~doc ["on-disk"])
-
   let sandbox =
     let open Cmdliner in
     let doc =
@@ -383,7 +423,7 @@ module Term = struct
       value
       & opt (some non_dir_file) None
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"FILE.json"
           ["sandbox"])
@@ -391,20 +431,24 @@ module Term = struct
   let progress_display_mode =
     let open Cmdliner in
     let doc =
-      Format.sprintf
-        "Determine whether the progress animation will be displayed to the \
-         logs. 'auto' will display progress animation only to a TTY. 'always' \
-         will display progress animation to any file descriptor. 'never' will \
-         not display progress animation."
+      "Determine whether the progress animation will be displayed to the logs. \
+       'auto' will display progress animation only to a TTY. 'always' will \
+       display progress animation to any file descriptor. 'never' will not \
+       display progress animation."
     in
     Arg.(
       value
       & opt (enum Animation.progress_display_mode_enum) Animation.Auto
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"<auto|always|never>"
           ["progress-display-mode"])
+
+  let format_json =
+    let open Cmdliner in
+    let doc = "Displays the snapshot's information in JSON format." in
+    Arg.(value & flag & info ~doc ["json"])
 
   let cmds =
     let open Cmdliner in
@@ -416,19 +460,20 @@ module Term = struct
            "export")
         Term.(
           ret
-            (const export $ Node_shared_arg.Term.args $ file_arg $ block
-           $ export_format $ export_rolling $ on_disk_index
-           $ progress_display_mode));
+            (const export $ Shared_arg.Term.data_dir
+           $ Shared_arg.Term.config_file $ file_arg $ block $ export_format
+           $ export_rolling $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"allows to import a snapshot from a given file" "import")
         Term.(
           ret
-            (const import $ Node_shared_arg.Term.args $ file_arg $ block
-           $ disable_check $ reconstruct $ in_memory_index $ sandbox
-           $ progress_display_mode));
+            (const import $ Shared_arg.Term.data_dir
+           $ Shared_arg.Term.config_file
+           $ Shared_arg.Term.operation_metadata_size_limit $ file_arg $ block
+           $ disable_check $ reconstruct $ sandbox $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"displays information about the snapshot file" "info")
-        Term.(ret (const get_info $ file_arg));
+        Term.(ret (const get_info $ file_arg $ format_json));
     ]
 end
 
@@ -468,7 +513,7 @@ module Manpage = struct
           "$(mname) snapshot import file.full --in-memory)" );
     ]
 
-  let man = examples @ Node_shared_arg.Manpage.bugs
+  let man = examples @ Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Manage snapshots" ~man "snapshot"
 end

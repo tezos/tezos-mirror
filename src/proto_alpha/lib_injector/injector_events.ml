@@ -179,6 +179,14 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
 
+  let retry_operation =
+    declare_1
+      ~name:"retry_operation"
+      ~msg:"Retry {operation}"
+      ~level:Notice
+      ("operation", L1_operation.encoding)
+      ~pp1:L1_operation.pp
+
   let included =
     declare_3
       ~name:"included"
@@ -230,4 +238,11 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ("error", Error_monad.trace_encoding)
       ~pp1:Format.pp_print_string
       ~pp2:Error_monad.pp_print_trace
+
+  let inject_wait =
+    declare_1
+      ~name:"inject_wait"
+      ~msg:"Waiting {delay} seconds to trigger injection"
+      ~level:Notice
+      ("delay", Data_encoding.float)
 end

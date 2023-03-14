@@ -28,6 +28,6 @@ eval $(opam env)
 # depext handling is done directly by opam 2.1 and later
 opam depext tezos
 # [install tezos]
-opam install tezos
+opam install octez
 # [test executables]
-tezos-client --version
+octez-client --version

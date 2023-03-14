@@ -26,6 +26,13 @@
 let qcheck_wrap ?verbose ?long ?rand =
   List.map (QCheck_alcotest.to_alcotest ?verbose ?long ?rand)
 
+let qcheck_wrap_lwt ?verbose ?long ?rand =
+  List.map (fun test ->
+      let name, speed, f =
+        QCheck_alcotest.to_alcotest ?verbose ?long ?rand test
+      in
+      (name, speed, fun arg -> Lwt.return (f arg)))
+
 let qcheck_make_result ?count ?print ?pp_error ?check ~name
     ~(gen : 'a QCheck2.Gen.t) (f : 'a -> (bool, 'b) result) =
   let check =
@@ -48,22 +55,43 @@ let qcheck_make_lwt ?count ?print ~extract ~name ~(gen : 'a QCheck2.Gen.t)
     (f : 'a -> bool Lwt.t) =
   QCheck2.Test.make ~name ?print ?count gen (fun x -> extract (f x))
 
-let qcheck_eq ?pp ?cmp ?eq expected actual =
+let qcheck_make_result_lwt ?count ?print ?pp_error ?check ~extract ~name
+    ~(gen : 'a QCheck2.Gen.t) (f : 'a -> (bool, 'b) result Lwt.t) =
+  let check =
+    match check with
+    | Some check -> check
+    | None -> (
+        function
+        | Ok b -> b
+        | Error err -> (
+            match pp_error with
+            | Some pp_error ->
+                QCheck2.Test.fail_reportf "Test failed:@,%a" pp_error err
+            | None ->
+                QCheck2.Test.fail_reportf
+                  "Test failed but no pretty printer was provided."))
+  in
+  QCheck2.Test.make ~name ?print ?count gen (fun x -> extract (f x) |> check)
+
+let qcheck_eq ?pp ?cmp ?eq ?__LOC__ expected actual =
   let pass =
     match (eq, cmp) with
     | Some eq, _ -> eq expected actual
     | None, Some cmp -> cmp expected actual = 0
     | None, None -> Stdlib.compare expected actual = 0
   in
+  let loc = match __LOC__ with Some s -> s ^ "\n" | None -> "" in
   if pass then true
   else
     match pp with
     | None ->
         QCheck2.Test.fail_reportf
-          "@[<h 0>Values are not equal, but no pretty printer was provided.@]"
+          "@[<h 0>%sValues are not equal, but no pretty printer was provided.@]"
+          loc
     | Some pp ->
         QCheck2.Test.fail_reportf
-          "@[<v 2>Equality check failed!@,expected:@,%a@,actual:@,%a@]"
+          "@[<v 2>%sEquality check failed!@,expected:@,%a@,actual:@,%a@]"
+          loc
           pp
           expected
           pp
@@ -279,7 +307,17 @@ let test_roundtrip ~count ~title ~gen ~eq encoding =
     |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
   in
   let test rdt input =
-    let output = Roundtrip.make encoding rdt input in
+    let output =
+      try Roundtrip.make encoding rdt input
+      with exn ->
+        QCheck2.Test.fail_reportf
+          "%s %s roundtrip error: error %s on %a"
+          title
+          (Roundtrip.target rdt)
+          (Printexc.to_string exn)
+          pp
+          input
+    in
     let success = eq input output in
     if not success then
       QCheck2.Test.fail_reportf

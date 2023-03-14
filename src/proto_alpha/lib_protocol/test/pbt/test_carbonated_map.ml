@@ -31,14 +31,9 @@
     Subject:      Operations in Carbonated_map
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 open Protocol
-
-let wrap m =
-  let open Lwt_syntax in
-  let+ v = m in
-  Environment.wrap_tzresult v
 
 let new_ctxt () =
   let open Lwt_result_syntax in
@@ -78,6 +73,7 @@ let int_map_gen =
          | Error _ -> Stdlib.failwith "Failed to construct map")
 
 let pp_int_map fmt map =
+  let open Lwt_result_wrap_syntax in
   let pp =
     Assert.pp_print_list (fun fmt (k, v) -> Format.fprintf fmt "(%d, %d)" k v)
   in
@@ -327,7 +323,7 @@ let test_find_existing =
   int_map_test "Find all elements" @@ fun map ->
   let ctxt = unsafe_new_context () in
   let* kvs, _ = CM.to_list ctxt map in
-  let* _ =
+  let* (_ : CM.context) =
     List.fold_left_e
       (fun ctxt (k, v) ->
         let* v_opt, ctxt = CM.find ctxt k map in

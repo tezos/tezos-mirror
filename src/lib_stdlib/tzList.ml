@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec repeat n x = if n <= 0 then [] else x :: repeat (pred n) x
+let repeat n x =
+  let rec loop acc n = if n <= 0 then acc else loop (x :: acc) (n - 1) in
+  loop [] n
 
 let rev_split_n n l =
   let rec loop acc n = function
@@ -44,3 +46,5 @@ let take_n n l = fst (split_n n l)
 
 let rec drop_n n l =
   if n <= 0 then l else match l with [] -> [] | _ :: xs -> drop_n (n - 1) xs
+
+let all_equal cmp = function [] -> true | x :: xs -> List.for_all (cmp x) xs

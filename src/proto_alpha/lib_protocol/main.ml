@@ -96,7 +96,7 @@ type application_state = Apply.application_state
 
 let init_allowed_consensus_operations ctxt ~endorsement_level
     ~preendorsement_level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt = Delegate.prepare_stake_distribution ctxt in
   let* ctxt, allowed_endorsements, allowed_preendorsements =
@@ -139,7 +139,7 @@ type mode =
     }
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Alpha_context in
   let level, timestamp =
     match mode with
@@ -171,6 +171,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
       ~endorsement_level:predecessor_level
       ~preendorsement_level
   in
+  Dal_apply.initialisation ~level:predecessor_level ctxt >>=? fun ctxt ->
   return
     ( ctxt,
       migration_balance_updates,
@@ -179,7 +180,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
       predecessor_raw_level )
 
 let begin_validation ctxt chain_id mode ~predecessor =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Alpha_context in
   let* ( ctxt,
          _migration_balance_updates,
@@ -264,7 +265,7 @@ let () =
     (fun () -> Cannot_apply_in_partial_validation)
 
 let begin_application ctxt chain_id mode ~predecessor =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Alpha_context in
   let* ( ctxt,
          migration_balance_updates,
@@ -284,7 +285,7 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~migration_operation_results
         ~predecessor_fitness
         block_header
-  | Partial_validation _ -> fail Cannot_apply_in_partial_validation
+  | Partial_validation _ -> tzfail Cannot_apply_in_partial_validation
   | Construction {predecessor_hash; timestamp; block_header_data; _} ->
       let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
       Apply.begin_full_construction
@@ -298,13 +299,14 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~predecessor_hash
         ~timestamp
         block_header_data.contents
-  | Partial_construction _ ->
+  | Partial_construction {predecessor_hash; _} ->
       Apply.begin_partial_construction
         ctxt
         chain_id
         ~migration_balance_updates
         ~migration_operation_results
         ~predecessor_level:predecessor_raw_level
+        ~predecessor_hash
         ~predecessor_fitness
 
 let apply_operation = Apply.apply_operation
@@ -317,6 +319,7 @@ let compare_operations (oph1, op1) (oph2, op2) =
 let init chain_id ctxt block_header =
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
+  let predecessor = block_header.predecessor in
   let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
       =
     let allow_forged_in_storage =
@@ -357,7 +360,13 @@ let init chain_id ctxt block_header =
       ~round:Alpha_context.Round.zero
       ~predecessor_round:Alpha_context.Round.zero
   in
-  Alpha_context.prepare_first_block chain_id ~typecheck ~level ~timestamp ctxt
+  Alpha_context.prepare_first_block
+    chain_id
+    ~typecheck
+    ~level
+    ~timestamp
+    ~predecessor
+    ctxt
   >>=? fun ctxt ->
   let cache_nonce =
     Alpha_context.Cache.cache_nonce_from_block_header
@@ -387,7 +396,7 @@ module Mempool = struct
   include Mempool_validation
 
   let init ctxt chain_id ~head_hash ~(head : Block_header.shell_header) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let open Alpha_context in
     let* ( ctxt,
            _migration_balance_updates,
@@ -401,9 +410,8 @@ module Mempool = struct
            {predecessor_hash = head_hash; timestamp = head.timestamp})
         ~predecessor:head
     in
-    let*? fitness = Fitness.from_raw head.fitness in
-    let predecessor_round = Fitness.round fitness in
-    let grandparent_round = Fitness.predecessor_round fitness in
+    let*? predecessor_round = Fitness.round_from_raw head.fitness in
+    let*? grandparent_round = Fitness.predecessor_round_from_raw head.fitness in
     return
       (init
          ctxt

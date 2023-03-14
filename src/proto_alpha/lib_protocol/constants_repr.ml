@@ -91,6 +91,13 @@ let sc_max_wrapped_proof_binary_size = 30_000
 *)
 let sc_rollup_message_size_limit = 4_096
 
+(** A limit on the number of messages per inbox level.
+
+    Benchmarks have shown that proving the inclusion of the element at
+    index 0 in a skip list of [1_000_000] elements is ~=6Kb large.
+*)
+let sc_rollup_max_number_of_messages_per_level = Z.of_int 1_000_000
+
 type fixed = unit
 
 let fixed_encoding =
@@ -107,7 +114,9 @@ let fixed_encoding =
           max_allowed_global_constant_depth,
           cache_layout_size,
           michelson_maximum_type_size ),
-        (sc_max_wrapped_proof_binary_size, sc_rollup_message_size_limit) ))
+        ( sc_max_wrapped_proof_binary_size,
+          sc_rollup_message_size_limit,
+          sc_rollup_max_number_of_messages_per_level ) ))
     (fun ( ( _proof_of_work_nonce_size,
              _nonce_length,
              _max_anon_ops_per_block,
@@ -118,8 +127,9 @@ let fixed_encoding =
              _max_allowed_global_constant_depth,
              _cache_layout_size,
              _michelson_maximum_type_size ),
-           (_sc_max_wrapped_proof_binary_size, _sc_rollup_message_size_limit) ) ->
-      ())
+           ( _sc_max_wrapped_proof_binary_size,
+             _sc_rollup_message_size_limit,
+             _sc_rollup_number_of_messages_per_level ) ) -> ())
     (merge_objs
        (obj10
           (req "proof_of_work_nonce_size" uint8)
@@ -132,9 +142,10 @@ let fixed_encoding =
           (req "max_allowed_global_constants_depth" int31)
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
-       (obj2
-          (req "sc_max_wrapped_proof_binary_size" int31)
-          (req "sc_rollup_message_size_limit" int31)))
+       (obj3
+          (req "smart_rollup_max_wrapped_proof_binary_size" int31)
+          (req "smart_rollup_message_size_limit" int31)
+          (req "smart_rollup_max_number_of_messages_per_level" n)))
 
 let fixed = ()
 
@@ -159,7 +170,7 @@ let () =
     ~description:"The provided protocol constants are not coherent."
     ~pp:(fun ppf reason ->
       Format.fprintf ppf "Invalid protocol constants: %s" reason)
-    Data_encoding.(obj1 (req "reason" string))
+    Data_encoding.(obj1 (req "reason" @@ string Plain))
     (function Invalid_protocol_constants reason -> Some reason | _ -> None)
     (fun reason -> Invalid_protocol_constants reason)
 
@@ -272,31 +283,23 @@ let check_constants constants =
   error_unless
     Compare.Int.(constants.sc_rollup.origination_size >= 0)
     (Invalid_protocol_constants
-       "The smart contract rollup origination size must be non-negative.")
+       "The smart rollup origination size must be non-negative.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.sc_rollup.challenge_window_in_blocks >= 0)
     (Invalid_protocol_constants
-       "The smart contract rollup challenge window in blocks must be \
-        non-negative.")
-  >>? fun () ->
-  error_unless
-    Compare.Int.(
-      constants.sc_rollup.max_number_of_messages_per_commitment_period > 0)
-    (Invalid_protocol_constants
-       "The smart contract rollup max number of messages per commitment \
-        period  must be strictly greater than 0.")
+       "The smart rollup challenge window in blocks must be non-negative.")
   >>? fun () ->
   error_unless
     Tez_repr.(constants.sc_rollup.stake_amount >= zero)
     (Invalid_protocol_constants
-       "The smart contract rollup max stake amount must be non-negative.")
+       "The smart rollup max stake amount must be non-negative.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.sc_rollup.commitment_period_in_blocks > 0)
     (Invalid_protocol_constants
-       "The smart contract rollup commitment period in blocks must be strictly \
-        greater than 0.")
+       "The smart rollup commitment period in blocks must be strictly greater \
+        than 0.")
   >>? fun () ->
   error_unless
     (let sc_rollup_max_lookahead_in_blocks =
@@ -305,22 +308,32 @@ let check_constants constants =
      Compare.Int32.(
        sc_rollup_max_lookahead_in_blocks
        > Int32.of_int constants.sc_rollup.commitment_period_in_blocks
-       && (* Check that [sc_rollup_challenge_window_in_blocks <
-             sc_rollup_max_lookahead_in_blocks]. Otherwise committers would be
+       && (* Check that [smart_rollup_challenge_window_in_blocks <
+             smart_rollup_max_lookahead_in_blocks]. Otherwise committers would be
              forced to commit at an artificially slow rate, affecting the
              throughput of the rollup. *)
        sc_rollup_max_lookahead_in_blocks
        > Int32.of_int constants.sc_rollup.challenge_window_in_blocks))
     (Invalid_protocol_constants
-       "The smart contract rollup max lookahead in blocks must be greater than \
-        [sc_rollup_commitment_period_in_blocks] and \
-        [sc_rollup_challenge_window_in_blocks].")
+       "The smart rollup max lookahead in blocks must be greater than \
+        [smart_rollup_commitment_period_in_blocks] and \
+        [smart_rollup_challenge_window_in_blocks].")
   >>? fun () ->
   error_unless
     Compare.Int.(
       constants.dal.number_of_slots > 0 && constants.dal.number_of_slots <= 256)
     (Invalid_protocol_constants
        "The number of data availability slot must be between 1 and 256")
+  >>? fun () ->
+  error_unless
+    Compare.Int32.(
+      constants.dal.blocks_per_epoch > 0l
+      && constants.dal.blocks_per_epoch <= constants.blocks_per_cycle
+      && Int32.rem constants.blocks_per_cycle constants.dal.blocks_per_epoch
+         = 0l)
+    (Invalid_protocol_constants
+       "The epoch length must be between 1 and blocks_per_cycle, and \
+        blocks_per_epoch must divide blocks_per_cycle.")
   >>? fun () ->
   error_unless
     Compare.Int.(

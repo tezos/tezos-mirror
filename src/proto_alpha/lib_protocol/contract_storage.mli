@@ -30,9 +30,17 @@ type error +=
   | (* `Temporary *)
       Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
-      Counter_in_the_past of Contract_repr.t * Z.t * Z.t
+      Counter_in_the_past of {
+      contract : Contract_repr.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
+    }
   | (* `Branch *)
-      Counter_in_the_future of Contract_repr.t * Z.t * Z.t
+      Counter_in_the_future of {
+      contract : Contract_repr.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
+    }
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.t
   | (* `Permanent *)
@@ -50,7 +58,7 @@ type error +=
 val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [exists ctxt contract] returns [true] if and only if either the
-   contract is originated or it is (implicit and) "allocated". *)
+   contract is implicit or it is (originated and) {!allocated}. *)
 val exists : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [must_exist ctxt contract] fails with the [Non_existing_contract] error if
@@ -72,7 +80,10 @@ val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment :
-  Raw_context.t -> Signature.Public_key_hash.t -> Z.t -> unit tzresult Lwt.t
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Manager_counter_repr.t ->
+  unit tzresult Lwt.t
 
 val increment_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
@@ -99,11 +110,13 @@ val check_allocated_and_get_balance :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
 
 val get_counter :
-  Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Manager_counter_repr.t tzresult Lwt.t
 
 val get_script_code :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   (Raw_context.t * Script_repr.lazy_expr option) tzresult Lwt.t
 
 val get_script :
@@ -113,7 +126,7 @@ val get_script :
 
 val get_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
 module Legacy_big_map_diff : sig
@@ -143,7 +156,7 @@ end
 
 val update_script_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   Script_repr.expr ->
   Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
@@ -192,7 +205,7 @@ val set_paid_storage_space_and_return_fees_to_pay :
 (** Enable a payer to increase the paid storage of a contract by some amount. *)
 val increase_paid_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   amount_in_bytes:Z.t ->
   Raw_context.t tzresult Lwt.t
 

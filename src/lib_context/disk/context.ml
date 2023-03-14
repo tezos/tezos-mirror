@@ -34,7 +34,6 @@ module Proof = Tezos_context_sigs.Context.Proof_types
 type error +=
   | Cannot_create_file of string
   | Cannot_open_file of string
-  | Cannot_retrieve_commit_info of Context_hash.t
   | Cannot_find_protocol
   | Suspicious_file of int
 
@@ -67,20 +66,6 @@ let () =
     (fun e -> Cannot_open_file e) ;
   register_error_kind
     `Permanent
-    ~id:"cannot_retrieve_commit_info"
-    ~title:"Cannot retrieve commit info"
-    ~description:""
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "@[Cannot retrieve commit info associated to context hash %a@]"
-        Context_hash.pp
-        hash)
-    Data_encoding.(obj1 (req "context_hash" Context_hash.encoding))
-    (function Cannot_retrieve_commit_info e -> Some e | _ -> None)
-    (fun e -> Cannot_retrieve_commit_info e) ;
-  register_error_kind
-    `Permanent
     ~id:"context_dump.cannot_find_protocol"
     ~title:"Cannot find protocol"
     ~description:""
@@ -106,7 +91,6 @@ module type TEZOS_CONTEXT_UNIX = sig
   type error +=
     | Cannot_create_file of string
     | Cannot_open_file of string
-    | Cannot_retrieve_commit_info of Context_hash.t
     | Cannot_find_protocol
     | Suspicious_file of int
 
@@ -122,21 +106,12 @@ module type TEZOS_CONTEXT_UNIX = sig
 
   (** {2 Context dumping} *)
 
-  val dump_context :
-    index ->
-    Context_hash.t ->
-    fd:Lwt_unix.file_descr ->
-    on_disk:bool ->
-    progress_display_mode:Animation.progress_display_mode ->
-    int tzresult Lwt.t
-
   (** Rebuild a context from a given snapshot. *)
   val restore_context :
     index ->
     expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
     fd:Lwt_unix.file_descr ->
-    legacy:bool ->
     in_memory:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
@@ -208,6 +183,14 @@ module Events = struct
       ~pp2:Time.System.Span.pp_hum
       ("finalisation", Time.System.Span.encoding)
 
+  let split_context =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"split_context"
+      ~msg:"splitting context into a new chunk"
+      ()
+
   let gc_failure =
     declare_1
       ~section
@@ -229,7 +212,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type error +=
     | Cannot_create_file = Cannot_create_file
     | Cannot_open_file = Cannot_open_file
-    | Cannot_retrieve_commit_info = Cannot_retrieve_commit_info
     | Cannot_find_protocol = Cannot_find_protocol
     | Suspicious_file = Suspicious_file
 
@@ -247,6 +229,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   module P = Store.Backend
 
   module Checks = struct
+    module Conf = struct
+      include Conf
+    end
+
     module Maker = struct
       module Maker = Irmin_pack_unix.Maker (Conf)
       include Maker.Make (Schema)
@@ -284,8 +270,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let current_protocol_key = ["protocol"]
 
   let current_test_chain_key = ["test_chain"]
-
-  let current_data_key = ["data"]
 
   let current_predecessor_block_metadata_hash_key =
     ["predecessor_block_metadata_hash"]
@@ -386,10 +370,16 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         Logs.info (fun m ->
             m "Launch GC for commit %a@." Context_hash.pp context_hash) ;
         let finished = function
-          | Ok (stats : Store.Gc.stats) ->
+          | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->
+              let total_duration =
+                Irmin_pack_unix.Stats.Latest_gc.total_duration stats
+              in
+              let finalise_duration =
+                Irmin_pack_unix.Stats.Latest_gc.finalise_duration stats
+              in
               Events.(emit ending_gc)
-                ( Time.System.Span.of_seconds_exn stats.duration,
-                  Time.System.Span.of_seconds_exn stats.finalisation_duration )
+                ( Time.System.Span.of_seconds_exn total_duration,
+                  Time.System.Span.of_seconds_exn finalise_duration )
           | Error (`Msg err) -> Events.(emit gc_failure) err
         in
         let commit_key = Store.Commit.key commit in
@@ -400,7 +390,35 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
             let* () = Events.(emit gc_launch_failure) err in
             return_unit)
 
+  let wait_gc_completion index =
+    let open Lwt_syntax in
+    let* () = sync index in
+    let* r = Store.Gc.wait index.repo in
+    match r with
+    | Ok _stats_opt -> return_unit
+    | Error (`Msg _msg) ->
+        (* Logs will be printed by the [gc] caller. *)
+        return_unit
+
   let is_gc_allowed index = Store.Gc.is_allowed index.repo
+
+  let split index =
+    let open Lwt_syntax in
+    let* () = Events.(emit split_context ()) in
+    Store.split index.repo ;
+    Lwt.return_unit
+
+  let export_snapshot index context_hash ~path =
+    let open Lwt_syntax in
+    let* commit_opt =
+      Store.Commit.of_hash index.repo (Hash.of_context_hash context_hash)
+    in
+    match commit_opt with
+    | None ->
+        Fmt.failwith "%a: unknown context hash" Context_hash.pp context_hash
+    | Some commit ->
+        let h = Store.Commit.key commit in
+        Store.create_one_commit_store index.repo h path
 
   (*-- Generic Store Primitives ------------------------------------------------*)
 
@@ -767,12 +785,13 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       | `Minimal -> I.minimal
     in
     let+ repo =
+      let env = Tezos_context_helpers.Env.v in
       let index_log_size =
         Option.value
           tbl_log_size
-          ~default:Tezos_context_helpers.Env.(v.index_log_size)
+          ~default:Tezos_context_helpers.Env.(env.index_log_size)
       in
-      let lru_size = Tezos_context_helpers.Env.lru_size in
+      let lru_size = env.lru_size in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
@@ -1112,114 +1131,18 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     module Block_header = Block_header
   end
 
-  (* Protocol data *)
-
-  let data_node_hash context =
-    let open Lwt_syntax in
-    let+ tree = Store.Tree.get_tree context.tree current_data_key in
-    Hash.to_context_hash (Store.Tree.hash tree)
-
-  let retrieve_commit_info index block_header =
-    let open Lwt_result_syntax in
-    let context_hash = block_header.Block_header.shell.context in
-    let* context =
-      let*! r = checkout index context_hash in
-      match r with
-      | Some c -> return c
-      | None -> tzfail (Cannot_retrieve_commit_info context_hash)
-    in
-    let irmin_info = Dumpable_context.context_info context in
-    let author = Info.author irmin_info in
-    let message = Info.message irmin_info in
-    let timestamp = Time.Protocol.of_seconds (Info.date irmin_info) in
-    let*! protocol_hash = get_protocol context in
-    let*! test_chain_status = get_test_chain context in
-    let*! predecessor_block_metadata_hash =
-      find_predecessor_block_metadata_hash context
-    in
-    let*! predecessor_ops_metadata_hash =
-      find_predecessor_ops_metadata_hash context
-    in
-    let*! data_key = data_node_hash context in
-    let parents_contexts = Dumpable_context.context_parents context in
-    return
-      ( protocol_hash,
-        author,
-        message,
-        timestamp,
-        test_chain_status,
-        data_key,
-        predecessor_block_metadata_hash,
-        predecessor_ops_metadata_hash,
-        parents_contexts )
-
-  let check_protocol_commit_consistency ~expected_context_hash
-      ~given_protocol_hash ~author ~message ~timestamp ~test_chain_status
-      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
-      ~data_merkle_root ~parents_contexts =
-    let open Lwt_syntax in
-    let data_merkle_root = Hash.of_context_hash data_merkle_root in
-    let parents = List.map Hash.of_context_hash parents_contexts in
-    let info = Info.v ~author (Time.Protocol.to_seconds timestamp) ~message in
-    let tree = Store.Tree.empty () in
-    let* tree = Root_tree.add_test_chain tree test_chain_status in
-    let* tree = Root_tree.add_protocol tree given_protocol_hash in
-    let* tree =
-      Option.fold
-        predecessor_block_metadata_hash
-        ~none:(Lwt.return tree)
-        ~some:(Root_tree.add_predecessor_block_metadata_hash tree)
-    in
-    let* tree =
-      Option.fold
-        predecessor_ops_metadata_hash
-        ~none:(Lwt.return tree)
-        ~some:(Root_tree.add_predecessor_ops_metadata_hash tree)
-    in
-    let data_t = Store.Tree.pruned (`Node data_merkle_root) in
-    let+ new_tree = Store.Tree.add_tree tree current_data_key data_t in
-    let node = Store.Tree.hash new_tree in
-    let ctxt_h =
-      P.Commit_portable.v ~info ~parents ~node
-      |> Commit_hash.hash |> Hash.to_context_hash
-    in
-    Context_hash.equal ctxt_h expected_context_hash
-
   (* Context dumper *)
 
   open Tezos_context_dump
   module Context_dumper = Context_dump.Make (Dumpable_context)
-  module Context_dumper_legacy = Context_dump.Make_legacy (Dumpable_context)
-
-  (* provides functions dump_context and restore_context *)
-  let dump_context idx data ~fd ~on_disk ~progress_display_mode =
-    let open Lwt_syntax in
-    let* res =
-      Context_dumper.dump_context_fd
-        idx
-        data
-        ~context_fd:fd
-        ~on_disk
-        ~progress_display_mode
-    in
-    let* () = Lwt_unix.fsync fd in
-    Lwt.return res
 
   let restore_context idx ~expected_context_hash ~nb_context_elements ~fd
-      ~legacy ~in_memory ~progress_display_mode =
-    if legacy then
-      Context_dumper_legacy.restore_context_fd
-        idx
-        ~expected_context_hash
-        ~fd
-        ~nb_context_elements
-        ~progress_display_mode
-    else
-      Context_dumper.restore_context_fd
-        idx
-        ~in_memory
-        ~expected_context_hash
-        ~fd
-        ~nb_context_elements
-        ~progress_display_mode
+      ~in_memory ~progress_display_mode =
+    Context_dumper.restore_context_fd
+      idx
+      ~in_memory
+      ~expected_context_hash
+      ~fd
+      ~nb_context_elements
+      ~progress_display_mode
 end

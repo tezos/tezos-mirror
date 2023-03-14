@@ -31,13 +31,20 @@ type 'a t = (Node.t, 'a) RPC_core.t
 module Query_arg = struct
   let opt name f = function None -> [] | Some x -> [(name, f x)]
 
+  let opt_list name f = function None -> [] | Some l -> List.map (f name) l
+
   let opt_bool name b = opt name string_of_bool b
 
   let switch name b = if b then [(name, "")] else []
 end
 
 let make ?data ?query_string =
-  make ?data ?query_string ~get_host:Node.rpc_host ~get_port:Node.rpc_port
+  make
+    ?data
+    ?query_string
+    ~get_host:Node.rpc_host
+    ~get_port:Node.rpc_port
+    ~get_scheme:Node.rpc_scheme
 
 module Decode = struct
   let mutez json = json |> JSON.as_int |> Tez.of_mutez_int
@@ -59,12 +66,27 @@ let get_network_connection peer_id =
   let id_point = JSON.(json |-> "id_point") in
   (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))
 
-let post_private_injection_operations ?(force = false) ?(async = false) ~ops ()
-    =
+let post_private_injection_operations ?(use_tmp_file = false) ?(force = false)
+    ?(async = false) ~ops () =
   let query_string =
     [("async", string_of_bool async); ("force", string_of_bool force)]
   in
-  let data = `A (List.map (fun (`Hex op) -> `String op) ops) in
+  let data : RPC_core.data =
+    if use_tmp_file then (
+      let filename = Temp.file "injection_operations.json" in
+      with_open_out filename (fun out ->
+          let open Format in
+          let fmt = formatter_of_out_channel out in
+          fprintf
+            fmt
+            "[%a]"
+            (pp_print_list
+               ~pp_sep:(fun fmt () -> fprintf fmt ",")
+               (fun fmt (`Hex op) -> fprintf fmt {|"%s"|} op))
+            ops) ;
+      File filename)
+    else Data (`A (List.map (fun (`Hex op) -> `String op) ops))
+  in
   make ~data ~query_string POST ["private"; "injection"; "operations"]
   @@ fun json ->
   JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
@@ -162,6 +184,21 @@ let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
     ]
     Fun.id
 
+let get_chain_block_context_liquidity_baking_cpmm_address ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "liquidity_baking";
+      "cpmm_address";
+    ]
+    JSON.as_string
+
 let get_network_peer_untrust peer_id =
   make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
 
@@ -194,6 +231,8 @@ let get_network_stat = make GET ["network"; "stat"] Fun.id
 let get_network_version = make GET ["network"; "version"] Fun.id
 
 let get_network_versions = make GET ["network"; "versions"] Fun.id
+
+let get_version = make GET ["version"] Fun.id
 
 let post_injection_operation ?(async = false) data =
   make
@@ -231,20 +270,20 @@ type block_metadata = {
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
-  dal_slot_availability : bool Array.t option;
+  dal_attestation : bool Array.t option;
 }
 
 let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] @@ fun json ->
-  let dal_slot_availability =
-    match JSON.(json |-> "dal_slot_availability" |> as_string_opt) with
+  let dal_attestation =
+    match JSON.(json |-> "dal_attestation" |> as_string_opt) with
     | None -> None
     | Some slots ->
-        let slot_availability = Z.of_string slots in
-        let length = Z.numbits slot_availability in
+        let attestation = Z.of_string slots in
+        let length = Z.numbits attestation in
         let array = Array.make length false in
         List.iter
-          (fun i -> if Z.testbit slot_availability i then array.(i) <- true)
+          (fun i -> if Z.testbit attestation i then array.(i) <- true)
           (range 0 (length - 1)) ;
         Some array
   in
@@ -256,7 +295,7 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
     | Some proposer -> proposer
   in
   let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
-  {dal_slot_availability; protocol; next_protocol; proposer; max_operations_ttl}
+  {dal_attestation; protocol; next_protocol; proposer; max_operations_ttl}
 
 let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string
@@ -268,7 +307,7 @@ let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
   make
     PATCH
     ["chains"; chain]
-    ~data:(`O [("bootstrapped", `Bool bootstrapped)])
+    ~data:(Data (`O [("bootstrapped", `Bool bootstrapped)]))
     ignore
 
 type sync_state = Synced | Unsynced | Stuck
@@ -385,7 +424,7 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   make ~query_string GET path Fun.id
 
 let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
-    ?branch_delayed ?branch_refused ?refused ?outdated () =
+    ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
   let query_string =
     Query_arg.opt "version" Fun.id version
     @ Query_arg.opt_bool "applied" applied
@@ -393,6 +432,10 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     @ Query_arg.opt_bool "outdated" outdated
     @ Query_arg.opt_bool "branch_delayed" branch_delayed
     @ Query_arg.opt_bool "branch_refused" branch_refused
+    @ Query_arg.opt_list
+        "validation_pass"
+        (fun name vp -> (name, string_of_int vp))
+        validation_passes
   in
   make
     ~query_string
@@ -472,8 +515,9 @@ type ctxt_type = Bytes | Json
 let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
 
 let get_chain_block_context_raw ?(chain = "main") ?(block = "head")
-    ?(ctxt_type = Json) ~value_path () =
+    ?(ctxt_type = Json) ?depth ~value_path () =
   make
+    ~query_string:(Query_arg.opt "depth" string_of_int depth)
     GET
     ([
        "chains";
@@ -495,6 +539,13 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
+    Fun.id
+
+let get_chain_block_context_constants_parametric ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "constants"; "parametric"]
     Fun.id
 
 let get_chain_block_context_contract_storage_used_space ?(chain = "main")
@@ -703,11 +754,25 @@ let get_chain_block_context_contract_storage ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "storage"]
     Fun.id
 
-let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
+let post_chain_block_context_contract_ticket_balance ?(chain = "main")
+    ?(block = "head") ~id ~data () =
+  make
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "ticket_balance";
+    ]
+    ~data
+    JSON.as_int
 
-let get_chain_block_context_sc_rollup_inbox ?(chain = "main") ?(block = "head")
-    sc_rollup =
+let get_chain_block_context_contract_all_ticket_balances ?(chain = "main")
+    ?(block = "head") ~id () =
   make
     GET
     [
@@ -716,45 +781,75 @@ let get_chain_block_context_sc_rollup_inbox ?(chain = "main") ?(block = "head")
       "blocks";
       block;
       "context";
-      "sc_rollup";
+      "contracts";
+      id;
+      "all_ticket_balances";
+    ]
+    Fun.id
+
+let get_chain_block_context_smart_rollups_all ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "smart_rollups"; "all"]
+    Fun.id
+
+let get_chain_block_context_smart_rollups_smart_rollup_staker_games
+    ?(chain = "main") ?(block = "head") ~staker sc_rollup () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
+      "staker";
+      staker;
+      "games";
+    ]
+    Fun.id
+
+let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "all";
       "inbox";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_genesis_info ?(chain = "main")
-    ?(block = "head") sc_rollup =
+let post_chain_block_context_smart_rollups_all_origination_proof
+    ?(chain = "main") ?(block = "head") ~kind ~boot_sector () =
+  let data : RPC_core.data =
+    Data (`O [("kind", `String kind); ("kernel", `String boot_sector)])
+  in
   make
-    GET
+    ~data
+    POST
     [
       "chains";
       chain;
       "blocks";
       block;
       "context";
-      "sc_rollup";
-      sc_rollup;
-      "genesis_info";
+      "smart_rollups";
+      "all";
+      "origination_proof";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_boot_sector ?(chain = "main")
-    ?(block = "head") sc_rollup =
-  make
-    GET
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "sc_rollup";
-      sc_rollup;
-      "boot_sector";
-    ]
-    Fun.id
-
-let get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+let get_chain_block_context_smart_rollups_smart_rollup_genesis_info
     ?(chain = "main") ?(block = "head") sc_rollup =
   make
     GET
@@ -764,13 +859,49 @@ let get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
       "blocks";
       block;
       "context";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "genesis_info";
+    ]
+    Fun.id
+
+let get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
+    ?(chain = "main") ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "last_cemented_commitment_hash_with_level";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_staker_staked_on_commitment
+let get_chain_block_context_smart_rollups_smart_rollup_commitment
+    ?(chain = "main") ?(block = "head") ~sc_rollup ~hash () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "commitment";
+      hash;
+    ]
+    Fun.id
+
+let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =
   make
     GET
@@ -780,7 +911,8 @@ let get_chain_block_context_sc_rollup_staker_staked_on_commitment
       "blocks";
       block;
       "context";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "staker";
       staker;
@@ -1092,6 +1224,19 @@ let get_chain_block_votes_total_voting_power ?(chain = "main") ?(block = "head")
   make
     GET
     ["chains"; chain; "blocks"; block; "votes"; "total_voting_power"]
+    Fun.id
+
+let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
+    ?level () =
+  let query_string =
+    match level with
+    | None -> []
+    | Some offset -> [("level", string_of_int offset)]
+  in
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "dal"; "shards"]
+    ~query_string
     Fun.id
 
 let make = RPC_core.make

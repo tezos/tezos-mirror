@@ -28,7 +28,7 @@ open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract

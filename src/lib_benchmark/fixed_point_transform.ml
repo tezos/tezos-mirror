@@ -129,11 +129,11 @@ let options_encoding =
     (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution) ->
       {precision; max_relative_error; cast_mode; inverse_scaling; resolution})
     (obj5
-       (req "precision" int31)
-       (req "max_relative_error" float)
-       (req "cast_mode" cast_mode_encoding)
-       (req "inverse_scaling" int31)
-       (req "resolution" int31))
+       (dft "precision" int31 default_options.precision)
+       (dft "max_relative_error" float default_options.max_relative_error)
+       (dft "cast_mode" cast_mode_encoding default_options.cast_mode)
+       (dft "inverse_scaling" int31 default_options.inverse_scaling)
+       (dft "resolution" int31 default_options.resolution))
 
 (* ------------------------------------------------------------------------- *)
 (* Error registration *)
@@ -176,9 +176,11 @@ let rec pow x n =
   else x * pow x (n - 1)
 
 let snap_to_grid ~inverse_scaling ~resolution x =
-  let not_significant = log10 x / inverse_scaling in
-  let grid = resolution * pow 10 not_significant in
-  grid * (1 + (x / grid))
+  if x = 0 then 0
+  else
+    let not_significant = log10 x / inverse_scaling in
+    let grid = resolution * pow 10 not_significant in
+    grid * (1 + (x / grid))
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
@@ -388,7 +390,7 @@ end = struct
 
   let ( + ) = lift_binop X.( + )
 
-  let ( - ) = lift_binop X.( - )
+  let sat_sub = lift_binop X.sat_sub
 
   let ( * ) x y =
     match (x, y) with

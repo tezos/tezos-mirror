@@ -1,5 +1,5 @@
 This generator is used to automatically generate js_of_ocaml stubs for
-hacl-star.  It uses both hacl-star ctypes bindings and the 'api.json'
+hacl-star. It uses both hacl-star ctypes bindings and the 'api.json'
 file (provides with the hacl-wasm npm package).
 
 There is a test making sure that 'api.json' is up to date.

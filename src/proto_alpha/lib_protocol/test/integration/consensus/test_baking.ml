@@ -76,14 +76,13 @@ let test_cycle () =
     (Alpha_context.Raw_level.to_int32 curr_level)
     (Int32.add (Alpha_context.Raw_level.to_int32 l) 10l)
 
-let wrap et = et >>= fun e -> Lwt.return (Environment.wrap_tzresult e)
-
 (** Test baking [n] cycles in a raw works smoothly. *)
 let test_bake_n_cycles n () =
   let open Block in
   let policy = By_round 0 in
   Context.init1 ~consensus_threshold:0 () >>=? fun (block, _contract) ->
-  Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return ()
+  Block.bake_until_n_cycle_end ~policy n block >>=? fun (_block : block) ->
+  return_unit
 
 (** Check that, after one or two voting periods, the voting power of a baker is
    updated according to the rewards it receives for baking the blocks in the
@@ -189,7 +188,7 @@ let get_contract_for_pkh contracts pkh =
     [b2].  *)
 let test_rewards_block_and_payload_producer () =
   Context.init_n ~consensus_threshold:1 10 () >>=? fun (genesis, contracts) ->
-  Context.get_baker (B genesis) ~round:0 >>=? fun baker_b1 ->
+  Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   get_contract_for_pkh contracts baker_b1 >>=? fun baker_b1_contract ->
   Block.bake ~policy:(By_round 0) genesis >>=? fun b1 ->
   Context.get_endorsers (B b1) >>=? fun endorsers ->
@@ -204,9 +203,7 @@ let test_rewards_block_and_payload_producer () =
      total endorsing power). *)
   let endorsers = List.take_n 5 endorsers in
   List.map_ep
-    (fun endorser ->
-      Op.endorsement ~delegate:endorser ~endorsed_block:b1 (B genesis) ()
-      >|=? Operation.pack)
+    (fun (endorser, _slots) -> Op.endorsement ~delegate:endorser b1)
     endorsers
   >>=? fun endos ->
   let endorsing_power =
@@ -216,10 +213,10 @@ let test_rewards_block_and_payload_producer () =
       endorsers
   in
   let fee = Tez.one in
-  Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.zero
+  Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.one
   >>=? fun tx ->
   Block.bake ~policy:(By_round 0) ~operations:(endos @ [tx]) b1 >>=? fun b2 ->
-  Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
+  Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->
   get_contract_for_pkh contracts baker_b2 >>=? fun baker_b2_contract ->
   Context.Contract.balance (B b2) baker_b2_contract >>=? fun bal ->
   Context.Delegate.current_frozen_deposits (B b2) baker_b2
@@ -250,12 +247,10 @@ let test_rewards_block_and_payload_producer () =
     endorsers
   >>=? fun preendorsers ->
   List.map_ep
-    (fun endorser ->
-      Op.preendorsement ~delegate:endorser ~endorsed_block:b2 (B b1) ()
-      >|=? Operation.pack)
+    (fun (endorser, _slots) -> Op.preendorsement ~delegate:endorser b2)
     preendorsers
   >>=? fun preendos ->
-  Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
+  Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->
   Context.get_bakers (B b1) >>=? fun bakers ->
   let baker_b2' = Context.get_first_different_baker baker_b2 bakers in
   Block.bake
@@ -285,7 +280,7 @@ let test_rewards_block_and_payload_producer () =
   Context.Contract.balance (B b2') baker_b2'_contract >>=? fun bal' ->
   Context.Delegate.current_frozen_deposits (B b2') baker_b2'
   >>=? fun frozen_deposits' ->
-  Context.get_baker (B genesis) ~round:0 >>=? fun baker_b1 ->
+  Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   let reward_for_b1' =
     if Signature.Public_key_hash.equal baker_b2' baker_b1 then baking_reward
     else Tez.zero
@@ -311,7 +306,10 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
      active balance is less or equal the staking balance (see
      [Delegate_sampler.select_distribution_for_cycle]). *)
   let initial_bal1 = if has_active_stake then tpr else Int64.sub tpr 1L in
-  Context.init2 ~initial_balances:[initial_bal1; tpr] ~consensus_threshold:0 ()
+  Context.init2
+    ~bootstrap_balances:[initial_bal1; tpr]
+    ~consensus_threshold:0
+    ()
   >>=? fun (b0, (account1, _account2)) ->
   let pkh1 = Context.Contract.pkh account1 in
   Context.get_constants (B b0)
@@ -336,16 +334,11 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
 
 let test_committee_sampling () =
   let test_distribution max_round distribution =
-    let initial_balances, bounds = List.split distribution in
-    let accounts =
-      Account.generate_accounts ~initial_balances (List.length initial_balances)
-    in
+    let bootstrap_balances, bounds = List.split distribution in
+    Account.generate_accounts (List.length bootstrap_balances)
+    >>?= fun accounts ->
     let bootstrap_accounts =
-      List.map
-        (fun (acc, tez, delegate_to) ->
-          Default_parameters.make_bootstrap_account
-            (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
-        accounts
+      Account.make_bootstrap_accounts ~bootstrap_balances accounts
     in
     let consensus_committee_size = max_round in
     assert (
@@ -368,8 +361,7 @@ let test_committee_sampling () =
     >|=? fun bakers ->
     let stats = Stdlib.Hashtbl.create 10 in
     Stdlib.List.iter2
-      (fun (acc, _, _) bounds ->
-        Stdlib.Hashtbl.add stats acc.Account.pkh (bounds, 0))
+      (fun acc bounds -> Stdlib.Hashtbl.add stats acc.Account.pkh (bounds, 0))
       accounts
       bounds ;
     List.iter

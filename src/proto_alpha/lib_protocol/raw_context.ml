@@ -26,23 +26,6 @@
 
 module Int_set = Set.Make (Compare.Int)
 
-module Sc_rollup_address_comparable = struct
-  include Sc_rollup_repr.Address
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2648
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let compare_cost _rollup = Saturation_repr.safe_int 15
-end
-
-(* This will not create the map yet, as functions to consume gas have not
-   been defined yet. However, it will make the type of the carbonated map
-   available to be used in the definition of type back.
-*)
-module Sc_rollup_address_map_builder =
-  Carbonated_map.Make_builder (Sc_rollup_address_comparable)
-
 (*
 
    Gas levels maintenance
@@ -240,6 +223,18 @@ module Raw_consensus = struct
     {t with grand_parent_branch = Some grand_parent_branch}
 end
 
+type dal_committee = {
+  pkh_to_shards :
+    (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+  shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
+}
+
+let empty_dal_committee =
+  {
+    pkh_to_shards = Signature.Public_key_hash.Map.empty;
+    shard_to_pkh = Dal_attestation_repr.Shard_map.empty;
+  }
+
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -263,7 +258,7 @@ type back = {
     Tez_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
-  sc_rollup_current_messages : Context.tree Sc_rollup_address_map_builder.t;
+  sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
 
@@ -278,7 +273,8 @@ type back = {
 
          - We need to provide an incentive to avoid byzantines to post
      dummy slot headers. *)
-  dal_endorsement_slot_accountability : Dal_endorsement_repr.Accountability.t;
+  dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
+  dal_committee : dal_committee;
 }
 
 (*
@@ -438,7 +434,7 @@ let () =
       Format.fprintf
         ppf
         "The stake distribution for the current cycle is not set.")
-    Data_encoding.(empty)
+    empty
     (function Stake_distribution_not_set -> Some () | _ -> None)
     (fun () -> Stake_distribution_not_set) ;
   register_error_kind
@@ -557,26 +553,13 @@ let consume_gas ctxt cost =
       else error Operation_quota_exceeded
 
 let check_enough_gas ctxt cost =
-  consume_gas ctxt cost >>? fun _ -> Result.return_unit
+  consume_gas ctxt cost >>? fun (_ : t) -> Result.return_unit
 
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
   | Limited {remaining = before}, Limited {remaining = after} ->
       Gas_limit_repr.Arith.sub before after
   | _, _ -> Gas_limit_repr.Arith.zero
-
-(* Once gas consuming functions have been defined,
-   we can instantiate the carbonated map.
-   See [Sc_rollup_carbonated_map_maker] above.
-*)
-
-module Gas = struct
-  type context = t
-
-  let consume = consume_gas
-end
-
-module Sc_rollup_carbonated_map = Sc_rollup_address_map_builder.Make (Gas)
 
 type missing_key_kind = Get | Set | Del | Copy
 
@@ -593,14 +576,14 @@ let storage_error_encoding =
       case
         (Tag 0)
         ~title:"Incompatible_protocol_version"
-        (obj1 (req "incompatible_protocol_version" string))
+        (obj1 (req "incompatible_protocol_version" @@ string Plain))
         (function Incompatible_protocol_version arg -> Some arg | _ -> None)
         (fun arg -> Incompatible_protocol_version arg);
       case
         (Tag 1)
         ~title:"Missing_key"
         (obj2
-           (req "missing_key" (list string))
+           (req "missing_key" (list @@ string Plain))
            (req
               "function"
               (string_enum
@@ -610,13 +593,13 @@ let storage_error_encoding =
       case
         (Tag 2)
         ~title:"Existing_key"
-        (obj1 (req "existing_key" (list string)))
+        (obj1 (req "existing_key" (list @@ string Plain)))
         (function Existing_key key -> Some key | _ -> None)
         (fun key -> Existing_key key);
       case
         (Tag 3)
         ~title:"Corrupted_data"
-        (obj1 (req "corrupted_data" (list string)))
+        (obj1 (req "corrupted_data" (list @@ string Plain)))
         (function Corrupted_data key -> Some key | _ -> None)
         (fun key -> Corrupted_data key);
     ]
@@ -721,7 +704,7 @@ let () =
         ppf
         "@[<v 2>Cannot parse the protocol parameter:@ %s@]"
         (Bytes.to_string bytes))
-    Data_encoding.(obj1 (req "contents" bytes))
+    Data_encoding.(obj1 (req "contents" @@ bytes Hex))
     (function Failed_to_parse_parameter data -> Some data | _ -> None)
     (fun data -> Failed_to_parse_parameter data) ;
   register_error_kind
@@ -736,7 +719,7 @@ let () =
         msg
         Data_encoding.Json.pp
         json)
-    Data_encoding.(obj2 (req "contents" json) (req "error" string))
+    Data_encoding.(obj2 (req "contents" json) (req "error" @@ string Plain))
     (function
       | Failed_to_decode_parameter (json, msg) -> Some (json, msg) | _ -> None)
     (fun (json, msg) -> Failed_to_decode_parameter (json, msg))
@@ -746,7 +729,7 @@ let get_proto_param ctxt =
   | None -> failwith "Missing protocol parameters."
   | Some bytes -> (
       match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
-      | None -> fail (Failed_to_parse_parameter bytes)
+      | None -> tzfail (Failed_to_parse_parameter bytes)
       | Some json -> (
           Context.remove ctxt protocol_param_key >|= fun ctxt ->
           match Data_encoding.Json.destruct Parameters_repr.encoding json with
@@ -816,6 +799,9 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
   get_cycle_eras ctxt >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
   let level = Level_repr.level_from_raw ~cycle_eras level in
+  let sc_rollup_current_messages =
+    Sc_rollup_inbox_repr.init_witness_no_history
+  in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
@@ -842,17 +828,18 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
-        sc_rollup_current_messages = Sc_rollup_carbonated_map.empty;
+        sc_rollup_current_messages;
         dal_slot_fee_market =
           Dal_slot_repr.Slot_market.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_endorsement_slot_accountability =
-          Dal_endorsement_repr.Accountability.init
+        dal_attestation_slot_accountability =
+          Dal_attestation_repr.Accountability.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
+        dal_committee = empty_dal_committee;
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Kathmandu_014
+type previous_protocol = Genesis of Parameters_repr.t | Lima_015
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -864,8 +851,7 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "kathmandu_014") then
-         return (Kathmandu_014, ctxt)
+       else if Compare.String.(s = "lima_015") then return (Lima_015, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
@@ -888,6 +874,82 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
             "Internal error: cannot parse previous protocol constants in \
              context."
       | Some constants -> Lwt.return constants)
+
+let update_block_time_related_constants (c : Constants_parametric_repr.t) =
+  let divide_period p =
+    Period_repr.of_seconds_exn
+      Int64.(div (add (Period_repr.to_seconds p) 1L) 2L)
+  in
+  let minimal_block_delay = divide_period c.minimal_block_delay in
+  let delay_increment_per_round = divide_period c.delay_increment_per_round in
+  let hard_gas_limit_per_block =
+    let two = Z.(succ one) in
+    Gas_limit_repr.Arith.(
+      integral_exn (Z.div (integral_to_z c.hard_gas_limit_per_block) two))
+  in
+  let Constants_repr.Generated.
+        {
+          consensus_threshold = _;
+          baking_reward_fixed_portion;
+          baking_reward_bonus_per_slot;
+          endorsing_reward_per_slot;
+          liquidity_baking_subsidy;
+        } =
+    Constants_repr.Generated.generate
+      ~consensus_committee_size:
+        c.Constants_parametric_repr.consensus_committee_size
+      ~blocks_per_minute:
+        {
+          numerator = 60;
+          denominator =
+            minimal_block_delay |> Period_repr.to_seconds |> Int64.to_int;
+        }
+  in
+  let double = Int32.mul 2l in
+  let blocks_per_cycle = double c.blocks_per_cycle in
+  let blocks_per_commitment = double c.blocks_per_commitment in
+  let nonce_revelation_threshold = double c.nonce_revelation_threshold in
+  let blocks_per_stake_snapshot = double c.blocks_per_stake_snapshot in
+  let max_operations_time_to_live = 2 * c.max_operations_time_to_live in
+  {
+    c with
+    blocks_per_cycle;
+    blocks_per_commitment;
+    nonce_revelation_threshold;
+    blocks_per_stake_snapshot;
+    max_operations_time_to_live;
+    minimal_block_delay;
+    delay_increment_per_round;
+    hard_gas_limit_per_block;
+    baking_reward_fixed_portion;
+    baking_reward_bonus_per_slot;
+    endorsing_reward_per_slot;
+    liquidity_baking_subsidy;
+  }
+
+let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
+    ~blocks_per_commitment =
+  get_cycle_eras ctxt >>=? fun cycle_eras ->
+  let current_era = Level_repr.current_era cycle_eras in
+  let current_cycle =
+    let level_position =
+      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
+    in
+    Cycle_repr.add
+      current_era.first_cycle
+      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
+  in
+  let new_cycle_era =
+    Level_repr.
+      {
+        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
+        first_cycle = Cycle_repr.succ current_cycle;
+        blocks_per_cycle;
+        blocks_per_commitment;
+      }
+  in
+  Level_repr.add_cycle_era new_cycle_era cycle_eras >>?= fun new_cycle_eras ->
+  set_cycle_eras ctxt new_cycle_eras
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
@@ -916,12 +978,12 @@ let prepare_first_block ~level ~timestamp ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Kathmandu_014 ->
+  | Lima_015 ->
       get_previous_protocol_constants ctxt >>= fun c ->
       let tx_rollup =
         Constants_parametric_repr.
           {
-            enable = c.tx_rollup.enable;
+            enable = false;
             origination_size = c.tx_rollup.origination_size;
             hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
             hard_size_limit_per_message =
@@ -950,82 +1012,41 @@ let prepare_first_block ~level ~timestamp ctxt =
       let dal =
         Constants_parametric_repr.
           {
-            feature_enable = false;
-            number_of_slots = 256;
-            endorsement_lag = 1;
-            availability_threshold = 50;
+            feature_enable = c.dal.feature_enable;
+            number_of_slots = c.dal.number_of_slots;
+            attestation_lag = c.dal.endorsement_lag;
+            attestation_threshold = c.dal.availability_threshold;
+            blocks_per_epoch = 32l;
             cryptobox_parameters;
           }
       in
-      (* Inherit values that existed in previous protocol and haven't changed.
-         Assign values to new constants or those with new default value. *)
       let sc_rollup =
         Constants_parametric_repr.
           {
-            enable = c.sc_rollup.enable;
+            enable = true;
+            arith_pvm_enable = false;
             origination_size = c.sc_rollup.origination_size;
-            challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
-            (*
-
-              The following value is chosen to limit the length of inbox
-              refutation proofs. In the worst case, the length of inbox
-              refutation proofs are logarithmic (in basis 2) in the
-              number of messages in the inboxes during the commitment
-              period.
-
-              With the following value, an inbox refutation proof is
-              made of at most 35 hashes, hence a payload bounded by
-              35 * 48 bytes, which far below than the 32kb of a Tezos
-              operations.
-
-            *)
-            max_number_of_messages_per_commitment_period =
-              c.sc_rollup.commitment_period_in_blocks * 10_000_000;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-               The following constants need to be refined. *)
-            stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;
-            commitment_period_in_blocks =
-              c.sc_rollup.commitment_period_in_blocks;
-            max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
-            (* Number of active levels kept for executing outbox messages.
-               WARNING: Changing this value impacts the storage charge for
-               applying messages from the outbox. It also requires migration for
-               remapping existing active outbox levels to new indices. *)
-            max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
-            (* Maximum number of outbox messages per level.
-               WARNING: changing this value impacts the storage cost charged
-               for applying messages from the outbox. *)
+            challenge_window_in_blocks = 80_640;
+            stake_amount = c.sc_rollup.stake_amount;
+            commitment_period_in_blocks = 60;
+            max_lookahead_in_blocks = 172_800l;
+            max_active_outbox_levels = 80_640l;
             max_outbox_messages_per_level =
               c.sc_rollup.max_outbox_messages_per_level;
-            (* The default number of required sections in a dissection *)
-            number_of_sections_in_dissection = 32;
-            timeout_period_in_blocks = 20_160;
-            (* We store multiple cemented commitments because we want to
-               allow the execution of outbox messages against cemented
-               commitments that are older than the last cemented commitment.
-               The execution of an outbox message is a manager operation,
-               and manager operations are kept in the mempool for one
-               hour. Hence we only need to ensure that an outbox message
-               can be validated against a cemented commitment produced in the
-               last hour. If we assume that the rollup is operating without
-               issues, that is no commitments are being refuted and commitments
-               are published and cemented regularly by one rollup node, we can
-               expect commitments to be cemented approximately every 15
-               minutes, or equivalently we can expect 5 commitments to be
-               published in one hour (at minutes 0, 15, 30, 45 and 60).
-               Therefore, we need to keep 5 cemented commitments to guarantee
-               that the execution of an outbox operation can always be
-               validated against a cemented commitment while it is in the
-               mempool. *)
-            max_number_of_stored_cemented_commitments = 5;
+            number_of_sections_in_dissection =
+              c.sc_rollup.number_of_sections_in_dissection;
+            timeout_period_in_blocks = 40_320;
+            max_number_of_stored_cemented_commitments =
+              c.sc_rollup.max_number_of_stored_cemented_commitments;
+            max_number_of_parallel_games = 32;
           }
       in
       let zk_rollup =
         Constants_parametric_repr.
           {
-            enable = false;
-            origination_size = 4_000;
-            min_pending_to_process = 10;
+            enable = c.zk_rollup.enable;
+            origination_size = c.zk_rollup.origination_size;
+            min_pending_to_process = c.zk_rollup.min_pending_to_process;
           }
       in
       let constants =
@@ -1040,7 +1061,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
-            minimal_stake = c.tokens_per_roll;
+            minimal_stake = c.minimal_stake;
             vdf_difficulty = c.vdf_difficulty;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
@@ -1079,6 +1100,20 @@ let prepare_first_block ~level ~timestamp ctxt =
             zk_rollup;
           }
       in
+      let block_time_is_at_least_15s =
+        Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay >= 15L)
+      in
+      (if block_time_is_at_least_15s then
+       let new_constants = update_block_time_related_constants constants in
+       update_cycle_eras
+         ctxt
+         level
+         ~prev_blocks_per_cycle:constants.blocks_per_cycle
+         ~blocks_per_cycle:new_constants.blocks_per_cycle
+         ~blocks_per_commitment:new_constants.blocks_per_commitment
+       >>=? fun ctxt -> return (ctxt, new_constants)
+      else return (ctxt, constants))
+      >>=? fun (ctxt, constants) ->
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp
@@ -1322,12 +1357,6 @@ let record_dictator_proposal_seen ctxt = update_dictator_proposal_seen ctxt true
 
 let dictator_proposal_seen ctxt = dictator_proposal_seen ctxt
 
-module Migration_from_Kathmandu = struct
-  let reset_samplers ctxt =
-    let ctxt = update_sampler_state ctxt Cycle_repr.Map.empty in
-    ok ctxt
-end
-
 let init_sampler_for_cycle ctxt cycle seed state =
   let map = sampler_state ctxt in
   if Cycle_repr.Map.mem cycle map then error (Sampler_already_set cycle)
@@ -1530,71 +1559,35 @@ end
    the block in a in-memory map.
 *)
 module Sc_rollup_in_memory_inbox = struct
-  let current_messages ctxt rollup =
-    let open Tzresult_syntax in
-    let+ messages, ctxt =
-      Sc_rollup_carbonated_map.find
-        ctxt
-        rollup
-        ctxt.back.sc_rollup_current_messages
-    in
-    (messages, ctxt)
+  let current_messages ctxt = ctxt.back.sc_rollup_current_messages
 
-  let set_current_messages ctxt rollup tree =
-    let open Tzresult_syntax in
-    let+ sc_rollup_current_messages, ctxt =
-      Sc_rollup_carbonated_map.update
-        ctxt
-        rollup
-        (fun ctxt _prev_tree -> return (Some tree, ctxt))
-        ctxt.back.sc_rollup_current_messages
-    in
-    let back = {ctxt.back with sc_rollup_current_messages} in
-    {ctxt with back}
+  let set_current_messages ctxt witness =
+    {ctxt with back = {ctxt.back with sc_rollup_current_messages = witness}}
 end
 
 module Dal = struct
-  type error +=
-    | Dal_register_invalid_slot_header of {
-        length : int;
-        slot_header : Dal_slot_repr.Header.t;
-      }
+  type cryptobox = Dal.t
 
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"dal_register_invalid_slot"
-      ~title:"Dal register invalid slot"
-      ~description:
-        "Attempt to register a slot which is invalid (the index is out of \
-         bounds)."
-      ~pp:(fun ppf (length, slot) ->
-        Format.fprintf
-          ppf
-          "The slot provided is invalid. Slot index should be between 0 and \
-           %d. Found: %a."
-          length
-          Dal_slot_repr.Index.pp
-          slot.Dal_slot_repr.Header.id.index)
-      Data_encoding.(
-        obj2
-          (req "length" int31)
-          (req "slot_header" Dal_slot_repr.Header.encoding))
-      (function
-        | Dal_register_invalid_slot_header {length; slot_header} ->
-            Some (length, slot_header)
-        | _ -> None)
-      (fun (length, slot_header) ->
-        Dal_register_invalid_slot_header {length; slot_header})
+  let make ctxt =
+    let open Result_syntax in
+    let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
+      ctxt.back.constants
+    in
+    match Dal.make cryptobox_parameters with
+    | Ok cryptobox -> return cryptobox
+    | Error (`Fail explanation) ->
+        error (Dal_errors_repr.Dal_cryptobox_error {explanation})
 
-  let record_available_shards ctxt slots shards =
-    let dal_endorsement_slot_accountability =
-      Dal_endorsement_repr.Accountability.record_shards_availability
-        ctxt.back.dal_endorsement_slot_accountability
-        slots
+  let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
+
+  let record_attested_shards ctxt attestation shards =
+    let dal_attestation_slot_accountability =
+      Dal_attestation_repr.Accountability.record_attested_shards
+        ctxt.back.dal_attestation_slot_accountability
+        attestation
         shards
     in
-    {ctxt with back = {ctxt.back with dal_endorsement_slot_accountability}}
+    {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
 
   let register_slot_header ctxt slot_header =
     match
@@ -1606,59 +1599,130 @@ module Dal = struct
         let length =
           Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
         in
-        error (Dal_register_invalid_slot_header {length; slot_header})
+        error
+          (Dal_errors_repr.Dal_register_invalid_slot_header
+             {length; slot_header})
     | Some (dal_slot_fee_market, updated) ->
-        ok ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
+        if not updated then
+          error
+            (Dal_errors_repr.Dal_publish_slot_header_duplicate {slot_header})
+        else ok {ctxt with back = {ctxt.back with dal_slot_fee_market}}
 
   let candidates ctxt =
     Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
 
-  let is_slot_index_available ctxt =
+  let is_slot_index_attested ctxt =
     let threshold =
-      ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
+      ctxt.back.constants.Constants_parametric_repr.dal.attestation_threshold
     in
     let number_of_shards =
       ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
         .number_of_shards
     in
-    Dal_endorsement_repr.Accountability.is_slot_available
-      ctxt.back.dal_endorsement_slot_accountability
+    Dal_attestation_repr.Accountability.is_slot_attested
+      ctxt.back.dal_attestation_slot_accountability
       ~threshold
       ~number_of_shards
 
+  type committee = dal_committee = {
+    pkh_to_shards :
+      (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
+  }
+
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
 
-     We have to choose for the sampling. Here we use the one used by
-     the consensus which is hackish and probably not what we want at
-     the end. However, it should be enough for a prototype. This has a
-     very bad complexity too. *)
-  let rec compute_shards ?(index = 0) ctxt ~endorser =
-    let max_shards =
-      ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
-    in
-    Slot_repr.Map.fold_e
-      (fun _ (consensus_key, power) (index, shards) ->
-        let limit = Compare.Int.min (index + power) max_shards in
-        (* Early fail when we have reached the desired number of shards *)
-        if Compare.Int.(index >= max_shards) then Error shards
-        else if
-          Signature.Public_key_hash.(consensus_key.consensus_pkh = endorser)
-        then
-          let shards = Misc.(index --> (limit - 1)) in
-          Ok (index + power, shards)
-        else Ok (index + power, shards))
-      ctxt.back.consensus.allowed_endorsements
-      (index, [])
-    |> function
-    | Ok (index, []) ->
-        (* This happens if the number of Tenderbake slots is below the
-           number of shards. Therefore, we reuse the committee using a
-           shift (index being the size of the committee). *)
-        compute_shards ~index ctxt ~endorser
-    | Ok (_index, shards) -> shards
-    | Error shards -> shards
+     A committee is selected by the callback function
+     [pkh_from_tenderbake_slot]. We use a callback because of circular
+     dependencies. It is not clear whether it will be the final choice
+     for the DAL committee. The current solution is a bit hackish but
+     should work. If we decide to differ from the Tenderbake
+     committee, one could just draw a new committee.
 
-  let shards ctxt ~endorser = compute_shards ~index:0 ctxt ~endorser
+     The problem with drawing a new committee is that it is not
+     guaranteed that everyone in the DAL committee will be in the
+     Tenderbake committee. Consequently, either we decide to have a
+     new consensus operation which does not count for Tenderbake,
+     and/or we take into account for the model of DAL that at every
+     level, a percentage of DAL attestations cannot be received. *)
+  let compute_committee ctxt pkh_from_tenderbake_slot =
+    let Constants_parametric_repr.
+          {
+            dal = {cryptobox_parameters = {number_of_shards; _}; _};
+            consensus_committee_size;
+            _;
+          } =
+      ctxt.back.constants
+    in
+    (* We first draw a committee by drawing slots from the Tenderbake
+       committee. To have a compact representation of slots, we can
+       sort the Tenderbake slots by [pkh], so that a committee is
+       actually only an interval. This is done by recomputing a
+       committee from the first one. *)
+    let update_committee committee pkh ~slot_index ~power =
+      {
+        pkh_to_shards =
+          Signature.Public_key_hash.Map.update
+            pkh
+            (function
+              | None -> Some (slot_index, power)
+              | Some (initial_shard_index, old_power) ->
+                  Some (initial_shard_index, old_power + power))
+            committee.pkh_to_shards;
+        shard_to_pkh =
+          List.fold_left
+            (fun shard_to_pkh slot ->
+              Dal_attestation_repr.Shard_map.add slot pkh shard_to_pkh)
+            committee.shard_to_pkh
+            Misc.(slot_index --> (slot_index + (power - 1)));
+      }
+    in
+    let rec compute_power index committee =
+      if Compare.Int.(index < 0) then return committee
+      else
+        let shard_index = index mod consensus_committee_size in
+        Slot_repr.of_int shard_index >>?= fun slot ->
+        pkh_from_tenderbake_slot slot >>=? fun (_ctxt, pkh) ->
+        (* The [Slot_repr] module is related to the Tenderbake committee. *)
+        let slot_index = Slot_repr.to_int slot in
+        (* An optimisation could be to return only [pkh_to_shards] map
+           because the second one is not used. This can be done later
+           on, if it is a good optimisation. *)
+        let committee = update_committee committee pkh ~slot_index ~power:1 in
+        compute_power (index - 1) committee
+    in
+    (* This committee is an intermediate to compute the final DAL
+       committee. This one only projects the Tenderbake committee into
+       the DAL committee. The next one reorders the slots so that they
+       are grouped by public key hash. *)
+    compute_power (number_of_shards - 1) empty_dal_committee
+    >>=? fun unordered_committee ->
+    let dal_committee =
+      Signature.Public_key_hash.Map.fold
+        (fun pkh (_, power) (total_power, committee) ->
+          let committee =
+            update_committee committee pkh ~slot_index:total_power ~power
+          in
+          let new_total_power = total_power + power in
+          (new_total_power, committee))
+        unordered_committee.pkh_to_shards
+        (0, empty_dal_committee)
+      |> snd
+    in
+    return dal_committee
+
+  let init_committee ctxt committee =
+    {ctxt with back = {ctxt.back with dal_committee = committee}}
+
+  let shards_of_attestor ctxt ~attestor:pkh =
+    let rec make acc (initial_shard_index, power) =
+      if Compare.Int.(power <= 0) then List.rev acc
+      else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)
+    in
+    Signature.Public_key_hash.Map.find_opt
+      pkh
+      ctxt.back.dal_committee.pkh_to_shards
+    |> Option.map (fun pre_shards -> make [] pre_shards)
 end
 
 (* The type for relative context accesses instead from the root. In order for

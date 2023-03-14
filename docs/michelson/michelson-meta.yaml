@@ -536,14 +536,17 @@ instructions:
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
     documentation_short: Boolean and bitwise AND
     documentation: |
-      The instruction ``AND`` is defined on boolean and natural number operands.
-      In the former case, the result is the logical AND of the operands.
-      In the latter case, the result is the bitwise AND of the operands.
+      The instruction ``AND`` is defined on boolean, natural number and bytes operands.
+      In the boolean case, the result is the logical AND of the operands.
+      In the natural number and bytes cases, the result is the bitwise AND of the operands.
 
       ``AND`` is also defined when the top operand is an ``int``. Negative
       numbers are considered in `two's complement representation <https://en.wikipedia.org/wiki/Two's_complement>`_,
       starting with a virtual infinite number of 1s.
 
+      When ``AND`` is used for bytes operands, the result bytes has the same length as the shorter operand.
+      The prefix of the longer operand is cut to match with the length of the shorter one before taking the bitwise AND.
+      
     examples:
     - name: Boolean AND
       description: This contracts takes a pair of booleans, and computes and stores their conjunction.
@@ -552,9 +555,17 @@ instructions:
       input: '(Pair True False)'
       final_storage: 'False'
 
-    - name: Bitwise AND
+    - name: Bitwise AND on natural numbers
       description: This contract demonstrates bitwise AND on numerical values.
       path: opcodes/and_binary.tz
+      initial_storage: 'Unit'
+      input: 'Unit'
+      final_storage: 'Unit'
+      hide_final_storage: True
+
+    - name: Bitwise AND on bytes
+      description: This contract demonstrates bitwise AND on bytes.
+      path: opcodes/and_bytes.tz
       initial_storage: 'Unit'
       input: 'Unit'
       final_storage: 'Unit'
@@ -1180,25 +1191,62 @@ instructions:
     category: arithmetic
     proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
-    documentation_short: Logically left shift a natural number
+    documentation_short: Logically left shift of a natural number and a byte sequence
     documentation: |
 
-      The ``LSL`` instruction consumes two natural numbers and produces
-      the first number logically left-shifted by second number.
+      For natural numbers, the ``LSL`` instruction consumes two natural 
+      numbers and produces the first number logically left-shifted 
+      by second number. This instruction is only defined if the second number
+      is less than or equal to 256.
 
-      This instruction is only defined if the second number is less
-      than or equal to 256.
+      For bytes, the ``LSL`` instruction consumes one chunk of bytes and 
+      one natural number and produces the bytes logically left-shifted by 
+      the natural number using big-endian encoding. The vacated bits on 
+      the right are filled with 0s. The shifted bits are 0-padded 
+      on the left in order to keep all the original bits: for example, 
+      ``0x1234 LSL 1`` is ``0x002468``, instead of ``0x2468`` (the left most
+      bit is lost) or ``0x00002468`` (not minimal padding). The length of
+      the returned bytes by ``LSL`` is ``l + (s + 7) / 8`` bytes where ``l``
+      is the length of the original bytes and ``s`` is the natural number.
+      This instruction is only defined if the second number is less than or
+      equal to 64000.
+
+    - name: LSL on bytes
+      description: This contract demonstrates LSL on bytes.
+      path: opcodes/lsl_bytes.tz
+      initial_storage: 'Unit'
+      input: 'Unit'
+      final_storage: 'Unit'
+      hide_final_storage: True
 
   LSR:
     category: arithmetic
     proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
-    documentation_short: Logically right shift a natural number
+    documentation_short: Logically right shift of a natural number and a byte sequence
     documentation: |
-      The ``LSR`` instruction consumes two natural numbers and produces
-      the first number logically right-shifted by second number.
+      For natural numbers, The ``LSR`` instruction consumes two natural
+      numbers and produces the first number logically right-shifted
+      by second number. This instruction is only defined if the second number
+      is less than or equal to 256.
 
-      This instruction is only defined if the second number is less than or equal to 256.
+      For bytes, the ``LSR`` instruction consumes one chunk of bytes
+      and one natural number and produces the bytes logically
+      right-shifted by the natural number using big-endian
+      encoding. The shifted bits are minimally 0-padded on the left to
+      fit in bytes. For example, ``0x123499 LSR 9`` is ``0x091a``,
+      instead of ``0x00091a`` (not minimal padding). The length of the
+      returned bytes by ``LSR`` is ``max 0 (l - s / 8)`` bytes where
+      ``l`` is the length of the original bytes and ``s`` is the
+      natural number.
+
+    - name: LSR on bytes
+      description: This contract demonstrates LSR on bytes.
+      path: opcodes/lsr_bytes.tz
+      initial_storage: 'Unit'
+      input: 'Unit'
+      final_storage: 'Unit'
+      hide_final_storage: True
 
   MUL:
     category: arithmetic
@@ -1229,7 +1277,7 @@ instructions:
     documentation_short: Boolean negation and bitwise complement
     documentation: |
       The ``NOT`` instruction is defined for ``bool``,
-      ``nat`` and ``int``.
+      ``nat``, ``int`` and ``bytes``.
 
       For ``bool``, it returns the logical negation of its operand.
 
@@ -1239,6 +1287,9 @@ instructions:
       also negated. For instance, the boolean negation of 0 is -1. To
       get a natural back, a possibility is to use ``AND`` with an unsigned
       mask afterwards.
+
+      For bytes, it returns the bytes whose contents are the bitwise negations
+      of the original.
 
   NEG:
     category: arithmetic
@@ -1458,9 +1509,13 @@ instructions:
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
     documentation_short: Boolean and bitwise OR
     documentation: |
-      The instruction ``OR`` is defined on boolean and natural number operands.
-      In the former case, the result is the logical OR of the operands.
-      In the latter case, the result is the bitwise OR of the operands.
+      The instruction ``OR`` is defined on boolean, natural number and bytes operands.
+      In the boolean case, the result is the logical OR of the operands.
+      In the natural number and bytes cases, the result is the bitwise OR of the operands.
+
+      When ``OR`` is used for bytes operands, the result bytes has the same length as the longer operand.
+      The shorter operand is 0-padded on the left to match with the length of
+      the longer one before taking the bitwise OR.
 
   SET_DELEGATE:
     category: blockchain
@@ -1599,9 +1654,13 @@ instructions:
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
     documentation_short: Boolean and bitwise eXclusive OR
     documentation: |
-      The instruction ``XOR`` is defined on boolean and natural number operands.
-      In the former case, the result is the logical XOR of the operands.
-      In the latter case, the result is the bitwise XOR of the operands.
+      The instruction ``XOR`` is defined on boolean, natural number and bytes operands.
+      In the boolean case, the result is the logical XOR of the operands.
+      In the natural number and bytes cases, the result is the bitwise XOR of the operands.
+
+      When ``XOR`` is used for bytes operands, the result bytes has the same length as the longer operand.
+      The shorter operand is 0-padded on the left to match with the length of
+      the longer one before taking the bitwise OR.
 
   DIG:
     category: stack
@@ -1641,12 +1700,22 @@ instructions:
     category: arithmetic
     proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
-    documentation_short: Convert a natural number or a BLS12-381 field element to an integer
+    documentation_short: Convert a natural number, a BLS12-381 field element or bytes to an integer
     documentation: |
       For natural numbers, ``INT`` is the identity cast from ``nat``
       to ``int``.  For BLS12-381 field elements, the returned value is
       always between ``0`` (inclusive) and the order of the BLS12-381 field
-      (exclusive).
+      (exclusive). For bytes, ``INT`` decodes the bytes using the big-endian
+      encoding, where negative numbers are considered in `two's complement representation
+      <https://en.wikipedia.org/wiki/Two's_complement>`_.
+
+  NAT:
+    category: arithmetic
+    proposed-in: ['ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK']
+    since: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+    documentation_short: Convert bytes to a natural number
+    documentation: |
+      ``NAT`` decodes the bytes using the big-endian encoding.
 
   ISNAT:
     category: arithmetic
@@ -1660,6 +1729,16 @@ instructions:
       represented as a natural number. Otherwise, ``None`` is
       returned.
 
+  BYTES:
+    category: arithmetic
+    proposed-in: ['ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK']
+    since: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+    documentation_short: Encode an integer or a natural number to bytes
+    documentation: |
+      ``BYTES`` encodes an integer or a natural number to bytes using the big-endian encoding.
+      For integers, negative numbers are considered in `two's complement representation
+      <https://en.wikipedia.org/wiki/Two's_complement>`_.
+  
   SAPLING_VERIFY_UPDATE:
     category: crypto
     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
@@ -2258,7 +2337,7 @@ types:
       code. Instead, they must be created using ``EMPTY_BIG_MAP`` and
       manipulated using ``GET``, ``UPDATE`` and ``MEM``. However,
       literal ``big_map``\ s are used when originating and calling
-      contracts using ``tezos-client``.
+      contracts using ``octez-client``.
 
       Values of the ``big_map`` type cannot be serialized using ``PACK``.
     examples:

@@ -846,7 +846,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
   let initial_balance = 1L in
   context_init
     ~min_proposal_quorum
-    ~initial_balances:[initial_balance; initial_balance; initial_balance]
+    ~bootstrap_balances:[initial_balance; initial_balance; initial_balance]
     10
     ()
   >>=? fun (b, delegates) ->
@@ -901,7 +901,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
 let test_quorum_in_proposal has_quorum () =
   let total_tokens = 32_000_000_000_000L in
   let half_tokens = Int64.div total_tokens 2L in
-  context_init ~initial_balances:[1L; half_tokens; half_tokens] 3 ()
+  context_init ~bootstrap_balances:[1L; half_tokens; half_tokens] 3 ()
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {min_proposal_quorum; _}; _} ->
@@ -1088,7 +1088,7 @@ let test_voting_power_updated_each_voting_period () =
   let init_bal2 = 48_000_000_000L in
   let init_bal3 = 40_000_000_000L in
   (* Create three accounts with different amounts *)
-  context_init ~initial_balances:[init_bal1; init_bal2; init_bal3] 3 ()
+  context_init ~bootstrap_balances:[init_bal1; init_bal2; init_bal3] 3 ()
   >>=? fun (genesis, contracts) ->
   let con1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let con2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1 in
@@ -1192,13 +1192,13 @@ let test_voting_power_updated_each_voting_period () =
     Int64.sub expected_power_of_baker_1 (Tez.to_mutez amount)
   in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
-  >>=? fun _ ->
+  >>=? fun () ->
   (* Assert voting power of baker2 has increased by [amount] *)
   let expected_power_of_baker_2 =
     Int64.add expected_power_of_baker_2 (Tez.to_mutez amount)
   in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
-  >>=? fun _ ->
+  >>=? fun () ->
   (* Retrieve voting power of baker3 *)
   get_voting_power block baker3 >>=? fun power ->
   let power_of_baker_3 = power in
@@ -1473,7 +1473,7 @@ let test_conflict_too_many_proposals () =
     Incremental.validate_operation current_block_state op_in_current_block
   in
   let* op = Op.proposals (B block) proposer [protos.(0)] in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
@@ -1493,7 +1493,7 @@ let test_conflicting_proposal () =
     Incremental.validate_operation current_block_state op_in_current_block
   in
   let* op = Op.proposals (B block) proposer [proposal] in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
@@ -1501,7 +1501,7 @@ let test_conflicting_proposal () =
   in
   let proposal' = protos.(1) in
   let* op' = Op.proposals (B block) proposer [proposal'] in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
@@ -1634,14 +1634,14 @@ let test_too_many_proposals_in_one_operation () =
   let open Lwt_result_syntax in
   let* b0, proposer0 = context_init1 () in
   let protos = Array.to_list protos in
-  let* _ =
-    try
-      let* _ = Op.proposals (B b0) proposer0 protos in
+  Lwt.catch
+    (fun () ->
+      let* (_ : packed_operation) = Op.proposals (B b0) proposer0 protos in
       failwith
-        "Encoding of proposals operation with too many proposals should fail"
-    with Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
-  in
-  return_unit
+        "Encoding of proposals operation with too many proposals should fail")
+    (function
+      | Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
+      | exn -> Lwt.fail exn)
 
 (* Bake blocks with various valid Proposals operations, and observe
    that their effects are correctly applied. *)
@@ -1838,7 +1838,7 @@ let test_conflicting_ballot () =
     Incremental.validate_operation current_block_state op_in_current_block
   in
   let* op = Op.ballot (B block) voter proposal Vote.Nay in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_ballot __LOC__)
       current_block_state

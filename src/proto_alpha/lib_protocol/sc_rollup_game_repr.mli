@@ -126,38 +126,6 @@ type error +=
   | Dissection_choice_not_found of Sc_rollup_tick_repr.t
         (** The given choice in a refutation is not a starting tick of any of
           the sections in the current dissection. *)
-  | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
-        (** There are more or less than the expected number of sections in the
-          given dissection. *)
-  | Dissection_invalid_number_of_sections of Z.t
-        (** There are less than two sections in the given dissection, which is
-          not valid. *)
-  | Dissection_start_hash_mismatch of {
-      expected : Sc_rollup_repr.State_hash.t option;
-      given : Sc_rollup_repr.State_hash.t option;
-    }
-        (** The given start hash in a dissection is [None] or doesn't match the
-          expected one.*)
-  | Dissection_stop_hash_mismatch of Sc_rollup_repr.State_hash.t option
-        (** The given stop state hash in a dissection should not match the last
-          hash of the section being refuted. *)
-  | Dissection_edge_ticks_mismatch of {
-      dissection_start_tick : Sc_rollup_tick_repr.t;
-      dissection_stop_tick : Sc_rollup_tick_repr.t;
-      chunk_start_tick : Sc_rollup_tick_repr.t;
-      chunk_stop_tick : Sc_rollup_tick_repr.t;
-    }
-        (** The given dissection's edge ticks don't match the edge ticks of the
-          section being refuted. *)
-  | Dissection_ticks_not_increasing
-        (** Invalid provided dissection because ticks are not increasing between
-          two successive sections. *)
-  | Dissection_invalid_distribution
-        (** Invalid provided dissection because ticks split is not well balanced
-          across sections *)
-  | Dissection_invalid_successive_states_shape
-        (** A dissection cannot have a section with no state hash after another
-          section with some state hash. *)
   | Proof_unexpected_section_size of Z.t
         (** Invalid proof step because there is more than one tick. *)
   | Proof_start_state_hash_mismatch of {
@@ -187,16 +155,7 @@ type error +=
 type player = Alice | Bob
 
 module V1 : sig
-  (** A dissection chunk is made of a state hash (that could be [None], see
-    invariants below), and a tick count. *)
-  type dissection_chunk = {
-    state_hash : State_hash.t option;
-    tick : Sc_rollup_tick_repr.t;
-  }
-
-  val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
-
-  val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+  type dissection_chunk = Sc_rollup_dissection_chunk_repr.t
 
   (** Describes the current state of a game. *)
   type game_state =
@@ -232,6 +191,12 @@ module V1 : sig
 
   (** A game is characterized by:
 
+    - [refuter_commitment_hash], the hash of the commitment of the player that
+      has initiated the game.
+
+    - [defender_commitment_hash], the hash of the commitment of the player that
+      is tentatively refuted.
+
     - [turn], the player that must provide the next move.
 
     - [inbox_snapshot], a snapshot of the inbox state at the moment the
@@ -240,14 +205,16 @@ module V1 : sig
       otherwise they would have a 'moving target' because the actual
       inbox may be updated continuously.
 
+    - [dal_snapshot], a snapshot of the DAL's confirmed slots history at the
+      moment the game is created. In fact, since the confirmed slots history at
+      initialization would likely evolve during the game, we need a (fixed)
+      reference w.r.t. which Dal input proofs would be produced and verified if
+      needed.
+
     - [level], the inbox level of the commitment the game is refuting.
       This is only used when checking [Blocked_step] proofs---the proof
       will show that the next message available in [inbox_snapshot] is
       at [level], so shouldn't be included in this commitment.
-
-    - [pvm_name] identifies the PVM used in this rollup. It is useful to
-      have here so we can check that the proof provided in a refutation
-      is of the correct kind.
 
     - [game_state], the current state of the game, see {!game_state}
       for more information.
@@ -259,14 +226,14 @@ module V1 : sig
     that size. The initial game dissection will be 3 values except in
     the case of a zero-tick commit when it will have 2 values.)
     - the first state hash value in [dissection] must not be [None]
-    - [inbox_snapshot] never changes once the game is created
+    - [inbox_snapshot] and [dal_snapshot] never change once the game is created
   *)
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
+    dal_snapshot : Dal_slot_repr.History.t;
     start_level : Raw_level_repr.t;
     inbox_level : Raw_level_repr.t;
-    pvm_name : string;
     game_state : game_state;
   }
 
@@ -323,19 +290,20 @@ end
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
 
-    [initial inbox ~start_level ~pvm_name ~parent ~child ~refuter ~defender
-    ~default_number_of_sections] will construct an initial game where [refuter]
-    is next to play. The game has [dissection] with three states:
+    [initial inbox dal_slots_history ~start_level ~parent_commitment
+    ~defender_commitment ~refuter ~defender ~default_number_of_sections] will
+    construct an initial game where [refuter] is next to play. The game has
+    [dissection] with three states:
 
-      - firstly, the state (with tick zero) of [parent], the commitment
-      that both stakers agree on.
+      - firstly, the state (with tick zero) of [parent_commitment], the
+      commitment that both stakers agree on.
 
-      - secondly, the state and tick count of [child], the commitment
-      that [defender] has staked on.
+      - secondly, the state and tick count of [defender_commitment], the
+      commitment that [defender] has staked on.
 
-      - thirdly, a [None] state which is a single tick after the [child]
-      commitment. This represents the claim, implicit in the commitment,
-      that the state given is blocked.
+      - thirdly, a [None] state which is a single tick after the
+      [defender_commitment] commitment. This represents the claim, implicit in
+      the commitment, that the state given is blocked.
 
     This gives [refuter] a binary choice: she can refute the commit
     itself by providing a new dissection between the two committed
@@ -344,12 +312,12 @@ end
     increment from that state to its successor. *)
 val initial :
   Sc_rollup_inbox_repr.history_proof ->
+  Dal_slot_repr.History.t ->
   start_level:Raw_level_repr.t ->
-  pvm_name:string ->
-  parent:Sc_rollup_commitment_repr.t ->
-  child:Sc_rollup_commitment_repr.t ->
-  refuter:Staker.t ->
-  defender:Staker.t ->
+  parent_commitment:Sc_rollup_commitment_repr.t ->
+  defender_commitment:Sc_rollup_commitment_repr.t ->
+  refuter:Signature.public_key_hash ->
+  defender:Signature.public_key_hash ->
   default_number_of_sections:int ->
   t
 
@@ -357,11 +325,17 @@ val initial :
     intermediate ticks remaining to put in it) or a proof. *)
 type step =
   | Dissection of dissection_chunk list
-  | Proof of Sc_rollup_proof_repr.t
+  | Proof of Sc_rollup_proof_repr.serialized Sc_rollup_proof_repr.t
 
-(** A [refutation] is a move in the game. [choice] is the final tick
-    in the current dissection at which the two players agree. *)
-type refutation = {choice : Sc_rollup_tick_repr.t; step : step}
+(** A [refutation] is a move in the game. *)
+type refutation =
+  | Start of {
+      player_commitment_hash : Sc_rollup_commitment_repr.Hash.t;
+      opponent_commitment_hash : Sc_rollup_commitment_repr.Hash.t;
+    }
+  | Move of {choice : Sc_rollup_tick_repr.t; step : step}
+      (** [choice] is the final tick in the current dissection at which
+          the two players agree. *)
 
 val pp_refutation : Format.formatter -> refutation -> unit
 
@@ -398,8 +372,9 @@ val pp_status : Format.formatter -> status -> unit
 
 val status_encoding : status Data_encoding.t
 
-(** Decide the loser of the game, if it exists. *)
-val loser_of_results : alice_result:bool -> bob_result:bool -> player option
+(* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+   Providing DAL parameters here is not resilient to their change during
+   protocol upgrade. *)
 
 (** Applies the move [refutation] to the game. Returns the game {!status}
     after applying the move.
@@ -407,13 +382,25 @@ val loser_of_results : alice_result:bool -> bob_result:bool -> player option
     In the case of the game continuing, this swaps the current
     player and returns a [Ongoing] status. Otherwise, it returns a
     [Ended <game_result>] status.
+
+    The provided DAL parameters and [dal_attestation_lag] are used in case the
+    game needs to check that a page's content is part of a slot (using the
+    slot's commitment).
 *)
 val play :
+  Sc_rollups.Kind.t ->
+  Dal_slot_repr.parameters ->
+  dal_attestation_lag:int ->
   stakers:Index.t ->
   Sc_rollup_metadata_repr.t ->
   t ->
-  refutation ->
+  step:step ->
+  choice:Sc_rollup_tick_repr.t ->
   (game_result, t) Either.t tzresult Lwt.t
+
+(** [cost_play ~step ~choice] returns the gas cost of [play] applied with[step],
+    and [choice]. *)
+val cost_play : step:step -> choice:Sc_rollup_tick_repr.t -> Gas_limit_repr.cost
 
 (** A type that represents the number of blocks left for players to play. Each
     player has her timeout value. `timeout` is expressed in the number of
@@ -443,23 +430,7 @@ module Internal_for_tests : sig
     Sc_rollup_tick_repr.t ->
     (dissection_chunk * dissection_chunk) tzresult
 
-  (** We check firstly that [dissection] is the correct length. It must be
-    [default_number_of_sections] values long, unless the distance between
-    [start_tick] and [stop_tick] is too small to make this possible, in which
-    case it should be as long as possible. (If the distance is one we fail
-    immediately as there is no possible legal dissection).
-
-    Then we check that [dissection] starts at the correct tick and state,
-    and that it ends at the correct tick and with a different state to
-    the current dissection.
-
-    Finally, we check that [dissection] is well formed: it has correctly
-    ordered the ticks, and it begins with a real hash of the form [Some
-    s] not a [None] state. Note that we have to allow the possibility of
-    multiple [None] states because the restrictions on dissection shape
-    (which are necessary to prevent a 'linear-time game' attack) will
-    mean that sometimes the honest play is a dissection with multiple
-    [None] states. *)
+  (** See {!Sc_rollup_dissection_chunk_repr.default_check} *)
   val check_dissection :
     default_number_of_sections:int ->
     start_chunk:dissection_chunk ->

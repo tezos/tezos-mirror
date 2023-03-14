@@ -46,7 +46,7 @@ let with_node f =
           Distributed_db_version.Name.of_string "SANDBOXED_TEZOS_DOCGEN";
         user_activated_upgrades = [];
         user_activated_protocol_overrides = [];
-        operation_metadata_size_limit = None;
+        operation_metadata_size_limit = Unlimited;
         patch_context = None;
         data_dir = dir;
         store_root = dir / "store";
@@ -56,16 +56,17 @@ let with_node f =
         target = None;
         disable_mempool = true;
         enable_testchain = false;
+        dal = Tezos_crypto_dal.Cryptobox.Config.default;
       }
     in
     let* node =
       Node.create
         ~singleprocess:true
         node_config
-        Node.default_peer_validator_limits
-        Node.default_block_validator_limits
-        Node.default_prevalidator_limits
-        Node.default_chain_validator_limits
+        Tezos_shell_services.Shell_limits.default_peer_validator_limits
+        Tezos_shell_services.Shell_limits.default_block_validator_limits
+        Tezos_shell_services.Shell_limits.default_prevalidator_limits
+        Tezos_shell_services.Shell_limits.default_chain_validator_limits
         None
     in
     f node

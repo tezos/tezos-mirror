@@ -385,10 +385,16 @@ module Context = struct
 
   type cache_key = Environment_cache.key
 
-  type block_cache = {context_hash : Context_hash.t; cache : cache}
+  type block_cache = {
+    context_hash : Tezos_crypto.Hashed.Context_hash.t;
+    cache : cache;
+  }
 
   type source_of_cache =
-    [`Force_load | `Load | `Lazy | `Inherited of block_cache * Context_hash.t]
+    [ `Force_load
+    | `Load
+    | `Lazy
+    | `Inherited of block_cache * Tezos_crypto.Hashed.Context_hash.t ]
 
   type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
@@ -654,7 +660,11 @@ module Context = struct
     let open Lwt_syntax in
     match mode with
     | `Inherited ({context_hash; cache}, predecessor_context_hash) ->
-        if Context_hash.equal context_hash predecessor_context_hash then
+        if
+          Tezos_crypto.Hashed.Context_hash.equal
+            context_hash
+            predecessor_context_hash
+        then
           (*
 
              We can safely reuse the cache of the predecessor block.
@@ -698,15 +708,14 @@ module Context = struct
 
   *)
   module Cache_cache =
-  Ringo_lwt.Functors.Make_result_presized (Ringo.SingletonMap (struct
-    type t = Block_hash.t
+    Aches_lwt.Lache.Make_result (Aches.Rache.SingletonTransferMap (Block_hash))
 
-    let equal = Block_hash.equal
-
-    let hash = Block_hash.hash
-  end))
-
-  let cache_cache : (cache, error trace) Cache_cache.t = Cache_cache.create ()
+  let cache_cache : (cache, error trace) Cache_cache.t =
+    (* The cache is a singleton cache, this is set during the instantiation of
+       the module in the functor application above. This is why [-1] is an
+       acceptable value for the size limit: it is ignored and the functor's
+       value is used instead. *)
+    Cache_cache.create (-1)
 
   let load_cache block_hash (Context ctxt) mode builder =
     let open Lwt_result_syntax in
@@ -714,11 +723,14 @@ module Context = struct
       match mode with
       | `Force_load ->
           let p = load_cache (Context ctxt) `Load builder in
-          Cache_cache.replace cache_cache block_hash p ;
+          Cache_cache.put cache_cache block_hash p ;
           p
       | (`Load | `Lazy | `Inherited _) as mode ->
-          Cache_cache.find_or_replace cache_cache block_hash (fun _block_hash ->
-              load_cache (Context ctxt) mode builder)
+          Cache_cache.bind_or_put
+            cache_cache
+            block_hash
+            (fun _block_hash -> load_cache (Context ctxt) mode builder)
+            (fun p -> Lwt.return p)
     in
     return (Context {ctxt with cache})
 
@@ -768,7 +780,11 @@ type validation_result = {
 type quota = {max_size : int; max_op : int option}
 
 type rpc_context = {
-  block_hash : Block_hash.t;
+  block_hash : Tezos_crypto.Hashed.Block_hash.t;
   block_header : Block_header.shell_header;
   context : Context.t;
 }
+
+type header_context_hash_semantics =
+  | Resulting_context
+  | Predecessor_resulting_context

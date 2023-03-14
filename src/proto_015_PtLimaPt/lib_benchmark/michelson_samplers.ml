@@ -266,7 +266,7 @@ let fail_sampling error = raise (SamplingError error)
 module Make (P : sig
   val parameters : parameters
 end)
-(Crypto_samplers : Crypto_samplers.Finite_key_pool_S) : S = struct
+(Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S) : S = struct
   module Michelson_base = Michelson_samplers_base.Make (struct
     let parameters = P.parameters.base_parameters
   end)
@@ -608,7 +608,7 @@ end)
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
       in
-      let pkh, _pk, _sk = Bls.generate_key ~seed () in
+      let pkh, _pk, _sk = Tezos_crypto.Signature.Bls.generate_key ~seed () in
       Tx_rollup_l2_address.Indexable.value pkh
 
     let chain_id rng_state =

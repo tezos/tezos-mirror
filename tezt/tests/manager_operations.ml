@@ -206,9 +206,6 @@ module Helpers = struct
       ~context_path:(Node.data_dir node // "context")
       client
 
-  let contract_file alias =
-    `File (Format.sprintf "./tezt/tests/contracts/proto_alpha/%s" alias)
-
   (** Initialize a network with two nodes *)
   let init ?(disable_operation_precheck = false)
       ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
@@ -266,19 +263,20 @@ module Helpers = struct
     in
     Lwt.return key
 
-  let originate_contract nodes ~alias =
-    Log.info "- Auxiliary step: originate contract %s." alias ;
-    let (`File prg) = contract_file alias in
-    let* contract =
-      Client.originate_contract
+  let originate_contract protocol nodes script_name =
+    Log.info
+      "- Auxiliary step: originate contract %s."
+      Michelson_script.(find script_name protocol |> name_s) ;
+    let* _alias, contract =
+      Client.originate_contract_at
         ~wait:"none"
         ~init:"{}"
-        ~alias
         ~amount:Tez.zero
         ~burn_cap:(Tez.of_int 10)
         ~src:Constant.bootstrap1.alias
-        ~prg
         nodes.main.client
+        script_name
+        protocol
     in
     let* () = bake_and_wait_block nodes.main in
     Log.info "  - Contract address is %s." contract ;
@@ -822,7 +820,10 @@ module Illtyped_originations = struct
         ~protocol
         ~source:Constant.bootstrap1
         ~init_storage:(`Json (`O [("int", `String "-10")]))
-        ~code:(Helpers.contract_file "parsable_contract.tz")
+        ~code:
+          (`File
+            Michelson_script.(
+              find ["mini_scenarios"; "parsable_contract"] protocol |> path))
         nodes.main.client
     in
     unit
@@ -848,24 +849,24 @@ module Deserialisation = struct
     String.make (size_kB * 2000) '0'
 
   (* Originate a contract that takes a byte sequence as argument and does nothing *)
-  let originate_noop_contract nc =
-    let* contract =
-      Client.originate_contract
+  let originate_noop_contract protocol nc =
+    let* _alias, contract =
+      Client.originate_contract_at
         ~wait:"none"
         ~init:"Unit"
-        ~alias:"deserialization_gas"
         ~amount:Tez.zero
         ~burn_cap:Tez.one
         ~src:Constant.bootstrap1.alias
-        ~prg:"parameter bytes; storage unit; code {CDR; NIL operation; PAIR}"
         nc.client
+        ["mini_scenarios"; "noop_bytes"]
+        protocol
     in
     let* () = Helpers.bake_and_wait_block nc in
     return contract
 
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
-    | Protocol.Kathmandu | Lima | Alpha -> 2109
+    | Protocol.Lima | Mumbai | Alpha -> 2109
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -892,7 +893,7 @@ module Deserialisation = struct
       ~tags:["precheck"; "gas"; "deserialization"; "canary"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* contract = originate_noop_contract nodes.main in
+    let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas = deserialization_gas ~size_kB in
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
@@ -921,7 +922,7 @@ module Deserialisation = struct
       ~tags:["precheck"; "gas"; "deserialization"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* contract = originate_noop_contract nodes.main in
+    let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas =
       Constant.manager_operation_gas_cost + deserialization_gas ~size_kB
@@ -946,7 +947,7 @@ module Deserialisation = struct
       ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* contract = originate_noop_contract nodes.main in
+    let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas = deserialization_gas ~size_kB in
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
@@ -1701,7 +1702,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1727,7 +1731,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1754,7 +1761,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1782,7 +1792,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1821,7 +1834,7 @@ module Tx_rollup = struct
       ~__FILE__
       ~title:"Deserialization of transfer ticket"
         (* TX rollups activated with (Proto 13) Jakarta  *)
-      ~supports:(Protocol.From_protocol 13)
+      ~supports:(Protocol.Between_protocols (13, 15))
       ~tags:
         [
           "precheck";
@@ -1851,6 +1864,72 @@ module Tx_rollup = struct
         ~gas_limit:(min_deserialization_gas + 1000)
           (* we add 1000 (the gas for manager operation) to avoid failing with
              gas_exhausted right after precheck *)
+        ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
+        ~ty:(`Json (`O [("prim", `String "bytes")]))
+        ~ticketer:Constant.bootstrap2.public_key_hash
+        ~amount:1
+        ~destination:Constant.bootstrap1.public_key_hash
+        ~entrypoint:"default"
+        nodes.main.client
+    in
+    unit
+
+  let transfer_ticket_no_overdraft =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Deserialization of transfer ticket to implicit account"
+        (* Ticket transfer to implicit accounts was introduced in (Proto 16) M *)
+      ~supports:(Protocol.From_protocol 16)
+      ~tags:
+        [
+          "precheck";
+          "deserialization";
+          "gas";
+          "transfer_ticket";
+          "tx_rollup";
+          "canary";
+        ]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let size_kB = 20 in
+    let min_deserialization_gas =
+      (* contents *) deserialization_gas ~size_kB + (* ty *) 1
+    in
+    let* _oph =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["gas_exhausted.operation"]]
+      (* Does not fail in precheck, so is applied (as failed) *)
+      @@ fun () ->
+      Operation.inject_transfer_ticket
+        ~protocol
+        ~source:Constant.bootstrap1
+        ~gas_limit:(min_deserialization_gas + 1000)
+          (* we add 1000 (the gas for manager operation) to avoid failing with
+             gas_exhausted right after precheck *)
+        ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
+        ~ty:(`Json (`O [("prim", `String "bytes")]))
+        ~ticketer:Constant.bootstrap2.public_key_hash
+        ~amount:1
+        ~destination:Constant.bootstrap1.public_key_hash
+        ~entrypoint:"default"
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["Negative_ticket_balance"]]
+      (* Does not fail in precheck, is applied with expected failure *)
+      @@ fun () ->
+      Operation.inject_transfer_ticket
+        ~protocol
+        ~source:Constant.bootstrap1
+        ~gas_limit:(min_deserialization_gas + 10000)
+          (* we add 10000 (the gas for manager operation) to make sure it goes all the way to trial application *)
         ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
         ~ty:(`Json (`O [("prim", `String "bytes")]))
         ~ticketer:Constant.bootstrap2.public_key_hash
@@ -1896,7 +1975,8 @@ module Tx_rollup = struct
 
   let register ~protocols =
     transfer_ticket_deserialization_canary protocols ;
-    transfer_ticket_deserialization_too_large protocols
+    transfer_ticket_deserialization_too_large protocols ;
+    transfer_ticket_no_overdraft protocols
 end
 
 let register ~protocols =

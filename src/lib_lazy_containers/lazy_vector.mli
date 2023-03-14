@@ -155,6 +155,12 @@ module type S = sig
       large. *)
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
+  (** [drop vector] removes the head from [vector] without returning it. It
+      doesn't read the value before removing it.
+
+      @raise Bounds when applied on an empty vector. *)
+  val drop : 'a t -> 'a t
+
   (** [pop vector] removes the head from [vector], and returns it.
 
       @raise Bounds when applied on an empty vector. *)
@@ -193,7 +199,7 @@ module type S = sig
   (** [loaded_bindings vector] returns the [(key * 'a) list] representation of
       the vector [vector] containing only the loaded values, in order of
       increasing keys. This function is a witness of internal mutations. *)
-  val loaded_bindings : 'a t -> (key * 'a) list
+  val loaded_bindings : 'a t -> (key * 'a option) list
 
   (** [first_key v] returns the first key of the given vector [v]. *)
   val first_key : 'a t -> key
@@ -243,6 +249,14 @@ module Mutable : sig
     val append : 'a -> 'a t -> key
 
     val cons : 'a -> 'a t -> unit
+
+    val drop : 'a t -> unit
+
+    val pop : 'a t -> 'a Lwt.t
+
+    (** [reset vec] empties [vec] completely. Contrary to [pop], no
+        values are read from the underlying backend. *)
+    val reset : 'a t -> unit
 
     val snapshot : 'a t -> 'a Vector.t
   end

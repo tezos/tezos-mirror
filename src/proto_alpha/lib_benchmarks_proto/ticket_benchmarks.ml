@@ -26,6 +26,10 @@
 open Protocol
 open Alpha_context
 
+let ns = Namespace.make Registration_helpers.ns "tickets"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 module Ticket_type_shared = struct
   type config = {max_size : int}
 
@@ -55,7 +59,7 @@ end
 
 exception
   Ticket_benchmark_error of {
-    benchmark_name : string;
+    benchmark_name : Namespace.t;
     trace : Tezos_base.TzPervasives.tztrace;
   }
 
@@ -75,7 +79,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let workload_to_vector () = Sparse_vec.String.of_list []
 
-  let name = "COMPARE_TICKET_HASH"
+  let name = ns "COMPARE_TICKET_HASH"
 
   let info = "Compare cost for Ticket_hash"
 
@@ -85,7 +89,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
       ~model:
         (Model.unknown_const2
            ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(Free_variable.of_string "compare_ticket_hash"))
+           ~const2:(fv "compare_ticket_hash"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -106,7 +110,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen compare_model)
 end
 
@@ -134,7 +138,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let tags = ["tickets"]
 
-  let name = "COMPARE_CONTRACT"
+  let name = ns "COMPARE_CONTRACT"
 
   let info = "Compare cost for Contracts"
 
@@ -144,7 +148,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
       ~model:
         (Model.unknown_const2
            ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(Free_variable.of_string "compare_contract"))
+           ~const2:(fv "compare_contract"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -164,7 +168,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen compare_model)
 end
 
@@ -200,7 +204,7 @@ let rec dummy_type_generator ~rng_state size =
 module Has_tickets_type_benchmark : Benchmark.S = struct
   include Ticket_type_shared
 
-  let name = "TYPE_HAS_TICKETS"
+  let name = ns "TYPE_HAS_TICKETS"
 
   let info = "Benchmarking type_has_tickets"
 
@@ -230,8 +234,8 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_has_tickets_model", size_model)]
 
@@ -240,7 +244,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_model)
 end
 
@@ -257,7 +261,7 @@ let ticket_sampler rng_state =
 module Collect_tickets_benchmark : Benchmark.S = struct
   include Ticket_type_shared
 
-  let name = "COLLECT_TICKETS_STEP"
+  let name = ns "COLLECT_TICKETS_STEP"
 
   let info = "Benchmarking tickets_of_value"
 
@@ -269,16 +273,16 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     let ty =
       match list_t (-1) ticket_ty with Error _ -> assert false | Ok t -> t
     in
-    let length, elements =
+    let _, elements =
       Structure_samplers.list
         ~range:{min = 0; max = config.max_size}
         ~sampler:ticket_sampler
         rng_state
     in
-    let boxed_ticket_list = {elements; length} in
+    let boxed_ticket_list = Script_list.of_list elements in
     Environment.wrap_tzresult
     @@ let* has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
-       let workload = {nodes = length} in
+       let workload = {nodes = Script_list.length boxed_ticket_list} in
        let closure () =
          ignore
            (Lwt_main.run
@@ -302,8 +306,8 @@ module Collect_tickets_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_collect_tickets_step_model", size_model)]
 
@@ -312,7 +316,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_model)
 end
 

@@ -7,10 +7,10 @@
   tezos-micheline
   tezos-base
   tezos-store
-  tezos-protocol-014-PtKathma
-  tezos-client-014-PtKathma
   tezos-protocol-015-PtLimaPt
   tezos-client-015-PtLimaPt
+  tezos-protocol-016-PtMumbai
+  tezos-client-016-PtMumbai
   tezos-protocol-alpha
   tezos-client-alpha)
  (library_flags (:standard -linkall))
@@ -26,6 +26,9 @@
   tezos-micheline
   tezos-base
   get_contracts_lib)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_micheline

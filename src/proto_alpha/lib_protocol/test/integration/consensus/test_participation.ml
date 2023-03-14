@@ -36,7 +36,7 @@ open Protocol
 open Alpha_context
 
 (** [baker] bakes and [endorser] endorses *)
-let bake_and_endorse_once (b_pred, b_cur) baker endorser =
+let bake_and_endorse_once (_b_pred, b_cur) baker endorser =
   let open Context in
   Context.get_endorsers (B b_cur) >>=? fun endorsers_list ->
   List.find_map
@@ -48,11 +48,9 @@ let bake_and_endorse_once (b_pred, b_cur) baker endorser =
     endorsers_list
   |> function
   | None -> assert false
-  | Some delegate ->
+  | Some (delegate, _slots) ->
       Block.get_round b_cur >>?= fun round ->
-      Op.endorsement ~round ~delegate ~endorsed_block:b_cur (B b_pred) ()
-      >>=? fun endorsement ->
-      let endorsement = Operation.pack endorsement in
+      Op.endorsement ~round ~delegate b_cur >>=? fun endorsement ->
       Block.bake ~policy:(By_account baker) ~operation:endorsement b_cur
 
 (** We test that:

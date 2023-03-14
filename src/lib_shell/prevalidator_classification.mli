@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
+
+   This file is part of the implementation of the new mempool, which
+   uses features of the protocol that only exist since Lima.
+
+   When you modify this file, consider whether you should also change
+   the files that implement the legacy mempool for Kathmandu. They all
+   start with the "legacy" prefix and will be removed when Lima is
+   activated on Mainnet. *)
+
+open Shell_operation
+
 (** Classifications which correspond to errors *)
 type error_classification =
   [ `Branch_delayed of tztrace
@@ -38,7 +50,7 @@ type 'protocol_data bounded_map
 (** [map bounded_map] gets the underling map of the [bounded_map]. *)
 val map :
   'protocol_data bounded_map ->
-  ('protocol_data Prevalidation.operation * tztrace) Operation_hash.Map.t
+  ('protocol_data operation * tztrace) Operation_hash.Map.t
 
 (** [cardinal bounded_map] gets the cardinal of the underling map of the [bounded_map] *)
 val cardinal : 'protocol_data bounded_map -> int
@@ -65,7 +77,7 @@ module Sized_map :
    applied].
 
     Note: unparsable operations are handled in a different way because
-   they cannot be handled as a [Prevalidation.operation] since this
+   they cannot be handled as a [operation] since this
    datatype requires an operation to be parsable. Hence, unparsable
    operations are handled differently. In particular, unparsable
    operations are removed on flush.
@@ -81,12 +93,11 @@ type 'protocol_data t = private {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev : 'protocol_data Prevalidation.operation list;
-  mutable prechecked : 'protocol_data Prevalidation.operation Sized_map.t;
+  mutable applied_rev : 'protocol_data operation list;
+  mutable prechecked : 'protocol_data operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool :
-    ('protocol_data Prevalidation.operation * classification)
-    Operation_hash.Map.t;
+    ('protocol_data operation * classification) Operation_hash.Map.t;
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold
@@ -107,7 +118,7 @@ val is_empty : 'protocol_data t -> bool
 val is_in_mempool :
   Operation_hash.t ->
   'protocol_data t ->
-  ('protocol_data Prevalidation.operation * classification) option
+  ('protocol_data operation * classification) option
 
 (** [is_known_unparsable oph] returns [true] if the [oph] is
    associated to an operation which is known to be unparsable. [false]
@@ -130,7 +141,7 @@ val is_known_unparsable : Operation_hash.t -> 'protocol_data t -> bool
 val remove :
   Operation_hash.t ->
   'protocol_data t ->
-  ('protocol_data Prevalidation.operation * classification) option
+  ('protocol_data operation * classification) option
 
 (** [add ~notify classification op classes] adds the operation [op]
     classified as [classification] to the classifier [classes]. The
@@ -157,11 +168,7 @@ val remove :
 
     - [Refused] is discarded 1 or 2 times (if the corresponding
    bounded_map is full) *)
-val add :
-  classification ->
-  'protocol_data Prevalidation.operation ->
-  'protocol_data t ->
-  unit
+val add : classification -> 'protocol_data operation -> 'protocol_data t -> unit
 
 (** [add_unparsable oph classes] adds [oph] as an unparsable
    operation. [unparsable] operations are removed automatically by the
@@ -171,7 +178,7 @@ val add_unparsable : Operation_hash.t -> 'protocol_data t -> unit
 
 (** Functions to query data on a polymorphic block-like type ['block]. *)
 type 'block block_tools = {
-  hash : 'block -> Block_hash.t;  (** The hash of a block *)
+  bhash : 'block -> Block_hash.t;  (** The hash of a block *)
   operations : 'block -> Operation.t list list;
       (** The list of operations of a block ordered by their validation pass *)
   all_operation_hashes : 'block -> Operation_hash.t list list;
@@ -225,15 +232,12 @@ val recycle_operations :
   to_branch:'block ->
   live_blocks:Block_hash.Set.t ->
   classes:'protocol_data t ->
-  parse:
-    (Operation_hash.t ->
-    Operation.t ->
-    'protocol_data Prevalidation.operation option) ->
-  pending:'protocol_data Prevalidation.operation Operation_hash.Map.t ->
+  parse:(Operation_hash.t -> Operation.t -> 'protocol_data operation option) ->
+  pending:'protocol_data operation Operation_hash.Map.t ->
   block_store:'block block_tools ->
   chain:'block chain_tools ->
   handle_branch_refused:bool ->
-  'protocol_data Prevalidation.operation Operation_hash.Map.t Lwt.t
+  'protocol_data operation Operation_hash.Map.t Lwt.t
 
 (**/**)
 
@@ -266,7 +270,7 @@ module Internal_for_tests : sig
     refused:bool ->
     outdated:bool ->
     'protocol_data t ->
-    'protocol_data Prevalidation.operation Operation_hash.Map.t
+    'protocol_data operation Operation_hash.Map.t
 
   (** [flush classes ~handle_branch_refused] partially resets [classes]:
       - fields [applied_rev], [branch_delayed] and [unparsable] are emptied;
@@ -313,10 +317,7 @@ module Internal_for_tests : sig
     from_branch:'block ->
     to_branch:'block ->
     is_branch_alive:(Block_hash.t -> bool) ->
-    parse:
-      (Operation_hash.t ->
-      Operation.t ->
-      'protocol_data Prevalidation.operation option) ->
-    'protocol_data Prevalidation.operation Operation_hash.Map.t ->
-    'protocol_data Prevalidation.operation Operation_hash.Map.t Lwt.t
+    parse:(Operation_hash.t -> Operation.t -> 'protocol_data operation option) ->
+    'protocol_data operation Operation_hash.Map.t ->
+    'protocol_data operation Operation_hash.Map.t Lwt.t
 end

@@ -113,5 +113,5 @@ val get_message_proof :
 module RPC : sig
   val get : t -> string -> string Lwt.t
 
-  val post : t -> ?data:Ezjsonm.value -> string -> string Lwt.t
+  val post : t -> ?data:JSON.u -> string -> string Lwt.t
 end

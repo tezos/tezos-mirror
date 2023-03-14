@@ -46,17 +46,6 @@ module Info : sig
 
   val compare : 'conn point_info -> 'conn point_info -> int
 
-  type reconnection_config = {
-    factor : float;
-    initial_delay : Time.System.Span.t;
-    disconnection_delay : Time.System.Span.t;
-    increase_cap : Time.System.Span.t;
-  }
-
-  val default_reconnection_config : reconnection_config
-
-  val reconnection_config_encoding : reconnection_config Data_encoding.encoding
-
   (** [create ~trusted addr port] is a freshly minted point_info. If
      [trusted] is true, this point is considered trusted and will be
      treated as such. If [expected_peer_id] is specified, we check
@@ -161,7 +150,7 @@ val set_private : 'conn Info.t -> bool -> unit
 val set_disconnected :
   timestamp:Time.System.t ->
   ?requested:bool ->
-  Info.reconnection_config ->
+  Point_reconnection_config.t ->
   'conn Info.t ->
   unit
 

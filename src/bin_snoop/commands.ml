@@ -29,7 +29,7 @@ let lift_opt f opt_arg state =
   match opt_arg with None -> state | Some arg -> f arg state
 
 let parse_parameter f m =
-  Clic.parameter (fun (_ : unit) p ->
+  Tezos_clic.parameter (fun (_ : unit) p ->
       Lwt.return
       @@
       match f p with
@@ -57,7 +57,7 @@ module Benchmark_cmd = struct
   let set_minor_heap_size minor_heap_size options =
     {options with minor_heap_size}
 
-  let set_config_dir config_dir options = {options with config_dir}
+  let set_config_file config_file options = {options with config_file}
 
   let default_benchmark_options =
     let options =
@@ -66,12 +66,12 @@ module Benchmark_cmd = struct
         nsamples = 3000;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
-        config_dir = None;
+        config_file = None;
       }
     in
     {
       options;
-      save_file = "<This field /will/ be set by Clic>";
+      save_file = "<This field /will/ be set by Tezos_clic>";
       storage = Memory;
       csv_export = None;
     }
@@ -84,7 +84,10 @@ module Benchmark_cmd = struct
       | Memory -> "Mem"
       | Disk {source; base_dir; header_json} ->
           let pp_src =
-            Format.asprintf "%a" Signature.Public_key_hash.pp source
+            Format.asprintf
+              "%a"
+              Tezos_crypto.Signature.Public_key_hash.pp
+              source
           in
           sprintf
             "Disk { source = %s ; base_dir = %s ; header_json = %s }"
@@ -103,7 +106,7 @@ module Benchmark_cmd = struct
   (* "benchmark" command handler *)
 
   let benchmark_handler
-      (nsamples, seed, bench_number, minor_heap_size, config_dir, csv_export)
+      (nsamples, seed, bench_number, minor_heap_size, config_file, csv_export)
       bench_name save_file () =
     let options =
       default_benchmark_options.options
@@ -111,7 +114,7 @@ module Benchmark_cmd = struct
       |> lift_opt set_seed seed
       |> lift_opt set_bench_number bench_number
       |> lift_opt set_minor_heap_size minor_heap_size
-      |> set_config_dir config_dir
+      |> set_config_file config_file
     in
     let options =
       {default_benchmark_options with options}
@@ -129,7 +132,7 @@ module Benchmark_cmd = struct
           int_of_string_opt
           "Error while parsing --nsamples argument."
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Number of samples per benchmark"
         ~long:"nsamples"
         ~placeholder:"strictly positive int"
@@ -140,15 +143,15 @@ module Benchmark_cmd = struct
       let seed =
         parse_parameter int_of_string_opt "Error while parsing --seed argument."
       in
-      Clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
+      Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
     (* String argument --dump-csv
        Parameter: filename of the file where to write the csv data. *)
     let dump_csv_arg =
       let dump_csv_arg_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Dumps raw benchmark results to CSV"
         ~long:"dump-csv"
         ~placeholder:"filename"
@@ -162,7 +165,7 @@ module Benchmark_cmd = struct
           int_of_string_opt
           "Error while parsing --bench-num argument."
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Number of benchmarks (i.e. random stacks)"
         ~long:"bench-num"
         ~placeholder:"strictly positive int"
@@ -176,51 +179,51 @@ module Benchmark_cmd = struct
           (fun s -> Option.map (fun p -> `words p) (int_of_string_opt s))
           "Error while parsing --minor-heap-size argument."
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Size of minor heap in words"
         ~long:"minor-heap-size"
         ~placeholder:"strictly positive int"
         minor_heap_size_param
 
-    let config_dir_arg =
-      let config_dir_arg_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+    let config_file_arg =
+      let config_file_arg_param =
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
-        ~doc:
-          "Specify directory where to search for benchmark configuration files"
+      Tezos_clic.arg
+        ~doc:"Specify a benchmark configuration file"
         ~short:'c'
-        ~long:"config-dir"
-        ~placeholder:"directory"
-        config_dir_arg_param
+        ~long:"config-file"
+        ~placeholder:"file"
+        config_file_arg_param
   end
 
   let options =
     let open Options in
-    Clic.args6
+    Tezos_clic.args6
       nsamples_arg
       seed_arg
       bench_number_arg
       minor_heap_size_arg
-      config_dir_arg
+      config_file_arg
       dump_csv_arg
 
   let benchmark_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"BENCH-NAME"
       ~desc:"Name of the benchmark"
-      (Clic.parameter
+      (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (module Bench : Benchmark.S) -> Bench.name)
+               (fun (module Bench : Benchmark.S) ->
+                 Namespace.to_string Bench.name)
                (Registration.all_benchmarks ())
            in
            Lwt.return_ok res)
          (fun _ str -> Lwt.return_ok str))
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefix "benchmark" @@ benchmark_param
       @@ prefixes ["and"; "save"; "to"]
       @@ string
@@ -230,12 +233,17 @@ module Benchmark_cmd = struct
 
   let group =
     {
-      Clic.name = "benchmark";
+      Tezos_clic.name = "benchmark";
       title = "Commands for benchmarking parts of the protocol";
     }
 
   let command =
-    Clic.command ~group ~desc:"Runs benchmarks" options params benchmark_handler
+    Tezos_clic.command
+      ~group
+      ~desc:"Runs benchmarks"
+      options
+      params
+      benchmark_handler
 end
 
 module Infer_cmd = struct
@@ -348,14 +356,17 @@ module Infer_cmd = struct
   module Options = struct
     (* Boolean argument --print-problem *)
     let print_problem =
-      Clic.switch
+      Tezos_clic.switch
         ~doc:"Prints problem as obtained after applying model to workload data"
         ~long:"print-problem"
         ()
 
     (* Boolean argument --plot *)
     let plot_arg =
-      Clic.switch ~doc:"Plot results of parameter inference" ~long:"plot" ()
+      Tezos_clic.switch
+        ~doc:"Plot results of parameter inference"
+        ~long:"plot"
+        ()
 
     (* Float argument --ridge-alpha *)
     let ridge_alpha_arg =
@@ -364,7 +375,7 @@ module Infer_cmd = struct
           float_of_string_opt
           "Error while parsing --ridge-alpha argument."
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Regularization parameter for ridge regression"
         ~long:"ridge-alpha"
         ~placeholder:"positive float"
@@ -377,7 +388,7 @@ module Infer_cmd = struct
           float_of_string_opt
           "Error while parsing --lasso-alpha argument."
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Regularization parameter for lasso regression"
         ~long:"lasso-alpha"
         ~placeholder:"positive float"
@@ -385,16 +396,16 @@ module Infer_cmd = struct
 
     (* Boolean argument --lasso-positive *)
     let lasso_positive_arg =
-      Clic.switch
+      Tezos_clic.switch
         ~doc:"Constrains solution of lasso regression to be positive"
         ~long:"lasso-positive"
         ()
 
     let dump_csv_arg =
       let dump_csv_arg_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Dumps solution of inference to a CSV file"
         ~long:"dump-csv"
         ~placeholder:"filename"
@@ -402,9 +413,9 @@ module Infer_cmd = struct
 
     let report_arg =
       let dump_report_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Produces a detailed report"
         ~long:"report"
         ~placeholder:"filename"
@@ -412,11 +423,11 @@ module Infer_cmd = struct
 
     let override_arg =
       let override_file_param =
-        Clic.parameter (fun (_ : unit) parsed ->
+        Tezos_clic.parameter (fun (_ : unit) parsed ->
             let files = String.split_no_empty ',' parsed in
             Lwt.return_ok files)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Specify CSV file containing overrided variables for inference"
         ~long:"override-csv"
         ~placeholder:"filename"
@@ -424,9 +435,9 @@ module Infer_cmd = struct
 
     let save_solution_arg =
       let override_file_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:
           "Specify file to which inference solution will be saved for code \
            generation"
@@ -436,9 +447,9 @@ module Infer_cmd = struct
 
     let dot_file_arg =
       let override_file_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:
           "Specify file to which dependency graph will be saved in graphviz \
            format"
@@ -447,16 +458,16 @@ module Infer_cmd = struct
         override_file_param
 
     let full_plot_verbosity_arg =
-      Clic.switch
+      Tezos_clic.switch
         ~doc:"Produces all (possibly redundant) plots"
         ~long:"full-plot-verbosity"
         ()
 
     let plot_raw_workload_arg =
       let raw_workload_directory_param =
-        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+        Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:
           "For each workload, produces a file containing the plot of the raw \
            data, in the specified directory"
@@ -466,7 +477,7 @@ module Infer_cmd = struct
 
     let empirical_plot_arg =
       let empirical_plot_param =
-        Clic.parameter (fun (_ : unit) parsed ->
+        Tezos_clic.parameter (fun (_ : unit) parsed ->
             match parsed with
             | "full" -> Lwt.return_ok Display.Empirical_plot_full
             | _ -> (
@@ -480,7 +491,7 @@ module Infer_cmd = struct
                     else Lwt.return_ok (Display.Empirical_plot_quantiles floats)
                 ))
       in
-      Clic.arg
+      Tezos_clic.arg
         ~doc:"Options for plotting empirical data quantiles"
         ~long:"empirical-plot"
         ~placeholder:"full|q1,...,qn"
@@ -489,7 +500,7 @@ module Infer_cmd = struct
 
   let options =
     let open Options in
-    Clic.args13
+    Tezos_clic.args13
       print_problem
       dump_csv_arg
       plot_arg
@@ -505,24 +516,24 @@ module Infer_cmd = struct
       empirical_plot_arg
 
   let model_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"MODEL-NAME"
       ~desc:"Name of the model for which to infer parameter"
-      (Clic.parameter
+      (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
            Lwt.return_ok (Registration.all_model_names ()))
          (fun _ str -> Lwt.return_ok str))
 
   let regression_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"REGRESSION-METHOD"
       ~desc:"Regression method used"
-      (Clic.parameter
+      (Tezos_clic.parameter
          ~autocomplete:(fun _ -> Lwt.return_ok ["lasso"; "ridge"; "nnls"])
          (fun _ str -> Lwt.return_ok str))
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefixes ["infer"; "parameters"; "for"; "model"]
       @@ model_param
       @@ prefixes ["on"; "data"]
@@ -533,12 +544,12 @@ module Infer_cmd = struct
 
   let group =
     {
-      Clic.name = "inference";
+      Tezos_clic.name = "inference";
       title = "Command for infering parameters of cost models";
     }
 
   let command =
-    Clic.command
+    Tezos_clic.command
       ~desc:"Perform parameter inference"
       ~group
       options
@@ -570,6 +581,7 @@ module Codegen_cmd = struct
         "%a@."
         Data_encoding.Json.pp
         (Data_encoding.Json.construct
+           ~include_default_fields:`Always
            Fixed_point_transform.options_encoding
            Fixed_point_transform.default_options) ;
       exit 1
@@ -585,18 +597,18 @@ module Codegen_cmd = struct
     Lwt.return_ok ()
 
   let options =
-    Clic.args1
-      (Clic.arg
+    Tezos_clic.args1
+      (Tezos_clic.arg
          ~doc:"Apply fixed-point transform to the model"
          ~long:"fixed-point"
          ~placeholder:"json-config-file"
-         (Clic.parameter (fun () filename -> Lwt.return_ok filename)))
+         (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename)))
 
   let model_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"MODEL-NAME"
       ~desc:"Name of the model for which to generate code"
-      (Clic.parameter
+      (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
            let res =
              List.map
@@ -607,7 +619,7 @@ module Codegen_cmd = struct
          (fun _ str -> Lwt.return_ok str))
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefixes ["generate"; "code"; "using"; "solution"]
       @@ string
            ~name:"SOLUTION-FILE"
@@ -617,10 +629,11 @@ module Codegen_cmd = struct
       @@ prefixes ["and"; "model"]
       @@ model_param @@ stop)
 
-  let group = {Clic.name = "codegen"; title = "Command for generating code"}
+  let group =
+    {Tezos_clic.name = "codegen"; title = "Command for generating code"}
 
   let command =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"Generate code for a specific model"
       options
@@ -642,7 +655,7 @@ module Codegen_all_cmd = struct
     Lwt.return_ok ()
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefixes ["generate"; "code"; "using"; "solution"]
       @@ string
            ~name:"SOLUTION-FILE"
@@ -654,7 +667,7 @@ module Codegen_all_cmd = struct
       @@ stop)
 
   let command =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"Generate code for all models matching regexp"
       options
@@ -662,22 +675,97 @@ module Codegen_all_cmd = struct
       codegen_all_handler
 end
 
+module Codegen_inferred_cmd = struct
+  include Codegen_cmd
+
+  let codegen_infer_handler json solution () =
+    let codegen_options =
+      match json with
+      | None -> No_transform
+      | Some json_file -> load_fixed_point_parameters json_file
+    in
+    commandline_outcome_ref :=
+      Some (Codegen_inferred {solution; codegen_options}) ;
+    Lwt.return_ok ()
+
+  let params =
+    Tezos_clic.(
+      prefixes ["generate"; "code"; "using"; "solution"]
+      @@ string
+           ~name:"SOLUTION-FILE"
+           ~desc:
+             "File containing solution, as obtained using the --save-solution \
+              switch"
+      @@ fixed ["for"; "inferred"; "models"])
+
+  let command =
+    Tezos_clic.command
+      ~group
+      ~desc:"Generate code for models inferred from the solution file"
+      options
+      params
+      codegen_infer_handler
+end
+
 module List_cmd = struct
   (* ------------------------------------------------------------------------- *)
 
   let tag_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"TAG"
       ~desc:"Tag of a benchmark"
-      (Clic.parameter
+      (Tezos_clic.parameter
          ~autocomplete:(fun _ -> Lwt.return_ok (Registration.all_tags ()))
          (fun _ s -> Lwt.return_ok s))
 
-  let params_all_bench = Clic.fixed ["list"; "all"; "benchmarks"]
+  let benchmark_param () =
+    Tezos_clic.param
+      ~name:"BENCH-NAME"
+      ~desc:"Name of the benchmark"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           let res =
+             List.map
+               (fun (module Bench : Benchmark.S) ->
+                 Namespace.to_string Bench.name)
+               (Registration.all_benchmarks ())
+           in
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
 
-  let option_show_tags =
-    Clic.args1
-      (Clic.switch
+  let parameter_param () =
+    Tezos_clic.param
+      ~name:"PARAM-NAME"
+      ~desc:"Name of the parameter"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           let res =
+             List.map
+               (fun (param, _) -> Namespace.to_string param)
+               (Registration.all_registered_parameters ())
+           in
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
+
+  let namespace_param () =
+    Tezos_clic.param
+      ~name:"NAMESPACE"
+      ~desc:"Namespace of a set of benchmarks"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           let res =
+             List.map
+               (fun (ns : Namespace.t) -> Namespace.to_string ns)
+               (Registration.all_namespaces ())
+           in
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
+
+  let params_all_bench = Tezos_clic.fixed ["list"; "all"; "benchmarks"]
+
+  let options =
+    Tezos_clic.args1
+      (Tezos_clic.switch
          ~long:"show-tags"
          ~short:'t'
          ~doc:"Show the tags of the benchmarks"
@@ -689,7 +777,8 @@ module List_cmd = struct
         (fun (module Bench : Benchmark.S) ->
           Format.fprintf
             Format.std_formatter
-            "%s: %s\n\tTags: %a\n"
+            "%a: %s\n\tTags: %a\n"
+            Namespace.pp
             Bench.name
             Bench.info
             (Format.pp_print_list
@@ -700,14 +789,19 @@ module List_cmd = struct
     else
       List.iter
         (fun (module Bench : Benchmark.S) ->
-          Format.fprintf Format.std_formatter "%s: %s\n" Bench.name Bench.info)
+          Format.fprintf
+            Format.std_formatter
+            "%a: %s\n"
+            Namespace.pp
+            Bench.name
+            Bench.info)
         bench_list ;
     Lwt_result_syntax.return_unit
 
   let handler_all_bench show_tags () =
     base_handler_bench (Registration.all_benchmarks ()) show_tags
 
-  let params_all_tags = Clic.fixed ["list"; "all"; "tags"]
+  let params_all_tags = Tezos_clic.fixed ["list"; "all"; "tags"]
 
   let handler_all_tags () () =
     List.iter
@@ -716,7 +810,7 @@ module List_cmd = struct
     Lwt_result_syntax.return_unit
 
   let params_bench_tags_any =
-    Clic.(
+    Tezos_clic.(
       prefixes ["list"; "benchmarks"; "with"; "tags"; "any"; "of"]
       @@ seq_of_param tag_param)
 
@@ -724,7 +818,7 @@ module List_cmd = struct
     base_handler_bench (Registration.all_benchmarks_with_any_of tags) show_tags
 
   let params_bench_tags_all =
-    Clic.(
+    Tezos_clic.(
       prefixes ["list"; "benchmarks"; "with"; "tags"; "all"; "of"]
       @@ seq_of_param tag_param)
 
@@ -732,54 +826,97 @@ module List_cmd = struct
     base_handler_bench (Registration.all_benchmarks_with_all_of tags) show_tags
 
   let params_bench_tags_exact =
-    Clic.(
+    Tezos_clic.(
       prefixes ["list"; "benchmarks"; "with"; "tags"; "exactly"]
       @@ seq_of_param tag_param)
 
   let handler_bench_tags_exact show_tags tags () =
     base_handler_bench (Registration.all_benchmarks_with_exactly tags) show_tags
 
-  let group = {Clic.name = "list"; title = "Commands for displaying lists"}
+  let params_bench_match =
+    Tezos_clic.(
+      prefixes ["list"; "benchmarks"; "in"] @@ namespace_param () @@ stop)
+
+  let handler_bench_match show_tags pattern () =
+    base_handler_bench
+      (Registration.find_benchmarks_in_namespace pattern)
+      show_tags
+
+  let params_all_param = Tezos_clic.fixed ["list"; "all"; "parameters"]
+
+  let handler_all_param () () =
+    List.iter
+      (fun (param, models) ->
+        Format.fprintf
+          Format.std_formatter
+          "%a\n\tModels: %a\n"
+          Namespace.pp
+          param
+          (Format.pp_print_list
+             ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
+             Format.pp_print_string)
+          models)
+      (Registration.all_registered_parameters ()) ;
+    Lwt_result_syntax.return_unit
+
+  let group =
+    {Tezos_clic.name = "list"; title = "Commands for displaying lists"}
 
   let command_all_bench =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks"
-      option_show_tags
+      options
       params_all_bench
       handler_all_bench
 
   let command_all_tags =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"List all available tags"
-      Clic.no_options
+      Tezos_clic.no_options
       params_all_tags
       handler_all_tags
 
   let command_bench_tags_any =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks containing any of the given tags"
-      option_show_tags
+      options
       params_bench_tags_any
       handler_bench_tags_any
 
   let command_bench_tags_all =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks containing all of the given tags"
-      option_show_tags
+      options
       params_bench_tags_all
       handler_bench_tags_all
 
   let command_bench_tags_exact =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks containing exactly the given tags"
-      option_show_tags
+      options
       params_bench_tags_exact
       handler_bench_tags_exact
+
+  let command_bench_match =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all benchmarks in the given namespace"
+      options
+      params_bench_match
+      handler_bench_match
+
+  let command_all_param =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all parameters"
+      Tezos_clic.no_options
+      params_all_param
+      handler_all_param
 
   let commands =
     [
@@ -788,7 +925,244 @@ module List_cmd = struct
       command_bench_tags_any;
       command_bench_tags_all;
       command_bench_tags_exact;
+      command_bench_match;
+      command_all_param;
     ]
+end
+
+module Config_cmd = struct
+  let config_file_param () =
+    Tezos_clic.param
+      ~name:"CONFIG-FILE"
+      ~desc:"Configuration file name"
+      (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
+
+  let benchmark_param = List_cmd.benchmark_param
+
+  let namespace_param = List_cmd.namespace_param
+
+  let options_merge =
+    Tezos_clic.args1
+      (Tezos_clic.switch
+         ~long:"delete-source"
+         ~short:'d'
+         ~doc:"Deletes the source config file given as argument for merging"
+         ())
+
+  let options_edit =
+    Tezos_clic.args4
+      (Tezos_clic.arg
+         ~long:"use-editor"
+         ~short:'e'
+         ~placeholder:"EDITOR"
+         ~doc:
+           "Specify the prefered text editor used for editing the config file"
+         (Tezos_clic.parameter (fun _ str -> Lwt.return_ok str)))
+      (Tezos_clic.switch
+         ~long:"read-stdin"
+         ~short:'i'
+         ~doc:
+           "Read the standard input for a Json document to edit the config file"
+         ())
+      (Tezos_clic.arg
+         ~long:"read-file"
+         ~short:'f'
+         ~placeholder:"FILE"
+         ~doc:"Use the given Json document to edit the config file"
+         (Tezos_clic.parameter (fun _ str -> Lwt.return_ok str)))
+      (Tezos_clic.arg
+         ~long:"read-json"
+         ~short:'j'
+         ~placeholder:"JSON"
+         ~doc:"Use inlined Json to edit the config file"
+         (Tezos_clic.parameter (fun _ str -> Lwt.return_ok str)))
+
+  let params_check =
+    Tezos_clic.(
+      prefixes ["config"; "check"]
+      @@ config_file_param () @@ prefix "for" @@ benchmark_param () @@ stop)
+
+  let handler_check () config_file benchmark () =
+    let bench = Registration.find_benchmark_exn benchmark in
+    match Benchmark.ex_unpack bench with
+    | Benchmark.Ex bench ->
+        let _ =
+          Config.parse_config ~print:Stdlib.stdout bench (Some config_file)
+        in
+        Lwt_result_syntax.return_unit
+
+  let params_generate_default =
+    Tezos_clic.(
+      prefixes ["config"; "generate"; "default"; "in"]
+      @@ config_file_param () @@ prefix "for"
+      @@ seq_of_param (namespace_param ()))
+
+  let handler_generate_default () config_file namespaces () =
+    let benchmarks =
+      List.map Registration.find_benchmarks_in_namespace namespaces
+      |> List.flatten
+    in
+    let config = Config.generate_default benchmarks in
+    let str =
+      Data_encoding.Json.construct Config.encoding config
+      |> Data_encoding.Json.to_string
+    in
+    let open Lwt.Infix in
+    Tezos_stdlib_unix.Lwt_utils_unix.create_file config_file str >|= fun r ->
+    Error_monad.catch (fun () -> r)
+
+  let params_generate_empty =
+    Tezos_clic.(
+      prefixes ["config"; "generate"; "empty"; "in"]
+      @@ config_file_param () @@ stop)
+
+  let handler_generate_empty () config_file () =
+    let config = Config.empty in
+    let str =
+      Data_encoding.Json.construct Config.encoding config
+      |> Data_encoding.Json.to_string
+    in
+    let open Lwt.Infix in
+    Tezos_stdlib_unix.Lwt_utils_unix.create_file config_file str >|= fun r ->
+    Error_monad.catch (fun () -> r)
+
+  let config_file_param_dst =
+    Tezos_clic.param
+      ~name:"DST"
+      ~desc:"Configuration file path destination"
+      (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
+
+  let config_file_param_src =
+    Tezos_clic.param
+      ~name:"SRC"
+      ~desc:"Configuration file path source"
+      (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
+
+  let params_merge =
+    Tezos_clic.(
+      prefixes ["config"; "merge"]
+      @@ config_file_param_src @@ prefix "in" @@ config_file_param_dst @@ stop)
+
+  let handler_merge delete_flag src dst () =
+    let () = Config.merge_config_files ~delete_src:delete_flag ~dst ~src () in
+    Lwt_result_syntax.return_unit
+
+  let params_edit =
+    Tezos_clic.(
+      prefixes ["config"; "edit"]
+      @@ config_file_param () @@ prefix "for" @@ namespace_param () @@ stop)
+
+  let handler_edit (editor, stdin, file, json) config_path namespace () =
+    let input =
+      match (editor, stdin, file, json) with
+      | Some e, false, None, None -> `Edit e
+      | None, _, None, None -> `Stdin
+      | None, false, Some f, None -> `File f
+      | None, false, None, Some s -> `String s
+      | _ ->
+          Format.eprintf
+            "Config file edition failed: too many input methods given as \
+             options@." ;
+          exit 1
+    in
+    let () = Config.edit_config ~input config_path namespace in
+    Lwt_result_syntax.return_unit
+
+  let group =
+    {
+      Tezos_clic.name = "config";
+      title = "Commands for manipulating config files";
+    }
+
+  let command_check =
+    Tezos_clic.command
+      ~group
+      ~desc:
+        "Prints the configuration that would be used for a given benchmark, \
+         given a configuration file"
+      Tezos_clic.no_options
+      params_check
+      handler_check
+
+  let command_generate_default =
+    Tezos_clic.command
+      ~group
+      ~desc:
+        "Generates a configuration file for the given benchmarks using their \
+         default configuration"
+      Tezos_clic.no_options
+      params_generate_default
+      handler_generate_default
+
+  let command_generate_empty =
+    Tezos_clic.command
+      ~group
+      ~desc:"Generates an empty configuration file for the given benchmarks"
+      Tezos_clic.no_options
+      params_generate_empty
+      handler_generate_empty
+
+  let command_merge =
+    Tezos_clic.command
+      ~group
+      ~desc:"Merges multiple configuration files. Fails in case of conflict"
+      options_merge
+      params_merge
+      handler_merge
+
+  let command_edit =
+    Tezos_clic.command
+      ~group
+      ~desc:"Edit configuration file at the given point"
+      options_edit
+      params_edit
+      handler_edit
+
+  let commands =
+    [
+      command_check;
+      command_generate_default;
+      command_generate_empty;
+      command_merge;
+      command_edit;
+    ]
+end
+
+module Generate_config_cmd = struct
+  let params = Tezos_clic.fixed ["generate"; "default-config"]
+
+  let options =
+    Tezos_clic.args1
+      (Tezos_clic.arg
+         ~doc:"save default config to file"
+         ~long:"save-to"
+         ~placeholder:"filename"
+         (Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)))
+
+  let show_config_handler filename () =
+    let json =
+      Data_encoding.Json.construct
+        ~include_default_fields:`Always
+        Fixed_point_transform.options_encoding
+        Fixed_point_transform.default_options
+    in
+    (match filename with
+    | Some filename ->
+        Out_channel.with_open_text filename @@ fun oc ->
+        let outfile = Format.formatter_of_out_channel oc in
+        Format.fprintf outfile "%a@." Data_encoding.Json.pp json ;
+        Format.eprintf "Saved default config to %s@." filename
+    | None -> Format.printf "%a@." Data_encoding.Json.pp json) ;
+    Lwt.return_ok ()
+
+  let command =
+    Tezos_clic.command
+      ~desc:
+        "Show the default configurations for fixed-point code generation as \
+         json"
+      options
+      params
+      show_config_handler
 end
 
 let all_commands =
@@ -797,31 +1171,34 @@ let all_commands =
     Infer_cmd.command;
     Codegen_cmd.command;
     Codegen_all_cmd.command;
+    Codegen_inferred_cmd.command;
+    Generate_config_cmd.command;
   ]
-  @ List_cmd.commands
+  @ List_cmd.commands @ Config_cmd.commands
   @ Registration.all_custom_commands ()
 
 module Global_options = struct
   (* --list-solvers *)
   let list_solvers =
-    Clic.switch ~doc:"List all available solvers" ~long:"list-solvers" ()
+    Tezos_clic.switch ~doc:"List all available solvers" ~long:"list-solvers" ()
 
   (* --list-models *)
-  let list_models = Clic.switch ~doc:"List all models" ~long:"list-models" ()
+  let list_models =
+    Tezos_clic.switch ~doc:"List all models" ~long:"list-models" ()
 
-  let options = Clic.args2 list_solvers list_models
+  let options = Tezos_clic.args2 list_solvers list_models
 end
 
 let commands_with_man =
-  Clic.add_manual
+  Tezos_clic.add_manual
     ~executable_name:(Filename.basename Sys.executable_name)
     ~global_options:Global_options.options
-    (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+    (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
     Format.std_formatter
     all_commands
 
 let usage () =
-  Clic.usage
+  Tezos_clic.usage
     Format.std_formatter
     ~executable_name:(Filename.basename Sys.executable_name)
     ~global_options:Global_options.options
@@ -842,7 +1219,7 @@ let original_args, autocomplete =
 
 let list_solvers, list_models =
   ignore
-    Clic.(
+    Tezos_clic.(
       setup_formatter
         Format.std_formatter
         (if Unix.isatty Unix.stdout then Ansi else Plain)
@@ -851,12 +1228,12 @@ let list_solvers, list_models =
     Lwt_main.run
       (let open Lwt_result_syntax in
       let* list_flags, args =
-        Clic.parse_global_options Global_options.options () original_args
+        Tezos_clic.parse_global_options Global_options.options () original_args
       in
       match autocomplete with
       | Some (prev_arg, cur_arg, script) ->
           let* completions =
-            Clic.autocompletion
+            Tezos_clic.autocompletion
               ~script
               ~cur_arg
               ~prev_arg
@@ -871,24 +1248,24 @@ let list_solvers, list_models =
           match args with
           | [] -> return list_flags
           | _ ->
-              let* () = Clic.dispatch commands_with_man () args in
+              let* () = Tezos_clic.dispatch commands_with_man () args in
               return list_flags))
   in
   match result with
   | Ok global_options -> global_options
-  | Error [Clic.Version] ->
+  | Error [Tezos_clic.Version] ->
       let version = Tezos_version.Bin_version.version_string in
       Format.printf "%s\n" version ;
       exit 0
-  | Error [Clic.Help command] ->
-      Clic.usage
+  | Error [Tezos_clic.Help command] ->
+      Tezos_clic.usage
         Format.std_formatter
         ~executable_name:(Filename.basename Sys.executable_name)
         ~global_options:Global_options.options
         (match command with None -> [] | Some c -> [c]) ;
       exit 0
   | Error errors ->
-      Clic.pp_cli_errors
+      Tezos_clic.pp_cli_errors
         Format.err_formatter
         ~executable_name:(Filename.basename Sys.executable_name)
         ~global_options:Global_options.options

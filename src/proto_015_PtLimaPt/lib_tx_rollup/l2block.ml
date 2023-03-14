@@ -27,8 +27,8 @@ open Protocol
 open Alpha_context
 
 module Hash =
-  Blake2B.Make
-    (Base58)
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
     (struct
       let name = "tx_rollup_l2_block_hash"
 
@@ -39,7 +39,8 @@ module Hash =
       let size = None
     end)
 
-let () = Base58.check_encoded_prefix Hash.b58check_encoding "BTx" 53
+let () =
+  Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "BTx" 53
 
 type hash = Hash.t
 

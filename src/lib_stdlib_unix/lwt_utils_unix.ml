@@ -120,7 +120,7 @@ let write_string ?(pos = 0) ?len descr buf =
 
 let is_directory file_name =
   let open Lwt_syntax in
-  let+ s = Lwt_unix.lstat file_name in
+  let+ s = Lwt_unix.stat file_name in
   s.st_kind = S_DIR
 
 let remove_dir dir =
@@ -321,6 +321,39 @@ type 'action io_error = {
   caller : string;
   arg : string;
 }
+
+type error += Io_error of [`Close | `Open | `Rename] io_error
+
+let tzfail_of_io_error e = Error [Io_error e]
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"io_error"
+    ~title:"IO error"
+    ~description:"IO error"
+    ~pp:(fun ppf (_action, unix_code, caller, arg) ->
+      Format.fprintf
+        ppf
+        "IO error in %s(%s): %s)"
+        caller
+        arg
+        (Unix.error_message unix_code))
+    Data_encoding.(
+      obj4
+        (req
+           "action"
+           (string_enum
+              [("close", `Close); ("open", `Open); ("Rename", `Rename)]))
+        (req "unix_code" Unix_error.encoding)
+        (req "caller" string)
+        (req "arg" string))
+    (function
+      | Io_error {action; unix_code; caller; arg} ->
+          Some (action, unix_code, caller, arg)
+      | _ -> None)
+    (fun (action, unix_code, caller, arg) ->
+      Io_error {action; unix_code; caller; arg})
 
 let with_open_file ~flags ?(perm = 0o640) filename task =
   let open Lwt_syntax in

@@ -23,23 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_crypto.Signature
+include Tezos_crypto.Signature.V0
 
 module Public_key_hash = struct
-  include Tezos_crypto.Signature.Public_key_hash
+  include Tezos_crypto.Signature.V0.Public_key_hash
 
   module Set = struct
-    include Stdlib.Set.Make (Tezos_crypto.Signature.Public_key_hash)
+    include Stdlib.Set.Make (Tezos_crypto.Signature.V0.Public_key_hash)
 
     let encoding =
       Data_encoding.conv
         elements
         (fun l -> List.fold_left (fun m x -> add x m) empty l)
-        Data_encoding.(list Tezos_crypto.Signature.Public_key_hash.encoding)
+        Data_encoding.(list Tezos_crypto.Signature.V0.Public_key_hash.encoding)
   end
 
   module Map = struct
-    include Stdlib.Map.Make (Tezos_crypto.Signature.Public_key_hash)
+    include Stdlib.Map.Make (Tezos_crypto.Signature.V0.Public_key_hash)
 
     let encoding arg_encoding =
       Data_encoding.conv
@@ -47,14 +47,23 @@ module Public_key_hash = struct
         (fun l -> List.fold_left (fun m (k, v) -> add k v m) empty l)
         Data_encoding.(
           list
-            (tup2 Tezos_crypto.Signature.Public_key_hash.encoding arg_encoding))
+            (tup2
+               Tezos_crypto.Signature.V0.Public_key_hash.encoding
+               arg_encoding))
   end
 
   module Table = struct
     include Stdlib.Hashtbl.MakeSeeded (struct
-      include Tezos_crypto.Signature.Public_key_hash
+      include Tezos_crypto.Signature.V0.Public_key_hash
+
+      (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+      [@@@ocaml.warning "-32"]
 
       let hash = Stdlib.Hashtbl.seeded_hash
+
+      let seeded_hash = Stdlib.Hashtbl.seeded_hash
+
+      [@@@ocaml.warning "+32"]
     end)
 
     let encoding arg_encoding =
@@ -66,6 +75,8 @@ module Public_key_hash = struct
           h)
         Data_encoding.(
           list
-            (tup2 Tezos_crypto.Signature.Public_key_hash.encoding arg_encoding))
+            (tup2
+               Tezos_crypto.Signature.V0.Public_key_hash.encoding
+               arg_encoding))
   end
 end

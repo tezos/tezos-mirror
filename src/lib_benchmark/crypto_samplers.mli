@@ -32,28 +32,73 @@
  *)
 
 module type Param_S = sig
+  type algo
+
   (** Maximal size of the key pool. *)
   val size : int
 
   (** Algorithm to use for triplet generation. *)
-  val algo : [`Algo of Signature.algo | `Default]
+  val algo : [`Algo of algo | `Default]
 end
 
-module type Finite_key_pool_S = sig
+module type P_Finite_key_pool_S = sig
+  type public_key_hash
+
+  type public_key
+
+  type secret_key
+
   (** Sample a public key from the pool. *)
-  val pk : Signature.public_key Base_samplers.sampler
+  val pk : public_key Base_samplers.sampler
 
   (** Sample a public key hash from the pool. *)
-  val pkh : Signature.public_key_hash Base_samplers.sampler
+  val pkh : public_key_hash Base_samplers.sampler
 
   (** Sample a secret key from the pool. *)
-  val sk : Signature.secret_key Base_samplers.sampler
+  val sk : secret_key Base_samplers.sampler
 
   (** Sample a (pkh, pk, sk) triplet from the pool. *)
-  val all :
-    (Signature.public_key_hash * Signature.public_key * Signature.secret_key)
-    Base_samplers.sampler
+  val all : (public_key_hash * public_key * secret_key) Base_samplers.sampler
 end
 
-(** Create a finite key pool. *)
-module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S
+module V0 : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V0.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V0.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V0.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V0.algo) :
+    Finite_key_pool_S
+end
+
+module V1 : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V1.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V1.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V1.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V1.algo) :
+    Finite_key_pool_S
+end
+
+module V_latest : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash :=
+        Tezos_crypto.Signature.V_latest.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V_latest.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V_latest.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V_latest.algo) :
+    Finite_key_pool_S
+end
+
+include module type of V_latest

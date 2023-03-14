@@ -1,12 +1,7 @@
 (** This module implements a FIFO queue to model the input. The messages are
     queued in an input_buffer in their order of appearance in the inbox. *)
 
-type message = {
-  rtype : int32;
-  raw_level : int32;
-  message_counter : Z.t;
-  payload : bytes;
-}
+type message = {raw_level : int32; message_counter : Z.t; payload : bytes}
 [@@deriving show]
 
 (** An element of type t will have a content which is a lazy_vector of messages
@@ -14,10 +9,7 @@ type message = {
     there is no cleanup operation so an input_buffer content will likely have
     more than [num_elements] messages (see #3340). *)
 
-type t = {
-  content : message Lazy_vector.Mutable.ZVector.t;
-  mutable num_elements : Z.t;
-}
+type t = message Lazy_vector.Mutable.ZVector.t
 
 exception Bounds
 
@@ -35,7 +27,8 @@ val alloc : unit -> t
     necessarily equal to the length of the content of the inbox (see #3340). *)
 val num_elements : t -> Z.t
 
-(* TODO: #3340 Note that op does not clean up the list. *)
+(** [reset buffer] removes the current contents of the buffer. *)
+val reset : t -> unit
 
 (** [dequeue buffer] pops the current message from buffer and returns it.
     Note that the input buffer models a FIFO queue so the current message is

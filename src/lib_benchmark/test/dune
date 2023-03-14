@@ -1,8 +1,13 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main_ci)
+(executables
+ (names
+  test_sparse_vec
+  test_costlang
+  test_probe
+  test_measure
+  test_benchmark_helpers)
  (libraries
   alcotest-lwt
   tezos-base
@@ -19,4 +24,24 @@
 (rule
  (alias runtest)
  (package tezos-benchmark-tests)
- (action (run %{dep:./main_ci.exe})))
+ (action (run %{dep:./test_sparse_vec.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-tests)
+ (action (run %{dep:./test_costlang.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-tests)
+ (action (run %{dep:./test_probe.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-tests)
+ (action (run %{dep:./test_measure.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-tests)
+ (action (run %{dep:./test_benchmark_helpers.exe})))

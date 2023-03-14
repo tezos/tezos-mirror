@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +29,7 @@
 
 let () =
   Migration.register () ;
-  Migration_voting.register [Kathmandu] ;
-  Stresstest_command.register ~protocols:[Alpha] ;
+  Stresstest_command.register ~protocols:Protocol.all ;
+  Dal.register [Alpha] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

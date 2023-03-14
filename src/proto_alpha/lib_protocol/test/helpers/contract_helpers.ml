@@ -74,7 +74,7 @@ let default_source = Contract.Implicit default_payer
 let default_step_constants =
   Script_interpreter.
     {
-      source = default_source;
+      source = Contract default_source;
       payer = default_payer;
       self = default_self;
       amount = Tez.zero;

@@ -45,6 +45,8 @@ type tag =
   | Tx_rollup
   | Tickets
   | Big_map
+  | Skip_list
+  | Sc_rollup
 
 type michelson_term_kind = Data | Code
 
@@ -59,7 +61,7 @@ let spawn_command snoop command =
 (* Benchmark command *)
 
 let benchmark_command ~bench_name ~bench_num ~save_to ~nsamples ?seed
-    ?config_dir ?csv_dump () =
+    ?config_file ?csv_dump () =
   let command =
     [
       "benchmark";
@@ -77,17 +79,17 @@ let benchmark_command ~bench_name ~bench_num ~save_to ~nsamples ?seed
   let seed =
     match seed with None -> [] | Some seed -> ["--seed"; string_of_int seed]
   in
-  let config_dir =
-    match config_dir with
+  let config_file =
+    match config_file with
     | None -> []
-    | Some config_dir -> ["--config-dir"; config_dir]
+    | Some config_file -> ["--config-file"; config_file]
   in
   let csv_dump =
     match csv_dump with None -> [] | Some csv -> ["--dump-csv"; csv]
   in
-  command @ seed @ config_dir @ csv_dump
+  command @ seed @ config_file @ csv_dump
 
-let spawn_benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_dir
+let spawn_benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_file
     ?csv_dump snoop =
   spawn_command
     snoop
@@ -97,11 +99,11 @@ let spawn_benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_dir
        ~save_to
        ~nsamples
        ?seed
-       ?config_dir
+       ?config_file
        ?csv_dump
        ())
 
-let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_dir
+let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_file
     ?csv_dump snoop =
   spawn_benchmark
     ~bench_name
@@ -109,7 +111,7 @@ let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_dir
     ~nsamples
     ~save_to
     ?seed
-    ?config_dir
+    ?config_file
     ?csv_dump
     snoop
   |> Process.check
@@ -352,6 +354,8 @@ let string_of_tag (tag : tag) =
   | Tx_rollup -> "tx_rollup"
   | Tickets -> "tickets"
   | Big_map -> "big_map"
+  | Skip_list -> "skip_list"
+  | Sc_rollup -> "sc_rollup"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
@@ -375,3 +379,18 @@ let list_benchmarks ~mode ~tags snoop =
           | None -> Test.fail "Can't parse benchmark out of \"%s\"" line
           | Some s -> return (Some s)))
     lines
+
+let empty_config ~(file : string) snoop =
+  let command = ["config"; "generate"; "empty"; "in"; file] in
+  spawn_command snoop command |> Process.check
+
+let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
+    snoop =
+  let command =
+    ["config"; "edit"; file; "for"; benchmark; "-f"; bench_config]
+  in
+  let* () =
+    if not (Sys.file_exists file) then empty_config ~file snoop
+    else Lwt.return_unit
+  in
+  spawn_command snoop command |> Process.check

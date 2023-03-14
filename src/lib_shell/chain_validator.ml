@@ -46,6 +46,7 @@ module Request = struct
         peer : P2p_peer_id.t option;
         (* The peer who sent the block if it was not injected locally. *)
         block : Store.Block.t;
+        resulting_context_hash : Context_hash.t;
       }
         -> (update, error trace) t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
@@ -62,10 +63,6 @@ module Request = struct
     | Disconnection peer_id -> PeerId peer_id
 end
 
-type synchronisation_limits = {latency : int; threshold : int}
-
-type limits = {synchronisation : synchronisation_limits}
-
 module Types = struct
   type parameters = {
     parent : Name.t option;
@@ -77,9 +74,9 @@ module Types = struct
     global_valid_block_input : Store.Block.t Lwt_watcher.input;
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
     start_prevalidator : bool;
-    prevalidator_limits : Prevalidator.limits;
-    peer_validator_limits : Peer_validator.limits;
-    limits : limits;
+    prevalidator_limits : Shell_limits.prevalidator_limits;
+    peer_validator_limits : Shell_limits.peer_validator_limits;
+    limits : Shell_limits.chain_validator_limits;
     metrics : Shell_metrics.Chain_validator.t;
   }
 
@@ -158,7 +155,7 @@ let check_and_update_synchronisation_state w (hash, block) peer_id : unit Lwt.t
   else Lwt.return_unit
 
 (* Called for every validated block. *)
-let notify_new_block w peer block =
+let notify_new_block w peer {Block_validator.block; resulting_context_hash} =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
@@ -169,7 +166,9 @@ let notify_new_block w peer block =
     nv.parameters.parent ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
-  Worker.Queue.push_request_now w (Validated {peer; block})
+  Worker.Queue.push_request_now
+    w
+    (Validated {peer; block; resulting_context_hash})
 
 let with_activated_peer_validator w peer_id f =
   let open Lwt_syntax in
@@ -198,18 +197,30 @@ let with_activated_peer_validator w peer_id f =
       | Worker_types.Launching _ ->
           return_ok_unit)
 
-let may_update_protocol_level chain_store ~block =
+let may_update_protocol_level chain_store block resulting_context_hash =
   let open Lwt_result_syntax in
   let* pred = Store.Block.read_predecessor chain_store block in
   let prev_proto_level = Store.Block.proto_level pred in
   let new_proto_level = Store.Block.proto_level block in
   if Compare.Int.(prev_proto_level < new_proto_level) then
-    let* context = Store.Block.context chain_store block in
-    let*! new_protocol = Context_ops.get_protocol context in
+    let context_index =
+      Store.context_index (Store.Chain.global_store chain_store)
+    in
+    let* resulting_context =
+      protect (fun () ->
+          let*! c =
+            Context_ops.checkout_exn context_index resulting_context_hash
+          in
+          return c)
+    in
+    let*! new_protocol = Context_ops.get_protocol resulting_context in
+    let* (module NewProto) = Registered_protocol.get_result new_protocol in
     Store.Chain.may_update_protocol_level
       chain_store
       ~pred
       ~protocol_level:new_proto_level
+      ~expect_predecessor_context:
+        (NewProto.expected_context_hash = Predecessor_resulting_context)
       (block, new_protocol)
   else return_unit
 
@@ -372,9 +383,7 @@ let safe_get_prevalidator_filter hash =
             hash
       | Some protocol ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
-          let (module Proto) = protocol in
-          let module Filter = Shell_plugin.No_filter (Proto) in
-          return_ok (module Filter : Shell_plugin.FILTER))
+          return_ok (Shell_plugin.no_filter protocol))
 
 let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
@@ -383,8 +392,8 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
     let* new_protocol =
       Store.Block.protocol_hash parameters.chain_store block
     in
-    let* (module Filter) = safe_get_prevalidator_filter new_protocol in
-    Prevalidator.create parameters.prevalidator_limits (module Filter) chain_db
+    let* filter = safe_get_prevalidator_filter new_protocol in
+    Prevalidator.create parameters.prevalidator_limits filter chain_db
   in
   match r with
   | Error errs ->
@@ -427,16 +436,80 @@ let may_flush_or_update_prevalidator parameters event prevalidator chain_db
           live_operations
 
 let register_garbage_collect_callback w =
+  let open Lwt_result_syntax in
   let nv = Worker.state w in
   let chain_store = nv.parameters.chain_store in
   let index = Store.(context_index (Chain.global_store chain_store)) in
-  let gc context_hash =
-    Block_validator.context_garbage_collection
-      nv.parameters.block_validator
-      index
-      context_hash
+  let gc_lockfile_path =
+    Naming.(file_path (gc_lockfile (Store.Chain.chain_dir chain_store)))
   in
-  Store.Chain.register_gc_callback nv.parameters.chain_store gc
+  let is_gc_allowed = Context_ops.is_gc_allowed index in
+  let gc_callback =
+    if is_gc_allowed then
+      let gc_synchronous_call block_hash =
+        let* block = Store.Block.read_block chain_store block_hash in
+        let* resulting_context_hash =
+          Store.Block.resulting_context_hash chain_store block
+        in
+        let* () =
+          Block_validator.context_garbage_collection
+            nv.parameters.block_validator
+            index
+            resulting_context_hash
+            ~gc_lockfile_path
+        in
+        let kind =
+          Block_validator_process.kind nv.parameters.block_validator_process
+        in
+        (* The callback call will block until the GC is completed: either
+           using the Irmin function directly in single-process or using
+           the lockfile through the validator process used to notify the
+           GC completion. *)
+        match kind with
+        | Single_process ->
+            (* If the GC is running in the same instance, we can directly
+               wait for its completion. *)
+            let*! () = Context_ops.wait_gc_completion index in
+            return_unit
+        | External_process ->
+            (* Otherwise, we wait for the lockfile, which is locked by the
+               external process when the GC starts and released when the
+               GC ends. *)
+            let* gc_lockfile =
+              protect (fun () ->
+                  let*! fd =
+                    Lwt_unix.openfile
+                      gc_lockfile_path
+                      [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+                      0o644
+                  in
+                  return fd)
+            in
+            Lwt.finalize
+              (fun () ->
+                let*! () = Lwt_unix.lockf gc_lockfile Unix.F_RLOCK 0 in
+                let*! () = Lwt_unix.lockf gc_lockfile Unix.F_ULOCK 0 in
+                return_unit)
+              (fun () -> Lwt_unix.close gc_lockfile)
+      in
+      Some gc_synchronous_call
+    else None
+  in
+  Store.Chain.register_gc_callback nv.parameters.chain_store gc_callback
+
+let register_split_callback w =
+  let nv = Worker.state w in
+  let chain_store = nv.parameters.chain_store in
+  let index = Store.(context_index (Chain.global_store chain_store)) in
+  let is_gc_allowed = Context_ops.is_gc_allowed index in
+  let split =
+    if is_gc_allowed then
+      Some
+        (fun () ->
+          Block_validator.context_split nv.parameters.block_validator index)
+    else None
+  in
+  Store.Chain.register_split_callback nv.parameters.chain_store split
 
 let may_synchronise_context synchronisation_state chain_store =
   if
@@ -452,7 +525,7 @@ let may_synchronise_context synchronisation_state chain_store =
   else Lwt.return_unit
 
 let on_validation_request w peer start_testchain active_chains spawn_child block
-    =
+    resulting_context_hash =
   let open Lwt_result_syntax in
   let*! () =
     Option.iter_s
@@ -470,46 +543,36 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   let accepted_head = Fitness.(new_fitness > head_fitness) in
   if not accepted_head then return Ignored_head
   else
-    let* o = Store.Chain.set_head chain_store block in
-    match o with
-    | None ->
-        (* None means that the given head is below a new_head and
-           therefore it must not be broadcasted *)
-        return Ignored_head
-    | Some previous ->
-        let*! () = broadcast_head w ~previous block in
-        let* () = may_update_protocol_level chain_store ~block in
-        let*! () =
-          if start_testchain then
-            may_switch_test_chain w active_chains spawn_child block
-          else Lwt.return_unit
-        in
-        Lwt_watcher.notify nv.new_head_input block ;
-        let is_head_increment =
-          Block_hash.equal head_hash block_header.shell.predecessor
-        in
-        let event =
-          if is_head_increment then Head_increment else Branch_switch
-        in
-        let* () =
-          when_ (not is_head_increment) (fun () ->
-              Store.Chain.may_update_ancestor_protocol_level
-                chain_store
-                ~head:block)
-        in
-        let*! () =
-          may_synchronise_context nv.synchronisation_state chain_store
-        in
-        let+ () =
-          may_flush_or_update_prevalidator
-            nv.parameters
-            event
-            nv.prevalidator
-            nv.chain_db
-            ~prev:previous
-            ~block
-        in
+    let* previous = Store.Chain.set_head chain_store block in
+    let*! () = broadcast_head w ~previous block in
+    let* () =
+      may_update_protocol_level chain_store block resulting_context_hash
+    in
+    let*! () =
+      if start_testchain then
+        may_switch_test_chain w active_chains spawn_child block
+      else Lwt.return_unit
+    in
+    Lwt_watcher.notify nv.new_head_input block ;
+    let is_head_increment =
+      Block_hash.equal head_hash block_header.shell.predecessor
+    in
+    let event = if is_head_increment then Head_increment else Branch_switch in
+    let* () =
+      when_ (not is_head_increment) (fun () ->
+          Store.Chain.may_update_ancestor_protocol_level chain_store ~head:block)
+    in
+    let*! () = may_synchronise_context nv.synchronisation_state chain_store in
+    let* () =
+      may_flush_or_update_prevalidator
+        nv.parameters
         event
+        nv.prevalidator
+        nv.chain_db
+        ~prev:previous
+        ~block
+    in
+    return event
 
 let on_notify_branch w peer_id locator =
   let open Lwt_syntax in
@@ -558,7 +621,7 @@ let on_request (type a b) w start_testchain active_chains spawn_child
   Prometheus.Counter.inc_one
     nv.parameters.metrics.worker_counters.worker_request_count ;
   match req with
-  | Request.Validated {peer; block} ->
+  | Request.Validated {peer; block; resulting_context_hash} ->
       on_validation_request
         w
         peer
@@ -566,6 +629,7 @@ let on_request (type a b) w start_testchain active_chains spawn_child
         active_chains
         spawn_child
         block
+        resulting_context_hash
   | Request.Notify_branch (peer_id, locator) ->
       on_notify_branch w peer_id locator
   | Request.Notify_head (peer_id, hash, header, mempool) ->
@@ -804,8 +868,9 @@ let on_launch w _ parameters =
 let metrics = Shell_metrics.Chain_validator.init Name.base
 
 let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
-    start_prevalidator (peer_validator_limits : Peer_validator.limits)
-    (prevalidator_limits : Prevalidator.limits) block_validator
+    start_prevalidator
+    (peer_validator_limits : Shell_limits.peer_validator_limits)
+    (prevalidator_limits : Shell_limits.prevalidator_limits) block_validator
     global_valid_block_input global_chains_input db chain_store limits =
   let open Lwt_result_syntax in
   let spawn_child ~parent enable_prevalidator peer_validator_limits
@@ -866,6 +931,7 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
   let* w = Worker.launch table chain_id parameters (module Handlers) in
   Chain_id.Table.add active_chains (Store.Chain.chain_id chain_store) w ;
   register_garbage_collect_callback w ;
+  register_split_callback w ;
   Lwt_watcher.notify global_chains_input (Store.Chain.chain_id chain_store, true) ;
   return w
 

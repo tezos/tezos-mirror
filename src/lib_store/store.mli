@@ -184,7 +184,7 @@ type chain_store
     chains and instantiate testchain's sub chain stores, for all
     chains contained in the store. The chain store created is based on
     the [genesis] provided. Its chain identifier will be computed
-    using the {!Tezos_crypto.Chain_id.of_block_hash} function.
+    using the {!Chain_id.of_block_hash} function.
 
     @param patch_context the handle called when initializing the
     context. It usually is passed when creating a sandboxed chain.
@@ -310,10 +310,10 @@ module Block : sig
       invalid blocks file). *)
   val is_known_invalid : chain_store -> Block_hash.t -> bool Lwt.t
 
-  (** [is_known_prechecked chain_store bh] tests that the block [bh]
-      is prechecked in [chain_store] (i.e. the block is present in the
-      prechecked block cache). *)
-  val is_known_prechecked : chain_store -> Block_hash.t -> bool Lwt.t
+  (** [is_known_validated chain_store bh] tests that the block [bh]
+      is validated in [chain_store] (i.e. the block is present in the
+      validated block cache). *)
+  val is_known_validated : chain_store -> Block_hash.t -> bool Lwt.t
 
   (** [is_known chain_store bh] tests that the block [bh] is either
       known valid or known invalid in [chain_store]. *)
@@ -411,14 +411,13 @@ module Block : sig
   val read_predecessor_of_hash_opt :
     chain_store -> Block_hash.t -> block option Lwt.t
 
-  (** [read_prechecked_block chain_store bh] tries to read in the
-      [chain_store]'s prechecked block cache the block [bh].*)
-  val read_prechecked_block :
-    chain_store -> Block_hash.t -> block tzresult Lwt.t
+  (** [read_validated_block chain_store bh] tries to read in the
+      [chain_store]'s validated block cache the block [bh].*)
+  val read_validated_block : chain_store -> Block_hash.t -> block tzresult Lwt.t
 
-  (** [read_prechecked_block_opt chain_store bh] optional version of
-      [read_prechecked_block].*)
-  val read_prechecked_block_opt :
+  (** [read_validated_block_opt chain_store bh] optional version of
+      [read_validated_block].*)
+  val read_validated_block_opt :
     chain_store -> Block_hash.t -> block option Lwt.t
 
   (** [store_block chain_store ~block_header ~operations
@@ -429,7 +428,7 @@ module Block : sig
      the newly created block is returned.
 
       If the block was successfully stored, then the block is removed
-     from the prechecked block cache.
+     from the validated block cache.
 
       {b Warning} The store will refuse to store blocks with no
      associated context's commit. *)
@@ -440,18 +439,27 @@ module Block : sig
     Block_validation.result ->
     block option tzresult Lwt.t
 
-  (** [store_prechecked_block chain_store ~hash ~block_header ~operations]
-      stores in [chain_store]'s prechecked block cache the block with
+  (** [store_validated_block chain_store ~hash ~block_header ~operations]
+      stores in [chain_store]'s validated block cache the block with
       its [block_header] and [operations]. *)
-  val store_prechecked_block :
+  val store_validated_block :
     chain_store ->
     hash:Block_hash.t ->
     block_header:Block_header.t ->
     operations:Operation.t trace trace ->
     unit tzresult Lwt.t
 
-  (** [context_exn chain_store block] checkouts the context of the
-      [block]. *)
+  (** [resulting_context_hash chain_store block] returns the resulting
+      context hash of the [block]. This context depends on the
+      [block]'s protocol associated semantics, i.e., it can either be
+      the one contained in its block header or the stored result of
+      its application. *)
+  val resulting_context_hash :
+    chain_store -> block -> Context_hash.t tzresult Lwt.t
+
+  (** [context_exn chain_store block] checkouts the {b resulting}
+      context of the [block] which may differ from its block header's
+      one depending on the block's associated protocol semantics. *)
   val context_exn :
     chain_store -> block -> Tezos_protocol_environment.Context.t Lwt.t
 
@@ -738,11 +746,8 @@ module Chain : sig
       cycle is ready to be cemented. Triggering a merge will update
       the savepoint, checkpoint and caboose consistently with the
       [chain_store]'s history mode. This function returns the previous
-      head or [None] if the given [block] is below one of the current
-      known heads. If [block] belongs to a new branch, the previous
-      head will also be stored as an alternate head. Setting a new
-      head will fail when the block is not fit to be promoted as head:
-      too old or no metadata.
+      head. Setting a new head will fail when the block is not fit to
+      be promoted as head (i.e. too old or no metadata).
 
       After a merge:
 
@@ -767,11 +772,7 @@ module Chain : sig
 
       - If a merge is triggered while another is happening, this
         function will block until the first merge is resolved. *)
-  val set_head : chain_store -> Block.t -> Block.t option tzresult Lwt.t
-
-  (** [known_heads chain_store] returns the list of alternate heads for
-      [chain_store]. *)
-  val known_heads : chain_store -> block_descriptor list Lwt.t
+  val set_head : chain_store -> Block.t -> Block.t tzresult Lwt.t
 
   (** [is_ancestor chain_store ~head ~ancestor] checks whether the
       [ancestor] is a predecessor or [head] in [chain_store]. *)
@@ -790,12 +791,6 @@ module Chain : sig
       [chain_store]. Its predecessor is supposed to be already
       stored. *)
   val is_acceptable_block : chain_store -> block_descriptor -> bool Lwt.t
-
-  (** [best_known_head_for_checkpoint chain_store checkpoint] returns
-      the fittest block among known heads in [chain_store] to be
-      promoted as checkpoint if there is one. *)
-  val best_known_head_for_checkpoint :
-    chain_store -> checkpoint:block_descriptor -> Block.t tzresult Lwt.t
 
   (** [compute_locator chain ?max_size head seed] computes a
       locator of the [chain] from [head] to the chain's caboose or until
@@ -861,43 +856,58 @@ module Chain : sig
 
   (** {2 Chain's protocols} *)
 
+  (** [find_protocol_info chain_store ~protocol_level] returns the
+     protocol info associated to the given [protocol_level]. *)
+  val find_protocol_info :
+    t -> protocol_level:int -> Protocol_levels.protocol_info option Lwt.t
+
   (** [find_activation_block chain_store ~protocol_level] returns the
       block that activated the protocol of level [protocol_level]. *)
   val find_activation_block :
-    chain_store ->
-    protocol_level:int ->
-    Protocol_levels.activation_block option Lwt.t
+    chain_store -> protocol_level:int -> block_descriptor option Lwt.t
 
   (** [find_protocol chain_store ~protocol_level] returns the protocol
       with the level [protocol_level]. *)
   val find_protocol :
     chain_store -> protocol_level:int -> Protocol_hash.t option Lwt.t
 
+  (** [expects_predecessor_context_hash chain_store proto_level]
+      returns whether or not a protocol requires the context hash of a
+      block to target resulting context of it's predecessor. This
+      depends on the environment of each protocol.*)
+  val expect_predecessor_context_hash :
+    chain_store -> protocol_level:int -> bool tzresult Lwt.t
+
   (** [all_protocol_levels chain_store] returns all the protocols
       registered in [chain_store]. *)
   val all_protocol_levels :
-    chain_store -> Protocol_levels.activation_block Protocol_levels.t Lwt.t
+    chain_store -> Protocol_levels.protocol_info Protocol_levels.t Lwt.t
 
   (** [may_update_protocol_level chain_store ?pred ?protocol_level
-      (block, ph)] updates the protocol level for the protocol [ph] in
-      [chain_store] with the activation [block]. If [pred] is not
-      provided, it reads the [block]'s predecessor and check that the
-      [block]'s protocol level is increasing compared to its
-      predecessor. If [protocol_level] is provided, we use this value
-      instead of the protocol level found in [block]. If a previous
-      entry is found, it overwrites it. *)
+      ~expect_predecessor_context (block, ph)] updates the protocol
+      level for the protocol [ph] in [chain_store] with the activation
+      [block]. If [pred] is not provided, it reads the [block]'s
+      predecessor and check that the [block]'s protocol level is
+      increasing compared to its predecessor. If [protocol_level] is
+      provided, we use this value instead of the protocol level found
+      in [block]. If a previous entry is found, it overwrites it. The
+      [expect_predecessor_context] argument specifies which context
+      hash semantics should be used. *)
   val may_update_protocol_level :
     chain_store ->
     ?pred:Block.block ->
     ?protocol_level:int ->
+    expect_predecessor_context:bool ->
     Block.block * Protocol_hash.t ->
     unit tzresult Lwt.t
 
-  (** [may_update_ancestor_protocol_level chain_store ~head] tries to
-     find the activation block of the [head]'s protocol, checks that
-     its an ancestor and tries to update it if that's not the case. If
-     the registered activation block is not reachable (already
-     pruned), this function does nothing. *)
+  (** [may_update_ancestor_protocol_level chain_store ~head
+      ~expect_predecessor_context] tries to find the activation block
+      of the [head]'s protocol, checks that its an ancestor and tries
+      to update it if that's not the case. If the registered
+      activation block is not reachable (already pruned), this
+      function does nothing. The [expect_predecessor_context] argument
+      specifies which context hash semantics should be used. *)
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
@@ -905,12 +915,17 @@ module Chain : sig
       [chain_store]. *)
   val watcher : chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 
+  (** [validated_watcher chain_store] instantiates a new validated block
+      watcher for [chain_store]. *)
+  val validated_watcher :
+    chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
+
   (** [get_rpc_directory chain_store block] returns the RPC directory
       associated to the [block]. *)
   val get_rpc_directory :
     chain_store ->
     Block.t ->
-    (chain_store * Block.t) RPC_directory.t option Lwt.t
+    (chain_store * Block.t) Tezos_rpc.Directory.t option Lwt.t
 
   (** [set_rpc_directory chain_store ph next_ph rpc_directory] sets a
       [rpc_directory] for the protocol [ph] and next protocol [next_ph]
@@ -919,14 +934,20 @@ module Chain : sig
     chain_store ->
     protocol_hash:Protocol_hash.t ->
     next_protocol_hash:Protocol_hash.t ->
-    (chain_store * Block.t) RPC_directory.t ->
+    (chain_store * Block.t) Tezos_rpc.Directory.t ->
     unit Lwt.t
 
   (** [register_gc_callback chain_store callback] installs a
       [callback] that may be triggered during a block store merge in
       order to garbage-collect old contexts. *)
   val register_gc_callback :
-    chain_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
+    chain_store -> (Block_hash.t -> unit tzresult Lwt.t) option -> unit
+
+  (** [register_split_callback chain_store callback] installs a
+      [callback] that may be triggered during a [set_head] in order to
+      split the context into a new chunk. *)
+  val register_split_callback :
+    chain_store -> (unit -> unit tzresult Lwt.t) option -> unit
 end
 
 (** [global_block_watcher global_store] instantiates a new block
@@ -999,6 +1020,8 @@ module Chain_traversal : sig
     to_block:Block.t ->
     (Block.t * Block.t list) Lwt.t
 end
+
+val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
 (**/**)
 

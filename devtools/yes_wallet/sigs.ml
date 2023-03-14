@@ -38,6 +38,27 @@ module type PROTOCOL = sig
     val to_mutez : t -> int64
   end
 
+  module Signature : sig
+    type public_key_hash
+
+    type public_key
+
+    type secret_key
+
+    type signature
+
+    module To_latest : sig
+      val public_key_hash :
+        public_key_hash -> Tezos_crypto.Signature.V_latest.public_key_hash
+
+      val public_key : public_key -> Tezos_crypto.Signature.V_latest.public_key
+
+      val secret_key : secret_key -> Tezos_crypto.Signature.V_latest.secret_key
+
+      val signature : signature -> Tezos_crypto.Signature.V_latest.signature
+    end
+  end
+
   module Delegate : sig
     val fold :
       context ->

@@ -333,11 +333,17 @@ module Dune = struct
 
   let glob_files expr = [S "glob_files"; S expr]
 
-  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs name =
+  let glob_files_rec expr = [S "glob_files_rec"; S expr]
+
+  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs ~dep_globs_rec
+      name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
-      match files @ globs with [] -> None | deps -> Some (of_list deps)
+      let globs_rec = List.map glob_files_rec dep_globs_rec in
+      match files @ globs @ globs_rec with
+      | [] -> None
+      | deps -> Some (of_list deps)
     in
     alias_rule
       alias
@@ -801,6 +807,8 @@ module Ctypes = struct
     function_description : description;
     generated_types : string;
     generated_entry_point : string;
+    c_flags : string list;
+    c_library_flags : string list;
   }
 
   let to_dune desc =
@@ -812,18 +820,20 @@ module Ctypes = struct
           S "build_flags_resolver";
           [
             S "vendored";
-            [
-              S "c_flags";
-              S ":standard";
-              S "-Wno-discarded-qualifiers";
-              S ("-I" ^ desc.extra_search_dir);
-            ];
-            [
-              S "c_library_flags";
-              S ":standard";
-              S ("-l" ^ desc.external_library_name);
-              S ("-L" ^ desc.extra_search_dir);
-            ];
+            of_atom_list
+              ([
+                 "c_flags";
+                 ":standard";
+                 "-Wno-discarded-qualifiers";
+                 "-I" ^ desc.extra_search_dir;
+               ]
+              @ desc.c_flags);
+            of_atom_list
+              (["c_library_flags"; ":standard"]
+              @ desc.c_library_flags
+              @ [
+                  "-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir;
+                ]);
           ];
         ];
         [S "headers"; [S "include"; S desc.include_header]];
@@ -929,6 +939,12 @@ end
 (*                                 TARGETS                                   *)
 (*****************************************************************************)
 
+let default_ocaml_dependency =
+  (* ocamlformat is set to produce code compatible with this version; thus, the
+     code may contain syntactic constructs which are not available beforehand;
+     e.g., let-punning in binding-operator *)
+  Version.at_least "4.14"
+
 module Target = struct
   let invalid_argf x = Printf.ksprintf invalid_arg x
 
@@ -1004,7 +1020,7 @@ module Target = struct
     modes : Dune.mode list option;
     modules : modules;
     modules_without_implementation : string list;
-    ocaml : Version.constraints option;
+    ocaml : Version.constraints;
     opam : string option;
     opam_bug_reports : string option;
     opam_doc : string option;
@@ -1029,6 +1045,7 @@ module Target = struct
     license : string option;
     extra_authors : string list;
     ctypes : Ctypes.t option;
+    with_macos_security_framework : bool;
   }
 
   and preprocessor = PPS of t * string list | Staged_PPS of t list
@@ -1211,6 +1228,7 @@ module Target = struct
     ?cram:bool ->
     ?license:string ->
     ?extra_authors:string list ->
+    ?with_macos_security_framework:bool ->
     path:string ->
     'a ->
     t option
@@ -1249,17 +1267,19 @@ module Target = struct
     snd (collect deps)
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
-      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
-      ?(dune = Dune.[]) ?flags ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
-      ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
-      ?(opam_with_test = Always) ?(optional = false) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?profile
-      ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static ?synopsis
-      ?description ?(time_measurement_ppx = false) ?(virtual_modules = [])
-      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ~path names =
+      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
+      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags ?foreign_stubs
+      ?ctypes ?implements ?inline_tests ?js_compatible ?js_of_ocaml
+      ?documentation ?(linkall = false) ?modes ?modules
+      ?(modules_without_implementation = []) ?(npm_deps = [])
+      ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
+      ?opam_homepage ?(opam_with_test = Always) ?(optional = false)
+      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
+      ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
+      ?synopsis ?description ?(time_measurement_ppx = false)
+      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
+      ?(extra_authors = []) ?(with_macos_security_framework = false) ~path names
+      =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1507,7 +1527,13 @@ module Target = struct
             if run_native then
               List.map
                 (fun name ->
-                  Dune.runtest ~alias ~dep_files ~dep_globs ?package name)
+                  Dune.runtest
+                    ~alias
+                    ~dep_files
+                    ~dep_globs
+                    ~dep_globs_rec
+                    ?package
+                    name)
                 (Ne_list.to_list names)
             else []
           in
@@ -1569,27 +1595,32 @@ module Target = struct
         license;
         extra_authors;
         ctypes;
+        with_macos_security_framework;
       }
 
   let public_lib ?internal_name =
-    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_library {internal_name; public_name}
 
   let private_lib =
-    internal ?dep_files:None ?dep_globs:None @@ fun name -> Private_library name
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None @@ fun name ->
+    Private_library name
 
   let public_exe ?internal_name =
-    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_executable ({internal_name; public_name}, [])
 
   let public_exes ?internal_names =
-    internal ?dep_files:None ?dep_globs:None @@ fun public_names ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun public_names ->
     let names =
       match internal_names with
       | None ->
@@ -1613,23 +1644,24 @@ module Target = struct
     | head :: tail -> Public_executable (head, tail)
 
   let private_exe =
-    internal ?dep_files:None ?dep_globs:None @@ fun internal_name ->
-    Private_executable (internal_name, [])
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun internal_name -> Private_executable (internal_name, [])
 
   let private_exes =
-    internal ?dep_files:None ?dep_globs:None @@ fun internal_names ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun internal_names ->
     match internal_names with
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(alias = "runtest") ?dep_files ?dep_globs =
+  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
     let runtest_alias = if alias = "" then None else Some alias in
-    internal ?dep_files ?dep_globs @@ fun test_name ->
+    internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
     Test_executable {names = (test_name, []); runtest_alias}
 
-  let tests ?(alias = "runtest") ?dep_files ?dep_globs =
+  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
     let runtest_alias = if alias = "" then None else Some alias in
-    internal ?dep_files ?dep_globs @@ fun test_names ->
+    internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail -> Test_executable {names = (head, tail); runtest_alias}
@@ -1758,12 +1790,14 @@ type tezt_target = {
   js_compatible : bool option;
   modes : Dune.mode list option;
   synopsis : string option;
+  with_macos_security_framework : bool;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
-    ?(js_deps = []) ?(dep_globs = []) ?synopsis modules =
+    ?(js_deps = []) ?(dep_globs = []) ?synopsis
+    ?(with_macos_security_framework = false) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1778,6 +1812,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       js_compatible;
       modes;
       synopsis;
+      with_macos_security_framework;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
@@ -1795,6 +1830,7 @@ let register_tezt_targets ~make_tezt_exe =
         js_compatible;
         modes;
         synopsis;
+        with_macos_security_framework;
       } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
@@ -1818,6 +1854,7 @@ let register_tezt_targets ~make_tezt_exe =
           exe_name
           ~alias:"runtezt"
           ~path
+          ~with_macos_security_framework
           ~opam
           ?synopsis
           ?js_compatible
@@ -1968,16 +2005,20 @@ let generate_dune (internal : Target.internal) =
   in
   let link_flags =
     let linkall = internal.linkall && not is_lib in
-    let static =
+    let static_flags =
       if internal.static then
-        Some Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]
-      else None
+        [Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]]
+      else []
     in
-    match (linkall, static) with
-    | false, None -> None
-    | true, None -> Some [Dune.[S ":standard"; S "-linkall"]]
-    | false, Some static -> Some [[S ":standard"]; static]
-    | true, Some static -> Some [[S ":standard"; S "-linkall"]; static]
+    let macos_link_flags =
+      if internal.with_macos_security_framework then
+        [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
+      else []
+    in
+    let linkall_flags = if linkall then [Dune.[S "-linkall"]] else [] in
+    List.concat [static_flags; macos_link_flags; linkall_flags] |> function
+    | [] -> None
+    | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
@@ -2452,10 +2493,19 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     match
       List.filter_map
-        (fun (internal : Target.internal) -> internal.ocaml)
+        (fun (internal : Target.internal) ->
+          if internal.ocaml == default_ocaml_dependency then None
+          else Some internal.ocaml)
         internals
     with
-    | [] -> depends
+    | [] ->
+        {
+          Opam.package = "ocaml";
+          version = default_ocaml_dependency;
+          with_test = Never;
+          optional = false;
+        }
+        :: depends
     | versions ->
         {
           Opam.package = "ocaml";
@@ -2820,36 +2870,18 @@ let generate_package_json_file () =
        pp_dep)
     (List.sort compare !l)
 
-let generate_binaries_for_release () =
-  write "script-inputs/binaries-for-release" @@ fun fmt ->
-  !Target.registered
-  |> List.iter (fun (internal : Target.internal) ->
-         match internal.release_status with
-         | Unreleased | Auto_opam -> ()
-         | Experimental ->
-             (* [binaries-for-release] is only used in tag releases. *)
-             ()
-         | Released -> (
-             match internal.kind with
-             | Public_library _ | Private_library _ | Private_executable _
-             | Test_executable _ ->
-                 ()
-             | Public_executable ne_list ->
-                 Ne_list.to_list ne_list
-                 |> List.iter (fun (full_name : Target.full_name) ->
-                        Format.fprintf fmt "%s@." full_name.public_name)))
-
-let generate_static_packages () =
-  write "script-inputs/static-packages" @@ fun fmt ->
-  Target.iter_internal_by_opam (fun package internals ->
-      if
-        List.exists
-          (fun (internal : Target.internal) ->
-            match internal.kind with
-            | Public_executable _ | Private_executable _ -> internal.static
-            | Public_library _ | Private_library _ | Test_executable _ -> false)
-          internals
-      then Format.fprintf fmt "%s\n" package)
+let generate_executable_list filename release_status_to_list =
+  write filename @@ fun fmt ->
+  Fun.flip List.iter !Target.registered @@ fun (internal : Target.internal) ->
+  if internal.release_status = release_status_to_list then
+    match internal.kind with
+    | Public_library _ | Private_library _ | Private_executable _
+    | Test_executable _ ->
+        ()
+    | Public_executable ne_list ->
+        Fun.flip List.iter (Ne_list.to_list ne_list)
+        @@ fun (full_name : Target.full_name) ->
+        Format.fprintf fmt "%s@." full_name.public_name
 
 let generate_workspace env dune =
   let pp_dune fmt dune =
@@ -3164,7 +3196,7 @@ let generate_opam_ci opam_release_graph =
   in
   (* Now [packages] is a list of [batch_index, package_name]
      where [batch_index] is 0 for packages that we do not need to test. *)
-  write ".gitlab/ci/opam-ci.yml" @@ fun fmt ->
+  write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
   pp_do_not_edit ~comment_start:"#" fmt () ;
   (* Output one template per batch. *)
   for i = 1 to batch_count do
@@ -3173,12 +3205,9 @@ let generate_opam_ci opam_release_graph =
       {|@..rules_template__trigger_opam_batch_%d:
   rules:
     # Run on scheduled builds.
-    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: delayed
       start_in: %d minutes
-    # Never run on branch pipelines for master.
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: never
     # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
       when: delayed
@@ -3335,10 +3364,12 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     generate_opam_files () ;
     generate_dune_project_files () ;
     generate_package_json_file () ;
-    generate_static_packages () ;
     let opam_release_graph = compute_opam_release_graph () in
     generate_opam_ci opam_release_graph ;
-    generate_binaries_for_release () ;
+    generate_executable_list "script-inputs/released-executables" Released ;
+    generate_executable_list
+      "script-inputs/experimental-executables"
+      Experimental ;
     generate_profiles ~default_profile ;
     Option.iter
       (generate_opam_files_for_release

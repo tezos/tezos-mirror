@@ -30,10 +30,10 @@
     Subject:      Fuzzing tests of internals of the client's --mode proxy
 *)
 
-module Local = Tezos_proxy.Local_context
+module Local = Tezos_context_memory.Context
 module Proxy_getter = Tezos_proxy.Proxy_getter
 module Tree = Proxy_getter.Internal.Tree
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 

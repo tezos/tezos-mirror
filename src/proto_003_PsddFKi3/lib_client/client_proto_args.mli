@@ -30,11 +30,14 @@ open Alpha_client_context
 
 val tez_sym : string
 
-val no_print_source_flag : (bool, full) Clic.arg
+val no_print_source_flag : (bool, full) Tezos_clic.arg
 
 val tez_arg :
-  default:string -> parameter:string -> doc:string -> (Tez.t, full) Clic.arg
+  default:string ->
+  parameter:string ->
+  doc:string ->
+  (Tez.t, full) Tezos_clic.arg
 
-val int_parameter : (int, full) Clic.parameter
+val int_parameter : (int, full) Tezos_clic.parameter
 
-val bytes_parameter : (Bytes.t, full) Clic.parameter
+val bytes_parameter : (Bytes.t, full) Tezos_clic.parameter

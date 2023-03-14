@@ -38,7 +38,7 @@ commands to install ``nvm`` and ``node``:
 ::
 
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    scripts/install_builld_deps.js.sh
+    scripts/install_build_deps.js.sh
 
 ``scripts/install_build_deps.js.sh`` will also install JavaScript
 dependencies required for running tests in JS.  If you install node
@@ -50,7 +50,7 @@ Running tests
 -------------
 
 One can run JavaScript tests with ``make test-js`` in the project root
-or directly using dune with ``dune builld @SOME-PATH/runtest_js``.
+or directly using dune with ``dune build @SOME-PATH/runtest_js``.
 
 
 Adding tests

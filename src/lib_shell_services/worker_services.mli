@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_context
+open Tezos_rpc.Context
 
 module Prevalidators : sig
   open Prevalidator_worker_state
@@ -55,7 +55,7 @@ module Prevalidators : sig
         * Worker_types.worker_information
         * int)
         list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val state :
       ( [`GET],
@@ -64,7 +64,7 @@ module Prevalidators : sig
         unit,
         unit,
         Request.view Worker_types.full_status )
-      RPC_service.t
+      Tezos_rpc.Service.t
   end
 end
 
@@ -81,7 +81,7 @@ module Block_validator : sig
         unit,
         unit,
         Request.view Worker_types.full_status )
-      RPC_service.t
+      Tezos_rpc.Service.t
   end
 end
 
@@ -117,7 +117,7 @@ module Peer_validators : sig
         * Worker_types.worker_information
         * Peer_validator_worker_state.pipeline_length)
         list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val state :
       ( [`GET],
@@ -126,7 +126,7 @@ module Peer_validators : sig
         unit,
         unit,
         Request.view Worker_types.full_status )
-      RPC_service.t
+      Tezos_rpc.Service.t
   end
 end
 
@@ -163,7 +163,7 @@ module Chain_validators : sig
         * Worker_types.worker_information
         * int)
         list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val state :
       ( [`GET],
@@ -172,7 +172,7 @@ module Chain_validators : sig
         unit,
         unit,
         Request.view Worker_types.full_status )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val ddb_state :
       ( [`GET],
@@ -181,6 +181,6 @@ module Chain_validators : sig
         unit,
         unit,
         Distributed_db_state.view )
-      RPC_service.t
+      Tezos_rpc.Service.t
   end
 end

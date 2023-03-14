@@ -85,7 +85,7 @@ module Block_seen_event = struct
     occurrence : [`Valid_blocks of Chain_id.t | `Heads];
   }
 
-  let make hash header occurrence () = {hash; header; occurrence}
+  let make hash header occurrence = {hash; header; occurrence}
 
   module Definition = struct
     let section = None
@@ -99,7 +99,7 @@ module Block_seen_event = struct
       let v0_encoding =
         conv
           (function {hash; header; occurrence} -> (hash, occurrence, header))
-          (fun (hash, occurrence, header) -> make hash header occurrence ())
+          (fun (hash, occurrence, header) -> make hash header occurrence)
           (obj3
              (req "hash" Block_hash.encoding)
              (* Occurrence has to come before header, because:
@@ -137,18 +137,18 @@ module Block_seen_event = struct
 
     let doc = "Block observed while monitoring a blockchain."
 
-    let level _ = Internal_event.Info
+    let level = Internal_event.Info
   end
 
   module Event = Internal_event.Make (Definition)
 end
 
-let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
-  Monitor_services.valid_blocks cctxt ?chains ?protocols ?next_protocols ()
+let monitor_applied_blocks cctxt ?chains ?protocols ~next_protocols () =
+  Monitor_services.applied_blocks cctxt ?chains ?protocols ?next_protocols ()
   >>=? fun (block_stream, stop) ->
   return
     ( Lwt_stream.map_s
-        (fun ((chain, block), header) ->
+        (fun (chain, block, header, _ops) ->
           Block_seen_event.(
             Event.emit (make block header (`Valid_blocks chain)))
           >>=? fun () ->
@@ -210,7 +210,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
   >>=? fun {level; _} ->
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
-  | Error (RPC_context.Not_found _ :: _) -> return_nil
+  | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in

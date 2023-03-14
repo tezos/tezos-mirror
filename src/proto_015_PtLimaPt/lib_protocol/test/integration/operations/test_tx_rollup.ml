@@ -310,7 +310,9 @@ let commitment_hash_testable =
   Alcotest.testable Tx_rollup_commitment_hash.pp Tx_rollup_commitment_hash.( = )
 
 let public_key_hash_testable =
-  Alcotest.testable Signature.Public_key_hash.pp Signature.Public_key_hash.( = )
+  Alcotest.testable
+    Signature.V0.Public_key_hash.pp
+    Signature.V0.Public_key_hash.( = )
 
 let raw_level_testable = Alcotest.testable Raw_level.pp Raw_level.( = )
 
@@ -325,7 +327,7 @@ let gen_l2_account ?rng_state () =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255))
       rng_state
   in
-  let pkh, public_key, secret_key = Bls.generate_key ?seed () in
+  let pkh, public_key, secret_key = Signature.Bls.generate_key ?seed () in
   (secret_key, public_key, pkh)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
@@ -2498,7 +2500,9 @@ module Rejection = struct
     let signatures =
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
-    let signature = assert_some @@ Bls.aggregate_signature_opt signatures in
+    let signature =
+      assert_some @@ Signature.Bls.aggregate_signature_opt signatures
+    in
     let batch =
       Tx_rollup_l2_batch.V1.
         {contents = [transaction]; aggregated_signature = signature}

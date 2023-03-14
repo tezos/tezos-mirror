@@ -246,29 +246,29 @@ quorum of the next vote.
 More details on the operations can be found in
 :src:`src/proto_015_PtLimaPt/lib_protocol/operation_repr.ml`.
 The binary format is described by
-``tezos-client describe unsigned operation``.
+``octez-client describe unsigned operation``.
 
 Client Commands
 ---------------
 
-The Octez client, ``tezos-client``, provides commands for basic exploration and
+The Octez client, ``octez-client``, provides commands for basic exploration and
 interaction with the amendment and voting process.
 
 
 Show
 ~~~~
 
-Tezos' client provides a command to show the status of a voting period.
+The client provides a command to show the status of a voting period.
 It displays different information for different kind of periods, as
 in the following samples::
 
-  $ tezos-client show voting period
+  $ octez-client show voting period
   Current period: "proposal"
   Blocks remaining until end of period: 59
   Current proposals:
   PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 2,400,000 ꜩ
 
-  $ tezos-client show voting period
+  $ octez-client show voting period
   Current period: "exploration"
   Blocks remaining until end of period: 63
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
@@ -279,7 +279,7 @@ in the following samples::
   Current participation 20.00%, necessary quorum 80.00%
   Current in favor 2,400,000 ꜩ, needed supermajority 1,920,000 ꜩ
 
-  $ tezos-client show voting period
+  $ octez-client show voting period
   Current period: "cooldown"
   Blocks remaining until end of period: 64
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
@@ -296,7 +296,7 @@ Submit proposals
 
 During a proposal period, a list of proposals can be submitted with::
 
-    tezos-client submit proposals for <delegate> <proposal1> <proposal2> ...
+    octez-client submit proposals for <delegate> <proposal1> <proposal2> ...
 
 Remember that each delegate can submit a maximum of 20 protocol
 hashes and that duplicates count towards this total.
@@ -323,7 +323,7 @@ Submit ballots
 During either of the **exploration** or **promotion** periods,
 ballots can be submitted once with::
 
-    tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
+    octez-client submit ballot for <delegate> <proposal> <yay|nay|pass>
 
 Further External Resources
 --------------------------

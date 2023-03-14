@@ -34,6 +34,7 @@
 (* Typedefs *)
 
 open Tezos_crypto
+open Tezos_crypto.Hashed
 
 type operation = {shell_header : branch; protocol_data : protocol_data}
 
@@ -57,12 +58,12 @@ and operation_content = {
 
 type mempool_operation =
   | Mempool_operation of {
-      protocol : Tezos_crypto.Protocol_hash.t;
+      protocol : Protocol_hash.t;
       shell_header : branch;
       protocol_data : protocol_data;
     }
 
-type mempool = (Tezos_crypto.Operation_hash.t * mempool_operation) list
+type mempool = (Operation_hash.t * mempool_operation) list
 
 (* ------------------------------------------------------------------------- *)
 (* Operation-related encodings *)
@@ -161,7 +162,7 @@ let unsigned_operation_to_json op =
 (* ------------------------------------------------------------------------- *)
 
 type state = {
-  protocol : Tezos_crypto.Protocol_hash.t;
+  protocol : Protocol_hash.t;
   sandbox_client : Tezt_tezos.Client.t;
   sandbox_node : Tezt_tezos.Node.t;
   counters : (Account.key, int) Hashtbl.t;
@@ -207,7 +208,7 @@ let encode_unsigned_operation_to_binary client op =
       rpc
         POST
         ["chains"; "main"; "blocks"; "head"; "helpers"; "forge"; "operations"]
-        ~data:op
+        ~data:(Data op)
         client)
   in
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))
@@ -216,7 +217,7 @@ let mempool_operation_from_op client protocol signer op :
     (mempool_operation * bytes) Lwt.t =
   let* bin = encode_unsigned_operation_to_binary client op in
   let signature = Operation.sign_manager_op_bytes ~signer bin in
-  let signature = Tezos_crypto.Signature.to_b58check signature in
+  let signature = Signature.to_b58check signature in
   return
     ( Mempool_operation
         {
@@ -414,9 +415,6 @@ let distinct_bakers_increasing_fees state sources =
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
 
-let has_1m_restriction_in_blocks protocol =
-  Protocol.(number protocol >= number Kathmandu)
-
 let bake_and_check ?expected_baked_operations state ~protocol ~mempool ~sources
     =
   let* () =
@@ -426,15 +424,11 @@ let bake_and_check ?expected_baked_operations state ~protocol ~mempool ~sources
   let expected_number_manager_op =
     match expected_baked_operations with
     | None ->
-        if has_1m_restriction_in_blocks protocol then
-          List.length
-            (List.sort_uniq
-               (fun src1 src2 ->
-                 String.compare
-                   src1.Account.public_key_hash
-                   src2.public_key_hash)
-               sources)
-        else List.length mempool
+        List.length
+          (List.sort_uniq
+             (fun src1 src2 ->
+               String.compare src1.Account.public_key_hash src2.public_key_hash)
+             sources)
     | Some n -> n
   in
   assert_block_is_well_baked block expected_number_manager_op ;
@@ -473,11 +467,10 @@ let test_ordering =
       ~mempool
       ~sources:[account]
   in
-  (* If 1m restriction is enabled on the protocol side, only one
-     operation has been added to the previous block, hence the next
-     counter for bootstrap1 is the successor of one. *)
-  if has_1m_restriction_in_blocks protocol then
-    Hashtbl.add state.counters account 2 ;
+  (* Because of the 1m restriction, only one operation has been added
+     to the previous block, hence the next counter for bootstrap1 is
+     the successor of one. *)
+  Hashtbl.add state.counters account 2 ;
   Log.info "Testing ordering by fees" ;
   let sources = Array.to_list bootstraps in
   let* mempool = distinct_bakers_increasing_fees state sources in
@@ -719,10 +712,31 @@ let test_operation_pool_ordering
   check_hashes op_hashes hashes ;
   Lwt.return_unit
 
+(** This test activates a protocol with a timestamps [Now]. It then bakes a
+    block with the given [minimal_timestamp] flag. *)
+let baking_with_given_minimal_timestamp ~minimal_timestamp =
+  Protocol.register_test
+    ~supports:Protocol.(From_protocol (number Mumbai + 1))
+    ~__FILE__
+    ~title:(sf "Baking minimal timestamp (%b)" minimal_timestamp)
+    ~tags:["baking"; "timestamp"]
+  @@ fun protocol ->
+  let* _node, client =
+    Client.init_with_protocol
+      ~timestamp:(Ago (Tezos_base.Time.System.Span.of_seconds_exn 60.))
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  Client.bake_for_and_wait ~minimal_timestamp client
+
 let register ~protocols =
   test_ordering protocols ;
   wrong_branch_operation_dismissal protocols ;
-  baking_operation_exception protocols
+  baking_operation_exception protocols ;
+  baking_with_given_minimal_timestamp ~minimal_timestamp:false protocols ;
+  baking_with_given_minimal_timestamp ~minimal_timestamp:true protocols
 
 let register_operations_pool ~protocols =
   List.iter

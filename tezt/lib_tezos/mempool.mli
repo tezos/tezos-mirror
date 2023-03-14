@@ -60,6 +60,7 @@ val get_mempool :
   ?branch_refused:bool ->
   ?refused:bool ->
   ?outdated:bool ->
+  ?validation_passes:int list ->
   Client.t ->
   t Lwt.t
 

@@ -68,7 +68,7 @@ type t = {
   p2p : Distributed_db.p2p;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   (* For P2P RPCs *)
   shutdown : unit -> unit Lwt.t;
 }
@@ -122,7 +122,7 @@ type config = {
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
   store_root : string;
   context_root : string;
@@ -131,34 +131,12 @@ type config = {
     (Tezos_protocol_environment.Context.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t)
     option;
-  p2p : (P2p.config * P2p.limits) option;
+  p2p : (P2p.config * P2p_limits.t) option;
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;
   enable_testchain : bool;
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
-
-let default_block_validator_limits =
-  let open Block_validator in
-  {
-    protocol_timeout = Time.System.Span.of_seconds_exn 120.;
-    operation_metadata_size_limit =
-      Block_validation.default_operation_metadata_size_limit;
-  }
-
-let default_prevalidator_limits = Prevalidator.default_limits
-
-let default_peer_validator_limits =
-  let open Peer_validator in
-  {
-    block_header_timeout = Time.System.Span.of_seconds_exn 300.;
-    block_operations_timeout = Time.System.Span.of_seconds_exn 300.;
-    protocol_timeout = Time.System.Span.of_seconds_exn 600.;
-    new_head_request_timeout = Time.System.Span.of_seconds_exn 90.;
-  }
-
-let default_chain_validator_limits =
-  let open Chain_validator in
-  {synchronisation = {latency = 150; threshold = 4}}
 
 (* These protocols are linked with the node and
    do not have their actual hash on purpose. *)
@@ -235,6 +213,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       target;
       disable_mempool;
       enable_testchain;
+      dal;
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
   let open Lwt_result_syntax in
@@ -288,6 +267,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters;
+               dal_config = dal;
              })
       in
       let commit_genesis ~chain_id =
@@ -361,10 +341,10 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
 let shutdown node = node.shutdown ()
 
 let build_rpc_directory node =
-  let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
-  let merge d = dir := RPC_directory.merge !dir d in
+  let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
+  let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
-    dir := RPC_directory.register !dir s (fun () p q -> f p q)
+    dir := Tezos_rpc.Directory.register !dir s (fun () p q -> f p q)
   in
   merge
     (Protocol_directory.build_rpc_directory
@@ -386,6 +366,6 @@ let build_rpc_directory node =
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory node.p2p) ;
-  register0 RPC_service.error_service (fun () () ->
+  register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

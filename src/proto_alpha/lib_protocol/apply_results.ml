@@ -117,11 +117,13 @@ type _ successful_manager_operation_result =
       -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
   | Transfer_ticket_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
   | Dal_publish_slot_header_result : {
+      slot_header : Dal.Slot.Header.t;
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.dal_publish_slot_header successful_manager_operation_result
@@ -135,7 +137,6 @@ type _ successful_manager_operation_result =
       -> Kind.sc_rollup_originate successful_manager_operation_result
   | Sc_rollup_add_messages_result : {
       consumed_gas : Gas.Arith.fp;
-      inbox_after : Sc_rollup.Inbox.t;
     }
       -> Kind.sc_rollup_add_messages successful_manager_operation_result
   | Sc_rollup_cement_result : {
@@ -164,6 +165,7 @@ type _ successful_manager_operation_result =
       -> Kind.sc_rollup_timeout successful_manager_operation_result
   | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
@@ -174,12 +176,6 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.sc_rollup_recover_bond successful_manager_operation_result
-  | Sc_rollup_dal_slot_subscribe_result : {
-      consumed_gas : Gas.Arith.fp;
-      slot_index : Dal.Slot_index.t;
-      level : Raw_level.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe successful_manager_operation_result
   | Zk_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       originated_zk_rollup : Zk_rollup.t;
@@ -193,6 +189,12 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.zk_rollup_publish successful_manager_operation_result
+  | Zk_rollup_update_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.zk_rollup_update successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
     ({
@@ -406,18 +408,18 @@ module Manager_result = struct
                 paid_storage_size_diff;
               });
         case
-          ~title:"To_sc_rollup"
+          ~title:"To_smart_rollup"
           (Tag 2)
           (obj2
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-             (req "inbox_after" Sc_rollup.Inbox.encoding))
+             (req "ticket_updates" Ticket_receipt.encoding))
           (function
-            | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
-                Some (consumed_gas, inbox_after)
+            | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
+                Some (consumed_gas, ticket_receipt)
             | _ -> None)
           (function
-            | consumed_gas, inbox_after ->
-                Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
+            | consumed_gas, ticket_receipt ->
+                Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
       ]
 
   let transaction_case =
@@ -526,20 +528,15 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.update_consensus_key_case
       ~encoding:
         Data_encoding.(
-          obj2
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Update_consensus_key_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Update_consensus_key_manager_kind
       ~proj:(function
-        | Update_consensus_key_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Update_consensus_key_result {consumed_gas = consumed_milligas})
+        | Update_consensus_key_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Update_consensus_key_result {consumed_gas})
 
   let set_deposits_limit_case =
     make
@@ -752,8 +749,9 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.transfer_ticket_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj4
             (req "balance_updates" Receipt.balance_updates_encoding)
+            (req "ticket_updates" Ticket_receipt.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -762,26 +760,47 @@ module Manager_result = struct
       ~kind:Kind.Transfer_ticket_manager_kind
       ~proj:(function
         | Transfer_ticket_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            (balance_updates, consumed_gas, paid_storage_size_diff))
-      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
+            {
+              balance_updates;
+              ticket_receipt;
+              consumed_gas;
+              paid_storage_size_diff;
+            } ->
+            ( balance_updates,
+              ticket_receipt,
+              consumed_gas,
+              paid_storage_size_diff ))
+      ~inj:
+        (fun ( balance_updates,
+               ticket_receipt,
+               consumed_gas,
+               paid_storage_size_diff ) ->
         Transfer_ticket_result
-          {balance_updates; consumed_gas; paid_storage_size_diff})
+          {
+            balance_updates;
+            ticket_receipt;
+            consumed_gas;
+            paid_storage_size_diff;
+          })
 
   let dal_publish_slot_header_case =
     make
       ~op_case:
         Operation.Encoding.Manager_operations.dal_publish_slot_header_case
       ~encoding:
-        (obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+        (obj2
+           (req "slot_header" Dal.Slot.Header.encoding)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Dal_publish_slot_header_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Dal_publish_slot_header_result {consumed_gas} -> consumed_gas)
+        | Dal_publish_slot_header_result {slot_header; consumed_gas} ->
+            (slot_header, consumed_gas))
       ~kind:Kind.Dal_publish_slot_header_manager_kind
-      ~inj:(fun consumed_gas -> Dal_publish_slot_header_result {consumed_gas})
+      ~inj:(fun (slot_header, consumed_gas) ->
+        Dal_publish_slot_header_result {slot_header; consumed_gas})
 
   let zk_rollup_origination_case =
     make
@@ -828,6 +847,27 @@ module Manager_result = struct
             (balance_updates, consumed_gas, paid_storage_size_diff))
       ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
         Zk_rollup_publish_result
+          {balance_updates; consumed_gas; paid_storage_size_diff})
+
+  let zk_rollup_update_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.zk_rollup_update_case
+      ~encoding:
+        Data_encoding.(
+          obj3
+            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+            (dft "paid_storage_size_diff" z Z.zero))
+      ~select:(function
+        | Successful_manager_result (Zk_rollup_update_result _ as op) -> Some op
+        | _ -> None)
+      ~kind:Kind.Zk_rollup_update_manager_kind
+      ~proj:(function
+        | Zk_rollup_update_result
+            {balance_updates; consumed_gas; paid_storage_size_diff} ->
+            (balance_updates, consumed_gas, paid_storage_size_diff))
+      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
+        Zk_rollup_update_result
           {balance_updates; consumed_gas; paid_storage_size_diff})
 
   let sc_rollup_originate_case =
@@ -878,19 +918,15 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_add_messages_case
       ~encoding:
-        (obj2
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "inbox_after" Sc_rollup.Inbox.encoding))
+        (obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Sc_rollup_add_messages_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_add_messages_result {consumed_gas; inbox_after} ->
-            (consumed_gas, inbox_after))
+        | Sc_rollup_add_messages_result {consumed_gas} -> consumed_gas)
       ~kind:Kind.Sc_rollup_add_messages_manager_kind
-      ~inj:(fun (consumed_gas, inbox_after) ->
-        Sc_rollup_add_messages_result {consumed_gas; inbox_after})
+      ~inj:(fun consumed_gas -> Sc_rollup_add_messages_result {consumed_gas})
 
   let sc_rollup_cement_case =
     make
@@ -979,8 +1015,9 @@ module Manager_result = struct
         .sc_rollup_execute_outbox_message_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj4
             (req "balance_updates" Receipt.balance_updates_encoding)
+            (req "ticket_updates" Ticket_receipt.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -991,11 +1028,28 @@ module Manager_result = struct
       ~kind:Kind.Sc_rollup_execute_outbox_message_manager_kind
       ~proj:(function
         | Sc_rollup_execute_outbox_message_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            (balance_updates, consumed_gas, paid_storage_size_diff))
-      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
+            {
+              balance_updates;
+              ticket_receipt;
+              consumed_gas;
+              paid_storage_size_diff;
+            } ->
+            ( balance_updates,
+              ticket_receipt,
+              consumed_gas,
+              paid_storage_size_diff ))
+      ~inj:
+        (fun ( balance_updates,
+               ticket_receipt,
+               consumed_gas,
+               paid_storage_size_diff ) ->
         Sc_rollup_execute_outbox_message_result
-          {balance_updates; consumed_gas; paid_storage_size_diff})
+          {
+            balance_updates;
+            ticket_receipt;
+            consumed_gas;
+            paid_storage_size_diff;
+          })
 
   let sc_rollup_recover_bond_case =
     make
@@ -1015,28 +1069,6 @@ module Manager_result = struct
             (balance_updates, consumed_gas))
       ~inj:(fun (balance_updates, consumed_gas) ->
         Sc_rollup_recover_bond_result {balance_updates; consumed_gas})
-
-  let sc_rollup_dal_slot_subscribe_case =
-    make
-      ~op_case:
-        Operation.Encoding.Manager_operations.sc_rollup_dal_slot_subscribe_case
-      ~encoding:
-        (obj3
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "slot_index" Dal.Slot_index.encoding)
-           (req "level" Raw_level.encoding))
-      ~select:(function
-        | Successful_manager_result
-            (Sc_rollup_dal_slot_subscribe_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~proj:(function
-        | Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}
-          ->
-            (consumed_gas, slot_index, level))
-      ~kind:Kind.Sc_rollup_dal_slot_subscribe_manager_kind
-      ~inj:(fun (consumed_gas, slot_index, level) ->
-        Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level})
 end
 
 let successful_manager_operation_result_encoding :
@@ -1084,10 +1116,10 @@ type 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
-  | Dal_slot_availability_result : {
+  | Dal_attestation_result : {
       delegate : Signature.Public_key_hash.t;
     }
-      -> Kind.dal_slot_availability contents_result
+      -> Kind.dal_attestation contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -1226,10 +1258,6 @@ let equal_manager_kind :
       Kind.Sc_rollup_recover_bond_manager_kind ) ->
       Some Eq
   | Kind.Sc_rollup_recover_bond_manager_kind, _ -> None
-  | ( Kind.Sc_rollup_dal_slot_subscribe_manager_kind,
-      Kind.Sc_rollup_dal_slot_subscribe_manager_kind ) ->
-      Some Eq
-  | Kind.Sc_rollup_dal_slot_subscribe_manager_kind, _ -> None
   | ( Kind.Zk_rollup_origination_manager_kind,
       Kind.Zk_rollup_origination_manager_kind ) ->
       Some Eq
@@ -1237,6 +1265,9 @@ let equal_manager_kind :
   | Kind.Zk_rollup_publish_manager_kind, Kind.Zk_rollup_publish_manager_kind ->
       Some Eq
   | Kind.Zk_rollup_publish_manager_kind, _ -> None
+  | Kind.Zk_rollup_update_manager_kind, Kind.Zk_rollup_update_manager_kind ->
+      Some Eq
+  | Kind.Zk_rollup_update_manager_kind, _ -> None
 
 module Encoding = struct
   type 'kind case =
@@ -1319,22 +1350,22 @@ module Encoding = struct
               {balance_updates; delegate; consensus_key; endorsement_power});
       }
 
-  let dal_slot_availability_case =
+  let dal_attestation_case =
     Case
       {
-        op_case = Operation.Encoding.dal_slot_availability_case;
+        op_case = Operation.Encoding.dal_attestation_case;
         encoding = obj1 (req "delegate" Signature.Public_key_hash.encoding);
         select =
           (function
-          | Contents_result (Dal_slot_availability_result _ as op) -> Some op
+          | Contents_result (Dal_attestation_result _ as op) -> Some op
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Dal_slot_availability _ as op), res) ->
+          | Contents_and_result ((Dal_attestation _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (function Dal_slot_availability_result {delegate} -> delegate);
-        inj = (fun delegate -> Dal_slot_availability_result {delegate});
+        proj = (function Dal_attestation_result {delegate} -> delegate);
+        inj = (fun delegate -> Dal_attestation_result {delegate});
       }
 
   let seed_nonce_revelation_case =
@@ -1568,7 +1599,7 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preendorsement_result _) -> None
           | Contents_result (Endorsement_result _) -> None
-          | Contents_result (Dal_slot_availability_result _) -> None
+          | Contents_result (Dal_attestation_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Vdf_revelation_result _) -> None
@@ -1885,18 +1916,6 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let sc_rollup_dal_slot_subscribe_case =
-    make_manager_case
-      Operation.Encoding.sc_rollup_dal_slot_subscribe_case
-      Manager_result.sc_rollup_dal_slot_subscribe_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _}
-              as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
   let zk_rollup_origination_case =
     make_manager_case
       Operation.Encoding.zk_rollup_origination_case
@@ -1915,6 +1934,17 @@ module Encoding = struct
       (function
         | Contents_and_result
             ((Manager_operation {operation = Zk_rollup_publish _; _} as op), res)
+          ->
+            Some (op, res)
+        | _ -> None)
+
+  let zk_rollup_update_case =
+    make_manager_case
+      Operation.Encoding.zk_rollup_update_case
+      Manager_result.zk_rollup_update_case
+      (function
+        | Contents_and_result
+            ((Manager_operation {operation = Zk_rollup_update _; _} as op), res)
           ->
             Some (op, res)
         | _ -> None)
@@ -1943,7 +1973,7 @@ let contents_result_encoding =
          make vdf_revelation_case;
          make endorsement_case;
          make preendorsement_case;
-         make dal_slot_availability_case;
+         make dal_attestation_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -1977,9 +2007,9 @@ let contents_result_encoding =
          make sc_rollup_timeout_case;
          make sc_rollup_execute_outbox_message_case;
          make sc_rollup_recover_bond_case;
-         make sc_rollup_dal_slot_subscribe_case;
          make zk_rollup_origination_case;
          make zk_rollup_publish_case;
+         make zk_rollup_update_case;
        ]
 
 let contents_and_result_encoding =
@@ -2010,7 +2040,7 @@ let contents_and_result_encoding =
          make vdf_revelation_case;
          make endorsement_case;
          make preendorsement_case;
-         make dal_slot_availability_case;
+         make dal_attestation_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -2044,9 +2074,9 @@ let contents_and_result_encoding =
          make sc_rollup_timeout_case;
          make sc_rollup_execute_outbox_message_case;
          make sc_rollup_recover_bond_case;
-         make sc_rollup_dal_slot_subscribe_case;
          make zk_rollup_origination_case;
          make zk_rollup_publish_case;
+         make zk_rollup_update_case;
        ]
 
 type 'kind contents_result_list =
@@ -2157,8 +2187,8 @@ let kind_equal :
   | Endorsement _, _ -> None
   | Preendorsement _, Preendorsement_result _ -> Some Eq
   | Preendorsement _, _ -> None
-  | Dal_slot_availability _, Dal_slot_availability_result _ -> Some Eq
-  | Dal_slot_availability _, _ -> None
+  | Dal_attestation _, Dal_attestation_result _ -> Some Eq
+  | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq
@@ -2871,37 +2901,6 @@ let kind_equal :
       Some Eq
   | Manager_operation {operation = Sc_rollup_execute_outbox_message _; _}, _ ->
       None
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {operation_result = Applied (Sc_rollup_dal_slot_subscribe_result _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Backtracked (Sc_rollup_dal_slot_subscribe_result _, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed
-              (Alpha_context.Kind.Sc_rollup_dal_slot_subscribe_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Sc_rollup_dal_slot_subscribe_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _}, _ -> None
   | ( Manager_operation {operation = Zk_rollup_origination _; _},
       Manager_operation_result
         {operation_result = Applied (Zk_rollup_origination_result _); _} ) ->
@@ -2953,6 +2952,31 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Zk_rollup_publish _; _}, _ -> None
+  | ( Manager_operation {operation = Zk_rollup_update _; _},
+      Manager_operation_result
+        {operation_result = Applied (Zk_rollup_update_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Zk_rollup_update _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Zk_rollup_update_result _, _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Zk_rollup_update _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Zk_rollup_update_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Zk_rollup_update _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Zk_rollup_update_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Zk_rollup_update _; _}, _ -> None
 
 let rec kind_equal_list :
     type kind kind2.
@@ -3067,7 +3091,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_slot_availability : Dal.Endorsement.t option;
+  dal_attestation : Dal.Attestation.t option;
 }
 
 let block_metadata_encoding =
@@ -3086,7 +3110,7 @@ let block_metadata_encoding =
               balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
-              dal_slot_availability;
+              dal_attestation;
             } ->
          ( ( proposer,
              baker,
@@ -3097,10 +3121,8 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              implicit_operations_results ),
-           ( proposer_active_key,
-             baker_active_key,
-             consumed_gas,
-             dal_slot_availability ) ))
+           (proposer_active_key, baker_active_key, consumed_gas, dal_attestation)
+         ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -3113,7 +3135,7 @@ let block_metadata_encoding =
               ( proposer_active_key,
                 baker_active_key,
                 consumed_gas,
-                dal_slot_availability ) ) ->
+                dal_attestation ) ) ->
          {
            proposer = {delegate = proposer; consensus_pkh = proposer_active_key};
            baker = {delegate = baker; consensus_pkh = baker_active_key};
@@ -3125,7 +3147,7 @@ let block_metadata_encoding =
            balance_updates;
            liquidity_baking_toggle_ema;
            implicit_operations_results;
-           dal_slot_availability;
+           dal_attestation;
          })
        (merge_objs
           (obj9
@@ -3150,4 +3172,4 @@ let block_metadata_encoding =
                 This varopt is here while the DAL is behind a feature
                 flag. This should be replaced by a required field once
                 the feature flag will be activated. *)
-             (varopt "dal_slot_availability" Dal.Endorsement.encoding)))
+             (varopt "dal_attestation" Dal.Attestation.encoding)))

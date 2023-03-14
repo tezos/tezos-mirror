@@ -12,10 +12,10 @@ paper <https://zerocoin.org/media/pdf/ZerocoinOakland.pdf>`_.
 
 The reference implementation of Sapling,
 `librustzcash <https://github.com/zcash/librustzcash>`_, was
-integrated in the Tezos codebase during 2019. It will be proposed as
+integrated in the Octez codebase during 2019. It will be proposed as
 part of a protocol amendment during 2020.
 
-Librustzcash and the Tezos integration implement the protocol
+Librustzcash and the Octez integration implement the protocol
 described in this `specification
 <https://github.com/zcash/zips/blob/2e26bb072dfd5f842fe9e779bdec8cabeb4fa9bf/protocol/protocol.pdf>`_, version 2020.1.0.
 
@@ -339,7 +339,7 @@ Client
 Wallet
 ^^^^^^
 
-tezos-client supports Sapling keys and can send
+octez-client supports Sapling keys and can send
 shielded transactions to smart contracts.
 
 The client supports two ways to generate a new Sapling spending key.
@@ -442,7 +442,7 @@ Client
 
 Under `lib_client_sapling` there is the client integration
 with the support for Sapling keys and forging of transactions.
-The main difference from the existing Tezos client is the need for the
+The main difference from the existing Octez client is the need for the
 Sapling client to keep an additional state, for each contract.
 Because Sapling uses a UTXO model it is necessary for a client to
 compute the set of unspent outputs in order to forge new transactions.
@@ -483,52 +483,52 @@ unshielding.
 ::
 
    # set up the sandbox
-   ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
-   eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
-   tezos-activate-alpha
+   ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
+   eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
+   octez-activate-alpha
 
    # originate the contract with its initial empty sapling storage,
    # bake a block to include it.
    # { } represents an empty Sapling state.
-   tezos-client originate contract shielded-tez transferring 0 from bootstrap1 \
+   octez-client originate contract shielded-tez transferring 0 from bootstrap1 \
    running src/proto_015_PtLimaPt/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz \
    --init '{ }' --burn-cap 3 &
-   tezos-client bake for bootstrap1
+   octez-client bake for bootstrap1
 
-   # as usual you can check the tezos-client manual
-   tezos-client sapling man
+   # as usual you can check the octez-client manual
+   octez-client sapling man
 
    # generate two shielded keys for Alice and Bob and use them for the shielded-tez contract
    # the memo size has to be indicated
-   tezos-client sapling gen key alice
-   tezos-client sapling use key alice for contract shielded-tez --memo-size 8
-   tezos-client sapling gen key bob
-   tezos-client sapling use key bob for contract shielded-tez --memo-size 8
+   octez-client sapling gen key alice
+   octez-client sapling use key alice for contract shielded-tez --memo-size 8
+   octez-client sapling gen key bob
+   octez-client sapling use key bob for contract shielded-tez --memo-size 8
 
    # generate an address for Alice to receive shielded tokens.
-   tezos-client sapling gen address alice
+   octez-client sapling gen address alice
    zet1AliceXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # Alice's address
 
 
    # shield 10 tez from bootstrap1 to alice
-   tezos-client sapling shield 10 from bootstrap1 to zet1AliceXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX using shielded-tez --burn-cap 2 &
-   tezos-client bake for bootstrap1
-   tezos-client sapling get balance for alice in contract shielded-tez
+   octez-client sapling shield 10 from bootstrap1 to zet1AliceXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX using shielded-tez --burn-cap 2 &
+   octez-client bake for bootstrap1
+   octez-client sapling get balance for alice in contract shielded-tez
 
    # generate an address for Bob to receive shielded tokens.
-   tezos-client sapling gen address bob
+   octez-client sapling gen address bob
    zet1BobXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # Bob's address
 
    # forge a shielded transaction from alice to bob that is saved to a file
-   tezos-client sapling forge transaction 10 from alice to zet1BobXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX using shielded-tez
+   octez-client sapling forge transaction 10 from alice to zet1BobXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX using shielded-tez
 
    # submit the shielded transaction from any transparent account
-   tezos-client sapling submit sapling_transaction from bootstrap2 using shielded-tez --burn-cap 1 &
-   tezos-client bake for bootstrap1
-   tezos-client sapling get balance for bob in contract shielded-tez
+   octez-client sapling submit sapling_transaction from bootstrap2 using shielded-tez --burn-cap 1 &
+   octez-client bake for bootstrap1
+   octez-client sapling get balance for bob in contract shielded-tez
 
    # unshield from bob to any transparent account
-   tezos-client sapling unshield 10 from bob to bootstrap1 using shielded-tez --burn-cap 1
+   octez-client sapling unshield 10 from bob to bootstrap1 using shielded-tez --burn-cap 1
    ctrl+z # to put the process in background
-   tezos-client bake for bootstrap1
+   octez-client bake for bootstrap1
    fg # to put resume the transfer

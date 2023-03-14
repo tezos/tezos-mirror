@@ -50,6 +50,9 @@ let get_head_max_op_ttl node =
   let* head = RPC.call node @@ RPC.get_chain_block_metadata () in
   return head.max_operations_ttl
 
+let pp_snapshot_export_format fmt v =
+  Format.fprintf fmt "%s" ((function Node.Tar -> "tar" | Raw -> "raw") v)
+
 (*
 
 Tests both the snapshot mechanism and the store's behaviour
@@ -70,10 +73,14 @@ TL;DR, how it works:
 - check consistency (the checkpoints should have moved)
 
 *)
-let test_storage_snapshot =
+let test_storage_snapshot export_format =
   Protocol.register_test
     ~__FILE__
-    ~title:"storage snapshot, import and export"
+    ~title:
+      (Format.asprintf
+         "storage snapshot, import and export (uisng %a format)"
+         pp_snapshot_export_format
+         export_format)
     ~tags:["storage"; "snapshot"; "import"; "export"]
   @@ fun protocol ->
   let show_node_group ns =
@@ -127,9 +134,11 @@ let test_storage_snapshot =
 
   let snapshot_dir = Temp.dir "multinode_snapshots" in
 
-  let export node history_mode ~export_level ~snapshot =
+  let export node history_mode ~export_level ~export_format ~snapshot =
     let file = snapshot_dir // snapshot in
-    let* () = Node.snapshot_export ~export_level ~history_mode node file in
+    let* () =
+      Node.snapshot_export ~export_level ~history_mode ~export_format node file
+    in
     Log.info "Node %s exported %s" (Node.name node) file ;
     unit
   in
@@ -304,31 +313,37 @@ let test_storage_snapshot =
       node_archive
       Full_history
       ~export_level:snapshot_level
+      ~export_format
       ~snapshot:"node_archive_batch_1.full"
-  and* () =
-    export
-      node_archive
-      Rolling_history
-      ~export_level:snapshot_level
-      ~snapshot:"node_archive_batch_1.rolling"
   and* () =
     export
       node_full
       Full_history
       ~export_level:snapshot_level
+      ~export_format
       ~snapshot:"node_full_batch_1.full"
-  and* () =
-    export
-      node_full
-      Rolling_history
-      ~export_level:snapshot_level
-      ~snapshot:"node_full_batch_1.rolling"
   and* () =
     export
       node_rolling
       Rolling_history
       ~export_level:snapshot_level
+      ~export_format
       ~snapshot:"node_rolling_batch_1.rolling"
+  in
+  let* () =
+    export
+      node_archive
+      Rolling_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_archive_batch_1.rolling"
+  and* () =
+    export
+      node_full
+      Rolling_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_full_batch_1.rolling"
   in
 
   Log.info "Import all kinds of snapshots" ;
@@ -373,6 +388,24 @@ let test_storage_snapshot =
 
   (* ########################################################################### *)
   Log.info "Check consistency 1" ;
+
+  (* Make sure that a snapshot freshly imported, that has its
+     savepoint set on the head, can export a valid snapshot. *)
+  let* () =
+    let node = node_rolling in
+    Log.info
+      "Check fresh import can be exported (node_rolling, %s)."
+      (Node.name node) ;
+    let* () =
+      export
+        node
+        Rolling_history
+        ~export_level:snapshot_level
+        ~export_format
+        ~snapshot:"from_fresh_import.rolling"
+    in
+    unit
+  in
 
   (*
     Check consistency of imported snapshots
@@ -882,31 +915,37 @@ let test_storage_snapshot =
       node_archive
       Full_history
       ~export_level:snapshot_level
+      ~export_format
       ~snapshot:"node_archive_batch_3.full"
-  and* () =
-    export
-      node_archive
-      Rolling_history
-      ~export_level:snapshot_level
-      ~snapshot:"node_archive_batch_3.rolling"
   and* () =
     export
       node_full
       Full_history
       ~export_level:snapshot_level
+      ~export_format
       ~snapshot:"node_full_batch_3.full"
-  and* () =
-    export
-      node_full
-      Rolling_history
-      ~export_level:snapshot_level
-      ~snapshot:"node_full_batch_3.rolling"
   and* () =
     export
       node_rolling
       Rolling_history
       ~export_level:snapshot_level
+      ~export_format
       ~snapshot:"node_rolling_batch_3.rolling"
+  in
+  let* () =
+    export
+      node_archive
+      Rolling_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_archive_batch_3.rolling"
+  and* () =
+    export
+      node_full
+      Rolling_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_full_batch_3.rolling"
   in
 
   (* ########################################################################### *)
@@ -1090,4 +1129,6 @@ let test_storage_snapshot =
 
   unit
 
-let register ~protocols = test_storage_snapshot protocols
+let register ~protocols =
+  test_storage_snapshot Node.Tar protocols ;
+  test_storage_snapshot Node.Raw protocols

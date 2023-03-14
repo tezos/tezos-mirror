@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -235,6 +236,29 @@ let error_state_gen =
     let+ err = truncated_string in
     Wasm_pvm_errors.Unknown_error err
   in
+  let fallback_error =
+    let decode_cause =
+      let+ exn = exn_gen in
+      let error =
+        Wasm_pvm_errors.extract_interpreter_error exn |> extract_error
+      in
+      Wasm_pvm_errors.Decode_cause error
+    in
+    let link_cause =
+      let+ error = truncated_string in
+      Wasm_pvm_errors.Link_cause error
+    in
+    let init_cause =
+      let+ exn = exn_gen in
+      let error =
+        Wasm_pvm_errors.extract_interpreter_error exn |> extract_error
+      in
+      Wasm_pvm_errors.Init_cause error
+    in
+    let+ cause = oneof [decode_cause; link_cause; init_cause] in
+    Wasm_pvm_errors.No_fallback_kernel cause
+  in
+
   let invalid_state =
     let+ err = truncated_string in
     Wasm_pvm_errors.Invalid_state err
@@ -247,43 +271,22 @@ let error_state_gen =
       eval_error;
       invalid_state;
       unknown_error;
+      fallback_error;
     ]
 
-let pp_interpreter_error out
-    Wasm_pvm_errors.{raw_exception = Truncated raw_exception; explanation} =
-  Format.fprintf
-    out
-    "@[<hv 2>{ raw_exception: %s; explanation: %s }@]"
-    raw_exception
-    (match explanation with
-    | None -> "None"
-    | Some (Truncated s) -> "Some: " ^ s)
+let check_interpreter_error error error' =
+  error.Wasm_pvm_errors.raw_exception = error'.Wasm_pvm_errors.raw_exception
+  && error.explanation = error'.explanation
 
-let pp_error_state out = function
-  | Wasm_pvm_errors.Eval_error error ->
-      Format.fprintf out "@[<hv 2>Eval_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Decode_error error ->
-      Format.fprintf out "@[<hv 2>Decode_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Link_error (Truncated error) ->
-      Format.fprintf out "@[<hv 2>Link_error %s@]" error
-  | Wasm_pvm_errors.Init_error error ->
-      Format.fprintf out "@[<hv 2>Init_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Invalid_state (Truncated err) ->
-      Format.fprintf out "@[<hv 2>Invalid_state (%s)@]" err
-  | Wasm_pvm_errors.Unknown_error (Truncated err) ->
-      Format.fprintf out "@[<hv 2>Unknown_error (%s)@]" err
-  | Wasm_pvm_errors.Too_many_ticks ->
-      Format.fprintf out "@[<hv 2>Too_many_ticks@]"
-  | Wasm_pvm_errors.Too_many_reboots ->
-      Format.fprintf out "@[<hv 2>Too_many_reboots@]"
-
-let print_error_state = Format.asprintf "%a" pp_error_state
+let fallback_cause_check cause cause' =
+  match (cause, cause') with
+  | Wasm_pvm_errors.Decode_cause error, Wasm_pvm_errors.Decode_cause error'
+  | Init_cause error, Init_cause error' ->
+      Lwt.return_ok (check_interpreter_error error error')
+  | Link_cause error, Link_cause error' -> Lwt.return_ok (error = error')
+  | _, _ -> Lwt.return_ok false
 
 let error_state_check state state' =
-  let check_interpreter_error error error' =
-    error.Wasm_pvm_errors.raw_exception = error'.Wasm_pvm_errors.raw_exception
-    && error.explanation = error'.explanation
-  in
   match (state, state') with
   | Wasm_pvm_errors.Decode_error error, Wasm_pvm_errors.Decode_error error'
   | Init_error error, Init_error error'
@@ -294,6 +297,8 @@ let error_state_check state state' =
   | Unknown_error err, Unknown_error err' ->
       Lwt.return_ok (err = err')
   | Too_many_ticks, Too_many_ticks -> Lwt.return_ok true
+  | No_fallback_kernel cause, No_fallback_kernel cause' ->
+      fallback_cause_check cause cause'
   | _, _ -> Lwt.return_ok false
 
 let tests =
@@ -302,7 +307,7 @@ let tests =
       "Wasm_pvm_errors"
       `Quick
       (Test_encodings_util.make_test
-         ~print:print_error_state
+         ~print:Wasm_utils.print_error_state
          (Tezos_tree_encoding.value [] Wasm_pvm_errors.encoding)
          error_state_gen
          error_state_check);

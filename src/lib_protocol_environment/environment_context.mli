@@ -122,7 +122,10 @@ module Context : sig
   (** A cache is a block-dependent value: to know whether a cache can
      be reused or recycled in a given block, we need the block that
      produces it. *)
-  type block_cache = {context_hash : Context_hash.t; cache : cache}
+  type block_cache = {
+    context_hash : Tezos_crypto.Hashed.Context_hash.t;
+    cache : cache;
+  }
 
   (** During its loading, a cache can be populated in two different
      ways:
@@ -171,7 +174,7 @@ module Context : sig
           and the cache cannot be inherited (as in the next case).
 
       *)
-    | `Inherited of block_cache * Context_hash.t
+    | `Inherited of block_cache * Tezos_crypto.Hashed.Context_hash.t
       (** When we already have some [block_cache.cache] in memory coming
           from the validation of some block [block_cache.context_hash],
           we can reuse or recycle its entries to reconstruct a cache to
@@ -203,7 +206,11 @@ module Context : sig
      key. In other words, the construction of cache should be
      reproducible. For this reason, an error in [builder] is fatal. *)
   val load_cache :
-    Block_hash.t -> t -> source_of_cache -> builder -> t tzresult Lwt.t
+    Tezos_crypto.Hashed.Block_hash.t ->
+    t ->
+    source_of_cache ->
+    builder ->
+    t tzresult Lwt.t
 end
 
 module Register (C : S) : sig
@@ -225,9 +232,19 @@ type validation_result = {
 type quota = {max_size : int; max_op : int option}
 
 type rpc_context = {
-  block_hash : Block_hash.t;
+  block_hash : Tezos_crypto.Hashed.Block_hash.t;
   block_header : Block_header.shell_header;
   context : Context.t;
 }
+
+(** Type of semantics defining the context's hash present in a block
+    header. *)
+type header_context_hash_semantics =
+  | Resulting_context
+      (** The block header must contain the hash of the context
+          resulting of the block's application. *)
+  | Predecessor_resulting_context
+      (** The block header must contain the hash of the context
+          resulting of its predecessor block application. *)
 
 val err_implementation_mismatch : expected:string -> got:string -> 'a

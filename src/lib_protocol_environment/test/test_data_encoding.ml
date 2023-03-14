@@ -36,7 +36,7 @@ open Tezos_protocol_environment_structs.V8
 type t = {x : int; y : string Data_encoding.lazy_t}
 
 let test_unparsable_lazyexpr () =
-  let parsed_encoding = Data_encoding.(lazy_encoding (Fixed.string 3)) in
+  let parsed_encoding = Data_encoding.(lazy_encoding (Fixed.string Plain 3)) in
   let enc =
     let open Data_encoding in
     conv
@@ -61,7 +61,7 @@ let test_unparsable_lazyexpr () =
         ("y", `O [("unparsed-binary", `String "01020304")]);
       ]
   in
-  Lib_test.Assert.equal
+  Assert.equal
     ~pp:Data_encoding.Json.pp
     ~msg:"Constructed json is incorrect"
     ~loc:__LOC__
@@ -69,8 +69,14 @@ let test_unparsable_lazyexpr () =
     json ;
   Lwt.return_unit
 
-let tests =
-  [
-    Alcotest_lwt.test_case "unparsable_lazyexpr" `Quick (fun _ ->
-        test_unparsable_lazyexpr);
-  ]
+let () =
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       "proto-env-v8-data-encoding"
+       [
+         ( "lazy",
+           [
+             Alcotest_lwt.test_case "unparsable_lazyexpr" `Quick (fun _ ->
+                 test_unparsable_lazyexpr);
+           ] );
+       ]

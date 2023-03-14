@@ -27,7 +27,7 @@ else
   gitlab_package_url="https://${CI_SERVER_HOST}${web_path}"
 fi
 
-if [ "${CI_PROJECT_NAMESPACE}" = "${TEZOS_DEFAULT_NAMESPACE}" ]
+if [ "${CI_PROJECT_NAMESPACE}" = "tezos" ]
 then
   ## Production => Docker Hub
   docker_hub_path='tezos/tezos'

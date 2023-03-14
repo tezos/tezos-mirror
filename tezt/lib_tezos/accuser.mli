@@ -29,7 +29,7 @@
 type t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Create an accuser.
 
@@ -69,8 +69,13 @@ val name : t -> string
 (** Get the RPC port of the associated node. *)
 val node_rpc_port : t -> int
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** {2 Commands} *)
 

@@ -101,6 +101,11 @@ let remove_prefix ~prefix s =
   if n >= x && String.sub s 0 x = prefix then Some (String.sub s x (n - x))
   else None
 
+let remove_suffix ~suffix s =
+  let x = String.length suffix in
+  let n = String.length s in
+  if String.ends_with s ~suffix then Some (String.sub s 0 (n - x)) else None
+
 let common_prefix s1 s2 =
   let last = min (String.length s1) (String.length s2) in
   let rec loop i =

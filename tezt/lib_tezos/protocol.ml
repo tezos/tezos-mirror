@@ -25,29 +25,26 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Kathmandu | Lima | Alpha
+type t = Lima | Mumbai | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function
-  | Alpha -> "Alpha"
-  | Kathmandu -> "Kathmandu"
-  | Lima -> "Lima"
+let name = function Alpha -> "Alpha" | Lima -> "Lima" | Mumbai -> "Mumbai"
 
-let number = function Kathmandu -> 014 | Lima -> 015 | Alpha -> 016
+let number = function Lima -> 015 | Mumbai -> 016 | Alpha -> 017
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Kathmandu -> "proto_014_PtKathma"
   | Lima -> "proto_015_PtLimaPt"
+  | Mumbai -> "proto_016_PtMumbai"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Kathmandu -> "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
   | Lima -> "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
+  | Mumbai -> "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -79,12 +76,19 @@ let encoding_prefix = function
 type parameter_overrides =
   (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
+let default_bootstrap_accounts =
+  Array.to_list Account.Bootstrap.keys |> List.map @@ fun key -> (key, None)
+
 let write_parameter_file :
-    ?additional_bootstrap_accounts:(Account.key * int option) list ->
+    ?bootstrap_accounts:(Account.key * int option) list ->
+    ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
- fun ?(additional_bootstrap_accounts = []) ~base parameter_overrides ->
+ fun ?(bootstrap_accounts = default_bootstrap_accounts)
+     ?(additional_bootstrap_accounts = [])
+     ~base
+     parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
   let overriden_parameters = Temp.file "parameters.json" in
   let original_parameters =
@@ -95,6 +99,24 @@ let write_parameter_file :
         base
     in
     JSON.parse_file file |> JSON.unannotate
+  in
+  let parameter_overrides =
+    if List.mem_assoc ["bootstrap_accounts"] parameter_overrides then
+      parameter_overrides
+    else
+      let bootstrap_accounts =
+        List.map
+          (fun ((account : Account.key), default_balance) ->
+            `A
+              [
+                `String account.public_key;
+                `String
+                  (string_of_int
+                     (Option.value ~default:4000000000000 default_balance));
+              ])
+          bootstrap_accounts
+      in
+      (["bootstrap_accounts"], `A bootstrap_accounts) :: parameter_overrides
   in
   let parameters =
     List.fold_left
@@ -111,16 +133,18 @@ let write_parameter_file :
       parameter_overrides
   in
   let parameters =
-    let bootstrap_accounts = ["bootstrap_accounts"] in
+    let path = ["bootstrap_accounts"] in
     let existing_accounts =
-      Ezjsonm.get_list Fun.id (Ezjsonm.find parameters bootstrap_accounts)
+      Ezjsonm.get_list Fun.id (Ezjsonm.find parameters path)
     in
     let additional_bootstrap_accounts =
       List.map
-        (fun ((account : Account.key), default_balance) ->
+        (fun ((account : Account.key), default_balance, is_revealed) ->
           `A
             [
-              `String account.public_key_hash;
+              `String
+                (if is_revealed then account.public_key
+                else account.public_key_hash);
               `String
                 (string_of_int
                    (Option.value ~default:4000000000000 default_balance));
@@ -129,23 +153,23 @@ let write_parameter_file :
     in
     Ezjsonm.update
       parameters
-      bootstrap_accounts
+      path
       (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
   in
   JSON.encode_to_file_u overriden_parameters parameters ;
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Kathmandu -> Some Alpha
   | Lima -> Some Alpha
+  | Mumbai -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Kathmandu
-  | Lima -> Some Kathmandu
-  | Kathmandu -> None
+  | Alpha -> Some Lima
+  | Mumbai -> Some Lima
+  | Lima -> None
 
-let all = [Alpha; Kathmandu; Lima]
+let all = [Alpha; Lima; Mumbai]
 
 type supported_protocols =
   | Any_protocol

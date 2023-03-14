@@ -99,7 +99,7 @@ val call_contract :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   contract:Contract_hash.t ->
   action:action ->
   tez_amount:Tez.t ->
@@ -137,7 +137,7 @@ val inject_token_transfer_batch :
   sender:Contract.t ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   token_transfers:token_transfer list ->
   fee_parameter:Injection.fee_parameter ->
   ?counter:counter ->
@@ -155,7 +155,7 @@ val run_view_action :
   ?source:Contract.t ->
   contract:Contract_hash.t ->
   action:action ->
-  ?payer:Signature.public_key_hash ->
+  ?payer:Tezos_crypto.Signature.V0.public_key_hash ->
   ?gas:Gas.Arith.integral ->
   unparsing_mode:Script_ir_unparser.unparsing_mode ->
   unit ->

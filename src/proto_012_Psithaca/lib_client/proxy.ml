@@ -23,24 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module L = (val Tezos_proxy.Logger.logger ~protocol_name:Protocol.name
-              : Tezos_proxy.Logger.S)
-
-let proxy_block_header (rpc_context : RPC_context.generic)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) =
-  let rpc_context = new Protocol_client_context.wrap_rpc_context rpc_context in
-  L.emit
-    L.proxy_block_header
-    ( Tezos_shell_services.Block_services.chain_to_string chain,
-      Tezos_shell_services.Block_services.to_string block )
-  >>= fun () ->
-  Protocol_client_context.Alpha_block_services.header
-    rpc_context
-    ~chain
-    ~block
-    ()
-
 module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
   (** Split done only when the mode is [Tezos_proxy.Proxy.server]. Getting
       an entire big map at once is useful for dapp developers that
@@ -94,8 +76,8 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       (key : Tezos_protocol_environment.Proxy_context.M.key) =
     let chain = pgi.chain in
     let block = pgi.block in
-    L.emit
-      L.proxy_block_rpc
+    Tezos_proxy.Logger.emit
+      Tezos_proxy.Logger.proxy_block_rpc
       ( Tezos_shell_services.Block_services.chain_to_string chain,
         Tezos_shell_services.Block_services.to_string block,
         key )
@@ -107,7 +89,7 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       key
     >>=? fun (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context)
       ->
-    L.emit L.tree_received
+    Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
     @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
     >>= fun () -> return raw_context
 end
@@ -117,8 +99,8 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
     Tezos_protocol_environment.Context.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*! () =
-    L.emit
-      L.proxy_getter_created
+    Tezos_proxy.Logger.emit
+      Tezos_proxy.Logger.proxy_getter_created
       ( Tezos_shell_services.Block_services.chain_to_string ctx.chain,
         Tezos_shell_services.Block_services.to_string ctx.block )
   in
@@ -139,7 +121,7 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
   in
   Lwt_result.ok (Protocol.Main.init_cache ctxt)
 
-let round_durations (rpc_context : RPC_context.generic)
+let round_durations (rpc_context : Tezos_rpc.Context.generic)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
   let open Protocol in
@@ -148,19 +130,6 @@ let round_durations (rpc_context : RPC_context.generic)
   (* Return the duration of block 0 *)
   return_some
     (Alpha_context.Period.to_seconds constants.parametric.minimal_block_delay)
-
-let init_env_rpc_context (ctxt : Tezos_proxy.Proxy_getter.rpc_context_args) :
-    Tezos_protocol_environment.rpc_context tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* header = proxy_block_header ctxt.rpc_context ctxt.chain ctxt.block in
-  let block_hash = header.hash in
-  let* context = initial_context ctxt header.shell.context in
-  return
-    {
-      Tezos_protocol_environment.block_hash;
-      block_header = header.shell;
-      context;
-    }
 
 let () =
   let open Tezos_proxy.Registration in
@@ -171,9 +140,7 @@ let () =
 
     let directory = Plugin.RPC.rpc_services
 
-    let hash = Protocol_client_context.Alpha_block_services.hash
-
-    let init_env_rpc_context = init_env_rpc_context
+    let initial_context = initial_context
 
     let time_between_blocks = round_durations
 

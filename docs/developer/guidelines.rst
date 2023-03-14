@@ -1,12 +1,12 @@
 Coding guidelines
 =================
 
-This document provides guidelines that should be observed by all the contributors to the Tezos codebase. It first presents documentation guidelines, and then rules more specific to coding (e.g., logging levels, code formatting, naming conventions, etc.).
+This document provides guidelines that should be observed by all the contributors to the Octez codebase. It first presents documentation guidelines, and then rules more specific to coding (e.g., logging levels, code formatting, naming conventions, etc.).
 
 License
 -------
 
-The Tezos software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
+The Octez software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
 
 .. literalinclude:: LICENSE.ml
    :language: ocaml
@@ -150,7 +150,7 @@ README files
 ------------
 
 Also at the level of the library, you should include a ``README.md`` in `Markdown format <https://daringfireball.net/projects/markdown/>`_.
-Such files are mandatory in top-level directories of the Tezos codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
+Such files are mandatory in top-level directories of the Octez codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
 Because it is accessible only in the source tree, the file should contain information that might be of interest to the maintainers and contributors.
 
 You must instantiate the ``README.md`` file with the following template:
@@ -199,7 +199,7 @@ the template, and address any gap if needed.
 Logging Levels
 --------------
 
-The Tezos libraries use an logging library with 5 different verbosity `levels`
+The Octez libraries use a logging library with 5 different verbosity `levels`
 defined in ``src/lib_event_logging/internal_event.mli`` for shell and
 ``src/lib_protocol_environment/sigs/v3/logging.mli`` for protocol code.
 
@@ -620,6 +620,6 @@ Coding conventions
 ------------------
 
 Other than the guidelines above, there are currently no coding
-conventions enforced in the codebase. However, Tezos developers should be aware
+conventions enforced in the codebase. However, Octez developers should be aware
 of general `OCaml programming guidelines <https://caml.inria.fr/resources/doc/guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
 and more.

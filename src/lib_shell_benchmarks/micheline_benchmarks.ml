@@ -25,6 +25,10 @@
 
 open Tezos_micheline
 
+let ns = Namespace.make Shell_namespace.ns "micheline"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 (* An ad-hoc sampler for Micheline values. Boltzmann sampling would do well
    here. *)
 
@@ -124,7 +128,7 @@ let micheline_size (n : node) =
   micheline_size n {nodes = 0; bytes = 0}
 
 module Micheline_strip_locations : Benchmark.S = struct
-  let name = "strip_locations_micheline"
+  let name = ns "strip_locations_micheline"
 
   let info = "Benchmarking Micheline.strip_locations"
 
@@ -155,7 +159,7 @@ module Micheline_strip_locations : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
-            ~model:(linear ~coeff:(Free_variable.of_string "nodes"))) );
+            ~model:(linear ~coeff:(fv "nodes"))) );
     ]
 
   let create_benchmark rng_state () =

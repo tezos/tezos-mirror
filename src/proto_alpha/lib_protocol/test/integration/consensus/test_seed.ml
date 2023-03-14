@@ -92,7 +92,7 @@ let test_seed_no_commitment () =
       ()
   in
   let* b = check_seed b initial_seed in
-  let* _ = bake_and_check_seed b seeds in
+  let* (_ : Block.t) = bake_and_check_seed b seeds in
   return_unit
 
 (** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]
@@ -278,8 +278,6 @@ let test_revelation_missing_and_late () =
       | Nonce_storage.Too_late_revelation -> true
       | _ -> false)
 
-let wrap e = e >|= Environment.wrap_tzresult
-
 (** Test that we do not distribute endorsing rewards if the nonce was
     not revealed. *)
 let test_unrevealed () =
@@ -302,17 +300,12 @@ let test_unrevealed () =
   let blocks_per_commitment =
     Int32.to_int csts.parametric.blocks_per_commitment
   in
-  let bake_and_endorse_block ?policy (pred_b, b) =
+  let bake_and_endorse_block ?policy (_pred_b, b) =
     let* slots = Context.get_endorsers (B b) in
     let* endorsements =
       List.map_es
-        (fun {Plugin.RPC.Validators.delegate; slots; _} ->
-          Op.endorsement
-            ~delegate:(delegate, slots)
-            ~endorsed_block:b
-            (B pred_b)
-            ()
-          >>=? fun op -> Operation.pack op |> return)
+        (fun {Plugin.RPC.Validators.consensus_key; _} ->
+          Op.endorsement ~delegate:consensus_key b)
         slots
     in
     Block.bake ?policy ~operations:endorsements b
@@ -579,7 +572,8 @@ let test_cycle_bounds () =
           cycle
   in
   let cycle = root in
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b) >>=? fun _ ->
+  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  >>=? fun (_ : _ list) ->
   let future_cycle = add cycle (future_offset + 1) in
   Context.get_bakers ~cycle:future_cycle (B b) >>= fun res ->
   (* the first cycle is special *)
@@ -591,8 +585,9 @@ let test_cycle_bounds () =
   >>=? fun () ->
   Block.bake_until_cycle_end b >>=? fun b ->
   let cycle = add cycle 1 in
-  Context.get_bakers ~cycle:root (B b) >>=? fun _ ->
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b) >>=? fun _ ->
+  Context.get_bakers ~cycle:root (B b) >>=? fun (_ : _ list) ->
+  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  >>=? fun (_ : _ list) ->
   Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__
@@ -603,7 +598,7 @@ let test_cycle_bounds () =
   Block.bake_until_n_cycle_end past_offset b >>=? fun b ->
   let cycle = add cycle past_offset in
   Context.get_bakers ~cycle:(Stdlib.Option.get (sub cycle past_offset)) (B b)
-  >>=? fun _ ->
+  >>=? fun (_ : _ list) ->
   Context.get_bakers
     ~cycle:(Stdlib.Option.get (sub cycle (past_offset + 1)))
     (B b)
@@ -614,7 +609,8 @@ let test_cycle_bounds () =
     ~error_info_field:`Message
     (expected_error_message `Past cycle)
   >>=? fun () ->
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b) >>=? fun _ ->
+  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  >>=? fun (_ : _ list) ->
   Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__

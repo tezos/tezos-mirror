@@ -9,16 +9,18 @@
 usage () {
     cat >&2 <<!EOF
 usage:
-  $0 [<branch>]
+  $0 [<repo> <branch>]
 !EOF
 }
 
-if [ $# -eq 1 ]
+if [ $# -eq 2 ]
 then
-  BRANCH=$1
-elif [ $# -eq 0 ]
+  REPO=$1
+  BRANCH=$2
+elif [ $# -eq 0 ]  # don't remove this branch used for an example in the doc!
 then
   # [select branch]
+  REPO="tezos/tezos"
   BRANCH="latest-release"
   # [end]
 else
@@ -32,12 +34,11 @@ cd
 # [install prerequisites]
 sudo apt-get update
 sudo apt-get install -y sudo
-sudo apt-get install -y cargo # NV: to avoid error on compiling rust-conf
 export OPAMYES=true
 # [install packages]
 # [Temporary fix: removes tezos folder from PATH if added with Octez <= v13 instructions]
 PATH=${PATH##"$HOME"/tezos/:}
-sudo apt-get install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev g++ opam jq zlib1g-dev bc autoconf
+sudo apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
@@ -45,10 +46,10 @@ chmod +x rustup-init.sh
 # [source cargo]
 . $HOME/.cargo/env
 # [get sources]
-git clone https://gitlab.com/tezos/tezos.git
+git clone https://gitlab.com/"$REPO".git tezos
 cd tezos
 git checkout $BRANCH
-# [install Tezos dependencies]
+# [install Octez dependencies]
 opam init --bare
 make build-deps
 # [compile sources]
@@ -62,7 +63,7 @@ make
 # removes Mainnet/testnet disclaimers:
 # export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 # [test executables]
-./tezos-client --version
-./tezos-node --version
-./tezos-baker-alpha --version
-./tezos-accuser-alpha --version
+./octez-client --version
+./octez-node --version
+./octez-baker-alpha --version
+./octez-accuser-alpha --version

@@ -38,13 +38,11 @@ type output_info = {
   message_index : Z.t;  (** The index of the message in the outbox. *)
 }
 
-type input_hash = Tezos_webassembly_interpreter.Reveal.input_hash
+type reveal_hash = string
 
-let input_hash_to_string =
-  Tezos_webassembly_interpreter.Reveal.input_hash_to_string
-
-type reveal = Tezos_webassembly_interpreter.Reveal.reveal =
-  | Reveal_raw_data of Tezos_webassembly_interpreter.Reveal.input_hash
+type reveal = Tezos_webassembly_interpreter.Host_funcs.reveal =
+  | Reveal_raw_data of reveal_hash
+  | Reveal_metadata
 
 (** Represents the state of input requests. *)
 type input_request =
@@ -65,7 +63,27 @@ type info = {
 (** This module type defines the state for the PVM.
     For use in lib_scoru_wasm only. *)
 module Internal_state = struct
+  (** General state of the PVM
+
+    The following describes the general state transitions.
+
+    {[
+      stateDiagram
+      Collect --> Padding
+      Snapshot --> Evaluation
+      state Evaluation {
+        Decode --> Link
+        Link --> Init
+        Init --> Eval
+      }
+      Evaluation --> Padding : evaluation succeeded
+      Padding --> Snapshot : reboot flag is set
+      Padding --> Collect : reboot flag is not set
+      Evaluation --> Stuck : something went wrong
+    ]}
+  *)
   type tick_state =
+    | Snapshot
     | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
     | Link of {
         ast_module : Tezos_webassembly_interpreter.Ast.module_;
@@ -80,9 +98,19 @@ module Internal_state = struct
         init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
         module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
       }
-    | Eval of Tezos_webassembly_interpreter.Eval.config
+    | Eval of {
+        config : Tezos_webassembly_interpreter.Eval.config;
+        module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
+      }
+    | Collect
     | Stuck of Wasm_pvm_errors.t
-    | Snapshot
+    | Padding
+
+  type output_buffer_parameters = {
+    validity_period : int32;
+        (** Number of levels an outbox is kept before being cleaned-up. *)
+    message_limit : Z.t;  (** Maximum number of messages per inbox *)
+  }
 
   type pvm_state = {
     last_input_info : input_info option;  (** Info about last read input. *)
@@ -97,5 +125,14 @@ module Internal_state = struct
     max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
     maximum_reboots_per_input : Z.t;
         (** Number of reboots between two inputs. *)
+    output_buffer_parameters : output_buffer_parameters;
+        (** Outbox paramaters defined by the protocol. *)
   }
+
+  type computation_status =
+    | Yielding
+    | Forcing_yield
+    | Running
+    | Failing
+    | Reboot
 end

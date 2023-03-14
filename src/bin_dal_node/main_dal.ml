@@ -23,11 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group = {Clic.name = "dal-node"; title = "Commands related to the DAL node"}
+let group =
+  {Tezos_clic.name = "dal-node"; title = "Commands related to the DAL node"}
 
 let data_dir_arg =
   let default = Configuration.default_data_dir in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"data-dir"
     ~placeholder:"data-dir"
     ~doc:
@@ -39,7 +40,7 @@ let data_dir_arg =
 
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"rpc-addr"
     ~placeholder:"rpc-address|ip"
     ~doc:
@@ -50,13 +51,18 @@ let rpc_addr_arg =
     (Client_config.string_parameter ())
 
 let int_parameter =
-  let open Clic in
+  let open Tezos_clic in
   parameter (fun _ p ->
-      try Lwt.return_ok (int_of_string p) with _ -> failwith "Cannot read int")
+      let open Lwt_result_syntax in
+      let* i =
+        try Lwt.return_ok (int_of_string p)
+        with _ -> failwith "Cannot read int"
+      in
+      if i < 0 then failwith "Parameter must be non-negative" else return i)
 
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"rpc-port"
     ~placeholder:"rpc-port"
     ~doc:
@@ -67,7 +73,7 @@ let rpc_port_arg =
     int_parameter
 
 let use_unsafe_srs_for_tests_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"use-unsafe-srs-for-tests"
     ~doc:
       (Format.sprintf
@@ -76,7 +82,7 @@ let use_unsafe_srs_for_tests_arg =
 
 let config_init_command =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Configure DAL node."
@@ -84,15 +90,125 @@ let config_init_command =
     (prefixes ["init-config"] stop)
     (fun (data_dir, rpc_addr, rpc_port, use_unsafe_srs) cctxt ->
       let open Configuration in
-      let config = {data_dir; rpc_addr; rpc_port; use_unsafe_srs} in
+      let config =
+        {
+          data_dir;
+          rpc_addr;
+          rpc_port;
+          use_unsafe_srs;
+          neighbors = [];
+          dac = default_dac;
+        }
+      in
       let* () = save config in
       let*! _ =
         cctxt#message "DAL node configuration written in %s" (filename config)
       in
       return ())
 
+(* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4125
+   Move the following commands to a dac node once we have one. *)
+module Dac_client = struct
+  let reveal_data_dir_arg =
+    Tezos_clic.arg
+      ~long:"reveal-data-dir"
+      ~placeholder:"reveal-data-dir"
+      ~doc:"The directory where reveal preimage pages are saved."
+      (Client_config.string_parameter ())
+
+  let threshold_arg =
+    Tezos_clic.arg
+      ~long:"threshold"
+      ~placeholder:"threshold"
+      ~doc:
+        "The number of signatures needed from the Data Availability Committee \
+         members to validate reveal data.)"
+      int_parameter
+
+  let tz4_address_parameter () =
+    Tezos_clic.parameter (fun _cctxt s ->
+        let open Lwt_result_syntax in
+        let*? bls_pkh = Signature.Bls.Public_key_hash.of_b58check s in
+        let pkh : Tezos_crypto.Aggregate_signature.public_key_hash =
+          Tezos_crypto.Aggregate_signature.Bls12_381 bls_pkh
+        in
+        return pkh)
+
+  let tz4_address_param ?(name = "public key hash")
+      ?(desc = "bls public key hash to use") =
+    let desc = String.concat "\n" [desc; "A tz4 address"] in
+    Tezos_clic.param ~name ~desc (tz4_address_parameter ())
+
+  (** Add an account alias as a member of the Data availability Committee in the
+    configuration of the Dal node. *)
+  let add_dac_alias_command =
+    let open Lwt_result_syntax in
+    let open Tezos_clic in
+    command
+      ~group
+      ~desc:"Add an account alias as Data Availability Committee member"
+      (args1 data_dir_arg)
+      (prefixes ["add"; "data"; "availability"; "committee"; "member"]
+      @@ tz4_address_param @@ stop)
+      (fun data_dir address cctxt ->
+        let open Configuration in
+        let* config = load ~data_dir in
+        let old_addresses = config.dac.addresses in
+        if
+          List.mem
+            ~equal:Tezos_crypto.Aggregate_signature.Public_key_hash.equal
+            address
+            old_addresses
+        then
+          let*! _ =
+            cctxt#message
+              "Alias is already listed as a DAC member %s"
+              (filename config)
+          in
+          return_unit
+        else
+          let addresses = old_addresses @ [address] in
+          let dac = {config.dac with addresses} in
+          let* () = save {config with dac} in
+          let*! _ =
+            cctxt#message
+              "DAC address added to configuration in %s"
+              (filename config)
+          in
+          return_unit)
+
+  (* DAC/TODO: https://gitlab.com/tezos/tezos/-/issues/4136
+     Add option to specify a list of addresses from a file. *)
+  let set_parameters_command =
+    let open Lwt_result_syntax in
+    let open Tezos_clic in
+    command
+      ~group
+      ~desc:"Configure DAC parameters."
+      (args3 data_dir_arg threshold_arg reveal_data_dir_arg)
+      (prefixes ["set"; "dac"; "parameters"] stop)
+      (fun (data_dir, threshold, reveal_data_dir) cctxt ->
+        let open Configuration in
+        let* config = load ~data_dir in
+        let threshold = Option.value threshold ~default:config.dac.threshold in
+        let reveal_data_dir =
+          Option.value reveal_data_dir ~default:config.dac.reveal_data_dir
+        in
+        let dac = {config.dac with threshold; reveal_data_dir} in
+        let config = {config with dac} in
+        let* () = save config in
+        let*! _ =
+          cctxt#message
+            "DAC parameters set for configuration in %s"
+            (filename config)
+        in
+        return ())
+
+  let commands = [add_dac_alias_command; set_parameters_command]
+end
+
 let run_command =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Run the DAL node."
@@ -100,7 +216,7 @@ let run_command =
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
 
-let commands () = [run_command; config_init_command]
+let commands () = [run_command; config_init_command] @ Dac_client.commands
 
 let select_commands _ _ =
   let open Lwt_result_syntax in

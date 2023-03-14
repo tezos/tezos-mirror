@@ -2,13 +2,15 @@
  (names rpc_doc
         p2p_doc)
  (libraries tezos-base
+            tezos-rpc
             tezos-stdlib-unix
             tezos-shell
             tezos-rpc-http-server
             tezos-protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
-            tezos-embedded-protocol-014-PtKathma
+            tezos-embedded-protocol-genesis
             tezos-embedded-protocol-015-PtLimaPt
+            tezos-embedded-protocol-016-PtMumbai
             tezos-embedded-protocol-alpha
             data-encoding
             re)
@@ -17,4 +19,5 @@
                    -open Tezos_shell
                    -open Tezos_store
                    -open Tezos_protocol_updater
-                   -linkall)))
+                   -linkall
+                   (:include %{workspace_root}/macos-link-flags.sexp))))

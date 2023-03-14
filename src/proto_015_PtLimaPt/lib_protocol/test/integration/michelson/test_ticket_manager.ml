@@ -46,7 +46,7 @@ let wrap m = m >|= Environment.wrap_tzresult
 
 type init_env = {
   block : Block.t;
-  baker : Signature.public_key_hash;
+  baker : Tezos_crypto.Signature.V0.public_key_hash;
   contract : Contract.t;
 }
 

@@ -74,9 +74,9 @@ val write_bytes :
   Bytes.t ->
   unit Lwt.t
 
-(** [is_directory path] tests if the given [path] refers to a
-   directory (file kind is [S_DIR]). Returns [false] if [path] refers
-   to a symbolic link. *)
+(** [is_directory path] tests if the given [path] (or the target of
+    the symbolic link located at [path]) refers to a directory (file
+    kind is [S_DIR]). *)
 val is_directory : string -> bool Lwt.t
 
 val remove_dir : string -> unit Lwt.t
@@ -136,6 +136,10 @@ type 'action io_error = {
   arg : string;  (** Argument given to the unix function: generally a path. *)
 }
 
+type error += Io_error of [`Close | `Open | `Rename] io_error
+
+val tzfail_of_io_error : [`Close | `Open | `Rename] io_error -> 'b tzresult
+
 (** [with_open_file ~flags ~perm filename f] opens the given file
    using {!Lwt_unix.open_file} and passes the resulting file-descriptor
    to [f]. [with_open_file] ensures that the file-descriptor is closed
@@ -169,7 +173,7 @@ val with_open_out :
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
   ('a, [`Open | `Close] io_error) result Lwt.t
 
-(** [with_atomic_open_out ?overwrite filename ?temp_dir f] is a
+(** [with_atomic_open_out ?(overwrite=true) filename ?temp_dir f] is a
    wrapper around [with_open_out] were it ensures that the data are
    written onto [filename] in an atomic way.
 
@@ -197,4 +201,4 @@ val with_atomic_open_out :
 val with_open_in :
   string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
-  ('a, [`Open | `Close] io_error) result Lwt.t
+  ('a, [> `Open | `Close] io_error) result Lwt.t

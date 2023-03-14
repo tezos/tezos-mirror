@@ -24,20 +24,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type Base58.data += Encrypted_ed25519 of Bytes.t
+type Tezos_crypto.Base58.data += Encrypted_ed25519 of Bytes.t
 
-type Base58.data += Encrypted_secp256k1 of Bytes.t
+type Tezos_crypto.Base58.data += Encrypted_secp256k1 of Bytes.t
 
-type Base58.data += Encrypted_p256 of Bytes.t
+type Tezos_crypto.Base58.data += Encrypted_p256 of Bytes.t
 
-type Base58.data += Encrypted_secp256k1_element of Bytes.t
+type Tezos_crypto.Base58.data += Encrypted_secp256k1_element of Bytes.t
 
-type Base58.data += Encrypted_bls12_381 of Bytes.t
+type Tezos_crypto.Base58.data += Encrypted_bls12_381 of Bytes.t
 
 type encrypted_sk = Encrypted_aggregate_sk | Encrypted_sk of Signature.algo
 
 type decrypted_sk =
-  | Decrypted_aggregate_sk of Aggregate_signature.Secret_key.t
+  | Decrypted_aggregate_sk of Tezos_crypto.Aggregate_signature.Secret_key.t
   | Decrypted_sk of Signature.Secret_key.t
 
 open Client_keys
@@ -51,42 +51,56 @@ module Raw = struct
   let salt_len = 8
 
   (* Fixed zero nonce *)
-  let nonce = Crypto_box.zero_nonce
+  let nonce = Tezos_crypto.Crypto_box.zero_nonce
 
   (* Secret keys for Ed25519, secp256k1, P256 have the same size. *)
-  let encrypted_size = Crypto_box.tag_length + Hacl.Ed25519.sk_size
+  let encrypted_size =
+    Tezos_crypto.Crypto_box.tag_length + Tezos_crypto.Hacl.Ed25519.sk_size
 
   let pbkdf ~salt ~password =
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
 
   let encrypt ~password sk =
-    let salt = Hacl.Rand.gen salt_len in
-    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    let salt = Tezos_crypto.Hacl.Rand.gen salt_len in
+    let key =
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password)
+    in
     let msg =
       match (sk : decrypted_sk) with
       | Decrypted_sk (Ed25519 sk) ->
-          Data_encoding.Binary.to_bytes_exn Ed25519.Secret_key.encoding sk
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Ed25519.Secret_key.encoding
+            sk
       | Decrypted_sk (Secp256k1 sk) ->
-          Data_encoding.Binary.to_bytes_exn Secp256k1.Secret_key.encoding sk
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Secp256k1.Secret_key.encoding
+            sk
       | Decrypted_sk (P256 sk) ->
-          Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
-      | Decrypted_aggregate_sk (Bls12_381 sk) ->
-          Data_encoding.Binary.to_bytes_exn Bls.Secret_key.encoding sk
+          Data_encoding.Binary.to_bytes_exn
+            Signature.P256.Secret_key.encoding
+            sk
+      | Decrypted_sk (Bls sk) | Decrypted_aggregate_sk (Bls12_381 sk) ->
+          Data_encoding.Binary.to_bytes_exn Signature.Bls.Secret_key.encoding sk
     in
-    Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
+    Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
 
   let decrypt algo ~password ~encrypted_sk =
     let open Lwt_result_syntax in
     let salt = Bytes.sub encrypted_sk 0 salt_len in
     let encrypted_sk = Bytes.sub encrypted_sk salt_len encrypted_size in
-    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    let key =
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password)
+    in
     match
-      (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce, algo)
+      ( Tezos_crypto.Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce,
+        algo )
     with
     | None, _ -> return_none
     | Some bytes, Encrypted_sk Signature.Ed25519 -> (
         match
-          Data_encoding.Binary.of_bytes_opt Ed25519.Secret_key.encoding bytes
+          Data_encoding.Binary.of_bytes_opt
+            Signature.Ed25519.Secret_key.encoding
+            bytes
         with
         | Some sk ->
             return_some (Decrypted_sk (Ed25519 sk : Signature.Secret_key.t))
@@ -96,7 +110,9 @@ module Raw = struct
                key")
     | Some bytes, Encrypted_sk Signature.Secp256k1 -> (
         match
-          Data_encoding.Binary.of_bytes_opt Secp256k1.Secret_key.encoding bytes
+          Data_encoding.Binary.of_bytes_opt
+            Signature.Secp256k1.Secret_key.encoding
+            bytes
         with
         | Some sk ->
             return_some (Decrypted_sk (Secp256k1 sk : Signature.Secret_key.t))
@@ -106,21 +122,25 @@ module Raw = struct
                secret key")
     | Some bytes, Encrypted_sk Signature.P256 -> (
         match
-          Data_encoding.Binary.of_bytes_opt P256.Secret_key.encoding bytes
+          Data_encoding.Binary.of_bytes_opt
+            Signature.P256.Secret_key.encoding
+            bytes
         with
         | Some sk ->
             return_some (Decrypted_sk (P256 sk : Signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid P256 secret key")
-    | Some bytes, Encrypted_aggregate_sk -> (
+    | Some bytes, (Encrypted_aggregate_sk | Encrypted_sk Signature.Bls) -> (
         match
-          Data_encoding.Binary.of_bytes_opt Bls.Secret_key.encoding bytes
+          Data_encoding.Binary.of_bytes_opt
+            Signature.Bls.Secret_key.encoding
+            bytes
         with
         | Some sk ->
             return_some
               (Decrypted_aggregate_sk
-                 (Bls12_381 sk : Aggregate_signature.Secret_key.t))
+                 (Bls12_381 sk : Tezos_crypto.Aggregate_signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid BLS12_381 \
@@ -129,9 +149,12 @@ end
 
 module Encodings = struct
   let ed25519 =
-    let length = Hacl.Ed25519.sk_size + Crypto_box.tag_length + Raw.salt_len in
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.ed25519_encrypted_seed
+    let length =
+      Tezos_crypto.Hacl.Ed25519.sk_size + Tezos_crypto.Crypto_box.tag_length
+      + Raw.salt_len
+    in
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.ed25519_encrypted_seed
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
@@ -140,9 +163,11 @@ module Encodings = struct
 
   let secp256k1 =
     let open Libsecp256k1.External in
-    let length = Key.secret_bytes + Crypto_box.tag_length + Raw.salt_len in
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.secp256k1_encrypted_secret_key
+    let length =
+      Key.secret_bytes + Tezos_crypto.Crypto_box.tag_length + Raw.salt_len
+    in
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.secp256k1_encrypted_secret_key
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
@@ -150,9 +175,12 @@ module Encodings = struct
       ~wrap:(fun sk -> Encrypted_secp256k1 sk)
 
   let p256 =
-    let length = Hacl.P256.sk_size + Crypto_box.tag_length + Raw.salt_len in
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.p256_encrypted_secret_key
+    let length =
+      Tezos_crypto.Hacl.P256.sk_size + Tezos_crypto.Crypto_box.tag_length
+      + Raw.salt_len
+    in
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.p256_encrypted_secret_key
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
@@ -162,11 +190,11 @@ module Encodings = struct
   let bls12_381 =
     let length =
       (* 32 + 16 + 8 = 56 *)
-      Bls12_381_signature.sk_size_in_bytes + Crypto_box.tag_length
+      Bls12_381_signature.sk_size_in_bytes + Tezos_crypto.Crypto_box.tag_length
       + Raw.salt_len
     in
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.bls12_381_encrypted_secret_key
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.bls12_381_encrypted_secret_key
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
@@ -174,9 +202,9 @@ module Encodings = struct
       ~wrap:(fun sk -> Encrypted_bls12_381 sk)
 
   let secp256k1_scalar =
-    let length = 36 + Crypto_box.tag_length + Raw.salt_len in
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.secp256k1_encrypted_scalar
+    let length = 36 + Tezos_crypto.Crypto_box.tag_length + Raw.salt_len in
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.secp256k1_encrypted_scalar
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
@@ -184,11 +212,11 @@ module Encodings = struct
       ~wrap:(fun sk -> Encrypted_secp256k1_element sk)
 
   let () =
-    Base58.check_encoded_prefix ed25519 "edesk" 88 ;
-    Base58.check_encoded_prefix secp256k1 "spesk" 88 ;
-    Base58.check_encoded_prefix p256 "p2esk" 88 ;
-    Base58.check_encoded_prefix bls12_381 "BLesk" 88 ;
-    Base58.check_encoded_prefix secp256k1_scalar "seesk" 93
+    Tezos_crypto.Base58.check_encoded_prefix ed25519 "edesk" 88 ;
+    Tezos_crypto.Base58.check_encoded_prefix secp256k1 "spesk" 88 ;
+    Tezos_crypto.Base58.check_encoded_prefix p256 "p2esk" 88 ;
+    Tezos_crypto.Base58.check_encoded_prefix bls12_381 "BLesk" 88 ;
+    Tezos_crypto.Base58.check_encoded_prefix secp256k1_scalar "seesk" 93
 end
 
 (* we cache the password in this list to avoid
@@ -264,7 +292,7 @@ let rec noninteractive_decrypt_loop algo ~encrypted_sk =
 let decrypt_payload cctxt ?name encrypted_sk =
   let open Lwt_result_syntax in
   let* algo, encrypted_sk =
-    match Base58.decode encrypted_sk with
+    match Tezos_crypto.Base58.decode encrypted_sk with
     | Some (Encrypted_ed25519 encrypted_sk) ->
         return (Encrypted_sk Signature.Ed25519, encrypted_sk)
     | Some (Encrypted_secp256k1 encrypted_sk) ->
@@ -362,9 +390,10 @@ let common_encrypt sk password =
     | Decrypted_sk (Ed25519 _) -> Encodings.ed25519
     | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
     | Decrypted_sk (P256 _) -> Encodings.p256
-    | Decrypted_aggregate_sk (Bls12_381 _) -> Encodings.bls12_381
+    | Decrypted_sk (Bls _) | Decrypted_aggregate_sk (Bls12_381 _) ->
+        Encodings.bls12_381
   in
-  Base58.simple_encode encoding payload
+  Tezos_crypto.Base58.simple_encode encoding payload
 
 let internal_encrypt_simple sk password =
   let open Lwt_result_syntax in
@@ -400,33 +429,40 @@ module Sapling_raw = struct
   let salt_len = 8
 
   (* 193 *)
-  let encrypted_size = Crypto_box.tag_length + salt_len + 169
+  let encrypted_size = Tezos_crypto.Crypto_box.tag_length + salt_len + 169
 
-  let nonce = Crypto_box.zero_nonce
+  let nonce = Tezos_crypto.Crypto_box.zero_nonce
 
   let pbkdf ~salt ~password =
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
 
   let encrypt ~password msg =
     let msg = Tezos_sapling.Core.Wallet.Spending_key.to_bytes msg in
-    let salt = Hacl.Rand.gen salt_len in
-    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
-    Bytes.(to_string (cat salt (Crypto_box.Secretbox.secretbox key msg nonce)))
+    let salt = Tezos_crypto.Hacl.Rand.gen salt_len in
+    let key =
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password)
+    in
+    Bytes.(
+      to_string
+        (cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)))
 
   let decrypt ~password payload =
     let ebytes = Bytes.of_string payload in
     let salt = Bytes.sub ebytes 0 salt_len in
     let encrypted_sk = Bytes.sub ebytes salt_len (encrypted_size - salt_len) in
-    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    let key =
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password)
+    in
     Option.bind
-      (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce)
+      (Tezos_crypto.Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce)
       Tezos_sapling.Core.Wallet.Spending_key.of_bytes
 
-  type Base58.data += Data of Tezos_sapling.Core.Wallet.Spending_key.t
+  type Tezos_crypto.Base58.data +=
+    | Data of Tezos_sapling.Core.Wallet.Spending_key.t
 
   let encrypted_b58_encoding password =
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.sapling_spending_key
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.sapling_spending_key
       ~length:encrypted_size
       ~to_raw:(encrypt ~password)
       ~of_raw:(decrypt ~password)
@@ -437,7 +473,9 @@ let encrypt_sapling_key cctxt sk =
   let open Lwt_result_syntax in
   let* password = read_password cctxt in
   let path =
-    Base58.simple_encode (Sapling_raw.encrypted_b58_encoding password) sk
+    Tezos_crypto.Base58.simple_encode
+      (Sapling_raw.encrypted_b58_encoding password)
+      sk
   in
   let*? v = Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()) in
   return v
@@ -451,7 +489,9 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
       cctxt#prompt_password "Enter password to decrypt your key: "
     in
     match
-      Base58.simple_decode (Sapling_raw.encrypted_b58_encoding password) payload
+      Tezos_crypto.Base58.simple_decode
+        (Sapling_raw.encrypted_b58_encoding password)
+        payload
     with
     | None ->
         failwith
@@ -460,7 +500,7 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
     | Some sapling_key -> return sapling_key
   else
     match
-      Base58.simple_decode
+      Tezos_crypto.Base58.simple_decode
         Tezos_sapling.Core.Wallet.Spending_key.b58check_encoding
         payload
     with
@@ -481,10 +521,11 @@ struct
     "Valid secret key URIs are of the form\n\
     \ - encrypted:<encrypted_key>\n\
      where <encrypted_key> is the encrypted (password protected using Nacl's \
-     cryptobox and pbkdf) secret key, formatted in unprefixed Base58.\n\
+     cryptobox and pbkdf) secret key, formatted in unprefixed \
+     Tezos_crypto.Base58.\n\
      Valid public key URIs are of the form\n\
     \ - encrypted:<public_key>\n\
-     where <public_key> is the public key in Base58."
+     where <public_key> is the public key in Tezos_crypto.Base58."
 
   include Client_keys.Signature_type
 
@@ -530,10 +571,11 @@ struct
     "Valid aggregate secret key URIs are of the form\n\
     \ - aggregate_encrypted:<encrypted_aggregate_key>\n\
      where <encrypted_key> is the encrypted (password protected using Nacl's \
-     cryptobox and pbkdf) secret key, formatted in unprefixed Base58.\n\
+     cryptobox and pbkdf) secret key, formatted in unprefixed \
+     Tezos_crypto.Base58.\n\
      Valid aggregate public key URIs are of the form\n\
     \ - aggregate_encrypted:<public_aggregate_key>\n\
-     where <public_aggregate_key> is the public key in Base58."
+     where <public_aggregate_key> is the public key in Tezos_crypto.Base58."
 
   include Client_keys.Aggregate_type
 
@@ -548,12 +590,12 @@ struct
     let* sk = decrypt_aggregate C.cctxt sk_uri in
     let*? v =
       Unencrypted.Aggregate.make_pk
-        (Aggregate_signature.Secret_key.to_public_key sk)
+        (Tezos_crypto.Aggregate_signature.Secret_key.to_public_key sk)
     in
     return v
 
   let sign sk_uri buf =
     let open Lwt_result_syntax in
     let* sk = decrypt_aggregate C.cctxt sk_uri in
-    return (Aggregate_signature.sign sk buf)
+    return (Tezos_crypto.Aggregate_signature.sign sk buf)
 end

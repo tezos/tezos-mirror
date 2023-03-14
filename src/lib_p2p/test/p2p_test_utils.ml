@@ -111,7 +111,7 @@ let close_active_conns pool =
 
 let canceler = Lwt_canceler.create () (* unused *)
 
-let proof_of_work_target = Crypto_box.make_pow_target 1.
+let proof_of_work_target = Tezos_crypto.Crypto_box.make_pow_target 1.
 
 let id1 = P2p_identity.generate proof_of_work_target
 
@@ -133,6 +133,8 @@ let conn_meta_config : unit P2p_params.conn_meta_config =
     conn_meta_value = (fun () -> ());
     private_node = (fun _ -> false);
   }
+
+let glob_port = ref None
 
 let rec listen ?port addr =
   let open Lwt_syntax in
@@ -166,9 +168,18 @@ let sync_nodes nodes =
   | Ok () | Error (Exn End_of_file :: _) -> return_unit
   | Error _ as err -> Lwt.return err
 
-let run_nodes client server =
+let run_nodes ?port client server =
   let open Lwt_result_syntax in
-  let*! main_socket, port = listen !addr in
+  let p =
+    match port with
+    | None ->
+        glob_port := None ;
+        None
+    | Some p ->
+        glob_port := Some (p + 1) ;
+        Some p
+  in
+  let*! main_socket, p = listen ?port:p !addr in
   let* server_node =
     Process.detach ~prefix:"server: " (fun channel ->
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
@@ -187,7 +198,7 @@ let run_nodes client server =
           | Ok () -> Lwt.return_unit
         in
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-        let* () = client channel sched !addr port in
+        let* () = client channel sched !addr p in
         let*! () = P2p_io_scheduler.shutdown sched in
         return_unit)
   in

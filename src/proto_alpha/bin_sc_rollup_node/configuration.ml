@@ -42,22 +42,33 @@ type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 
+type batcher = {
+  simulate : bool;
+  min_batch_elements : int;
+  min_batch_size : int;
+  max_batch_elements : int;
+  max_batch_size : int;
+}
+
 type t = {
-  data_dir : string;
   sc_rollup_address : Sc_rollup.t;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
+  metrics_addr : string option;
   reconnection_delay : float;
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   dal_node_addr : string;
   dal_node_port : int;
+  batcher : batcher;
+  injector_retention_period : int;
+  l2_blocks_cache_size : int;
 }
 
 let default_data_dir =
-  Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-node"
+  Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node"
 
 let storage_dir = "storage"
 
@@ -67,13 +78,13 @@ let default_storage_dir data_dir = Filename.concat data_dir storage_dir
 
 let default_context_dir data_dir = Filename.concat data_dir context_dir
 
-let relative_filename data_dir = Filename.concat data_dir "config.json"
-
-let filename config = relative_filename config.data_dir
+let config_filename ~data_dir = Filename.concat data_dir "config.json"
 
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8932
+
+let default_metrics_port = 9933
 
 let default_reconnection_delay = 2.0 (* seconds *)
 
@@ -160,6 +171,62 @@ let default_fee_parameters =
       Operator_purpose_map.add purpose (default_fee_parameter ~purpose ()) acc)
     Operator_purpose_map.empty
     purposes
+
+let default_batcher_simulate = true
+
+let default_batcher_min_batch_elements = 10
+
+let default_batcher_min_batch_size = 10
+
+let default_batcher_max_batch_elements = max_int
+
+let protocol_max_batch_size =
+  let empty_message_op : _ Operation.t =
+    let open Protocol in
+    let open Alpha_context in
+    let open Operation in
+    {
+      shell = {branch = Block_hash.zero};
+      protocol_data =
+        {
+          signature = Some Signature.zero;
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source = Signature.Public_key_hash.zero;
+                   fee = Tez.of_mutez_exn Int64.max_int;
+                   counter = Manager_counter.Internal_for_tests.of_int max_int;
+                   gas_limit =
+                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
+                   storage_limit = Z.of_int max_int;
+                   operation = Sc_rollup_add_messages {messages = [""]};
+                 });
+        };
+    }
+  in
+  Protocol.Constants_repr.max_operation_data_length
+  - Data_encoding.Binary.length
+      Operation.encoding
+      (Operation.pack empty_message_op)
+
+let default_batcher_max_batch_size = protocol_max_batch_size
+
+let default_batcher =
+  {
+    simulate = default_batcher_simulate;
+    min_batch_elements = default_batcher_min_batch_elements;
+    min_batch_size = default_batcher_min_batch_size;
+    max_batch_elements = default_batcher_max_batch_elements;
+    max_batch_size = default_batcher_max_batch_size;
+  }
+
+let max_injector_retention_period =
+  5 * 8192 (* Preserved cycles (5) for mainnet *)
+
+let default_injector_retention_period = 2048
+
+let default_l2_blocks_cache_size = 64
 
 let string_of_purpose = function
   | Publish -> "publish"
@@ -361,74 +428,136 @@ let mode_encoding =
       ("custom", Custom);
     ]
 
+let batcher_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (fun {
+           simulate;
+           min_batch_elements;
+           min_batch_size;
+           max_batch_elements;
+           max_batch_size;
+         } ->
+      ( simulate,
+        min_batch_elements,
+        min_batch_size,
+        max_batch_elements,
+        max_batch_size ))
+    (fun ( simulate,
+           min_batch_elements,
+           min_batch_size,
+           max_batch_elements,
+           max_batch_size ) ->
+      if max_batch_size > protocol_max_batch_size then
+        Error
+          (Format.sprintf
+             "max_batch_size must be smaller than %d"
+             protocol_max_batch_size)
+      else if min_batch_size <= 0 then Error "min_batch_size must be positive"
+      else if max_batch_size < min_batch_size then
+        Error "max_batch_size must be greater than min_batch_size"
+      else if min_batch_elements <= 0 then
+        Error "min_batch_elements must be positive"
+      else if max_batch_elements < min_batch_elements then
+        Error "max_batch_elements must be greater than min_batch_elements"
+      else
+        Ok
+          {
+            simulate;
+            min_batch_elements;
+            min_batch_size;
+            max_batch_elements;
+            max_batch_size;
+          })
+  @@ obj5
+       (dft "simulate" bool default_batcher_simulate)
+       (dft "min_batch_elements" int31 default_batcher_min_batch_elements)
+       (dft "min_batch_size" int31 default_batcher_min_batch_size)
+       (dft "max_batch_elements" int31 default_batcher_max_batch_elements)
+       (dft "max_batch_size" int31 default_batcher_max_batch_size)
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {
-           data_dir;
            sc_rollup_address;
            sc_rollup_node_operators;
            rpc_addr;
            rpc_port;
+           metrics_addr;
            reconnection_delay;
            fee_parameters;
            mode;
            loser_mode;
            dal_node_addr;
            dal_node_port;
+           batcher;
+           injector_retention_period;
+           l2_blocks_cache_size;
          } ->
-      ( ( data_dir,
-          sc_rollup_address,
+      ( ( sc_rollup_address,
           sc_rollup_node_operators,
           rpc_addr,
           rpc_port,
+          metrics_addr,
           reconnection_delay,
           fee_parameters,
           mode,
           loser_mode ),
-        (dal_node_addr, dal_node_port) ))
-    (fun ( ( data_dir,
-             sc_rollup_address,
+        ( dal_node_addr,
+          dal_node_port,
+          batcher,
+          injector_retention_period,
+          l2_blocks_cache_size ) ))
+    (fun ( ( sc_rollup_address,
              sc_rollup_node_operators,
              rpc_addr,
              rpc_port,
+             metrics_addr,
              reconnection_delay,
              fee_parameters,
              mode,
              loser_mode ),
-           (dal_node_addr, dal_node_port) ) ->
+           ( dal_node_addr,
+             dal_node_port,
+             batcher,
+             injector_retention_period,
+             l2_blocks_cache_size ) ) ->
+      if injector_retention_period > max_injector_retention_period then
+        Format.ksprintf
+          Stdlib.failwith
+          "injector_retention_period should be smaller than %d"
+          max_injector_retention_period ;
       {
-        data_dir;
         sc_rollup_address;
         sc_rollup_node_operators;
         rpc_addr;
         rpc_port;
+        metrics_addr;
         reconnection_delay;
         fee_parameters;
         mode;
         loser_mode;
         dal_node_addr;
         dal_node_port;
+        batcher;
+        injector_retention_period;
+        l2_blocks_cache_size;
       })
     (merge_objs
        (obj9
-          (dft
-             "data-dir"
-             ~description:"Location of the data dir"
-             string
-             default_data_dir)
           (req
-             "sc-rollup-address"
-             ~description:"Smart contract rollup address"
+             "smart-rollup-address"
+             ~description:"Smart rollup address"
              Protocol.Alpha_context.Sc_rollup.Address.encoding)
           (req
-             "sc-rollup-node-operator"
+             "smart-rollup-node-operator"
              ~description:
-               "Operators that sign operations of the smart contract rollup, \
-                by purpose"
+               "Operators that sign operations of the smart rollup, by purpose"
              operators_encoding)
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+          (opt "metrics-addr" ~description:"Metrics address" string)
           (dft
              "reconnection_delay"
              ~description:
@@ -453,9 +582,15 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj2
+       (obj5
           (dft "DAL node address" string default_dal_node_addr)
-          (dft "DAL node port" int16 default_dal_node_port)))
+          (dft "DAL node port" int16 default_dal_node_port)
+          (dft "batcher" batcher_encoding default_batcher)
+          (dft
+             "injector_retention_period"
+             uint16
+             default_injector_retention_period)
+          (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)))
 
 let check_mode config =
   let open Result_syntax in
@@ -499,16 +634,16 @@ This should be used for test only!
 ************ WARNING *************
 |}
 
-let save config =
+let save ~data_dir config =
   loser_warning_message config ;
   let open Lwt_syntax in
   let json = Data_encoding.Json.construct encoding config in
-  let* () = Lwt_utils_unix.create_dir config.data_dir in
-  Lwt_utils_unix.Json.write_file (filename config) json
+  let* () = Lwt_utils_unix.create_dir data_dir in
+  Lwt_utils_unix.Json.write_file (config_filename ~data_dir) json
 
 let load ~data_dir =
   let open Lwt_result_syntax in
-  let+ json = Lwt_utils_unix.Json.read_file (relative_filename data_dir) in
+  let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
   let config = Data_encoding.Json.destruct encoding json in
   loser_warning_message config ;
   config

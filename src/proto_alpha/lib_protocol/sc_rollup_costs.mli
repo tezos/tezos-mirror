@@ -27,14 +27,6 @@
     functions used when handling SC rollups operations in context. *)
 
 module Constants : sig
-  val cost_add_message_base : Gas_limit_repr.cost
-
-  val cost_add_message_per_byte : Gas_limit_repr.cost
-
-  val cost_add_inbox_per_level : Gas_limit_repr.cost
-
-  val cost_update_num_and_size_of_messages : Gas_limit_repr.cost
-
   val cost_serialize_state_hash : Gas_limit_repr.cost
 
   val cost_serialize_commitment_hash : Gas_limit_repr.cost
@@ -49,13 +41,6 @@ end
 val is_valid_parameters_ty_cost :
   ty_size:'a Saturation_repr.t -> Saturation_repr.may_saturate Saturation_repr.t
 
-(** [cost_add_serialized_messages ~num_messages ~total_messages_length level]
-    returns the cost of adding [num_messages] with total messages size
-    [total_messages_size] to a sc-rollup inbox at level [level]. This
-    function is used internally in the [Sc_rollup_storage] module. *)
-val cost_add_serialized_messages :
-  num_messages:int -> total_messages_size:int -> int32 -> Gas_limit_repr.cost
-
 (** [cost_serialize_internal_inbox_message internal_inbox_message] is the cost
     of the serialization of an internal inbox message. It's equal to the cost of
     serializing the script expression, with {!Script_repr.force_bytes_cost} plus
@@ -69,8 +54,7 @@ val cost_serialize_internal_inbox_message :
   Sc_rollup_inbox_message_repr.internal_inbox_message -> Gas_limit_repr.cost
 
 (** [cost_deserialize_output_proof ~bytes_len] is the cost of the
-    deserialization of an output proof. It's equal to the cost of deserializing
-    a script expression of size [bytes_len]. *)
+    deserialization of an output proof. *)
 val cost_deserialize_output_proof : bytes_len:int -> Gas_limit_repr.cost
 
 (** [cost_serialize_external_inbox_message ~bytes_len] is the cost of the
@@ -80,3 +64,21 @@ val cost_serialize_external_inbox_message : bytes_len:int -> Gas_limit_repr.cost
 
 (** [cost_hash_bytes ~bytes_len] is the cost of hashing [bytes_len] bytes. *)
 val cost_hash_bytes : bytes_len:int -> Gas_limit_repr.cost
+
+(** [cost_check_dissection ~number_of_states ~tick_size ~hash_size] is the cost
+    of checking that a dissection with a given [number_of_states] used in a
+    refutation game is well-formed. This includes the comparison of a linear
+    number of ticks as well as the verification of two hashes of given
+    [hash_size]. *)
+val cost_check_dissection :
+  number_of_states:int -> tick_size:int -> hash_size:int -> Gas_limit_repr.cost
+
+(** [cost_verify_output_proof ~bytes_len] is the cost of verifying an output
+     proof of length [bytes_len]. *)
+val cost_verify_output_proof : bytes_len:int -> Gas_limit_repr.cost
+
+(** [cost_add_message ~new_cell_index ~msg_len] returns the cost of adding a
+    message of length [msg_len] to a sc-rollup inbox. This function is used
+    internally in the [Sc_rollup_storage] module and covers the function
+    {!Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload *)
+val cost_add_message : current_index:Z.t -> msg_len:int -> Gas_limit_repr.cost

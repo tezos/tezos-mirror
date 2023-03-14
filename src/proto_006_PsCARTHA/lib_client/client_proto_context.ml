@@ -28,7 +28,7 @@ open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
@@ -196,7 +196,7 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?fee ~manager_sk ~fee_parameter src_pk =
-  let source = Signature.Public_key.hash src_pk in
+  let source = Signature.V0.Public_key.hash src_pk in
   delegate_contract
     cctxt
     ~chain
@@ -260,7 +260,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
         (List.length contracts)
 
 type activation_key = {
-  pkh : Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -271,7 +271,7 @@ type activation_key = {
 let raw_activation_key_encoding =
   let open Data_encoding in
   obj6
-    (req "pkh" Ed25519.Public_key_hash.encoding)
+    (req "pkh" Signature.Ed25519.Public_key_hash.encoding)
     (req "amount" Tez.encoding)
     (req "activation_code" Blinded_public_key_hash.activation_code_encoding)
     (req "mnemonic" (list string))
@@ -301,7 +301,7 @@ let activation_key_encoding =
                 ~title:"Deprecated_activation"
                 Json_only
                 (obj6
-                   (req "pkh" Ed25519.Public_key_hash.encoding)
+                   (req "pkh" Signature.Ed25519.Public_key_hash.encoding)
                    (req "amount" Tez.encoding)
                    (req
                       "secret"
@@ -323,12 +323,14 @@ let read_key key =
       in
       let sk = Bip39.to_seed ~passphrase t in
       let sk = Bytes.sub sk 0 32 in
-      let sk : Signature.Secret_key.t =
+      let sk : Signature.V0.Secret_key.t =
         Ed25519
-          (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
+          (Data_encoding.Binary.of_bytes_exn
+             Signature.Ed25519.Secret_key.encoding
+             sk)
       in
-      let pk = Signature.Secret_key.to_public_key sk in
-      let pkh = Signature.Public_key.hash pk in
+      let pk = Signature.V0.Secret_key.to_public_key sk in
+      let pkh = Signature.V0.Public_key.hash pk in
       return (pkh, pk, sk)
 
 let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
@@ -354,7 +356,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
       cctxt#message
         "Account %s (%a) activated with %s%a."
         alias
-        Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         pkh
         Client_proto_args.tez_sym
         Tez.pp
@@ -369,21 +371,23 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?(encrypted = false) ?force key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless
-    (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
+    (Signature.V0.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (error_of_fmt
        "@[<v 2>Inconsistent activation key:@ Computed pkh: %a@ Embedded pkh: \
         %a @]"
-       Signature.Public_key_hash.pp
+       Signature.V0.Public_key_hash.pp
        pkh
-       Ed25519.Public_key_hash.pp
+       Signature.Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
+  let pk = Signature.Of_V0.public_key pk in
+  let sk = Signature.Of_V0.secret_key sk in
   Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
    Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
   else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return)
   >>=? fun sk_uri ->
-  Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
+  Client_keys_v0.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->
   inject_activate_operation
     cctxt
@@ -397,7 +401,7 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let activate_existing_account (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run alias activation_code =
-  Client_keys.alias_keys cctxt alias >>=? function
+  Client_keys_v0.alias_keys cctxt alias >>=? function
   | Some (Ed25519 pkh, _, _) ->
       inject_activate_operation
         cctxt

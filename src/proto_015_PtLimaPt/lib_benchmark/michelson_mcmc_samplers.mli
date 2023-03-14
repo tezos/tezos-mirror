@@ -79,7 +79,7 @@ val load : filename:string -> michelson_sample list
  *)
 module Make_code_sampler : functor
   (Michelson_base : Michelson_samplers_base.S)
-  (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+  (Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S)
   (X : sig
      val rng_state : Random.State.t
 
@@ -98,7 +98,7 @@ end
 (** See documentation for [Make_code_sampler] *)
 module Make_data_sampler : functor
   (Michelson_base : Michelson_samplers_base.S)
-  (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+  (Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S)
   (X : sig
      val rng_state : Random.State.t
 

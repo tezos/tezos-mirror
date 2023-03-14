@@ -10,14 +10,16 @@
   test_sampler
   test_script_comparison
   test_tez_repr
-  test_tx_rollup_l2_encoding
   test_bitset
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding
   test_refutation_game
   test_carbonated_map
   test_zk_rollup_encoding
-  test_dal_slot_proof)
+  test_dal_slot_proof
+  test_compare_operations
+  test_operation_encoding
+  test_bytes_conversion)
  (libraries
   tezos-base
   tezos-micheline
@@ -31,21 +33,27 @@
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-sc-rollup-alpha
+  tezos-smart-rollup-alpha
   tezos-crypto-dal
-  tezos-base-test-helpers)
+  tezos-base-test-helpers
+  tezos-protocol-alpha.parameters)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
   -open Tezos_client_alpha
   -open Tezos_protocol_alpha
+  -open Tezos_test_helpers
   -open Tezos_alpha_test_helpers
   -open Tezos_benchmark_alpha
   -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_sc_rollup_alpha
+  -open Tezos_smart_rollup_alpha
   -open Tezos_crypto_dal
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_alpha_parameters))
 
 (rule
  (alias runtest)
@@ -85,11 +93,6 @@
 (rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
- (action (run %{dep:./test_tx_rollup_l2_encoding.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-alpha-tests)
  (action (run %{dep:./test_bitset.exe})))
 
 (rule
@@ -122,6 +125,21 @@
  (package tezos-protocol-alpha-tests)
  (action (run %{dep:./test_dal_slot_proof.exe})))
 
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_compare_operations.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_operation_encoding.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_bytes_conversion.exe})))
+
 (rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
 
 (rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
@@ -136,8 +154,6 @@
 
 (rule (alias runtest2) (action (run %{exe:test_tez_repr.exe})))
 
-(rule (alias runtest2) (action (run %{exe:test_tx_rollup_l2_encoding.exe})))
-
 (rule (alias runtest2) (action (run %{exe:test_bitset.exe})))
 
 (rule (alias runtest2) (action (run %{exe:test_sc_rollup_tick_repr.exe})))
@@ -151,3 +167,9 @@
 (rule (alias runtest3) (action (run %{exe:test_zk_rollup_encoding.exe})))
 
 (rule (alias runtest3) (action (run %{exe:test_dal_slot_proof.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_compare_operations.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_operation_encoding.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_bytes_conversion.exe})))

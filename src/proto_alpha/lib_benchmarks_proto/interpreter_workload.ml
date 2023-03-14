@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -97,6 +98,16 @@ type instruction_name =
   | N_IConcat_bytes_pair
   | N_ISlice_bytes
   | N_IBytes_size
+  | N_IOr_bytes
+  | N_IAnd_bytes
+  | N_IXor_bytes
+  | N_INot_bytes
+  | N_ILsl_bytes
+  | N_ILsr_bytes
+  | N_IBytes_nat
+  | N_INat_bytes
+  | N_IBytes_int
+  | N_IInt_bytes
   (* timestamp operations *)
   | N_IAdd_seconds_to_timestamp
   | N_IAdd_timestamp_to_seconds
@@ -170,6 +181,7 @@ type instruction_name =
   | N_ICheck_signature_ed25519
   | N_ICheck_signature_secp256k1
   | N_ICheck_signature_p256
+  | N_ICheck_signature_bls
   | N_IHash_key
   | N_IPack
   | N_IUnpack
@@ -297,6 +309,16 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IConcat_bytes_pair -> "N_IConcat_bytes_pair"
   | N_ISlice_bytes -> "N_ISlice_bytes"
   | N_IBytes_size -> "N_IBytes_size"
+  | N_IOr_bytes -> "N_IOr_bytes"
+  | N_IAnd_bytes -> "N_IAnd_bytes"
+  | N_IXor_bytes -> "N_IXor_bytes"
+  | N_INot_bytes -> "N_INot_bytes"
+  | N_ILsl_bytes -> "N_ILsl_bytes"
+  | N_ILsr_bytes -> "N_ILsr_bytes"
+  | N_IBytes_nat -> "N_IBytes_nat"
+  | N_INat_bytes -> "N_INat_bytes"
+  | N_IBytes_int -> "N_IBytes_int"
+  | N_IInt_bytes -> "N_IInt_bytes"
   | N_IAdd_seconds_to_timestamp -> "N_IAdd_seconds_to_timestamp"
   | N_IAdd_timestamp_to_seconds -> "N_IAdd_timestamp_to_seconds"
   | N_ISub_timestamp_seconds -> "N_ISub_timestamp_seconds"
@@ -357,6 +379,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ICheck_signature_ed25519 -> "N_ICheck_signature_ed25519"
   | N_ICheck_signature_secp256k1 -> "N_ICheck_signature_secp256k1"
   | N_ICheck_signature_p256 -> "N_ICheck_signature_p256"
+  | N_ICheck_signature_bls -> "N_ICheck_signature_bls"
   | N_IHash_key -> "N_IHash_key"
   | N_IPack -> "N_IPack"
   | N_IUnpack -> "N_IUnpack"
@@ -518,6 +541,10 @@ let all_instructions =
     N_IConcat_bytes_pair;
     N_ISlice_bytes;
     N_IBytes_size;
+    N_IBytes_nat;
+    N_INat_bytes;
+    N_IBytes_int;
+    N_IInt_bytes;
     N_IAdd_seconds_to_timestamp;
     N_IAdd_timestamp_to_seconds;
     N_ISub_timestamp_seconds;
@@ -578,6 +605,7 @@ let all_instructions =
     N_ICheck_signature_ed25519;
     N_ICheck_signature_secp256k1;
     N_ICheck_signature_p256;
+    N_ICheck_signature_bls;
     N_IHash_key;
     N_IPack;
     N_IUnpack;
@@ -632,6 +660,12 @@ let all_instructions =
     N_ILog;
     N_IOpen_chest;
     N_IEmit;
+    N_ILsl_bytes;
+    N_ILsr_bytes;
+    N_IOr_bytes;
+    N_IAnd_bytes;
+    N_IXor_bytes;
+    N_INot_bytes;
   ]
 
 let all_continuations =
@@ -817,6 +851,31 @@ module Instructions = struct
 
   let bytes_size = ir_sized_step N_IBytes_size nullary
 
+  let lsl_bytes bytes shift =
+    ir_sized_step N_ILsl_bytes (binary "bytes" bytes "shift" shift)
+
+  let lsr_bytes bytes shift =
+    ir_sized_step N_ILsr_bytes (binary "bytes" bytes "shift" shift)
+
+  let or_bytes bytes1 bytes2 =
+    ir_sized_step N_IOr_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
+
+  let and_bytes bytes1 bytes2 =
+    ir_sized_step N_IAnd_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
+
+  let xor_bytes bytes1 bytes2 =
+    ir_sized_step N_IXor_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
+
+  let not_bytes bytes = ir_sized_step N_INot_bytes (unary "bytes" bytes)
+
+  let bytes_nat nat = ir_sized_step N_IBytes_nat (unary "nat" nat)
+
+  let nat_bytes bytes = ir_sized_step N_INat_bytes (unary "bytes" bytes)
+
+  let bytes_int int = ir_sized_step N_IBytes_int (unary "int" int)
+
+  let int_bytes bytes = ir_sized_step N_IInt_bytes (unary "bytes" bytes)
+
   let add_seconds_to_timestamp seconds tstamp =
     ir_sized_step
       N_IAdd_seconds_to_timestamp
@@ -963,6 +1022,9 @@ module Instructions = struct
 
   let check_signature_p256 _pk _signature message =
     ir_sized_step N_ICheck_signature_p256 (unary "message" message)
+
+  let check_signature_bls _pk _signature message =
+    ir_sized_step N_ICheck_signature_bls (unary "message" message)
 
   let hash_key = ir_sized_step N_IHash_key nullary
 
@@ -1253,6 +1315,10 @@ let extract_ir_sized_step :
   | ISlice_bytes (_, _), (_off, (_len, (s, _))) ->
       Instructions.slice_bytes (Size.bytes s)
   | IBytes_size (_, _), _ -> Instructions.bytes_size
+  | IBytes_nat (_, _), (n, _) -> Instructions.bytes_nat (Size.integer n)
+  | INat_bytes (_, _), (b, _) -> Instructions.nat_bytes (Size.bytes b)
+  | IBytes_int (_, _), (n, _) -> Instructions.bytes_int (Size.integer n)
+  | IInt_bytes (_, _), (b, _) -> Instructions.int_bytes (Size.bytes b)
   | IAdd_seconds_to_timestamp (_, _), (s, (t, _)) ->
       Instructions.add_seconds_to_timestamp (Size.timestamp t) (Size.integer s)
   | IAdd_timestamp_to_seconds (_, _), (t, (s, _)) ->
@@ -1341,21 +1407,26 @@ let extract_ir_sized_step :
   | ILevel (_, _), _ -> Instructions.level
   | ICheck_signature (_, _), (public_key, (_signature, (message, _))) -> (
       match public_key with
-      | Signature.Ed25519 _pk ->
-          let pk = Size.of_int Ed25519.size in
-          let signature = Size.of_int Signature.size in
+      | Signature.Ed25519 pk ->
+          let pk = Size.of_int (Signature.Ed25519.Public_key.size pk) in
+          let signature = Size.of_int Signature.Ed25519.size in
           let message = Size.bytes message in
           Instructions.check_signature_ed25519 pk signature message
-      | Signature.Secp256k1 _pk ->
-          let pk = Size.of_int Secp256k1.size in
-          let signature = Size.of_int Signature.size in
+      | Signature.Secp256k1 pk ->
+          let pk = Size.of_int (Signature.Secp256k1.Public_key.size pk) in
+          let signature = Size.of_int Signature.Secp256k1.size in
           let message = Size.bytes message in
           Instructions.check_signature_secp256k1 pk signature message
-      | Signature.P256 _pk ->
-          let pk = Size.of_int P256.size in
-          let signature = Size.of_int Signature.size in
+      | Signature.P256 pk ->
+          let pk = Size.of_int (Signature.P256.Public_key.size pk) in
+          let signature = Size.of_int Signature.P256.size in
           let message = Size.bytes message in
-          Instructions.check_signature_p256 pk signature message)
+          Instructions.check_signature_p256 pk signature message
+      | Signature.Bls pk ->
+          let pk = Size.of_int (Signature.Bls.Public_key.size pk) in
+          let signature = Size.of_int Signature.Bls.size in
+          let message = Size.bytes message in
+          Instructions.check_signature_bls pk signature message)
   | IHash_key (_, _), _ -> Instructions.hash_key
   | IPack (_, ty, _), (v, _) -> (
       let script_res =
@@ -1439,6 +1510,27 @@ let extract_ir_sized_step :
       Instructions.open_chest log_time plaintext_size
   | IMin_block_time _, _ -> Instructions.min_block_time
   | IEmit _, _ -> Instructions.emit
+  | ILsl_bytes (_, _), (x, (y, _)) ->
+      let y =
+        match Script_int.to_int y with
+        | Some y -> y
+        | None -> (* overflow *) assert false
+      in
+      Instructions.lsl_bytes (Size.bytes x) y
+  | ILsr_bytes (_, _), (x, (y, _)) ->
+      let y =
+        match Script_int.to_int y with
+        | Some y -> y
+        | None -> (* overflow *) assert false
+      in
+      Instructions.lsr_bytes (Size.bytes x) y
+  | IOr_bytes (_, _), (x, (y, _)) ->
+      Instructions.or_bytes (Size.bytes x) (Size.bytes y)
+  | IAnd_bytes (_, _), (x, (y, _)) ->
+      Instructions.and_bytes (Size.bytes x) (Size.bytes y)
+  | IXor_bytes (_, _), (x, (y, _)) ->
+      Instructions.xor_bytes (Size.bytes x) (Size.bytes y)
+  | INot_bytes (_, _), (x, _) -> Instructions.not_bytes (Size.bytes x)
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =
@@ -1454,7 +1546,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KList_enter_body (_, xs, ys, _, _, _) ->
       Control.list_enter_body
         (Size.of_int (List.length xs))
-        (Size.of_int (List.length ys))
+        (Size.of_int (Script_list.length ys))
   | KList_exit_body (_, _, _, _, _, _) -> Control.list_exit_body
   | KMap_enter_body (_, xs, _, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))
@@ -1482,17 +1574,24 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
     (stack : bef_top * bef) =
   let trace = ref [] in
   (* Logger definition *)
-  let log_interp _instr _ctxt _log _stack_ty _stack = () in
-  let log_entry :
-      type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
-   fun kinstr ctxt _loc _stack_ty stack ->
-    trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
-    match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+  let logger =
+    Script_interpreter_logging.make
+      (module struct
+        let log_interp _instr _ctxt _log _stack_ty _stack = ()
+
+        let log_entry :
+            type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
+         fun kinstr ctxt _loc _stack_ty stack ->
+          trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
+          match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+
+        let log_control kont = trace := extract_control_trace kont :: !trace
+
+        let log_exit _instr _ctxt _log _stack_ty _stack = ()
+
+        let get_log () = Environment.Error_monad.return_none
+      end)
   in
-  let log_control kont = trace := extract_control_trace kont :: !trace in
-  let log_exit _instr _ctxt _log _stack_ty _stack = () in
-  let get_log () = Environment.Error_monad.return_none in
-  let logger = {log_interp; log_entry; log_control; log_exit; get_log} in
   try
     let res =
       Lwt_main.run
@@ -1520,17 +1619,24 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
     (stack : bef_top * bef) =
   let trace = ref [] in
   (* Logger definition *)
-  let log_interp _instr _ctxt _log _stack_ty _stack = () in
-  let log_entry :
-      type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
-   fun kinstr ctxt _loc _stack_ty stack ->
-    trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
-    match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+  let logger =
+    Script_interpreter_logging.make
+      (module struct
+        let log_interp _instr _ctxt _log _stack_ty _stack = ()
+
+        let log_entry :
+            type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
+         fun kinstr ctxt _loc _stack_ty stack ->
+          trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
+          match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+
+        let log_control kont = trace := extract_control_trace kont :: !trace
+
+        let log_exit _instr _ctxt _log _stack_ty _stack = ()
+
+        let get_log () = Environment.Error_monad.return_none
+      end)
   in
-  let log_control kont = trace := extract_control_trace kont :: !trace in
-  let log_exit _instr _ctxt _log _stack_ty _stack = () in
-  let get_log () = Environment.Error_monad.return_none in
-  let logger = {log_interp; log_entry; log_control; log_exit; get_log} in
   try
     let res =
       let _gas_counter, outdated_ctxt =

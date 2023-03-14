@@ -3,15 +3,17 @@
 usage () {
     cat >&2 <<!EOF
 usage:
-  $0 [<branch>]
+  $0 [<repo> <branch>]
 !EOF
 }
 
-if [ $# -eq 1 ];
+if [ $# -eq 2 ];
 then
-  BRANCH=$1
+  REPO=$1
+  BRANCH=$2
 elif [ $# -eq 0 ]
 then
+  REPO="tezos/tezos"
   BRANCH="latest-release"
 else
   usage
@@ -65,20 +67,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.10.5 through pyenv
+## Install python 3.10.10 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.10.5
-pyenv global 3.10.5
+pyenv install 3.10.10
+pyenv global 3.10.10
 
 # [print python version]
-python --version # should output 3.10.5
+python --version # should output 3.10.10
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.10.5" ]
+[ "$(python --version)" = "Python 3.10.10" ]
 
 ##
 ## Install poetry
@@ -102,7 +104,7 @@ poetry --version # should output 1.1.13
 ##
 ## Test installing Octez python development dependencies
 ##
-git clone "$CI_REPOSITORY_URL" --depth 1 --branch "$BRANCH"
+git clone --depth 1 --branch "$BRANCH" https://gitlab.com/"$REPO".git tezos
 
 # [install octez python dev-dependencies]
 cd tezos

@@ -56,13 +56,13 @@ let change_logging_configuration =
   in
   let* () =
     should_fail "wrong-json" (fun () ->
-        call_config Ezjsonm.(dict [("wrong", `Null)]))
+        call_config (Data Ezjsonm.(dict [("wrong", `Null)])))
   in
   (* Empty just works: *)
-  let* () = call_config Ezjsonm.(dict []) in
+  let* () = call_config (Data Ezjsonm.(dict [])) in
   let call_config_activate ?(use_deprecated_key = false) l =
     let key_name = if use_deprecated_key then "activate" else "active_sinks" in
-    call_config Ezjsonm.(dict [(key_name, strings l)])
+    call_config (Data Ezjsonm.(dict [(key_name, strings l)]))
   in
   let tmp0 = Temp.file "tezt-rpc-logging0.log" in
   let tmp1 = Temp.file "tezt-rpc-logging1.log" in
@@ -111,7 +111,7 @@ let change_logging_configuration =
     call_config_activate
       [
         sf
-          "file-descriptor-path://%s?section-prefix=rpc:debug&section-prefix=validator:debug&fresh=true"
+          "file-descriptor-path://%s?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none&fresh=true"
           tmp1;
       ]
   in

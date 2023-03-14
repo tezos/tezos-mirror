@@ -558,12 +558,6 @@ module type TEZOS_CONTEXT = sig
 
     val make_repo : unit -> repo Lwt.t
 
-    (** [shallow repo k] is the "shallow" tree having key [k] based on the
-        repository [repo]. A shallow tree is a tree that exists in an underlying
-        backend repository, but has not yet been loaded into memory from that
-        backend. *)
-    val shallow : repo -> kinded_key -> tree
-
     val is_shallow : tree -> bool
 
     val kinded_key : tree -> kinded_key option
@@ -740,11 +734,25 @@ module type TEZOS_CONTEXT = sig
   val commit :
     time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
 
-  (** [gc t h] removes from disk all the data older than the commit
-    [hash]. Every operations working on checkouts greater or equal to
-    [h] will continue to work. Calling [checkout h'] on GC-ed commits
-    will return [None]. *)
+  (** [gc index commit_hash] removes from disk all the data older than
+      the [commit_hash]. Operations needing to checkout commits
+      greater or equal to [commit_hash] will continue to work. Calling
+      [checkout h'] on GC-ed commits will return [None].
+
+      From the irmin point of view, a successful gc call on a
+      [commit_hash] will result in a new prefix file containing that
+      [commit_hash] as a root commit. This prefix file is considered
+      as standalone as all the data referenced by that commit is
+      contained in that file. *)
   val gc : index -> Context_hash.t -> unit Lwt.t
+
+  (** [wait_gc_completion index] will return a blocking thread if an
+      Irmin GC is currently ongoing.
+
+      {b Warning}: this currently only applies to GC started in the
+      Irmin instance referenced as [index]; other opened instances
+      will always return instantly. *)
+  val wait_gc_completion : index -> unit Lwt.t
 
   (** Sync the context with disk. Only useful for read-only instances.
       Does not fail when the context is not in read-only mode. *)
@@ -756,7 +764,38 @@ module type TEZOS_CONTEXT = sig
      strategy mode "always", which is not suitable for GC.*)
   val is_gc_allowed : index -> bool
 
-  val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
+  (** [split index] creates a new suffix file, also called "chunk",
+      into the irmin's file hierarchy.
+
+      To be optimal, the split function is expected to be called
+      directly after committing, to the context, a commit (of hash
+      [context_hash]) that will be a future candidate of a GC
+      target. Thus, the commit [commit_hash] is the last commit stored
+      on a given chunk. The GC called on that [commit_hash] will be
+      able to extract that [commit_hash] into a new prefix file, and
+      then, drop the whole chunk.
+
+      If the last commit of a chunk appears not to be the candidate of
+      a future GC, it may result in keeping chunks containing
+      partially needed data. This is not an issue, but it should be
+      avoided to prevent storing unnecessary data and thus, to
+      minimize the disk footprint. *)
+  val split : index -> unit Lwt.t
+
+  (** [export_snapshot index context_hash ~path] exports the context
+      corresponding to [context_hash], if found in [index], into the
+      given folder path.
+      As the export uses the GC's behaviour to extract a single commit
+      into a standalone fresh store, it is not possible to export a
+      snapshot while a GC is running. This call will hang until the GC
+      has finished.
+
+      Note: there is no associated [import_snapshot] function as the
+      import consist in copying the exported store. *)
+  val export_snapshot : index -> Context_hash.t -> path:string -> unit Lwt.t
+
+  val set_head :
+    index -> Tezos_crypto.Hashed.Chain_id.t -> Context_hash.t -> unit Lwt.t
 
   val set_master : index -> Context_hash.t -> unit Lwt.t
 
@@ -802,34 +841,6 @@ module type TEZOS_CONTEXT = sig
 
   val add_predecessor_ops_metadata_hash :
     context -> Operation_metadata_list_list_hash.t -> context Lwt.t
-
-  val retrieve_commit_info :
-    index ->
-    Block_header.t ->
-    (Protocol_hash.t
-    * string
-    * string
-    * Time.Protocol.t
-    * Test_chain_status.t
-    * Context_hash.t
-    * Block_metadata_hash.t option
-    * Operation_metadata_list_list_hash.t option
-    * Context_hash.t list)
-    tzresult
-    Lwt.t
-
-  val check_protocol_commit_consistency :
-    expected_context_hash:Context_hash.t ->
-    given_protocol_hash:Protocol_hash.t ->
-    author:string ->
-    message:string ->
-    timestamp:Time.Protocol.t ->
-    test_chain_status:Test_chain_status.t ->
-    predecessor_block_metadata_hash:Block_metadata_hash.t option ->
-    predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
-    data_merkle_root:Context_hash.t ->
-    parents_contexts:Context_hash.t list ->
-    bool Lwt.t
 end
 
 (** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.

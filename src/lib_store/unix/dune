@@ -20,8 +20,10 @@
   tezos-protocol-updater
   tezos-stdlib-unix
   tezos-stdlib
+  tezos-crypto
   lwt-watcher
-  ringo-lwt
+  aches
+  aches-lwt
   camlzip
   tar
   tar-unix
@@ -38,7 +40,8 @@
   -open Tezos_validation
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix
-  -open Tezos_stdlib)
+  -open Tezos_stdlib
+  -open Tezos_crypto)
  (modules
   block_repr_unix
   block_store
@@ -47,7 +50,6 @@
   floating_block_index
   floating_block_store
   protocol_store
-  stored_data
   store_metrics
   store))
 
@@ -58,6 +60,7 @@
  (libraries
   tezos-base
   tezos-stdlib-unix
+  tezos-crypto
   tezos-shell-services
   tezos-protocol-updater
   tezos-validation
@@ -69,6 +72,7 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
+  -open Tezos_crypto
   -open Tezos_shell_services
   -open Tezos_protocol_updater
   -open Tezos_validation
@@ -84,6 +88,7 @@
  (libraries
   tezos-base
   tezos-stdlib-unix
+  tezos-crypto
   tezos-shell-services
   tezos-context
   tezos-validation
@@ -94,6 +99,7 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
+  -open Tezos_crypto
   -open Tezos_shell_services
   -open Tezos_context
   -open Tezos_validation

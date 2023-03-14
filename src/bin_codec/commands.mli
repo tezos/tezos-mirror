@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commands : unit -> Client_context.printer Clic.command list
+val commands : unit -> Client_context.printer Tezos_clic.command list

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,18 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
+
+   This file is part of the implementation of the new mempool, which
+   uses features of the protocol that only exist since Lima.
+
+   When you modify this file, consider whether you should also change
+   the files that implement the legacy mempool for Kathmandu. They all
+   start with the "legacy" prefix and will be removed when Lima is
+   activated on Mainnet. *)
+
+open Shell_operation
 
 (** The priority of a pending operation.
 
@@ -46,8 +58,7 @@ val hashes : 'protocol_data t -> Operation_hash.Set.t
 
 (** [operations p] returns the Map of bindings [oph -> op] contained in [p] *)
 val operations :
-  'protocol_data t ->
-  'protocol_data Prevalidation.operation Operation_hash.Map.t
+  'protocol_data t -> 'protocol_data operation Operation_hash.Map.t
 
 (** [is_empty p] returns [true] if [p] has operations, [false] otherwise. *)
 val is_empty : 'protocol_data t -> bool
@@ -70,10 +81,7 @@ val mem : Operation_hash.t -> 'protocol_data t -> bool
     as the caller of the function to ensure this.
 *)
 val add :
-  'protocol_data Prevalidation.operation ->
-  priority ->
-  'protocol_data t ->
-  'protocol_data t
+  'protocol_data operation -> priority -> 'protocol_data t -> 'protocol_data t
 
 (** [remove oph op p] removes the binding [oph] from [p].
 
@@ -99,21 +107,14 @@ val cardinal : 'protocol_data t -> int
     processed first).
 *)
 val fold :
-  (priority ->
-  Operation_hash.t ->
-  'protocol_data Prevalidation.operation ->
-  'a ->
-  'a) ->
+  (priority -> Operation_hash.t -> 'protocol_data operation -> 'a -> 'a) ->
   'protocol_data t ->
   'a ->
   'a
 
 (** [iter f p] is similar to [fold] where [acc] is unit *)
 val iter :
-  (priority ->
-  Operation_hash.t ->
-  'protocol_data Prevalidation.operation ->
-  unit) ->
+  (priority -> Operation_hash.t -> 'protocol_data operation -> unit) ->
   'protocol_data t ->
   unit
 
@@ -123,7 +124,7 @@ val iter :
 val fold_es :
   (priority ->
   Operation_hash.t ->
-  'protocol_data Prevalidation.operation ->
+  'protocol_data operation ->
   'a ->
   ('a, 'b) result Lwt.t) ->
   'protocol_data t ->

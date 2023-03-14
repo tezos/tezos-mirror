@@ -177,7 +177,8 @@ let input_string string run =
 
 (* Printing *)
 
-let map_to_list m = List.map snd (Lazy_vector.Int32Vector.loaded_bindings m)
+let map_to_list m =
+  List.filter_map snd (Lazy_vector.Int32Vector.loaded_bindings m)
 
 let print_import m im =
   let open Types in
@@ -375,7 +376,10 @@ let rec run_definition def : Ast.module_ Lwt.t =
   | Textual m -> Lwt.return m
   | Encoded (name, bytes) ->
       let* () = trace_lwt "Decoding..." in
-      Decode.decode ~name ~bytes:(Chunked_byte_vector.of_string bytes)
+      Decode.decode
+        ~allow_floats:true
+        ~name
+        ~bytes:(Chunked_byte_vector.of_string bytes)
   | Quoted (_, s) ->
       let* () = trace_lwt "Parsing quote..." in
       let def' = Parse.string_to_module s in

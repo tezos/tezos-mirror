@@ -33,8 +33,9 @@ let replace_variables string =
       ("sh1\\w{71}\\b", "[DAL_SLOT_HEADER]");
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
          Remove this regexp as soon as the WASM PVM stabilizes. *)
-      ("scs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
+      ("srs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
       ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
+      ("SRCo\\w{50}\\b", "[SC_ROLLUP_CONTEXT_HASH]");
       ("Co\\w{50}\\b", "[CONTEXT_HASH]");
       ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
       ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
@@ -42,14 +43,16 @@ let replace_variables string =
       ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
       ("txM\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]");
       ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
-      ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
-      ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
+      ("src1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
+      ("srib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
+      ("srib2\\w{50}\\b", "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]");
+      ("srib3\\w{50}\\b", "[SC_ROLLUP_INBOX_MESSAGE_HASH]");
       ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
       ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
       ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
       ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
       ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
-      ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
+      ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
       (* Ports are non-deterministic when using -j. *)
@@ -62,7 +65,11 @@ let replace_variables string =
     string
     replacements
 
-let hooks =
+let scrubbed_global_options =
+  ["--base-dir"; "-d"; "--endpoint"; "-E"; "--sources"]
+
+let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
+    ?(replace_variables = replace_variables) () =
   let on_spawn command arguments =
     (* Remove arguments that shouldn't be captured in regression output. *)
     let arguments, _ =
@@ -72,8 +79,7 @@ let hooks =
           else
             match arg with
             (* scrub client global options *)
-            | "--base-dir" | "-d" | "--endpoint" | "-E" | "--sources" ->
-                (acc, true)
+            | option when List.mem option scrubbed_global_options -> (acc, true)
             | _ -> (acc @ [replace_variables arg], false))
         ([], (* scrub_next *) false)
         arguments
@@ -83,3 +89,5 @@ let hooks =
   in
   let on_log output = replace_variables output |> Regression.capture in
   {Process.on_spawn; on_log}
+
+let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()

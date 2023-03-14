@@ -61,10 +61,6 @@ type level = Lwt_log_core.level =
   | Error
   | Fatal
 
-let should_log ~level ~sink_level =
-  (* Same criteria as [Lwt_log_core.log] *)
-  level >= sink_level
-
 module Level = struct
   type t = level
 
@@ -189,13 +185,13 @@ module type EVENT_DEFINITION = sig
 
   val encoding : t Data_encoding.t
 
-  val level : t -> level
+  val level : level
 end
 
 module type EVENT = sig
   include EVENT_DEFINITION
 
-  val emit : ?section:Section.t -> (unit -> t) -> unit tzresult Lwt.t
+  val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
 end
 
 type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
@@ -207,12 +203,10 @@ module type SINK = sig
 
   val configure : Uri.t -> t tzresult Lwt.t
 
+  val should_handle : ?section:Section.t -> t -> _ event_definition -> bool
+
   val handle :
-    t ->
-    'a event_definition ->
-    ?section:Section.t ->
-    (unit -> 'a) ->
-    unit tzresult Lwt.t
+    t -> 'a event_definition -> ?section:Section.t -> 'a -> unit tzresult Lwt.t
 
   val close : t -> unit tzresult Lwt.t
 end
@@ -348,8 +342,10 @@ module All_sinks = struct
 
   let handle def section v =
     let handle (type a) sink definition =
+      let open Lwt_result_syntax in
       let module S = (val definition : SINK with type t = a) in
-      S.handle ?section sink def v
+      if S.should_handle ?section sink def then S.handle ?section sink def v
+      else return_unit
     in
     List.iter_es
       (function Active {sink; definition; _} -> handle sink definition)
@@ -475,11 +471,7 @@ end
 module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
   include E
 
-  let emit ?section x =
-    (* In order to evaluate the event at most once, we wrap it in a
-       `Lazy.t`: *)
-    let x = lazy (x ()) in
-    All_sinks.handle (module E) section (fun () -> Lazy.force x)
+  let emit ?section x = All_sinks.handle (module E) section x
 
   let () = All_definitions.add (module E)
 end
@@ -780,10 +772,10 @@ module Simple = struct
 
       let encoding = with_version ~name Data_encoding.unit
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun () -> Event.emit ?section (fun () -> ())
+    fun () -> Event.emit ?section ()
 
   let declare_1 (type a) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) =
@@ -807,10 +799,10 @@ module Simple = struct
 
       let encoding = with_version ~name f1_enc
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameter -> Event.emit ?section (fun () -> parameter)
+    fun parameter -> Event.emit ?section parameter
 
   let declare_2 (type a b) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -842,10 +834,10 @@ module Simple = struct
              (Data_encoding.req f1_name f1_enc)
              (Data_encoding.req f2_name f2_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_3 (type a b c) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -880,10 +872,10 @@ module Simple = struct
              (Data_encoding.req f2_name f2_enc)
              (Data_encoding.req f3_name f3_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -922,10 +914,10 @@ module Simple = struct
              (Data_encoding.req f3_name f3_enc)
              (Data_encoding.req f4_name f4_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -969,10 +961,10 @@ module Simple = struct
              (Data_encoding.req f4_name f4_enc)
              (Data_encoding.req f5_name f5_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1019,10 +1011,10 @@ module Simple = struct
              (Data_encoding.req f5_name f5_enc)
              (Data_encoding.req f6_name f6_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1074,10 +1066,10 @@ module Simple = struct
              (Data_encoding.req f6_name f6_enc)
              (Data_encoding.req f7_name f7_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1132,81 +1124,14 @@ module Simple = struct
              (Data_encoding.req f7_name f7_enc)
              (Data_encoding.req f8_name f8_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 end
 
 module Legacy_logging = struct
-  module type LOG = sig
-    val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val log_notice : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val log_error : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val fatal_error : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val lwt_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_log_info : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_log_notice : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-  end
-
-  open Tezos_stdlib
-
-  type ('a, 'b) msgf =
-    (('a, Format.formatter, unit, 'b) format4 -> ?tags:Tag.set -> 'a) ->
-    ?tags:Tag.set ->
-    'b
-
-  type ('a, 'b) log = ('a, 'b) msgf -> 'b
-
-  module type SEMLOG = sig
-    module Tag = Tag
-
-    val debug : ('a, unit) log
-
-    val log_info : ('a, unit) log
-
-    val log_notice : ('a, unit) log
-
-    val warn : ('a, unit) log
-
-    val log_error : ('a, unit) log
-
-    val fatal_error : ('a, unit) log
-
-    val lwt_debug : ('a, unit Lwt.t) log
-
-    val lwt_log_info : ('a, unit Lwt.t) log
-
-    val lwt_log_notice : ('a, unit Lwt.t) log
-
-    val lwt_warn : ('a, unit Lwt.t) log
-
-    val lwt_log_error : ('a, unit Lwt.t) log
-
-    val lwt_fatal_error : ('a, unit Lwt.t) log
-
-    val event : string Tag.def
-
-    val exn : exn Tag.def
-  end
-
-  module Make_event (P : sig
+  module Make (P : sig
     val name : string
   end) =
   struct
@@ -1214,223 +1139,106 @@ module Legacy_logging = struct
 
     let section = Section.make name_split
 
-    module Definition = struct
-      let name = "legacy_logging_event-" ^ String.concat "-" name_split
+    let name = "legacy_logging_event-" ^ String.concat "-" name_split
 
-      type t = {
-        message : string;
-        section : Section.t;
-        level : level;
-        tags : Tag.set;
-      }
+    module Make_definition (P : sig
+      val level : level
+    end) =
+    struct
+      type t = string
 
-      let make ?(tags = Tag.empty) level message =
-        {message; section; level; tags}
+      let name = Printf.sprintf "%s-%s" name (Level.to_string P.level)
 
       let v0_encoding =
         let open Data_encoding in
-        conv
-          (fun {message; section; level; tags} ->
-            (message, section, level, tags))
-          (fun (message, section, level, tags) ->
-            {message; section; level; tags})
-          (obj4
-             (req "message" string)
-             (req "section" Section.encoding)
-             (req "level" Level.encoding)
-             (dft
-                "tags"
-                (conv
-                   (fun tags -> Format.asprintf "%a" Tag.pp_set tags)
-                   (fun _ -> Tag.empty)
-                   string)
-                Tag.empty))
+        obj1 (req "message" string)
 
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-      let pp ~short:_ ppf {message; _} =
-        let open Format in
-        fprintf ppf "%s" message
+      let pp ~short:_ ppf message = Format.fprintf ppf "%s" message
 
       let doc = "Generic event legacy / string-based information logging."
 
-      let level {level; _} = level
+      let level = P.level
 
       let section = Some section
     end
 
     let () = registered_sections := String.Set.add P.name !registered_sections
 
-    module Event = Make (Definition)
+    module Debug_event = Make (Make_definition (struct
+      let level = Debug
+    end))
 
-    let emit_async level fmt ?tags =
+    module Info_event = Make (Make_definition (struct
+      let level = Info
+    end))
+
+    module Notice_event = Make (Make_definition (struct
+      let level = Notice
+    end))
+
+    module Warning_event = Make (Make_definition (struct
+      let level = Warning
+    end))
+
+    module Error_event = Make (Make_definition (struct
+      let level = Error
+    end))
+
+    module Fatal_event = Make (Make_definition (struct
+      let level = Fatal
+    end))
+
+    let emit_async (emit : ?section:Section.t -> string -> unit tzresult Lwt.t)
+        fmt =
       Format.kasprintf
-        (fun message ->
-          Lwt.ignore_result
-            (Event.emit ~section (fun () -> Definition.make ?tags level message)))
+        (fun message -> Lwt.ignore_result (emit ~section message))
         fmt
 
-    let emit_lwt level fmt ?tags =
+    let emit_lwt (emit : ?section:Section.t -> string -> unit tzresult Lwt.t)
+        fmt =
       let open Lwt_syntax in
       Format.kasprintf
         (fun message ->
-          let* r =
-            Event.emit ~section (fun () -> Definition.make ?tags level message)
-          in
+          let* r = emit ~section message in
           match r with
           | Ok () -> Lwt.return_unit
-          | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
+          | Error el ->
+              Format.kasprintf Lwt_log_core.error "%a@\n" pp_print_trace el)
         fmt
+
+    let debug f = emit_async Debug_event.emit f
+
+    let log_info f = emit_async Info_event.emit f
+
+    let log_notice f = emit_async Notice_event.emit f
+
+    let warn f = emit_async Warning_event.emit f
+
+    let log_error f = emit_async Error_event.emit f
+
+    let fatal_error f = emit_async Fatal_event.emit f
+
+    let lwt_debug f = emit_lwt Debug_event.emit f
+
+    let lwt_log_info f = emit_lwt Info_event.emit f
+
+    let lwt_log_notice f = emit_lwt Notice_event.emit f
+
+    let lwt_warn f = emit_lwt Warning_event.emit f
+
+    let lwt_log_error f = emit_lwt Error_event.emit f
+
+    let lwt_fatal_error f = emit_lwt Fatal_event.emit f
   end
-
-  module Make (P : sig
-    val name : string
-  end) =
-  struct
-    include Make_event (P)
-
-    let emit_async = emit_async ?tags:None
-
-    let debug f = emit_async Debug f
-
-    let log_info f = emit_async Info f
-
-    let log_notice f = emit_async Notice f
-
-    let warn f = emit_async Warning f
-
-    let log_error f = emit_async Error f
-
-    let fatal_error f = emit_async Fatal f
-
-    let emit_lwt = emit_lwt ?tags:None
-
-    let lwt_debug f = emit_lwt Debug f
-
-    let lwt_log_info f = emit_lwt Info f
-
-    let lwt_log_notice f = emit_lwt Notice f
-
-    let lwt_warn f = emit_lwt Warning f
-
-    let lwt_log_error f = emit_lwt Error f
-
-    let lwt_fatal_error f = emit_lwt Fatal f
-  end
-
-  module Make_semantic (P : sig
-    val name : string
-  end) =
-  struct
-    include Make_event (P)
-
-    let debug (f : ('a, unit) msgf) = f (emit_async Debug) ?tags:None
-
-    let log_info f = f (emit_async Info) ?tags:None
-
-    let log_notice f = f (emit_async Notice) ?tags:None
-
-    let warn f = f (emit_async Warning) ?tags:None
-
-    let log_error f = f (emit_async Error) ?tags:None
-
-    let fatal_error f = f (emit_async Fatal) ?tags:None
-
-    let lwt_debug f = f (emit_lwt Debug) ?tags:None
-
-    let lwt_log_info f = f (emit_lwt Info) ?tags:None
-
-    let lwt_log_notice f = f (emit_lwt Notice) ?tags:None
-
-    let lwt_warn f = f (emit_lwt Warning) ?tags:None
-
-    let lwt_log_error f = f (emit_lwt Error) ?tags:None
-
-    let lwt_fatal_error f = f (emit_lwt Fatal) ?tags:None
-
-    module Tag = Tag
-
-    let event =
-      Tag.def
-        ~doc:"String identifier for the class of event being logged"
-        "event"
-        Format.pp_print_text
-
-    let exn =
-      Tag.def ~doc:"Exception which was detected" "exception" (fun f e ->
-          Format.pp_print_text f (Printexc.to_string e))
-  end
-end
-
-module Error_event = struct
-  type t = {
-    message : string option;
-    severity : [`Fatal | `Recoverable];
-    trace : Error_monad.error list;
-  }
-
-  let make ?message ?(severity = `Recoverable) trace () =
-    {message; trace; severity}
-
-  module Definition = struct
-    let section = None
-
-    let name = "error-event"
-
-    type nonrec t = t
-
-    let encoding =
-      let open Data_encoding in
-      let v0_encoding =
-        conv
-          (fun {message; trace; severity} -> (message, severity, trace))
-          (fun (message, severity, trace) -> {message; severity; trace})
-          (obj3
-             (opt "message" string)
-             (req
-                "severity"
-                (string_enum [("fatal", `Fatal); ("recoverable", `Recoverable)]))
-             (req "trace" (list Error_monad.error_encoding)))
-      in
-      With_version.(encoding ~name (first_version v0_encoding))
-
-    let pp ~short:_ f x =
-      Format.fprintf
-        f
-        "%s:@ %s"
-        name
-        (match x.message with Some x -> x | None -> "")
-
-    let doc = "Generic event for any kind of error."
-
-    let level {severity; _} =
-      match severity with `Fatal -> Fatal | `Recoverable -> Error
-  end
-
-  include (Make (Definition) : EVENT with type t := t)
-
-  let log_error_and_recover ?section ?message ?severity f =
-    let open Lwt_syntax in
-    let* r = f () in
-    match r with
-    | Ok () -> Lwt.return_unit
-    | Error el -> (
-        let* r = emit ?section (fun () -> make ?message ?severity el ()) in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error el ->
-            Format.kasprintf
-              Lwt_log_core.error
-              "Error while emitting error logging event !! %a"
-              pp_print_trace
-              el)
 end
 
 module Debug_event = struct
   type t = {message : string; attachment : Data_encoding.Json.t}
 
-  let make ?(attach = `Null) message () = {message; attachment = attach}
+  let make ?(attach = `Null) message = {message; attachment = attach}
 
   let v0_encoding =
     let open Data_encoding in
@@ -1455,93 +1263,78 @@ module Debug_event = struct
 
     let doc = "Generic event for semi-structured debug information."
 
-    let level _ = Debug
+    let level = Debug
   end
 
   include (Make (Definition) : EVENT with type t := t)
 end
 
-module Lwt_worker_event = struct
-  type t = {name : string; event : [`Started | `Ended | `Failed of string]}
+module Lwt_worker_logger = struct
+  module Started_event = Make (struct
+    type t = unit
 
-  let v0_encoding =
-    let open Data_encoding in
-    conv
-      (fun {name; event} -> (name, event))
-      (fun (name, event) -> {name; event})
-      (obj2
-         (req "name" string)
-         (req
-            "event"
-            (union
-               [
-                 case
-                   ~title:"started"
-                   (Tag 0)
-                   (obj1 (req "kind" (constant "started")))
-                   (function `Started -> Some () | _ -> None)
-                   (fun () -> `Started);
-                 case
-                   ~title:"ended"
-                   (Tag 1)
-                   (obj1 (req "kind" (constant "ended")))
-                   (function `Ended -> Some () | _ -> None)
-                   (fun () -> `Ended);
-                 case
-                   ~title:"failed"
-                   (Tag 2)
-                   (obj2
-                      (req "kind" (constant "failed"))
-                      (req "exception" string))
-                   (function `Failed s -> Some ((), s) | _ -> None)
-                   (fun ((), s) -> `Failed s);
-               ])))
-
-  module Definition = struct
     let section = None
 
-    let name = "lwt-worker-event"
+    let name = "lwt-worker_started"
 
-    type nonrec t = t
+    let encoding = Data_encoding.constant "started"
 
-    let encoding =
-      Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
+    let pp ~short:_ ppf () = Format.fprintf ppf "started"
 
-    let pp ~short:_ ppf {name; event} =
-      let open Format in
-      fprintf
-        ppf
-        "Worker %s:@ %a"
-        name
-        (fun fmt -> function
-          | `Failed msg -> fprintf ppf "Failed with %s" msg
-          | `Ended -> fprintf fmt "Ended"
-          | `Started -> fprintf fmt "Started")
-        event
+    let doc = "Worker started event"
 
-    let doc = "Generic event for callers of the function Lwt_utils.worker."
+    let level = Debug
+  end)
 
-    let level {event; _} =
-      match event with `Failed _ -> Error | `Started | `Ended -> Debug
-  end
+  module Ended_event = Make (struct
+    type t = unit
 
-  include (Make (Definition) : EVENT with type t := t)
+    let section = None
+
+    let name = "lwt-worker_ended"
+
+    let encoding = Data_encoding.constant "ended"
+
+    let pp ~short:_ ppf () = Format.fprintf ppf "ended"
+
+    let doc = "Worker ended event"
+
+    let level = Debug
+  end)
+
+  module Failed_event = Make (struct
+    type t = string
+
+    let section = None
+
+    let name = "lwt-worker_failed"
+
+    let encoding = Data_encoding.(obj1 (req "error" string))
+
+    let pp ~short:_ ppf error = Format.fprintf ppf "failed with %s" error
+
+    let doc = "Worker failed event"
+
+    let level = Error
+  end)
 
   let on_event name event =
+    let open Lwt_syntax in
     let section = Section.make_sanitized ["lwt-worker"; name] in
-    Error_event.log_error_and_recover
-      ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
-      ~severity:`Fatal
-      (fun () -> emit ~section (fun () -> {name; event}))
-
-  let on_event name event =
-    Lwt.catch
-      (fun () -> on_event name event)
-      (fun exc ->
-        Format.eprintf
-          "@[<hv 2>Failed to log event:@ %s@]@."
-          (Printexc.to_string exc) ;
-        Lwt.return_unit)
+    let* r =
+      match event with
+      | `Started -> Started_event.emit ~section ()
+      | `Ended -> Ended_event.emit ~section ()
+      | `Failed msg -> Failed_event.emit ~section msg
+    in
+    match r with
+    | Ok () -> Lwt.return_unit
+    | Error errs ->
+        Format.kasprintf
+          Lwt_log_core.error
+          "failed to log worker event:@ %a@\n"
+          Error_monad.pp_print_trace
+          errs
 end
 
 module Lwt_log_sink = struct
@@ -1556,27 +1349,29 @@ module Lwt_log_sink = struct
 
     let configure _ = Lwt_result_syntax.return_unit
 
-    let handle (type a) () m ?section (v : unit -> a) =
+    let should_handle (type a) ?section () m =
+      let module M = (val m : EVENT_DEFINITION with type t = a) in
+      (* Same criteria as [Lwt_log_core.log] *)
+      let section =
+        Option.fold ~none:default_section ~some:Section.to_lwt_log section
+      in
+      M.level >= Lwt_log_core.Section.level section
+
+    let handle (type a) () m ?section (ev : a) =
       let open Lwt_syntax in
       let module M = (val m : EVENT_DEFINITION with type t = a) in
       protect (fun () ->
-          let ev = v () in
-          let level = M.level ev in
           let section =
             Option.fold ~some:Section.to_lwt_log section ~none:default_section
           in
-          (* Only call printf if the event is to be printed. *)
-          if should_log ~level ~sink_level:(Lwt_log_core.Section.level section)
-          then
-            let* () =
-              Format.kasprintf
-                (Lwt_log_core.log ~section ~level)
-                "%a"
-                (M.pp ~short:false)
-                ev
-            in
-            return_ok_unit
-          else return_ok_unit)
+          let* () =
+            Format.kasprintf
+              (Lwt_log_core.log ~section ~level:M.level)
+              "%a"
+              (M.pp ~short:false)
+              ev
+          in
+          return_ok_unit)
 
     let close _ =
       let open Lwt_syntax in

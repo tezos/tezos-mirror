@@ -30,7 +30,6 @@ module Hashtbl = Stdlib.Hashtbl
 
 type context =
   | Add
-  | Sub
   | Mul
   | Div
   | Lam_body
@@ -69,9 +68,9 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
     unprotect_in_context [Add; Lam_body] (fun fmtr () ->
         Format.fprintf fmtr "%a +@, %a" x Add y Add)
 
-  let ( - ) x y =
-    unprotect_in_context [Lam_body] (fun fmtr () ->
-        Format.fprintf fmtr "%a - %a" x Sub y Sub)
+  let sat_sub x y =
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
+        Format.fprintf fmtr "sat_sub %a %a" x Arg_app y Arg_app)
 
   let ( * ) x y =
     unprotect_in_context [Mul; Lam_body] (fun fmtr () ->
@@ -82,30 +81,31 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
         Format.fprintf fmtr "%a / %a" x Div y Div)
 
   let max x y =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "max %a %a" x Arg_app y Arg_app)
 
   let min x y =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "min %a %a" x Arg_app y Arg_app)
 
   let shift_left x i =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "%a lsl %d" x Arg_app i)
 
   let shift_right x i =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "%a lsr %d" x Arg_app i)
 
   let log2 x =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "log2 @[<h>%a@]" x Arg_app)
 
   let sqrt x =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "sqrt @[<h>%a@]" x Arg_app)
 
-  let free ~name fmtr _c = Format.fprintf fmtr "free(%a)" Free_variable.pp name
+  let free ~name fmtr _c =
+    Format.fprintf fmtr "free(%a)" Free_variable.pp_short name
 
   let lt x y =
     unprotect_in_context [Lam_body; If_cond] (fun fmtr () ->
@@ -254,7 +254,7 @@ let overrides_table (overrides : float Free_variable.Map.t) =
     let data =
       Free_variable.Map.fold
         (fun var value acc ->
-          let var = Format.asprintf "%a" Free_variable.pp var in
+          let var = Format.asprintf "%a" Free_variable.pp_short var in
           Latex_syntax.Row [[maths var]; [maths (string_of_float value)]] :: acc)
         overrides
         []
@@ -325,7 +325,9 @@ let report ~(measure : Measure.packed_measurement)
   (* let pp_step_model = model (module Pp) in *)
   let open Latex_syntax in
   let preamble : section_content =
-    let text = Format.asprintf "Results for benchmark %s." Bench.name in
+    let text =
+      Format.asprintf "Results for benchmark %a." Namespace.pp Bench.name
+    in
     Text [normal_text text; normal_text "Options used:"]
   in
   let overrides_table : section_content =
@@ -345,7 +347,7 @@ let report ~(measure : Measure.packed_measurement)
     List.map
       (fun figs_file ->
         Figure
-          ( [normal_text Bench.name],
+          ( [normal_text (Namespace.basename Bench.name)],
             {filename = Filename.basename figs_file; size = Some (Width_cm 17)}
           ))
       figs_files
@@ -379,7 +381,7 @@ let report ~(measure : Measure.packed_measurement)
             [Text [normal_text "Recorded workloads:"]; Table contents])
           (workloads_table (module Bench) workload_data)
   in
-  Section (Bench.name, sections @ figure)
+  Section (Namespace.basename Bench.name, sections @ figure)
 
 type t = Latex_syntax.t
 

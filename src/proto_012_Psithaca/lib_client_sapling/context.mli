@@ -59,7 +59,8 @@ end
 module Shielded_tez_contract_input : sig
   type t
 
-  val create : ?pkh:Signature.Public_key_hash.t -> UTXO.transaction -> t
+  val create :
+    ?pkh:Tezos_crypto.Signature.V0.Public_key_hash.t -> UTXO.transaction -> t
 
   val encoding : t Data_encoding.t
 
@@ -134,7 +135,7 @@ val shield :
    *)
 val unshield :
   src:Spending_key.t ->
-  dst:Signature.public_key_hash ->
+  dst:Tezos_crypto.Signature.V0.public_key_hash ->
   backdst:Viewing_key.address ->
   Shielded_tez.t ->
   Contract_state.t ->

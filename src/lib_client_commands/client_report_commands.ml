@@ -37,7 +37,7 @@ let print_invalid_blocks ppf (b : Shell_services.Chain.invalid_block) =
 
 let commands () =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   let group =
     {name = "report"; title = "Commands to report the node's status"}
   in
@@ -52,7 +52,7 @@ let commands () =
          | "-" -> return Format.std_formatter
          | file ->
              let ppf = Format.formatter_of_out_channel (open_out file) in
-             ignore Clic.(setup_formatter ppf Plain Full) ;
+             ignore Tezos_clic.(setup_formatter ppf Plain Full) ;
              return ppf))
   in
   [

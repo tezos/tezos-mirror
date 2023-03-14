@@ -22,8 +22,7 @@ Events have:
   for human readers.
 
 Events are by default “lazy”: if no active sink accepts their section and level,
-they are not evaluated at all (i.e. in OCaml, the ``unit -> event`` argument of
-``Event.emit`` is never called). This means that outputting *more* events
+they are not emitted at all. This means that outputting *more* events
 implies more CPU and memory usage.
 
 *“Legacy events”* are the events that use the old & deprecated logging API;
@@ -83,7 +82,9 @@ Common options:
    pairs ``<section-prefix>:<level-threshold>`` which can be used to
    setup more precise filters. ``level-at-least=info`` can be understood
    as ``section-prefix=:info``, the empty section prefix matches all
-   sections.
+   sections. To exclude a specific section use the ``none`` filter, for
+   example ``section-prefix=p2p:none``. To define a filter only for
+   one specific section ``section-prefix=p2p:debug&section-prefix=:none``
 -  ``format=<value>`` the output format used; acceptable values are:
 
    -  ``one-per-line`` (the default): output JSON objects, one per line,
@@ -118,6 +119,9 @@ Examples:
    Executables will write to the file-descriptor ``4`` likely opened by
    a parent monitoring process. The reader will only receive the logs
    from the section ``rpc`` (but all of them including ``Debug``).
+-  ``file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"``
+   → Write only sections validator and rpc at debug level but exclude all
+   other sections from the stream.
 
 The format of the events is (usually minified):
 
@@ -199,7 +203,7 @@ Environment Variables
 The logging framework can be configured with environment variables
 before starting the node. Those variables work on all the code using the
 ``tezos-stdlib-unix`` library as long as ``Internal_event_unix.init`` is
-called; this should include *all* the regular ``tezos-*`` binaries.
+called; this should include *all* the regular ``octez-*`` binaries.
 
 -  ``TEZOS_EVENTS_CONFIG`` must be a whitespace-separated list of URIs:
 
@@ -237,7 +241,7 @@ Node-Specific Configuration
 Configuration File
 ~~~~~~~~~~~~~~~~~~
 
-See ``tezos-node config --help`` for the full schema of the node’s JSON
+See ``octez-node config --help`` for the full schema of the node’s JSON
 configuration file.
 
 In particular the fields:
@@ -251,7 +255,7 @@ In particular the fields:
 Command Line Options
 ~~~~~~~~~~~~~~~~~~~~
 
-See ``tezos-node run --help``, the ``lwt-log://`` sink configuration can
+See ``octez-node run --help``, the ``lwt-log://`` sink configuration can
 be also changed with 2 options:
 
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``
@@ -274,13 +278,13 @@ events) this call adds a sink to suddenly start pretty-printing all
 
 ::
 
-   tezos-client rpc put /config/logging with \
+   octez-client rpc put /config/logging with \
      '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
 Client and Baking Daemons
 -------------------------
 
-For now, ``tezos-client``, ``tezos-{baker,accuser}-*``, etc.
+For now, ``octez-client``, ``octez-{baker,accuser}-*``, etc.
 can only be configured using the environment variables.
 
 There is one common option ``--log-requests`` which can be used to trace
@@ -292,12 +296,12 @@ Processing Structured Events
 
 This is work-in-progress, see:
 
--  ``tezos-admin-client show event-logging`` outputs the configuration
-   currently understood by ``tezos-admin-client`` (hence through the
+-  ``octez-admin-client show event-logging`` outputs the configuration
+   currently understood by ``octez-admin-client`` (hence through the
    ``TEZOS_EVENTS_CONFIG`` variable) and lists all the events it knows
    about.
--  ``tezos-admin-client output schema of <Event-Name> to <File-path>``
+-  ``octez-admin-client output schema of <Event-Name> to <File-path>``
    get the JSON-Schema for an event.
 
 Example:
-``tezos-admin-client output schema of block-seen-alpha to block-seen-alpha.json``
+``octez-admin-client output schema of block-seen-alpha to block-seen-alpha.json``

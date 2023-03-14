@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let lwt_variable = Free_variable.of_string "lwt_main_run"
+let ns = Namespace.make Shell_namespace.ns "misc"
+
+let fv s = Free_variable.of_namespace (ns s)
+
+let lwt_variable = fv "lwt_main_run"
 
 let lwt_model =
   Model.make
@@ -40,7 +44,7 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let config_encoding = Data_encoding.unit
 
-  let name = "LWT_MAIN.RUN"
+  let name = ns "LWT_MAIN.RUN"
 
   let info = "Benchmark of Lwt_main.run"
 

@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "hacl-star" { >= "0.4.2" & < "0.5" }
+  "hacl-star" { >= "0.6.1" & < "0.7" }
   "hacl-star-raw"
   "ctypes_stubs_js"
   "ctypes" { >= "0.18.0" }
@@ -19,8 +19,8 @@ depends: [
   "tezos-error-monad" {with-test}
   "zarith" { with-test & >= "1.12" & < "1.13" }
   "zarith_stubs_js" {with-test}
-  "data-encoding" { with-test & >= "0.6" & < "0.7" }
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "data-encoding" { with-test & >= "0.7.1" & < "1.0.0" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
 ]
 conflicts: [

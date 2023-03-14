@@ -45,13 +45,13 @@ module PS = Sc_rollup_PVM_sig
   Its value is the result of the following snippet
 
   {|
-  let*! state = Prover.initial_state context in
+  let*! state = Prover.initial_state ~empty in
   Prover.state_hash state
   |}
 *)
 let reference_initial_state_hash =
   State_hash.of_b58check_exn
-    "scs11cXwQJJ5dkpEQGq3x2MJm3cM73cbEkHJqo5eDSoRpHUPyEQLB4"
+    "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj"
 
 type error +=
   | Arith_proof_production_failed
@@ -63,7 +63,7 @@ let () =
   let msg = "Invalid claim about outbox" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_arith_invalid_claim_about_outbox"
+    ~id:"smart_rollup_arith_invalid_claim_about_outbox"
     ~title:msg
     ~pp:(fun fmt () -> Format.pp_print_string fmt msg)
     ~description:msg
@@ -73,7 +73,7 @@ let () =
   let msg = "Output proof production failed" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_arith_output_proof_production_failed"
+    ~id:"smart_rollup_arith_output_proof_production_failed"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
@@ -83,7 +83,7 @@ let () =
   let msg = "Proof production failed" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_arith_proof_production_failed"
+    ~id:"smart_rollup_arith_proof_production_failed"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
@@ -116,8 +116,6 @@ end
 module type S = sig
   include PS.S
 
-  val name : string
-
   val parse_boot_sector : string -> string option
 
   val pp_boot_sector : Format.formatter -> string -> unit
@@ -136,7 +134,8 @@ module type S = sig
 
   val get_status : state -> status Lwt.t
 
-  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
+  val get_outbox :
+    Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   type instruction =
     | IPush : int -> instruction
@@ -179,8 +178,6 @@ module Make (Context : P) :
 
   let proof_stop_state proof = Context.proof_after proof
 
-  let name = "arith"
-
   let parse_boot_sector s = Some s
 
   let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
@@ -211,6 +208,18 @@ module Make (Context : P) :
     | IPush x -> Format.fprintf fmt "push(%d)" x
     | IAdd -> Format.fprintf fmt "add"
     | IStore x -> Format.fprintf fmt "store(%s)" x
+
+  let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk =
+    let open Sc_rollup_dissection_chunk_repr in
+    let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
+    let section_maximum_size = Z.div dist (Z.of_int 2) in
+    Sc_rollup_dissection_chunk_repr.(
+      default_check
+        ~section_maximum_size
+        ~check_sections_number:default_check_sections_number
+        ~default_number_of_sections
+        ~start_chunk
+        ~stop_chunk)
 
   (*
 
@@ -554,7 +563,7 @@ module Make (Context : P) :
               case
                 ~title:"store"
                 (Tag 2)
-                Data_encoding.string
+                Data_encoding.(string Plain)
                 (function IStore x -> Some x | _ -> None)
                 (fun x -> IStore x);
             ])
@@ -567,7 +576,7 @@ module Make (Context : P) :
 
       let initial = ""
 
-      let encoding = Data_encoding.string
+      let encoding = Data_encoding.(string Plain)
 
       let pp fmt s = Format.fprintf fmt "%s" s
     end)
@@ -602,18 +611,18 @@ module Make (Context : P) :
     end)
 
     module Required_reveal = Make_var (struct
-      type t = PS.Input_hash.t option
+      type t = PS.reveal option
 
       let initial = None
 
-      let encoding = Data_encoding.option PS.Input_hash.encoding
+      let encoding = Data_encoding.option PS.reveal_encoding
 
-      let name = "required_pre_image_hash"
+      let name = "required_reveal"
 
       let pp fmt v =
         match v with
         | None -> Format.fprintf fmt "<none>"
-        | Some h -> PS.Input_hash.pp fmt h
+        | Some h -> PS.pp_reveal fmt h
     end)
 
     module Metadata = Make_var (struct
@@ -657,12 +666,32 @@ module Make (Context : P) :
         | Some c -> Format.fprintf fmt "Some %a" Z.pp_print c
     end)
 
+    (** Store an internal message counter. This is used to distinguish
+        an unparsable external message and a internal message, which we both
+        treat as no-ops. *)
+    module Internal_message_counter = Make_var (struct
+      type t = Z.t
+
+      let initial = Z.zero
+
+      let encoding = Data_encoding.n
+
+      let name = "internal_message_counter"
+
+      let pp fmt c = Z.pp_print fmt c
+    end)
+
+    let incr_internal_message_counter =
+      let open Monad.Syntax in
+      let* current_counter = Internal_message_counter.get in
+      Internal_message_counter.set (Z.succ current_counter)
+
     module Next_message = Make_var (struct
       type t = string option
 
       let initial = None
 
-      let encoding = Data_encoding.(option string)
+      let encoding = Data_encoding.(option (string Plain))
 
       let name = "next_message"
 
@@ -818,15 +847,14 @@ module Make (Context : P) :
 
   open Monad
 
-  let initial_state ctxt =
-    let state = Tree.empty ctxt in
+  let initial_state ~empty =
     let m =
       let open Monad.Syntax in
       let* () = Status.set Halted in
       return ()
     in
     let open Lwt_syntax in
-    let* state, _ = run m state in
+    let* state, _ = run m empty in
     return state
 
   let install_boot_sector state boot_sector =
@@ -883,10 +911,10 @@ module Make (Context : P) :
         | Some n -> return (PS.First_after (level, n))
         | None -> return PS.Initial)
     | Waiting_for_reveal -> (
-        let* h = Required_reveal.get in
-        match h with
+        let* r = Required_reveal.get in
+        match r with
         | None -> internal_error "Internal error: Reveal invariant broken"
-        | Some h -> return (PS.Needs_reveal (Reveal_raw_data h)))
+        | Some reveal -> return (PS.Needs_reveal reveal))
     | Waiting_for_metadata -> return PS.(Needs_reveal Reveal_metadata)
     | Halted | Parsing | Evaluating -> return PS.No_input_required
 
@@ -895,10 +923,14 @@ module Make (Context : P) :
 
   let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
 
-  let get_outbox state =
+  let get_outbox outbox_level state =
     let open Lwt_syntax in
     let+ entries = result_of ~default:[] Output.entries state in
-    List.map snd entries
+    List.filter_map
+      (fun (_, msg) ->
+        if Raw_level_repr.(msg.PS.outbox_level = outbox_level) then Some msg
+        else None)
+      entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
@@ -923,14 +955,30 @@ module Make (Context : P) :
 
   let set_inbox_message_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
-    let payload =
+    let* payload =
       match Sc_rollup_inbox_message_repr.deserialize payload with
-      | Error _ -> None
-      | Ok (External payload) -> Some payload
-      | Ok (Internal {payload; _}) -> (
-          match Micheline.root payload with
-          | String (_, payload) -> Some payload
-          | _ -> None)
+      | Error _ -> return None
+      | Ok (External payload) -> return (Some payload)
+      | Ok (Internal (Transfer {payload; destination; _})) -> (
+          let* () = incr_internal_message_counter in
+          let* (metadata : Sc_rollup_metadata_repr.t option) = Metadata.get in
+          match metadata with
+          | Some {address; _} when Address.(destination = address) -> (
+              match Micheline.root payload with
+              | Bytes (_, payload) ->
+                  let payload = Bytes.to_string payload in
+                  return (Some payload)
+              | _ -> return None)
+          | _ -> return None)
+      | Ok (Internal Start_of_level) ->
+          let* () = incr_internal_message_counter in
+          return None
+      | Ok (Internal End_of_level) ->
+          let* () = incr_internal_message_counter in
+          return None
+      | Ok (Internal (Info_per_level _)) ->
+          let* () = incr_internal_message_counter in
+          return None
     in
     match payload with
     | Some payload ->
@@ -971,6 +1019,18 @@ module Make (Context : P) :
     | PS.Metadata metadata ->
         let* () = Metadata.set (Some metadata) in
         let* () = Status.set Waiting_for_input_message in
+        return ()
+    | PS.Dal_page None ->
+        (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
+           Below, we set the status to [Waiting_for_input_message] because the
+           inbox is the only source of automatically fetched data.
+           Once the issue above is handled (auto-fetch of Dal pages with EOL/SOL),
+           the implementation should be adapted. *)
+        let* () = Status.set Waiting_for_input_message in
+        return ()
+    | PS.Dal_page (Some data) ->
+        let* () = Next_message.set (Some (Bytes.to_string data)) in
+        let* () = start_parsing in
         return ()
 
   let ticked m =
@@ -1047,7 +1107,7 @@ module Make (Context : P) :
   let parse : unit t =
     let open Monad.Syntax in
     let produce_add =
-      let* _ = lexeme in
+      let* (_ : string) = lexeme in
       let* () = next_char in
       let* () = Code.inject IAdd in
       return ()
@@ -1111,12 +1171,12 @@ module Make (Context : P) :
         | Some (' ' | '\n') -> next_char
         | Some '+' -> produce_add
         | Some d when is_digit d ->
-            let* _ = lexeme in
+            let* (_ : string) = lexeme in
             let* () = next_char in
             let* () = Parser_state.set ParseInt in
             return ()
         | Some d when is_letter d ->
-            let* _ = lexeme in
+            let* (_ : string) = lexeme in
             let* () = next_char in
             let* () = Parser_state.set ParseVar in
             return ()
@@ -1164,6 +1224,85 @@ module Make (Context : P) :
             return (destination, entrypoint))
     | [] -> fail
 
+  let evaluate_preimage_request hash =
+    let open Monad.Syntax in
+    match Sc_rollup_reveal_hash.of_hex hash with
+    | None -> stop_evaluating false
+    | Some hash ->
+        let* () = Required_reveal.set (Some (Reveal_raw_data hash)) in
+        let* () = Status.set Waiting_for_reveal in
+        return ()
+
+  let evaluate_dal_page_request =
+    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+       - We should rather provide DAL parameters to PVM via metadata (and handle
+         the case where parameters are updated on L1).
+       - It's better to use EOL/SOL to request DAL pages once unique inbox MR
+         is merged. *)
+    (* The parameters below are those of mainnet in protocol constants, divided
+       by 16. *)
+    let attestation_lag = 1l in
+    let page_size = 4096 / 64 in
+    let slot_size = (1 lsl 20) / 64 in
+    let number_of_slots = 256 / 64 in
+    let number_of_pages = slot_size / page_size in
+    let mk_slot_index slot_str =
+      let open Option_syntax in
+      let* index = Option.map Int32.to_int @@ Int32.of_string_opt slot_str in
+      if Compare.Int.(index < 0 || index >= number_of_slots) then None
+      else Dal_slot_index_repr.of_int_opt index
+    in
+    let mk_page_index page_str =
+      let open Option_syntax in
+      let* index = Option.map Int32.to_int @@ Int32.of_string_opt page_str in
+      if Compare.Int.(index < 0 || index >= number_of_pages) then None
+      else Some index
+    in
+    fun raw_page_id ->
+      let mk_page_id current_lvl =
+        (* Dal pages import directive is [dal:<LVL>:<SID>:<PID>]. See mli file.*)
+        let open Option_syntax in
+        match String.split_on_char ':' raw_page_id with
+        | [lvl; slot; page] ->
+            let* lvl = Int32.of_string_opt lvl in
+            let* lvl = Bounded.Non_negative_int32.of_value lvl in
+            let published_level = Raw_level_repr.of_int32_non_negative lvl in
+            let delta = Raw_level_repr.diff current_lvl published_level in
+            (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
+               Putting delta > 0l doesn't work here because of the way the node
+               currently fetches blocks' data and calls the PVM.
+               This will be changed, in particular once EOL is used to fetch DAL
+               data.
+
+               More generally, the whole condition below will be reworked. *)
+            if
+              Compare.Int32.(
+                delta > 1l && delta <= Int32.mul 2l attestation_lag)
+            then
+              let* index = mk_slot_index slot in
+              let* page_index = mk_page_index page in
+              let slot_id = Dal_slot_repr.Header.{published_level; index} in
+              Some Dal_slot_repr.Page.{slot_id; page_index}
+            else None
+        | _ -> None
+      in
+      let open Monad.Syntax in
+      let* current_lvl = Current_level.get in
+      match mk_page_id current_lvl with
+      | Some page_id ->
+          let* () = Required_reveal.set (Some (Request_dal_page page_id)) in
+          let* () = Status.set Waiting_for_reveal in
+          return ()
+      | None -> stop_evaluating false
+
+  let remove_prefix prefix input input_len =
+    let prefix_len = String.length prefix in
+    if
+      Compare.Int.(input_len > prefix_len)
+      && String.(equal (sub input 0 prefix_len) prefix)
+    then Some (String.sub input prefix_len (input_len - prefix_len))
+    else None
+
   let evaluate =
     let open Monad.Syntax in
     let* i = Code.pop in
@@ -1171,24 +1310,28 @@ module Make (Context : P) :
     | None -> stop_evaluating true
     | Some (IPush x) -> Stack.push x
     | Some (IStore x) -> (
+        (* When evaluating an instruction [IStore x], we start by checking if [x]
+           is a reserved directive:
+           - "hash:<HASH>", to import a DAC data;
+           - "dal:<LVL>:<SID>:<PID>", to request a Dal page;
+           - "out" or "<DESTINATION>%<ENTRYPOINT>", to add a message in the outbox.
+           Otherwise, the instruction is interpreted as a directive to store the
+           top of the PVM's stack into the variable [x].
+        *)
         let len = String.length x in
-        if Compare.Int.(len > 5) && Compare.String.(String.sub x 0 5 = "hash:")
-        then
-          let hash = String.sub x 5 (len - 5) in
-          match PS.Input_hash.of_b58check_opt hash with
-          | None -> stop_evaluating false
-          | Some hash ->
-              let* () = Required_reveal.set (Some hash) in
-              let* () = Status.set Waiting_for_reveal in
-              return ()
-        else
-          let* v = Stack.top in
-          match v with
-          | None -> stop_evaluating false
-          | Some v -> (
-              match identifies_target_contract x with
-              | Some contract_entrypoint -> output contract_entrypoint v
-              | None -> Vars.set x v))
+        match remove_prefix "hash:" x len with
+        | Some hash -> evaluate_preimage_request hash
+        | None -> (
+            match remove_prefix "dal:" x len with
+            | Some pid -> evaluate_dal_page_request pid
+            | None -> (
+                let* v = Stack.top in
+                match v with
+                | None -> stop_evaluating false
+                | Some v -> (
+                    match identifies_target_contract x with
+                    | Some contract_entrypoint -> output contract_entrypoint v
+                    | None -> Vars.set x v))))
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
@@ -1229,58 +1372,55 @@ module Make (Context : P) :
   let step_transition input_given state =
     let open Lwt_syntax in
     let* request = is_input_state state in
+    let error msg = state_of (internal_error msg) state in
     let* state =
-      match request with
-      | PS.No_input_required -> eval state
-      | PS.Initial | PS.First_after _ -> (
-          match input_given with
-          | Some (PS.Inbox_message _ as input_given) ->
-              set_input input_given state
-          | None | Some (PS.Reveal _) ->
-              state_of
-                (internal_error
-                   "Invalid set_input: expecting inbox message, got a reveal.")
-                state)
-      | PS.Needs_reveal (Reveal_raw_data _hash) -> (
-          match input_given with
-          | Some (PS.Reveal (Raw_data _) as input_given) ->
-              set_input input_given state
-          | None | Some (PS.Inbox_message _) | Some (PS.Reveal (Metadata _)) ->
-              state_of
-                (internal_error
-                   "Invalid set_input: expecting a raw data reveal, got an \
-                    inbox message or a reveal metadata.")
-                state)
-      | PS.Needs_reveal Reveal_metadata -> (
-          match input_given with
-          | Some (PS.Reveal (Metadata _) as metadata) ->
-              set_input metadata state
-          | None | Some (PS.Reveal (Raw_data _)) | Some (PS.Inbox_message _) ->
-              state_of
-                (internal_error
-                   "Invalid set_input: expecting a metadata reveal, got an \
-                    inbox message or a raw data reveal.")
-                state)
+      match (request, input_given) with
+      | PS.No_input_required, None -> eval state
+      | PS.No_input_required, Some _ ->
+          error "Invalid set_input: expecting no input message but got one."
+      | (PS.Initial | PS.First_after _), Some (PS.Inbox_message _ as input)
+      | ( PS.Needs_reveal (Reveal_raw_data _),
+          Some (PS.Reveal (Raw_data _) as input) )
+      | PS.Needs_reveal Reveal_metadata, Some (PS.Reveal (Metadata _) as input)
+      | ( PS.Needs_reveal (PS.Request_dal_page _),
+          Some (PS.Reveal (Dal_page _) as input) ) ->
+          (* For all the cases above, the input request matches the given input, so
+             we proceed by setting the input. *)
+          set_input input state
+      | (PS.Initial | PS.First_after _), _ ->
+          error "Invalid set_input: expecting inbox message, got a reveal."
+      | PS.Needs_reveal (Reveal_raw_data _hash), _ ->
+          error
+            "Invalid set_input: expecting a raw data reveal, got an inbox \
+             message or a reveal metadata."
+      | PS.Needs_reveal Reveal_metadata, _ ->
+          error
+            "Invalid set_input: expecting a metadata reveal, got an inbox \
+             message or a raw data reveal."
+      | PS.Needs_reveal (PS.Request_dal_page _), _ ->
+          error
+            "Invalid set_input: expecting a dal page reveal, got an inbox \
+             message or a raw data reveal."
     in
     return (state, request)
 
   type error += Arith_proof_verification_failed
 
   let verify_proof input_given proof =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! result = Context.verify_proof proof (step_transition input_given) in
     match result with
-    | None -> fail Arith_proof_verification_failed
+    | None -> tzfail Arith_proof_verification_failed
     | Some (_state, request) -> return request
 
   let produce_proof context input_given state =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! result =
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
     | Some (tree_proof, _requested) -> return tree_proof
-    | None -> fail Arith_proof_production_failed
+    | None -> tzfail Arith_proof_production_failed
 
   let verify_origination_proof proof boot_sector =
     let open Lwt_syntax in
@@ -1295,8 +1435,8 @@ module Make (Context : P) :
       match result with None -> return false | Some (_, ()) -> return true
 
   let produce_origination_proof context boot_sector =
-    let open Lwt_tzresult_syntax in
-    let*! state = initial_state context in
+    let open Lwt_result_syntax in
+    let*! state = initial_state ~empty:(Tree.empty context) in
     let*! result =
       Context.produce_proof context state (fun state ->
           let open Lwt_syntax in
@@ -1305,7 +1445,7 @@ module Make (Context : P) :
     in
     match result with
     | Some (proof, ()) -> return proof
-    | None -> fail Arith_proof_production_failed
+    | None -> tzfail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)
 
@@ -1356,6 +1496,11 @@ module Make (Context : P) :
     | Some (_, false) -> fail Arith_invalid_claim_about_outbox
     | None -> fail Arith_output_proof_production_failed
 
+  let get_current_level state =
+    let open Lwt_syntax in
+    let* _state_, current_level = Monad.run Current_level.get state in
+    return current_level
+
   module Internal_for_tests = struct
     let insert_failure state =
       let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
@@ -1385,6 +1530,8 @@ module Protocol_implementation = Make (struct
   type proof = Context.Proof.tree Context.Proof.t
 
   let verify_proof p f =
+    let open Lwt_option_syntax in
+    let*? () = Result.to_option (Context_binary_proof.check_is_binary p) in
     Lwt.map Result.to_option (Context.verify_tree_proof p f)
 
   let produce_proof _context _state _f =
@@ -1398,5 +1545,5 @@ module Protocol_implementation = Make (struct
 
   let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
-  let proof_encoding = Context.Proof_encoding.V2.Tree32.tree_proof_encoding
+  let proof_encoding = Context.Proof_encoding.V2.Tree2.tree_proof_encoding
 end)

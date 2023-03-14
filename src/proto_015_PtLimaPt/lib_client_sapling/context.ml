@@ -140,7 +140,7 @@ module Input_set = struct
     Format.fprintf
       pp
       "@[<h>%s %Ld@]"
-      (Base58.simple_encode
+      (Tezos_crypto.Base58.simple_encode
          Viewing_key.address_b58check_encoding
          (F.Input.address i))
       (F.Input.amount i)

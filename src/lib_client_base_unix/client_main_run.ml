@@ -27,11 +27,10 @@
 (* Tezos Command line interface - Main Program *)
 
 open Client_context_unix
-open Tezos_clic
 
 let builtin_commands =
   let open Lwt_syntax in
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~desc:"List the protocol versions that this client understands."
@@ -49,7 +48,8 @@ let builtin_commands =
 module type M = sig
   type t
 
-  val global_options : unit -> (t, Client_context_unix.unix_full) Clic.options
+  val global_options :
+    unit -> (t, Client_context_unix.unix_full) Tezos_clic.options
 
   val parse_config_args :
     #Tezos_client_base.Client_context.full ->
@@ -70,11 +70,13 @@ module type M = sig
 
   val clic_commands :
     base_dir:string ->
-    config_commands:Tezos_client_base.Client_context.full Clic.command list ->
-    builtin_commands:Tezos_client_base.Client_context.full Clic.command list ->
-    other_commands:Tezos_client_base.Client_context.full Clic.command list ->
+    config_commands:
+      Tezos_client_base.Client_context.full Tezos_clic.command list ->
+    builtin_commands:
+      Tezos_client_base.Client_context.full Tezos_clic.command list ->
+    other_commands:Tezos_client_base.Client_context.full Tezos_clic.command list ->
     require_auth:bool ->
-    Tezos_client_base.Client_context.full Clic.command list
+    Tezos_client_base.Client_context.full Tezos_clic.command list
 
   val logger : RPC_client_unix.logger option
 end
@@ -90,7 +92,10 @@ let setup_remote_signer (module C : M) client_config
           (function
             | _, known_pkh, _, Some known_sk_uri
               when List.exists
-                     (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh)
+                     (fun pkh ->
+                       Tezos_crypto.Signature.Public_key_hash.equal
+                         pkh
+                         known_pkh)
                      pkhs ->
                 Some known_sk_uri
             | _ -> None)
@@ -212,11 +217,6 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~verbose_rpc_error_diagnostics
   | (`Mode_light | `Mode_proxy) as mode ->
       let printer = new unix_logger ~base_dir in
-      let rpc_context =
-        new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-          rpc_config
-          Media_type.all_media_types
-      in
       let get_mode () =
         match (mode, sources) with
         | `Mode_proxy, _ -> return Tezos_proxy.Proxy_services.Proxy_client
@@ -231,7 +231,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
               (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                  {rpc_config with endpoint}
                  (Media_type.Command_line.of_command_line rpc_config.media_type)
-                :> RPC_context.simple)
+                :> Tezos_rpc.Context.simple)
             in
             let sources =
               Tezos_proxy.Light.sources_config_to_sources
@@ -240,18 +240,10 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             in
             return (Tezos_proxy.Proxy_services.Light_client sources)
       in
-      let* proxy_env =
-        Tezos_proxy.Registration.get_registered_proxy
-          printer
-          rpc_context
-          mode
-          ~chain
-          ~block
-          protocol
-      in
       let* mode = get_mode () in
       return
       @@ new unix_proxy
+           ?protocol
            ~chain
            ~block
            ~confirmations
@@ -259,7 +251,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~base_dir
            ~rpc_config
            ~mode
-           ~proxy_env
+           ()
 
 let setup_mockup_rpc_client_config
     (cctxt : Tezos_client_base.Client_context.printer)
@@ -409,13 +401,13 @@ let main (module C : M) ~select_commands =
   in
   Random.self_init () ;
   ignore
-    Clic.(
+    Tezos_clic.(
       setup_formatter
         Format.std_formatter
         (if Unix.isatty Unix.stdout then Ansi else Plain)
         Short) ;
   ignore
-    Clic.(
+    Tezos_clic.(
       setup_formatter
         Format.err_formatter
         (if Unix.isatty Unix.stderr then Ansi else Plain)
@@ -503,10 +495,11 @@ let main (module C : M) ~select_commands =
             | None -> return_nil
           in
           let commands =
-            Clic.add_manual
+            Tezos_clic.add_manual
               ~executable_name
               ~global_options
-              (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+              (if Unix.isatty Unix.stdout then Tezos_clic.Ansi
+              else Tezos_clic.Plain)
               Format.std_formatter
               (C.clic_commands
                  ~base_dir
@@ -518,7 +511,7 @@ let main (module C : M) ~select_commands =
           match autocomplete with
           | Some (prev_arg, cur_arg, script) ->
               let* completions =
-                Clic.autocompletion
+                Tezos_clic.autocompletion
                   ~script
                   ~cur_arg
                   ~prev_arg
@@ -529,23 +522,23 @@ let main (module C : M) ~select_commands =
               in
               List.iter print_endline completions ;
               return_unit
-          | None -> Clic.dispatch commands client_config remaining
+          | None -> Tezos_clic.dispatch commands client_config remaining
         in
         match r with
         | Ok () -> Lwt.return 0
-        | Error [Clic.Version] ->
+        | Error [Tezos_clic.Version] ->
             let version = Tezos_version.Bin_version.version_string in
             Format.printf "%s\n" version ;
             Lwt.return 0
-        | Error [Clic.Help command] ->
-            Clic.usage
+        | Error [Tezos_clic.Help command] ->
+            Tezos_clic.usage
               Format.std_formatter
               ~executable_name
               ~global_options
               (match command with None -> [] | Some c -> [c]) ;
             Lwt.return 0
         | Error errs ->
-            Clic.pp_cli_errors
+            Tezos_clic.pp_cli_errors
               Format.err_formatter
               ~executable_name
               ~global_options
@@ -580,6 +573,6 @@ let run (module M : M)
     ~(select_commands :
        RPC_client_unix.http_ctxt ->
        Client_config.cli_args ->
-       Client_context.full Clic.command list tzresult Lwt.t) =
+       Client_context.full Tezos_clic.command list tzresult Lwt.t) =
   Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_and_forward
   @@ main (module M) ~select_commands

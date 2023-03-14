@@ -1,0 +1,7 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+build_get_contracts:
+  extends:
+    - .build_template
+  script:
+    - dune build @devtools/get_contracts/check

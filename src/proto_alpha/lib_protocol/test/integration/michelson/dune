@@ -14,7 +14,11 @@
   tezos-micheline
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
+  tezos-protocol-plugin-alpha
   tezos-protocol-alpha.parameters)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -25,10 +29,14 @@
   -open Tezos_client_alpha
   -open Tezos_micheline
   -open Tezos_benchmark_alpha
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_plugin_alpha))
 
 (rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
- (deps (glob_files contracts/*) (glob_files patched_contracts/*))
+ (deps
+  (glob_files contracts/*)
+  (glob_files patched_contracts/*)
+  (glob_files_rec ../../../../../../michelson_test_scripts/*))
  (action (run %{dep:./main.exe})))

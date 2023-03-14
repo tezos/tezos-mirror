@@ -56,7 +56,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im\"\nlet name = Tezos_protocol_environment_genesis.Name.name\ninclude Tezos_raw_protocol_genesis\ninclude Tezos_raw_protocol_genesis.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im\"\nlet name = Tezos_protocol_environment_genesis.Name.name\ninclude Tezos_raw_protocol_genesis\ninclude Tezos_raw_protocol_genesis.Main\n")))
 
 (rule
  (targets tezos_protocol_genesis.ml)

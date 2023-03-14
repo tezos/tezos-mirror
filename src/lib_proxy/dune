@@ -6,7 +6,8 @@
  (public_name tezos-proxy)
  (instrumentation (backend bisect_ppx))
  (libraries
-  ringo-lwt
+  aches
+  aches-lwt
   tezos-base
   tezos-clic
   tezos-client-base

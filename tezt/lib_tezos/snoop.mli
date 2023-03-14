@@ -46,7 +46,7 @@ val benchmark :
   nsamples:int ->
   save_to:string ->
   ?seed:int ->
-  ?config_dir:string ->
+  ?config_file:string ->
   ?csv_dump:string ->
   t ->
   unit Lwt.t
@@ -138,7 +138,12 @@ type tag =
   | Tx_rollup
   | Tickets
   | Big_map
+  | Skip_list
+  | Sc_rollup
 
 type list_mode = All | Any | Exactly
 
 val list_benchmarks : mode:list_mode -> tags:tag list -> t -> string list Lwt.t
+
+val write_config :
+  benchmark:string -> bench_config:string -> file:string -> t -> unit Lwt.t

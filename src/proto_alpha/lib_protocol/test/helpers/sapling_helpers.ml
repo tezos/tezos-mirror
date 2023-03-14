@@ -117,7 +117,7 @@ module Common = struct
       let payload_enc =
         Data_encoding.Binary.to_bytes_exn
           Data_encoding.bytes
-          (Hacl.Rand.gen (memo_size + 4 + 16 + 11 + 32 + 8))
+          (Tezos_crypto.Hacl.Rand.gen (memo_size + 4 + 16 + 11 + 32 + 8))
       in
       Data_encoding.Binary.of_bytes_exn
         Ciphertext.encoding

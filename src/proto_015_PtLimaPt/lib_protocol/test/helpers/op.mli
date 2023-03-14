@@ -44,6 +44,13 @@ open Alpha_context
 val pack_operation :
   Context.t -> signature option -> 'a contents_list -> packed_operation
 
+val sign :
+  ?watermark:Tezos_crypto.Signature.V0.watermark ->
+  Tezos_crypto.Signature.V0.secret_key ->
+  Context.t ->
+  packed_contents_list ->
+  packed_operation
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->
@@ -238,7 +245,7 @@ val originated_contract : Operation.packed -> Contract.t
 val register_global_constant :
   ?force_reveal:bool ->
   ?counter:Z.t ->
-  ?public_key:Signature.public_key ->
+  ?public_key:Tezos_crypto.Signature.V0.public_key ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -269,7 +276,7 @@ val double_baking :
 
 val activation :
   Context.t ->
-  Signature.Public_key_hash.t ->
+  Tezos_crypto.Signature.V0.Public_key_hash.t ->
   Blinded_public_key_hash.activation_code ->
   Operation.packed tzresult Lwt.t
 
@@ -734,9 +741,7 @@ val zk_rollup_origination :
   ?storage_limit:counter ->
   Context.t ->
   Contract.t ->
-  public_parameters:
-    Plonk.Main_protocol.verifier_public_parameters
-    * Plonk.Main_protocol.transcript ->
+  public_parameters:Environment.Plonk.public_parameters ->
   circuits_info:bool Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
@@ -755,9 +760,9 @@ val update_consensus_key :
 
 val drain_delegate :
   Context.t ->
-  consensus_key:Signature.Public_key_hash.t ->
-  delegate:Signature.Public_key_hash.t ->
-  destination:Signature.Public_key_hash.t ->
+  consensus_key:Tezos_crypto.Signature.V0.Public_key_hash.t ->
+  delegate:Tezos_crypto.Signature.V0.Public_key_hash.t ->
+  destination:Tezos_crypto.Signature.V0.Public_key_hash.t ->
   packed_operation tzresult Lwt.t
 
 (** [zk_rollup_publish ctxt source ~zk_rollup ~op] tries to add an operation

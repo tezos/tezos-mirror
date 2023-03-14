@@ -23,12 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type neighbor = {addr : string; port : int}
+
+type dac = {
+  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+  threshold : int;
+      (** The number of signature needed on root page hashes for the
+          corresponding reveal preimages to be available. *)
+  reveal_data_dir : string;
+      (** The directory where the dal node saves pages computed
+          from reveal preimages. If the dal node saves the data
+          directly into the rollup node, this should be
+          {ROLLUP_NODE_DATA_DIR}/{PVM_NAME}. *)
+}
+
 type t = {
   use_unsafe_srs : bool;
       (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
   data_dir : string;  (** The path to the DAL node data directory *)
   rpc_addr : string;  (** The address the DAL node listens to *)
   rpc_port : int;  (** The port the DAL node listens to *)
+  neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
+  dac : dac;
+      (** The aggregate account aliases that constitute the Data availability
+          Committee. *)
 }
 
 (** [filename config] gets the path to config file *)
@@ -40,9 +58,14 @@ val data_dir_path : t -> string -> string
 
 val default_data_dir : string
 
+val default_reveal_data_dir : string
+
 val default_rpc_addr : string
 
 val default_rpc_port : int
+
+(** Default configuration for the data availability committee. *)
+val default_dac : dac
 
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t

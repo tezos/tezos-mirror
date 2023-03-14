@@ -1,5 +1,16 @@
 {0 Overview of the prevalidator implementation }
 
+This documentation was written for what is now considered the legacy version of
+the mempool (see {{: https://gitlab.com/tezos/tezos/-/issues/4113 } issue
+#4113}). This mempool supports the Kathmandu protocol and is implemented in
+{{!Tezos_shell.Legacy_prevalidator_internal} Legacy_prevalidator_internal} and
+its dependencies. The newer mempool implementation, supporting protocols Lima
+and up, does not have a similar documentation yet. Nevertheless, most of the
+concepts presented here still apply to the newer mempool.
+
+FIXME: https://gitlab.com/tezos/tezos/-/issues/4146
+Some links in this file have been broken by file renamings.
+
 This page details the internals of the prevalidator component. It explains the
 complete lifecycle of an operation in the prevalidator, from its reception to
 its classification and advertisement to the neighborhood.
@@ -35,7 +46,7 @@ from the peers through the {{!Tezos_p2p.module-P2p} p2p} network.
 Finally, once the operation has been fetched, it is parsed. If an error occurs
 during parsing, the operation is rejected with an [unparsable] classification.
 Otherwise, it is pre-filtered (see
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.pre_filter} pre_filter} and
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.pre_filter} pre_filter} and
 filter section) before being added to a set of pending operations that await to
 be classified.
 
@@ -65,7 +76,7 @@ amounts to classify it on top of the current validation state. An operation
 classification consists of precheck, application, and post-filtering phases.
 
 The goal of
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.precheck} precheck}
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.precheck} precheck}
 is to check the
 {{: https://tezos.gitlab.io/alpha/precheck.html#solvable-operations } solvability}
 of the operation (see {!section-precheck}) within the
@@ -109,7 +120,7 @@ happen currently) or if the protocol rejects this operation with an error
 classified as [Temporary].
 
 Once they are [Applied], operations are then post-filtered (see
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.post_filter} post_filter}).
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.post_filter} post_filter}).
 Like for the [pre_filter], [apply_operation] and [precheck], an operation
 post_filtering can return an error: the operation is then classified according to
 this error (see
@@ -151,7 +162,7 @@ new [live_blocks] and [live_operations], triggering also a
 {{!Tezos_shell.module-Prevalidator.flush} flush} of the mempool: every operation
 classified as {{!Tezos_shell.module-Prevalidation.T.result.Applied} Applied} or
 {{!Tezos_shell.module-Prevalidation.T.result.Branch_delayed} Branch_delayed}
-which is anchored (to the {{!Tezos_crypto.module-Block_hash.type-t} block_hash}
+which is anchored (to the {{!module-Block_hash.type-t} block_hash}
 on which the operation is based on when it was created) on a [live block] and
 which is not in the [live operations] (operations which are included in
 [live_blocks]) is set
@@ -163,7 +174,7 @@ Operations classified as
 reclassified only if the old head is not the predecessor block of the new head.
 
 We use the
-{{!Tezos_shell_services.module-Chain_validator_worker_state.module-Event.type-update} Chain_validator_worker_state.Event.update}
+{{!Tezos_shell_services.module-Chain_validator_worker_state.type-update} Chain_validator_worker_state.Event.update}
 for that purpose (see [on_flush]).
 
 {{!Tezos_shell.module-Prevalidation.T.result.Refused} Refused} and
@@ -177,11 +188,11 @@ operations is reset.
 
 {3 Filters}
 
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool} Prevalidator filters}, implemented in protocol plugins, are used as an
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool} Prevalidator filters}, implemented in protocol plugins, are used as an
 anti-spam protection mechanism. These plugins are provided as extensions of the protocol and are more restrictive but not mandatory: without them, the prevalidator still works but may propagate outdate operations and be slower. The plugin comes with three functions:
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.pre_filter } pre_filter},
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.precheck } precheck} and
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.post_filter } post_filter}.
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.pre_filter } pre_filter},
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.precheck } precheck} and
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.post_filter } post_filter}.
 
 Except for locally injected operations, pending operations are first
 pre-filtered. The [precheck] is called before trying to apply an operation.
@@ -192,7 +203,7 @@ The [post_filter] is called every time an operation is classified as
 {4 Precheck}
 
 As explained before,
-{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.precheck} precheck} can
+{{!Tezos_shell.Shell_plugin.FILTER.Mempool.precheck} precheck} can
 either return an error, [Undecided] if the operation is not precheckable
 (i.e. not a manager operation), or can return [Passed_precheck].
 [Passed_precheck] can contain a replacement information [Replace (oph,error)].
@@ -289,7 +300,7 @@ We aim to make it functional in the future, to enforce invariants on how and
 where the global state is updated.
 
 The [Handlers] module implement the functions needed by the
-{{!Tezos_workers.Worker.Make.HANDLERS} Worker Handlers} API. These functions
+{{!Tezos_workers.Worker.module-type-T.HANDLERS} Worker Handlers} API. These functions
 concern the lifecycle of a [Worker], such as what happens when it starts and
 when it is shut down. Except for initialization, the [Handlers] module is mostly
 boilerplate.

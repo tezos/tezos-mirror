@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
 open Protocol
 open Protocol_client_context
 
@@ -33,7 +32,7 @@ let bake cctxt ?timestamp block command sk =
     | Some t -> t
     | None -> Time.System.(to_protocol (Tezos_base.Time.System.now ()))
   in
-  let protocol_data = {command; signature = Signature.zero} in
+  let protocol_data = {command; signature = Tezos_crypto.Signature.V0.zero} in
   Genesis_block_services.Helpers.Preapply.block
     cctxt
     ~block
@@ -43,60 +42,88 @@ let bake cctxt ?timestamp block command sk =
   >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in
   Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun chain_id ->
-  Client_keys.append cctxt sk ~watermark:(Block_header chain_id) blk
+  Client_keys_v0.append cctxt sk ~watermark:(Block_header chain_id) blk
   >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
 
-let int64_parameter =
-  Clic.parameter (fun _ p ->
-      try return (Int64.of_string p) with _ -> failwith "Cannot read int64")
+let int32_parameter =
+  Tezos_clic.parameter (fun _ p ->
+      match Int32.of_string p with
+      | i32 ->
+          if Compare.Int32.(i32 < 0l) then
+            failwith "Cannot provide a negative int32"
+          else return i32
+      | exception _ -> failwith "Cannot read int32")
 
 let file_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
       else return p)
 
-let fitness_from_int64 fitness =
+let fitness_from_uint32 fitness =
   (* definition taken from src/proto_alpha/lib_protocol/src/constants_repr.ml *)
-  let version_number = "\000" in
-  (* definitions taken from src/proto_alpha/lib_protocol/src/fitness_repr.ml *)
-  let int64_to_bytes i =
-    let b = Bytes.create 8 in
-    TzEndian.set_int64 b 0 i ;
+  let version_number = "\002" in
+  let int32_to_bytes i =
+    let b = Bytes.create 4 in
+    TzEndian.set_int32 b 0 i ;
     b
   in
-  [Bytes.of_string version_number; int64_to_bytes fitness]
+  (* Tenderbake-compatible fitness format.
+
+     We encode the genesis fitness using tenderbake's fitness format.
+     In order to do that, we need to select a tenderbake's fitness
+     field that won't break tenderbake invariants. When a tenderbake
+     protocol parses the fitness: [level], [locked_round], [round] and
+     [predecessor_round]. [level] cannot be used as tenderbake
+     protocols might not be able to produce higher fitness; if
+     present, [locked_round] must be lower or equal than [round],
+     [predecessor_round] starts at 0xffffffff which cannot be simply
+     incremented; [round] thus may be used but will impact block
+     delays. *)
+  (* We use (fitness - 1) as the most common way to call this command
+     is by providing a fitness of 1 and we don't want block
+     delays. Therefore, we want an argument of 1 to result in a round
+     0. *)
+  let fitness_to_round = Int32.(max 0l (pred fitness)) in
+  [
+    Bytes.of_string version_number (* version *);
+    int32_to_bytes 0l (* level *);
+    Bytes.empty (* locked-round *);
+    int32_to_bytes (-1l) (* predecessor round *);
+    int32_to_bytes fitness_to_round (* round *);
+  ]
 
 let timestamp_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"timestamp"
     ~placeholder:"date"
     ~doc:"Set the timestamp of the block (and initial time of the chain)"
-    (Clic.parameter (fun _ t ->
+    (Tezos_clic.parameter (fun _ t ->
          match Time.System.of_notation_opt t with
          | None ->
              failwith "Could not parse value provided to -timestamp option"
          | Some t -> return t))
 
 let test_delay_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"delay"
     ~placeholder:"time"
     ~doc:"Set the life span of the test chain (in seconds)"
     ~default:(Int64.to_string (Int64.mul 24L 3600L))
-    (Clic.parameter (fun _ t ->
+    (Tezos_clic.parameter (fun _ t ->
          match Int64.of_string_opt t with
          | None -> failwith "Could not parse value provided to -delay option"
          | Some t -> return t))
 
 let proto_param ~name ~desc t =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc
-    (Clic.parameter (fun _ str -> Lwt.return (Protocol_hash.of_b58check str)))
+    (Tezos_clic.parameter (fun _ str ->
+         Lwt.return (Protocol_hash.of_b58check str)))
     t
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let args =
     args1
       (arg
@@ -119,9 +146,9 @@ let commands () =
       @@ param
            ~name:"fitness"
            ~desc:"Hardcoded fitness of the first block (integer)"
-           int64_parameter
+           int32_parameter
       @@ prefixes ["and"; "key"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"password"
            ~desc:"Activator's key"
       @@ prefixes ["and"; "parameters"]
@@ -136,7 +163,7 @@ let commands () =
            sk
            param_json_file
            (cctxt : Client_context.full) ->
-        let fitness = fitness_from_int64 fitness in
+        let fitness = fitness_from_uint32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =
@@ -161,9 +188,9 @@ let commands () =
            ~name:"fitness"
            ~desc:
              "Hardcoded fitness of the first block of the testchain (integer)"
-           int64_parameter
+           int32_parameter
       @@ prefixes ["and"; "key"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"password"
            ~desc:"Activator's key"
       @@ prefixes ["and"; "parameters"]
@@ -173,7 +200,7 @@ let commands () =
            file_parameter
       @@ stop)
       (fun (timestamp, delay) hash fitness sk param_json_file cctxt ->
-        let fitness = fitness_from_int64 fitness in
+        let fitness = fitness_from_uint32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =

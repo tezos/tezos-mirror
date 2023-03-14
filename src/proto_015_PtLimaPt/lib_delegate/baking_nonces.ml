@@ -140,7 +140,7 @@ let filter_outdated_nonces state nonces =
 
 let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
-  | Error (RPC_context.Not_found _ :: _) -> return_nil
+  | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) -> (
       Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
@@ -203,11 +203,13 @@ let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
   (match nonce_config with
   | Deterministic ->
       let data = Data_encoding.Binary.to_bytes_exn Raw_level.encoding level in
-      Client_keys.deterministic_nonce delegate.secret_key_uri data
+      Client_keys_v0.deterministic_nonce delegate.secret_key_uri data
       >>=? fun nonce ->
       return (Data_encoding.Binary.of_bytes_exn Nonce.encoding nonce)
   | Random -> (
-      match Nonce.of_bytes (Rand.generate Constants.nonce_length) with
+      match
+        Nonce.of_bytes (Tezos_crypto.Rand.generate Constants.nonce_length)
+      with
       | Error _errs -> assert false
       | Ok nonce -> return nonce))
   >>=? fun nonce -> return (Nonce.hash nonce, nonce)
@@ -237,7 +239,11 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             ~nonce
             ()
           >>=? fun bytes ->
-          let bytes = Signature.concat bytes Signature.zero in
+          let bytes =
+            Tezos_crypto.Signature.V0.concat
+              bytes
+              Tezos_crypto.Signature.V0.zero
+          in
           Shell_services.Injection.operation ~async:true cctxt ~chain bytes
           >>=? fun oph ->
           Events.(

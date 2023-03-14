@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 open Tezos_protocol_alpha
 open Protocol
 open Alpha_context
@@ -207,7 +207,10 @@ let get_next_baker_by_round rpc_ctxt round block =
     Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~max_round:(round + 1) block
   in
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
-    List.find (fun {Plugin.RPC.Baking_rights.round = p; _} -> p = round) bakers
+    List.find
+      (fun {Plugin.RPC.Baking_rights.round = p; _} ->
+        Round.to_int32 p = Int32.of_int round)
+      bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
@@ -220,6 +223,7 @@ let get_next_baker_by_account rpc_ctxt pkh block =
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.hd bakers |> WithExceptions.Option.get ~loc:__LOC__
   in
+  let*? round = Round.to_int round |> Environment.wrap_tzresult in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_excluding rpc_ctxt excludes block =
@@ -232,6 +236,7 @@ let get_next_baker_excluding rpc_ctxt excludes block =
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
+  let*? round = Round.to_int round |> Environment.wrap_tzresult in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let dispatch_policy rpc_ctxt = function
@@ -269,7 +274,7 @@ module Forge = struct
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash
-      ~proto_level =
+      ~proto_level ~pred_resulting_context_hash =
     Tezos_base.Block_header.
       {
         level;
@@ -279,7 +284,7 @@ module Forge = struct
         operations_hash;
         proto_level;
         validation_passes = List.length Main.validation_passes;
-        context = Context_hash.zero (* to update later *);
+        context = pred_resulting_context_hash;
       }
 
   let set_seed_nonce_hash seed_nonce_hash {baker; shell; contents} =
@@ -303,7 +308,8 @@ module Forge = struct
     in
     Block_header.{shell; protocol_data = {contents; signature}} |> return
 
-  let forge_header rpc_ctxt ?(policy = By_round 0) ?timestamp ~operations pred =
+  let forge_header rpc_ctxt ?(policy = By_round 0) ?timestamp ~operations pred
+      pred_resulting_context_hash =
     let open Lwt_result_syntax in
     let predecessor_round =
       match Fitness.from_raw (Store.Block.fitness pred) with
@@ -344,6 +350,7 @@ module Forge = struct
         ~fitness
         ~operations_hash
         ~proto_level
+        ~pred_resulting_context_hash
     in
     let contents =
       make_contents
@@ -487,9 +494,10 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = Main.finalize_validation validation_state in
   Main.finalize_application application_state shell_header
 
-let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
+let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
+    pred pred_resulting_context_hash =
   let open Lwt_result_syntax in
-  let* rpc_ctxt = make_rpc_context ~chain_id ctxt pred in
+  let* rpc_ctxt = make_rpc_context ~chain_id pred_resulting_ctxt pred in
   let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
       ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
     let*! f =
@@ -509,34 +517,39 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
         return r)
   in
   let* {shell; contents; baker} =
-    Forge.forge_header rpc_ctxt ?policy ~operations pred
+    Forge.forge_header
+      rpc_ctxt
+      ?policy
+      ~operations
+      pred
+      pred_resulting_context_hash
   in
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
-  let*! context =
+  let*! ctxt =
     match Store.Block.block_metadata_hash pred with
-    | None -> Lwt.return ctxt
-    | Some hash -> Context_ops.add_predecessor_block_metadata_hash ctxt hash
+    | None -> Lwt.return pred_resulting_ctxt
+    | Some hash ->
+        Context_ops.add_predecessor_block_metadata_hash pred_resulting_ctxt hash
   in
   let*! ctxt =
     match Store.Block.all_operations_metadata_hash pred with
-    | None -> Lwt.return context
-    | Some hash -> Context_ops.add_predecessor_ops_metadata_hash context hash
+    | None -> Lwt.return ctxt
+    | Some hash -> Context_ops.add_predecessor_ops_metadata_hash ctxt hash
   in
-  let predecessor_context = ctxt in
   let* element_of_key =
     element_of_key
       ~chain_id
-      ~predecessor_context
+      ~predecessor_context:ctxt
       ~predecessor_timestamp:(Store.Block.timestamp pred)
       ~predecessor_level:(Store.Block.level pred)
       ~predecessor_fitness:(Store.Block.fitness pred)
       ~predecessor:(Store.Block.hash pred)
       ~timestamp:shell.timestamp
   in
-  let* predecessor_context =
+  let* pred_ctxt =
     Tezos_protocol_environment.Context.load_cache
       (Store.Block.hash pred)
-      predecessor_context
+      ctxt
       `Lazy
       element_of_key
   in
@@ -545,7 +558,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       let open Environment.Error_monad in
       let* vstate =
         begin_validation_and_application
-          predecessor_context
+          pred_ctxt
           chain_id
           (Construction
              {
@@ -577,7 +590,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   in
   let validation = {validation with max_operations_ttl} in
   let context = Shell_context.unwrap_disk_context validation.context in
-  let*! context_hash =
+  let*! resulting_context_hash =
     Context.commit ~time:shell.timestamp ?message:validation.message context
   in
   let block_header_metadata =
@@ -594,7 +607,6 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       hashes
   in
   let contents = {contents with payload_hash} in
-  let shell = {shell with context = context_hash} in
   let* header = Forge.sign_header ~chain_id {baker; shell; contents} in
   let protocol_data =
     Data_encoding.Binary.to_bytes_exn
@@ -618,21 +630,31 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       block_header_metadata,
       block_hash_metadata,
       operations_metadata_hashes,
+      resulting_context_hash,
       validation )
 
 let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     ?(operations = empty_operations) pred =
   let open Lwt_result_syntax in
-  let* ctxt = Store.Block.context chain_store pred in
+  let* pred_resulting_ctxt = Store.Block.context chain_store pred in
+  let* pred_resulting_context_hash =
+    Store.Block.resulting_context_hash chain_store pred
+  in
   let chain_id = Store.Chain.chain_id chain_store in
   let* ( block_header,
          block_header_metadata,
          block_metadata_hash,
          ops_metadata_hashes,
+         resulting_context_hash,
          validation ) =
-    apply ctxt chain_id ~policy ~operations pred
+    apply
+      pred_resulting_ctxt
+      chain_id
+      ~policy
+      ~operations
+      pred
+      pred_resulting_context_hash
   in
-  let context_hash = block_header.shell.context in
   let ops_metadata =
     let operations_metadata =
       WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])
@@ -653,7 +675,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     {
       Tezos_validation.Block_validation.validation_store =
         {
-          context_hash;
+          resulting_context_hash;
           timestamp = block_header.shell.timestamp;
           message = validation.Tezos_protocol_environment.message;
           max_operations_ttl = validation.max_operations_ttl;
@@ -661,6 +683,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         };
       block_metadata = (block_header_metadata, block_metadata_hash);
       ops_metadata;
+      shell_header_hash = Block_validation.Shell_header_hash.zero;
     }
   in
   let operations =

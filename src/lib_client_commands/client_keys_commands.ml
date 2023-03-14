@@ -27,31 +27,32 @@ open Client_keys
 
 let group =
   {
-    Clic.name = "keys";
+    Tezos_clic.name = "keys";
     title = "Commands for managing the wallet of cryptographic keys";
   }
 
 let algo_param () =
   let open Lwt_result_syntax in
-  Clic.parameter
-    ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"])
+  Tezos_clic.parameter
+    ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"; "bls"])
     (fun _ name ->
       match name with
       | "ed25519" -> return Signature.Ed25519
       | "secp256k1" -> return Signature.Secp256k1
       | "p256" -> return Signature.P256
+      | "bls" -> return Signature.Bls
       | name ->
           failwith
             "Unknown signature algorithm (%s). Available: 'ed25519', \
-             'secp256k1' or 'p256'"
+             'secp256k1','p256' or 'bls'"
             name)
 
 let sig_algo_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~doc:"use custom signature algorithm"
     ~long:"sig"
     ~short:'s'
-    ~placeholder:"ed25519|secp256k1|p256"
+    ~placeholder:"ed25519|secp256k1|p256|bls"
     ~default:"ed25519"
     (algo_param ())
 
@@ -63,9 +64,9 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false)
     List.filter
       (fun s ->
         not
-        @@ Base58.Alphabet.all_in_alphabet
+        @@ Tezos_crypto.Base58.Alphabet.all_in_alphabet
              ~ignore_case
-             Base58.Alphabet.bitcoin
+             Tezos_crypto.Base58.Alphabet.bitcoin
              s)
       containing
   in
@@ -87,8 +88,8 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false)
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
            (fun ppf s -> Format.fprintf ppf "'%s'" s))
         unrepresentable
-        Base58.Alphabet.pp
-        Base58.Alphabet.bitcoin
+        Tezos_crypto.Base58.Alphabet.pp
+        Tezos_crypto.Base58.Alphabet.bitcoin
         good_initial_char
   | [] -> (
       let unrepresentable =
@@ -107,8 +108,8 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false)
                ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
                (fun ppf s -> Format.fprintf ppf "'%s'" s))
             unrepresentable
-            Base58.Alphabet.pp
-            Base58.Alphabet.bitcoin
+            Tezos_crypto.Base58.Alphabet.pp
+            Tezos_crypto.Base58.Alphabet.bitcoin
             good_initial_char
       | [] ->
           let* name_exists = Public_key_hash.mem cctxt name in
@@ -226,7 +227,9 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       let sk = Bytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
-          (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
+          (Data_encoding.Binary.of_bytes_exn
+             Signature.Ed25519.Secret_key.encoding
+             sk)
       in
       let pk = Signature.Secret_key.to_public_key sk in
       let pkh = Signature.Public_key.hash pk in
@@ -253,7 +256,7 @@ let fail_if_already_registered cctxt force pk_uri name =
            name)
 
 let keys_count_param =
-  let open Clic in
+  let open Tezos_clic in
   param
     ~name:"keys_count"
     ~desc:"How many keys to generate"
@@ -313,9 +316,8 @@ end
     protocol-specific code because it should be available before a
     protocol is activated. *)
 let generate_test_keys =
-  let open Clic in
+  let open Tezos_clic in
   let alias_prefix_param =
-    let open Clic in
     arg
       ~long:"alias-prefix"
       ~placeholder:"PREFIX"
@@ -404,7 +406,7 @@ module Bls_commands = struct
         (Bip39.to_words mnemonic)
     in
     let seed = Mnemonic.to_32_bytes mnemonic in
-    let pkh, pk, sk = Aggregate_signature.generate_key ~seed () in
+    let pkh, pk, sk = Tezos_crypto.Aggregate_signature.generate_key ~seed () in
     let*? pk_uri = Tezos_signer_backends.Unencrypted.Aggregate.make_pk pk in
     let* sk_uri =
       if encrypted then
@@ -447,7 +449,10 @@ module Bls_commands = struct
         return_unit
     | Some (pkh, pk, skloc) -> (
         let*! () =
-          cctxt#message "Hash: %a" Aggregate_signature.Public_key_hash.pp pkh
+          cctxt#message
+            "Hash: %a"
+            Tezos_crypto.Aggregate_signature.Public_key_hash.pp
+            pkh
         in
         match pk with
         | None -> return_unit
@@ -455,7 +460,7 @@ module Bls_commands = struct
             let*! () =
               cctxt#message
                 "Public Key: %a"
-                Aggregate_signature.Public_key.pp
+                Tezos_crypto.Aggregate_signature.Public_key.pp
                 pk
             in
             if show_private then
@@ -477,22 +482,22 @@ module Bls_commands = struct
     let*! () =
       cctxt#message
         "Bls address added: %a"
-        Aggregate_signature.Public_key_hash.pp
+        Tezos_crypto.Aggregate_signature.Public_key_hash.pp
         pkh
     in
     register_aggregate_key cctxt (pkh, pk_uri, sk_uri) ?public_key name
 end
 
-let commands network : Client_context.full Clic.command list =
+let commands network : Client_context.full Tezos_clic.command list =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   let encrypted_switch () =
     if
       List.exists
         (fun (scheme, _) -> scheme = Tezos_signer_backends.Unencrypted.scheme)
         (Client_keys.registered_signers ())
-    then Clic.switch ~long:"encrypted" ~doc:"Encrypt the key on-disk" ()
-    else Clic.constant true
+    then Tezos_clic.switch ~long:"encrypted" ~doc:"Encrypt the key on-disk" ()
+    else Tezos_clic.constant true
   in
   let show_private_switch =
     switch ~long:"show-secret" ~short:'S' ~doc:"show the private key" ()
@@ -802,7 +807,7 @@ let commands network : Client_context.full Clic.command list =
         ~group
         ~desc:"Forget one address."
         (args1
-           (Clic.switch
+           (Tezos_clic.switch
               ~long:"force"
               ~short:'f'
               ~doc:"delete associated keys when present"
@@ -825,7 +830,7 @@ let commands network : Client_context.full Clic.command list =
         ~group
         ~desc:"Forget the entire wallet of keys."
         (args1
-           (Clic.switch
+           (Tezos_clic.switch
               ~long:"force"
               ~short:'f'
               ~doc:"you got to use the force for that"
@@ -923,7 +928,7 @@ let commands network : Client_context.full Clic.command list =
               let sk : Signature.Secret_key.t =
                 Ed25519
                   (Data_encoding.Binary.of_bytes_exn
-                     Ed25519.Secret_key.encoding
+                     Signature.Ed25519.Secret_key.encoding
                      sk)
               in
               let*? unencrypted_sk_uri =

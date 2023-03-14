@@ -50,11 +50,6 @@
     According the rollup management protocol, the payload must be obtained
     through {!Sc_rollup_inbox_message_repr.serialize} which follows a documented
     format.
-
-    FIXME: https://gitlab.com/tezos/tezos/-/issues/3649
-
-    This type cannot be extended in a retro-compatible way. It should
-    be put into a variant.
 *)
 
 type inbox_message = {
@@ -63,9 +58,37 @@ type inbox_message = {
   payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
-type reveal_data = Raw_data of string | Metadata of Sc_rollup_metadata_repr.t
+type reveal_data =
+  | Raw_data of string
+  | Metadata of Sc_rollup_metadata_repr.t
+  | Dal_page of Dal_slot_repr.Page.content option
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
+
+let pp_inbox_message fmt {inbox_level; message_counter; _} =
+  Format.fprintf
+    fmt
+    "@[<v 2>level: %a@,message index: %a@]"
+    Raw_level_repr.pp
+    inbox_level
+    Z.pp_print
+    message_counter
+
+let pp_reveal_data fmt = function
+  | Raw_data _ -> Format.pp_print_string fmt "raw data"
+  | Metadata metadata -> Sc_rollup_metadata_repr.pp fmt metadata
+  | Dal_page content_opt ->
+      Format.pp_print_option
+        ~none:(fun fmt () -> Format.pp_print_string fmt "<No_dal_data>")
+        (fun fmt _a -> Format.fprintf fmt "<Some_dal_data>")
+        fmt
+        content_opt
+
+let pp_input fmt = function
+  | Inbox_message msg ->
+      Format.fprintf fmt "@[<v 2>inbox message:@,%a@]" pp_inbox_message msg
+  | Reveal reveal ->
+      Format.fprintf fmt "@[<v 2>reveal: %a@]" pp_reveal_data reveal
 
 (** [inbox_message_encoding] encoding value for {!inbox_message}. *)
 let inbox_message_encoding =
@@ -79,51 +102,57 @@ let inbox_message_encoding =
     (obj3
        (req "inbox_level" Raw_level_repr.encoding)
        (req "message_counter" n)
-       (req "payload" string))
+       (req "payload" (string Hex)))
 
 let reveal_data_encoding =
   let open Data_encoding in
+  let kind name = req "reveal_data_kind" (constant name) in
   let case_raw_data =
     case
       ~title:"raw data"
       (Tag 0)
       (obj2
-         (req "reveal_data_kind" (constant "raw_data"))
+         (kind "raw_data")
          (req
             "raw_data"
-            (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
-      (function Raw_data m -> Some ((), Bytes.of_string m) | _ -> None)
-      (fun ((), m) -> Raw_data (Bytes.to_string m))
+            (check_size
+               Constants_repr.sc_rollup_message_size_limit
+               Variable.(string Hex))))
+      (function Raw_data m -> Some ((), m) | _ -> None)
+      (fun ((), m) -> Raw_data m)
   and case_metadata =
     case
       ~title:"metadata"
       (Tag 1)
-      (obj2
-         (req "reveal_data_kind" (constant "metadata"))
-         (req "metadata" Sc_rollup_metadata_repr.encoding))
+      (obj2 (kind "metadata") (req "metadata" Sc_rollup_metadata_repr.encoding))
       (function Metadata md -> Some ((), md) | _ -> None)
       (fun ((), md) -> Metadata md)
   in
-  union [case_raw_data; case_metadata]
+  let case_dal_page =
+    case
+      ~title:"dal page"
+      (Tag 2)
+      (obj2 (kind "dal_page") (req "dal_page_content" (option (bytes Hex))))
+      (function Dal_page p -> Some ((), p) | _ -> None)
+      (fun ((), p) -> Dal_page p)
+  in
+  union [case_raw_data; case_metadata; case_dal_page]
 
 let input_encoding =
   let open Data_encoding in
+  let kind name = req "input_kind" (constant name) in
   let case_inbox_message =
     case
       ~title:"inbox msg"
       (Tag 0)
-      (obj2
-         (req "input_kind" (constant "inbox_message"))
-         (req "inbox_message" inbox_message_encoding))
+      (obj2 (kind "inbox_message") (req "inbox_message" inbox_message_encoding))
       (function Inbox_message m -> Some ((), m) | _ -> None)
       (fun ((), m) -> Inbox_message m)
   and case_reveal_revelation =
     case
       ~title:"reveal"
       (Tag 1)
-      (obj2
-         (req "input_kind" (constant "reveal_revelation"))
-         (req "reveal_data" reveal_data_encoding))
+      (obj2 (kind "reveal_revelation") (req "reveal_data" reveal_data_encoding))
       (function Reveal d -> Some ((), d) | _ -> None)
       (fun ((), d) -> Reveal d)
   in
@@ -143,6 +172,8 @@ let reveal_data_equal a b =
   | Raw_data _, _ -> false
   | Metadata a, Metadata b -> Sc_rollup_metadata_repr.equal a b
   | Metadata _, _ -> false
+  | Dal_page a, Dal_page b -> Option.equal Bytes.equal a b
+  | Dal_page _, _ -> false
 
 let input_equal a b =
   match (a, b) with
@@ -155,9 +186,9 @@ module Input_hash =
   Blake2B.Make
     (Base58)
     (struct
-      let name = "Sc_rollup_input_hash"
+      let name = "Smart_rollup_input_hash"
 
-      let title = "A smart contract rollup input hash"
+      let title = "A smart rollup input hash"
 
       let b58check_prefix =
         "\001\118\125\135" (* "scd1(37)" decoded from base 58. *)
@@ -165,28 +196,40 @@ module Input_hash =
       let size = Some 20
     end)
 
-type reveal = Reveal_raw_data of Input_hash.t | Reveal_metadata
+type reveal =
+  | Reveal_raw_data of Sc_rollup_reveal_hash.t
+  | Reveal_metadata
+  | Request_dal_page of Dal_slot_repr.Page.t
 
 let reveal_encoding =
   let open Data_encoding in
+  let kind name = req "reveal_kind" (constant name) in
   let case_raw_data =
     case
       ~title:"Reveal_raw_data"
       (Tag 0)
       (obj2
-         (req "reveal_kind" (constant "reveal_raw_data"))
-         (req "input_hash" Input_hash.encoding))
+         (kind "reveal_raw_data")
+         (req "input_hash" Sc_rollup_reveal_hash.encoding))
       (function Reveal_raw_data s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_raw_data s)
   and case_metadata =
     case
       ~title:"Reveal_metadata"
       (Tag 1)
-      (obj1 (req "reveal_kind" (constant "reveal_metadata")))
+      (obj1 (kind "reveal_kind"))
       (function Reveal_metadata -> Some () | _ -> None)
       (fun () -> Reveal_metadata)
   in
-  union [case_raw_data; case_metadata]
+  let case_dal_page =
+    case
+      ~title:"Request_dal_page"
+      (Tag 2)
+      (obj2 (kind "reveal_kind") (req "page_id" Dal_slot_repr.Page.encoding))
+      (function Request_dal_page s -> Some ((), s) | _ -> None)
+      (fun ((), s) -> Request_dal_page s)
+  in
+  union [case_raw_data; case_metadata; case_dal_page]
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
@@ -209,26 +252,27 @@ type input_request =
 (** [input_request_encoding] encoding value for {!input_request}. *)
 let input_request_encoding =
   let open Data_encoding in
+  let kind name = req "input_request_kind" (constant name) in
   union
     ~tag_size:`Uint8
     [
       case
         ~title:"No_input_required"
         (Tag 0)
-        (obj1 (req "input_request_kind" (constant "no_input_required")))
+        (obj1 (kind "no_input_required"))
         (function No_input_required -> Some () | _ -> None)
         (fun () -> No_input_required);
       case
         ~title:"Initial"
         (Tag 1)
-        (obj1 (req "input_request_kind" (constant "initial")))
+        (obj1 (kind "initial"))
         (function Initial -> Some () | _ -> None)
         (fun () -> Initial);
       case
         ~title:"First_after"
         (Tag 2)
         (obj3
-           (req "input_request_kind" (constant "first_after"))
+           (kind "first_after")
            (req "level" Raw_level_repr.encoding)
            (req "counter" n))
         (function
@@ -238,16 +282,15 @@ let input_request_encoding =
       case
         ~title:"Needs_reveal"
         (Tag 3)
-        (obj2
-           (req "input_request_kind" (constant "needs_reveal"))
-           (req "reveal" reveal_encoding))
+        (obj2 (kind "needs_reveal") (req "reveal" reveal_encoding))
         (function Needs_reveal p -> Some ((), p) | _ -> None)
         (fun ((), p) -> Needs_reveal p);
     ]
 
 let pp_reveal fmt = function
-  | Reveal_raw_data hash -> Input_hash.pp fmt hash
+  | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
+  | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -268,10 +311,12 @@ let pp_input_request fmt request =
 
 let reveal_equal p1 p2 =
   match (p1, p2) with
-  | Reveal_raw_data h1, Reveal_raw_data h2 -> Input_hash.equal h1 h2
+  | Reveal_raw_data h1, Reveal_raw_data h2 -> Sc_rollup_reveal_hash.equal h1 h2
   | Reveal_raw_data _, _ -> false
   | Reveal_metadata, Reveal_metadata -> true
   | Reveal_metadata, _ -> false
+  | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
+  | Request_dal_page _, _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =
@@ -338,10 +383,9 @@ module type S = sig
 
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
-  (** A state is initialized in a given context. A [context]
-      represents the executable environment needed by the state to
-      exist. Typically, the rollup node storage can be part of this
-      context to allow the PVM state to be persistent. *)
+  (** A [context] represents the executable environment needed by the state to
+      exist. Typically, the rollup node storage can be part of this context to
+      allow the PVM state to be persistent. *)
   type context
 
   (** A [hash] characterizes the contents of a state. *)
@@ -410,12 +454,10 @@ module type S = sig
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
 
-  (** [initial_state context] is the initial state of the PVM, before
-      its specialization with a given [boot_sector].
-
-      The [context] argument is required for technical reasons and does
-      not impact the result. *)
-  val initial_state : context -> state Lwt.t
+  (** [initial_state ~empty] is the initial state of the PVM, before its
+      specialization with a given [boot_sector]. The initial state is built on
+      the [empty] state which must be provided. *)
+  val initial_state : empty:state -> state Lwt.t
 
   (** [install_boot_sector state boot_sector] specializes the initial
       [state] of a PVM using a dedicated [boot_sector], submitted at
@@ -485,6 +527,21 @@ module type S = sig
       the fact that [output] is part of [state]'s outbox. *)
   val produce_output_proof :
     context -> state -> output -> (output_proof, error) result Lwt.t
+
+  (** [check_dissection ~default_number_of_sections ~start_chunk
+      ~stop_chunk chunks] fails if the dissection encoded by the list
+      [[start_chunk] @ chunks @ [stop_chunk]] does not satisfy the
+      properties expected by the PVM. *)
+  val check_dissection :
+    default_number_of_sections:int ->
+    start_chunk:Sc_rollup_dissection_chunk_repr.t ->
+    stop_chunk:Sc_rollup_dissection_chunk_repr.t ->
+    Sc_rollup_dissection_chunk_repr.t list ->
+    unit tzresult
+
+  (** [get_current_level state] returns the current level of the [state],
+      returns [None] if it is not possible to compute the level. *)
+  val get_current_level : state -> Raw_level_repr.t option Lwt.t
 
   module Internal_for_tests : sig
     (** [insert_failure state] corrupts the PVM state. This is used in

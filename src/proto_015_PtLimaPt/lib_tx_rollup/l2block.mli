@@ -29,7 +29,7 @@ open Alpha_context
 (**  {2 Types for L2 block and header} *)
 
 (** Hash with b58check encoding BTx(53), for hashes of L2 block headers *)
-module Hash : S.HASH
+module Hash : Tezos_crypto.Intfs.HASH
 
 (** Alias for block (header) hashes *)
 type hash = Hash.t

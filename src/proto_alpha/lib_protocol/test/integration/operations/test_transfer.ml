@@ -91,7 +91,7 @@ let single_transfer ?fee ?expect_apply_failure amount =
     contract_2
     amount
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Single transfer without fee. *)
 let test_block_with_a_single_transfer () = single_transfer Tez.one
@@ -136,7 +136,7 @@ let test_transfer_to_originate_with_fee () =
   Incremental.begin_construction b >>=? fun i ->
   transfer_and_check_balances ~loc:__LOC__ i ~fee contract new_contract amount
   >>=? fun (i, _) ->
-  Incremental.finalize_block i >>=? fun _ -> return_unit
+  Incremental.finalize_block i >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer from balance. *)
 let test_transfer_amount_of_contract_balance () =
@@ -151,7 +151,7 @@ let test_transfer_amount_of_contract_balance () =
   (* transfer all the tez inside contract 1 *)
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 balance
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer to oneself. *)
 let test_transfers_to_self () =
@@ -173,7 +173,7 @@ let test_transfers_to_self () =
     ~fee
     contract
     ten_tez
-  >>=? fun _ -> return_unit
+  >>=? fun (_, _) -> return_unit
 
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
@@ -188,8 +188,9 @@ let test_missing_transaction () =
   (* Do the transfer 3 times from source contract to destination contract *)
   n_transactions 3 i contract_1 contract_2 amount >>=? fun i ->
   (* do the fourth transfer from source contract to destination contract *)
-  Op.transaction (I i) contract_1 contract_2 amount >>=? fun _ ->
-  Incremental.finalize_block i >>=? fun _ -> return_unit
+  Op.transaction (I i) contract_1 contract_2 amount
+  >>=? fun (_ : packed_operation) ->
+  Incremental.finalize_block i >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer zero tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_zero_implicit_with_bal_src_as_fee () =
@@ -241,7 +242,7 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   Op.transaction (B b) ~fee:bal_src src new_contract Tez.zero
   >>=? fun operation ->
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
-  Block.bake ~operation b >>=? fun _ -> return_unit
+  Block.bake ~operation b >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer one tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_one_to_implicit_with_bal_src_as_fee () =
@@ -262,7 +263,7 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
           Assert.test_error_encodings err ;
           return_unit
       | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Incremental.t) -> return_unit
 
 (********************)
 (* The following tests are for different kind of contracts:
@@ -307,7 +308,7 @@ let test_transfer_from_implicit_to_implicit_contract () =
     dest
     amount2
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Implicit to originated. *)
 let test_transfer_from_implicit_to_originated_contract () =
@@ -340,7 +341,7 @@ let test_transfer_from_implicit_to_originated_contract () =
   (* transfer from implicit contract to originated contract *)
   transfer_and_check_balances ~loc:__LOC__ i src new_contract amount2
   >>=? fun (i, _) ->
-  Incremental.finalize_block i >>=? fun _ -> return_unit
+  Incremental.finalize_block i >>=? fun (_ : Block.t) -> return_unit
 
 (********************)
 (* Slow tests case *)
@@ -352,7 +353,7 @@ let multiple_transfer n ?fee amount =
   >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   n_transactions n b ?fee contract_1 contract_2 amount >>=? fun b ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** 1- Create a block with two contracts;
     2- Apply 100 transfers.
@@ -392,7 +393,7 @@ let test_block_with_multiple_transfers_with_without_fee () =
   n_transactions 50 ~fee:ten b contracts.(7) contracts.(5) twenty >>=? fun b ->
   n_transactions 30 ~fee:ten b contracts.(0) contracts.(7) hundred >>=? fun b ->
   n_transactions 20 ~fee:ten b contracts.(1) contracts.(0) twenty >>=? fun b ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
@@ -406,7 +407,7 @@ let test_build_a_chain () =
       >>=? fun (b, _) -> Incremental.finalize_block b)
     b
     (1 -- 10)
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Block.t) -> return_unit
 
 (*********************************************************************)
 (* Expected error test cases                                         *)
@@ -430,31 +431,40 @@ let test_empty_implicit () =
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
-  Context.init2 ~consensus_threshold:0 ()
-  >>=? fun (b, (contract_1, contract_2)) ->
-  Context.Contract.balance (B b) contract_1 >>=? fun balance1 ->
-  Context.Contract.balance (B b) contract_2 >>=? fun balance2 ->
+  let open Lwt_result_syntax in
+  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* balance1 = Context.Contract.balance (B b) contract_1 in
+  let* balance2 = Context.Contract.balance (B b) contract_2 in
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
-  Op.transaction ~fee (B b) contract_1 contract_2 max_tez >>=? fun op ->
-  let expect_apply_failure = function
+  let* op = Op.transaction ~fee (B b) contract_1 contract_2 max_tez in
+  let expect_failure = function
     | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as err)
       :: _ ->
         Assert.test_error_encodings err ;
         return_unit
     | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
   in
-  (* the fee is higher than the balance then raise an error "Balance_too_low" *)
-  Incremental.begin_construction b >>=? fun i ->
+  let* i = Incremental.begin_construction b in
   if fee > balance1 then
-    Incremental.add_operation ~expect_apply_failure i op >>= fun _res ->
+    (* The fee is higher than the balance, so the operation validation
+       fails with the [Balance_too_low] error. *)
+    let* (_res : Incremental.t) =
+      Incremental.add_operation ~expect_failure i op
+    in
     return_unit
-    (* the fee is smaller than the balance, then the transfer is accepted
-       but it is not processed, and fees are taken *)
   else
-    Incremental.add_operation ~expect_apply_failure i op >>=? fun i ->
+    (* The fee is smaller than or equal to the balance, so the
+       operation is successfully validated and its fees are
+       taken. However, since the amount to transfer exceeds the
+       balance, the application has no further effects and the
+       operation is marked with the [Balance_too_low] error. *)
+    let* i =
+      Incremental.add_operation ~expect_apply_failure:expect_failure i op
+    in
     (* contract_1 loses the fees *)
-    Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
-    >>=? fun () ->
+    let* () =
+      Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
+    in
     (* contract_2 is not credited *)
     Assert.balance_was_credited ~loc:__LOC__ (I i) contract_2 balance2 Tez.zero
 
@@ -487,9 +497,7 @@ let test_balance_too_low_two_transfers fee () =
       :: _ ->
         Assert.test_error_encodings err ;
         return_unit
-    | t ->
-        failwith "Unexpected error: %a" Error_monad.pp_print_trace t
-        >>=? fun _ -> return_unit
+    | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
   in
   Incremental.begin_construction b >>=? fun i ->
   Incremental.add_operation ~expect_apply_failure i operation >>=? fun i ->
@@ -523,7 +531,8 @@ let test_add_the_same_operation_twice () =
   >>=? fun (i, op_transfer) ->
   Incremental.finalize_block i >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->
-  Op.transaction (I i) contract_1 contract_2 ten_tez >>=? fun _ ->
+  Op.transaction (I i) contract_1 contract_2 ten_tez
+  >>=? fun (_ : packed_operation) ->
   Incremental.add_operation i op_transfer >>= fun b ->
   Assert.proto_error ~loc:__LOC__ b (function
       | Contract_storage.Counter_in_the_past _ as err ->
@@ -536,7 +545,7 @@ let invalid_counter_in_the_future () =
   Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   Context.Contract.counter (I b) contract_1 >>=? fun cpt ->
-  let counter = Z.add cpt (Z.of_int 10) in
+  let counter = Manager_counter.Internal_for_tests.add cpt 10 in
   Op.transaction (I b) contract_1 contract_2 Tez.one ~counter >>=? fun op ->
   Incremental.add_operation b op >>= fun b ->
   Assert.proto_error ~loc:__LOC__ b (function
@@ -554,7 +563,7 @@ let test_ownership_sender () =
   let imcontract_1 = Alpha_context.Contract.Implicit manager.pkh in
   transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (*********************************************************************)
 (* Random transfer *)
@@ -591,12 +600,12 @@ let test_random_transfer () =
       b
       source
       amount
-    >>=? fun _ -> return_unit
+    >>=? fun (_, _) -> return_unit
   else
     Incremental.begin_construction ~policy:(Block.Excluding [source_pkh]) b
     >>=? fun i ->
-    transfer_and_check_balances ~loc:__LOC__ i source dest amount >>=? fun _ ->
-    return_unit
+    transfer_and_check_balances ~loc:__LOC__ i source dest amount
+    >>=? fun (_, _) -> return_unit
 
 (** Transfer random transactions. *)
 let test_random_multi_transactions () =
@@ -659,10 +668,11 @@ let test_bad_parameter () =
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let transfer_to_itself_with_no_such_entrypoint () =
+  let open Lwt_result_syntax in
   let entrypoint = Entrypoint.of_string_strict_exn "bad entrypoint" in
-  Context.init1 () >>=? fun (b, addr) ->
-  Incremental.begin_construction b >>=? fun i ->
-  Op.transaction (B b) addr addr Tez.one ~entrypoint >>=? fun transaction ->
+  let* b, addr = Context.init1 () in
+  let* i = Incremental.begin_construction b in
+  let* transaction = Op.transaction (B b) addr addr Tez.one ~entrypoint in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _ as e)
       :: _ ->
@@ -670,86 +680,42 @@ let transfer_to_itself_with_no_such_entrypoint () =
         return ()
     | _ -> failwith "no such entrypoint should fail"
   in
-  Incremental.add_operation ~expect_apply_failure i transaction >>= fun _res ->
-  return ()
+  let* (_res : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure i transaction
+  in
+  return_unit
 
-(** A module with a type that tracks a block's predecessor. *)
-module State = struct
-  type t = {predecessor : Block.t option; current : Block.t}
-
-  let init () =
-    let open Lwt_result_syntax in
-    let+ block, b1 = Context.init1 () in
-    ({predecessor = None; current = block}, b1)
-
-  (** Applies an operation to a state and returns the resulting state. *)
-  let apply ~baker ~operation ~state =
-    let block = state.current in
-    let open Lwt_result_syntax in
-    let open Incremental in
-    let* inc = begin_construction ~policy:Block.(By_account baker) block in
-    let* inc = add_operation inc operation in
-    let* inc =
-      match state.predecessor with
-      | None -> return inc
-      | Some predecessor ->
-          (* Include all endorsements. *)
-          let* endorsers = Context.get_endorsers (B block) in
-          List.fold_left_es
-            (fun inc {Plugin.RPC.Validators.delegate; slots; _} ->
-              let* endorsement =
-                Op.endorsement
-                  ~delegate:(delegate, slots)
-                  ~endorsed_block:block
-                  (B predecessor)
-                  ()
-              in
-              add_operation inc (Operation.pack endorsement))
-            inc
-            endorsers
-    in
-    let+ next = finalize_block inc in
-    {predecessor = Some block; current = next}
-
-  let current {current; _} = current
-
-  (** Originates a contract with a [script] and an initial [credit] and
+(** Originates a contract with a [script] and an initial [credit] and
       [storage]. *)
-  let contract_originate ~baker ~(state : t) ~script ~credit ~storage ~source =
-    let open Lwt_result_syntax in
-    let block = current state in
-    let code = Expr.from_string script in
-    let script =
-      Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
-    in
-    let* op, dst =
-      Op.contract_origination_hash
-        (B block)
-        source
-        ~fee:Tez.zero
-        ~script
-        ~credit
-    in
-    let+ state = apply ~operation:op ~state ~baker in
-    (state, dst)
+let contract_originate ~baker ~block ~script ~credit ~storage ~source =
+  let open Lwt_result_syntax in
+  let code = Expr.from_string script in
+  let script =
+    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+  in
+  let* op, dst =
+    Op.contract_origination_hash (B block) source ~fee:Tez.zero ~script ~credit
+  in
+  let+ state =
+    Block.bake ~policy:Block.(By_account baker) ~operations:[op] block
+  in
+  (state, dst)
 
-  (** Runs a transaction from a [source] to a [destination]. *)
-  let transfer ?force_reveal ?parameters ~baker ~state ~source ~destination
-      amount =
-    let open Lwt_result_syntax in
-    let block = current state in
-    let* operation =
-      Op.transaction
-        ?force_reveal
-        ?parameters
-        ~fee:Tez.zero
-        (B block)
-        source
-        destination
-        amount
-    in
-    apply ~operation ~state ~baker
-end
+(** Runs a transaction from a [source] to a [destination]. *)
+let transfer ?force_reveal ?parameters ~baker ~block ~source ~destination amount
+    =
+  let open Lwt_result_syntax in
+  let* operation =
+    Op.transaction
+      ?force_reveal
+      ?parameters
+      ~fee:Tez.zero
+      (B block)
+      source
+      destination
+      amount
+  in
+  Block.bake ~policy:Block.(By_account baker) ~operations:[operation] block
 
 (** The script of a contract that transfers its balance to the caller, and
     stores the parameter of the call. *)
@@ -783,15 +749,15 @@ let script =
     balance. *)
 let test_storage_fees_and_internal_operation () =
   let open Lwt_result_syntax in
-  let* initial_state, b1 = State.init () in
+  let* initial_block, contract = Context.init1 ~consensus_threshold:0 () in
   let null_string = Expr.from_string "\"\"" in
   let caller = Account.new_account () in
   (* Initialize a caller account. *)
-  let* initial_state =
-    State.transfer
-      ~state:initial_state
-      ~baker:(Context.Contract.pkh b1)
-      ~source:b1
+  let* initial_block =
+    transfer
+      ~block:initial_block
+      ~baker:(Context.Contract.pkh contract)
+      ~source:contract
       ~destination:(Contract.Implicit caller.pkh)
       Tez.one_mutez
   in
@@ -799,35 +765,37 @@ let test_storage_fees_and_internal_operation () =
      initial storage, and an initial credit of [initial_amount]. And then, calls
      the originated contract from [caller] with a parameter that allocates
      additional storage. *)
-  let originate_and_call ~initial_state ~initial_amount =
-    let* state, contract_hash =
-      State.contract_originate
-        ~state:initial_state
-        ~baker:(Context.Contract.pkh b1)
+  let originate_and_call ~initial_block ~initial_amount =
+    let* block, contract_hash =
+      contract_originate
+        ~block:initial_block
+        ~baker:(Context.Contract.pkh contract)
         ~script
-        ~source:b1
+        ~source:contract
         ~credit:initial_amount
         ~storage:null_string
     in
     let random_string = Expr.from_string "\"Abracadabra\"" in
-    State.transfer
+    transfer
       ~force_reveal:true
       ~parameters:(Alpha_context.Script.lazy_expr random_string)
-      ~state
-      ~baker:(Context.Contract.pkh b1)
+      ~block
+      ~baker:(Context.Contract.pkh contract)
       ~source:(Contract.Implicit caller.pkh)
       ~destination:(Contract.Originated contract_hash)
       Tez.zero
   in
   (* Ensure failure when the initial balance of the originated contract is not
      sufficient to pay storage fees. *)
-  let*! res = originate_and_call ~initial_state ~initial_amount:Tez.one_mutez in
+  let*! res = originate_and_call ~initial_block ~initial_amount:Tez.one_mutez in
   let* () =
     Assert.proto_error_with_info ~loc:__LOC__ res "Cannot pay storage fee"
   in
   (* Ensure success when the initial balance of the originated contract is
      sufficient to pay storage fees. *)
-  let+ _ = originate_and_call ~initial_state ~initial_amount:Tez.one_cent in
+  let+ (_ : Block.t) =
+    originate_and_call ~initial_block ~initial_amount:Tez.one_cent
+  in
   ()
 
 let tests =

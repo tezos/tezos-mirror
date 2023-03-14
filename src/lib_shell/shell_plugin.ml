@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,56 +37,38 @@ module type FILTER = sig
     type state
 
     val init :
-      config ->
-      ?validation_state:Proto.validation_state ->
-      predecessor:Tezos_base.Block_header.t ->
-      unit ->
+      Tezos_protocol_environment.Context.t ->
+      head:Tezos_base.Block_header.shell_header ->
       state tzresult Lwt.t
 
-    val on_flush :
-      config ->
-      state ->
-      ?validation_state:Proto.validation_state ->
-      predecessor:Tezos_base.Block_header.t ->
-      unit ->
-      state tzresult Lwt.t
+    val flush :
+      state -> head:Tezos_base.Block_header.shell_header -> state tzresult Lwt.t
 
     val remove : filter_state:state -> Operation_hash.t -> state
-
-    val precheck :
-      config ->
-      filter_state:state ->
-      validation_state:Proto.validation_state ->
-      Operation_hash.t ->
-      Proto.operation ->
-      nb_successful_prechecks:int ->
-      [ `Passed_precheck of
-        state
-        * Proto.validation_state
-        * [ `No_replace
-          | `Replace of
-            Operation_hash.t * Prevalidator_classification.error_classification
-          ]
-      | `Undecided
-      | Prevalidator_classification.error_classification ]
-      Lwt.t
 
     val pre_filter :
       config ->
       filter_state:state ->
-      ?validation_state_before:Proto.validation_state ->
       Proto.operation ->
       [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
       Lwt.t
 
-    val post_filter :
+    val add_operation_and_enforce_mempool_bound :
+      ?replace:Operation_hash.t ->
       config ->
-      filter_state:state ->
-      validation_state_before:Proto.validation_state ->
-      validation_state_after:Proto.validation_state ->
-      Proto.operation * Proto.operation_receipt ->
-      [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
+      state ->
+      Operation_hash.t * Proto.operation ->
+      ( state
+        * [ `No_replace
+          | `Replace of
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ],
+        Prevalidator_classification.error_classification )
+      result
+      Lwt.t
+
+    val conflict_handler : config -> Proto.Mempool.conflict_handler
   end
 end
 
@@ -93,10 +76,11 @@ module type RPC = sig
   module Proto : Registered_protocol.T
 
   val rpc_services :
-    Tezos_protocol_environment.rpc_context RPC_directory.directory
+    Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
 end
 
-module No_filter (Proto : Registered_protocol.T) = struct
+module No_filter (Proto : Registered_protocol.T) :
+  FILTER with module Proto = Proto and type Mempool.state = unit = struct
   module Proto = Proto
 
   module Mempool = struct
@@ -108,24 +92,22 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     type state = unit
 
-    let init _ ?validation_state:_ ~predecessor:_ () =
-      Lwt_result_syntax.return_unit
+    let init _ ~head:_ = Lwt_result_syntax.return_unit
 
     let remove ~filter_state _ = filter_state
 
-    let on_flush _ _ ?validation_state:_ ~predecessor:_ () =
-      Lwt_result_syntax.return_unit
+    let flush _ ~head:_ = Lwt_result_syntax.return_unit
 
-    let precheck _ ~filter_state:_ ~validation_state:_ _ _
-        ~nb_successful_prechecks:_ =
-      Lwt.return `Undecided
-
-    let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =
+    let pre_filter _ ~filter_state:_ _ =
       Lwt.return @@ `Passed_prefilter (`Low [])
 
-    let post_filter _ ~filter_state ~validation_state_before:_
-        ~validation_state_after:_ _ =
-      Lwt.return (`Passed_postfilter filter_state)
+    let add_operation_and_enforce_mempool_bound ?replace:_ _ filter_state _ =
+      Lwt_result.return (filter_state, `No_replace)
+
+    let conflict_handler _ ~existing_operation ~new_operation =
+      if Proto.compare_operations existing_operation new_operation < 0 then
+        `Replace
+      else `Keep
   end
 end
 
@@ -148,18 +130,11 @@ struct
   let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
 end
 
-let filter_table : (module FILTER) Protocol_hash.Table.t =
-  Protocol_hash.Table.create 5
-
 let rpc_table : (module RPC) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
 let metrics_table : (module METRICS) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
-
-let register_filter (module Filter : FILTER) =
-  assert (not (Protocol_hash.Table.mem filter_table Filter.Proto.hash)) ;
-  Protocol_hash.Table.add filter_table Filter.Proto.hash (module Filter)
 
 let register_rpc (module Rpc : RPC) =
   assert (not (Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
@@ -167,8 +142,6 @@ let register_rpc (module Rpc : RPC) =
 
 let register_metrics (module Metrics : METRICS) =
   Protocol_hash.Table.replace metrics_table Metrics.hash (module Metrics)
-
-let find_filter = Protocol_hash.Table.find filter_table
 
 let find_rpc = Protocol_hash.Table.find rpc_table
 
@@ -182,3 +155,28 @@ let safe_find_metrics hash =
         let hash = hash
       end) in
       Lwt.return (module Metrics : METRICS)
+
+type filter_t =
+  | Recent of (module FILTER)
+  | Legacy of (module Legacy_mempool_plugin.FILTER)
+
+let is_recent_proto (module Proto : Registered_protocol.T) =
+  Proto.(compare environment_version V7 >= 0)
+
+let no_filter (module Proto : Registered_protocol.T) =
+  if is_recent_proto (module Proto) then Recent (module No_filter (Proto))
+  else Legacy (module Legacy_mempool_plugin.No_filter (Proto))
+
+let filter_table : filter_t Protocol_hash.Table.t = Protocol_hash.Table.create 5
+
+let add_to_filter_table proto_hash (filter : filter_t) =
+  assert (not (Protocol_hash.Table.mem filter_table proto_hash)) ;
+  Protocol_hash.Table.add filter_table proto_hash filter
+
+let register_filter (module Filter : FILTER) =
+  add_to_filter_table Filter.Proto.hash (Recent (module Filter))
+
+let register_legacy_filter (module Filter : Legacy_mempool_plugin.FILTER) =
+  add_to_filter_table Filter.Proto.hash (Legacy (module Filter))
+
+let find_filter = Protocol_hash.Table.find filter_table

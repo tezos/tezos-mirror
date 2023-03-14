@@ -333,8 +333,10 @@ let bootstrap_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
 let compute_accounts =
   List.map (fun s ->
-      let public_key = Signature.Public_key.of_b58check_exn s in
-      let public_key_hash = Signature.Public_key.hash public_key in
+      let public_key = Tezos_crypto.Signature.V0.Public_key.of_b58check_exn s in
+      let public_key_hash =
+        Tezos_crypto.Signature.V0.Public_key.hash public_key
+      in
       Parameters.
         {
           public_key_hash;

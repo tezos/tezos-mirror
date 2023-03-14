@@ -1,4 +1,4 @@
-This page describes the RPCs built into the Octez shell, which are independent from a particular version of the Tezos protocol.
+This page describes the RPCs built into the Tezos shell, which are independent from a particular version of the Tezos protocol.
 
 .. warning::
 
@@ -12,12 +12,12 @@ RPCs - Index
 
 Note that the RPCs served under a given prefix can also be listed using the client, e.g.::
 
-    tezos-client rpc list /chains/main/levels
+    octez-client rpc list /chains/main/levels
 
 Any RPC endpoint may also be described, using the ``describe`` RPC to
 retrieve all JSON and binary schemas, e.g.::
 
-    tezos-client rpc get /describe/chains/main/chain_id
+    octez-client rpc get /describe/chains/main/chain_id
 
 Protocol
 ========

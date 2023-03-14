@@ -30,13 +30,12 @@ open Protocol.Alpha_context
 type round = Round.t
 
 module Block_cache =
-  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-    (Block_hash)
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Block_hash)
 
 (** The [Timestamp_of_round_tbl] module allows to create memoization tables
     to store function calls of [Round.timestamp_of_round]. *)
 module Timestamp_of_round_cache =
-  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (struct
       (* The type of keys is a tuple that corresponds to the arguments
          of [Round.timestamp_of_round]. *)
@@ -81,5 +80,5 @@ module Round_cache_key = struct
 end
 
 module Round_timestamp_interval_cache =
-  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (Round_cache_key)

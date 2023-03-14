@@ -291,9 +291,9 @@ module Cfg_file = struct
          (opt "node_port" uint16)
          (opt "tls" bool)
          (opt "media_type" Media_type.Command_line.encoding)
-         (opt "endpoint" RPC_encoding.uri_encoding)
+         (opt "endpoint" Tezos_rpc.Encoding.uri_encoding)
          (opt "web_port" uint16)
-         (opt "remote_signer" RPC_encoding.uri_encoding)
+         (opt "remote_signer" Tezos_rpc.Encoding.uri_encoding)
          (opt "confirmations" int8)
          (opt "password_filename" string))
 
@@ -324,22 +324,20 @@ let default_cli_args =
     client_mode = `Mode_client;
   }
 
-open Tezos_clic.Clic
-
-let string_parameter () : (string, #Client_context.full) parameter =
-  parameter (fun _ x -> Lwt.return_ok x)
+let string_parameter () : (string, #Client_context.full) Tezos_clic.parameter =
+  Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
 
 let media_type_parameter () :
-    (Media_type.Command_line.t, #Client_context.full) parameter =
+    (Media_type.Command_line.t, #Client_context.full) Tezos_clic.parameter =
   let open Lwt_result_syntax in
-  parameter (fun _ x ->
+  Tezos_clic.parameter (fun _ x ->
       match Media_type.Command_line.parse_cli_parameter x with
       | Some v -> return v
       | None -> tzfail (Invalid_media_type_arg x))
 
 let endpoint_parameter () =
   let open Lwt_result_syntax in
-  parameter (fun _ x ->
+  Tezos_clic.parameter (fun _ x ->
       let parsed = Uri.of_string x in
       let* _ =
         match Uri.scheme parsed with
@@ -358,7 +356,7 @@ let endpoint_parameter () =
 
 let sources_parameter () =
   let open Lwt_result_syntax in
-  parameter (fun _ path ->
+  Tezos_clic.parameter (fun _ path ->
       let*! r = Lwt_utils_unix.Json.read_file path in
       match r with
       | Error errs ->
@@ -380,21 +378,21 @@ let sources_parameter () =
               exn))
 
 let chain_parameter () =
-  parameter (fun _ chain ->
+  Tezos_clic.parameter (fun _ chain ->
       let open Lwt_result_syntax in
       match Chain_services.parse_chain chain with
       | Error _ -> tzfail (Invalid_chain_argument chain)
       | Ok chain -> return chain)
 
 let block_parameter () =
-  parameter (fun _ block ->
+  Tezos_clic.parameter (fun _ block ->
       let open Lwt_result_syntax in
       match Block_services.parse_block block with
       | Error _ -> tzfail (Invalid_block_argument block)
       | Ok block -> return block)
 
 let wait_parameter () =
-  parameter (fun _ wait ->
+  Tezos_clic.parameter (fun _ wait ->
       let open Lwt_result_syntax in
       match wait with
       | "no" | "none" -> return_none
@@ -404,7 +402,7 @@ let wait_parameter () =
           | None | Some _ -> tzfail (Invalid_wait_arg wait)))
 
 let protocol_parameter () =
-  parameter (fun _ arg ->
+  Tezos_clic.parameter (fun _ arg ->
       let open Lwt_result_syntax in
       match
         Seq.filter
@@ -418,7 +416,7 @@ let protocol_parameter () =
 
 (* Command-line only args (not in config file) *)
 let base_dir_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"base-dir"
     ~short:'d'
     ~placeholder:"path"
@@ -435,8 +433,15 @@ let base_dir_arg () =
          default_base_dir)
     (string_parameter ())
 
+let no_base_dir_warnings_switch () =
+  Tezos_clic.switch
+    ~long:"no-base-dir-warnings"
+    ~short:'n'
+    ~doc:"silence warnings about client data directory"
+    ()
+
 let config_file_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"config-file"
     ~short:'c'
     ~placeholder:"path"
@@ -444,10 +449,10 @@ let config_file_arg () =
     (string_parameter ())
 
 let timings_switch () =
-  switch ~long:"timings" ~short:'t' ~doc:"show RPC request times" ()
+  Tezos_clic.switch ~long:"timings" ~short:'t' ~doc:"show RPC request times" ()
 
 let chain_arg () =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"chain"
     ~placeholder:"hash|tag"
     ~doc:
@@ -458,7 +463,7 @@ let chain_arg () =
     (chain_parameter ())
 
 let block_arg () =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"block"
     ~short:'b'
     ~placeholder:"hash|level|tag"
@@ -472,7 +477,7 @@ let block_arg () =
     (block_parameter ())
 
 let wait_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"wait"
     ~short:'w'
     ~placeholder:"none|<int>"
@@ -482,7 +487,7 @@ let wait_arg () =
     (wait_parameter ())
 
 let protocol_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"protocol"
     ~short:'p'
     ~placeholder:"hash"
@@ -490,10 +495,14 @@ let protocol_arg () =
     (protocol_parameter ())
 
 let log_requests_switch () =
-  switch ~long:"log-requests" ~short:'l' ~doc:"log all requests to the node" ()
+  Tezos_clic.switch
+    ~long:"log-requests"
+    ~short:'l'
+    ~doc:"log all requests to the node"
+    ()
 
 let better_errors () =
-  switch
+  Tezos_clic.switch
     ~long:"better-errors"
     ~doc:
       "Error reporting is more detailed. Can be used if a call to an RPC fails \
@@ -505,7 +514,7 @@ let better_errors () =
 let addr_confdesc = "-A/--addr ('node_addr' in config file)"
 
 let addr_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"addr"
     ~short:'A'
     ~placeholder:"IP addr|host"
@@ -515,12 +524,12 @@ let addr_arg () =
 let port_confdesc = "-P/--port ('node_port' in config file)"
 
 let port_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"port"
     ~short:'P'
     ~placeholder:"number"
     ~doc:"[DEPRECATED: use --endpoint instead] RPC port of the node"
-    (parameter (fun _ x ->
+    (Tezos_clic.parameter (fun _ x ->
          let open Lwt_result_syntax in
          match int_of_string_opt x with
          | Some i -> return i
@@ -529,7 +538,7 @@ let port_arg () =
 let tls_confdesc = "-S/--tls ('tls' in config file)"
 
 let tls_switch () =
-  switch
+  Tezos_clic.switch
     ~long:"tls"
     ~short:'S'
     ~doc:"[DEPRECATED: use --endpoint instead] use TLS to connect to node."
@@ -538,7 +547,7 @@ let tls_switch () =
 let media_type_confdesc = "-m/--media-type"
 
 let media_type_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"media-type"
     ~short:'m'
     ~placeholder:"json, binary, any or default"
@@ -554,7 +563,7 @@ let media_type_arg () =
 let endpoint_confdesc = "-E/--endpoint ('endpoint' in config file)"
 
 let endpoint_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"endpoint"
     ~short:'E'
     ~placeholder:"uri"
@@ -563,7 +572,7 @@ let endpoint_arg () =
     (endpoint_parameter ())
 
 let sources_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"sources"
     ~short:'s'
     ~placeholder:"path"
@@ -573,15 +582,16 @@ let sources_arg () =
     (sources_parameter ())
 
 let remote_signer_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"remote-signer"
     ~short:'R'
     ~placeholder:"uri"
     ~doc:"URI of the remote signer"
-    (parameter (fun _ x -> Tezos_signer_backends_unix.Remote.parse_base_uri x))
+    (Tezos_clic.parameter (fun _ x ->
+         Tezos_signer_backends_unix.Remote.parse_base_uri x))
 
 let password_filename_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"password-filename"
     ~short:'f'
     ~placeholder:"filename"
@@ -602,13 +612,13 @@ let client_mode_arg () =
     | None -> tzfail (Invalid_mode_arg str)
     | Some mode -> return mode
   in
-  default_arg
+  Tezos_clic.default_arg
     ~short:'M'
     ~long:"mode"
     ~placeholder:(String.concat "|" mode_strings)
     ~doc:"how to interact with the node"
     ~default:(client_mode_to_string `Mode_client)
-    (parameter
+    (Tezos_clic.parameter
        ~autocomplete:(fun _ -> Lwt.return_ok mode_strings)
        (fun _ param -> Lwt.return (parse_client_mode param)))
 
@@ -769,7 +779,7 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
 
 let commands config_file cfg (client_mode : client_mode)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
-  let open Tezos_clic.Clic in
+  let open Tezos_clic in
   let group =
     {
       name = "config";
@@ -856,8 +866,9 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  args18
+  Tezos_clic.args19
     (base_dir_arg ())
+    (no_base_dir_warnings_switch ())
     (config_file_arg ())
     (timings_switch ())
     (chain_arg ())
@@ -879,7 +890,7 @@ let global_options () =
 type parsed_config_args = {
   parsed_config_file : Cfg_file.t option;
   parsed_args : cli_args option;
-  config_commands : Client_context.full command list;
+  config_commands : Client_context.full Tezos_clic.command list;
   base_dir : string option;
   require_auth : bool;
 }
@@ -900,7 +911,8 @@ let default_parsed_config_args =
  * (when all/most commands will fail) or emits a warning (some commands may
  * fail).
  *)
-let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
+let check_base_dir_for_mode (ctx : #Client_context.full) client_mode
+    no_base_dir_warnings base_dir =
   let open Lwt_result_syntax in
   let open Tezos_mockup.Persistence in
   let* base_dir_class = classify_base_dir base_dir in
@@ -925,12 +937,14 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   | `Mode_mockup -> (
       let warn_might_not_work explain =
         let*! () =
-          ctx#warning
-            "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
-             not work correctly.@]"
-            base_dir
-            explain
-            ()
+          if not no_base_dir_warnings then
+            ctx#warning
+              "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) \
+               might not work correctly.@]"
+              base_dir
+              explain
+              ()
+          else Lwt.return_unit
         in
         return_unit
       in
@@ -1028,6 +1042,7 @@ let light_mode_checks mode endpoint sources =
 let parse_config_args (ctx : #Client_context.full) argv =
   let open Lwt_result_syntax in
   let* ( ( base_dir,
+           no_base_dir_warnings,
            config_file,
            timings,
            chain,
@@ -1046,7 +1061,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
            password_filename,
            client_mode ),
          remaining ) =
-    parse_global_options (global_options ()) ctx argv
+    Tezos_clic.parse_global_options (global_options ()) ctx argv
   in
   let* base_dir =
     match base_dir with
@@ -1074,7 +1089,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
             (* In mockup mode base dir may be created automatically. *)
             return dir)
   in
-  let* () = check_base_dir_for_mode ctx client_mode base_dir in
+  let* () =
+    check_base_dir_for_mode ctx client_mode no_base_dir_warnings base_dir
+  in
   let* () =
     when_
       (Option.is_some sources && client_mode <> `Mode_light)
@@ -1216,6 +1233,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
 
 type t =
   string option
+  * bool
   * string option
   * bool
   * Shell_services.chain
@@ -1236,7 +1254,9 @@ type t =
 
 module type Remote_params = sig
   val authenticate :
-    Signature.public_key_hash list -> Bytes.t -> Signature.t tzresult Lwt.t
+    Tezos_crypto.Signature.public_key_hash list ->
+    Bytes.t ->
+    Tezos_crypto.Signature.t tzresult Lwt.t
 
   val logger : Tezos_rpc_http_client_unix.RPC_client_unix.logger
 end

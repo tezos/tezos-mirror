@@ -9,20 +9,21 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
   "tezos-base"
   "caqti"
   "caqti-dynload"
   "caqti-lwt"
-  "data-encoding" { >= "0.6" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "lwt" { >= "5.6.0" }
   "tezos-baking-alpha"
   "tezos-client-alpha"
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
-  "tezt"
+  "tezt" { >= "3.0.0" }
   "tezt-tezos"
   "tezt-performance-regression"
-  "uri" { >= "2.2.0" }
+  "uri" { >= "3.1.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -72,10 +72,10 @@ and 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
-  | Dal_slot_availability_result : {
+  | Dal_attestation_result : {
       delegate : Signature.Public_key_hash.t;
     }
-      -> Kind.dal_slot_availability contents_result
+      -> Kind.dal_attestation contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -220,11 +220,13 @@ and _ successful_manager_operation_result =
       -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
   | Transfer_ticket_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
   | Dal_publish_slot_header_result : {
+      slot_header : Dal.Slot.Header.t;
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.dal_publish_slot_header successful_manager_operation_result
@@ -238,7 +240,6 @@ and _ successful_manager_operation_result =
       -> Kind.sc_rollup_originate successful_manager_operation_result
   | Sc_rollup_add_messages_result : {
       consumed_gas : Gas.Arith.fp;
-      inbox_after : Sc_rollup.Inbox.t;
     }
       -> Kind.sc_rollup_add_messages successful_manager_operation_result
   | Sc_rollup_cement_result : {
@@ -267,6 +268,7 @@ and _ successful_manager_operation_result =
       -> Kind.sc_rollup_timeout successful_manager_operation_result
   | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
@@ -277,12 +279,6 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.sc_rollup_recover_bond successful_manager_operation_result
-  | Sc_rollup_dal_slot_subscribe_result : {
-      consumed_gas : Gas.Arith.fp;
-      slot_index : Dal.Slot_index.t;
-      level : Raw_level.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe successful_manager_operation_result
   | Zk_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       originated_zk_rollup : Zk_rollup.t;
@@ -298,6 +294,12 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.zk_rollup_publish successful_manager_operation_result
+  | Zk_rollup_update_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.zk_rollup_update successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
@@ -361,7 +363,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_slot_availability : Dal.Endorsement.t option;
+  dal_attestation : Dal.Attestation.t option;
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding

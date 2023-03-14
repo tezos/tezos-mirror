@@ -34,6 +34,7 @@
 open Tztest
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
+open Wasm_utils
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
@@ -59,19 +60,10 @@ module Tree : Tezos_tree_encoding.TREE with type tree = Context.tree = struct
   let wrap t = Tree t
 end
 
-module Wasm = Wasm_pvm.Make (Tree)
 module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (Tree)
 
 let current_tick_encoding =
   Tezos_tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n
-
-let floppy_encoding =
-  Tezos_tree_encoding.value
-    ["gather-floppies"; "status"]
-    Gather_floppies.internal_status_encoding
-
-let inp_encoding =
-  Tezos_tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
 
 (* Replicates the encoding of buffers from [Wasm_pvm] as part of the pvm_state. *)
 let buffers_encoding =
@@ -82,30 +74,8 @@ let zero =
     ~loc:__LOC__
     (Bounded.Non_negative_int32.of_value 0l)
 
-(** Artificial initialization. Under normal circumstances the changes in
-    [current_tick], [gather_floppies] and [status] will be done by the other
-    PVM operations. for example the [origination_kernel_loading_step] in
-    Gather_floppies will initialize both the [current_tick] and the
-    [gather_floppies] *)
 let initialise_tree () =
-  let open Lwt_syntax in
-  let* empty_tree = empty_tree () in
-  let boot_sector =
-    Data_encoding.Binary.to_string_exn
-      Gather_floppies.origination_message_encoding
-      (Complete_kernel (Bytes.of_string "some boot sector"))
-  in
-  let* tree =
-    Wasm.Internal_for_tests.initial_tree_from_boot_sector
-      ~empty_tree
-      boot_sector
-  in
-
-  let* tree = Tree_encoding_runner.encode current_tick_encoding Z.zero tree in
-  Tree_encoding_runner.encode
-    floppy_encoding
-    Gather_floppies.Not_gathering_floppies
-    tree
+  Wasm_utils.initial_tree ~from_binary:true "arbitrary boot sector"
 
 let make_inbox_info ~inbox_level ~message_counter =
   Wasm_pvm_state.
@@ -153,16 +123,7 @@ let test_get_info () =
     let last_input_read =
       Some (make_inbox_info ~inbox_level ~message_counter)
     in
-    {
-      current_tick = Z.one;
-      last_input_read;
-      input_request =
-        Input_required
-        (* While it shouldn't be Input_required after an input, `add_input_info`
-           doesn't use the PVM interface but encodes it directly into the tree.
-           The tree is in `Input_required` state since it is in snapshot state,
-           waiting for the next_input. *);
-    }
+    {current_tick = Z.zero; last_input_read; input_request = Input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info.last_input_read = None) ;
@@ -179,7 +140,7 @@ let encode_tick_state tree =
   let* tree =
     Tree_encoding_runner.encode
       (Tezos_tree_encoding.value ["wasm"; "tag"] Data_encoding.string)
-      "snapshot"
+      "collect"
       tree
   in
   (* Encode the value. *)
@@ -196,31 +157,34 @@ let encode_tick_state tree =
 let test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
-  let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
   let* tree = encode_tick_state tree in
   let* tree =
     Wasm.set_input_step
       {inbox_level = zero; message_counter = Z.of_int 1}
-      "hello"
+      "\000\000hello"
       tree
   in
-  let* result_input = Tree_encoding_runner.decode inp_encoding tree in
+  let* buffers =
+    Tree_encoding_runner.decode
+      (Tezos_tree_encoding.option Wasm_pvm.durable_buffers_encoding)
+      tree
+  in
+  let buffers =
+    match buffers with Some buffers -> buffers | None -> assert false
+  in
+  let* result_message = Input_buffer.dequeue buffers.input in
   let* current_tick = Tree_encoding_runner.decode current_tick_encoding tree in
   let expected_info =
     let open Wasm_pvm_state in
     let last_input_read =
-      Some (make_inbox_info ~inbox_level:5 ~message_counter:10)
+      Some (make_inbox_info ~inbox_level:0 ~message_counter:1)
     in
-    {
-      current_tick = Z.(succ one);
-      last_input_read;
-      input_request = No_input_required;
-    }
+    {current_tick = Z.one; last_input_read; input_request = Input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info = expected_info) ;
   assert (current_tick = Z.one) ;
-  assert (result_input = "hello") ;
+  assert (Bytes.to_string result_message.payload = "\000\000hello") ;
   Lwt_result_syntax.return_unit
 
 (** Given a [config] whose output has a given payload at position (0,0), if we
@@ -230,11 +194,11 @@ let test_get_output () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
-  let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs ;
-  let output = Output_buffer.alloc () in
-  Output_buffer.set_level output 0l ;
-  let* () = Output_buffer.set_value output @@ Bytes.of_string "hello" in
+  let output = Tezos_webassembly_interpreter.Eval.default_output_buffer () in
+  let* Output_buffer.{outbox_level; message_index} =
+    Output_buffer.push_message output @@ Bytes.of_string "hello"
+  in
+  assert (outbox_level = 0l && Z.equal message_index Z.zero) ;
   let buffers = Eval.{input = Input_buffer.alloc (); output} in
   let* tree =
     Tree_encoding_runner.encode

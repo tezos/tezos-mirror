@@ -118,12 +118,16 @@ type invoke_step_kont =
       concat_kont : value concat_kont;
     }
   | Inv_reveal_tick of {
-      reveal : Reveal.reveal;
+      reveal : Host_funcs.reveal;
       base_destination : int32;
       max_bytes : int32;
       code : code;
     }
-  | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+  | Inv_stop of {
+      code : code;
+      fresh_frame : ongoing frame_stack option;
+      remaining_ticks : Z.t;
+    }
 
 type label_step_kont =
   | LS_Start : ongoing label_kont -> label_step_kont
@@ -154,7 +158,6 @@ type config = {
   step_kont : step_kont;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
-  module_reg : module_reg;
 }
 
 type ('a, 'b, 'acc) fold_right2_kont = {
@@ -261,6 +264,7 @@ val invoke :
   ?input:Input_buffer.t ->
   ?output:Output_buffer.t ->
   ?durable:Durable_storage.t ->
+  ?init:bool ->
   Host_funcs.registry ->
   func_inst ->
   value list ->
@@ -269,6 +273,7 @@ val invoke :
 val step :
   ?init:bool ->
   ?durable:Durable_storage.t ->
+  module_reg ->
   config ->
   buffers ->
   (Durable_storage.t * config) Lwt.t
@@ -285,25 +290,36 @@ exception Reveal_error of reveal_error
 (** [is_reveal_tick config] returns [Some hash] if the evalutation is
     in a state expecting the payload of a given hash, and returns [None]
     otherwise. *)
-val is_reveal_tick : config -> Reveal.reveal option
+val is_reveal_tick : config -> Host_funcs.reveal option
 
-(** [reveal_step module_reg payload config] loads [payload] in the
-    memory of the module whose function is being evaluated with [config].
+(** [reveal_step reveal module_reg payload config] loads [payload] in
+    the memory of the module whose function is being evaluated with
+    [config].
 
     This function can only be used when [is_reveal_tick] returns
     something ({i i.e.}, not [None]).
 
     @raise Reveal_error
 *)
-val reveal_step : module_reg -> bytes -> config -> config Lwt.t
+val reveal_step :
+  (memory:memory_inst ->
+  dst:int32 ->
+  max_bytes:int32 ->
+  payload:bytes ->
+  int32 Lwt.t) ->
+  module_reg ->
+  bytes ->
+  config ->
+  config Lwt.t
 
 val config :
   Host_funcs.registry ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
-  module_reg ->
   value Vector.t ->
   admin_instr Vector.t ->
   config
+
+val default_output_buffer : unit -> output_inst
 
 val buffers : ?input:input_inst -> ?output:output_inst -> unit -> buffers

@@ -405,8 +405,8 @@ type error +=
       expected : Operation_list_list_hash.t;
       found : Operation_list_list_hash.t;
     }
+  | Applying_non_validated_block of Block_hash.t
   | Failed_to_checkout_context of Context_hash.t
-  | Applying_non_prechecked_block of Block_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
@@ -483,18 +483,18 @@ let () =
       Inconsistent_operations_hash {block; expected; found}) ;
   Error_monad.register_error_kind
     `Permanent
-    ~id:"Block_validator_process.applying_non_prechecked_block"
-    ~title:"Applying non prechecked block"
-    ~description:"Applying non prechecked block"
-    ~pp:(fun ppf (hash : Tezos_crypto.Block_hash.t) ->
+    ~id:"Block_validator_process.applying_non_validated_block"
+    ~title:"Applying non validated block"
+    ~description:"Applying non validated block"
+    ~pp:(fun ppf (hash : Block_hash.t) ->
       Format.fprintf
         ppf
-        "Applying non prechecked block %a"
-        Tezos_crypto.Block_hash.pp_short
+        "Applying non validated block %a"
+        Block_hash.pp_short
         hash)
-    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
-    (function Applying_non_prechecked_block bh -> Some bh | _ -> None)
-    (fun bh -> Applying_non_prechecked_block bh) ;
+    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    (function Applying_non_validated_block bh -> Some bh | _ -> None)
+    (fun bh -> Applying_non_validated_block bh) ;
   Error_monad.register_error_kind
     `Permanent
     ~id:"Block_validator_process.failed_to_checkout_context"

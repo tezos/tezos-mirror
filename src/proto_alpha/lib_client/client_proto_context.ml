@@ -85,6 +85,16 @@ let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
          ok hash)
        script_opt
 
+let get_contract_ticket_balance (rpc : #rpc_context) ~chain ~block contract key
+    =
+  Plugin.RPC.Contract.get_ticket_balance rpc (chain, block) contract key
+
+let get_contract_all_ticket_balances (rpc : #rpc_context) ~chain ~block contract
+    =
+  Plugin.RPC.Contract.get_all_ticket_balances rpc (chain, block) contract
+
+let ticket_balances_encoding = Plugin.RPC.Contract.ticket_balances_encoding
+
 let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
   Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
 
@@ -614,7 +624,7 @@ let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
       return (oph, op, result)
 
 type activation_key = {
-  pkh : Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -625,7 +635,7 @@ type activation_key = {
 let raw_activation_key_encoding =
   let open Data_encoding in
   obj6
-    (req "pkh" Ed25519.Public_key_hash.encoding)
+    (req "pkh" Signature.Ed25519.Public_key_hash.encoding)
     (req "amount" Tez.encoding)
     (req "activation_code" Blinded_public_key_hash.activation_code_encoding)
     (req "mnemonic" (list string))
@@ -655,7 +665,7 @@ let activation_key_encoding =
                 ~title:"Deprecated_activation"
                 Json_only
                 (obj6
-                   (req "pkh" Ed25519.Public_key_hash.encoding)
+                   (req "pkh" Signature.Ed25519.Public_key_hash.encoding)
                    (req "amount" Tez.encoding)
                    (req
                       "secret"
@@ -705,7 +715,9 @@ let read_key key =
       let sk = Bytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
-          (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
+          (Data_encoding.Binary.of_bytes_exn
+             Signature.Ed25519.Secret_key.encoding
+             sk)
       in
       let pk = Signature.Secret_key.to_public_key sk in
       let pkh = Signature.Public_key.hash pk in
@@ -733,7 +745,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
       cctxt#message
         "Account %s (%a) activated with %s%a."
         alias
-        Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         pkh
         Operation_result.tez_sym
         Tez.pp
@@ -754,9 +766,11 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
         %a @]"
        Signature.Public_key_hash.pp
        pkh
-       Ed25519.Public_key_hash.pp
+       Signature.Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
+  let pk = Signature.Of_V1.public_key pk in
+  let sk = Signature.Of_V1.secret_key sk in
   Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
    Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -938,322 +952,6 @@ let contract_cache_size_limit cctxt ~chain ~block =
   let cb = (chain, block) in
   Alpha_services.Cache.contract_cache_size_limit cctxt cb
 
-let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~src_pk ~src_sk ~fee_parameter () =
-  let contents :
-      Kind.tx_rollup_origination Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         Tx_rollup_origination)
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?burn_limit ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~content ~tx_rollup () =
-  let contents :
-      Kind.tx_rollup_submit_batch Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_submit_batch {tx_rollup; content; burn_limit}))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~successor_level:true
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~inbox_merkle_root
-    ~messages ~predecessor ~tx_rollup () =
-  let commitment : Tx_rollup_commitment.Full.t =
-    {level; messages; predecessor; inbox_merkle_root}
-  in
-  let contents :
-      Kind.tx_rollup_commit Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_commit {tx_rollup; commitment}))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~successor_level:true
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let submit_tx_rollup_finalize_commitment (cctxt : #full) ~chain ~block
-    ?confirmations ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit
-    ?storage_limit ?counter ~source ~src_pk ~src_sk ~fee_parameter ~tx_rollup ()
-    =
-  let contents :
-      Kind.tx_rollup_finalize_commitment
-      Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_finalize_commitment {tx_rollup}))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let submit_tx_rollup_remove_commitment (cctxt : #full) ~chain ~block
-    ?confirmations ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit
-    ?storage_limit ?counter ~source ~src_pk ~src_sk ~fee_parameter ~tx_rollup ()
-    =
-  let contents :
-      Kind.tx_rollup_remove_commitment
-      Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_remove_commitment {tx_rollup}))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~tx_rollup ~message
-    ~message_position ~message_path ~message_result_hash ~message_result_path
-    ~previous_context_hash ~previous_withdraw_list_hash
-    ~previous_message_result_path ~proof () =
-  let previous_message_result =
-    Tx_rollup_message_result.
-      {
-        context_hash = previous_context_hash;
-        withdraw_list_hash = previous_withdraw_list_hash;
-      }
-  in
-  let proof = Tx_rollup_l2_proof.serialize_proof_exn proof in
-  let contents :
-      Kind.tx_rollup_rejection Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_rejection
-            {
-              tx_rollup;
-              level;
-              message;
-              message_position;
-              message_path;
-              message_result_hash;
-              message_result_path;
-              previous_message_result_path;
-              previous_message_result;
-              proof;
-            }))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let submit_tx_rollup_return_bond (cctxt : #full) ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~tx_rollup () =
-  let contents :
-      Kind.tx_rollup_return_bond Annotated_manager_operation.annotated_list =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_return_bond {tx_rollup}))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
-let tx_rollup_dispatch_tickets (cctxt : #full) ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~context_hash
-    ~message_position ~message_result_path ~tickets_info ~tx_rollup () =
-  let contents :
-      Kind.tx_rollup_dispatch_tickets Annotated_manager_operation.annotated_list
-      =
-    Annotated_manager_operation.Single_manager
-      (Injection.prepare_manager_operation
-         ~fee:(Limit.of_option fee)
-         ~gas_limit:(Limit.of_option gas_limit)
-         ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_dispatch_tickets
-            {
-              tx_rollup;
-              level;
-              context_hash;
-              message_index = message_position;
-              message_result_path;
-              tickets_info;
-            }))
-  in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ?counter
-    ~source
-    ~successor_level:true
-    ~fee:(Limit.of_option fee)
-    ~storage_limit:(Limit.of_option storage_limit)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun (oph, _, op, result) ->
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
-
 let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
     ~src_pk ~src_sk ~fee_parameter ~contents ~ty ~ticketer ~amount ~destination
@@ -1298,12 +996,9 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
     ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk ~fee_parameter () =
-  Client_proto_rollups.ScRollup.origination_proof_exn ~boot_sector kind
-  >>= fun origination_proof ->
-  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-  let origination_proof =
-    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
-  in
+  Proof_helpers.origination_proof ~boot_sector kind
+  >|= Environment.wrap_tzresult
+  >>=? fun origination_proof ->
   let op =
     Annotated_manager_operation.Single_manager
       (Injection.prepare_manager_operation
@@ -1337,14 +1032,14 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let sc_rollup_add_messages (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~rollup ~messages ~src_pk ~src_sk ~fee_parameter () =
+    ~messages ~src_pk ~src_sk ~fee_parameter () =
   let op =
     Annotated_manager_operation.Single_manager
       (Injection.prepare_manager_operation
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_add_messages {rollup; messages}))
+         (Sc_rollup_add_messages {messages}))
   in
   Injection.inject_manager_operation
     cctxt
@@ -1471,7 +1166,7 @@ let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
 
 let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~src_pk ~src_sk ~fee_parameter ~sc_rollup () =
+    ~src_pk ~src_sk ~fee_parameter ~sc_rollup ~staker () =
   let contents :
       Kind.sc_rollup_recover_bond Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager
@@ -1479,7 +1174,7 @@ let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_recover_bond {sc_rollup}))
+         (Sc_rollup_recover_bond {sc_rollup; staker}))
   in
   (* TODO/Fixme: https://gitlab.com/tezos/tezos/-/issues/2609
      Decide if we should enforce ~successor_level:true for simulation.
@@ -1505,42 +1200,6 @@ let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
-
-let sc_rollup_dal_slot_subscribe (cctxt : #full) ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~rollup ~slot_index ~src_pk ~src_sk ~fee_parameter () =
-  match Dal.Slot_index.of_int slot_index with
-  | None -> failwith "Dal slot index either negative or above hard limit"
-  | Some slot_index -> (
-      let op =
-        Annotated_manager_operation.Single_manager
-          (Injection.prepare_manager_operation
-             ~fee:(Limit.of_option fee)
-             ~gas_limit:(Limit.of_option gas_limit)
-             ~storage_limit:(Limit.of_option storage_limit)
-             (Sc_rollup_dal_slot_subscribe {rollup; slot_index}))
-      in
-      Injection.inject_manager_operation
-        cctxt
-        ~chain
-        ~block
-        ?confirmations
-        ?dry_run
-        ?verbose_signing
-        ?simulation
-        ?counter
-        ~source
-        ~fee:(Limit.of_option fee)
-        ~storage_limit:(Limit.of_option storage_limit)
-        ~gas_limit:(Limit.of_option gas_limit)
-        ~src_pk
-        ~src_sk
-        ~fee_parameter
-        op
-      >>=? fun (oph, _, op, result) ->
-      match Apply_results.pack_contents_list op result with
-      | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-          return (oph, op, result))
 
 let sc_rollup_refute (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
@@ -1586,6 +1245,107 @@ let sc_rollup_timeout (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
          (Sc_rollup_timeout {rollup; stakers}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    op
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let zk_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~public_parameters ~circuits_info ~init_state ~nb_ops ~src_pk ~src_sk
+    ~fee_parameter () =
+  let op =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Zk_rollup_origination
+            {public_parameters; circuits_info; init_state; nb_ops}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    op
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let zk_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~zk_rollup ~ops ~src_pk ~src_sk ~fee_parameter () =
+  let op =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Zk_rollup_publish {zk_rollup; ops}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    op
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let zk_rollup_update (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~zk_rollup ~update ~src_pk ~src_sk ~fee_parameter () =
+  let op =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Zk_rollup_update {zk_rollup; update}))
   in
   Injection.inject_manager_operation
     cctxt

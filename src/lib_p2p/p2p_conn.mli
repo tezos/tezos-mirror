@@ -92,19 +92,39 @@ val write_sync : ('msg, 'peer, 'conn) t -> 'msg -> unit tzresult Lwt.t
     [t'] is the internal [P2p_socket.t] inside [t]. *)
 val write_now : ('msg, 'peer, 'conn) t -> 'msg -> bool tzresult
 
+(** [encode t messsage] encodes a message to be used with
+    [write_encoded_now]. It is particularly useful to avoid encoding
+    several times the same message.*)
+val encode :
+  ('msg, 'peer, 'conn) t ->
+  'msg ->
+  'msg P2p_message.t P2p_socket.encoded_message tzresult
+
+(** [write_encoded_now t msg] is [P2p_socket.write_now t' msg] where
+    [t'] is the internal [P2p_socket.t] inside [t] and [msg] has been
+    pre-encoded using [encode].
+    [msg] will be overwritten and should not be used after this
+    invocation.
+*)
+val write_encoded_now :
+  ('msg, 'peer, 'conn) t ->
+  'msg P2p_message.t P2p_socket.encoded_message ->
+  bool tzresult
+
 val equal_sock : ('msg, 'peer, 'conn) t -> ('msg, 'peer, 'conn) t -> bool
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4615
+   Properly document disconnect/close. Check they are properly used
+   and if we really need both. *)
+
 val disconnect : ?wait:bool -> ('msg, 'peer, 'conn) t -> unit Lwt.t
+
+val close : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (** Returns the network version that will be used for this connection.
    This network version is the best version compatible with the versions
    supported by ours and the remote peer. *)
 val negotiated_version : ('msg, 'peer, 'conn) t -> Network_version.t
-
-(* TODO properly document disconnect/close. Check they are properly used
-   and if we really need both. *)
-
-val close : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (**/**)
 

@@ -78,7 +78,9 @@ let big_map_id ?(loc = 0) id = int ~loc @@ Big_map.Id.unparse_to_z id
 let timestamp_of_zint zint = Script_timestamp.of_zint zint
 
 let public_key_of_bytes_exn b =
-  Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding b
+  Data_encoding.Binary.of_bytes_exn
+    Tezos_crypto.Signature.V0.Public_key.encoding
+    b
 
 let address_of_bytes_exn b =
   Data_encoding.Binary.of_bytes_exn Contract.encoding b

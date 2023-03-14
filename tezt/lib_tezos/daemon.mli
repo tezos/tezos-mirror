@@ -93,7 +93,7 @@ module Make : functor (X : PARAMETERS) -> sig
         -> event_handler
 
   (** Raw events. *)
-  type event = {name : string; value : JSON.t}
+  type event = {name : string; value : JSON.t; timestamp : float}
 
   (** Daemon states. *)
   type t = {
@@ -111,8 +111,13 @@ module Make : functor (X : PARAMETERS) -> sig
   (** Get the name of a daemon. *)
   val name : t -> string
 
-  (** Send SIGTERM (or SIGKILL) to a daemon and wait for it to terminate. *)
-  val terminate : ?kill:bool -> t -> unit Lwt.t
+  (** Send SIGTERM to a daemon and wait for it to terminate.
+
+      Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+  val terminate : ?timeout:float -> t -> unit Lwt.t
+
+  (** Send SIGKILL to a daemon and wait for it to terminate. *)
+  val kill : t -> unit Lwt.t
 
   (** Generate a fresh indentifier based on [X.base_default_name].
       This function ensures that a same name can't be returned twice. *)

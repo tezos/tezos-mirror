@@ -46,6 +46,8 @@ if a malicious participant can make sure she is the last revealer, then she
 can choose whether to reveal its committed value, effectively choosing between
 two different predetermined seeds.
 
+.. _vdf_alpha:
+
 Verifiable Delay Function
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -74,6 +76,8 @@ cheaper and based on a weaker security assumption (low order assumption).
 
 Protocol
 --------
+
+.. _randomness_generation_alpha:
 
 Randomness generation overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -146,9 +150,9 @@ Randomness generation parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_COMMITMENT``
-     - 64 blocks
+     - 128 blocks
    * - ``NONCE_REVELATION_THRESHOLD``
-     - 256 blocks
+     - 512 blocks
    * -  ``MAX_ANON_OPS_PER_BLOCK``
      - 132 revelations
    * - ``SEED_NONCE_REVELATION_TIP``

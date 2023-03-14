@@ -43,72 +43,78 @@ module type T = sig
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
-       and type Chain_id.t = Chain_id.t
-       and type Block_hash.t = Block_hash.t
-       and type Operation_hash.t = Operation_hash.t
-       and type Operation_list_hash.t = Operation_list_hash.t
-       and type Operation_list_list_hash.t = Operation_list_list_hash.t
+       and type Chain_id.t = Tezos_crypto.Hashed.Chain_id.t
+       and type Block_hash.t = Tezos_crypto.Hashed.Block_hash.t
+       and type Operation_hash.t = Tezos_crypto.Hashed.Operation_hash.t
+       and type Operation_list_hash.t =
+        Tezos_crypto.Hashed.Operation_list_hash.t
+       and type Operation_list_list_hash.t =
+        Tezos_crypto.Hashed.Operation_list_list_hash.t
        and type Context.t = Context.t
        and type Context.cache_key = Environment_context.Context.cache_key
        and type Context.cache_value = Environment_context.Context.cache_value
-       and type Context_hash.t = Context_hash.t
-       and type Context_hash.Version.t = Context_hash.Version.t
+       and type Context_hash.t = Tezos_crypto.Hashed.Context_hash.t
+       and type Context_hash.Version.t =
+        Tezos_crypto.Hashed.Context_hash.Version.t
        and type Context.config = Tezos_context_sigs.Config.t
        and module Context.Proof = Environment_context.Context.Proof
-       and type Protocol_hash.t = Protocol_hash.t
+       and type Protocol_hash.t = Tezos_crypto.Hashed.Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
        and type Block_header.t = Block_header.t
-       and type 'a RPC_directory.t = 'a RPC_directory.t
-       and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
-       and type Ed25519.Public_key.t = Ed25519.Public_key.t
-       and type Ed25519.t = Ed25519.t
-       and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
-       and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
-       and type Secp256k1.t = Secp256k1.t
-       and type P256.Public_key_hash.t = P256.Public_key_hash.t
-       and type P256.Public_key.t = P256.Public_key.t
-       and type P256.t = P256.t
-       and type Bls.Public_key_hash.t = Bls.Public_key_hash.t
-       and type Bls.Public_key.t = Bls.Public_key.t
-       and type Bls.t = Bls.t
-       and type Signature.public_key_hash = Signature.public_key_hash
-       and type Signature.public_key = Signature.public_key
-       and type Signature.t = Signature.t
-       and type Signature.watermark = Signature.watermark
+       and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
+       and type Ed25519.Public_key_hash.t = Signature.Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t = Signature.Ed25519.Public_key.t
+       and type Ed25519.t = Signature.Ed25519.t
+       and type Secp256k1.Public_key_hash.t =
+        Signature.Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Signature.Secp256k1.Public_key.t
+       and type Secp256k1.t = Signature.Secp256k1.t
+       and type P256.Public_key_hash.t = Signature.P256.Public_key_hash.t
+       and type P256.Public_key.t = Signature.P256.Public_key.t
+       and type P256.t = Signature.P256.t
+       and type Bls.Public_key_hash.t = Signature.Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Signature.Bls.Public_key.t
+       and type Bls.t = Signature.Bls.t
+       and type Signature.public_key_hash = Signature.V1.public_key_hash
+       and type Signature.public_key = Signature.V1.public_key
+       and type Signature.signature = Signature.V1.signature
+       and type Signature.t = Signature.V1.t
+       and type Signature.watermark = Signature.V1.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type Q.t = Q.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
-       and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
-       and type RPC_service.meth = RPC_service.meth
+       and type ('a, 'b) RPC_path.t = ('a, 'b) Tezos_rpc.Path.t
+       and type RPC_service.meth = Tezos_rpc.Service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Timelock.chest
-       and type Timelock.chest_key = Timelock.chest_key
-       and type Timelock.opening_result = Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
+       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
        and type Plonk.proof = Tezos_protocol_environment_structs.V8.Plonk.proof
        and type Plonk.public_parameters =
         Tezos_protocol_environment_structs.V8.Plonk.verifier_public_parameters
-        * Tezos_protocol_environment_structs.V8.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
        and type Dal.commitment = Tezos_crypto_dal.Cryptobox.Verifier.commitment
+       and type Dal.commitment_proof =
+        Tezos_crypto_dal.Cryptobox.Verifier.commitment_proof
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
-       and type Wasm_2_0_0.input_hash =
-        Tezos_scoru_wasm.Wasm_pvm_state.input_hash
+       and type Wasm_2_0_0.reveal_hash =
+        Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
        and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
        and type Wasm_2_0_0.input_request =
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
@@ -134,7 +140,7 @@ module type T = sig
        and type application_state = P.application_state
 
   class ['chain, 'block] proto_rpc_context :
-    Tezos_rpc.RPC_context.t
+    Tezos_rpc.Context.t
     -> (unit, (unit * 'chain) * 'block) RPC_path.t
     -> ['chain * 'block] RPC_context.simple
 
@@ -200,7 +206,7 @@ struct
   module List = Tezos_error_monad.TzLwtreslib.List
   module Array = Tezos_protocol_environment_structs.V8.Array
   module Char = Char
-  module Bytes = Bytes
+  module Bytes = Tezos_base.TzPervasives.Bytes
   module Hex = Tezos_stdlib.Hex
   module String = String
   module Bits = Bits
@@ -245,17 +251,18 @@ struct
   end
 
   module Raw_hashes = struct
-    let sha256 = Hacl.Hash.SHA256.digest
+    let sha256 = Tezos_crypto.Hacl.Hash.SHA256.digest
 
-    let sha512 = Hacl.Hash.SHA512.digest
+    let sha512 = Tezos_crypto.Hacl.Hash.SHA512.digest
 
-    let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
+    let blake2b msg =
+      Tezos_crypto.Blake2B.to_bytes (Tezos_crypto.Blake2B.hash_bytes [msg])
 
-    let keccak256 msg = Hacl.Hash.Keccak_256.digest msg
+    let keccak256 msg = Tezos_crypto.Hacl.Hash.Keccak_256.digest msg
 
-    let sha3_256 msg = Hacl.Hash.SHA3_256.digest msg
+    let sha3_256 msg = Tezos_crypto.Hacl.Hash.SHA3_256.digest msg
 
-    let sha3_512 msg = Hacl.Hash.SHA3_512.digest msg
+    let sha3_512 msg = Tezos_crypto.Hacl.Hash.SHA3_512.digest msg
   end
 
   module Z = Z
@@ -269,15 +276,35 @@ struct
 
     let def name ?title ?description encoding =
       def (Param.name ^ "." ^ name) ?title ?description encoding
+
+    (* TODO: https://gitlab.com/nomadic-labs/data-encoding/-/issues/58
+       Remove when fix is integrated in data-encoding. *)
+    let splitted ~json ~binary =
+      let open Data_encoding__.Encoding in
+      let e = splitted ~json ~binary in
+      {
+        e with
+        encoding =
+          (match e.encoding with
+          | Splitted {encoding; json_encoding; _} ->
+              Splitted
+                {
+                  encoding;
+                  json_encoding;
+                  is_obj = is_obj json && is_obj binary;
+                  is_tup = is_tup json && is_tup binary;
+                }
+          | desc -> desc);
+      }
   end
 
   module Time = Time.Protocol
-  module Ed25519 = Ed25519
-  module Secp256k1 = Secp256k1
-  module P256 = P256
-  module Bls = Bls
-  module Signature = Signature
-  module Timelock = Timelock
+  module Ed25519 = Signature.Ed25519
+  module Secp256k1 = Signature.Secp256k1
+  module P256 = Signature.P256
+  module Bls = Signature.Bls
+  module Signature = Signature.V1
+  module Timelock = Tezos_crypto.Timelock
   module Vdf = Class_group_vdf.Vdf_self_contained
 
   module S = struct
@@ -285,7 +312,7 @@ struct
 
     module type HASHABLE = Tezos_base.S.HASHABLE
 
-    module type MINIMAL_HASH = Tezos_crypto.S.MINIMAL_HASH
+    module type MINIMAL_HASH = Tezos_crypto.Intfs.MINIMAL_HASH
 
     module type B58_DATA = sig
       type t
@@ -298,9 +325,9 @@ struct
 
       val of_b58check_opt : string -> t option
 
-      type Base58.data += Data of t
+      type Tezos_crypto.Base58.data += Data of t
 
-      val b58check_encoding : t Base58.encoding
+      val b58check_encoding : t Tezos_crypto.Base58.encoding
     end
 
     module type RAW_DATA = sig
@@ -320,7 +347,7 @@ struct
 
       val encoding : t Data_encoding.t
 
-      val rpc_arg : t RPC_arg.t
+      val rpc_arg : t Tezos_rpc.Arg.t
     end
 
     module type INDEXES_SET = sig
@@ -448,6 +475,20 @@ struct
         (Public_key.t * watermark option * bytes) list -> t -> bool
 
       val aggregate_signature_opt : t list -> t option
+    end
+
+    module type SPLIT_SIGNATURE = sig
+      include SIGNATURE
+
+      type prefix
+
+      type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+      val split_signature : t -> splitted
+
+      val of_splitted : splitted -> t option
+
+      val prefix_encoding : prefix Data_encoding.t
     end
 
     module type FIELD = sig
@@ -621,8 +662,6 @@ struct
 
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
-    module Tzresult_syntax = Traced_result_syntax
-    module Lwt_tzresult_syntax = Lwt_traced_result_syntax
     include
       Tezos_error_monad.Monad_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
@@ -630,7 +669,7 @@ struct
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
     include Tezos_protocol_environment_structs.V8.Error_monad_infix_globals
 
-    let fail e = Lwt.return_error (TzTrace.make e)
+    let tzfail e = Lwt.return_error (TzTrace.make e)
 
     let error e = Error (TzTrace.make e)
 
@@ -655,7 +694,7 @@ struct
         ~description:"Exception safely wrapped in an error"
         ~pp:(fun ppf s ->
           Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
-        Data_encoding.(obj1 (req "msg" string))
+        Data_encoding.(obj1 (req "msg" @@ string Plain))
         (function
           | Exn (Failure msg) -> Some msg
           | Exn exn -> Some (Printexc.to_string exn)
@@ -697,23 +736,23 @@ struct
 
   let wrap_tzresult r = Result.map_error wrap_tztrace r
 
-  module Chain_id = Chain_id
-  module Block_hash = Block_hash
-  module Operation_hash = Operation_hash
-  module Operation_list_hash = Operation_list_hash
-  module Operation_list_list_hash = Operation_list_list_hash
-  module Context_hash = Context_hash
-  module Protocol_hash = Protocol_hash
-  module Blake2B = Blake2B
+  module Chain_id = Tezos_crypto.Hashed.Chain_id
+  module Block_hash = Tezos_crypto.Hashed.Block_hash
+  module Operation_hash = Tezos_crypto.Hashed.Operation_hash
+  module Operation_list_hash = Tezos_crypto.Hashed.Operation_list_hash
+  module Operation_list_list_hash = Tezos_crypto.Hashed.Operation_list_list_hash
+  module Context_hash = Tezos_crypto.Hashed.Context_hash
+  module Protocol_hash = Tezos_crypto.Hashed.Protocol_hash
+  module Blake2B = Tezos_crypto.Blake2B
   module Fitness = Fitness
   module Operation = Operation
   module Block_header = Block_header
   module Bounded = Bounded
   module Protocol = Protocol
-  module RPC_arg = RPC_arg
-  module RPC_path = RPC_path
-  module RPC_query = RPC_query
-  module RPC_service = RPC_service
+  module RPC_arg = Tezos_rpc.Arg
+  module RPC_path = Tezos_rpc.Path
+  module RPC_query = Tezos_rpc.Query
+  module RPC_service = Tezos_rpc.Service
 
   module RPC_answer = struct
     type 'o t =
@@ -745,7 +784,7 @@ struct
   end
 
   module RPC_directory = struct
-    include RPC_directory
+    include Tezos_rpc.Directory
 
     let gen_register dir service handler =
       let open Lwt_syntax in
@@ -873,7 +912,13 @@ struct
       object
         method call_proto_service0 :
           'm 'q 'i 'o.
-          (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
+          ( ([< Tezos_rpc.Service.meth] as 'm),
+            t,
+            t,
+            'q,
+            'i,
+            'o )
+          Tezos_rpc.Service.t ->
           'pr ->
           'q ->
           'i ->
@@ -881,7 +926,13 @@ struct
 
         method call_proto_service1 :
           'm 'a 'q 'i 'o.
-          (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
+          ( ([< Tezos_rpc.Service.meth] as 'm),
+            t,
+            t * 'a,
+            'q,
+            'i,
+            'o )
+          Tezos_rpc.Service.t ->
           'pr ->
           'a ->
           'q ->
@@ -890,13 +941,13 @@ struct
 
         method call_proto_service2 :
           'm 'a 'b 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             t,
             (t * 'a) * 'b,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           'pr ->
           'a ->
           'b ->
@@ -942,7 +993,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call0 s ctxt block q i in
       match r with
-      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
@@ -950,7 +1001,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call1 s ctxt block a1 q i in
       match r with
-      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
@@ -958,7 +1009,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call2 s ctxt block a1 a2 q i in
       match r with
-      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
@@ -966,7 +1017,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call3 s ctxt block a1 a2 a3 q i in
       match r with
-      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
   end
@@ -1055,13 +1106,11 @@ struct
       message_index : Z.t;
     }
 
-    type input_hash = Tezos_scoru_wasm.Wasm_pvm_state.input_hash
-
-    let input_hash_to_string =
-      Tezos_scoru_wasm.Wasm_pvm_state.input_hash_to_string
+    type reveal_hash = Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
 
     type reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal =
-      | Reveal_raw_data of input_hash
+      | Reveal_raw_data of reveal_hash
+      | Reveal_metadata
 
     type input_request = Tezos_scoru_wasm.Wasm_pvm_state.input_request =
       | No_input_required
@@ -1079,7 +1128,7 @@ struct
     struct
       type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
 
-      module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
+      include Tezos_scoru_wasm.Wasm_pvm.Make (struct
         include Tree
 
         let select = function
@@ -1088,22 +1137,13 @@ struct
 
         let wrap t = PVM_tree t
       end)
-
-      let compute_step (tree : Tree.tree) = Wasm.compute_step tree
-
-      let set_input_step input payload (tree : Tree.tree) =
-        Wasm.set_input_step input payload tree
-
-      let reveal_step = Wasm.reveal_step
-
-      let get_output output (tree : Tree.tree) = Wasm.get_output output tree
-
-      let get_info (tree : Tree.tree) = Wasm.get_info tree
     end
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
     let environment_version = Protocol.V8
+
+    let expected_context_hash = Predecessor_resulting_context
 
     include P
 
@@ -1240,7 +1280,7 @@ struct
     end
   end
 
-  class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
+  class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.Context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
     object
       method call_proto_service0
@@ -1324,7 +1364,7 @@ struct
 
   class ['block] proto_rpc_context_of_directory conv dir :
     ['block] RPC_context.simple =
-    let lookup = new Tezos_rpc.RPC_context.of_directory dir in
+    let lookup = new Tezos_rpc.Context.of_directory dir in
     object
       method call_proto_service0
           : 'm 'q 'i 'o.

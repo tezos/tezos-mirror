@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Resto_cohttp.Media_type.Make(RPC_encoding).t = {
+type t = Resto_cohttp.Media_type.Make(Tezos_rpc.Encoding).t = {
   name : Cohttp.Accept.media_range;
   q : int option;
   pp : 'a. 'a Data_encoding.t -> Format.formatter -> string -> unit;

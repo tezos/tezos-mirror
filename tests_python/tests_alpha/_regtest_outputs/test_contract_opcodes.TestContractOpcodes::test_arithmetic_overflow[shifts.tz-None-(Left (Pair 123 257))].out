@@ -22,5 +22,15 @@ Runtime error in contract [CONTRACT_HASH]:
   19: 
 At line 10 characters 25 to 28,
 unexpected arithmetic overflow
+trace
+  - location: 14 (just consumed gas: 8.811)
+    [ (Pair (Left (Pair 123 257)) None) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Left (Pair 123 257)) ]
+  - location: 15 (just consumed gas: 0)
+    [ (Pair 123 257) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ 123
+      257 ]
 Fatal error:
   error running script

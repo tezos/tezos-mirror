@@ -176,7 +176,11 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
     pp_print_cut ppf ()
   in
   let hash_pp l =
-    fprintf ppf "%s" (Base58.raw_encode Blake2B.(hash_bytes l |> to_string))
+    fprintf
+      ppf
+      "%s"
+      (Tezos_crypto.Base58.raw_encode
+         Tezos_crypto.Blake2B.(hash_bytes l |> to_string))
   in
   item (fun ppf () ->
       pp_print_text ppf "Branch: " ;
@@ -251,7 +255,10 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = Bytes.length bytes + Signature.size in
+  let packed_op =
+    {shell = {branch}; protocol_data = Operation_data {contents; signature}}
+  in
+  let size = Data_encoding.Binary.length Operation.encoding packed_op in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -336,11 +343,11 @@ let estimated_gas_single (type kind)
         | Sc_rollup_refute_result {consumed_gas; _}
         | Sc_rollup_timeout_result {consumed_gas; _}
         | Sc_rollup_execute_outbox_message_result {consumed_gas; _}
-        | Sc_rollup_recover_bond_result {consumed_gas; _}
-        | Sc_rollup_dal_slot_subscribe_result {consumed_gas; _} ->
+        | Sc_rollup_recover_bond_result {consumed_gas; _} ->
             Ok consumed_gas
         | Zk_rollup_origination_result {consumed_gas; _} -> Ok consumed_gas
-        | Zk_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas)
+        | Zk_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas
+        | Zk_rollup_update_result {consumed_gas; _} -> Ok consumed_gas)
     | Skipped _ ->
         error_with "Cannot estimate gas of skipped operation"
         (* There must be another error for this to happen, and it should not
@@ -397,6 +404,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}
         | Transfer_ticket_result {paid_storage_size_diff; _}
         | Zk_rollup_publish_result {paid_storage_size_diff; _}
+        | Zk_rollup_update_result {paid_storage_size_diff; _}
         | Transaction_result
             (Transaction_to_zk_rollup_result {paid_storage_size_diff; _}) ->
             Ok paid_storage_size_diff
@@ -423,8 +431,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         *)
         | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
         | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
-        | Sc_rollup_recover_bond_result _
-        | Sc_rollup_dal_slot_subscribe_result _ ->
+        | Sc_rollup_recover_bond_result _ ->
             Ok Z.zero)
     | Skipped _ ->
         error_with "Cannot estimate storage of skipped operation"
@@ -515,9 +522,8 @@ let originated_contracts_single (type kind)
         | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
         | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
         | Sc_rollup_timeout_result _ | Sc_rollup_execute_outbox_message_result _
-        | Sc_rollup_recover_bond_result _
-        | Sc_rollup_dal_slot_subscribe_result _ | Zk_rollup_origination_result _
-        | Zk_rollup_publish_result _ ->
+        | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
+        | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
             Ok [])
     | Skipped _ ->
         error_with "Cannot know originated contracts of skipped operation"
@@ -624,6 +630,15 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
   in
   fun {contents} -> detect_script_failure contents
 
+let signature_size_of_algo : Signature.algo -> int = function
+  | Ed25519 -> Signature.Ed25519.size
+  | Secp256k1 -> Signature.Secp256k1.size
+  | P256 -> Signature.P256.size
+  | Bls ->
+      (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
+         prefix and a tag [03]. *)
+      Signature.Bls.size + 2
+
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 
@@ -651,8 +666,8 @@ let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 *)
 
 let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
-    ~fee_parameter ~chain ~block ?successor_level ?branch ?(force = false)
-    ?(simulation = false)
+    ~fee_parameter ~signature_algo ~chain ~block ?successor_level ?branch
+    ?(force = false) ?(simulation = false)
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
     kind Kind.manager contents_list tzresult Lwt.t =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
@@ -786,7 +801,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
-            + Signature.size
+            + signature_size_of_algo signature_algo
           else
             Data_encoding.Binary.length
               Operation.contents_encoding
@@ -1361,9 +1376,9 @@ let may_replace_operation (type kind) (cctxt : #full) chain from
     Lwt.return_ok contents
 
 let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
-    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ~source ~src_pk
-    ~src_sk ~fee ~gas_limit ~storage_limit ?counter ?(replace_by_fees = false)
-    ~fee_parameter (type kind)
+    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ~source
+    ~(src_pk : public_key) ~src_sk ~fee ~gas_limit ~storage_limit ?counter
+    ?(replace_by_fees = false) ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
     * packed_operation
@@ -1375,7 +1390,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
   | None ->
       Alpha_services.Contract.counter cctxt (chain, block) source
       >>=? fun pcounter ->
-      let counter = Z.succ pcounter in
+      let counter = Manager_counter.succ pcounter in
       return counter
   | Some counter -> return counter)
   >>=? fun counter ->
@@ -1389,6 +1404,13 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     | Cons_manager (Manager_info {operation = Reveal _; _}, _) -> true
     | _ -> false
   in
+  let signature_algo =
+    match src_pk with
+    | Ed25519 _ -> Signature.Ed25519
+    | Secp256k1 _ -> Secp256k1
+    | P256 _ -> P256
+    | Bls _ -> Bls
+  in
   let apply_specified_options counter op =
     Annotated_manager_operation.set_source source op >>? fun op ->
     Annotated_manager_operation.set_counter counter op >>? fun op ->
@@ -1398,7 +1420,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
   in
   let rec build_contents :
       type kind.
-      Z.t ->
+      Manager_counter.t ->
       kind Annotated_manager_operation.annotated_list ->
       kind Annotated_manager_operation.annotated_list tzresult =
    fun counter -> function
@@ -1407,7 +1429,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         Annotated_manager_operation.Single_manager op
     | Cons_manager (op, rest) ->
         apply_specified_options counter op >>? fun op ->
-        build_contents (Z.succ counter) rest >|? fun rest ->
+        build_contents (Manager_counter.succ counter) rest >|? fun rest ->
         Annotated_manager_operation.Cons_manager (op, rest)
   in
   match key with
@@ -1425,11 +1447,12 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       in
       Annotated_manager_operation.set_source source reveal >>?= fun reveal ->
       Annotated_manager_operation.set_counter counter reveal >>?= fun reveal ->
-      build_contents (Z.succ counter) operations >>?= fun rest ->
+      build_contents (Manager_counter.succ counter) operations >>?= fun rest ->
       let contents = Annotated_manager_operation.Cons_manager (reveal, rest) in
       may_patch_limits
         cctxt
         ~fee_parameter
+        ~signature_algo
         ~chain
         ~block
         ?force
@@ -1471,6 +1494,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       may_patch_limits
         cctxt
         ~fee_parameter
+        ~signature_algo
         ~chain
         ~block
         ?force

@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -31,35 +32,34 @@
             badly-indented scripts
 *)
 
-let badly_indented_script =
-  {|
-parameter string;
-  storage string;
- code {CAR; NIL operation; PAIR}
-|}
-
 let script_hash = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
+
+let tags = ["client"; "michelson"; "typechecking"]
 
 let test_bad_indentation_ill_typed =
   Protocol.register_test
     ~__FILE__
     ~title:"Bad indentation contract is ill-typed"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let process =
-    Client.spawn_typecheck_script ~script:badly_indented_script client
+  let script =
+    Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
   in
+  let process = Client.spawn_typecheck_script ~script client in
   Process.check_error ~exit_code:1 ~msg:(rex "syntax error in program") process
 
 let test_bad_indentation_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"Bad indentation contract hash is expected"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* received = Client.hash_script ~script:badly_indented_script client in
+  let script =
+    Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
+  in
+  let* received = Client.hash_script ~script client in
   let returned_hash = String.trim received in
   Check.(
     (returned_hash = script_hash)
@@ -72,29 +72,31 @@ let test_formatted_typechecks =
   Protocol.register_test
     ~__FILE__
     ~title:"Formatted bad indentation contract is well-typed"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* formatted_script =
     Client.convert_script
-      ~script:badly_indented_script
+      ~script:
+        Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
       ~src_format:`Michelson
       ~dst_format:`Michelson
       client
   in
-  let* _ = Client.typecheck_script ~script:formatted_script client in
+  let* () = Client.typecheck_script ~script:formatted_script client in
   unit
 
 let test_formatted_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"Formatted bad indentation contract hash is expected"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* formatted_script =
     Client.convert_script
-      ~script:badly_indented_script
+      ~script:
+        Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
       ~src_format:`Michelson
       ~dst_format:`Michelson
       client

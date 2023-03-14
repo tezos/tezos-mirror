@@ -27,11 +27,14 @@ open Store_types
 
 (** {1 File convention} *)
 
+(** The 'kind aims to be used to reflect in the type system the
+    directory name to ease the readibility of the
+    code. E.g. [[[`Block]] directory]. *)
 type 'kind directory
 
 type 'kind file
 
-type ('kind, 'data) encoded_file
+type ('kind, 'data) encoded_file = 'data Stored_data.file
 
 val dir_path : 'kind directory -> string
 
@@ -73,6 +76,8 @@ val chain_dir :
 
 val lock_file : [`Chain_dir] directory -> [`Lockfile] file
 
+val gc_lockfile : [`Chain_dir] directory -> [`Gc_lockfile] file
+
 val reconstruction_lock_file :
   [`Chain_dir] directory -> [`Reconstruction_lockfile] file
 
@@ -86,7 +91,13 @@ val chain_config_file :
 val protocol_levels_file :
   [< `Chain_dir] directory ->
   ( [`Protocol_levels],
-    Protocol_levels.activation_block Protocol_levels.t )
+    Protocol_levels.protocol_info Protocol_levels.t )
+  encoded_file
+
+val legacy_protocol_levels_file :
+  [< `Chain_dir] directory ->
+  ( [`Protocol_levels],
+    Protocol_levels.Legacy.activation_block Protocol_levels.Legacy.t )
   encoded_file
 
 val genesis_block_file :
@@ -94,10 +105,6 @@ val genesis_block_file :
 
 val current_head_file :
   [`Chain_dir] directory -> ([`Current_head], block_descriptor) encoded_file
-
-val alternate_heads_file :
-  [`Chain_dir] directory ->
-  ([`Alternate_heads], block_descriptor list) encoded_file
 
 val cementing_highwatermark_file :
   [`Chain_dir] directory ->
@@ -212,7 +219,7 @@ val snapshot_version_file :
 val snapshot_protocol_levels_file :
   [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
   ( [`Snapshot_protocol_levels],
-    Protocol_levels.activation_block Protocol_levels.t )
+    Protocol_levels.protocol_info Protocol_levels.t )
   encoded_file
 
 val snapshot_tar_root : [`Tar_archive] directory

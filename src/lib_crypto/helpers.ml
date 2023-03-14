@@ -140,7 +140,7 @@ struct
   let of_b58check = H.of_b58check
 
   let rpc_arg =
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:H.name
       ~descr:(Format.asprintf "%s (Base58Check-encoded)" H.name)
       ~destruct:(fun s ->
@@ -155,12 +155,6 @@ struct
       ~construct:H.to_b58check
       ()
 end
-
-module Weak_FIFO_Cache_Maker : Ringo.MAP_MAKER = (val Ringo.map_maker
-                                                        ~replacement:FIFO
-                                                        ~overflow:Weak
-                                                        ~accounting:Sloppy
-                                                    : Ringo.MAP_MAKER)
 
 module MakeIterator (H : sig
   type t
@@ -212,7 +206,14 @@ struct
     include Hashtbl.MakeSeeded (struct
       type t = H.t
 
+      (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+      [@@@ocaml.warning "-32"]
+
       let hash = H.seeded_hash
+
+      let seeded_hash = H.seeded_hash
+
+      [@@@ocaml.warning "+32"]
 
       let equal = H.equal
     end)
@@ -248,7 +249,7 @@ struct
   module WeakRingTable = struct
     let h_encoding = H.encoding
 
-    include Weak_FIFO_Cache_Maker (H)
+    include Aches.Vache.Map (Aches.Vache.FIFO_Sloppy) (Aches.Vache.Weak) (H)
 
     let encoding arg_encoding =
       let open Data_encoding in

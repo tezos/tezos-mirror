@@ -41,7 +41,7 @@ type validation_result = Environment_context.validation_result = {
 type quota = Environment_context.quota = {max_size : int; max_op : int option}
 
 type rpc_context = Environment_context.rpc_context = {
-  block_hash : Block_hash.t;
+  block_hash : Tezos_crypto.Hashed.Block_hash.t;
   block_header : Block_header.shell_header;
   context : Context.t;
 }
@@ -57,6 +57,7 @@ module V5 = Environment_V5
 module V6 = Environment_V6
 module V7 = Environment_V7
 module V8 = Environment_V8
+module V9 = Environment_V9
 module Memory_context = Memory_context
 module Proxy_context = Proxy_context
 module Proxy_delegate = Proxy_delegate

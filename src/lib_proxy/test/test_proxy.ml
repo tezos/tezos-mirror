@@ -34,7 +34,7 @@
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
 module StringMap = String.Map
-module Local = Tezos_proxy.Local_context
+module Local = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 
 (** Alias to make "empty list" intention more explicit *)
@@ -79,11 +79,11 @@ let mock_proto_rpc () =
       Lwt_result_syntax.return @@ mock_raw_context k
   end : MOCKED_PROTO_RPC)
 
-class mock_rpc_context : RPC_context.simple =
+class mock_rpc_context : Tezos_rpc.Context.simple =
   object
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           'p ->
           'q ->
           'i ->
@@ -103,8 +103,8 @@ let mock_input : Tezos_proxy.Proxy.proxy_getter_input =
     block = mock_block;
   }
 
-open Lib_test.Assert
-open Lib_test.Lwt_assert
+open Assert
+open Lwt_assert
 
 let test_tree _ () =
   let open Tezos_proxy.Proxy_getter.RequestsTree in

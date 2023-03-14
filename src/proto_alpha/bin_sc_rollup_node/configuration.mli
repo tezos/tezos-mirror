@@ -43,12 +43,33 @@ type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 
+(** Configuration for the batcher.
+
+  Invariants:
+  - 0 < [min_batch_size] <= [max_batch_size] <= [protocol_max_batch_size]
+  - 0 < [min_batch_elements] <= [max_batch_elements]
+*)
+type batcher = {
+  simulate : bool;
+      (** If [true], the batcher will simulate the messages it receives, in an
+      incremental context, before queuing them. *)
+  min_batch_elements : int;
+      (** The minimum number elements in a batch for it to be produced when the
+          batcher receives new messages. *)
+  min_batch_size : int;
+      (** The minimum size in bytes of a batch for it to be produced when the
+          batcher receives new messages. *)
+  max_batch_elements : int;
+      (** The maximum number of elements that we can put in a batch. *)
+  max_batch_size : int;  (** The maximum size in bytes of a batch. *)
+}
+
 type t = {
-  data_dir : string;
   sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
+  metrics_addr : string option;
   reconnection_delay : float;
   fee_parameters : fee_parameters;
   mode : mode;
@@ -59,6 +80,9 @@ type t = {
   *)
   dal_node_addr : string;
   dal_node_port : int;
+  batcher : batcher;
+  injector_retention_period : int;
+  l2_blocks_cache_size : int;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -92,6 +116,9 @@ val default_rpc_addr : string
 (** [default_rpc_port] is the default value for [rpc_port]. *)
 val default_rpc_port : int
 
+(** [default_metrics_port] is the default port for the metrics server. *)
+val default_metrics_port : int
+
 (** [default_reconnection_delay] is the default value for [reconnection_delay]. *)
 val default_reconnection_delay : float
 
@@ -110,6 +137,21 @@ val default_dal_node_addr : string
 (** [default_dal_node_port] is the default value for [dal_node_port]. *)
 val default_dal_node_port : int
 
+(** [default_batcher] is the default configuration parameters for the batcher. *)
+val default_batcher : batcher
+
+(** [default_injector_retention_period] is the default number of blocks the
+    injector will keep in memory. *)
+val default_injector_retention_period : int
+
+(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
+    cached by the rollup node *)
+val default_l2_blocks_cache_size : int
+
+(** [max_injector_retention_period] is the maximum allowed value for
+    [injector_retention_period]. *)
+val max_injector_retention_period : int
+
 (** This is the list of available modes. *)
 val modes : mode list
 
@@ -122,15 +164,16 @@ val mode_of_string : string -> mode tzresult
 (** [description_of_mode m] returns a textual description of the mode [m]. *)
 val description_of_mode : mode -> string
 
-(** [filename configuration] returns the [configuration] filename. *)
-val filename : t -> string
+(** [config_filename data_dir] returns
+    the configration filename from the [data_dir] *)
+val config_filename : data_dir:string -> string
 
 (** [check_mode config] ensures the operators correspond to the chosen mode and
     removes the extra ones. *)
 val check_mode : t -> t tzresult
 
-(** [save configuration] overwrites [configuration] file. *)
-val save : t -> unit tzresult Lwt.t
+(** [save configuration] overwrites [configuration] file from [data_dir]. *)
+val save : data_dir:string -> t -> unit tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t

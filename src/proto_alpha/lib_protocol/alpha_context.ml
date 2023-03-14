@@ -57,10 +57,18 @@ module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
   module Metadata = Sc_rollup_metadata_repr
+  module Dissection_chunk = Sc_rollup_dissection_chunk_repr
   include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith
   module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
   module Inbox_message = Sc_rollup_inbox_message_repr
+  module Inbox_merkelized_payload_hashes =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr
+
+  module Staker = struct
+    include Sc_rollup_repr.Staker
+    module Index = Sc_rollup_staker_index_repr
+  end
 
   module Inbox = struct
     include Sc_rollup_inbox_repr
@@ -68,7 +76,6 @@ module Sc_rollup = struct
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests
-      include Sc_rollup_inbox_storage.Internal_for_tests
     end
   end
 
@@ -97,14 +104,22 @@ module Sc_rollup = struct
 end
 
 module Dal = struct
+  include Dal_slot_repr
+  include Raw_context.Dal
+
   module Slot_index = struct
-    include Dal_slot_repr.Index
+    include Dal_slot_index_repr
   end
 
-  module Endorsement = struct
-    include Dal_endorsement_repr
+  module Attestation = struct
+    include Dal_attestation_repr
     include Raw_context.Dal
   end
+
+  type slot_id = Dal_slot_repr.Header.id = {
+    published_level : Raw_level_repr.t;
+    index : Dal_slot_index_repr.t;
+  }
 
   module Page = struct
     include Dal_slot_repr.Page
@@ -114,6 +129,10 @@ module Dal = struct
     include Dal_slot_repr
     include Dal_slot_storage
     include Raw_context.Dal
+  end
+
+  module Operations = struct
+    include Dal_operations_repr
   end
 
   module Slots_history = Dal_slot_repr.History
@@ -129,10 +148,13 @@ module Zk_rollup = struct
   module Operation = Zk_rollup_operation_repr
   module Ticket = Zk_rollup_ticket_repr
   module Errors = Zk_rollup_errors
+  module Circuit_public_inputs = Zk_rollup_circuit_public_inputs_repr
+  module Update = Zk_rollup_update_repr
   include Zk_rollup_storage
 end
 
 module Entrypoint = Entrypoint_repr
+module Manager_counter = Manager_counter_repr
 include Operation_repr
 
 module Operation = struct
@@ -164,7 +186,17 @@ module First_level_of_protocol = struct
 end
 
 module Ratio = Ratio_repr
-module Raw_level = Raw_level_repr
+
+module Raw_level = struct
+  include Raw_level_repr
+
+  module Internal_for_tests = struct
+    let add = add
+
+    let sub = sub
+  end
+end
+
 module Cycle = Cycle_repr
 module Fees = Fees_storage
 
@@ -289,7 +321,10 @@ module Origination_nonce = struct
   module Internal_for_tests = Origination_nonce
 end
 
-module Destination = Destination_repr
+module Destination = struct
+  include Destination_repr
+  include Destination_storage
+end
 
 module Contract = struct
   include Contract_repr
@@ -484,6 +519,8 @@ module Delegate = struct
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 
+  let check_not_tz4 = Contract_delegate_storage.check_not_tz4
+
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
 
   let deactivated = Delegate_activation_storage.is_inactive
@@ -607,10 +644,6 @@ end
 
 module Ticket_balance = struct
   include Ticket_storage
-end
-
-module Ticket_receipt = struct
-  include Ticket_receipt_repr
 end
 
 module Token = Token

@@ -32,7 +32,6 @@
                   of [tezos-proxy-server]
 *)
 
-open Lib_test
 open Tezos_proxy_server_config
 
 (** Lift a generator of ['a] to ['a option] by always creating [Some] values *)

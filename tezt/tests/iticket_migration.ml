@@ -27,7 +27,7 @@
    -------
    Component:    Protocol
    Invocation:   dune exec tezt/tests/main.exe -- --file iticket_migration.ml
-   Subject:      Checks the migration of ITicket in protocol Alpha, to make sure
+   Subject:      Checks the migration of ITicket in protocol Lima, to make sure
                  that the old TICKET instruction is mapped to TICKET_DEPRECATED,
                  and the old contracts continue to function provided that they
                  avoid creating zero tickets.
@@ -449,7 +449,7 @@ let test_ticket_migration_in_storage ~blocks_per_cycle ~migration_level
   in
   unit
 
-(* This test activates Alpha protocol and asserts that it is impossible to
+(* This test activates Lima protocol and asserts that it is impossible to
    originate contracts containing the deprecated TICKET instruction.
 *)
 let test_iticket_deprecation ~protocol =
@@ -543,13 +543,13 @@ let register ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   match migrate_to with
-  | Protocol.Alpha ->
+  | Protocol.Lima ->
       test_ticket_migration
         ~blocks_per_cycle
         ~migration_level:(2 * blocks_per_cycle)
         ~migrate_from
         ~migrate_to ;
-      test_iticket_deprecation ~protocol:Protocol.Alpha ;
+      test_iticket_deprecation ~protocol:Protocol.Lima ;
       test_ticket_migration_in_storage
         ~blocks_per_cycle
         ~migration_level:(2 * blocks_per_cycle)
@@ -560,5 +560,5 @@ let register ~migrate_from ~migrate_to =
         ~migration_level:(2 * blocks_per_cycle)
         ~migrate_from
         ~migrate_to ;
-      test_iticket_after_migration ~protocol:Protocol.Alpha
+      test_iticket_after_migration ~protocol:Protocol.Lima
   | _ -> ()

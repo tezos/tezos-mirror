@@ -1,0 +1,21 @@
+# This contract constructs one unit of a string ticket with content "Ticket" and send it to the input address
+# which can be either a contract, which should have a default entrypoint to accept a ticket, or an implicit account
+parameter (pair address nat);
+storage unit;
+code { CAR;
+       UNPAIR ;
+       CONTRACT (ticket string) ;
+       IF_NONE
+         { PUSH string "Contract not found" ;
+           FAILWITH }
+         { PUSH mutez 0 ;
+           DIG 2 ;
+           PUSH string "Ticket" ;
+           TICKET ;
+           ASSERT_SOME ;
+           TRANSFER_TOKENS ;
+           PUSH unit Unit ;
+           NIL operation ;
+           DIG 2 ;
+           CONS ;
+           PAIR } }

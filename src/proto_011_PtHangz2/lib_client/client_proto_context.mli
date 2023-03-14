@@ -60,9 +60,9 @@ val register_global_constant :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->
   unit ->
@@ -118,7 +118,7 @@ val set_delegate :
   ?fee:Tez.tez ->
   public_key_hash ->
   src_pk:public_key ->
-  manager_sk:Client_keys.sk_uri ->
+  manager_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   public_key_hash option ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
@@ -131,7 +131,7 @@ val register_as_delegate :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?fee:Tez.tez ->
-  manager_sk:Client_keys.sk_uri ->
+  manager_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   public_key ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
@@ -159,7 +159,7 @@ val originate_contract :
   balance:Tez.t ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   code:Script.expr ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
@@ -189,7 +189,7 @@ val transfer :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   destination:Contract.t ->
   ?entrypoint:string ->
   ?arg:string ->
@@ -220,14 +220,14 @@ val reveal :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   ?fee:Tez.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key = {
-  pkh : Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -311,7 +311,7 @@ val submit_proposals :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   public_key_hash ->
   Protocol_hash.t list ->
   Kind.proposals Injection.result_list tzresult Lwt.t
@@ -323,7 +323,7 @@ val submit_ballot :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   public_key_hash ->
   Protocol_hash.t ->
   Vote.ballot ->

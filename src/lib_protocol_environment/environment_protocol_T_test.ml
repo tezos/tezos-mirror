@@ -33,7 +33,9 @@ module Mock_all_unit :
      and type operation_data = unit
      and type operation_receipt = unit
      and type validation_state = unit
-     and type application_state = unit = struct
+     and type application_state = unit
+     and type Mempool.t = unit
+     and type Mempool.validation_info = unit = struct
   type block_header_data = unit
 
   type operation = {
@@ -54,6 +56,8 @@ module Mock_all_unit :
 
   let environment_version = Protocol.V0
 
+  let expected_context_hash = Environment_context.Resulting_context
+
   let init _ = assert false
 
   type nonrec validation_state = unit
@@ -64,12 +68,12 @@ module Mock_all_unit :
     | Application of block_header
     | Partial_validation of block_header
     | Construction of {
-        predecessor_hash : Block_hash.t;
+        predecessor_hash : Tezos_crypto.Hashed.Block_hash.t;
         timestamp : Time.Protocol.t;
         block_header_data : block_header_data;
       }
     | Partial_construction of {
-        predecessor_hash : Block_hash.t;
+        predecessor_hash : Tezos_crypto.Hashed.Block_hash.t;
         timestamp : Time.Protocol.t;
       }
 
@@ -85,7 +89,7 @@ module Mock_all_unit :
 
   let finalize_application _ = assert false
 
-  let rpc_services = RPC_directory.empty
+  let rpc_services = Tezos_rpc.Directory.empty
 
   let compare_operations _ = assert false
 
@@ -123,19 +127,19 @@ module Mock_all_unit :
     type validation_info = unit
 
     type conflict_handler =
-      existing_operation:Operation_hash.t * operation ->
-      new_operation:Operation_hash.t * operation ->
+      existing_operation:Tezos_crypto.Hashed.Operation_hash.t * operation ->
+      new_operation:Tezos_crypto.Hashed.Operation_hash.t * operation ->
       [`Keep | `Replace]
 
     type operation_conflict =
       | Operation_conflict of {
-          existing : Operation_hash.t;
-          new_operation : Operation_hash.t;
+          existing : Tezos_crypto.Hashed.Operation_hash.t;
+          new_operation : Tezos_crypto.Hashed.Operation_hash.t;
         }
 
     type add_result =
       | Added
-      | Replaced of {removed : Operation_hash.t}
+      | Replaced of {removed : Tezos_crypto.Hashed.Operation_hash.t}
       | Unchanged
 
     type add_error =
@@ -146,17 +150,17 @@ module Mock_all_unit :
       | Incompatible_mempool
       | Merge_conflict of operation_conflict
 
-    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = Lwt.return_ok ((), ())
+    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = assert false
 
     let encoding = Data_encoding.unit
 
     let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-      Lwt.return_ok ((), Unchanged)
+      assert false
 
-    let remove_operation () _ = ()
+    let remove_operation () _ = assert false
 
-    let merge ?conflict_handler:_ () () = Ok ()
+    let merge ?conflict_handler:_ () () = assert false
 
-    let operations () = Operation_hash.Map.empty
+    let operations () = assert false
   end
 end

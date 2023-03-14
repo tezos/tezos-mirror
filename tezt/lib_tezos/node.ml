@@ -34,6 +34,8 @@ let string_of_media_type = function
   | Binary -> "binary"
   | Json -> "json"
 
+type tls_config = {certificate_path : string; key_path : string}
+
 type argument =
   | Network of string
   | History_mode of history_mode
@@ -50,6 +52,8 @@ type argument =
   | Media_type of media_type
   | Metadata_size_limit of int option
   | Metrics_addr of string
+  | Cors_origin of string
+  | Disable_mempool
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -75,8 +79,49 @@ let make_argument = function
   | Metadata_size_limit None -> ["--metadata-size-limit"; "unlimited"]
   | Metadata_size_limit (Some i) -> ["--metadata-size-limit"; string_of_int i]
   | Metrics_addr metrics_addr -> ["--metrics-addr"; metrics_addr]
+  | Cors_origin cors_origin -> ["--cors-origin"; cors_origin]
+  | Disable_mempool -> ["--disable-mempool"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
+
+(** [true] if the two given arguments are the same type
+    and cannot be repeated. [false] otherwise.
+ *)
+let is_redundant = function
+  | Network _, Network _
+  | History_mode _, History_mode _
+  | Expected_pow _, Expected_pow _
+  | Singleprocess, Singleprocess
+  | Bootstrap_threshold _, Bootstrap_threshold _
+  | Synchronisation_threshold _, Synchronisation_threshold _
+  | Sync_latency _, Sync_latency _
+  | Connections _, Connections _
+  | Private_mode, Private_mode
+  | No_bootstrap_peers, No_bootstrap_peers
+  | Disable_operations_precheck, Disable_operations_precheck
+  | Media_type _, Media_type _
+  | Metadata_size_limit _, Metadata_size_limit _ ->
+      true
+  | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
+  | Peer peer1, Peer peer2 -> peer1 = peer2
+  | Network _, _
+  | History_mode _, _
+  | Expected_pow _, _
+  | Singleprocess, _
+  | Bootstrap_threshold _, _
+  | Synchronisation_threshold _, _
+  | Sync_latency _, _
+  | Connections _, _
+  | Private_mode, _
+  | No_bootstrap_peers, _
+  | Disable_operations_precheck, _
+  | Media_type _, _
+  | Metadata_size_limit _, _
+  | Peer _, _
+  | Metrics_addr _, _
+  | Cors_origin _, _
+  | Disable_mempool, _ ->
+      false
 
 type 'a known = Unknown | Known of 'a
 
@@ -87,7 +132,10 @@ module Parameters = struct
     advertised_net_port : int option;
     rpc_host : string;
     rpc_port : int;
+    rpc_tls : tls_config option;
+    allow_all_rpc : bool;
     default_expected_pow : int;
+    mutable default_arguments : argument list;
     mutable arguments : argument list;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
@@ -129,9 +177,15 @@ let net_port node = node.persistent_state.net_port
 
 let advertised_net_port node = node.persistent_state.advertised_net_port
 
+let rpc_scheme node =
+  match node.persistent_state.rpc_tls with Some _ -> "https" | None -> "http"
+
 let rpc_host node = node.persistent_state.rpc_host
 
 let rpc_port node = node.persistent_state.rpc_port
+
+let rpc_endpoint node =
+  sf "%s://%s:%d" (rpc_scheme node) (rpc_host node) (rpc_port node)
 
 let data_dir node = node.persistent_state.data_dir
 
@@ -168,30 +222,49 @@ let show_history_mode = function
   | Rolling None -> "rolling"
   | Rolling (Some i) -> "rolling_" ^ string_of_int i
 
-let spawn_config_init node arguments =
-  let arguments = node.persistent_state.arguments @ arguments in
-  (* Since arguments will be in the configuration file, we will not need them after this. *)
-  node.persistent_state.arguments <- [] ;
+let add_missing_argument arguments argument =
+  if List.exists (fun arg -> is_redundant (arg, argument)) arguments then
+    arguments
+  else argument :: arguments
+
+let add_default_arguments arguments =
   let arguments =
     (* Give a default value of "sandbox" to --network. *)
-    if List.exists (function Network _ -> true | _ -> false) arguments then
-      arguments
-    else Network "sandbox" :: arguments
+    add_missing_argument arguments (Network "sandbox")
   in
+  (* Give a default value of 0 to --expected-pow. *)
+  add_missing_argument arguments (Expected_pow 0)
+
+let spawn_config_command command node arguments =
+  let arguments =
+    List.fold_left
+      add_missing_argument
+      arguments
+      node.persistent_state.arguments
+  in
+  (* Since arguments will be in the configuration file, we will not need them after this. *)
+  node.persistent_state.arguments <- [] ;
   spawn_command
     node
-    ("config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
+    ("config" :: command :: "--data-dir" :: node.persistent_state.data_dir
    :: make_arguments arguments)
+
+let spawn_config_init = spawn_config_command "init"
+
+let spawn_config_update = spawn_config_command "update"
+
+let spawn_config_reset node arguments =
+  node.persistent_state.arguments <- node.persistent_state.default_arguments ;
+  spawn_config_command "reset" node arguments
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
 
+let config_update node arguments =
+  spawn_config_update node arguments |> Process.check
+
 let config_reset node arguments =
-  spawn_command
-    node
-    ("config" :: "reset" :: "--data-dir" :: node.persistent_state.data_dir
-   :: arguments)
-  |> Process.check
+  spawn_config_reset node arguments |> Process.check
 
 let config_show node =
   let* output =
@@ -359,8 +432,10 @@ end
 
 type snapshot_history_mode = Rolling_history | Full_history
 
-let spawn_snapshot_export ?(history_mode = Full_history) ?export_level node file
-    =
+type export_format = Tar | Raw
+
+let spawn_snapshot_export ?(history_mode = Full_history) ?export_level
+    ?(export_format = Tar) node file =
   spawn_command
     node
     (["snapshot"; "export"; "--data-dir"; node.persistent_state.data_dir]
@@ -368,10 +443,13 @@ let spawn_snapshot_export ?(history_mode = Full_history) ?export_level node file
       | Full_history -> []
       | Rolling_history -> ["--rolling"])
     @ optional_arg "block" string_of_int export_level
+    @ (["--export-format"]
+      @ match export_format with Tar -> ["tar"] | Raw -> ["raw"])
     @ [file])
 
-let snapshot_export ?history_mode ?export_level node file =
-  spawn_snapshot_export ?history_mode ?export_level node file |> Process.check
+let snapshot_export ?history_mode ?export_level ?export_format node file =
+  spawn_snapshot_export ?history_mode ?export_level ?export_format node file
+  |> Process.check
 
 let spawn_snapshot_import ?(reconstruct = false) node file =
   spawn_command
@@ -382,6 +460,13 @@ let spawn_snapshot_import ?(reconstruct = false) node file =
 
 let snapshot_import ?reconstruct node file =
   spawn_snapshot_import ?reconstruct node file |> Process.check
+
+let spawn_reconstruct node =
+  spawn_command
+    node
+    ["reconstruct"; "--data-dir"; node.persistent_state.data_dir]
+
+let reconstruct node = spawn_reconstruct node |> Process.check
 
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
@@ -427,7 +512,7 @@ let update_identity node identity =
         (fun resolver -> Lwt.wakeup_later resolver (Some identity))
         pending
 
-let handle_event node {name; value} =
+let handle_event node {name; value; timestamp = _} =
   match name with
   | "node_is_ready.v0" -> set_ready node
   | "head_increment.v0" | "branch_switch.v0" -> (
@@ -521,7 +606,7 @@ let wait_for_request ~request node =
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
-    ?rpc_port arguments =
+    ?rpc_port ?rpc_tls ?(allow_all_rpc = true) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -532,12 +617,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let arguments =
-    (* Give a default value of 0 to --expected-pow. *)
-    if List.exists (function Expected_pow _ -> true | _ -> false) arguments
-    then arguments
-    else Expected_pow 0 :: arguments
-  in
+  let arguments = add_default_arguments arguments in
   let default_expected_pow =
     list_find_map (function Expected_pow x -> Some x | _ -> None) arguments
     |> Option.value ~default:0
@@ -555,6 +635,9 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         advertised_net_port;
         rpc_host;
         rpc_port;
+        rpc_tls;
+        allow_all_rpc;
+        default_arguments = arguments;
         arguments;
         default_expected_pow;
         runner;
@@ -615,13 +698,30 @@ let runlike_command_arguments node command arguments =
         (* FIXME spawn an ssh tunnel in case of remote host *)
         ("0.0.0.0:", "0.0.0.0:")
   in
-  let arguments = node.persistent_state.arguments @ arguments in
-
+  let arguments =
+    List.fold_left
+      add_missing_argument
+      arguments
+      node.persistent_state.arguments
+  in
   let command_args = make_arguments arguments in
   let command_args =
     match node.persistent_state.advertised_net_port with
     | None -> command_args
     | Some port -> "--advertised-net-port" :: string_of_int port :: command_args
+  in
+  let command_args =
+    if node.persistent_state.allow_all_rpc then
+      "--allow-all-rpc"
+      :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+      :: command_args
+    else command_args
+  in
+  let command_args =
+    match node.persistent_state.rpc_tls with
+    | None -> command_args
+    | Some {certificate_path; key_path} ->
+        "--rpc-tls" :: (certificate_path ^ "," ^ key_path) :: command_args
   in
   command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
@@ -680,8 +780,8 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
-    ?patch_config ?snapshot arguments =
+    ?advertised_net_port ?rpc_host ?rpc_port ?rpc_tls ?event_level
+    ?event_sections_levels ?patch_config ?snapshot arguments =
   let node =
     create
       ?runner
@@ -694,6 +794,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?advertised_net_port
       ?rpc_host
       ?rpc_port
+      ?rpc_tls
       arguments
   in
   let* () = identity_generate node in

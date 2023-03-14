@@ -89,12 +89,18 @@
   (select void_for_linking-tezos-protocol-plugin-013-PtJakart from
    (tezos-protocol-plugin-013-PtJakart -> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty)
    (-> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty))
-  tezos-client-014-PtKathma.commands-registration
-  tezos-baking-014-PtKathma-commands.registration
-  tezos-protocol-plugin-014-PtKathma
+  (select void_for_linking-tezos-client-014-PtKathma-commands-registration from
+   (tezos-client-014-PtKathma.commands-registration -> void_for_linking-tezos-client-014-PtKathma-commands-registration.empty)
+   (-> void_for_linking-tezos-client-014-PtKathma-commands-registration.empty))
+  (select void_for_linking-tezos-protocol-plugin-014-PtKathma from
+   (tezos-protocol-plugin-014-PtKathma -> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty)
+   (-> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty))
   tezos-client-015-PtLimaPt.commands-registration
   tezos-baking-015-PtLimaPt-commands.registration
   tezos-protocol-plugin-015-PtLimaPt
+  tezos-client-016-PtMumbai.commands-registration
+  tezos-baking-016-PtMumbai-commands.registration
+  tezos-protocol-plugin-016-PtMumbai
   (select void_for_linking-tezos-client-alpha-commands-registration from
    (tezos-client-alpha.commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
    (-> void_for_linking-tezos-client-alpha-commands-registration.empty))
@@ -105,12 +111,13 @@
    (tezos-protocol-plugin-alpha -> void_for_linking-tezos-protocol-plugin-alpha.empty)
    (-> void_for_linking-tezos-protocol-plugin-alpha.empty)))
  (link_flags
-  (:standard -linkall)
-  (:include %{workspace_root}/static-link-flags.sexp))
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_clic
   -open Tezos_rpc_http_client
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
@@ -145,6 +152,8 @@
    (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca.empty "")
    (write-file void_for_linking-tezos-client-013-PtJakart-commands-registration.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart.empty "")
+   (write-file void_for_linking-tezos-client-014-PtKathma-commands-registration.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-client-alpha-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-alpha-commands-registration.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))

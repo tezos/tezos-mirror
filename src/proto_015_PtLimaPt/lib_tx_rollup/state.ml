@@ -28,12 +28,9 @@
 open Protocol.Alpha_context
 open Protocol_client_context
 open Injector_common
-
 module Tezos_blocks_cache =
-  Ringo_lwt.Functors.Make_opt
-    ((val Ringo.(
-            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Block_hash))
+  Aches_lwt.Lache.Make_option
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
@@ -70,11 +67,12 @@ let get_head state = state.head
 
 let fetch_tezos_block state hash =
   trace (Error.Tx_rollup_cannot_fetch_tezos_block hash)
-  @@ fetch_tezos_block
-       state.cctxt
-       hash
-       ~find_in_cache:
-         (Tezos_blocks_cache.find_or_replace state.tezos_blocks_cache)
+  @@ fetch_tezos_block state.cctxt hash ~find_in_cache:(fun hash mk ->
+         Tezos_blocks_cache.bind_or_put
+           state.tezos_blocks_cache
+           hash
+           mk
+           Lwt.return)
 
 let set_tezos_head state new_head_hash =
   let open Lwt_result_syntax in

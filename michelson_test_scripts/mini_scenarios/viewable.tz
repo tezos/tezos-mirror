@@ -1,0 +1,54 @@
+{ parameter nat;
+  storage nat;
+  code { CAR; NIL operation ; PAIR };
+  view "add_v" nat nat { UNPAIR; ADD };
+  view "mul_v" nat nat { UNPAIR; MUL };
+  view "value" unit nat { CDR };
+  view
+    "loop" int unit
+    {CAR; DUP; EQ;
+     IF{DROP; UNIT}
+       {SELF_ADDRESS; SWAP; PUSH int -1; ADD; VIEW "loop" unit; ASSERT_SOME}};
+  view "my_external_view"
+       int
+       int
+       { LAMBDA int int { DUP ; MUL } ;
+         SWAP ;
+         UNPAIR ;
+         DUP 3 ;
+         SWAP ;
+         EXEC ;
+         SWAP ;
+         DIG 2 ;
+         SWAP ;
+         INT ;
+         EXEC ;
+         ADD ;
+         PUSH int 1000000 ;
+         NEG ;
+         ADD } ;
+  view "v_external"
+       address
+       int
+       { UNPAIR ;
+         PUSH int 33 ;
+         VIEW "my_external_view" int ;
+         IF_NONE
+           { DROP ; PUSH string "Call to 'my_external_view' returned None" ; FAILWITH }
+           { ADD } } ;
+  view "v_entrypoint"
+       int
+       int
+       { LAMBDA int int { DUP ; MUL } ;
+         SWAP ;
+         UNPAIR ;
+         DUP 3 ;
+         SWAP ;
+         EXEC ;
+         SWAP ;
+         DIG 2 ;
+         SWAP ;
+         INT ;
+         EXEC ;
+         ADD } ;
+}

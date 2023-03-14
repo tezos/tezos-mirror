@@ -37,15 +37,16 @@ type error +=
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
+  | Non_empty_transaction_from of Destination.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
-  | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
   | Zero_frozen_deposits of Signature.Public_key_hash.t
-  | Invalid_transfer_to_sc_rollup_from_implicit_account
+  | Invalid_transfer_to_sc_rollup
+  | Invalid_source of Destination.t
 
 let () =
   register_error_kind
@@ -160,6 +161,20 @@ let () =
     Data_encoding.(obj1 (req "contract" Contract.encoding))
     (function Empty_transaction c -> Some c | _ -> None)
     (fun c -> Empty_transaction c) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.non_empty_transaction_from_source"
+    ~title:"Unexpected non-empty transaction"
+    ~description:"This address cannot initiate non-empty transactions"
+    ~pp:(fun ppf contract ->
+      Format.fprintf
+        ppf
+        "%a does not have a balance and cannot initiate non-empty transactions"
+        Destination.pp
+        contract)
+    Data_encoding.(obj1 (req "source" Destination.encoding))
+    (function Non_empty_transaction_from c -> Some c | _ -> None)
+    (fun c -> Non_empty_transaction_from c) ;
 
   register_error_kind
     `Permanent
@@ -167,10 +182,7 @@ let () =
     ~title:"Tx rollup is disabled"
     ~description:"Cannot originate a tx rollup as it is disabled."
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Cannot apply a tx rollup operation as it is disabled. This feature \
-         will be enabled in a future proposal")
+      Format.fprintf ppf "Cannot apply a tx rollup operation as it is disabled.")
     Data_encoding.unit
     (function Tx_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Tx_rollup_feature_disabled) ;
@@ -189,22 +201,11 @@ let () =
       | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
     (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
 
+  let description = "Smart rollups are disabled." in
   register_error_kind
     `Permanent
-    ~id:"operation.cannot_transfer_ticket_to_implicit"
-    ~title:"Cannot transfer ticket to implicit account"
-    ~description:"Cannot transfer ticket to implicit account"
-    Data_encoding.unit
-    (function Cannot_transfer_ticket_to_implicit -> Some () | _ -> None)
-    (fun () -> Cannot_transfer_ticket_to_implicit) ;
-
-  let description =
-    "Smart contract rollups will be enabled in a future proposal."
-  in
-  register_error_kind
-    `Permanent
-    ~id:"operation.sc_rollup_disabled"
-    ~title:"Smart contract rollups are disabled"
+    ~id:"operation.smart_rollup_disabled"
+    ~title:"Smart rollups are disabled"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
@@ -254,19 +255,34 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate) ;
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_transfer_to_sc_rollup_from_implicit_account"
-    ~title:"Invalid transfer to sc rollup"
-    ~description:"Invalid transfer to sc rollup from implicit account"
+    ~id:"operations.invalid_transfer_to_smart_rollup_from_implicit_account"
+    ~title:"Invalid transfer to smart rollup"
+    ~description:"Invalid transfer to smart rollup from implicit account"
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Invalid source for transfer operation to smart-contract rollup. Only \
-         originated accounts are allowed")
+        "Invalid source for transfer operation to smart rollup. Only \
+         originated accounts are allowed.")
     Data_encoding.empty
-    (function
-      | Invalid_transfer_to_sc_rollup_from_implicit_account -> Some ()
-      | _ -> None)
-    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
+    (function Invalid_transfer_to_sc_rollup -> Some () | _ -> None)
+    (fun () -> Invalid_transfer_to_sc_rollup) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_source"
+    ~title:"Invalid source for an internal operation"
+    ~description:
+      "Invalid source for an internal operation restricted to implicit and \
+       originated accounts."
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Invalid source (%a) for this internal operation. Only implicit and \
+         originated accounts are allowed"
+        Destination.pp
+        c)
+    Data_encoding.(obj1 (req "contract" Destination.encoding))
+    (function Invalid_source c -> Some c | _ -> None)
+    (fun c -> Invalid_source c)
 
 open Apply_results
 open Apply_operation_result
@@ -286,6 +302,7 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
   Contract.update_script_storage ctxt self_contract storage lazy_storage_diff
   >>=? fun ctxt ->
+  let self_contract = Contract.Originated self_contract in
   Ticket_accounting.update_ticket_balances
     ctxt
     ~self_contract
@@ -325,6 +342,58 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
   in
   return (ctxt, result, [])
 
+let transfer_from_any_address ctxt source destination amount =
+  match source with
+  | Destination.Contract source ->
+      Token.transfer ctxt (`Contract source) (`Contract destination) amount
+  | Destination.Sc_rollup _ | Destination.Tx_rollup _ | Destination.Zk_rollup _
+    ->
+      (* We do not allow transferring tez from rollups to other contracts. *)
+      error_unless Tez.(amount = zero) (Non_empty_transaction_from source)
+      >>?= fun () -> return (ctxt, [])
+
+let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
+    ~amount ~before_operation ctxt =
+  let destination = Contract.Implicit destination in
+  Contract.allocated ctxt destination >>= fun already_allocated ->
+  let ex_token, ticket_amount =
+    Ticket_scanner.ex_token_and_amount_of_ex_ticket
+    @@ Ticket_scanner.Ex_ticket (ty, ticket)
+  in
+  Ticket_token_unparser.unparse ctxt ex_token >>=? fun (ticket_token, ctxt) ->
+  transfer_from_any_address ctxt source destination amount
+  >>=? fun (ctxt, balance_updates) ->
+  let ticket_receipt =
+    Ticket_receipt.
+      [
+        {
+          ticket_token;
+          updates =
+            [
+              {
+                account = Destination.Contract destination;
+                amount = Script_int.(to_zint (ticket_amount :> n num));
+              };
+            ];
+        };
+      ]
+  in
+  return
+    ( ctxt,
+      Transaction_to_contract_result
+        {
+          storage = None;
+          lazy_storage_diff = None;
+          balance_updates;
+          ticket_receipt;
+          originated_contracts = [];
+          consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+          storage_size = Z.zero;
+          paid_storage_size_diff = Z.zero;
+          allocated_destination_contract = not already_allocated;
+        },
+      [] )
+
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
   let contract = Contract.Originated contract_hash in
@@ -334,11 +403,11 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
      does not exist, [Script_cache.find] will signal that by returning [None]
      and we'll fail.
   *)
-  Token.transfer ctxt (`Contract source) (`Contract contract) amount
+  transfer_from_any_address ctxt source contract amount
   >>=? fun (ctxt, balance_updates) ->
   Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
   match script with
-  | None -> fail (Contract.Non_existing_contract contract)
+  | None -> tzfail (Contract.Non_existing_contract contract)
   | Some (script, script_ir) ->
       (* Token.transfer which is being called before already loads this value into
          the Irmin cache, so no need to burn gas for it. *)
@@ -391,7 +460,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                  ctxt ) ->
       update_script_storage_and_ticket_balances
         ctxt
-        ~self_contract:contract
+        ~self_contract:contract_hash
         storage
         lazy_storage_diff
         ticket_diffs
@@ -401,7 +470,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
         ctxt
         ~storage_diff:ticket_table_size_diff
       >>=? fun (ticket_paid_storage_diff, ctxt) ->
-      Fees.record_paid_storage_space ctxt contract
+      Fees.record_paid_storage_space ctxt contract_hash
       >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
       Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
       >>=? fun originated_contracts ->
@@ -451,7 +520,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
        {payload_size = ticket_size; limit})
   >>=? fun () ->
   let ex_token, ticket_amount =
-    Ticket_token.token_and_amount_of_ex_ticket ex_ticket
+    Ticket_scanner.ex_token_and_amount_of_ex_ticket ex_ticket
   in
   Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
   >>=? fun (ticket_hash, ctxt) ->
@@ -530,7 +599,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->
-  Fees.record_paid_storage_space ctxt contract
+  Fees.record_paid_storage_space ctxt contract_hash
   >|=? fun (ctxt, size, paid_storage_size_diff) ->
   let result =
     {
@@ -556,11 +625,15 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
+let assert_source_is_contract = function
+  | Destination.Contract source -> ok source
+  | source -> error (Invalid_source source)
+
 let apply_internal_operation_contents :
     type kind.
     context ->
     payer:public_key_hash ->
-    source:Contract.t ->
+    source:Destination.t ->
     chain_id:Chain_id.t ->
     kind Script_typed_ir.internal_operation_contents ->
     (context
@@ -569,21 +642,41 @@ let apply_internal_operation_contents :
     tzresult
     Lwt.t =
  fun ctxt_before_op ~payer ~source ~chain_id operation ->
-  Contract.must_exist ctxt_before_op source >>=? fun () ->
-  Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
-  >>?= fun ctxt ->
+  Destination.must_exist ctxt_before_op source >>=? fun ctxt ->
+  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
   (* Note that [ctxt_before_op] will be used again later to compute
      gas consumption and originations for the operation result (by
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
   | Transaction_to_implicit {destination = pkh; amount} ->
+      assert_source_is_contract source >>?= fun source ->
       apply_transaction_to_implicit
         ~ctxt
         ~source
         ~amount
         ~pkh
         ~before_operation:ctxt_before_op
+      >|=? fun (ctxt, res, ops) ->
+      ( ctxt,
+        (ITransaction_result res : kind successful_internal_operation_result),
+        ops )
+  | Transaction_to_implicit_with_ticket
+      {
+        destination;
+        ticket_ty = Script_typed_ir.Ticket_t (ty, _ty_metadata);
+        ticket;
+        amount;
+        unparsed_ticket = _;
+      } ->
+      apply_transaction_to_implicit_with_ticket
+        ~source
+        ~destination
+        ~ty
+        ~ticket
+        ~amount
+        ~before_operation:ctxt_before_op
+        ctxt
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
         (ITransaction_result res : kind successful_internal_operation_result),
@@ -623,34 +716,57 @@ let apply_internal_operation_contents :
       {
         destination;
         entrypoint = _;
-        parameters_ty = _;
-        parameters = _;
+        parameters_ty;
+        parameters;
         unparsed_parameters = payload;
       } ->
       assert_sc_rollup_feature_enabled ctxt >>?= fun () ->
-      (* TODO: #3242
-         We could rather change the type of [source] in
-         {!Script_type_ir.internal_operation}. Only originated accounts should
-         be allowed anyway for internal operations.
-      *)
       (match source with
-      | Contract.Implicit _ ->
-          error Invalid_transfer_to_sc_rollup_from_implicit_account
-      | Originated hash -> ok hash)
+      | Destination.Contract (Originated hash) -> ok hash
+      | _ -> error Invalid_transfer_to_sc_rollup)
       >>?= fun sender ->
       (* Adding the message to the inbox. Note that it is safe to ignore the
          size diff since only its hash and meta data are stored in the context.
          See #3232. *)
-      Sc_rollup.Inbox.add_internal_message
+      Sc_rollup.Inbox.add_deposit
         ctxt
-        destination
+        ~destination
         ~payload
         ~sender
         ~source:payer
-      >|=? fun (inbox_after, _size, ctxt) ->
+      >>=? fun ctxt ->
+      Ticket_scanner.type_has_tickets ctxt parameters_ty
+      >>?= fun (has_tickets, ctxt) ->
+      Ticket_accounting.ticket_balances_of_value
+        ctxt
+        ~include_lazy:true
+        has_tickets
+        parameters
+      >>=? fun (ticket_token_map, ctxt) ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4354
+         Factor out function for constructing a ticket receipt.
+         There are multiple places where we compute the receipt from a
+         ticket-token-map. We should factor out and reuse this logic. *)
+      Ticket_token_map.fold_es
+        ctxt
+        (fun ctxt acc ex_token amount ->
+          Ticket_token_unparser.unparse ctxt ex_token
+          >>=? fun (ticket_token, ctxt) ->
+          let item =
+            Ticket_receipt.
+              {
+                ticket_token;
+                updates =
+                  [{account = Destination.Sc_rollup destination; amount}];
+              }
+          in
+          return (item :: acc, ctxt))
+        []
+        ticket_token_map
+      >|=? fun (ticket_receipt, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
-        Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
+        Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt}
       in
       (ctxt, ITransaction_result result, [])
   | Event {ty = _; unparsed_data = _; tag = _} ->
@@ -677,6 +793,7 @@ let apply_internal_operation_contents :
         storage_type;
         storage;
       } ->
+      assert_source_is_contract source >>?= fun source ->
       apply_origination
         ~ctxt
         ~storage_type
@@ -690,6 +807,7 @@ let apply_internal_operation_contents :
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, IOrigination_result origination_result, ops)
   | Delegation delegate ->
+      assert_source_is_contract source >>?= fun source ->
       apply_delegation ~ctxt ~source ~delegate ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
@@ -707,7 +825,6 @@ let apply_manager_operation :
     Lwt.t =
  fun ctxt_before_op ~source ~chain_id operation ->
   let source_contract = Contract.Implicit source in
-  Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
   >>?= fun ctxt ->
   (* Note that [ctxt_before_op] will be used again later to compute
@@ -781,7 +898,7 @@ let apply_manager_operation :
       >>?= fun (parameters, ctxt) ->
       apply_transaction_to_smart_contract
         ~ctxt
-        ~source:source_contract
+        ~source:(Destination.Contract source_contract)
         ~contract_hash
         ~amount
         ~entrypoint
@@ -818,20 +935,19 @@ let apply_manager_operation :
             Tx_rollup_l2_qty.(amount <= zero)
             Script_tc_errors.Forbidden_zero_ticket_quantity
           >>?= fun () ->
-          Tx_rollup_ticket.parse_ticket
+          Ticket_transfer.parse_ticket
             ~consume_deserialization_gas
             ~ticketer
             ~contents
             ~ty
             ctxt
           >>=? fun (ctxt, ticket_token) ->
-          Tx_rollup_ticket.make_withdraw_order
+          Ticket_balance_key.of_ex_token
             ctxt
-            tx_rollup
+            ~owner:(Tx_rollup tx_rollup)
             ticket_token
-            claimer
-            amount
-          >>=? fun (ctxt, withdrawal) ->
+          >>=? fun (ticket_hash, ctxt) ->
+          let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return
             (withdrawal :: acc_withdraw, (withdrawal, ticket_token) :: acc, ctxt))
         ([], [], ctxt)
@@ -868,7 +984,7 @@ let apply_manager_operation :
           ~owner:(Contract (Contract.Implicit claimer))
           ticket_token
         >>=? fun (claimer_ticket_hash, ctxt) ->
-        Tx_rollup_ticket.transfer_ticket_with_hashes
+        Ticket_transfer.transfer_ticket_with_hashes
           ctxt
           ~src_hash:tx_rollup_ticket_hash
           ~dst_hash:claimer_ticket_hash
@@ -892,35 +1008,96 @@ let apply_manager_operation :
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
     -> (
       match destination with
-      | Implicit _ -> fail Cannot_transfer_ticket_to_implicit
-      | Originated destination_hash ->
-          Tx_rollup_ticket.parse_ticket_and_operation
+      | Implicit _ ->
+          error_unless
+            Entrypoint.(entrypoint = default)
+            (Script_tc_errors.No_such_entrypoint entrypoint)
+          >>?= fun () ->
+          Ticket_transfer.parse_ticket
             ~consume_deserialization_gas
             ~ticketer
             ~contents
             ~ty
-            ~source:source_contract
+            ctxt
+          >>=? fun (ctxt, ticket) ->
+          Ticket_transfer.transfer_ticket
+            ctxt
+            ~src:(Contract source_contract)
+            ~dst:(Contract destination)
+            ticket
+            amount
+          >>=? fun (ctxt, paid_storage_size_diff) ->
+          Ticket_token_unparser.unparse ctxt ticket
+          >>=? fun (ticket_token, ctxt) ->
+          let amount = Script_int.(to_zint (amount :> n num)) in
+          let ticket_receipt =
+            Ticket_receipt.
+              [
+                {
+                  ticket_token;
+                  updates =
+                    [
+                      {account = Contract source_contract; amount = Z.neg amount};
+                      {account = Contract destination; amount};
+                    ];
+                };
+              ]
+          in
+          return
+            ( ctxt,
+              Transfer_ticket_result
+                {
+                  balance_updates = [];
+                  ticket_receipt;
+                  consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+                  paid_storage_size_diff;
+                },
+              [] )
+      | Originated destination_hash ->
+          Ticket_transfer.parse_ticket_and_operation
+            ~consume_deserialization_gas
+            ~ticketer
+            ~contents
+            ~ty
+            ~source:(Destination.Contract source_contract)
             ~destination:destination_hash
             ~entrypoint
             ~amount
             ctxt
-          >>=? fun (ctxt, ticket_token, op) ->
-          Tx_rollup_ticket.transfer_ticket
+          >>=? fun (ctxt, token, op) ->
+          Ticket_transfer.transfer_ticket
             ctxt
             ~src:(Contract source_contract)
             ~dst:(Contract destination)
-            ticket_token
+            token
             amount
           >>=? fun (ctxt, paid_storage_size_diff) ->
-          let result =
-            Transfer_ticket_result
-              {
-                balance_updates = [];
-                consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
-                paid_storage_size_diff;
-              }
+          Ticket_token_unparser.unparse ctxt token
+          >>=? fun (ticket_token, ctxt) ->
+          let amount = Script_int.(to_zint (amount :> n num)) in
+          let ticket_receipt =
+            Ticket_receipt.
+              [
+                {
+                  ticket_token;
+                  updates =
+                    [
+                      {account = Contract source_contract; amount = Z.neg amount}
+                      (* The transfer of the ticket to [destination] is part of the internal operation [op]. *);
+                    ];
+                };
+              ]
           in
-          return (ctxt, result, [op]))
+          return
+            ( ctxt,
+              Transfer_ticket_result
+                {
+                  balance_updates = [];
+                  ticket_receipt;
+                  consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+                  paid_storage_size_diff;
+                },
+              [op] ))
   | Origination {delegate; script; credit} ->
       (* Internal originations have their address generated in the interpreter
          so that the script can use it immediately.
@@ -1035,8 +1212,7 @@ let apply_manager_operation :
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Increase_paid_storage {amount_in_bytes; destination} ->
-      let contract = Contract.Originated destination in
-      Contract.increase_paid_storage ctxt contract ~amount_in_bytes
+      Contract.increase_paid_storage ctxt destination ~amount_in_bytes
       >>=? fun ctxt ->
       let payer = `Contract (Contract.Implicit source) in
       Fees.burn_storage_increase_fees ctxt ~payer amount_in_bytes
@@ -1289,11 +1465,12 @@ let apply_manager_operation :
               }
           in
           return (ctxt, result, [])
-      | None -> fail Tx_rollup_errors.Proof_undecodable)
-  | Dal_publish_slot_header {slot_header} ->
-      Dal_apply.apply_publish_slot_header ctxt slot_header >>?= fun ctxt ->
+      | None -> tzfail Tx_rollup_errors.Proof_undecodable)
+  | Dal_publish_slot_header slot_header ->
+      Dal_apply.apply_publish_slot_header ctxt slot_header
+      >>?= fun (ctxt, slot_header) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result = Dal_publish_slot_header_result {consumed_gas} in
+      let result = Dal_publish_slot_header_result {slot_header; consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty} ->
       Sc_rollup_operations.originate
@@ -1315,11 +1492,10 @@ let apply_manager_operation :
           }
       in
       return (ctxt, result, [])
-  | Sc_rollup_add_messages {rollup; messages} ->
-      Sc_rollup.Inbox.add_external_messages ctxt rollup messages
-      >>=? fun (inbox_after, _size, ctxt) ->
+  | Sc_rollup_add_messages {messages} ->
+      Sc_rollup.Inbox.add_external_messages ctxt messages >>=? fun ctxt ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
+      let result = Sc_rollup_add_messages_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
       Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
@@ -1343,10 +1519,15 @@ let apply_manager_operation :
       let open Sc_rollup.Refutation_storage in
       let player = source in
       (match refutation with
-      | None ->
-          start_game ctxt rollup ~player ~opponent >>=? fun ctxt ->
-          return (None, ctxt)
-      | Some refutation -> game_move ctxt rollup ~player ~opponent refutation)
+      | Start {player_commitment_hash; opponent_commitment_hash} ->
+          start_game
+            ctxt
+            rollup
+            ~player:(player, player_commitment_hash)
+            ~opponent:(opponent, opponent_commitment_hash)
+          >>=? fun ctxt -> return (None, ctxt)
+      | Move {step; choice} ->
+          game_move ctxt rollup ~player ~opponent ~step ~choice)
       >>=? fun (game_result, ctxt) ->
       (match game_result with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])
@@ -1383,18 +1564,26 @@ let apply_manager_operation :
         ctxt
         rollup
         ~cemented_commitment
-        ~source
         ~output_proof
-      >|=? fun ({Sc_rollup_operations.paid_storage_size_diff; operations}, ctxt)
-        ->
+      >|=? fun ( {
+                   Sc_rollup_operations.paid_storage_size_diff;
+                   ticket_receipt;
+                   operations;
+                 },
+                 ctxt ) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_execute_outbox_message_result
-          {paid_storage_size_diff; balance_updates = []; consumed_gas}
+          {
+            paid_storage_size_diff;
+            ticket_receipt;
+            balance_updates = [];
+            consumed_gas;
+          }
       in
       (ctxt, result, operations)
-  | Sc_rollup_recover_bond {sc_rollup} ->
-      Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup source
+  | Sc_rollup_recover_bond {sc_rollup; staker} ->
+      Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup staker
       >>=? fun (ctxt, balance_updates) ->
       let result =
         Sc_rollup_recover_bond_result
@@ -1404,16 +1593,6 @@ let apply_manager_operation :
           }
       in
       return (ctxt, result, [])
-  | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-      let open Lwt_tzresult_syntax in
-      let+ slot_index, level, ctxt =
-        Sc_rollup.Dal_slot.subscribe ctxt rollup ~slot_index
-      in
-      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result =
-        Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}
-      in
-      (ctxt, result, [])
   | Zk_rollup_origination {public_parameters; circuits_info; init_state; nb_ops}
     ->
       Zk_rollup_apply.originate
@@ -1425,6 +1604,8 @@ let apply_manager_operation :
         ~nb_ops
   | Zk_rollup_publish {zk_rollup; ops} ->
       Zk_rollup_apply.publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops:ops
+  | Zk_rollup_update {zk_rollup; update} ->
+      Zk_rollup_apply.update ~ctxt_before_op ~ctxt ~zk_rollup ~update
 
 type success_or_failure = Success of context | Failure
 
@@ -1436,7 +1617,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
          let op_res = Apply_internal_results.internal_operation op in
-         fail (Internal_operation_replay (Internal_operation op_res))
+         tzfail (Internal_operation_replay (Internal_operation op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_operation_contents
@@ -1655,7 +1836,6 @@ let burn_manager_storage_fees :
         Sc_rollup_execute_outbox_message_result {payload with balance_updates}
       )
   | Sc_rollup_recover_bond_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_dal_slot_subscribe_result _ -> return (ctxt, storage_limit, smopr)
   | Zk_rollup_origination_result payload ->
       Fees.burn_zk_rollup_origination_fees
         ctxt
@@ -1675,6 +1855,15 @@ let burn_manager_storage_fees :
       ( ctxt,
         storage_limit,
         Zk_rollup_publish_result {payload with balance_updates} )
+  | Zk_rollup_update_result
+      ({paid_storage_size_diff; balance_updates; _} as payload) ->
+      let consumed = paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >|=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ balance_updates in
+      ( ctxt,
+        storage_limit,
+        Zk_rollup_update_result {payload with balance_updates} )
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].
@@ -1832,7 +2021,7 @@ let rec mark_skipped :
    the operation is solvable, i.e. its fees can be taken, i.e.
    [take_fees] cannot return an error. *)
 let take_fees ctxt contents_list =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec take_fees_rec :
       type kind.
       context ->
@@ -1986,7 +2175,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   match operation.protocol_data.contents with
   | Single (Preendorsement _) -> ctxt
   | Single (Endorsement _) -> ctxt
-  | Single (Dal_slot_availability _) -> ctxt
+  | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_endorsement_evidence _
@@ -1997,7 +2186,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
 
 let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preendorsement contents_result_list) tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let ctxt =
     match mode with
     | Full_construction _ -> (
@@ -2037,7 +2226,7 @@ let is_grandparent_endorsement mode content =
 
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let mk_endorsement_result {Consensus_key.delegate; consensus_pkh}
       endorsement_power =
     Single_result
@@ -2060,7 +2249,7 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     match Slot.Map.find content.slot (Consensus.allowed_endorsements ctxt) with
     | None ->
         (* This should not happen: operation validation should have failed. *)
-        fail Faulty_validation_wrong_slot
+        tzfail Faulty_validation_wrong_slot
     | Some (consensus_key, power) ->
         let*? ctxt =
           Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
@@ -2083,7 +2272,7 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
 
 let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     contents_list =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
   let*! ctxt, contents_result_list =
@@ -2171,7 +2360,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preendorsement ctxt mode consensus_content |> Lwt.return
   | Single (Endorsement consensus_content) ->
       record_endorsement ctxt mode consensus_content
-  | Single (Dal_slot_availability (endorser, slot_availability)) ->
+  | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
          This is a temporary operation. We do no check for the
@@ -2182,11 +2371,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          endorsement encoding. However, once the DAL will be ready, this
          operation should be merged with an endorsement or at least
          refined. *)
-      Dal_apply.apply_data_availability ctxt slot_availability ~endorser
-      >>=? fun ctxt ->
+      Dal_apply.apply_attestation ctxt op >>?= fun ctxt ->
       return
-        ( ctxt,
-          Single_result (Dal_slot_availability_result {delegate = endorser}) )
+        (ctxt, Single_result (Dal_attestation_result {delegate = op.attestor}))
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
@@ -2246,7 +2433,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Failing_noop _) ->
       (* This operation always fails. It should already have been
          rejected by {!Validate.validate_operation}. *)
-      fail Validate_errors.Failing_noop_error
+      tzfail Validate_errors.Failing_noop_error
   | Single (Manager_operation _) ->
       apply_manager_operations
         ctxt
@@ -2263,7 +2450,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         contents_list
 
 let apply_operation application_state operation_hash operation =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let apply_operation application_state packed_operation ~payload_producer =
     let {shell; protocol_data = Operation_data unpacked_protocol_data} =
       packed_operation
@@ -2343,7 +2530,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
        Script_cache.find ctxt liquidity_baking_cpmm_contract_hash
        >>=? fun (ctxt, cache_key, script) ->
        match script with
-       | None -> fail (Script_tc_errors.No_such_entrypoint Entrypoint.default)
+       | None -> tzfail (Script_tc_errors.No_such_entrypoint Entrypoint.default)
        | Some (script, script_ir) -> (
            (* Token.transfer which is being called above already loads this
               value into the Irmin cache, so no need to burn gas for it. *)
@@ -2360,7 +2547,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 since they are not used within the CPMM default
                 entrypoint. *)
              {
-               source = liquidity_baking_cpmm_contract;
+               source = Destination.Contract liquidity_baking_cpmm_contract;
                payer = Signature.Public_key_hash.zero;
                self = liquidity_baking_cpmm_contract_hash;
                amount = liquidity_baking_subsidy;
@@ -2410,7 +2597,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                (* update CPMM storage *)
                update_script_storage_and_ticket_balances
                  ctxt
-                 ~self_contract:liquidity_baking_cpmm_contract
+                 ~self_contract:liquidity_baking_cpmm_contract_hash
                  storage
                  lazy_storage_diff
                  ticket_diffs
@@ -2418,7 +2605,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                >>=? fun (ticket_table_size_diff, ctxt) ->
                Fees.record_paid_storage_space
                  ctxt
-                 liquidity_baking_cpmm_contract
+                 liquidity_baking_cpmm_contract_hash
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
                Ticket_balance.adjust_storage_space
                  ctxt
@@ -2492,7 +2679,7 @@ let record_endorsing_participation ctxt =
 let begin_application ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~(predecessor_fitness : Fitness.raw)
     (block_header : Block_header.t) : application_state tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? fitness = Fitness.from_raw block_header.shell.fitness in
   let level = block_header.shell.level in
   let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
@@ -2515,6 +2702,11 @@ let begin_application ctxt chain_id ~migration_balance_updates
   in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let*! ctxt =
+    Sc_rollup.Inbox.add_info_per_level
+      ~predecessor:block_header.shell.predecessor
+      ctxt
   in
   let mode =
     Application
@@ -2545,7 +2737,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_timestamp ~predecessor_level
     ~predecessor_round ~predecessor_hash ~timestamp
     (block_data_contents : Block_header.contents) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let round_durations = Constants.round_durations ctxt in
   let*? round =
     Round.round_of_timestamp
@@ -2569,6 +2761,9 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let toggle_vote = block_data_contents.liquidity_baking_toggle_vote in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let*! ctxt =
+    Sc_rollup.Inbox.add_info_per_level ~predecessor:predecessor_hash ctxt
   in
   let mode =
     Full_construction
@@ -2597,12 +2792,22 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     }
 
 let begin_partial_construction ctxt chain_id ~migration_balance_updates
-    ~migration_operation_results ~predecessor_level
+    ~migration_operation_results ~predecessor_level ~predecessor_hash
     ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let toggle_vote = Liquidity_baking.LB_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let* ctxt =
+    (* The mode [Partial_construction] is used in simulation. We try to
+       put a realistic value of the block's timestamp. Even though, it should
+       not have an impact on the simulation of the following smart rollup
+       operations.
+    *)
+    let predecessor = predecessor_hash in
+    let*! ctxt = Sc_rollup.Inbox.add_info_per_level ~predecessor ctxt in
+    return ctxt
   in
   let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
@@ -2623,7 +2828,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~liquidity_baking_toggle_ema ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let level = Level.current ctxt in
   let endorsing_power = Consensus.current_endorsement_power ctxt in
   let* required_endorsements =
@@ -2691,7 +2896,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     may_start_new_cycle ctxt
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
-  let* ctxt, dal_slot_availability = Dal_apply.dal_finalisation ctxt in
+  let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
+  let*! ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
@@ -2714,7 +2920,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         balance_updates;
         liquidity_baking_toggle_ema;
         implicit_operations_results;
-        dal_slot_availability;
+        dal_attestation;
       }
   in
   (ctxt, receipt)
@@ -2758,7 +2964,7 @@ let finalize_with_commit_message ctxt ~cache_nonce fitness round op_count =
   return validation_result
 
 let finalize_block (application_state : application_state) shell_header_opt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let {
     ctxt;
     liquidity_baking_toggle_ema;
@@ -2837,7 +3043,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
-              dal_slot_availability = None;
+              dal_attestation = None;
             } )
   | Application
       {

@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -32,15 +33,15 @@
 
 let init_with_contract ~protocol () =
   let* client = Client.init_mockup ~protocol () in
-  let* contract =
-    Client.originate_contract
-      ~alias:"tzip4_view.tz"
+  let* _alias, contract =
+    Client.originate_contract_at
       ~amount:(Tez.of_int 1000)
       ~src:Constant.bootstrap1.alias
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/tzip4_view.tz"
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "tzip4_view"]
+      protocol
   in
   Lwt.return (client, contract)
 

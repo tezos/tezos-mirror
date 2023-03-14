@@ -10,7 +10,7 @@ During activation of Granada protocol, a constant product market making (CPMM) M
 
 .. warning::
 
-   while the CPMM and LQT contract originations provide an ``Origination_result``, the LQT contract contains two big maps not included in a `lazy_storage_diff` field. Indexers and other tooling may need manual updates to include these.
+   While the CPMM and LQT contract originations provide an ``Origination_result``, the LQT contract contains two big maps not included in a `lazy_storage_diff` field. Indexers and other tooling may need manual updates to include these.
 
 The CPMM maintains a balance of ``a`` tez and ``b`` `tzBTC <https://tzbtc.io/>`_, where tzBTC is the `FA1.2 token <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_  found at address ``KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn``. The smart contract accepts deposits of ``da`` tez and returns ``db`` tzBTC (or vice versa) where the invariant ``(a + da * (1 - f - n)) * (b - db) = a b`` is preserved, and ``f`` and ``n`` are a fee and burn, set at 0.1% each. Calculations are done with precision of 1000, rounding down on division.
 
@@ -26,7 +26,7 @@ The LIGO and Michelson code for these contracts, as well as detailed documentati
 Subsidy
 ~~~~~~~
 
-At every block in the chain, a small amount of tez is minted and credited to the CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the ``xtz_pool`` balance in its storage. The amount that is minted and sent to the CPMM contract is 1/16th of the rewards for a block; currently these rewards are 40 tez per block so the amount that is sent to the CPMM contract is 2.5 tez per block.
+At every block in the chain, a small amount of tez is minted and credited to the CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the ``xtz_pool`` balance in its storage. The amount that is minted and sent to the CPMM contract is 1/16th of the rewards for a block of round 0 with all endorsements; currently these rewards are 20 tez per block so the amount that is sent to the CPMM contract is 1.25 tez per block.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
@@ -46,7 +46,7 @@ the subsidy, and ``Pass`` to abstain.
 ``e[n+1] = e[n]`` if the flag is set to ``Pass``.
 ``e[n+1] = (1999 * e[n] // 2000) + 1_000_000`` if the flag is set to ``Off``.
 ``e[n+1] = (1999 * e[n] // 2000)`` if the flag is set to ``On``.
-When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000```.
+When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000``.
 
 If at any block ``e[n] >= 1_000_000_000`` then it means that an
 exponential moving average with a window size on the order of two
@@ -60,15 +60,15 @@ For indicative purposes, if among the non-abstaining blocks a fraction
 reached after roughly ``2*(log(1-1/(2f)) / log(0.999))``
 non-abstaining blocks, about 1386 blocks if everyone signals, 1963
 blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
-that assuming two blocks per minute there are 2880 blocks per day.
+that assuming four blocks per minute there are 5760 blocks per day.
 
-When producing blocks using Octez baking daemon ``tezos-baker``, there
+When producing blocks using Octez baking daemon ``octez-baker``, there
 are two command-line options affecting toggle vote. The
 ``--liquidity-baking-toggle-vote <on|off|pass>`` option sets a static
 value to be used in each block. Note that this option must be placed
 **after** ``run`` on the command-line. Moreover, the path of a JSON file
 can be given to the ``--votefile <path>`` option
-e.g. ``tezos-baker-<protocol codename> run with local node
+e.g. ``octez-baker-<protocol codename> run with local node
 ~/.tezos-node alice --liquidity-baking-toggle-vote on --votefile
 "per_block_votes.json"``, or placed in a default location:
 ``per_block_votes.json`` in the current working directory. The content

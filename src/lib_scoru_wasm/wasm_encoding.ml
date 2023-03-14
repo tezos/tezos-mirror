@@ -35,6 +35,7 @@ module C = Chunked_byte_vector
 open Tezos_tree_encoding
 module NameMap = Lazy_map_encoding.Make (Instance.NameMap)
 module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
+module Outboxes = Lazy_map_encoding.Make (Output_buffer.Outboxes.Map)
 
 (** Utility function*)
 let string_tag = value [] Data_encoding.string
@@ -870,39 +871,24 @@ let admin_instr_encoding =
 
 let input_buffer_message_encoding =
   conv_lwt
-    (fun (rtype, raw_level, message_counter, payload) ->
+    (fun (raw_level, message_counter, payload) ->
       let open Lwt.Syntax in
       let+ payload = C.to_bytes payload in
-      Input_buffer.{rtype; raw_level; message_counter; payload})
-    (fun Input_buffer.{rtype; raw_level; message_counter; payload} ->
+      Input_buffer.{raw_level; message_counter; payload})
+    (fun Input_buffer.{raw_level; message_counter; payload} ->
       let payload = C.of_bytes payload in
-      Lwt.return (rtype, raw_level, message_counter, payload))
-    (tup4
+      Lwt.return (raw_level, message_counter, payload))
+    (tup3
        ~flatten:true
-       (value ["rtype"] Data_encoding.int32)
        (value ["raw-level"] Data_encoding.int32)
        (value ["message-counter"] Data_encoding.z)
        chunked_byte_vector)
 
 let input_buffer_encoding =
   conv
-    (fun (content, num_elements) ->
-      {
-        Input_buffer.content = Lazy_vector.Mutable.ZVector.of_immutable content;
-        num_elements;
-      })
-    (fun buffer ->
-      Input_buffer.
-        ( Lazy_vector.Mutable.ZVector.snapshot buffer.content,
-          buffer.num_elements ))
-    (tup2
-       ~flatten:true
-       (scope
-          ["messages"]
-          (z_lazy_vector
-             (value [] Data_encoding.z)
-             input_buffer_message_encoding))
-       (value ["num-messages"] Data_encoding.z))
+    (fun index -> Lazy_vector.Mutable.ZVector.of_immutable index)
+    (fun buffer -> Lazy_vector.Mutable.ZVector.snapshot buffer)
+    (z_lazy_vector (value [] Data_encoding.z) input_buffer_message_encoding)
 
 let label_encoding =
   conv
@@ -987,11 +973,7 @@ let packed_frame_stack_encoding =
        (scope ["frame"] frame_encoding)
        (scope ["label_kont"] packed_label_kont_encoding))
 
-let input_hash_encoding =
-  conv
-    Reveal.input_hash_from_string_exn
-    Reveal.input_hash_to_string
-    (value [] (Data_encoding.Fixed.string 32))
+let reveal_hash_encoding = value [] (Data_encoding.string' Hex)
 
 let reveal_encoding =
   tagged_union
@@ -999,9 +981,14 @@ let reveal_encoding =
     [
       case
         "Reveal_raw_data"
-        input_hash_encoding
-        (function Reveal.Reveal_raw_data hash -> Some hash)
+        reveal_hash_encoding
+        (function Host_funcs.Reveal_raw_data hash -> Some hash | _ -> None)
         (fun hash -> Reveal_raw_data hash);
+      case
+        "Reveal_metadata"
+        (value [] Data_encoding.unit)
+        (function Host_funcs.Reveal_metadata -> Some () | _ -> None)
+        (fun () -> Reveal_metadata);
     ]
 
 let invoke_step_kont_encoding =
@@ -1104,16 +1091,18 @@ let invoke_step_kont_encoding =
           Inv_reveal_tick {reveal; base_destination; max_bytes; code = (vs, es)});
       case
         "Inv_stop"
-        (tup3
+        (tup4
            ~flatten:true
            (scope ["values"] values_encoding)
            (lazy_vector_encoding "instructions" admin_instr_encoding)
-           (scope ["fresh_frame"] (option ongoing_frame_stack_encoding)))
+           (scope ["fresh_frame"] (option ongoing_frame_stack_encoding))
+           (value ["remaining_ticks"] Data_encoding.z))
         (function
-          | Eval.Inv_stop {code = vs, es; fresh_frame} ->
-              Some (vs, es, fresh_frame)
+          | Eval.Inv_stop {code = vs, es; fresh_frame; remaining_ticks} ->
+              Some (vs, es, fresh_frame, remaining_ticks)
           | _ -> None)
-        (fun (vs, es, fresh_frame) -> Inv_stop {code = (vs, es); fresh_frame});
+        (fun (vs, es, fresh_frame, remaining_ticks) ->
+          Inv_stop {code = (vs, es); fresh_frame; remaining_ticks});
     ]
 
 let label_step_kont_encoding =
@@ -1216,29 +1205,41 @@ let step_kont_encoding =
         (fun msg -> SK_Trapped Source.(msg @@ no_region));
     ]
 
-let index_vector_encoding =
+let messages_encoding =
   conv
-    (fun index -> Output_buffer.Index_Vector.of_immutable index)
-    (fun buffer -> Output_buffer.Index_Vector.snapshot buffer)
+    (fun index -> Output_buffer.Messages.of_immutable index)
+    (fun buffer -> Output_buffer.Messages.snapshot buffer)
     (z_lazy_vector (value [] Data_encoding.z) (value [] Data_encoding.bytes))
 
-let output_buffer_encoding =
+let outboxes_encoding =
   conv
-    (fun output -> Output_buffer.Level_Vector.of_immutable output)
-    (fun buffer -> Output_buffer.Level_Vector.snapshot buffer)
-    (int32_lazy_vector (value [] Data_encoding.int32) index_vector_encoding)
+    Output_buffer.Outboxes.of_immutable
+    Output_buffer.Outboxes.snapshot
+    (Outboxes.lazy_map messages_encoding)
+
+let output_buffer_encoding =
+  let open Output_buffer in
+  conv
+    (fun (outboxes, last_level, validity_period, message_limit) ->
+      {outboxes; last_level; validity_period; message_limit})
+    (fun {outboxes; last_level; validity_period; message_limit} ->
+      (outboxes, last_level, validity_period, message_limit))
+    (tup4
+       ~flatten:false
+       (scope ["outboxes"] outboxes_encoding)
+       (value_option ["last_level"] Data_encoding.int32)
+       (value ["validity_period"] Data_encoding.int32)
+       (value ["message_limit"] Data_encoding.z))
 
 let config_encoding ~host_funcs =
   conv
-    (fun (step_kont, stack_size_limit, module_reg) ->
-      Eval.{step_kont; host_funcs; stack_size_limit; module_reg})
-    (fun Eval.{step_kont; stack_size_limit; module_reg; _} ->
-      (step_kont, stack_size_limit, module_reg))
-    (tup3
+    (fun (step_kont, stack_size_limit) ->
+      Eval.{step_kont; host_funcs; stack_size_limit})
+    (fun Eval.{step_kont; stack_size_limit; _} -> (step_kont, stack_size_limit))
+    (tup2
        ~flatten:true
        (scope ["step_kont"] step_kont_encoding)
-       (value ["stack_size_limit"] Data_encoding.int31)
-       (scope ["modules"] module_instances_encoding))
+       (value ["stack_size_limit"] Data_encoding.int31))
 
 let buffers_encoding =
   conv

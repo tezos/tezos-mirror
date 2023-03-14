@@ -26,22 +26,23 @@
 (** Persistent block store with arborescent history
 
     The floating block store is an append-only store where blocks are
-   stored arbitrarily. This structure possess an indexed map
-   {!Block_hash.t} -> (offset × predecessors) which points to its
-   offset in the associated file along with an exponential list of
-   predecessors block hashes (as implemented in
-   {!Block_store.compute_predecessors}). The structure
-   access/modification is protected by a mutex ({!Lwt_idle_waiter})
-   and thus can be manipulated concurrently. Stored blocks may or may
-   not contain metadata. The instance maintains an opened file
-   descriptor. Therefore it must be properly closed or it might lead
-   to a file descriptor leak.
+    stored arbitrarily. This structure possess an indexed map
+    {!Block_hash.t} -> (offset × predecessors x
+    resulting_context_hash) which points to its offset in the
+    associated file along with an exponential list of predecessors
+    block hashes (as implemented in
+    {!Block_store.compute_predecessors}) and the block's resulting
+    context hash. The structure access/modification is protected by a
+    mutex ({!Lwt_idle_waiter}) and thus can be manipulated
+    concurrently. Stored blocks may or may not contain metadata. The
+    instance maintains an opened file descriptor. Therefore it must be
+    properly closed or it might lead to a file descriptor leak.
 
     Four different kind of instances are allowed to co-exist for an
-   identical path: - RO, a read-only instance; - RW, a read-write
-   instance - RO_TMP, RW_TMP, read-write instances; - Restore is a
-   generic instance used to wrap leftover instances while fixing a
-   crashed storage. See {!Block_store}.
+    identical path: - RO, a read-only instance; - RW, a read-write
+    instance - RO_TMP, RW_TMP, read-write instances; - Restore is a
+    generic instance used to wrap leftover instances while fixing a
+    crashed storage. See {!Block_store}.
 
     {1 Invariants}
 
@@ -72,6 +73,16 @@ type floating_kind = Naming.floating_kind =
   | RO_TMP
   | Restore of floating_kind
 
+(** The type for informations stored in floating store indexes. *)
+type info = {
+  predecessors : Block_hash.t list;
+  resulting_context_hash : Context_hash.t;
+}
+
+(** The default value of the floating blocks cache size used by index
+    library. *)
+val default_floating_blocks_log_size : int
+
 (** [kind floating_store] returns the floating store's kind. *)
 val kind : t -> floating_kind
 
@@ -79,40 +90,49 @@ val kind : t -> floating_kind
     [floating_store]. *)
 val mem : t -> Block_hash.t -> bool Lwt.t
 
+(** [find_info floating_store block_hash] reads from the index the
+    info of [block_hash] if the block is stored in [floating_store],
+    returns [None] otherwise. *)
+val find_info : t -> Block_hash.t -> info option Lwt.t
+
 (** [find_predecessors floating_store block_hash] reads from the index
     the list of [block_hash]'s predecessors if the block is stored in
     [floating_store], returns [None] otherwise. *)
 val find_predecessors : t -> Block_hash.t -> Block_hash.t list option Lwt.t
+
+(** [find_resulting_context_hash floating_store block_hash] reads from
+   the index the resulting context hash if the block is stored in
+   [floating_store], returns [None] otherwise. *)
+val find_resulting_context_hash :
+  t -> Block_hash.t -> Context_hash.t option Lwt.t
 
 (** [read_block floating_store hash] reads from the file the block of
     [hash] if the block is stored in [floating_store], returns [None]
     otherwise. *)
 val read_block : t -> Block_hash.t -> Block_repr.t option Lwt.t
 
-(** [read_block_and_predecessors floating_store hash] same as
-    [read_block] but also returns the block's predecessors. Returns
+(** [read_block_and_info floating_store hash] same as
+    [read_block] but also returns the block's info. Returns
     [None] if it fails to resolve the given [hash].*)
-val read_block_and_predecessors :
-  t -> Block_hash.t -> (Block_repr.t * Block_hash.t list) option Lwt.t
+val read_block_and_info :
+  t -> Block_hash.t -> (Block_repr.t * info) option Lwt.t
 
-(** [append_block floating_store ?flush preds block] stores the
-    [block] in [floating_store] updating its index with the given
-    predecessors [preds] and flushing if [flush] is set to [true]
-    (defaults to [true]). [log_metrics] enables logs of the amount of
-    written bytes using the node's metrics. *)
+(** [append_block floating_store ?flush ?log_metrics info block]
+    stores the [block] in [floating_store] updating its index with the
+    given [info] and flushing if [flush] is set to [true] (defaults to
+    [true]). [log_metrics] enables logs of the amount of written bytes
+    using the node's metrics. *)
 val append_block :
+  t ->
   ?flush:bool ->
   ?log_metrics:bool ->
-  t ->
-  Block_hash.t trace ->
+  info ->
   Block_repr.block ->
   unit tzresult Lwt.t
 
-(** [append_all floating_store chunk] stores the [chunk] of
-    (predecessors × blocks) in [floating_store] updating its index
-    accordingly. *)
-val append_all :
-  t -> (Block_hash.t list * Block_repr.t) Seq.t -> unit tzresult Lwt.t
+(** [append_all floating_store chunk] stores the [chunk] of (blocks x
+    info) in [floating_store] updating its index accordingly. *)
+val append_all : t -> (Block_repr.t * info) Seq.t -> unit tzresult Lwt.t
 
 (** [iter_s_raw_fd f fd] unsafe sequential iterator on a file descriptor
     [fd]. Applies [f] on every block encountered.
@@ -129,12 +149,12 @@ val iter_s_raw_fd :
 val fold_left_s :
   ('a -> Block_repr.block -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
 
-(** [fold_left_with_pred_s f e floating_store] sequential fold left on the
+(** [fold_left_with_info_s f e floating_store] sequential fold left on the
     [floating_store] using [f] on every block and [e] as initial
     element. The function [f] is given the last read block along with
-    its predecessors. *)
-val fold_left_with_pred_s :
-  ('a -> Block_repr.block * Block_hash.t list -> 'a tzresult Lwt.t) ->
+    its info. *)
+val fold_left_with_info_s :
+  ('a -> Block_repr.block * info -> 'a tzresult Lwt.t) ->
   'a ->
   t ->
   'a tzresult Lwt.t
@@ -143,13 +163,11 @@ val fold_left_with_pred_s :
     [floating_store]. Applies [f] on every block read. *)
 val iter_s : (Block_repr.t -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
 
-(** [iter_with_pred_s f floating_store] sequential iterator on the
-    [floating_store]. Applies [f] on every block with its predecessors
+(** [iter_with_info_s f floating_store] sequential iterator on the
+    [floating_store]. Applies [f] on every block (and its info)
     read. *)
-val iter_with_pred_s :
-  (Block_repr.t * Block_hash.t list -> unit tzresult Lwt.t) ->
-  t ->
-  unit tzresult Lwt.t
+val iter_with_info_s :
+  (Block_repr.t * info -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
 
 (** [init ~chain_dir ~readonly kind] creates or load an existing
    floating store at path [chain_dir] with [kind].
@@ -194,11 +212,13 @@ val fix_integrity :
 
 (** Unsafe set of functions intended for merging optimizations. *)
 
-(** [raw_append dst_store (hash, buffer, total_length, predecessors)]
-    appends a block with its [hash] in [dst_store] contained in the
-    [buffer]. *)
+(** [raw_append dst_store (hash, buffer, total_length, predecessors,
+   resulting_context_hash)] appends a block with its [hash] in
+   [dst_store] contained in the [buffer]. *)
 val raw_append :
-  t -> Block_hash.t * bytes * int * Block_hash.t list -> unit tzresult Lwt.t
+  t ->
+  Block_hash.t * bytes * int * Block_hash.t list * Context_hash.t ->
+  unit tzresult Lwt.t
 
 (** [raw_copy_all src_stores block_hashes dst_store] retrieves
     [block_hashes] from [src_stores] and copy them (without decoding)
@@ -232,6 +252,22 @@ val raw_retrieve_blocks_seq :
     is consistent.
 
     {b Warning}: the [buffer] is modified through the iteration and
-    therefore must not be used outside of the definition of [f]. *)
+    therefore must not be used outside of the definition of [f].
+
+    For internal use only! *)
 val raw_iterate :
   (bytes * int -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
+
+(** [raw_iterate_fd f fd] iterate over all blocks in a floating store
+    block file and calling [f] providing it with a [buffer] and the
+    [total_block_length] such that [(decode Block_repr.encoding
+    (Bytes.sub buffer 0 total_block_length))] is consistent.
+
+    {b Warning}: the [buffer] is modified through the iteration and
+    therefore must not be used outside of the definition of [f].
+
+    For internal use only! *)
+val raw_iterate_fd :
+  (bytes * int -> unit tzresult Lwt.t) ->
+  Lwt_unix.file_descr ->
+  unit tzresult Lwt.t

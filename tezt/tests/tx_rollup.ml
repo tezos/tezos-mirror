@@ -846,15 +846,15 @@ let test_submit_from_originated_source =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   (* We begin by originating a contract *)
-  let* originated_contract =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
+  let* _alias, originated_contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   (* We originate a tx_rollup using an implicit account *)
@@ -877,9 +877,7 @@ let test_submit_from_originated_source =
   in
   let msg =
     match protocol with
-    | Lima | Alpha -> rex "Erroneous command line argument"
-    | Kathmandu ->
-        rex "Only implicit accounts can submit transaction rollup batches"
+    | Lima | Mumbai | Alpha -> rex "Erroneous command line argument"
   in
   let* () = Process.check_error ~exit_code:1 ~msg process in
   unit
@@ -1534,20 +1532,15 @@ let test_deposit_withdraw_max_big_tickets =
   in
   let ticket_contents_ty = "string" in
   (* 1. originate a deposit contract *)
-  let* deposit_contract =
-    Client.originate_contract
-      ~alias:"deposit_contract"
+  let* _alias, deposit_contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:account
-      ~prg:
-        (match protocol with
-        | Lima | Alpha ->
-            "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-        | _ ->
-            "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "tx_rollup_deposit"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   (* 2. Deposit tickets to the tx_rollup. *)
@@ -1692,22 +1685,22 @@ let test_deposit_withdraw_max_big_tickets =
 
   (* Withdraw contract that has an optional tickets in storage. Drop the
      previous value. *)
-  let* withdraw_contract =
-    Client.originate_contract
-      ~alias:"withdraw_contract"
+  let* _alias, withdraw_contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:account
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_withdraw.tz"
       ~init:"None"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "tickets_receive_and_store"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   (* repeat the operation to ensure all tickets can be transfered *)
   let* () =
     repeat max_withdrawals_per_batch (fun () ->
         let*! () =
-          Client.Tx_rollup.transfer_tickets
+          Client.transfer_tickets
             ~qty:l2_amount
             ~src:account
             ~destination:withdraw_contract

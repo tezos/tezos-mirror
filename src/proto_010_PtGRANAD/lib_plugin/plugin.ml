@@ -1149,7 +1149,7 @@ module RPC = struct
           let operation : _ operation = {shell; protocol_data} in
           let hash = Operation.hash {shell; protocol_data} in
           let ctxt = Contract.init_origination_nonce ctxt hash in
-          let baker = Signature.Public_key_hash.zero in
+          let baker = Tezos_crypto.Signature.V0.Public_key_hash.zero in
           match protocol_data.contents with
           | Single (Manager_operation _) as op ->
               partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->

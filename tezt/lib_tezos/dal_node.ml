@@ -29,6 +29,7 @@ module Parameters = struct
     rpc_host : string;
     rpc_port : int;
     node : Node.t;
+    client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -95,6 +96,51 @@ let init_config ?use_unsafe_srs dal_node =
   | None -> failwith "DAL node configuration initialization failed"
   | Some filename -> return filename
 
+module Dac = struct
+  let spawn_set_parameters ?threshold ?reveal_data_dir dal_node =
+    let threshold_arg =
+      match threshold with
+      | None -> []
+      | Some threshold -> ["--threshold"; Int.to_string threshold]
+    in
+    let reveal_data_dir_arg =
+      match reveal_data_dir with
+      | None -> []
+      | Some reveal_data_dir -> ["--reveal-data-dir"; reveal_data_dir]
+    in
+    let data_dir_arg = ["--data-dir"; data_dir dal_node] in
+    spawn_command dal_node
+    @@ ["set"; "dac"; "parameters"]
+    @ threshold_arg @ reveal_data_dir_arg @ data_dir_arg
+
+  let set_parameters ?threshold ?reveal_data_dir dal_node =
+    spawn_set_parameters ?threshold ?reveal_data_dir dal_node |> Process.check
+
+  let spawn_add_committee_member ~address dal_node =
+    let base_dir_argument =
+      ["--base-dir"; Client.base_dir dal_node.persistent_state.client]
+    in
+    spawn_command
+      dal_node
+      (base_dir_argument
+      @ ["add"; "data"; "availability"; "committee"; "member"]
+      @ [address]
+      @ ["--data-dir"; dal_node.persistent_state.data_dir])
+
+  let add_committee_member ~address dal_node =
+    spawn_add_committee_member ~address dal_node |> Process.check
+end
+
+module Config_file = struct
+  let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
+
+  let read dal_node = JSON.parse_file (filename dal_node)
+
+  let write dal_node config = JSON.encode_to_file (filename dal_node) config
+
+  let update dal_node update = read dal_node |> update |> write dal_node
+end
+
 let check_event ?timeout ?where dal_node name promise =
   let* result =
     match timeout with
@@ -133,11 +179,11 @@ let wait_for_ready dal_node =
         resolver :: dal_node.persistent_state.pending_ready ;
       check_event dal_node "dal_node_is_ready.v0" promise
 
-let handle_event dal_node {name; value = _} =
+let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ~node () =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ~node ~client () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -151,16 +197,22 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
       ~name
       ?color
       ?event_pipe
-      {data_dir; rpc_host; rpc_port; pending_ready = []; node}
+      {data_dir; rpc_host; rpc_port; pending_ready = []; node; client}
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
 let make_arguments node =
-  [
-    "--endpoint";
-    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
-  ]
+  let base_dir_args =
+    ["--base-dir"; Client.base_dir node.persistent_state.client]
+  in
+  let endpoint_args =
+    [
+      "--endpoint";
+      Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    ]
+  in
+  base_dir_args @ endpoint_args
 
 let do_runlike_command ?env node arguments =
   if node.status <> Not_running then

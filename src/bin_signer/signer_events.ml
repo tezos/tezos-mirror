@@ -63,7 +63,7 @@ module Handler = struct
         "request for signing {bytes} bytes of data for key {key}, magic byte = \
          {magic}"
       ("bytes", Data_encoding.int31)
-      ("key", Signature.Public_key_hash.encoding)
+      ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
       ("magic", Data_encoding.uint8)
 
   let signing_data =
@@ -81,7 +81,7 @@ module Handler = struct
       ~name:"request_for_deterministic_nonce"
       ~msg:"request for creating a nonce from {bytes} input bytes for key {key}"
       ("bytes", Data_encoding.int31)
-      ("key", Signature.Public_key_hash.encoding)
+      ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
 
   let creating_nonce =
     declare_1
@@ -100,7 +100,7 @@ module Handler = struct
         "request for creating a nonce hash from {bytes} input bytes for key \
          {key}"
       ("bytes", Data_encoding.int31)
-      ("key", Signature.Public_key_hash.encoding)
+      ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
 
   let creating_nonce_hash =
     declare_1
@@ -118,7 +118,7 @@ module Handler = struct
       ~msg:
         "request for checking whether the signer supports deterministic nonces \
          for key {key}"
-      ("key", Signature.Public_key_hash.encoding)
+      ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
 
   let supports_deterministic_nonces =
     declare_1
@@ -136,7 +136,7 @@ module Handler = struct
       ~level
       ~name:"request_for_public_key"
       ~msg:"request for public key {key}"
-      ("key", Signature.Public_key_hash.encoding)
+      ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
 
   let not_found_public_key =
     declare_1
@@ -144,7 +144,7 @@ module Handler = struct
       ~level
       ~name:"not_found_public_key"
       ~msg:"no public key found for hash {hash}"
-      ("hash", Signature.Public_key_hash.encoding)
+      ("hash", Tezos_crypto.Signature.Public_key_hash.encoding)
 
   let found_public_key =
     declare_2
@@ -152,7 +152,7 @@ module Handler = struct
       ~level
       ~name:"found_public_key"
       ~msg:"found public key for hash {hash} (name: {name})"
-      ("hash", Signature.Public_key_hash.encoding)
+      ("hash", Tezos_crypto.Signature.Public_key_hash.encoding)
       ("name", Data_encoding.string)
 end
 

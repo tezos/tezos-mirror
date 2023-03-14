@@ -53,7 +53,7 @@ module type S = sig
 
   val nat : Script_int.n Script_int.num sampler
 
-  val signature : Tezos_crypto.Signature.t sampler
+  val signature : Tezos_crypto.Signature.V0.t sampler
 
   val string : Script_string.t sampler
 
@@ -81,25 +81,25 @@ end) : S = struct
     let i = Random.State.int rng_state 4 in
     match i with
     | 0 -> (
-        let open Ed25519 in
+        let open Tezos_crypto.Signature.Ed25519 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
-        | Some s -> Signature.of_ed25519 s)
+        | Some s -> Tezos_crypto.Signature.V0.of_ed25519 s)
     | 1 -> (
-        let open Secp256k1 in
+        let open Tezos_crypto.Signature.Secp256k1 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
-        | Some s -> Signature.of_secp256k1 s)
+        | Some s -> Tezos_crypto.Signature.V0.of_secp256k1 s)
     | 2 -> (
-        let open P256 in
+        let open Tezos_crypto.Signature.P256 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
-        | Some s -> Signature.of_p256 s)
+        | Some s -> Tezos_crypto.Signature.V0.of_p256 s)
     | _ -> (
-        let open Signature in
+        let open Tezos_crypto.Signature.V0 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with None -> assert false | Some s -> s)
 

@@ -30,51 +30,51 @@ open Tezos_micheline
 
 let group =
   {
-    Clic.name = "multisig";
+    Tezos_clic.name = "multisig";
     title = "Commands for managing a multisig smart contract";
   }
 
 let threshold_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"threshold"
     ~desc:"Number of required signatures"
     Client_proto_args.int_parameter
 
 let public_key_param () =
-  Client_keys.Public_key.source_param
+  Client_keys_v0.Public_key.source_param
     ~name:"key"
     ~desc:"Each signer of the multisig contract"
 
 let secret_key_param () =
-  Client_keys.Secret_key.source_param
+  Client_keys_v0.Secret_key.source_param
     ~name:"key"
     ~desc:
       "Secret key corresponding to one of the public keys stored on the \
        multisig contract"
 
 let signature_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"signature"
     ~desc:"Each signer of the multisig contract"
     Client_proto_args.signature_parameter
 
 let lambda_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"lambda"
     ~desc:"the lambda to execute, of type lambda unit (list operation)"
     string_parameter
 
 let bytes_only_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"bytes-only"
     ~doc:"return only the byte sequence to be signed"
     ()
 
 let bytes_param ~name ~desc =
-  Clic.param ~name ~desc Client_proto_args.bytes_parameter
+  Tezos_clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
-  Clic.args10
+  Tezos_clic.args10
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
@@ -87,7 +87,7 @@ let transfer_options =
     Client_proto_args.entrypoint_arg
 
 let non_transfer_options =
-  Clic.args8
+  Tezos_clic.args8
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
@@ -113,7 +113,8 @@ let prepare_command_display prepared_command bytes_only =
         Format.fprintf
           ppf
           "Blake 2B Hash: '%s'"
-          (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
+          (Tezos_crypto.Base58.raw_encode
+             Tezos_crypto.Blake2B.(hash_bytes [x] |> to_string)))
       prepared_command.Client_proto_multisig.bytes
       (fun ppf z ->
         Format.fprintf
@@ -127,7 +128,7 @@ let prepare_command_display prepared_command bytes_only =
           "@[<2>Public keys of the signers:@ %a@]"
           (Format.pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-             Signature.Public_key.pp))
+             Tezos_crypto.Signature.V0.Public_key.pp))
       prepared_command.Client_proto_multisig.keys
 
 let get_parameter_type (cctxt : #Protocol_client_context.full)
@@ -154,8 +155,8 @@ let get_parameter_type (cctxt : #Protocol_client_context.full)
             entrypoint
       | Some parameter_type -> return parameter_type)
 
-let commands_ro () : #Protocol_client_context.full Clic.command list =
-  Clic.
+let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
+  Tezos_clic.
     [
       command
         ~group
@@ -182,8 +183,8 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           return_unit);
     ]
 
-let commands_rw () : #Protocol_client_context.full Clic.command list =
-  Clic.
+let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
+  Tezos_clic.
     [
       command
         ~group
@@ -194,7 +195,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
            Client_proto_args.gas_limit_arg
            Client_proto_args.storage_limit_arg
            Client_proto_args.delegate_arg
-           (Client_keys.force_switch ())
+           (Client_keys_v0.force_switch ())
            Client_proto_args.no_print_source_flag
            Client_proto_args.fee_parameter_args
            Client_proto_context_commands.verbose_signing_switch)
@@ -239,9 +240,10 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of an origination"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               List.map_es
-                (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+                (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
                 keys
               >>=? fun keys ->
               Client_proto_multisig.originate_multisig
@@ -323,8 +325,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                  {amount; destination; entrypoint; parameter_type; parameter})
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Signature.pp signature);
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Sign a lambda for a generic multisig contract."
@@ -353,8 +356,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
             ~action:(Lambda lambda)
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Signature.pp signature);
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Sign a delegate change for a multisig contract."
@@ -364,7 +368,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Client_keys_v0.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -382,8 +386,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate (Some delegate))
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Signature.pp signature);
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Sign a delegate withdraw for a multisig contract."
@@ -404,8 +409,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate None)
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Signature.pp signature);
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:
@@ -428,7 +434,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              new_keys
              (cctxt : #Protocol_client_context.full) ->
           List.map_es
-            (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+            (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
             new_keys
           >>=? fun keys ->
           Client_proto_multisig.prepare_multisig_transaction
@@ -440,8 +446,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               (Client_proto_multisig.Change_keys (Z.of_int new_threshold, keys))
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Signature.pp signature);
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Transfer tokens using a multisig contract."
@@ -494,7 +501,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -564,7 +572,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               Lwt.return @@ Micheline_parser.no_parsing_error
               @@ Michelson_v1_parser.parse_expression lambda
               >>=? fun {expanded = lambda; _} ->
@@ -604,7 +613,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "to"
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Client_keys_v0.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
@@ -631,7 +640,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -690,7 +700,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -753,9 +764,10 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               List.map_es
-                (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+                (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
                 new_keys
               >>=? fun keys ->
               Client_proto_multisig.call_multisig
@@ -787,7 +799,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               >>= function
               | None -> return_unit
               | Some (_res, _contracts) -> return_unit));
-      (* This command is no longer necessary as Clic now supports non terminal
+      (* This command is no longer necessary as Tezos_clic now supports non terminal
          lists of parameters, however, it is kept for compatibility. *)
       command
         ~group
@@ -830,7 +842,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               Client_proto_multisig.call_multisig_on_bytes
                 cctxt
                 ~chain:cctxt#chain
@@ -941,7 +954,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Client_keys_v0.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ stop)
@@ -1002,7 +1015,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              new_keys
              (cctxt : #Protocol_client_context.full) ->
           List.map_es
-            (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+            (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
             new_keys
           >>=? fun keys ->
           Client_proto_multisig.prepare_multisig_transaction

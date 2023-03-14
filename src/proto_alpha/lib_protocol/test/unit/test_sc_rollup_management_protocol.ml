@@ -34,10 +34,8 @@
 open Protocol
 open Alpha_context
 
-let wrap m = m >|= Environment.wrap_tzresult
-
 let check_encode_decode_inbox_message message =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult @@ Sc_rollup.Inbox_message.serialize message
@@ -55,7 +53,7 @@ let check_encode_decode_inbox_message message =
     (Sc_rollup.Inbox_message.unsafe_to_string bytes')
 
 let check_encode_decode_outbox_message ctxt message =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
@@ -100,10 +98,11 @@ let assert_encoding_failure ~loc res =
     res
     "Failed to encode a rollup management protocol inbox message value"
 
-let test_encode_decode_internal_inbox_message () =
+let test_encode_decode_internal_inbox_message_transfer () =
+  let open Lwt_result_wrap_syntax in
   let open WithExceptions in
-  let open Lwt_result_syntax in
   let* ctxt = init_ctxt () in
+  let destination = Sc_rollup.Address.zero in
   let sender =
     Contract_hash.of_b58check_exn "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"
   in
@@ -124,34 +123,44 @@ let test_encode_decode_internal_inbox_message () =
     ( Script_int.(abs @@ of_int 42),
       string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 )
   in
-  let* deposit, ctxt =
+  let* transfer, ctxt =
     wrap
-    @@ Sc_rollup_management_protocol.make_internal_inbox_message
+    @@ Sc_rollup_management_protocol.make_internal_transfer
          ctxt
          pair_nat_ticket_string_ty
          ~payload
          ~sender
          ~source
+         ~destination
   in
-  let* () = check_encode_decode_inbox_message deposit in
+  let* () = check_encode_decode_inbox_message transfer in
   (* Check that the size of messages that can be encoded is bounded. *)
   let msg = String.make 4050 'c' in
   let*? payload = Environment.wrap_tzresult (Script_string.of_string msg) in
-  let* deposit, _ctxt =
+  let* transfer, _ctxt =
     let open Script_typed_ir in
     wrap
-    @@ Sc_rollup_management_protocol.make_internal_inbox_message
+    @@ Sc_rollup_management_protocol.make_internal_transfer
          ctxt
          String_t
          ~payload
          ~sender
          ~source
+         ~destination
   in
-  let*! res = check_encode_decode_inbox_message deposit in
+  let*! res = check_encode_decode_inbox_message transfer in
   assert_encoding_failure ~loc:__LOC__ res
 
+let test_encode_decode_internal_inbox_message_sol () =
+  let sol = Sc_rollup.Inbox_message.(Internal Start_of_level) in
+  check_encode_decode_inbox_message sol
+
+let test_encode_decode_internal_inbox_message_eol () =
+  let eol = Sc_rollup.Inbox_message.(Internal End_of_level) in
+  check_encode_decode_inbox_message eol
+
 let test_encode_decode_external_inbox_message () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let assert_prefix message =
     let inbox_message = Sc_rollup.Inbox_message.External message in
     let*? real_encoding =
@@ -177,14 +186,20 @@ let test_encode_decode_external_inbox_message () =
   let* () = assert_prefix "A" in
   let* () = assert_prefix "0123456789" in
   let* () = assert_prefix (String.init 256 (Fun.const 'A')) in
+  let assert_encoding_success message =
+    let inbox_message = Sc_rollup.Inbox_message.External message in
+    let*! res = check_encode_decode_inbox_message inbox_message in
+    assert (Result.is_ok res) ;
+    return_unit
+  in
   let assert_encoding_failure message =
     let inbox_message = Sc_rollup.Inbox_message.External message in
     let*! res = check_encode_decode_inbox_message inbox_message in
     assert_encoding_failure ~loc:__LOC__ res
   in
   let max_msg_size = Constants_repr.sc_rollup_message_size_limit in
-  let message = String.init max_msg_size (Fun.const 'A') in
-  let* () = assert_encoding_failure message in
+  let message = String.init (max_msg_size - 1) (Fun.const 'A') in
+  let* () = assert_encoding_success message in
   let message = String.init max_msg_size (Fun.const 'b') in
   let* () = assert_encoding_failure message in
   assert_encoding_failure message
@@ -218,7 +233,7 @@ let add_or_clear =
   |}
 
 let test_encode_decode_outbox_message () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block, baker, source_contract = init_env () in
   let* ticket_receiver, _, block =
     Contract_helpers.originate_contract_from_string
@@ -305,9 +320,17 @@ let test_encode_decode_outbox_message () =
 let tests =
   [
     Tztest.tztest
-      "Encode/decode internal inbox message"
+      "Encode/decode internal inbox message transfer"
       `Quick
-      test_encode_decode_internal_inbox_message;
+      test_encode_decode_internal_inbox_message_transfer;
+    Tztest.tztest
+      "Encode/decode internal inbox message start of level"
+      `Quick
+      test_encode_decode_internal_inbox_message_sol;
+    Tztest.tztest
+      "Encode/decode internal inbox message end of level"
+      `Quick
+      test_encode_decode_internal_inbox_message_eol;
     Tztest.tztest
       "Encode/decode external inbox message"
       `Quick

@@ -42,14 +42,18 @@ let test_context () =
   return (Incremental.alpha_ctxt v)
 
 let logger =
-  Script_typed_ir.
-    {
-      log_interp = (fun _ _ _ _ _ -> ());
-      log_entry = (fun _ _ _ _ _ -> ());
-      log_exit = (fun _ _ _ _ _ -> ());
-      log_control = (fun _ -> ());
-      get_log = (fun () -> Lwt.return (Ok None));
-    }
+  Script_interpreter_logging.make
+    (module struct
+      let log_interp _ _ _ _ _ = ()
+
+      let log_entry _ _ _ _ _ = ()
+
+      let log_exit _ _ _ _ _ = ()
+
+      let log_control _ = ()
+
+      let get_log () = Lwt.return (Ok None)
+    end)
 
 let run_step ctxt code accu stack =
   let open Script_interpreter in

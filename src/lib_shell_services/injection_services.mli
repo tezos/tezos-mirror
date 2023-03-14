@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_context
+open Tezos_rpc.Context
 
 (** While injecting several operations (see
    {!val:private_operations}), if one injection failed, we have to
@@ -94,7 +94,7 @@ module S : sig
       < async : bool ; force : bool ; chain : Chain_services.chain option >,
       Bytes.t * Operation.t list list,
       Block_hash.t )
-    RPC_service.t
+    Tezos_rpc.Service.t
 
   val operation :
     ( [`POST],
@@ -103,7 +103,7 @@ module S : sig
       < async : bool ; chain : Chain_services.chain option >,
       Bytes.t,
       Operation_hash.t )
-    RPC_service.t
+    Tezos_rpc.Service.t
 
   val private_operation :
     ( [`POST],
@@ -112,7 +112,7 @@ module S : sig
       < async : bool ; chain : Chain_services.chain option >,
       Bytes.t,
       Operation_hash.t )
-    RPC_service.t
+    Tezos_rpc.Service.t
 
   val private_operations :
     ( [`POST],
@@ -121,7 +121,7 @@ module S : sig
       < async : bool ; force : bool ; chain : Chain_services.chain option >,
       Bytes.t list,
       Operation_hash.t list )
-    RPC_service.t
+    Tezos_rpc.Service.t
 
   val protocol :
     ( [`POST],
@@ -130,5 +130,5 @@ module S : sig
       < async : bool >,
       Protocol.t,
       Protocol_hash.t )
-    RPC_service.t
+    Tezos_rpc.Service.t
 end

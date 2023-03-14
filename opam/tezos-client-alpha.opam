@@ -9,6 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
   "ppx_expect"
   "tezos-base"
   "tezos-clic"
@@ -20,12 +21,13 @@ depends: [
   "tezos-signer-backends"
   "tezos-protocol-plugin-alpha"
   "tezos-rpc"
-  "uri" { >= "2.2.0" }
+  "tezos-smart-rollup-alpha"
+  "uri" { >= "3.1.0" }
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-stdlib-unix"
   "tezos-protocol-environment"
   "tezos-mockup"

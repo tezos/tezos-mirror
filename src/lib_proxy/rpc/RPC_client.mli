@@ -31,7 +31,7 @@
       obtains data from endpoints with protocol-dependent RPCs). *)
 class http_local_ctxt :
   Tezos_client_base.Client_context.printer
-  -> RPC_context.generic
+  -> Tezos_rpc.Context.generic
   -> Tezos_proxy.Proxy_services.mode
-  -> Tezos_proxy.Registration.proxy_environment
-  -> RPC_context.generic
+  -> Protocol_hash.t option
+  -> Tezos_rpc.Context.generic

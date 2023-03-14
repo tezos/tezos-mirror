@@ -44,7 +44,7 @@ type t
    aims to be provided for the economic protocol. The other interface,
    called the {!module:Builder} is for the shell.
 
-    A [Verifier], has hinted by the name, mainly needs to check
+    A [Verifier], as hinted by the name, mainly needs to check
    proofs:
 
     1. A proof that a commitment is valid
@@ -61,12 +61,16 @@ type t
 
 type commitment
 
+type commitment_proof
+
 type page_proof
 
 module Verifier :
   VERIFIER
-    with type parameters = parameters
+    with type t = t
+     and type parameters = parameters
      and type commitment = commitment
+     and type commitment_proof = commitment_proof
      and type page_proof = page_proof
 
 include
@@ -74,35 +78,20 @@ include
     with type t := t
      and type parameters := parameters
      and type commitment := commitment
+     and type commitment_proof := commitment_proof
      and type page_proof := page_proof
 
 (** The primitives exposed in this modules require some
    preprocessing. This preprocessing generates data from an unknown
-   secret. For the security of those primtives, it is important that
+   secret. For the security of those primitives, it is important that
    the secret is unknown. *)
 type initialisation_parameters
-
-(** [initialisation_parameters_from_files ~g1_path ~g2_path] allows to
-   load initialisation_parameters from files [g1_path] and
-   [g2_path]. It is important that every time those primitives are
-   used, they are used with the very same initialisation
-   parameters. To ensure this property, an integrity check is run.
-
-   This function can take several seconds to run. *)
-val initialisation_parameters_from_files :
-  g1_path:string ->
-  g2_path:string ->
-  initialisation_parameters Error_monad.tzresult Lwt.t
-
-val load_parameters : initialisation_parameters -> unit Error_monad.tzresult
 
 module Commitment : sig
   include COMMITMENT with type t = commitment
 
   val rpc_arg : commitment Resto.Arg.t
 end
-
-module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
 
 (** A slot is a byte sequence corresponding to some data. *)
 type slot = bytes
@@ -158,8 +147,8 @@ type shard = {index : int; share : share}
 (** An encoding of a share. *)
 val shard_encoding : shard Data_encoding.t
 
-(** An encoding for a map of shares. *)
-val shards_encoding : share IntMap.t Data_encoding.t
+(** [encoded_share_size t] returns the size of a share in byte depending on [t] *)
+val encoded_share_size : t -> int
 
 (** [polynomial_from_shards t shares] computes the original polynomial
      from [shares]. The proportion of shares needed is [1] over
@@ -169,12 +158,12 @@ val shards_encoding : share IntMap.t Data_encoding.t
      can be recomputed. *)
 val polynomial_from_shards :
   t ->
-  share IntMap.t ->
+  shard Seq.t ->
   (polynomial, [> `Invert_zero of string | `Not_enough_shards of string]) result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
      encoding the original [polynomial]. *)
-val shards_from_polynomial : t -> polynomial -> share IntMap.t
+val shards_from_polynomial : t -> polynomial -> shard Seq.t
 
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
@@ -186,9 +175,9 @@ type shard_proof
      the commitment. *)
 val verify_shard : t -> commitment -> shard -> shard_proof -> bool
 
-(** [prove_commitment polynomial] produces a proof that the
-     slot represented by [polynomial] has its size bounded by the
-     maximum slot size. *)
+(** [prove_commitment t polynomial] produces a proof that the
+     slot represented by [polynomial] has its size bounded by
+     [t.slot_size]. *)
 val prove_commitment : t -> polynomial -> commitment_proof
 
 (** [prove_page] produces a proof that the [n]th page computed
@@ -218,7 +207,45 @@ module Internal_for_tests : sig
      from test frameworks where tests with various parameters could be
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
+end
 
-  (** [parameters t] returns the parameters with which [t] was initialized. *)
-  val parameters : t -> parameters
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
+
+   This configuration module is currently used by each process that
+   needs to initialize DAL. Given that in the default case [init_dal]
+   may take several seconds, it would be better to call this function
+   only once. *)
+
+(** node parameters for the DAL. *)
+module Config : sig
+  type t = {
+    activated : bool;
+        (** [true] if the DAL is activated ([false] by default). This may have
+        an impact on the loading time of the node. *)
+    srs_size : int option;
+        (** If [None] (the default), the srs is read from the srs
+        files. This is the value expected for production. For testing
+        purposes, we may want to compute the srs instead but this is
+        unsafe. In that case, a size must be specified. *)
+  }
+
+  val encoding : t Data_encoding.t
+
+  (** The default configuration is [{activated = false; srs_size = None}]. *)
+  val default : t
+
+  (** [init_dal find_trusted_setup_files config] initializes the DAL
+     according to the dal configuration [config].
+
+      When [config.srs_size = None], [init_dal] loads
+     [initialisation_parameters] from the files at the paths provided
+     by [find_trusted_setup_files ()]. It is important that every time
+     the primitives above are used, they are used with the very same
+     initialization parameters. (To ensure this property, an integrity
+     check is run.) In this case, [init_dal] can take several seconds
+     to run. *)
+  val init_dal :
+    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+    t ->
+    unit Error_monad.tzresult Lwt.t
 end

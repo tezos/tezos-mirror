@@ -41,15 +41,13 @@ let handle_python_error msg closure =
       Stdlib.failwith s
 
 let pyinit () =
-  let interpreter =
-    if Sys.file_exists "venv/bin/python3" then "venv/bin/python3"
-    else if Sys.file_exists "/usr/bin/python3" then "/usr/bin/python3"
-    else Stdlib.failwith "python3 interpreter not found"
-  in
   if not (Py.is_initialized ()) then (
-    Printf.eprintf "Initializing python... " ;
-    Py.initialize ~interpreter ~version:3 () ;
-    Printf.eprintf "Done.\n%!")
+    Printf.eprintf "Initializing python... \n%!" ;
+    Py.initialize ~version:3 () ;
+    Format.eprintf
+      "Python library used: (%a)\n%!"
+      Format.(pp_print_option pp_print_string)
+      (Py.get_library_filename ()))
 
 let numpy () =
   pyinit () ;
@@ -65,3 +63,24 @@ let scipy_optimize () =
   pyinit () ;
   handle_python_error "While initializing scipy.optimize" @@ fun () ->
   Py.Import.import_module "scipy.optimize"
+
+let sklearn_metrics () =
+  pyinit () ;
+  handle_python_error "While initializing sklearn.metrics" @@ fun () ->
+  Py.Import.import_module "sklearn.metrics"
+
+let%expect_test "pyinit can be called twice without failing" =
+  (* Paths are environment specific, do not leak into tests *)
+  let discard_python_path str =
+    let re = Str.regexp {|\(Python library used:\).*|} in
+    Str.replace_first re {|\1REPLACED_FOR_TEST|} str
+  in
+  pyinit () ;
+  [%expect.output] |> discard_python_path |> print_endline ;
+  [%expect
+    {|
+      Initializing python...
+      Python library used:REPLACED_FOR_TEST|}] ;
+  (* Second run is empty, but no failure *)
+  pyinit () ;
+  [%expect {| |}]

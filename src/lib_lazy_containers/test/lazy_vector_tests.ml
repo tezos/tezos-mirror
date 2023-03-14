@@ -164,11 +164,93 @@ let concat_works () =
   and+ () = lwt_check (-1) (IntVector.get 3 map) in
   ()
 
+let drop_works =
+  Test.make
+    ~name:"drop works"
+    Gen.(gen int)
+    (fun map ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@ Lwt.catch
+           (fun () ->
+             let map_with_drop = IntVector.drop map in
+             let* value, map_with_pop = IntVector.pop map in
+             let* value_0_from_map = IntVector.get 0 map in
+             let check_value_dropped = value = value_0_from_map in
+             let check_map_size =
+               IntVector.num_elements map
+               = IntVector.num_elements map_with_drop + 1
+               && IntVector.num_elements map_with_drop
+                  = IntVector.num_elements map_with_pop
+             in
+             let iterable_list =
+               List.init (IntVector.num_elements map_with_drop) Fun.id
+             in
+             let* check_dropped_vector =
+               Lwt_list.for_all_p (fun i ->
+                   let+ x = IntVector.get i map_with_drop
+                   and+ y = IntVector.get (i + 1) map in
+                   x = y)
+               @@ iterable_list
+             in
+             let+ check_dropped_equal_popped =
+               Lwt_list.for_all_p (fun i ->
+                   let+ x = IntVector.get i map_with_drop
+                   and+ y = IntVector.get i map_with_pop in
+                   x = y)
+               @@ iterable_list
+             in
+             check_value_dropped && check_map_size && check_dropped_vector
+             && check_dropped_equal_popped)
+           (function
+             | Bounds -> Lwt.return (IntVector.num_elements map = 0)
+             | _ -> Lwt.return false))
+
+let check_overflow () =
+  let open Lwt.Syntax in
+  let expect_size_overflow f =
+    Lwt.catch
+      (fun () ->
+        let+ () = f () in
+        failwith "This test should have overflown, but didn't.")
+      (function SizeOverflow -> Lwt.return_unit | exn -> raise exn)
+  in
+  (* Creates a vector of the maximum size possible (2^63) *)
+  let v = IntVector.create (-1) in
+  (* Unfortunately, we cannot put the previous QCheck tests into the Lwt monad
+     to be runned by Alcotest_lwt, since they use `Lwt_main.run` themselves. As
+     such, we directly run the monad in the test. *)
+  Lwt_main.run
+    ((* Check overflow on cons *)
+     let* () =
+       expect_size_overflow (fun () ->
+           let _ = IntVector.cons 0 v in
+           Lwt.return_unit)
+     in
+     (* Check overflow on grow *)
+     let* () =
+       expect_size_overflow (fun () ->
+           let _ = IntVector.grow 1 v in
+           Lwt.return_unit)
+     in
+     (* Check overflow on append *)
+     let* () =
+       expect_size_overflow (fun () ->
+           let _ = IntVector.append 1 v in
+           Lwt.return_unit)
+     in
+     (* Check overflow on concat *)
+     expect_size_overflow (fun () ->
+         let _ = IntVector.concat v v in
+         Lwt.return_unit))
+
 let tests =
   [
     to_alcotest of_list_constructs_correctly;
     to_alcotest create_constructs_correctly;
     to_alcotest grow_works;
     to_alcotest cons_works;
+    to_alcotest drop_works;
     ("concat works lazily", `Quick, concat_works);
+    ("check size overflow", `Quick, check_overflow);
   ]
