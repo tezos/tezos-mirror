@@ -133,17 +133,6 @@ let select_ops db_pool level =
        o.endorser = d.id AND e.delegate = d.id WHERE o.level = ? AND e.level = \
        ?"
   in
-  let parse_included_row
-      ((address, alias, power), (endorsement, round, block_hash)) =
-    ( address,
-      alias,
-      power,
-      (match endorsement with
-      | false -> Consensus_ops.Preendorsement
-      | true -> Consensus_ops.Endorsement),
-      round,
-      block_hash )
-  in
   let q_received =
     Caqti_request.Infix.(
       Caqti_type.(tup2 int32 int32)
@@ -157,25 +146,16 @@ let select_ops db_pool level =
        o.endorser = d.id AND e.delegate = d.id WHERE o.level = ? AND e.level = \
        ?"
   in
-  let parse_received_row
-      ((address, alias, power, timestamp), (errors, endorsement, round)) =
-    ( address,
-      alias,
-      power,
-      timestamp,
-      errors,
-      (match endorsement with
-      | false -> Consensus_ops.Preendorsement
-      | true -> Consensus_ops.Endorsement),
-      round )
-  in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
   let cb_missing (delegate, alias, power) info =
     Ops.add delegate (alias, power, Pkh_ops.empty) info
   in
-  let cb_included r info =
-    let delegate, alias, power, kind, round, block_hash =
-      parse_included_row r
+  let cb_included ((delegate, alias, power), (endorsement, round, block_hash))
+      info =
+    let kind =
+      match endorsement with
+      | false -> Consensus_ops.Preendorsement
+      | true -> Consensus_ops.Endorsement
     in
     match Ops.find_opt delegate info with
     | Some (alias, power, ops) ->
@@ -194,9 +174,13 @@ let select_ops db_pool level =
         let ops = Pkh_ops.singleton op_key op_info in
         Ops.add delegate (alias, power, ops) info
   in
-  let cb_received r info =
-    let delegate, alias, power, reception_time, errors, kind, round =
-      parse_received_row r
+  let cb_received
+      ((delegate, alias, power, reception_time), (errors, endorsement, round))
+      info =
+    let kind =
+      match endorsement with
+      | false -> Consensus_ops.Preendorsement
+      | true -> Consensus_ops.Endorsement
     in
     let received_info = {reception_time; errors} in
     match Ops.find_opt delegate info with
