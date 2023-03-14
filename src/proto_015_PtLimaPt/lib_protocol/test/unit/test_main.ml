@@ -49,42 +49,49 @@ let () =
   Alcotest_lwt.run
     "protocol > unit"
     [
-      Unit_test.spec "Alpha_context.ml" Test_alpha_context.tests;
-      Unit_test.spec "Raw_level_repr.ml" Test_raw_level_repr.tests;
-      Unit_test.skip "Raw_level_repr.ml" Test_raw_level_repr.skipped_tests;
-      Unit_test.spec "Tez_repr.ml" Test_tez_repr.tests;
-      Unit_test.spec "Contract_repr.ml" Test_contract_repr.tests;
-      Unit_test.spec "Destination_repr.ml" Test_destination_repr.tests;
-      Unit_test.spec "Operation_repr.ml" Test_operation_repr.tests;
+      Unit_test.spec (Protocol.name ^ ": Tez_repr.ml") Test_tez_repr.tests;
       Unit_test.spec
-        "Global_constants_storage.ml"
+        (Protocol.name ^ ": Contract_repr.ml")
+        Test_contract_repr.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": Destination_repr.ml")
+        Test_destination_repr.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": Operation_repr.ml")
+        Test_operation_repr.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": Global_constants_storage.ml")
         Test_global_constants_storage.tests;
-      Unit_test.spec "fitness" Test_fitness.tests;
-      Unit_test.spec "fixed point computation" Test_fixed_point.tests;
-      Unit_test.spec "level module" Test_level_module.tests;
-      Unit_test.spec "qty" Test_qty.tests;
-      Unit_test.spec "round" Test_round_repr.tests;
-      Unit_test.spec "time" Test_time_repr.tests;
-      Unit_test.spec "receipt encodings" Test_receipt.tests;
-      Unit_test.spec "saturation arithmetic" Test_saturation.tests;
-      Unit_test.spec "gas monad" Test_gas_monad.tests;
-      Unit_test.spec "sc rollup storage" Test_sc_rollup_storage.tests;
-      Unit_test.spec "sc rollup game" Test_sc_rollup_game.tests;
-      Unit_test.spec "tx rollup l2" Test_tx_rollup_l2.tests;
-      Unit_test.spec "tx rollup l2 apply" Test_tx_rollup_l2_apply.tests;
-      Unit_test.spec "liquidity baking" Test_liquidity_baking_repr.tests;
-      Unit_test.spec "sc rollup wasm" Test_sc_rollup_wasm.tests;
-      Unit_test.spec "sc rollup arith" Test_sc_rollup_arith.tests;
-      Unit_test.spec "merkle list" Test_merkle_list.tests;
-      Unit_test.spec "sc rollup inbox" Test_sc_rollup_inbox.tests;
-      Unit_test.spec "skip list" Test_skip_list_repr.tests;
+      Unit_test.spec (Protocol.name ^ ": fitness") Test_fitness.tests;
       Unit_test.spec
-        "sc rollup management protocol"
-        Test_sc_rollup_management_protocol.tests;
-      Unit_test.spec "Bond_id_repr.ml" Test_bond_id_repr.tests;
-      Unit_test.spec "zk rollup storage" Test_zk_rollup_storage.tests;
-      Unit_test.spec "Delegate_consensus_key.ml" Test_consensus_key.tests;
-      Unit_test.spec "local_contexts" Test_local_contexts.tests;
-      Unit_test.spec "dal slot proof" Test_dal_slot_proof.tests;
+        (Protocol.name ^ ": fixed point computation")
+        Test_fixed_point.tests;
+      Unit_test.spec (Protocol.name ^ ": level module") Test_level_module.tests;
+      Unit_test.spec (Protocol.name ^ ": qty") Test_qty.tests;
+      Unit_test.spec (Protocol.name ^ ": round") Test_round_repr.tests;
+      Unit_test.spec (Protocol.name ^ ": time") Test_time_repr.tests;
+      Unit_test.spec (Protocol.name ^ ": receipt encodings") Test_receipt.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": saturation arithmetic")
+        Test_saturation.tests;
+      Unit_test.spec (Protocol.name ^ ": gas monad") Test_gas_monad.tests;
+      Unit_test.spec (Protocol.name ^ ": tx rollup l2") Test_tx_rollup_l2.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": tx rollup l2 apply")
+        Test_tx_rollup_l2_apply.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": liquidity baking")
+        Test_liquidity_baking_repr.tests;
+      Unit_test.spec (Protocol.name ^ ": merkle list") Test_merkle_list.tests;
+      Unit_test.spec (Protocol.name ^ ": skip list") Test_skip_list_repr.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": Bond_id_repr.ml")
+        Test_bond_id_repr.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": zk rollup storage")
+        Test_zk_rollup_storage.tests;
+      Unit_test.spec
+        (Protocol.name ^ ": Delegate_consensus_key.ml")
+        Test_consensus_key.tests;
     ]
   |> Lwt_main.run

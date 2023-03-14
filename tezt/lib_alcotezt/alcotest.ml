@@ -71,6 +71,8 @@ let pp (type a) (t : a testable) =
   let module T = (val t) in
   T.pp
 
+let of_pp pp = testable pp ( = )
+
 let equal (type a) (t : a testable) =
   let module T = (val t) in
   T.equal
