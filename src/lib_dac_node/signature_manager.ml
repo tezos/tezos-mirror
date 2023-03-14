@@ -373,27 +373,12 @@ module Coordinator = struct
       return ()
     else return ()
 
-  let handle_put_dac_member_signature ctx cctxt committee_member_signature =
+  let handle_put_dac_member_signature get_committee_members ctx dac_plugin
+      certificate_streamers_opt rw_node_store page_store cctxt
+      committee_member_signature =
+    let committee_members = get_committee_members ctx in
     let open Lwt_result_syntax in
-    let* certificate_streamers_opt =
-      match Node_context.mode ctx with
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5292
-                  Make type non optional when Legacy mode has been removed. *)
-      | Node_context.Coordinator {certificate_streamers; _} ->
-          return @@ Some certificate_streamers
-      | Legacy _ -> return None
-      | _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5370
-             This line will never be executed as
-             [handle_put_dac_member_signature] is only invoked when the
-             DAC node is running in either coordinator or legacy mode.
-          *)
-          failwith "Operation not supported for operating mode"
-    in
-    let*? dac_plugin = Node_context.get_dac_plugin ctx in
-    let page_store = Node_context.get_page_store ctx in
-    let*? committee_members = Node_context.get_committee_members ctx in
-    let rw_node_store = Node_context.get_node_store ctx Store_sigs.Read_write in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let Signature_repr.{root_hash; _} = committee_member_signature in
     let* () =
       check_coordinator_knows_root_hash dac_plugin page_store root_hash

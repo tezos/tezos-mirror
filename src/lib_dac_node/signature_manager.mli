@@ -65,19 +65,24 @@ val verify :
 module Coordinator : sig
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
      Verify that root hash is one that the coordinator has *)
-  (** [handle_put_dac_member_signature ctxt cctxt dac_members_pkh dac_member_signature]
-      does the following procedure:
+  (** [handle_put_dac_member_signature dac_plugin ro_store rw_store page_store
+      cctxt dac_members_pkh dac_member_signature] does the following procedure:
       1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
-      1. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
-      2. Checks that the dac member has not yet signed. If already signed, then noop
+      2. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
+      3. Checks that the dac member has not yet signed. If already signed, then noop
          and return.
-      3. Otherwise:
+      4. Otherwise:
         1. Verify the signature against the root hash and signer's public key.
         2. Add signature to [Signature_store]
         3. Update the aggregate signature in [Aggregate_signature_store]
   *)
   val handle_put_dac_member_signature :
-    Node_context.t ->
+    ('a -> Tezos_crypto.Aggregate_signature.public_key_hash list) ->
+    'a ->
+    Dac_plugin.t ->
+    Certificate_streamers.t option ->
+    Store_sigs.rw Store.Irmin_store.t ->
+    Page_store.Filesystem.t ->
     #Client_context.wallet ->
     Signature_repr.t ->
     unit tzresult Lwt.t
