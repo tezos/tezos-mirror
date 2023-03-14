@@ -176,12 +176,11 @@ fn store_code_hash<Host: Runtime + RawRollupCore>(
 pub fn store_account<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account: Account,
-    address: Hash,
+    account_path: &OwnedPath,
 ) -> Result<(), Error> {
-    let account_path = account_path(address)?;
-    store_nonce(host, &account_path, account.nonce)?;
-    store_balance(host, &account_path, account.balance)?;
-    store_code_hash(host, &account_path, &account.code_hash)
+    store_nonce(host, account_path, account.nonce)?;
+    store_balance(host, account_path, account.balance)?;
+    store_code_hash(host, account_path, &account.code_hash)
 }
 
 pub fn read_current_block_number<Host: Runtime + RawRollupCore>(

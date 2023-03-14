@@ -62,7 +62,7 @@ pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Resu
 
         let mock_account = Account::default_account(balance);
 
-        store_account(host, mock_account, &hash)?
+        store_account(host, mock_account, &path)?
     };
     Ok(())
 }
