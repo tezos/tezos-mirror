@@ -484,9 +484,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IOpt_map : {
       loc : Script.location;
       body : ('a, 'S, 'b, 'S) kinstr;
-      k : ('b option, 'S, 'c, 'T) kinstr;
+      k : ('b option, 'S, 'c, 'F) kinstr;
     }
-      -> ('a option, 'S, 'c, 'T) kinstr
+      -> ('a option, 'S, 'c, 'F) kinstr
   (*
      Ors
      ------
@@ -800,9 +800,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       loc : Script.location;
-      branch_if_true : ('a, 'S, 'b, 'U) kinstr;
-      branch_if_false : ('a, 'S, 'b, 'U) kinstr;
-      k : ('b, 'U, 'r, 'F) kinstr;
+      branch_if_true : ('a, 'S, 'b, 'T) kinstr;
+      branch_if_false : ('a, 'S, 'b, 'T) kinstr;
+      k : ('b, 'T, 'r, 'F) kinstr;
     }
       -> (bool, 'a * 'S, 'r, 'F) kinstr
   | ILoop :
@@ -1861,11 +1861,11 @@ val chest_t : (Script_timelock.chest, no) ty
 
 *)
 type 'a kinstr_traverse = {
-  apply : 'b 'U 'r 'F. 'a -> ('b, 'U, 'r, 'F) kinstr -> 'a;
+  apply : 'b 'S 'r 'F. 'a -> ('b, 'S, 'r, 'F) kinstr -> 'a;
 }
 
 val kinstr_traverse :
-  ('a, 'b, 'c, 'd) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
+  ('a, 'S, 'c, 'F) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
 
 type 'a ty_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a}
 
