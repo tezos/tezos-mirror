@@ -27,67 +27,7 @@ open Tezos_gossipsub
 open Gossipsub_intf
 open Tezt
 open Tezt_core.Base
-
-module Automaton_config :
-  AUTOMATON_CONFIG
-    with type Time.t = int
-     and type Span.t = int
-     and type Peer.t = int
-     and type Topic.t = string
-     and type Message_id.t = int
-     and type Message.t = int = struct
-  module Span = struct
-    type t = int
-
-    let pp = Format.pp_print_int
-  end
-
-  module Time = struct
-    type span = Span.t
-
-    let pp = Format.pp_print_int
-
-    let now =
-      let cpt = ref (-1) in
-      fun () ->
-        incr cpt ;
-        !cpt
-
-    let add = ( + )
-
-    let sub = ( - )
-
-    let mul_span = ( * )
-
-    include Compare.Int
-  end
-
-  module Int_iterable = struct
-    include Compare.Int
-
-    let pp = Format.pp_print_int
-
-    module Map = Map.Make (Int)
-    module Set = Set.Make (Int)
-  end
-
-  module String_iterable = struct
-    include Compare.String
-
-    let pp = Format.pp_print_string
-
-    module Map = Map.Make (String)
-    module Set = Set.Make (String)
-  end
-
-  module Peer = Int_iterable
-  module Topic = String_iterable
-  module Message_id = Int_iterable
-  module Message = Int_iterable
-end
-
-module C = Automaton_config
-module GS = Make (C)
+open Test_gossipsub_shared
 
 (* Most of these limits are the default ones used by the Go implementation. *)
 let default_limits =
