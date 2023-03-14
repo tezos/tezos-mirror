@@ -11,7 +11,7 @@ use host::runtime::Runtime;
 
 use crate::helpers::ensures;
 
-use tezos_ethereum::eth_gen::{RawTransaction, TransactionHash};
+use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
 
 pub struct Transaction {
     pub level: i32,

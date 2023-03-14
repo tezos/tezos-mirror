@@ -13,9 +13,9 @@ use host::runtime::Runtime;
 
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::{
-    BlockHash, L2Level, OwnedHash, Quantity, RawTransaction, TransactionHash, BLOCK_HASH_SIZE,
-};
+use tezos_ethereum::eth_gen::{BlockHash, L2Level, OwnedHash, Quantity, BLOCK_HASH_SIZE};
+use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
+
 use tezos_ethereum::wei::Wei;
 
 use debug::debug_msg;

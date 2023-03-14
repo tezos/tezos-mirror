@@ -12,7 +12,8 @@ use std::str::from_utf8;
 use crate::block::L2Block;
 use crate::error::Error;
 use tezos_ethereum::account::*;
-use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level, TransactionHash, TRANSACTION_HASH_SIZE};
+use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level};
+use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::U256;
