@@ -343,47 +343,11 @@ module Make (C : CONFIGURATION) :
   *)
 
   module Monad = struct
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/5013
+    type 'a t = (state, 'a) State_monad.t
 
-       This module could be put outside of the `Make` functor.
-    *)
-    type 'a t = state -> state * 'a
+    type ('pass, 'fail) check = (state, 'pass, 'fail) State_monad.check
 
-    type 'c check = [`Pass of 'a | `Fail of 'b] t
-      constraint 'c = < pass : 'a ; fail : 'b >
-
-    let bind m f state =
-      let state, res = m state in
-      f res state
-
-    let get p f state =
-      let res = p state in
-      f res state
-
-    let return x state = (state, x)
-
-    let check c f =
-      bind c (function `Pass res -> f res | `Fail output -> return output)
-
-    let return_pass x = `Pass x |> return
-
-    let return_fail x = `Fail x |> return
-
-    module Syntax = struct
-      let ( let* ) = bind
-
-      let ( let*? ) = check
-
-      let ( let*! ) = get
-
-      let return = return
-
-      let pass = return_pass
-
-      let unit = pass ()
-
-      let fail = return_fail
-    end
+    include State_monad.M
   end
 
   let make : Random.State.t -> limits -> parameters -> state =
@@ -905,8 +869,7 @@ module Make (C : CONFIGURATION) :
     Publish.handle
 
   module Join = struct
-    let check_is_not_subscribed topic :
-        < fail : [`Join] output ; pass : unit > Monad.check =
+    let check_is_not_subscribed topic : (unit, [`Join] output) Monad.check =
       let open Monad.Syntax in
       let*! mesh in
       match Topic.Map.find topic mesh with
@@ -971,8 +934,7 @@ module Make (C : CONFIGURATION) :
   module Leave = struct
     type mesh = Peer.Set.t
 
-    let check_already_subscribed topic :
-        < fail : [`Leave] output ; pass : mesh > Monad.check =
+    let check_already_subscribed topic : (mesh, [`Leave] output) Monad.check =
       let open Monad.Syntax in
       let*! mesh in
       match Topic.Map.find topic mesh with
