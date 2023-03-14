@@ -1241,7 +1241,7 @@ let octez_plonk_distribution =
     ~deps:[octez_plonk; octez_plonk_aggregation]
     ~preprocess:[pps ppx_repr]
 
-let _octez_plonk_test_helpers =
+let octez_plonk_test_helpers =
   public_lib
     "octez-plonk.plonk-test"
     ~path:"src/lib_plonk/test"
@@ -1249,6 +1249,71 @@ let _octez_plonk_test_helpers =
     ~deps:[octez_plonk; octez_plonk_aggregation; octez_plonk_distribution]
     ~modules:["helpers"; "cases"]
     ~preprocess:[pps ppx_repr]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-plonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
+let _octez_plonk_test_helpers_main =
+  private_exe
+    "main"
+    ~path:"src/lib_plonk/test"
+    ~opam:"octez-plonk"
+    ~modules:
+      [
+        "main";
+        "test_circuit";
+        "test_evaluations";
+        "test_main_protocol";
+        "test_pack";
+        "test_permutations";
+        "test_plookup";
+        "test_polynomial_commitment";
+        "test_polynomial_protocol";
+        "test_range_checks";
+        "test_utils";
+      ]
+    ~bisect_ppx:No
+    ~deps:
+      [
+        octez_plonk_test_helpers;
+        qcheck_alcotest;
+        octez_bls12_381_polynomial |> open_;
+      ]
 
 let _octez_srs_extraction_tests =
   tests
