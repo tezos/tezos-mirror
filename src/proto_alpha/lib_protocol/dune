@@ -142,6 +142,7 @@
   Lazy_storage_kind
   Receipt_repr
   Migration_repr
+  Stake_repr
   Carbonated_map_costs
   Carbonated_map
   Raw_context_intf
@@ -420,6 +421,7 @@
   lazy_storage_kind.ml lazy_storage_kind.mli
   receipt_repr.ml receipt_repr.mli
   migration_repr.ml migration_repr.mli
+  stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   raw_context_intf.ml
@@ -700,6 +702,7 @@
   lazy_storage_kind.ml lazy_storage_kind.mli
   receipt_repr.ml receipt_repr.mli
   migration_repr.ml migration_repr.mli
+  stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   raw_context_intf.ml
@@ -964,6 +967,7 @@
   lazy_storage_kind.ml lazy_storage_kind.mli
   receipt_repr.ml receipt_repr.mli
   migration_repr.ml migration_repr.mli
+  stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   raw_context_intf.ml
