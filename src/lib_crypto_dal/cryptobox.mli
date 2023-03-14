@@ -103,6 +103,17 @@ type page_proof
 
 type ('a, 'b) error_container = {given : 'a; expected : 'b}
 
+open Error_monad
+
+(** [Dal_initialisation_twice], thrown by {!Config.init_dal}. *)
+type error += Dal_initialisation_twice
+
+(** [Failed_to_load_trusted_setup], thrown by {!Config.init_dal}. *)
+type error += Failed_to_load_trusted_setup of string
+
+(** [Invalid_precomputation_hash], thrown by {!load_precompute_shards_proofs}. *)
+type error += Invalid_precomputation_hash of (string, string) error_container
+
 module Verifier :
   VERIFIER
     with type t = t
@@ -276,8 +287,9 @@ type shard_proof
     Ensures:
     - [verify_shard t commitment shard proof = Ok ()] if
     and only if
-    [Array.mem shard (shards_from_polynomial t polynomial])
-    [proof = (prove_shards t polynomial).(shard.index)],
+    [Array.mem shard (shards_from_polynomial t polynomial]),
+    [precomputation = precompute_shards_proofs t],
+    [proof = (prove_shards t ~precomputation ~polynomial).(shard.index)],
     and [commitment = commit t p]. *)
 val verify_shard :
   t ->
@@ -333,23 +345,65 @@ val prove_page :
     | `Segment_index_out_of_range ] )
   Result.t
 
-(** [prove_shards t polynomial] produces [number_of_shards] proofs
-    (π_0, ..., π_{number_of_shards}) for the elements of
-    [polynomial_from_shards polynomial] where [number_of_shards]
-    is declared in [t].
+(** The precomputation used to produce shard proofs. *)
+type shards_proofs_precomputation
 
-    Requires:
-    - [polynomial = polynomial_from_slot t s] for some slot [s] and the
-    same value [t] used in [prove_shards]. Since the caller of [prove_shards]
-    knows [polynomial], it is its responsibility to enforce this requirement.
+val shards_proofs_precomputation_encoding :
+  shards_proofs_precomputation Data_encoding.t
 
-    Ensures:
-    - [verify_shard t commitment shard proof = Ok ()] if
-    and only if
-    [Array.mem shard (shards_from_polynomial t polynomial])
-    [proof = (prove_shards t polynomial).(shard.index)],
-    and [commitment = commit t polynomial]. *)
-val prove_shards : t -> polynomial -> shard_proof array
+(** [precomputation_shard_proofs t] returns the precomputation used to
+   produce shard proofs. *)
+val precompute_shards_proofs : t -> shards_proofs_precomputation
+
+(** [save_precompute_shards_proofs precomputation ~filename] saves the
+   given [precomputation] to disk with the given [filename]. *)
+val save_precompute_shards_proofs :
+  shards_proofs_precomputation ->
+  filename:string ->
+  unit Error_monad.tzresult Lwt.t
+
+(** [load_precompute_shards_proofs ~hash ~filename ()] loads the precomputation
+    from disk from the given [filename]. If [hash] is not [None], an integrity
+    check of the retrieved precomputation is performed.
+
+    Returns the error {!type:Invalid_precomputation_hash} if the integrity check fails. *)
+val load_precompute_shards_proofs :
+  hash:Tezos_crypto.Blake2B.t option ->
+  filename:string ->
+  unit ->
+  shards_proofs_precomputation Error_monad.tzresult Lwt.t
+
+(** [hash_precomputation precomputation] returns the {!Tezos_crypto.Blake2B.t}
+    hash of the {!Data_encoding.t} value of [precomputation].
+
+    @raises a {!Data_encoding.Binary.Write_error} if [precomputation] can't be
+    serialized to a value {!val:shards_proofs_precomputation_encoding}. *)
+val hash_precomputation : shards_proofs_precomputation -> Tezos_crypto.Blake2B.t
+
+(** [prove_shards t ~precomputation ~polynomial] produces
+   [number_of_shards] proofs (π_0, ..., π_{number_of_shards - 1}) for the elements
+   of [polynomial_from_shards polynomial] (where [number_of_shards]
+   is declared in [t]) using the [precomputation].
+
+   Requires:
+   - [polynomial = polynomial_from_slot t s] for some slot [s] and the
+   same value [t] used in [prove_shards]. Since the caller of [prove_shards]
+   knows [polynomial], it is its responsibility to enforce this requirement.
+   - [precomputation = precompute_shards_proofs t] with the same value [t]
+   used in [prove_shards]. There is no way for this function to check that
+   the [precomputation] is correct since it doesn't compute it.
+
+   Ensures:
+   - [verify_shard t commitment shard proof = Ok ()] if
+   and only if
+   [Array.mem shard (shards_from_polynomial t polynomial])
+   [proof = (prove_shards t polynomial).(shard.index)],
+   and [commitment = commit t polynomial]. *)
+val prove_shards :
+  t ->
+  precomputation:shards_proofs_precomputation ->
+  polynomial:polynomial ->
+  shard_proof array
 
 module Internal_for_tests : sig
   (** The initialisation parameters can be too large for testing
@@ -365,38 +419,52 @@ module Internal_for_tests : sig
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
 
-  (* Returns a randomized valid sequence of shards using the random state
+  (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
   val make_dummy_shards : t -> state:Random.State.t -> shard Seq.t
 
-  (* [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
+  (** [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
      represent the same polynomial. *)
   val polynomials_equal : polynomial -> polynomial -> bool
 
-  (* [page_proof_equal proof1 proof2] returns true if and only if [proof1]
+  (** [page_proof_equal proof1 proof2] returns true if and only if [proof1]
      and [proof2] represent the same proof. *)
   val page_proof_equal : page_proof -> page_proof -> bool
 
-  (* [alter_page_proof page_proof] returns a different page proof than the
+  (** [alter_page_proof page_proof] returns a different page proof than the
      input. *)
   val alter_page_proof : page_proof -> page_proof
 
-  (* [alter_shard_proof shard_proof] returns a different shard proof than
+  (** [alter_shard_proof shard_proof] returns a different shard proof than
      the input. *)
   val alter_shard_proof : shard_proof -> shard_proof
 
-  (* [alter_commitment_proof commitment_proof] returns a different commitment
+  (** [alter_commitment_proof commitment_proof] returns a different commitment
      proof than the input. *)
   val alter_commitment_proof : commitment_proof -> commitment_proof
 
-  (* [length_of_share t] returns the shard_length for the given parameters [t]. *)
-  val length_of_share : t -> int
-
-  (* [minimum_number_of_shards_to_reconstruct_slot t] returns the minimum
+  (** [minimum_number_of_shards_to_reconstruct_slot t] returns the minimum
      number of shards to reconstruct a slot using [polynomial_from_shards]. *)
   val minimum_number_of_shards_to_reconstruct_slot : t -> int
 
-  (* [select_fft_domain domain_size] selects a suitable domain for the FFT.
+  val dummy_commitment : state:Random.State.t -> unit -> commitment
+
+  val dummy_page_proof : state:Random.State.t -> unit -> page_proof
+
+  val dummy_shard_proof : state:Random.State.t -> unit -> shard_proof
+
+  val make_dummy_shard :
+    state:Random.State.t -> index:int -> length:int -> shard
+
+  val number_of_pages : t -> int
+
+  val shard_length : t -> int
+
+  val dummy_polynomial : state:Random.State.t -> degree:int -> polynomial
+
+  val srs_size_g1 : t -> int
+
+  (** [select_fft_domain domain_size] selects a suitable domain for the FFT.
 
      The domain size [domain_size] is expected to be strictly positive.
      Return [(size, power_of_two, remainder)] such that:
@@ -408,7 +476,14 @@ module Internal_for_tests : sig
      and [remainder] is not divisible by 2. *)
   val select_fft_domain : int -> int * int * int
 
-  (* [ensure_validity parameters] returns true if the [parameters] are valid.
+  val precomputation_equal :
+    shards_proofs_precomputation -> shards_proofs_precomputation -> bool
+
+  val reset_initialisation_parameters : unit -> unit
+
+  val encoded_share_size : t -> int
+
+  (** [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
 end
@@ -441,8 +516,10 @@ module Config : sig
       [{activated = false; use_mock_srs_for_testing = None}]. *)
   val default : t
 
-  (** [init_dal find_trusted_setup_files config] initializes the DAL
-     according to the dal configuration [config].
+  (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the
+     DAL according to the dal configuration [config], a function to find the SRS
+     files [find_trusted_setup_files] and the optional log2 of the SRS size
+     [srs_size_log2].
 
       When [config.use_mock_srs_for_testing = None],
      [init_dal] loads [initialisation_parameters] from the files at the
@@ -453,6 +530,7 @@ module Config : sig
      to run. *)
   val init_dal :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+    ?srs_size_log2:int ->
     t ->
     unit Error_monad.tzresult Lwt.t
 end

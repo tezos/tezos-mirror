@@ -43,6 +43,7 @@ let () =
     (function
       | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
     (fun parameter -> Failed_to_load_trusted_setup parameter)
+  [@@coverage off]
 
 type initialisation_parameters = {srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
 
@@ -50,6 +51,19 @@ type initialisation_parameters = {srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
 let initialisation_parameters = ref None
 
 type error += Dal_initialisation_twice
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.initialisation_twice"
+    ~title:"Initialisation_twice"
+    ~description:"DAL parameters were initialised twice"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "DAL parameters were initialised twice")
+    Data_encoding.empty
+    (function Dal_initialisation_twice -> Some () | _ -> None)
+    (function () -> Dal_initialisation_twice)
+  [@@coverage off]
 
 (* This function is expected to be called once. *)
 let load_parameters parameters =
@@ -64,36 +78,46 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 
-let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path =
+let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path
+    ~srs_size_log2 =
   let open Lwt_result_syntax in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
-
-     The `21` constant is the logarithmic size of the file. Can this
-     constant be recomputed? Even though it should be determined by
-     the integrity check. *)
-  let logarithmic_size = 21 in
-  let to_bigstring path =
+  let len = 1 lsl srs_size_log2 in
+  let to_bigstring ~path =
     let open Lwt_syntax in
     let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
     Lwt.finalize
       (fun () ->
         return
-          (Lwt_bytes.map_file
-             ~fd:(Lwt_unix.unix_file_descr fd)
-             ~shared:false
-             ~size:(1 lsl logarithmic_size)
-             ()))
+          (match
+             Lwt_bytes.map_file
+               ~fd:(Lwt_unix.unix_file_descr fd)
+               ~shared:false
+               ()
+           with
+          | exception Unix.Unix_error (error_code, function_name, _) ->
+              Error
+                [
+                  Failed_to_load_trusted_setup
+                    (Format.sprintf
+                       "%s: Unix.Unix_error: %s"
+                       function_name
+                       (Unix.error_message error_code));
+                ]
+          | exception e ->
+              Error [Failed_to_load_trusted_setup (Printexc.to_string e)]
+          | res -> Ok res))
       (fun () -> Lwt_unix.close fd)
   in
-  let*! srs_g1_bigstring = to_bigstring srs_g1_path in
-  let*! srs_g2_bigstring = to_bigstring srs_g2_path in
+  let* srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
+  let* srs_g2_bigstring = to_bigstring ~path:srs_g2_path in
   match
     let open Result_syntax in
-    let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring in
-    let* srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring in
+    let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring ~len in
+    let* srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring ~len in
     return (srs_g1, srs_g2)
   with
-  | Error (`End_of_file s) -> tzfail (Failed_to_load_trusted_setup s)
+  | Error (`End_of_file s) ->
+      tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
   | Error (`Invalid_point p) ->
       tzfail
         (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
@@ -141,7 +165,9 @@ module Inner = struct
 
   type shard = {index : int; share : share}
 
-  type shards_proofs_precomputation = Scalar.t array * page_proof array array
+  type shards_proofs_precomputation = scalar array * shard_proof array array
+
+  type ('a, 'b) error_container = {given : 'a; expected : 'b}
 
   module Encoding = struct
     open Data_encoding
@@ -170,9 +196,17 @@ module Inner = struct
         (fun {index; share} -> (index, share))
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
+      [@@coverage off]
 
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
+
+    let error_container_encoding (given_encoding : 'a encoding)
+        (expected_encoding : 'b encoding) : ('a, 'b) error_container encoding =
+      conv
+        (fun {given; expected} -> (given, expected))
+        (fun (given, expected) -> {given; expected})
+        (obj2 (req "given" given_encoding) (req "expected" expected_encoding))
   end
 
   include Encoding
@@ -189,18 +223,22 @@ module Inner = struct
     let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
 
     let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt
+      [@@coverage off]
 
     let commitment_of_bytes_exn bytes =
       match Bls12_381.G1.of_compressed_bytes_opt bytes with
       | None ->
           Format.kasprintf Stdlib.failwith "Unexpected data (DAL commitment)"
       | Some commitment -> commitment
+      [@@coverage off]
 
-    let commitment_size = Bls12_381.G1.compressed_size_in_bytes
+    let commitment_size = Bls12_381.G1.compressed_size_in_bytes [@@coverage off]
 
     let to_string commitment = commitment_to_bytes commitment |> Bytes.to_string
+      [@@coverage off]
 
     let of_string_opt str = commitment_of_bytes_opt (String.to_bytes str)
+      [@@coverage off]
 
     let b58check_encoding =
       Base58.register_encoding
@@ -209,6 +247,7 @@ module Inner = struct
         ~to_raw:to_string
         ~of_raw:of_string_opt
         ~wrap:(fun x -> Data x)
+      [@@coverage off]
 
     let raw_encoding =
       let open Data_encoding in
@@ -216,6 +255,7 @@ module Inner = struct
         commitment_to_bytes
         commitment_of_bytes_exn
         (Fixed.bytes commitment_size)
+      [@@coverage off]
 
     include Tezos_crypto.Helpers.Make (struct
       type t = commitment
@@ -237,10 +277,12 @@ module Inner = struct
            function exposed. We only need the Base58 encoding and the
            rpc_arg. *)
         assert false
+        [@@coverage off]
 
       let seeded_hash _ _ =
         (* Same argument. *)
         assert false
+        [@@coverage off]
     end)
 
     let of_b58check = of_b58check
@@ -258,6 +300,7 @@ module Inner = struct
             Stdlib.failwith
             "Unexpected data (DAL commitment proof)"
       | Some proof -> proof
+      [@@coverage off]
 
     let size = Bls12_381.G1.compressed_size_in_bytes
 
@@ -268,7 +311,26 @@ module Inner = struct
     let encoding = raw_encoding
   end
 
-  type ('a, 'b) error_container = {given : 'a; expected : 'b}
+  type error += Invalid_precomputation_hash of (string, string) error_container
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.node.invalid_precomputation_hash"
+      ~title:"Invalid_precomputation_hash"
+      ~description:"Unexpected precomputation hash"
+      ~pp:(fun ppf {given; expected} ->
+        Format.fprintf
+          ppf
+          "Invalid precomputation hash: expected %s. Got %s"
+          expected
+          given)
+      (Encoding.error_container_encoding
+         Data_encoding.string
+         Data_encoding.string)
+      (function Invalid_precomputation_hash err -> Some err | _ -> None)
+      (function err -> Invalid_precomputation_hash err)
+    [@@coverage off]
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
@@ -467,18 +529,26 @@ module Inner = struct
             slot_size
             page_size)
     in
+    let max_two_adicity_log = 32 in
+    let two_adicity_log =
+      snd Z.(remove (of_int erasure_encoded_polynomial_length) (of_int 2))
+    in
     let* () =
       assert_result
-        (snd Z.(remove (of_int erasure_encoded_polynomial_length) (of_int 2))
-        <= 32)
-        (* The 2-adicity of n must be at most 2^32, the size of the biggest subgroup
-           of 2^i roots of unity in the multiplicative group of Fr, because the FFTs
-           operate on such groups. *)
-          (fun () ->
+        (two_adicity_log <= max_two_adicity_log)
+        (* The 2-adicity of [erasure_encoded_polynomial_length] must be at most 2^32,
+           the size of the biggest subgroup of 2^i roots of unity in the multiplicative group of Fr,
+           because the FFTs operate on such groups. *)
+        (fun () ->
           Format.asprintf
-            "Slot size is expected to be less than '%d'. Got: %d"
-            (1 lsl 36)
-            slot_size)
+            "Slot size (%d) and/or redundancy factor (%d) is/are too high: \
+             expected 2-adicity of erasure_encoded_polynomial_length (%d) to \
+             be at most 2^%d, got: 2^%d"
+            slot_size
+            redundancy_factor
+            erasure_encoded_polynomial_length
+            max_two_adicity_log
+            two_adicity_log)
     in
     let* () =
       assert_result
@@ -559,6 +629,7 @@ module Inner = struct
          (req "page_size" uint16)
          (req "slot_size" int31)
          (req "number_of_shards" uint16))
+    [@@coverage off]
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
 
@@ -626,6 +697,7 @@ module Inner = struct
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
     {redundancy_factor; slot_size; page_size; number_of_shards}
+    [@@coverage off]
 
   let polynomial_degree = Polynomials.degree
 
@@ -741,7 +813,7 @@ module Inner = struct
     (* The last operation of [polynomial_from_slot] is the interpolation,
        so we undo it with an evaluation on the same domain [t.domain_polynomial_length]. *)
     let evaluations = fft t.max_polynomial_length p in
-    let slot = Bytes.make t.slot_size '0' in
+    let slot = Bytes.make t.slot_size '\x00' in
     let offset = ref 0 in
     (* Reverse permutation from [polynomial_from_slot]. *)
     for page = 0 to t.pages_per_slot - 1 do
@@ -1468,40 +1540,71 @@ module Inner = struct
            (proof, commit_srs_point_minus_root_pow);
          ])
 
-  let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
-      filename =
-    let chan = open_out_bin filename in
-    output_bytes
-      chan
-      (Data_encoding.Binary.to_bytes_exn
-         Encoding.shards_proofs_precomputation_encoding
-         preprocess) ;
-    close_out_noerr chan
+  let save_precompute_shards_proofs precomputation ~filename =
+    protect (fun () ->
+        Lwt_io.with_file ~mode:Output filename (fun chan ->
+            let open Lwt_result_syntax in
+            let str =
+              Data_encoding.Binary.to_string_exn
+                Encoding.shards_proofs_precomputation_encoding
+                precomputation
+            in
+            let*! () = Lwt_io.write chan str in
+            return_unit))
 
-  let _load_precompute_shards_proofs filename =
-    let chan = open_in_bin filename in
-    let len = Int64.to_int (LargeFile.in_channel_length chan) in
-    let data = Bytes.create len in
-    let () = try really_input chan data 0 len with End_of_file -> () in
-    let precomp =
-      Data_encoding.Binary.of_bytes_exn
+  let hash_precomputation precomputation =
+    let encoding =
+      Data_encoding.Binary.to_bytes_exn
         Encoding.shards_proofs_precomputation_encoding
-        data
+        precomputation
     in
-    close_in_noerr chan ;
-    precomp
+    Tezos_crypto.Blake2B.hash_bytes [encoding]
 
-  let prove_shards t p =
+  let load_precompute_shards_proofs ~hash ~filename () =
+    protect (fun () ->
+        Lwt_io.with_file ~mode:Input filename (fun chan ->
+            let open Lwt_result_syntax in
+            let*! str = Lwt_io.read chan in
+            let precomputation =
+              Data_encoding.Binary.of_string_exn
+                Encoding.shards_proofs_precomputation_encoding
+                str
+            in
+            let* () =
+              match hash with
+              | Some given ->
+                  let expected = hash_precomputation precomputation in
+                  if Tezos_crypto.Blake2B.equal given expected then return_unit
+                  else
+                    tzfail
+                      (Invalid_precomputation_hash
+                         {
+                           given = Tezos_crypto.Blake2B.to_string given;
+                           expected = Tezos_crypto.Blake2B.to_string expected;
+                         })
+              | None -> return_unit
+            in
+            return precomputation))
+
+  let precompute_shards_proofs t =
     (* Precomputes step. 1 of multiple multi-reveals. *)
-    let preprocess = preprocess_multiple_multi_reveals t in
+    let domain, precomputation = preprocess_multiple_multi_reveals t in
+    ( Domains.Domain_unsafe.to_array domain,
+      Array.map G1_array.to_array precomputation )
+
+  let prove_shards t ~precomputation:(domain, precomp) ~polynomial =
+    let setup =
+      ( Domains.Domain_unsafe.of_array domain,
+        Array.map G1_array.of_array precomp )
+    in
     (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)
     let coefficients =
       Array.init (t.max_polynomial_length + 1) (fun _ -> Scalar.(copy zero))
     in
-    let p_length = Polynomials.degree p + 1 in
-    let p = Polynomials.to_dense_coefficients p in
+    let p_length = Polynomials.degree polynomial + 1 in
+    let p = Polynomials.to_dense_coefficients polynomial in
     Array.blit p 0 coefficients 0 p_length ;
-    multiple_multi_reveals t ~preprocess ~coefficients
+    multiple_multi_reveals t ~preprocess:setup ~coefficients
 
   let verify_shard (t : t) commitment {index = shard_index; share = evaluations}
       proof =
@@ -1650,12 +1753,42 @@ module Internal_for_tests = struct
 
   let alter_commitment_proof (proof : commitment_proof) = alter_proof proof
 
-  let length_of_share (t : t) = t.shard_length
-
   let minimum_number_of_shards_to_reconstruct_slot (t : t) =
-    t.max_polynomial_length / t.number_of_shards
+    t.number_of_shards / t.redundancy_factor
 
   let select_fft_domain = select_fft_domain
+
+  let precomputation_equal ((d1, a1) : shards_proofs_precomputation)
+      ((d2, a2) : shards_proofs_precomputation) =
+    Array.for_all2 Scalar.eq d1 d2
+    && Array.for_all2 (Array.for_all2 Bls12_381.G1.eq) a1 a2
+
+  let reset_initialisation_parameters () = initialisation_parameters := None
+
+  let dummy_commitment ~state () = Bls12_381.G1.random ~state ()
+
+  let dummy_page_proof ~state () = Bls12_381.G1.random ~state ()
+
+  let dummy_shard_proof ~state () = Bls12_381.G1.random ~state ()
+
+  let make_dummy_shard ~state ~index ~length =
+    {index; share = Array.init length (fun _ -> Scalar.(random ~state ()))}
+
+  let number_of_pages t = t.pages_per_slot
+
+  let shard_length t = t.shard_length
+
+  let dummy_polynomial ~state ~degree =
+    let rec nonzero () =
+      let res = Bls12_381.Fr.random ~state () in
+      if Bls12_381.Fr.is_zero res then nonzero () else res
+    in
+    Polynomials.init (degree + 1) (fun i ->
+        if i = degree then nonzero () else Bls12_381.Fr.random ~state ())
+
+  let srs_size_g1 t = Srs_g1.size t.srs.raw.srs_g1
+
+  let encoded_share_size = encoded_share_size
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
@@ -1702,6 +1835,7 @@ module Config = struct
          (req "page_size" int31)
          (req "redundancy_factor" int31)
          (req "number_of_shards" int31))
+    [@@coverage off]
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
@@ -1713,10 +1847,11 @@ module Config = struct
       (obj2
          (req "activated" bool)
          (req "use_mock_srs_for_testing" (option parameters_encoding)))
+    [@@coverage off]
 
   let default = {activated = false; use_mock_srs_for_testing = None}
 
-  let init_dal ~find_srs_files dal_config =
+  let init_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
     let open Lwt_result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
@@ -1725,7 +1860,10 @@ module Config = struct
             return (Internal_for_tests.parameters_initialisation parameters)
         | None ->
             let*? srs_g1_path, srs_g2_path = find_srs_files () in
-            initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path
+            initialisation_parameters_from_files
+              ~srs_g1_path
+              ~srs_g2_path
+              ~srs_size_log2
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit
