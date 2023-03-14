@@ -403,35 +403,35 @@ module Internal_for_tests : sig
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
 
-  (* Returns a randomized valid sequence of shards using the random state
+  (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
   val make_dummy_shards : t -> state:Random.State.t -> shard Seq.t
 
-  (* [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
+  (** [polynomials_equal p1 p2] returns true if and only if [p1] and [p2]
      represent the same polynomial. *)
   val polynomials_equal : polynomial -> polynomial -> bool
 
-  (* [page_proof_equal proof1 proof2] returns true if and only if [proof1]
+  (** [page_proof_equal proof1 proof2] returns true if and only if [proof1]
      and [proof2] represent the same proof. *)
   val page_proof_equal : page_proof -> page_proof -> bool
 
-  (* [alter_page_proof page_proof] returns a different page proof than the
+  (** [alter_page_proof page_proof] returns a different page proof than the
      input. *)
   val alter_page_proof : page_proof -> page_proof
 
-  (* [alter_shard_proof shard_proof] returns a different shard proof than
+  (** [alter_shard_proof shard_proof] returns a different shard proof than
      the input. *)
   val alter_shard_proof : shard_proof -> shard_proof
 
-  (* [alter_commitment_proof commitment_proof] returns a different commitment
+  (** [alter_commitment_proof commitment_proof] returns a different commitment
      proof than the input. *)
   val alter_commitment_proof : commitment_proof -> commitment_proof
 
-  (* [minimum_number_of_shards_to_reconstruct_slot t] returns the minimum
+  (** [minimum_number_of_shards_to_reconstruct_slot t] returns the minimum
      number of shards to reconstruct a slot using [polynomial_from_shards]. *)
   val minimum_number_of_shards_to_reconstruct_slot : t -> int
 
-  (* [select_fft_domain domain_size] selects a suitable domain for the FFT.
+  (** [select_fft_domain domain_size] selects a suitable domain for the FFT.
 
      The domain size [domain_size] is expected to be strictly positive.
      Return [(size, power_of_two, remainder)] such that:
@@ -448,7 +448,7 @@ module Internal_for_tests : sig
 
   val reset_initialisation_parameters : unit -> unit
 
-  (* [ensure_validity parameters] returns true if the [parameters] are valid.
+  (** [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
 end
