@@ -358,7 +358,8 @@ module Dune = struct
   let chdir_workspace_root followup =
     [G [S "chdir"; S "%{workspace_root}"]; followup]
 
-  let backend name = [S "backend"; S name]
+  let backend ?(args = Stdlib.List.[]) name =
+    S "backend" :: S name :: of_atom_list args
 
   let ocamllex name = [S "ocamllex"; S name]
 
@@ -997,6 +998,8 @@ module Target = struct
 
   type release_status = Unreleased | Experimental | Released | Auto_opam
 
+  type bisect_ppx = No | Yes | With_sigterm
+
   let show_release_status = function
     | Unreleased -> "Unreleased"
     | Experimental -> "Experimental"
@@ -1004,7 +1007,7 @@ module Target = struct
     | Auto_opam -> "Auto_opam"
 
   type internal = {
-    bisect_ppx : bool;
+    bisect_ppx : bisect_ppx;
     time_measurement_ppx : bool;
     c_library_flags : string list option;
     conflicts : t list;
@@ -1175,7 +1178,7 @@ module Target = struct
 
   type 'a maker =
     ?all_modules_except:string list ->
-    ?bisect_ppx:bool ->
+    ?bisect_ppx:bisect_ppx ->
     ?c_library_flags:string list ->
     ?conflicts:t option list ->
     ?deps:t option list ->
@@ -1504,7 +1507,9 @@ module Target = struct
           true
       | Test_executable _ -> false
     in
-    let bisect_ppx = Option.value bisect_ppx ~default:not_a_test in
+    let bisect_ppx =
+      Option.value bisect_ppx ~default:(if not_a_test then Yes else No)
+    in
     let runtest_rules =
       let run_js = js_compatible in
       let run_native =
@@ -2137,7 +2142,11 @@ let generate_dune (internal : Target.internal) =
 
   let instrumentation =
     let bisect_ppx =
-      if internal.bisect_ppx then Some (Dune.backend "bisect_ppx") else None
+      match internal.bisect_ppx with
+      | Yes -> Some (Dune.backend "bisect_ppx")
+      | With_sigterm ->
+          Some (Dune.backend "bisect_ppx" ~args:["--bisect-sigterm"])
+      | No -> None
     in
     let time_measurement_ppx =
       if internal.time_measurement_ppx then

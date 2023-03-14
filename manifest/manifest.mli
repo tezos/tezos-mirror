@@ -582,6 +582,13 @@ type with_test = Always | Never | Only_on_64_arch
     which is needed as a transitive dependency of a [Released] target. *)
 type release_status = Unreleased | Experimental | Released | Auto_opam
 
+(** Configure [bisect_ppx] instrumentation.
+
+    If [No], disable instrumentation. If [Yes], enable
+    instrumentation. If [With_sigterm], enable instrumentation and
+    install a sigterm handler. See {!maker} for more details. *)
+type bisect_ppx = No | Yes | With_sigterm
+
 (** Functions that build internal targets.
 
     The ['a] argument is instantiated by the relevant type for the name(s)
@@ -589,11 +596,14 @@ type release_status = Unreleased | Experimental | Released | Auto_opam
 
     - [all_modules_except]: short-hand for [~modules: (All_module_except ...)].
 
-    - [bisect_ppx]: if [true], the target's [dune] file is generated
-      with [(instrumentation (backend bisect_ppx))] for this target.
+    - [bisect_ppx]: if [Yes] (respectively [With_sigterm]), the target's [dune] file
+      is generated with [(instrumentation (backend bisect_ppx))] (respectively
+      [(instrumentation (backend bisect_ppx --bisect-sigterm))]) for this target.
       This makes it possible to compute coverage. It is recommended to set this
-      for all libraries and executables except those that are only used for tests
-      (and thus are never run by users).
+      to [Yes] for all libraries and executables except those that are only used for tests
+      (and thus are never run by users). It should be set to [With_sigterm] for test
+      executables that spawn sub-processes which are susceptible to termination
+      through sigterm in non-exceptional circumstances (e.g. Tezt entrypoints).
 
     - [time_measurement_ppx]: if [true], the target's [dune] file is generated
       with [(instrumentation (backend time_measurement_ppx))] for this target.
@@ -740,7 +750,7 @@ type release_status = Unreleased | Experimental | Released | Auto_opam
       macOS system. *)
 type 'a maker =
   ?all_modules_except:string list ->
-  ?bisect_ppx:bool ->
+  ?bisect_ppx:bisect_ppx ->
   ?c_library_flags:string list ->
   ?conflicts:target list ->
   ?deps:target list ->
