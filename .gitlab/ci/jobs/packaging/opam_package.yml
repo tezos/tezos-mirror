@@ -222,6 +222,8 @@ opam:octez-alcotezt:
   variables:
     package: octez-alcotezt
 
+# Ignoring unreleased package octez-aplonk.
+
 opam:octez-baker-PtLimaPt:
   extends:
     - .opam_template

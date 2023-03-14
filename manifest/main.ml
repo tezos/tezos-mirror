@@ -1222,6 +1222,17 @@ let octez_plonk_aggregation =
     ~preprocess:[pps ppx_repr]
     ~deps:[octez_plonk; octez_bls12_381_polynomial |> open_]
 
+let _octez_aplonk =
+  public_lib
+    "octez-aplonk"
+    ~internal_name:"aplonk"
+    ~path:"src/lib_aplonk"
+    ~synopsis:
+      "Zero-knowledge proving system based on PlonK optimized for proofs \
+       aggregation"
+    ~preprocess:[pps ppx_repr]
+    ~deps:[octez_plonk_aggregation]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]

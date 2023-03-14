@@ -7,6 +7,7 @@
 (package (name octez-accuser-PtMumbai))
 (package (name octez-accuser-alpha))
 (package (name octez-alcotezt))
+(package (name octez-aplonk))
 (package (name octez-baker-PtLimaPt))
 (package (name octez-baker-PtMumbai))
 (package (name octez-baker-alpha))
