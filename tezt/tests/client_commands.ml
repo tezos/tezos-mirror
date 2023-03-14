@@ -618,91 +618,92 @@ module Dry_run = struct
       "This test checks that the consumed gas returned by the dry run of a \
        contract origination is sufficient to successfully inject the \
        origination." ;
-
     Log.info "Initialize a client with protocol %s." (Protocol.name protocol) ;
     let* node, client = Client.init_with_protocol `Client ~protocol () in
-
-    let alias = "originated_contract" in
-    let src = Constant.bootstrap1.alias in
-    let amount = Tez.zero in
-    let burn_cap = Tez.of_int 10 in
     let prg =
       Michelson_script.(
-        find ["mini_scenarios"; "large_flat_contract"] protocol |> path)
+        find ["mini_scenarios"; "large_str_id"] protocol |> path)
     in
-
-    Log.info
-      "Call the origination command of the client with dry-run argument to \
-       recover gas_consumption estimation." ;
-    let dry_run_res =
-      Client.spawn_originate_contract
-        ~alias
-        ~amount
-        ~src
-        ~prg
-        ~burn_cap
-        ~dry_run:true
-        client
-    in
-    let* res = Process.check_and_read_stdout dry_run_res in
-    let gas_consumed =
-      let re =
-        Re.Str.regexp "\\(.\\|[ \\\n]\\)*Consumed gas: \\([0-9.]+\\).*"
+    let test_with_signature_scheme sig_alg =
+      Log.info
+        ~color:Log.Color.bold
+        "----------------------------------------\nWith signature scheme: %s"
+        sig_alg ;
+      let* source = Client.gen_and_show_keys ~sig_alg client in
+      Log.info "Fund the source." ;
+      let* () =
+        Client.transfer
+          ~amount:(Tez.of_int 1000)
+          ~giver:Constant.bootstrap1.public_key_hash
+          ~receiver:source.public_key_hash
+          ~burn_cap:Tez.one
+          client
       in
-      if Re.Str.string_match re res 0 then
-        float_of_string (Re.Str.matched_group 2 res)
-      else
-        Test.fail
-          "Failed to parse the consumed gas in the following output of the dry \
-           run:\n\
-           %s"
-          res
+      let* () = Client.bake_for_and_wait client in
+      Log.info
+        "Call the origination command of the client with [--dry-run] to \
+         recover the consumed gas." ;
+      let call_originate_contract =
+        Client.spawn_originate_contract
+          ~alias:("originated_contract_" ^ sig_alg)
+          ~amount:Tez.zero
+          ~src:source.public_key_hash
+          ~prg
+          ~init:{|Pair "" ""|}
+          ~burn_cap:(Tez.of_int 10)
+      in
+      let dry_run_res = call_originate_contract ~dry_run:true client in
+      let* res = Process.check_and_read_stdout dry_run_res in
+      let gas_consumed =
+        let re =
+          Re.Str.regexp "\\(.\\|[ \\\n]\\)*Consumed gas: \\([0-9.]+\\).*"
+        in
+        if Re.Str.string_match re res 0 then
+          float_of_string (Re.Str.matched_group 2 res)
+        else
+          Test.fail
+            "Failed to parse the consumed gas in the following output of the \
+             dry run:\n\
+             %s"
+            res
+      in
+      let gas_limit = Float.(to_int (ceil gas_consumed)) in
+      Log.info
+        "Estimated gas consumption is: %f. The gas_limit must be at least of \
+         %d gas units for the origination to succeed."
+        gas_consumed
+        gas_limit ;
+      Log.info
+        "Try to originate the contract with a gas_limit of %d and check that \
+         the origination fails."
+        (pred gas_limit) ;
+      let originate_res_ko =
+        call_originate_contract
+          ~gas_limit:(pred gas_limit)
+          ~dry_run:false
+          client
+      in
+      let* () = Process.check_error originate_res_ko in
+      Log.info
+        "Originate the contract with a gas_limit of %d (ceil gas_consumed + 1) \
+         and check that the origination succeeds."
+        (succ gas_limit) ;
+      let originate_res_ok =
+        call_originate_contract
+        (* We wait for a new block to force the application of the
+           operation, not only its validation. *)
+          ~wait:"0"
+          ~gas_limit:(succ gas_limit)
+          ~dry_run:false
+          client
+      in
+      let* () = Node.wait_for_request ~request:`Inject node in
+      let* () = Client.bake_for_and_wait client in
+      Process.check originate_res_ok
     in
-    let gas_limit = Float.(to_int (ceil gas_consumed)) in
-    Log.info
-      "Estimated gas consumption is: %f. The gas_limit must be at least of %d \
-       gas unit for the origination to succeed."
-      gas_consumed
-      gas_limit ;
-
-    Log.info
-      "Try to originate the contract with a gas_limit of %d and check that the \
-       origination fails."
-      (pred gas_limit) ;
-    let originate_res_ko =
-      Client.spawn_originate_contract
-        ~alias
-        ~amount
-        ~src
-        ~prg
-        ~burn_cap
-        ~gas_limit:(pred gas_limit)
-        ~dry_run:false
-        client
-    in
-    let* () = Process.check_error originate_res_ko in
-
-    Log.info
-      "Originate the contract with a gas_limit of %d (ceil gas_consumed + 1) \
-       and check that the origination succeeds."
-      (succ gas_limit) ;
-    let originate_res_ok =
-      Client.spawn_originate_contract
-        ~alias
-        ~amount
-        ~wait:"0"
-          (* We wait for a new block to force the application of the
-             operation not only its prechecking. *)
-        ~src
-        ~prg
-        ~burn_cap
-        ~gas_limit:(succ gas_limit)
-        ~dry_run:false
-        client
-    in
-    let* () = Node.wait_for_request ~request:`Inject node in
-    let* _ = Client.bake_for client in
-    Process.check originate_res_ok
+    Lwt_list.iter_s
+      test_with_signature_scheme
+      (Helpers.supported_signature_schemes protocol)
 
   let register protocols = test_gas_consumed protocols
 end
