@@ -24,10 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Aggregate_signature = Tezos_crypto.Aggregate_signature
+
 type error +=
   | Cannot_convert_root_page_hash_to_bytes of string
   | Cannot_compute_aggregate_signature of string
   | Public_key_for_witness_not_available of int * string
+  | Public_key_is_non_dac_member of Aggregate_signature.public_key_hash
+  | Signature_verification_failed of
+      (Aggregate_signature.public_key * Aggregate_signature.t * string)
+  | Public_key_for_dac_member_not_available of
+      Aggregate_signature.public_key_hash
 
 let () =
   register_error_kind
@@ -78,7 +85,72 @@ let () =
     (function
       | Public_key_for_witness_not_available (index, hash) -> Some (index, hash)
       | _ -> None)
-    (fun (index, hash) -> Public_key_for_witness_not_available (index, hash))
+    (fun (index, hash) -> Public_key_for_witness_not_available (index, hash)) ;
+  register_error_kind
+    `Permanent
+    ~id:"Public_key_is_non_dac_member"
+    ~title:"Public key hash is not a valid dac member"
+    ~description:
+      "Public key hash is not associated with any Dac member registered with \
+       this Dac coordinator."
+    ~pp:(fun ppf dac_member_pkh ->
+      Format.fprintf
+        ppf
+        "Expected public key to be an active Dac committee member but was not: \
+         %s"
+        (Tezos_crypto.Aggregate_signature.Public_key_hash.to_short_b58check
+           dac_member_pkh))
+    Data_encoding.(
+      obj1
+        (req
+           "public_key_hash"
+           Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
+    (function
+      | Public_key_is_non_dac_member dac_member_pkh -> Some dac_member_pkh
+      | _ -> None)
+    (fun dac_member_pkh -> Public_key_is_non_dac_member dac_member_pkh) ;
+  register_error_kind
+    `Permanent
+    ~id:"signature_verification_failed"
+    ~title:"Signature verification failed"
+    ~description:"Signature verification failed."
+    ~pp:(fun ppf (pk, signature, root_hash) ->
+      let pk = Aggregate_signature.Public_key.to_short_b58check pk in
+      let signature = Aggregate_signature.to_short_b58check signature in
+      Format.fprintf
+        ppf
+        "Could not verify signature \"%s\" given public key \"%s\" and \
+         root_hash \"%s\": Signature verification failed."
+        pk
+        signature
+        root_hash)
+    Data_encoding.(
+      obj3
+        (req "public_key" Aggregate_signature.Public_key.encoding)
+        (req "signature" Aggregate_signature.encoding)
+        (req "root_hash" (string' Plain)))
+    (function
+      | Signature_verification_failed (pk, signature, root_hash) ->
+          Some (pk, signature, root_hash)
+      | _ -> None)
+    (function
+      | pk, signature, root_hash ->
+          Signature_verification_failed (pk, signature, root_hash)) ;
+  register_error_kind
+    `Permanent
+    ~id:"public_key_of_dac_member_not_available"
+    ~title:"Public key of dac member not available."
+    ~description:"Public key of  dac member not available."
+    ~pp:(fun ppf b58_hash ->
+      Format.fprintf ppf "Public key of dac member %s not available." b58_hash)
+    Data_encoding.(obj1 (req "hash" (string' Plain)))
+    (function
+      | Public_key_for_dac_member_not_available hash ->
+          Some (Aggregate_signature.Public_key_hash.to_b58check hash)
+      | _ -> None)
+    (fun hash ->
+      Public_key_for_dac_member_not_available
+        (Aggregate_signature.Public_key_hash.of_b58check_exn hash))
 
 let bind_es (f : 'a -> 'b option tzresult Lwt.t) v_opt =
   let open Lwt_result_syntax in
@@ -169,96 +241,6 @@ let verify dac_plugin ~public_keys_opt root_page_hash signature witnesses =
       @@ Tezos_crypto.Aggregate_signature.aggregate_check pk_msg_list signature
 
 module Coordinator = struct
-  module Aggregate_signature = Tezos_crypto.Aggregate_signature
-
-  type error +=
-    | Public_key_is_non_dac_member of Aggregate_signature.public_key_hash
-    | Signature_verification_failed of
-        (Aggregate_signature.public_key * Aggregate_signature.t * string)
-    | Public_key_for_dac_member_not_available of
-        Aggregate_signature.public_key_hash
-    | Unknown_root_hash of string
-
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"Public_key_is_non_dac_member"
-      ~title:"Public key hash is not a valid dac member"
-      ~description:
-        "Public key hash is not associated with any Dac member registered with \
-         this Dac coordinator."
-      ~pp:(fun ppf dac_member_pkh ->
-        Format.fprintf
-          ppf
-          "Expected public key to be an active Dac committee member but was \
-           not: %s"
-          (Tezos_crypto.Aggregate_signature.Public_key_hash.to_short_b58check
-             dac_member_pkh))
-      Data_encoding.(
-        obj1
-          (req
-             "public_key_hash"
-             Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
-      (function
-        | Public_key_is_non_dac_member dac_member_pkh -> Some dac_member_pkh
-        | _ -> None)
-      (fun dac_member_pkh -> Public_key_is_non_dac_member dac_member_pkh) ;
-    register_error_kind
-      `Permanent
-      ~id:"signature_verification_failed"
-      ~title:"Signature verification failed"
-      ~description:"Signature verification failed."
-      ~pp:(fun ppf (pk, signature, root_hash) ->
-        let pk = Aggregate_signature.Public_key.to_short_b58check pk in
-        let signature = Aggregate_signature.to_short_b58check signature in
-        Format.fprintf
-          ppf
-          "Could not verify signature \"%s\" given public key \"%s\" and \
-           root_hash \"%s\": Signature verification failed."
-          pk
-          signature
-          root_hash)
-      Data_encoding.(
-        obj3
-          (req "public_key" Aggregate_signature.Public_key.encoding)
-          (req "signature" Aggregate_signature.encoding)
-          (req "root_hash" (string' Plain)))
-      (function
-        | Signature_verification_failed (pk, signature, root_hash) ->
-            Some (pk, signature, root_hash)
-        | _ -> None)
-      (function
-        | pk, signature, root_hash ->
-            Signature_verification_failed (pk, signature, root_hash)) ;
-    register_error_kind
-      `Permanent
-      ~id:"public_key_of_dac_member_not_available"
-      ~title:"Public key of dac member not available."
-      ~description:"Public key of  dac member not available."
-      ~pp:(fun ppf b58_hash ->
-        Format.fprintf ppf "Public key of dac member %s not available." b58_hash)
-      Data_encoding.(obj1 (req "hash" (string' Plain)))
-      (function
-        | Public_key_for_dac_member_not_available hash ->
-            Some (Aggregate_signature.Public_key_hash.to_b58check hash)
-        | _ -> None)
-      (fun hash ->
-        Public_key_for_dac_member_not_available
-          (Aggregate_signature.Public_key_hash.of_b58check_exn hash)) ;
-    register_error_kind
-      `Permanent
-      ~id:"unknown_root_hash"
-      ~title:"No data associated to the provided root hash"
-      ~description:"There is no data in storage for this root hash"
-      ~pp:(fun ppf hash ->
-        Format.fprintf
-          ppf
-          "There is no data available for the root page hash %s"
-          hash)
-      Data_encoding.(obj1 (req "hash" (string' Plain)))
-      (function Unknown_root_hash hash -> Some hash | _ -> None)
-      (fun hash -> Unknown_root_hash hash)
-
   let verify_signature ((module Plugin) : Dac_plugin.t) pk signature root_hash =
     let root_hash_bytes = Dac_plugin.hash_to_bytes root_hash in
     fail_unless

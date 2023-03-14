@@ -29,6 +29,14 @@ type error +=
   | Cannot_convert_root_page_hash_to_bytes of string
   | Cannot_compute_aggregate_signature of string
   | Public_key_for_witness_not_available of int * string
+  | Public_key_is_non_dac_member of
+      Tezos_crypto.Aggregate_signature.public_key_hash
+  | Signature_verification_failed of
+      (Tezos_crypto.Aggregate_signature.public_key
+      * Tezos_crypto.Aggregate_signature.t
+      * string)
+  | Public_key_for_dac_member_not_available of
+      Tezos_crypto.Aggregate_signature.public_key_hash
 
 (* [sign_root_hash dac_pliugin cctx dac_sk_uris_opt root_hash] is legacy function that
    returns an aggregate signature over [root_hash] and a bitmap of witnesses where
@@ -55,17 +63,8 @@ val verify :
 (** Module that exposes signature operations necsesary when running in
     [Configuration.Coordinator] mode.*)
 module Coordinator : sig
-  type error +=
-    | Public_key_is_non_dac_member of
-        Tezos_crypto.Aggregate_signature.public_key_hash
-    | Signature_verification_failed of
-        (Tezos_crypto.Aggregate_signature.public_key
-        * Tezos_crypto.Aggregate_signature.t
-        * string)
-    | Public_key_for_dac_member_not_available of
-        Tezos_crypto.Aggregate_signature.public_key_hash
-    | Unknown_root_hash of string
-
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
+     Verify that root hash is one that the coordinator has *)
   (** [handle_put_dac_member_signature ctxt cctxt dac_members_pkh dac_member_signature]
       does the following procedure:
       1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
