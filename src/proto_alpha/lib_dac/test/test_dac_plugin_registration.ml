@@ -150,3 +150,13 @@ let tests =
       `Quick
       test_dac_hash_hash_string_with_reveal_hash;
   ]
+
+let () =
+  Alcotest_lwt.run
+    "protocol > unit"
+    [
+      Test_helpers.Unit_test.spec
+        (Protocol.name ^ ": Dac_plugin_registration.ml")
+        tests;
+    ]
+  |> Lwt_main.run
