@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_dac_test_tezt_lib)
+ (name src_proto_alpha_lib_dac_plugin_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -34,7 +34,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_dac_test_tezt_lib
+  src_proto_alpha_lib_dac_plugin_test_tezt_lib
   tezt)
  (link_flags
   (:standard)

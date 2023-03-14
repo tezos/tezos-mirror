@@ -5472,7 +5472,7 @@ module Protocol = Protocol
       only_if (active && N.(number >= 017)) @@ fun () ->
       public_lib
         (sf "tezos-dac-%s" name_dash)
-        ~path:(path // "lib_dac")
+        ~path:(path // "lib_dac_plugin")
         ~synopsis:
           "Tezos/Protocol: protocol specific library for the Data availability \
            Committee"
@@ -5498,7 +5498,7 @@ module Protocol = Protocol
           "test_dac_plugin_registration";
           "test_helpers";
         ]
-        ~path:(path // "lib_dac/test")
+        ~path:(path // "lib_dac_plugin/test")
         ~with_macos_security_framework:true
         ~opam:(sf "tezos-dac-%s" name_dash)
         ~deps:
