@@ -8,16 +8,14 @@ use crate::wei::Wei;
 // Simple representation of an account, only contains fixed-sized values (no
 // code nor storage).
 pub struct Account {
-    pub hash: OwnedHash,
     pub nonce: Quantity, // initially 0, updated after each transaction
     pub balance: Wei,
     pub code_hash: OwnedHash, // 256 bits hash
 }
 
 impl Account {
-    pub fn default_account(hash: OwnedHash, balance: Wei) -> Self {
+    pub fn default_account(balance: Wei) -> Self {
         Self {
-            hash,
             balance,
             nonce: 0,
             // TODO: https://gitlab.com/tezos/tezos/-/issues/4859

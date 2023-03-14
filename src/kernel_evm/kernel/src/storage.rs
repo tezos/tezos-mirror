@@ -139,7 +139,6 @@ pub fn read_account<Host: Runtime + RawRollupCore>(
     let code_hash = read_account_code_hash(host, &account_path)?;
 
     Ok(Account {
-        hash: address.to_vec(),
         nonce,
         balance,
         code_hash,
@@ -177,8 +176,9 @@ fn store_code_hash<Host: Runtime + RawRollupCore>(
 pub fn store_account<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     account: Account,
+    address: Hash,
 ) -> Result<(), Error> {
-    let account_path = account_path(&account.hash)?;
+    let account_path = account_path(address)?;
     store_nonce(host, &account_path, account.nonce)?;
     store_balance(host, &account_path, account.balance)?;
     store_code_hash(host, &account_path, &account.code_hash)
