@@ -1881,6 +1881,9 @@ let register_tezt_targets ~make_tezt_exe =
           ?synopsis
           ?js_compatible
           ?modes
+            (* Instrument with sigterm handler, to ensure that coverage from
+               Tezt worker processes are collected. *)
+          ~bisect_ppx:With_sigterm
           ~deps:(lib :: deps)
           ~dep_globs
           ~dep_globs_rec

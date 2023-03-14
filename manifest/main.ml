@@ -6649,6 +6649,9 @@ let () =
       ~with_macos_security_framework:true
       ~alias:""
       ~path:"tezt/tests"
+        (* Instrument with sigterm handler, to ensure that coverage from
+           Tezt worker processes are collected. *)
+      ~bisect_ppx:With_sigterm
       ~opam:""
       ~deps:(deps @ test_libs)
   in
