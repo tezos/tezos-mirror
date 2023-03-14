@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Type : sig
+  val time_protocol : Tezos_base.Time.Protocol.t Caqti_type.t
+
+  val block_hash : Tezos_crypto.Block_hash.t Caqti_type.t
+
+  val operation_hash : Tezos_crypto.Operation_hash.t Caqti_type.t
+
+  val public_key_hash : Tezos_crypto.Signature.public_key_hash Caqti_type.t
+
+  val errors : Tezos_error_monad.TzCore.error list option Caqti_type.t
+end
+
 val bool_to_int : bool -> int
 
 val create_tables : string list

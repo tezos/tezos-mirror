@@ -160,6 +160,12 @@ module Type = struct
       ~decode:(fun s -> decode_error (Tezos_crypto.Block_hash.of_string s))
       Caqti_type.octets
 
+  let operation_hash =
+    Caqti_type.custom
+      ~encode:(fun t -> Result.Ok (Tezos_crypto.Operation_hash.to_string t))
+      ~decode:(fun s -> decode_error (Tezos_crypto.Operation_hash.of_string s))
+      Caqti_type.octets
+
   let public_key_hash =
     Caqti_type.custom
       ~encode:(fun t ->
@@ -167,6 +173,28 @@ module Type = struct
       ~decode:(fun s ->
         decode_error (Tezos_crypto.Signature.Public_key_hash.of_string s))
       Caqti_type.octets
+
+  let errors =
+    Caqti_type.(
+      option
+        (custom
+           ~encode:(fun errors ->
+             Result.map_error
+               (fun x ->
+                 Format.asprintf "%a@." Data_encoding.Binary.pp_write_error x)
+               (Data_encoding.Binary.to_string
+                  (Data_encoding.list
+                     Tezos_error_monad.Error_monad.error_encoding)
+                  errors))
+           ~decode:(fun s ->
+             Result.map_error
+               (fun x ->
+                 Format.asprintf "%a@." Data_encoding.Binary.pp_read_error x)
+               (Data_encoding.Binary.of_string
+                  (Data_encoding.list
+                     Tezos_error_monad.Error_monad.error_encoding)
+                  s))
+           Caqti_type.octets))
 end
 
 let maybe_insert_source =
