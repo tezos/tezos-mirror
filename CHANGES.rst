@@ -51,9 +51,6 @@ Node
   indexing strategy. For now, only the ``minimal`` indexing strategy
   is allowed.
 
-- Updated the built-in network alias for Mumbainet (``--network mumbainet``).
-  The new alias matches the relaunch of Mumbainet with the protocol `PtMumbai2`.
-
 Client
 ------
 
