@@ -81,6 +81,14 @@ module Simple = struct
       ("level", Raw_level.encoding)
       ("other", Sc_rollup.Staker.encoding)
       ("their_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
+
+  let timeout_detected =
+    declare_1
+      ~name:"sc_rollup_node_timeout_detected"
+      ~msg:
+        "The rollup node has detected that opponent {other} can be timed out."
+      ~level:Notice
+      ("other", Sc_rollup.Staker.encoding)
 end
 
 let timeout address = Simple.(emit timeout address)
@@ -112,3 +120,5 @@ let potential_conflict_detected ~our_commitment_hash ~their_commitment_hash
     emit
       potential_conflict_detected
       (our_commitment_hash, level, other, their_commitment_hash))
+
+let timeout_detected other = Simple.(emit timeout_detected other)

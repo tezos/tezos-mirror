@@ -208,6 +208,13 @@ let wait_for_conflict_detected sc_node =
   let our_hash = JSON.(json |-> "our_commitment_hash" |> as_string) in
   Some (our_hash, json)
 
+(** Wait for the rollup node to detect a timeout *)
+let wait_for_timeout_detected sc_node =
+  Sc_rollup_node.wait_for sc_node "sc_rollup_node_timeout_detected.v0"
+  @@ fun json ->
+  let other = JSON.(json |-> "other" |> as_string) in
+  Some other
+
 (* Configuration of a rollup node
    ------------------------------
 
@@ -2603,6 +2610,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let conflict_detected = ref false in
   let detected_conflicts = ref [] in
   let published_commitments = ref [] in
+  let detected_timeouts = Hashtbl.create 5 in
   let _ =
     let* conflict = wait_for_conflict_detected sc_rollup_node in
     conflict_detected := true ;
@@ -2616,6 +2624,17 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       gather_commitments ()
     in
     gather_commitments ()
+  in
+  let _ =
+    let rec gather_timeouts () =
+      let* other = wait_for_timeout_detected sc_rollup_node in
+      Hashtbl.replace
+        detected_timeouts
+        other
+        (Option.value ~default:0 (Hashtbl.find_opt detected_timeouts other) + 1) ;
+      gather_timeouts ()
+    in
+    gather_timeouts ()
   in
 
   let loser_sc_rollup_nodes =
@@ -2694,6 +2713,16 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
 
   if not !conflict_detected then
     Test.fail "Honest node did not detect the conflict" ;
+
+  let multiple_timeouts_for_opponent =
+    Hashtbl.fold
+      (fun _other timeouts no -> no || timeouts > 1)
+      detected_timeouts
+      false
+  in
+
+  if multiple_timeouts_for_opponent then
+    Test.fail "Attempted to timeout an opponent more than once" ;
 
   if mode = Accuser then (
     assert (!detected_conflicts <> []) ;
