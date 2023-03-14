@@ -29,30 +29,27 @@ open Teztale_lib
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
 let parse_block_row
-    ( (hash_hex, delegate_hex, delegate_alias),
-      (round, reception_time, timestamp) ) =
-  let hash = Tezos_crypto.Block_hash.of_hex_exn (`Hex hash_hex) in
-  let delegate =
-    Tezos_crypto.Signature.Public_key_hash.of_hex_exn (`Hex delegate_hex)
-  in
-  let timestamp = Time.Protocol.of_seconds timestamp in
+    ((hash, delegate, delegate_alias), (round, reception_time, timestamp)) =
   let nonce = None in
   Teztale_lib.Data.Block.
     {hash; delegate; delegate_alias; round; reception_time; timestamp; nonce}
 
 let select_blocks db_pool level =
   let q =
-    "SELECT hex(b.hash), hex(d.address), d.alias, b.round, r.timestamp, \
-     b.timestamp FROM blocks b, blocks_reception r, delegates d ON r.block = \
-     b.id AND d.id = b.baker WHERE b.level = ?"
+    "SELECT b.hash, d.address, d.alias, b.round, r.timestamp, b.timestamp FROM \
+     blocks b, blocks_reception r, delegates d ON r.block = b.id AND d.id = \
+     b.baker WHERE b.level = ?"
   in
   let request =
     Caqti_request.Infix.(
       Caqti_type.int32
       ->* Caqti_type.(
             tup2
-              (tup3 string string (option string))
-              (tup3 int32 (option ptime) int64)))
+              (tup3
+                 Sql_requests.Type.block_hash
+                 Sql_requests.Type.public_key_hash
+                 (option string))
+              (tup3 int32 (option ptime) Sql_requests.Type.time_protocol)))
       q
   in
   let f r acc =
@@ -117,76 +114,63 @@ let select_ops db_pool level =
   let q_missing =
     Caqti_request.Infix.(
       Caqti_type.(tup2 int32 int32)
-      ->* Caqti_type.(tup3 string (option string) int))
-      "SELECT hex(d.address), d.alias, e.endorsing_power FROM endorsing_rights \
-       e, delegates d ON e.delegate = d.id WHERE e.level = ? AND e.delegate \
-       NOT IN (SELECT o.endorser FROM operations o WHERE o.level = ?)"
-  in
-  let parse_missing_row (address_hex, alias, power) =
-    ( `Hex address_hex |> Tezos_crypto.Signature.Public_key_hash.of_hex_exn,
-      alias,
-      power )
+      ->* Caqti_type.(
+            tup3 Sql_requests.Type.public_key_hash (option string) int))
+      "SELECT d.address, d.alias, e.endorsing_power FROM endorsing_rights e, \
+       delegates d ON e.delegate = d.id WHERE e.level = ? AND e.delegate NOT \
+       IN (SELECT o.endorser FROM operations o WHERE o.level = ?)"
   in
   let q_included =
     Caqti_request.Infix.(
       Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
             tup2
-              (tup3 string (option string) int)
-              (tup3 int (option int32) string)))
-      "SELECT hex(d.address), d.alias, e.endorsing_power, o.endorsement, \
-       o.round, hex(b.hash) FROM operations o, endorsing_rights e, \
-       operations_inclusion i, blocks b, delegates d ON i.operation = o.id AND \
-       i.block = b.id AND o.endorser = d.id AND e.delegate = d.id WHERE \
-       o.level = ? AND e.level = ?"
+              (tup3 Sql_requests.Type.public_key_hash (option string) int)
+              (tup3 bool (option int32) Sql_requests.Type.block_hash)))
+      "SELECT d.address, d.alias, e.endorsing_power, o.endorsement, o.round, \
+       b.hash FROM operations o, endorsing_rights e, operations_inclusion i, \
+       blocks b, delegates d ON i.operation = o.id AND i.block = b.id AND \
+       o.endorser = d.id AND e.delegate = d.id WHERE o.level = ? AND e.level = \
+       ?"
   in
   let parse_included_row
-      ((address_hex, alias, power), (endorsement, round, block_hash_hex)) =
-    ( `Hex address_hex |> Tezos_crypto.Signature.Public_key_hash.of_hex_exn,
+      ((address, alias, power), (endorsement, round, block_hash)) =
+    ( address,
       alias,
       power,
       (match endorsement with
-      | 0 -> Consensus_ops.Preendorsement
-      | 1 -> Consensus_ops.Endorsement
-      | _ -> Stdlib.failwith "[parse_included_row] unknown operation kind"),
+      | false -> Consensus_ops.Preendorsement
+      | true -> Consensus_ops.Endorsement),
       round,
-      `Hex block_hash_hex |> Tezos_crypto.Block_hash.of_hex_exn )
+      block_hash )
   in
   let q_received =
     Caqti_request.Infix.(
       Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
             tup2
-              (tup4 string (option string) int ptime)
-              (tup3 (option string) int (option int32))))
-      "SELECT hex(d.address), d.alias, e.endorsing_power, r.timestamp, \
-       iif(r.errors IS NULL, NULL, hex(r.errors)), o.endorsement, o.round FROM \
-       operations o, endorsing_rights e, operations_reception r, delegates d \
-       ON r.operation = o.id AND o.endorser = d.id AND e.delegate = d.id WHERE \
-       o.level = ? AND e.level = ?"
+              (tup4 Sql_requests.Type.public_key_hash (option string) int ptime)
+              (tup3 Sql_requests.Type.errors bool (option int32))))
+      "SELECT d.address, d.alias, e.endorsing_power, r.timestamp, r.errors, \
+       o.endorsement, o.round FROM operations o, endorsing_rights e, \
+       operations_reception r, delegates d ON r.operation = o.id AND \
+       o.endorser = d.id AND e.delegate = d.id WHERE o.level = ? AND e.level = \
+       ?"
   in
   let parse_received_row
-      ((address_hex, alias, power, timestamp), (errors, endorsement, round)) =
-    ( `Hex address_hex |> Tezos_crypto.Signature.Public_key_hash.of_hex_exn,
+      ((address, alias, power, timestamp), (errors, endorsement, round)) =
+    ( address,
       alias,
       power,
       timestamp,
-      errors
-      |> Option.map (fun x -> `Hex x)
-      |> Option.map Hex.to_bytes
-      |> Option.map (fun bytes ->
-             Data_encoding.Binary.of_bytes_exn
-               (Data_encoding.list Tezos_error_monad.Error_monad.error_encoding)
-               bytes),
+      errors,
       (match endorsement with
-      | 0 -> Consensus_ops.Preendorsement
-      | 1 -> Consensus_ops.Endorsement
-      | _ -> Stdlib.failwith "[parse_included_row] unknown operation kind"),
+      | false -> Consensus_ops.Preendorsement
+      | true -> Consensus_ops.Endorsement),
       round )
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
-  let cb_missing r info =
-    let delegate, alias, power = parse_missing_row r in
+  let cb_missing (delegate, alias, power) info =
     Ops.add delegate (alias, power, Pkh_ops.empty) info
   in
   let cb_included r info =
