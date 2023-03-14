@@ -489,7 +489,7 @@ let make_durable list_key_vals =
   in
   Durable.to_storage tree
 
-let make_module_inst list_key_vals src =
+let make_module_inst ~version list_key_vals src =
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let _ =
@@ -505,7 +505,7 @@ let make_module_inst list_key_vals src =
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
   Instance.update_module_ref module_reg module_key module_inst ;
-  (module_reg, module_key, Host_funcs.all)
+  (module_reg, module_key, Host_funcs.all ~version)
 
 let retrieve_memory module_reg =
   let open Lwt_syntax in

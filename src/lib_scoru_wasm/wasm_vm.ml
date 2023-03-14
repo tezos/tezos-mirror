@@ -438,18 +438,21 @@ let compute_step pvm_state =
   let open Lwt_syntax in
   let* version = get_wasm_version pvm_state in
   let stack_size_limit = stack_size_limit version in
-  compute_step_with_host_functions ~stack_size_limit Host_funcs.all pvm_state
+  compute_step_with_host_functions
+    ~stack_size_limit
+    (Host_funcs.all ~version)
+    pvm_state
 
 let compute_step_with_debug ~write_debug pvm_state =
   let open Lwt_syntax in
+  let* version = get_wasm_version pvm_state in
   let registry =
     match write_debug with
-    | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
-    | Noop -> Host_funcs.all
+    | Builtins.Printer _ -> Host_funcs.all_debug ~version ~write_debug
+    | Noop -> Host_funcs.all ~version
   in
-  let* wasm_version = get_wasm_version pvm_state in
   compute_step_with_host_functions
-    ~stack_size_limit:(stack_size_limit wasm_version)
+    ~stack_size_limit:(stack_size_limit version)
     registry
     pvm_state
 
@@ -527,8 +530,8 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
   let stack_size_limit = stack_size_limit version in
   let host_function_registry =
     match write_debug with
-    | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
-    | Noop -> Host_funcs.all
+    | Builtins.Printer _ -> Host_funcs.all_debug ~version ~write_debug
+    | Noop -> Host_funcs.all ~version
   in
   let compute_step_with_reveal =
     match reveal_builtins with
