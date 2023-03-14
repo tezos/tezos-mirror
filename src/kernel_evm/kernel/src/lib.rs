@@ -46,7 +46,7 @@ pub fn stage_two<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
     }) = storage::read_current_block(host)
     {
         debug_msg!(host; "Block {} at number {} contains {} transaction(s).\n",
-            String::from_utf8(hash).expect("INVALID HASH"),
+            String::from_utf8(hash.to_vec()).expect("INVALID HASH"),
             number,
             transactions.len()
         )
