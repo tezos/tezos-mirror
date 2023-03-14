@@ -1691,7 +1691,14 @@ module Internal_for_tests = struct
 
   let dummy_page_proof ~state () = Bls12_381.G1.random ~state ()
 
+  let dummy_shard_proof ~state () = Bls12_381.G1.random ~state ()
+
+  let make_dummy_shard ~state ~index ~length =
+    {index; share = Array.init length (fun _ -> Scalar.(random ~state ()))}
+
   let number_of_pages t = t.pages_per_slot
+
+  let shard_length t = t.shard_length
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =

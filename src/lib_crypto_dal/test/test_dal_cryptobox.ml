@@ -1,7 +1,13 @@
 module Test = struct
   (* [randrange ?(min=0) max] returns a random integer in the range [min, max - 1]. *)
   let randrange ?(min = 0) max =
-    min + QCheck2.Gen.(generate1 (int_bound (max - min - 1)))
+    QCheck2.Gen.(generate1 (int_range min (max - 1)))
+
+  let out_of_range ~min ~max =
+    let left = QCheck2.Gen.(Int.min_int -- (min - 1)) in
+    let right = QCheck2.Gen.(max -- Int.max_int) in
+    let a, b = QCheck2.Gen.(pair left right |> generate1) in
+    QCheck2.Gen.(generate1 (oneofl [a; b]))
 
   (* Samples k random integers within the range [0, bound[. *)
   let random_indices bound k =
@@ -256,9 +262,11 @@ module Test = struct
         in
         let random_shards =
           Seq.take shards_amount shards
-          |> Seq.map
-               (fun ({index; share} : Cryptobox.shard) : Cryptobox.shard ->
-                 {index = index + 1000; share})
+          |> Seq.map (fun ({share; _} : Cryptobox.shard) : Cryptobox.shard ->
+                 {
+                   index = out_of_range ~min:0 ~max:params.number_of_shards;
+                   share;
+                 })
         in
         Cryptobox.polynomial_from_shards t random_shards)
         |> function
@@ -591,7 +599,7 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let slot = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
+        let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
         assume (Bytes.length slot <> params.slot_size) ;
         Cryptobox.polynomial_from_slot t slot)
         |> function
@@ -614,19 +622,111 @@ module Test = struct
         assume (ensure_validity params) ;
         (let open Error_monad.Result_syntax in
         let* t = Cryptobox.make (get_cryptobox_parameters params) in
-        let slot = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
+        let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
         assume (Bytes.length slot <> params.slot_size) ;
         let state = QCheck_base_runner.random_state () in
-        let commitment = Cryptobox.Internal_for_tests.dummy_commitment ~state () in
+        let commitment =
+          Cryptobox.Internal_for_tests.dummy_commitment ~state ()
+        in
         let page = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
         assume (Bytes.length page <> params.page_size) ;
-        let page_proof = Cryptobox.Internal_for_tests.dummy_page_proof ~state () in
+        let page_proof =
+          Cryptobox.Internal_for_tests.dummy_page_proof ~state ()
+        in
         let page_index =
           randrange (Cryptobox.Internal_for_tests.number_of_pages t)
         in
         Cryptobox.verify_page t commitment ~page_index page page_proof)
         |> function
         | Error `Page_length_mismatch -> true
+        | _ -> false)
+
+  let test_prove_page_out_of_bounds =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test prove page out of bound"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+        let proof_index =
+          out_of_range
+            ~min:0
+            ~max:(Cryptobox.Internal_for_tests.number_of_pages t)
+        in
+        Cryptobox.prove_page t polynomial proof_index)
+        |> function
+        | Error `Segment_index_out_of_range -> true
+        | _ -> false)
+
+  let test_verify_page_out_of_bounds =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test verify page out of bound"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
+        assume (Bytes.length slot <> params.slot_size) ;
+        let state = QCheck_base_runner.random_state () in
+        let commitment =
+          Cryptobox.Internal_for_tests.dummy_commitment ~state ()
+        in
+        let page = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
+        assume (Bytes.length page <> params.page_size) ;
+        let page_proof =
+          Cryptobox.Internal_for_tests.dummy_page_proof ~state ()
+        in
+        let page_index =
+          out_of_range
+            ~min:0
+            ~max:(Cryptobox.Internal_for_tests.number_of_pages t)
+        in
+        Cryptobox.verify_page t commitment ~page_index page page_proof)
+        |> function
+        | Error `Segment_index_out_of_range -> true
+        | _ -> false)
+
+  let test_verify_shard_out_of_bounds =
+    let open QCheck2 in
+    Test.make
+      ~name:"DAL cryptobox: test verify shard out of bound"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let open Error_monad.Result_syntax in
+        let* t = Cryptobox.make (get_cryptobox_parameters params) in
+        let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
+        assume (Bytes.length slot <> params.slot_size) ;
+        let state = QCheck_base_runner.random_state () in
+        let commitment =
+          Cryptobox.Internal_for_tests.dummy_commitment ~state ()
+        in
+        let page = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
+        assume (Bytes.length page <> params.page_size) ;
+        let shard_proof =
+          Cryptobox.Internal_for_tests.dummy_shard_proof ~state ()
+        in
+        let shard_index = out_of_range ~min:0 ~max:params.number_of_shards in
+        let shard =
+          Cryptobox.Internal_for_tests.make_dummy_shard
+            ~state
+            ~index:shard_index
+            ~length:(Cryptobox.Internal_for_tests.shard_length t)
+        in
+        Cryptobox.verify_shard t commitment shard shard_proof)
+        |> function
+        | Error (`Shard_index_out_of_range _) -> true
         | _ -> false)
 
   (* We can craft two slots whose commitments are equal for two different
@@ -724,5 +824,8 @@ let () =
             Test.test_dal_initialisation_twice_failure;
             Test.test_wrong_slot_size;
             Test.test_page_length_mismatch;
+            Test.test_prove_page_out_of_bounds;
+            Test.test_verify_page_out_of_bounds;
+            Test.test_verify_shard_out_of_bounds;
           ] );
     ]

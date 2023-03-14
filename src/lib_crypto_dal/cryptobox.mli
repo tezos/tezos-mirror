@@ -435,7 +435,14 @@ module Internal_for_tests : sig
 
   val dummy_page_proof : state:Random.State.t -> unit -> page_proof
 
+  val dummy_shard_proof : state:Random.State.t -> unit -> shard_proof
+
+  val make_dummy_shard :
+    state:Random.State.t -> index:int -> length:int -> shard
+
   val number_of_pages : t -> int
+
+  val shard_length : t -> int
 
   (** [select_fft_domain domain_size] selects a suitable domain for the FFT.
 
