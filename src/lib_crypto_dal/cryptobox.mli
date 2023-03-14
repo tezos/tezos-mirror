@@ -111,6 +111,9 @@ type error += Dal_initialisation_twice
 (** [Failed_to_load_trusted_setup], thrown by {!Config.init_dal}. *)
 type error += Failed_to_load_trusted_setup of string
 
+(** [Invalid_precomputation_hash], thrown by {!load_precompute_shards_proofs}. *)
+type error += Invalid_precomputation_hash of (string, string) error_container
+
 module Verifier :
   VERIFIER
     with type t = t
@@ -359,10 +362,23 @@ val save_precompute_shards_proofs :
   filename:string ->
   unit Error_monad.tzresult Lwt.t
 
-(** [load_precompute_shards_proofs ~filename] loads the precomputation from disk
-   from the given [filename]. *)
+(** [load_precompute_shards_proofs ~hash ~filename ()] loads the precomputation
+    from disk from the given [filename]. If [hash] is not [None], an integrity
+    check of the retrieved precomputation is performed.
+
+    Returns the error {!type:Invalid_precomputation_hash} if the integrity check fails. *)
 val load_precompute_shards_proofs :
-  filename:string -> shards_proofs_precomputation Error_monad.tzresult Lwt.t
+  hash:Tezos_crypto.Blake2B.t option ->
+  filename:string ->
+  unit ->
+  shards_proofs_precomputation Error_monad.tzresult Lwt.t
+
+(** [hash_precomputation precomputation] returns the {!Tezos_crypto.Blake2B.t}
+    hash of the {!Data_encoding.t} value of [precomputation].
+
+    @raises a {!Data_encoding.Binary.Write_error} if [precomputation] can't be
+    serialized to a value {!val:shards_proofs_precomputation_encoding}. *)
+val hash_precomputation : shards_proofs_precomputation -> Tezos_crypto.Blake2B.t
 
 (** [prove_shards t ~precomputation ~polynomial] produces
    [number_of_shards] proofs (π_0, ..., π_{number_of_shards - 1}) for the elements

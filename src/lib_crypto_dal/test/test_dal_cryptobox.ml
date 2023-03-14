@@ -518,13 +518,17 @@ module Test = struct
          in
          let filename = path "test_precomputation" in
          let precomputation = Cryptobox.precompute_shards_proofs t in
+         let hash = Cryptobox.hash_precomputation precomputation in
          let* retrieved_precomputation =
            Lwt_main.run
              (let open Error_monad.Lwt_result_syntax in
              let* () =
                Cryptobox.save_precompute_shards_proofs precomputation ~filename
              in
-             Cryptobox.load_precompute_shards_proofs ~filename)
+             Cryptobox.load_precompute_shards_proofs
+               ~hash:(Some hash)
+               ~filename
+               ())
          in
          Sys.remove filename ;
          return
@@ -534,6 +538,47 @@ module Test = struct
         |> function
         | Ok true -> true
         | _ -> false)
+
+  let test_shard_proofs_load_from_file_invalid_hash =
+    let filename = ref (path "test_precomputation") in
+    let open QCheck2 in
+    Test.make
+      ~name:"shard proofs loading invalid hash"
+      ~print:print_parameters
+      ~count:1
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        let open Error_monad.Result_syntax in
+        (let* t =
+           Result.map_error
+             (function `Fail s -> [Error_monad.error_of_exn (Failure s)])
+             (Cryptobox.make (get_cryptobox_parameters params))
+         in
+         let precomputation = Cryptobox.precompute_shards_proofs t in
+         let dummy_hash = Tezos_crypto.Blake2B.hash_bytes [] in
+         let* _ =
+           Lwt_main.run
+             (let open Error_monad.Lwt_result_syntax in
+             let* () =
+               Cryptobox.save_precompute_shards_proofs
+                 precomputation
+                 ~filename:!filename
+             in
+             Cryptobox.load_precompute_shards_proofs
+               ~hash:(Some dummy_hash)
+               ~filename:!filename
+               ())
+         in
+         return filename)
+        |> function
+        | Error [Cryptobox.Invalid_precomputation_hash _] ->
+            Sys.remove !filename ;
+            true
+        | _ ->
+            Sys.remove !filename ;
+            false)
 
   let test_dal_initialisation_twice_failure =
     let open QCheck2 in
@@ -904,6 +949,7 @@ let () =
             Test.test_polynomial_slot_conversions;
             Test.test_select_fft_domain;
             Test.test_shard_proofs_load_from_file;
+            Test.test_shard_proofs_load_from_file_invalid_hash;
             Test.test_dal_initialisation_twice_failure;
             Test.test_wrong_slot_size;
             Test.test_page_length_mismatch;

@@ -154,6 +154,8 @@ module Inner = struct
 
   type shards_proofs_precomputation = scalar array * shard_proof array array
 
+  type ('a, 'b) error_container = {given : 'a; expected : 'b}
+
   module Encoding = struct
     open Data_encoding
 
@@ -185,6 +187,13 @@ module Inner = struct
 
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
+
+    let error_container_encoding (given_encoding : 'a encoding)
+        (expected_encoding : 'b encoding) : ('a, 'b) error_container encoding =
+      conv
+        (fun {given; expected} -> (given, expected))
+        (fun (given, expected) -> {given; expected})
+        (obj2 (req "given" given_encoding) (req "expected" expected_encoding))
   end
 
   include Encoding
@@ -289,7 +298,26 @@ module Inner = struct
     let encoding = raw_encoding
   end
 
-  type ('a, 'b) error_container = {given : 'a; expected : 'b}
+  type error += Invalid_precomputation_hash of (string, string) error_container
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.node.invalid_precomputation_hash"
+      ~title:"Invalid_precomputation_hash"
+      ~description:"Unexpected precomputation hash"
+      ~pp:(fun ppf {given; expected} ->
+        Format.fprintf
+          ppf
+          "Invalid precomputation hash: expected %s. Got %s"
+          expected
+          given)
+      (Encoding.error_container_encoding
+         Data_encoding.string
+         Data_encoding.string)
+      (function Invalid_precomputation_hash err -> Some err | _ -> None)
+      (function err -> Invalid_precomputation_hash err)
+    [@@coverage off]
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
@@ -1511,15 +1539,39 @@ module Inner = struct
             let*! () = Lwt_io.write chan str in
             return_unit))
 
-  let load_precompute_shards_proofs ~filename =
+  let hash_precomputation precomputation =
+    let encoding =
+      Data_encoding.Binary.to_bytes_exn
+        Encoding.shards_proofs_precomputation_encoding
+        precomputation
+    in
+    Tezos_crypto.Blake2B.hash_bytes [encoding]
+
+  let load_precompute_shards_proofs ~hash ~filename () =
     protect (fun () ->
         Lwt_io.with_file ~mode:Input filename (fun chan ->
             let open Lwt_result_syntax in
             let*! str = Lwt_io.read chan in
-            return
-              (Data_encoding.Binary.of_string_exn
-                 Encoding.shards_proofs_precomputation_encoding
-                 str)))
+            let precomputation =
+              Data_encoding.Binary.of_string_exn
+                Encoding.shards_proofs_precomputation_encoding
+                str
+            in
+            let* () =
+              match hash with
+              | Some given ->
+                  let expected = hash_precomputation precomputation in
+                  if Tezos_crypto.Blake2B.equal given expected then return_unit
+                  else
+                    tzfail
+                      (Invalid_precomputation_hash
+                         {
+                           given = Tezos_crypto.Blake2B.to_string given;
+                           expected = Tezos_crypto.Blake2B.to_string expected;
+                         })
+              | None -> return_unit
+            in
+            return precomputation))
 
   let precompute_shards_proofs t =
     (* Precomputes step. 1 of multiple multi-reveals. *)
