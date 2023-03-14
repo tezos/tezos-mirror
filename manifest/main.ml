@@ -1233,6 +1233,14 @@ let _octez_aplonk =
     ~preprocess:[pps ppx_repr]
     ~deps:[octez_plonk_aggregation]
 
+let octez_plonk_distribution =
+  public_lib
+    "octez-plonk.distribution"
+    ~internal_name:"plonk_for_distribution"
+    ~path:"src/lib_distributed_plonk/plonk-distribution"
+    ~deps:[octez_plonk; octez_plonk_aggregation]
+    ~preprocess:[pps ppx_repr]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]
