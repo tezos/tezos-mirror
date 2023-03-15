@@ -89,7 +89,7 @@ module Committee_member = struct
           {coordinator_rpc_address; coordinator_rpc_port; address})
         (obj3
            (req "coordinator_rpc_address" string)
-           (req "coordinator_rpc_port" int16)
+           (req "coordinator_rpc_port" uint16)
            (req
               "address"
               Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
