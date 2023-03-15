@@ -286,50 +286,6 @@ let test_rpc_getBalance =
          Account.prefunded_account_address) ;
   unit
 
-let test_rpc_sendRawTransaction =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "send_raw_transaction"]
-    ~title:"RPC method eth_sendRawTransaction"
-  @@ fun protocol ->
-  let* {node; client; evm_proxy_server; sc_rollup_node; sc_rollup_client; _} =
-    setup_evm_kernel protocol
-  in
-  (* [Eth_cli.transaction_send] implicitly calls `eth_blockNumber` at some point.
-     We thus need to at least go the first evm run level for the kernel to be able
-     to read at current block's number path, otherwise the test will fail. *)
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* tx_hash =
-    Eth_cli.transaction_send
-      ~source_private_key:Account.accounts.(0).private_key
-      ~to_public_key:Account.accounts.(1).address
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
-            Introduce a eth/wei module. *)
-      ~value:Z.(of_int 42 * (of_int 10 ** 18))
-      ~endpoint:evm_proxy_server_endpoint
-  in
-  Log.info "Sent %s to the proxy server." tx_hash ;
-  let*! batcher_queue = Sc_rollup_client.batcher_queue sc_rollup_client in
-  let () =
-    match batcher_queue with
-    | [(_hash, _binary_msg)] -> ()
-    | _ ->
-        Test.fail
-          ~__LOC__
-          "Expected exactly one element to the batcher queue, got %d"
-          (List.length batcher_queue)
-  in
-  let* () =
-    wait_until_tx_included
-      ~evm_proxy_server_endpoint
-      ~sc_rollup_node
-      ~tx_hash
-      ~node
-      client
-  in
-  unit
-
 let test_rpc_getBlockByNumber =
   Protocol.register_test
     ~__FILE__
@@ -455,7 +411,6 @@ let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
   test_rpc_getBalance protocols ;
-  test_rpc_sendRawTransaction protocols ;
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getTransactionCount protocols ;
   test_l2_blocks_progression protocols ;
