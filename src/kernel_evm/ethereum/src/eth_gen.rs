@@ -9,3 +9,6 @@ pub type L2Level = u64;
 pub type Quantity = u64;
 pub type OwnedHash = Vec<u8>;
 pub type Hash<'a> = &'a Vec<u8>;
+
+pub const ADDRESS_SIZE: usize = 20;
+pub type Address = [u8; ADDRESS_SIZE];
