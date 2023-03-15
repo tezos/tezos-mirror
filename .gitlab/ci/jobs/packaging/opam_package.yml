@@ -252,6 +252,8 @@ opam:octez-codec:
   variables:
     package: octez-codec
 
+# Ignoring unreleased package octez-crawler.
+
 # Ignoring unreleased package octez-dac-node.
 
 # Ignoring unreleased package octez-dal-node.
