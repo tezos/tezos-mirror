@@ -128,7 +128,7 @@ module type VERIFIER = sig
       contained in [t] is too small to proceed with the verification
       - [Error `Page_length_mismatch] if the page is not of the expected
       length [page_size] given for the initialisation of [t]
-      - [Error `Segment_index_out_of_range] if [page_index] is out of the
+      - [Error `Page_index_out_of_range] if [page_index] is out of the
       range [0, slot_size/page_size - 1] where [slot_size] and [page_size]
       are given for the initialisation of [t]
 
@@ -150,6 +150,6 @@ module type VERIFIER = sig
          (int, int) error_container
       | `Invalid_page
       | `Page_length_mismatch
-      | `Segment_index_out_of_range ] )
+      | `Page_index_out_of_range ] )
     Result.t
 end

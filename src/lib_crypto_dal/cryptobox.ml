@@ -1616,7 +1616,7 @@ module Inner = struct
 
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then
-      Error `Segment_index_out_of_range
+      Error `Page_index_out_of_range
     else
       let wi = Domains.get t.domain_polynomial_length page_index in
       let quotient, _ =
@@ -1631,7 +1631,7 @@ module Inner = struct
      evaluation points are given by the [slot_page_index]. *)
   let verify_page t commitment ~page_index page proof =
     if page_index < 0 || page_index >= t.pages_per_slot then
-      Error `Segment_index_out_of_range
+      Error `Page_index_out_of_range
     else
       let expected_page_length = t.page_size in
       let got_page_length = Bytes.length page in

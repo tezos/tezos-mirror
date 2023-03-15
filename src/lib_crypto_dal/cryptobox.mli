@@ -325,7 +325,7 @@ val prove_commitment :
     Fails with:
     - [Error `Invalid_degree_strictly_less_than_expected _] if the SRS
     contained in [t] is too small to produce the proof
-    - [Error (`Segment_index_out_of_range msg)] if the page index
+    - [Error (`Page_index_out_of_range msg)] if the page index
     is not within the range [0, slot_size/page_size - 1]
     (where [slot_size] and [page_size] are found in [t]).
 
@@ -342,7 +342,7 @@ val prove_page :
   int ->
   ( page_proof,
     [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
-    | `Segment_index_out_of_range ] )
+    | `Page_index_out_of_range ] )
   Result.t
 
 (** The precomputation used to produce shard proofs. *)

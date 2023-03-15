@@ -109,7 +109,7 @@ module Make (Interpreter : Interpreter.S) :
           "%s"
           (match e with
           | `Fail s -> "Fail " ^ s
-          | `Segment_index_out_of_range -> "Segment_index_out_of_range"
+          | `Page_index_out_of_range -> "Page_index_out_of_range"
           | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
           | `Invalid_degree_strictly_less_than_expected
               Cryptobox.{given; expected} ->

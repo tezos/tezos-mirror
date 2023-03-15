@@ -717,7 +717,7 @@ module Test = struct
          in
          Cryptobox.prove_page t polynomial proof_index)
         |> function
-        | Error `Segment_index_out_of_range -> true
+        | Error `Page_index_out_of_range -> true
         | _ -> false)
 
   let test_verify_page_out_of_bounds =
@@ -749,7 +749,7 @@ module Test = struct
          in
          Cryptobox.verify_page t commitment ~page_index page page_proof)
         |> function
-        | Error `Segment_index_out_of_range -> true
+        | Error `Page_index_out_of_range -> true
         | _ -> false)
 
   let test_verify_shard_out_of_bounds =

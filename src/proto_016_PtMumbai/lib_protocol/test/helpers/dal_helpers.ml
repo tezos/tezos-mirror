@@ -103,8 +103,8 @@ struct
     let open Result_syntax in
     match Cryptobox.prove_page cryptobox polynomial page_id.P.page_index with
     | Ok p -> return p
-    | Error `Segment_index_out_of_range ->
-        fail [Test_failure "compute_proof_segment: Segment_index_out_of_range"]
+    | Error `Page_index_out_of_range ->
+        fail [Test_failure "compute_proof_segment: Page_index_out_of_range"]
     | Error
         (`Invalid_degree_strictly_less_than_expected
           Cryptobox.{given; expected}) ->
