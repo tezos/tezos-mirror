@@ -127,9 +127,8 @@ module Mock = struct
       gasUsed = gas_price;
       logs = [];
       logsBloom = hash_f @@ String.make 256 'a';
-      type_ = hash_f "00";
+      type_ = qty_f Z.zero;
       status = qty_f Z.one;
-      root = hash_f @@ String.make 32 'a';
     }
 
   let call = hash_f "0x"
@@ -210,7 +209,8 @@ let dispatch (rollup_node_config : ((module Rollup_node.S) * string) option) dir
             return (Get_transaction_count.Output (Ok nonce))
         | Get_transaction_receipt.Input _ ->
             return
-              (Get_transaction_receipt.Output (Ok (Mock.transaction_receipt ())))
+              (Get_transaction_receipt.Output
+                 (Ok (Some (Mock.transaction_receipt ()))))
         | Send_raw_transaction.Input (Some tx_raw) ->
             let* tx_hash =
               match rollup_node_config with
