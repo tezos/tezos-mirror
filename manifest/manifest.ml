@@ -1786,6 +1786,7 @@ type tezt_target = {
   exe_deps : target list;
   js_deps : target list;
   dep_globs : string list;
+  dep_globs_rec : string list;
   dep_files : string list;
   modules : string list;
   js_compatible : bool option;
@@ -1798,8 +1799,8 @@ type tezt_target = {
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
-    ?(js_deps = []) ?(dep_globs = []) ?(dep_files = []) ?synopsis
-    ?opam_with_test ?(with_macos_security_framework = false) modules =
+    ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
+    ?synopsis ?opam_with_test ?(with_macos_security_framework = false) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1811,6 +1812,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       js_deps;
       dep_globs;
       dep_files;
+      dep_globs_rec;
       modules;
       js_compatible;
       modes;
@@ -1830,6 +1832,7 @@ let register_tezt_targets ~make_tezt_exe =
         exe_deps;
         js_deps;
         dep_globs;
+        dep_globs_rec;
         dep_files;
         modules;
         js_compatible;
@@ -1867,6 +1870,7 @@ let register_tezt_targets ~make_tezt_exe =
           ?modes
           ~deps:(lib :: deps)
           ~dep_globs
+          ~dep_globs_rec
           ~dep_files
           ~modules:[exe_name]
           ?opam_with_test

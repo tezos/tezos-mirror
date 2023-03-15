@@ -385,8 +385,9 @@ let tezt_core_lib =
 
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
-let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
-    ?opam_with_test ?synopsis ?(with_macos_security_framework = false) l =
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
+    ?dep_globs_rec ?dep_files ?opam_with_test ?synopsis
+    ?(with_macos_security_framework = false) l =
   tezt_without_tezt_lib_dependency
     ~with_macos_security_framework
     ~opam
@@ -398,6 +399,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
     ~exe_deps:[tezt_lib]
     ~js_deps:[tezt_js_lib]
     ?dep_globs
+    ?dep_globs_rec
     ?dep_files
     ?opam_with_test
     l
@@ -3933,8 +3935,36 @@ end = struct
             ]
       in
       let _integration_michelson =
-        test
-          "main"
+        let modules =
+          [
+            ("test_main", true);
+            ("test_annotations", true);
+            ("test_block_time_instructions", true);
+            ("test_contract_event", true);
+            ("test_global_constants_storage", true);
+            ("test_interpretation", true);
+            ("test_lazy_storage_diff", true);
+            ("test_patched_contracts", true);
+            ("test_sapling", true);
+            ("test_script_cache", true);
+            ("test_script_typed_ir_size", true);
+            ("test_temp_big_maps", true);
+            ("test_ticket_accounting", true);
+            ("test_ticket_balance_key", true);
+            ("test_ticket_balance", true);
+            ("test_ticket_lazy_storage_diff", true);
+            ("test_ticket_manager", true);
+            ("test_ticket_operations_diff", true);
+            ("test_ticket_scanner", true);
+            ("test_ticket_storage", true);
+            ("test_timelock", true);
+            ("test_typechecking", true);
+            ("test_lambda_normalization", N.(number >= 016));
+          ]
+          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+        in
+        tezt
+          modules
           ~path:(path // "lib_protocol/test/integration/michelson")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true
@@ -3952,7 +3982,7 @@ end = struct
                ])
           ~deps:
             [
-              alcotest_lwt;
+              alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;

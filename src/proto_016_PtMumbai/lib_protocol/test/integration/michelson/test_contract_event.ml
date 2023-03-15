@@ -60,10 +60,12 @@ let originate_contract file storage src b =
   let+ b = Incremental.finalize_block incr in
   (dst, b)
 
+let path = project_root // Filename.dirname __FILE__
+
 (** Run emit.tz and assert that both the order of events and data content are correct *)
 let contract_test () =
   let* b, src = Context.init1 ~consensus_threshold:0 () in
-  let* dst, b = originate_contract "contracts/emit.tz" "Unit" src b in
+  let* dst, b = originate_contract (path // "contracts/emit.tz") "Unit" src b in
   let fee = Test_tez.of_int 10 in
   let parameters = Script.unit_parameter in
   let* operation =
