@@ -23,14 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Injector_common
 open Injector_sigs
 
 module Request (Inj_operation : INJECTOR_OPERATION) : sig
   type ('a, 'b) t =
     | Add_pending : Inj_operation.t -> (unit, error trace) t
     | New_tezos_head :
-        (Block_hash.t * int32) * (Block_hash.t * int32) reorg
+        (Block_hash.t * int32) * (Block_hash.t * int32) Reorg.t
         -> (unit, error trace) t
     | Inject : (unit, error trace) t
 

@@ -11,18 +11,14 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "logs"
+  "tezos-rpc-http"
   "tezos-stdlib-unix"
-  "tezos-crypto"
-  "tezos-micheline"
   "tezos-client-base"
-  "tezos-workers"
   "tezos-shell"
-  "octez-crawler"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez: library for building injectors"
+synopsis: "Octez: library to crawl blocks of the L1 chain"

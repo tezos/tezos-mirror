@@ -29,6 +29,7 @@ depends: [
   "tezos-smart-rollup-layer2-alpha"
   "tezos-layer2-utils-alpha"
   "tezos-layer2-store"
+  "octez-crawler"
   "tezos-tree-encoding"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "irmin-pack" { >= "3.6.0" & < "3.7.0" }

@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) Nomadic Labs, <contact@nomadic-labs.com>                    *)
+(* Copyright (c) Functori, <contact@functori.com>                            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,60 +24,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module maintains information about the layer 1 chain.
+(** This module allow to follow the layer 1 chain by subscribing to the head
+    monitoring RPC offered by the Tezos node, reconnecting, etc. *)
 
-   This module follows the evolution of the layer 1 chain by
-   subscribing to the head monitoring RPC offered by the Tezos node.
-*)
+(** The type of layer 1 followers. *)
+type t
 
-type head = {hash : Block_hash.t; level : int32}
+(** {2 Monitoring the Layer 1 chain} *)
 
-val head_encoding : head Data_encoding.t
+(** [start ~name ~reconnection_delay cctxt] connects to a Tezos node and starts
+    monitoring new heads. One can iterate on the heads by calling {!iter_heads}
+    on its result. [reconnection_delay] gives an initial delay for the
+    reconnection which is used in an exponential backoff. The [name] is used to
+    differentiate events. *)
+val start :
+  name:string ->
+  reconnection_delay:float ->
+  #Client_context.full ->
+  t tzresult Lwt.t
 
-include module type of Octez_crawler.Layer_1
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3311
-   Allow to retrieve L1 blocks through Tezos node storage locally. *)
+(** [shutdown t] properly shuts the layer 1 down. *)
+val shutdown : t -> unit Lwt.t
 
 (** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
-    automatically. If [f] returns an error (other than a disconnection) it,
+    automatically. If [f] returns an error (other than a disconnection),
     [iter_heads] terminates and returns the error.  *)
-val iter_heads : t -> (head -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+val iter_heads :
+  t ->
+  (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
+  unit tzresult Lwt.t
 
-(** {2 Helpers } *)
+(** {2 Helper functions for the Layer 1 chain} *)
 
 (** [get_predecessor_opt state head] returns the predecessor of block [head],
     when [head] is not the genesis block. *)
-val get_predecessor_opt : t -> head -> head option tzresult Lwt.t
+val get_predecessor_opt :
+  t -> Block_hash.t * int32 -> (Block_hash.t * int32) option tzresult Lwt.t
 
 (** [get_predecessor state head] returns the predecessor block of [head]. *)
-val get_predecessor : t -> head -> head tzresult Lwt.t
+val get_predecessor :
+  t -> Block_hash.t * int32 -> (Block_hash.t * int32) tzresult Lwt.t
 
-(** [nth_predecessor l1_ctxt n head] return [block, history] where [block] is
+(** [nth_predecessor l1_ctxt n head] returns [block, history] where [block] is
     the nth predecessor of [head] and [history] is the list of blocks between
     [block] (excluded) and [head] (included) on the chain *)
-val nth_predecessor : t -> int -> head -> (head * head list) tzresult Lwt.t
+val nth_predecessor :
+  t ->
+  int ->
+  Block_hash.t * int32 ->
+  ((Block_hash.t * int32) * (Block_hash.t * int32) list) tzresult Lwt.t
 
 (** [get_tezos_reorg_for_new_head l1_ctxt old_head new_head] returns the
     reorganization of L1 blocks between [old_head] and [new_head]. If [old_head]
     is [`Level l], then it returns the reorganization between [new_head] and
     level [l] on the same chain. *)
 val get_tezos_reorg_for_new_head :
-  t -> [`Head of head | `Level of int32] -> head -> head Reorg.t tzresult Lwt.t
-
-(** [fetch_tezos_shell_header cctxt hash] returns the block shell header of
-    [hash]. Looks for the block in the blocks cache first, and fetches it from
-    the L1 node otherwise. *)
-val fetch_tezos_shell_header :
-  #Tezos_rpc.Context.simple ->
-  Block_hash.t ->
-  Block_header.shell_header tzresult Lwt.t
-
-(** [fetch_tezos_block cctxt hash] returns a block info given a block hash.
-    Looks for the block in the blocks cache first, and fetches it from the L1
-    node otherwise. *)
-val fetch_tezos_block :
-  #Tezos_rpc.Context.simple ->
-  Block_hash.t ->
-  Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
+  t ->
+  [`Head of Block_hash.t * int32 | `Level of int32] ->
+  Block_hash.t * int32 ->
+  (Block_hash.t * int32) Reorg.t tzresult Lwt.t

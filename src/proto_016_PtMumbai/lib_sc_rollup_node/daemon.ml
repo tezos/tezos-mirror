@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -263,7 +264,7 @@ module Make (PVM : Pvm.S) = struct
   let process_l1_block_operations ~finalized node_ctxt
       (Layer1.{hash; _} as head) =
     let open Lwt_result_syntax in
-    let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
+    let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.cctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
         result =
       let open Lwt_result_syntax in
@@ -371,7 +372,7 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let notify_injector new_head (reorg : Layer1.head Injector_common.reorg) =
+  let notify_injector new_head (reorg : Layer1.head Reorg.t) =
     let open Lwt_result_syntax in
     let open Layer1 in
     let new_chain =
@@ -417,9 +418,7 @@ module Make (PVM : Pvm.S) = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
        Rollback state information on reorganization, i.e. for
        reorg.old_chain. *)
-    let* new_head =
-      Layer1.fetch_tezos_block node_ctxt.l1_ctxt head.Layer1.hash
-    in
+    let* new_head = Layer1.fetch_tezos_block node_ctxt.cctxt head.Layer1.hash in
     let header =
       Block_header.(
         raw
@@ -440,49 +439,8 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Injector.inject ~header () in
     return_unit
 
-  let is_connection_error trace =
-    TzTrace.fold
-      (fun yes error ->
-        yes
-        ||
-        match error with
-        | Tezos_rpc_http.RPC_client_errors.(
-            Request_failed {error = Connection_failed _; _}) ->
-            true
-        | _ -> false)
-      false
-      trace
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
-     Use Lwt_stream.fold_es once it is exposed. *)
-  let daemonize configuration (node_ctxt : _ Node_context.t) =
-    let open Lwt_result_syntax in
-    let rec loop (l1_ctxt : Layer1.t) =
-      let*! () =
-        Lwt_stream.iter_s
-          (fun head ->
-            let open Lwt_syntax in
-            let* res = on_layer_1_head node_ctxt head in
-            match res with
-            | Ok () -> return_unit
-            | Error trace when is_connection_error trace ->
-                Format.eprintf
-                  "@[<v 2>Connection error:@ %a@]@."
-                  pp_print_trace
-                  trace ;
-                l1_ctxt.stopper () ;
-                return_unit
-            | Error e ->
-                Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
-                let* _ = Lwt_exit.exit_and_wait 1 in
-                return_unit)
-          l1_ctxt.heads
-      in
-      let*! () = Event.connection_lost () in
-      let* l1_ctxt = Layer1.reconnect configuration node_ctxt.l1_ctxt in
-      loop l1_ctxt
-    in
-    protect @@ fun () -> Lwt.no_cancel @@ loop node_ctxt.l1_ctxt
+  let daemonize (node_ctxt : _ Node_context.t) =
+    Layer1.iter_heads node_ctxt.l1_ctxt (on_layer_1_head node_ctxt)
 
   let install_finalizer node_ctxt rpc_server =
     let open Lwt_syntax in
@@ -526,11 +484,11 @@ module Make (PVM : Pvm.S) = struct
   let run node_ctxt configuration =
     let open Lwt_result_syntax in
     let* () = check_initial_state_hash node_ctxt in
+    let* rpc_server = Components.RPC_server.start node_ctxt configuration in
+    let (_ : Lwt_exit.clean_up_callback_id) =
+      install_finalizer node_ctxt rpc_server
+    in
     let start () =
-      let* rpc_server = Components.RPC_server.start node_ctxt configuration in
-      let (_ : Lwt_exit.clean_up_callback_id) =
-        install_finalizer node_ctxt rpc_server
-      in
       let*! () = Inbox.start () in
       let signers =
         Configuration.Operator_purpose_map.bindings node_ctxt.operators
@@ -590,7 +548,7 @@ module Make (PVM : Pvm.S) = struct
           ~rpc_addr:configuration.rpc_addr
           ~rpc_port:configuration.rpc_port
       in
-      daemonize configuration node_ctxt
+      daemonize node_ctxt
     in
     Metrics.Info.init_rollup_node_info
       ~id:node_ctxt.rollup_address
@@ -598,7 +556,10 @@ module Make (PVM : Pvm.S) = struct
       ~genesis_level:node_ctxt.genesis_info.level
       ~genesis_hash:node_ctxt.genesis_info.commitment_hash
       ~pvm_kind:node_ctxt.kind ;
-    start ()
+    protect start ~on_error:(fun e ->
+        Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
+        let*! _ = Lwt_exit.exit_and_wait 1 in
+        return_unit)
 end
 
 let run ~data_dir (configuration : Configuration.t)

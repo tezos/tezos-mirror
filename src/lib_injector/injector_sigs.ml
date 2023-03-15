@@ -306,9 +306,7 @@ module type S = sig
       reorganization are put back in the pending queue). When an operation is
       considered as {e confirmed}, it disappears from the injector. *)
   val new_tezos_head :
-    Block_hash.t * int32 ->
-    (Block_hash.t * int32) Injector_common.reorg ->
-    unit Lwt.t
+    Block_hash.t * int32 -> (Block_hash.t * int32) Reorg.t -> unit Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending

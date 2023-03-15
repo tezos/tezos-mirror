@@ -3418,6 +3418,24 @@ let octez_node_config =
         octez_validation |> open_;
       ]
 
+let octez_crawler =
+  public_lib
+    "octez-crawler"
+    ~internal_name:"octez_crawler"
+    ~path:"src/lib_crawler"
+    ~synopsis:"Octez: library to crawl blocks of the L1 chain"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives"
+        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
+        |> open_;
+        octez_rpc_http |> open_;
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_client_base |> open_;
+        octez_shell;
+      ]
+
 let octez_injector =
   public_lib
     "octez-injector"
@@ -3436,6 +3454,7 @@ let octez_injector =
         octez_client_base |> open_;
         octez_workers |> open_;
         octez_shell;
+        octez_crawler |> open_;
       ]
 
 let octez_scoru_wasm_helpers =
@@ -5204,6 +5223,7 @@ module Protocol = Protocol
             octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
+            octez_crawler |> open_;
             tree_encoding;
             data_encoding;
             irmin_pack;

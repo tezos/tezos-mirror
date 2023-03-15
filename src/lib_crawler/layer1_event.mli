@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) Nomadic Labs <contact@nomadic-labs.com>                     *)
+(* Copyright (c) Functori, <contact@functori.com>                            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of signers for operations injected by the injector *)
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
+(** This module defines functions that emit the events used by the layer 1 chain
+    (see {!Layer_1}). *)
 
-(** Retrieve a signer from the client wallet. *)
-val get_signer :
-  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
+val starting : name:string -> unit Lwt.t
+
+val stopping : name:string -> unit Lwt.t
+
+(** Emits the event that the connection to the Tezos node has been lost. *)
+val connection_lost : name:string -> unit Lwt.t
+
+(** [cannot_connect ~count error] emits the event that the rollup node cannot
+    connect to the Tezos node because of [error] for the [count]'s time. *)
+val cannot_connect : name:string -> count:int -> tztrace -> unit Lwt.t
+
+(** [wait_reconnect delay] emits the event that the rollup will wait [delay]
+    seconds before attempting to reconnect to the Tezos node . *)
+val wait_reconnect : name:string -> float -> unit Lwt.t
+
+(** [switched_new_head hash level] emits the event that the layer 1 has notified
+    a new head with [hash] at some given [level]. *)
+val switched_new_head : name:string -> Block_hash.t -> int32 -> unit Lwt.t

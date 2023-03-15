@@ -252,6 +252,13 @@ opam:octez-codec:
   variables:
     package: octez-codec
 
+opam:octez-crawler:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-crawler
+
 # Ignoring unreleased package octez-dac-node.
 
 # Ignoring unreleased package octez-dal-node.
@@ -469,7 +476,7 @@ opam:tezos-client-001-PtCJ7pwo:
 opam:tezos-client-002-PsYLVpVv:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-client-002-PsYLVpVv
 
@@ -518,7 +525,7 @@ opam:tezos-client-008-PtEdo2Zk:
 opam:tezos-client-009-PsFLoren:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-client-009-PsFLoren
 
@@ -766,7 +773,7 @@ opam:tezos-embedded-protocol-011-PtHangz2:
 opam:tezos-embedded-protocol-012-Psithaca:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-012-Psithaca
 
@@ -1101,7 +1108,7 @@ opam:tezos-protocol-alpha:
 opam:tezos-protocol-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-demo-counter
 
@@ -1420,7 +1427,7 @@ opam:tezos-shell-services-test-helpers:
 opam:tezos-signer-backends:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-signer-backends
 
@@ -1519,7 +1526,7 @@ opam:tezos-validation:
 opam:tezos-version:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-version
 

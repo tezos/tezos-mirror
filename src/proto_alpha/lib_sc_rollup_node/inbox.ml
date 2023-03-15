@@ -31,9 +31,9 @@ open Alpha_context
 
 let lift promise = Lwt.map Environment.wrap_tzresult promise
 
-let get_messages Node_context.{l1_ctxt; _} head =
+let get_messages Node_context.{cctxt; _} head =
   let open Lwt_result_syntax in
-  let* block = Layer1.fetch_tezos_block l1_ctxt head in
+  let* block = Layer1.fetch_tezos_block cctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
       _result =
     let open Result_syntax in
@@ -84,7 +84,7 @@ let get_messages Node_context.{l1_ctxt; _} head =
          proto_level = predecessor_proto_level;
          _;
        } =
-    Layer1.fetch_tezos_shell_header l1_ctxt predecessor
+    Layer1.fetch_tezos_shell_header cctxt predecessor
   in
   let is_migration_block =
     block.header.shell.proto_level <> predecessor_proto_level

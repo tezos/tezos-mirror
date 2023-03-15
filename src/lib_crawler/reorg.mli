@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) Nomadic Labs, <contact@nomadic-labs.com>                    *)
+(* Copyright (c) Functori, <contact@functori.com>                            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of signers for operations injected by the injector *)
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
+(** Type of chain reorganizations. *)
+type 'block t = {
+  old_chain : 'block list;
+      (** The blocks that were in the old chain and which are not in the new one. *)
+  new_chain : 'block list;
+      (** The blocks that are now in the new chain. The length of [old_chain] and
+      [new_chain] may be different. *)
 }
 
-(** Retrieve a signer from the client wallet. *)
-val get_signer :
-  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
+val no_reorg : 'a t
+
+val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+
+val map : ('a -> 'b) -> 'a t -> 'b t

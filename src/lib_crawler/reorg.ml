@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) Nomadic Labs, <contact@nomadic-labs.com>                    *)
+(* Copyright (c) Functori, <contact@functori.com>                            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +24,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of signers for operations injected by the injector *)
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
+type 'block t = {old_chain : 'block list; new_chain : 'block list}
 
-(** Retrieve a signer from the client wallet. *)
-val get_signer :
-  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
+let no_reorg = {old_chain = []; new_chain = []}
+
+let encoding block_encoding =
+  let open Data_encoding in
+  conv
+    (fun {old_chain; new_chain} -> (old_chain, new_chain))
+    (fun (old_chain, new_chain) -> {old_chain; new_chain})
+  @@ obj2
+       (req "old_chain" (list block_encoding))
+       (req "new_chain" (list block_encoding))
+
+let map f {old_chain; new_chain} =
+  {old_chain = List.map f old_chain; new_chain = List.map f new_chain}
