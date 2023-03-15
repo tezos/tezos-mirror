@@ -83,7 +83,7 @@ module Shards = struct
   let init node_store_dir shard_store_dir =
     let ( // ) = Filename.concat in
     let dir_path = node_store_dir // shard_store_dir in
-    init ~lru_size:Constants.shards_max_mutexes (fun (commitment, index) ->
+    init ~lru_size:Constants.shards_store_lru_size (fun (commitment, index) ->
         let commitment_string = Cryptobox.Commitment.to_b58check commitment in
         let filename = string_of_int index in
         let filepath = dir_path // commitment_string // filename in

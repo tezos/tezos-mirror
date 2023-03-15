@@ -23,10 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [shards_max_mutexes] is the limit of simultaneous mutexes on shard storage.
-     see [Shard_store.init].
+(** [shards_store_lru_size] is the maximum shards store LRU size. See
+    {!Key_value_store.init} and {!Store.Shards.init}.
 *)
-val shards_max_mutexes : int
+val shards_store_lru_size : int
 
 (** [committee_cache_size] is the size of the DAL committee cache. *)
 val committee_cache_size : int
