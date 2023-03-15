@@ -102,53 +102,101 @@ let display_answer (cctxt : #Configuration.sc_client_context) :
       cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
   | _ -> cctxt#error "Unexpected server answer\n%!"
 
-let find_string json key =
-  match Ezjsonm.find_opt json [key] with
-  | Some v -> Ezjsonm.get_string v
-  | None ->
-      invalid_arg
-        (Printf.sprintf
-           "Key %S was not found in %s: "
-           key
-           (Ezjsonm.value_to_string json))
+let unparsed_transaction_encoding =
+  let open Data_encoding in
+  obj3
+    (req "parameters" string)
+    (req "destination" Contract.originated_encoding)
+    (opt "entrypoint" Entrypoint.simple_encoding)
 
-let parse_transactions transactions =
-  let json = Ezjsonm.from_string transactions in
-  let open Ezjsonm in
-  let open Sc_rollup.Outbox.Message in
-  let open Lwt_result_syntax in
-  Error.trace_lwt_result_with
-    "Failed to parse JSON transactions: %s"
-    transactions
-  @@
-  let transaction json =
-    let destination =
-      find_string json "destination" |> Protocol.Contract_hash.of_b58check_exn
-    in
-    let entrypoint =
-      match find_opt json ["entrypoint"] with
-      | None -> Entrypoint.default
-      | Some entrypoint ->
-          entrypoint |> get_string |> Entrypoint.of_string_strict_exn
-    in
-    let*? parameters =
-      Tezos_micheline.Micheline_parser.no_parsing_error
-      @@ (find_string json "parameters" |> Michelson_v1_parser.parse_expression)
-    in
-    let unparsed_parameters = parameters.expanded in
-    return @@ {destination; entrypoint; unparsed_parameters}
+let unparsed_typed_transaction_encoding =
+  let open Data_encoding in
+  obj4
+    (req "parameters" string)
+    (req "parameters_ty" string)
+    (req "destination" Contract.originated_encoding)
+    (opt "entrypoint" Entrypoint.simple_encoding)
+
+type unparsed_batch =
+  | Atomic_transaction_batch of
+      (string * Protocol.Contract_hash.t * Entrypoint.t option) list
+  | Atomic_transaction_batch_typed of
+      (string * string * Protocol.Contract_hash.t * Entrypoint.t option) list
+
+let unparsed_batch_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Atomic_transaction_batch"
+        (list unparsed_transaction_encoding)
+        (function
+          | Atomic_transaction_batch transactions -> Some transactions
+          | _ -> None)
+        (fun transactions -> Atomic_transaction_batch transactions);
+      case
+        (Tag 1)
+        ~title:"Atomic_transaction_batch_typed"
+        (list unparsed_typed_transaction_encoding)
+        (function
+          | Atomic_transaction_batch_typed transactions -> Some transactions
+          | _ -> None)
+        (fun transactions -> Atomic_transaction_batch_typed transactions);
+    ]
+
+let expand_expr expr =
+  let open Result_syntax in
+  let* expr =
+    Michelson_v1_parser.parse_expression expr
+    |> Tezos_micheline.Micheline_parser.no_parsing_error
   in
-  match json with
-  | `A messages ->
-      let* transactions = List.map_es transaction messages in
-      return @@ Atomic_transaction_batch {transactions}
-  | `O _ ->
-      let* transaction = transaction json in
-      return @@ Atomic_transaction_batch {transactions = [transaction]}
-  | _ ->
-      failwith
-        "An outbox message must be either a single transaction or a list of \
-         transactions."
+  return expr.expanded
+
+let parse_unparsed_batch json =
+  let open Lwt_result_syntax in
+  match Data_encoding.Json.destruct unparsed_batch_encoding json with
+  | Atomic_transaction_batch transactions ->
+      let* transactions =
+        List.map_es
+          (fun (unparsed_parameters, destination, entrypoint) ->
+            let*? unparsed_parameters = expand_expr unparsed_parameters in
+            return
+              Sc_rollup.Outbox.Message.
+                {
+                  unparsed_parameters;
+                  destination;
+                  entrypoint =
+                    Option.value ~default:Entrypoint.default entrypoint;
+                })
+          transactions
+      in
+      return (Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions})
+  | Atomic_transaction_batch_typed transactions ->
+      let* transactions =
+        List.map_es
+          (fun (unparsed_parameters, unparsed_ty, destination, entrypoint) ->
+            let*? unparsed_parameters = expand_expr unparsed_parameters in
+            let*? unparsed_ty = expand_expr unparsed_ty in
+            return
+              Sc_rollup.Outbox.Message.
+                {
+                  unparsed_parameters;
+                  unparsed_ty;
+                  destination;
+                  entrypoint =
+                    Option.value ~default:Entrypoint.default entrypoint;
+                })
+          transactions
+      in
+      return
+        (Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed {transactions})
+
+let outbox_message_parameter =
+  Tezos_clic.parameter (fun (cctxt : #Configuration.sc_client_context) str ->
+      match Data_encoding.Json.from_string str with
+      | Ok json -> parse_unparsed_batch json
+      | Error reason -> cctxt#error "Invalid transaction json: %s" reason)
 
 let get_output_proof () =
   Tezos_clic.command
@@ -163,13 +211,13 @@ let get_output_proof () =
          ~name:"level"
          ~desc:"The level of the rollup outbox where the message is available"
     @@ Tezos_clic.prefixes ["transferring"]
-    @@ Tezos_clic.string
+    @@ Tezos_clic.param
          ~name:"transactions"
          ~desc:"A JSON description of the transactions"
+         outbox_message_parameter
     @@ Tezos_clic.stop)
-    (fun () index level transactions (cctxt : #Configuration.sc_client_context) ->
+    (fun () index level message (cctxt : #Configuration.sc_client_context) ->
       let open Lwt_result_syntax in
-      let* message = parse_transactions transactions in
       let output =
         Protocol.Alpha_context.Sc_rollup.
           {
@@ -192,14 +240,14 @@ let get_output_message_encoding () =
     ~desc:"Get output message encoding."
     Tezos_clic.no_options
     (Tezos_clic.prefixes ["encode"; "outbox"; "message"]
-    @@ Tezos_clic.string
+    @@ Tezos_clic.param
          ~name:"transactions"
          ~desc:"A JSON description of the transactions"
+         outbox_message_parameter
     @@ Tezos_clic.stop)
-    (fun () transactions (cctxt : #Configuration.sc_client_context) ->
+    (fun () message (cctxt : #Configuration.sc_client_context) ->
       let open Lwt_result_syntax in
       let open Protocol.Alpha_context.Sc_rollup.Outbox.Message in
-      let* message = parse_transactions transactions in
       let encoded_message = serialize message in
       (match encoded_message with
       | Ok encoded_message ->
