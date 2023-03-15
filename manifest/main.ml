@@ -1260,13 +1260,24 @@ let octez_plonk_distribution =
     ~deps:[octez_plonk; octez_plonk_aggregation]
     ~preprocess:[pps ppx_repr]
 
-let _octez_plonk_communication =
+let octez_plonk_communication =
   public_lib
     "octez-plonk.communication"
     ~internal_name:"communication"
     ~path:"src/lib_distributed_plonk/communication"
     ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
     ~preprocess:[pps ppx_repr]
+
+let _octez_distributed_plonk =
+  public_lib
+    "octez-distributed-plonk"
+    ~internal_name:"distributed_plonk"
+    ~path:"src/lib_distributed_plonk"
+    ~synopsis:"Distributed version of the proving system"
+    ~deps:[octez_aplonk; octez_plonk_communication; octez_plonk |> open_]
+    ~modules:["distributed_prover"; "filenames"; "master_runner"; "worker"]
+    ~preprocess:[pps ppx_repr]
+    ~bisect_ppx:Yes
 
 let octez_plonk_test_helpers =
   public_lib

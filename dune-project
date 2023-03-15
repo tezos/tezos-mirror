@@ -21,6 +21,7 @@
 (package (name octez-dal-node))
 (package (name octez-distributed-internal))
 (package (name octez-distributed-lwt-internal))
+(package (name octez-distributed-plonk))
 (package (name octez-evm-proxy))
 (package (name octez-injector))
 (package (name octez-mec))
