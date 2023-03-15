@@ -154,12 +154,20 @@ let commands () =
             return_unit
         | Error (P2p_errors.Pending_connection :: _) ->
             let*! () =
-              cctxt#warning "Already connecting to peer %a" P2p_addr.pp address
+              cctxt#warning
+                "Already connecting to peer %a:%d"
+                P2p_addr.pp
+                address
+                port
             in
             return_unit
         | Error (P2p_errors.Connected :: _) ->
             let*! () =
-              cctxt#warning "Already connected to peer %a" P2p_addr.pp address
+              cctxt#warning
+                "Already connected to peer %a:%d"
+                P2p_addr.pp
+                address
+                port
             in
             return_unit
         | Error _ as e -> Lwt.return e);
