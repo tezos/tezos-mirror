@@ -84,7 +84,7 @@ fn write_u256(host: &mut impl Runtime, path: &OwnedPath, value: U256) -> Result<
 
 fn address_path(address: Hash) -> Result<OwnedPath, Error> {
     let address: &str = from_utf8(address)?;
-    let address_path: Vec<u8> = format!("/{}", &address).into();
+    let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
 
