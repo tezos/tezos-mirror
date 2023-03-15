@@ -1441,6 +1441,12 @@ module Legacy = struct
 end
 
 module Full_infrastructure = struct
+  let coordinator_serializes_payload coordinator ~payload ~expected_rh =
+    let* actual_rh =
+      RPC.call coordinator (Dac_rpc.Coordinator.post_preimage ~payload)
+    in
+    return @@ check_valid_root_hash expected_rh actual_rh
+
   let test_coordinator_post_preimage_endpoint Scenarios.{coordinator_node; _} =
     (* 1. Send the [payload] to coordinator.
        2. Assert that it returns [expected_rh].
@@ -1459,6 +1465,86 @@ module Full_infrastructure = struct
     let () = check_valid_root_hash expected_rh actual_rh in
     let* () = root_hash_pushed_to_data_streamer_promise in
     Lwt.return_unit
+
+  let test_download_and_retrieval_of_pages
+      Scenarios.{coordinator_node; committee_members_nodes; observer_nodes; _} =
+    (* 0. Coordinator node is already running when the this function is
+          executed by the test
+       1. Run committee members and observers
+       2. Post a preimage to coordinator
+       3. Wait until all observer and committee members download the payload
+       4. Check that all pages can be retrieved by committee members
+          and observers using the GET preimage endpoint. *)
+    let payload, expected_rh = sample_payload "preimage" in
+    let push_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
+    in
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    let wait_for_root_hash_processed_promises nodes =
+      List.map
+        (fun dac_node ->
+          wait_for_received_root_hash_processed dac_node expected_rh)
+        nodes
+    in
+    (* Initialize configuration of all nodes. *)
+    let* _ =
+      Lwt_list.iter_s
+        (fun committee_member_node ->
+          let* _ = Dac_node.init_config committee_member_node in
+          return ())
+        committee_members_nodes
+    in
+    let* _ =
+      Lwt_list.iter_s
+        (fun observer_node ->
+          let* _ = Dac_node.init_config observer_node in
+          return ())
+        observer_nodes
+    in
+    (* 1. Run committee member and observer nodes.
+       Because the event resolution loop in the Daemon always resolves
+       all promises matching an event filter, when a new event is received,
+       we cannot wait for multiple subscription to the hash streamer, as
+       events of this kind are indistinguishable one from the other.
+       Instead, we wait for the subscription of one observer/committe_member
+       node to be notified before running the next node. *)
+    let* () =
+      Lwt_list.iter_s
+        (fun node ->
+          let node_is_subscribed =
+            wait_for_node_subscribed_to_data_streamer ()
+          in
+          let* () = Dac_node.run ~wait_ready:true node in
+          node_is_subscribed)
+        (committee_members_nodes @ observer_nodes)
+    in
+    let all_nodes_have_processed_root_hash =
+      Lwt.join
+      @@ wait_for_root_hash_processed_promises
+           (committee_members_nodes @ observer_nodes)
+    in
+    (* 2. Post a preimage to the coordinator. *)
+    let* () =
+      coordinator_serializes_payload coordinator_node ~payload ~expected_rh
+    in
+    (* Assert [coordinator] emitted event that [expected_rh] was pushed
+       to the data_streamer. *)
+    let* () = push_promise in
+    (* 3. Wait until all observer and committee member nodes downloaded the
+          payload. *)
+    let* () = all_nodes_have_processed_root_hash in
+    (* 4. Check that all pages can be retrieved by committee members
+          and observers using the GET preimage endpoint.
+
+       Note that using check_downloaded_preimage will request pages from the
+       coordinator node for each observer and committee_member node.
+       This might be inefficient *)
+    Lwt_list.iter_s
+      (fun dac_node ->
+        check_downloaded_preimage coordinator_node dac_node expected_rh)
+      (committee_members_nodes @ observer_nodes)
 end
 
 let register ~protocols =
@@ -1549,4 +1635,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_observer_get_missing_page"
     Legacy.test_observer_get_missing_page
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~observers:1
+    ~committee_members:1
+    ~tags:["dac"; "dac_node"]
+    "committee members and observers download pages from coordinator"
+    Full_infrastructure.test_download_and_retrieval_of_pages
     protocols
