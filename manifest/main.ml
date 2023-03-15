@@ -1475,7 +1475,7 @@ let _octez_distributed_plonk_test_main =
         [
           alias_rule
             "runtest"
-            ~package:"octez-plonk"
+            ~package:"octez-distributed-plonk"
             ~action:[S "run"; S "%{exe:main.exe}"];
         ]
 
