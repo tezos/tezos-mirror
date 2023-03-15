@@ -106,7 +106,11 @@ let find_string json key =
   match Ezjsonm.find_opt json [key] with
   | Some v -> Ezjsonm.get_string v
   | None ->
-      invalid_arg ("Key %s was not found in: " ^ Ezjsonm.value_to_string json)
+      invalid_arg
+        (Printf.sprintf
+           "Key %S was not found in %s: "
+           key
+           (Ezjsonm.value_to_string json))
 
 let parse_transactions transactions =
   let json = Ezjsonm.from_string transactions in
