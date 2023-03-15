@@ -60,9 +60,9 @@ pub fn init_mock_account<Host: Runtime + RawRollupCore>(host: &mut Host) -> Resu
     if !storage::has_account(host, &path)? {
         let balance: Wei = from_eth(9999);
 
-        let mock_account = Account::default_account(hash, balance);
+        let mock_account = Account::default_account(balance);
 
-        store_account(host, mock_account)?
+        store_account(host, mock_account, &path)?
     };
     Ok(())
 }

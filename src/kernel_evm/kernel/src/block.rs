@@ -94,23 +94,21 @@ impl L2Block {
     }
 }
 
-fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedHash, OwnedPath), Error> {
+fn get_tx_sender(tx: &RawTransaction) -> Result<OwnedPath, Error> {
     match tx.sender() {
         // We reencode in hexadecimal, since the accounts hash are encoded in
         // hexadecimal in the storage.
         Ok(address) => {
             let hash = address_to_hash(address);
-            let path = storage::account_path(&hash)?;
-            Ok((hash, path))
+            storage::account_path(&hash)
         }
         Err(_) => Err(Error::Generic),
     }
 }
 
-fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedHash, OwnedPath), Error> {
+fn get_tx_receiver(tx: &RawTransaction) -> Result<OwnedPath, Error> {
     let hash = address_to_hash(tx.to);
-    let path = storage::account_path(&hash)?;
-    Ok((hash, path))
+    storage::account_path(&hash)
 }
 
 // A transaction is valid if the signature is valid, its nonce is valid and it
@@ -120,9 +118,10 @@ fn validate_transaction<Host: Runtime + RawRollupCore>(
     transaction: &Transaction,
 ) -> Result<(), Error> {
     let tx = &transaction.tx;
-    let (_, src) = get_tx_sender(tx)?;
-    let src_balance = storage::read_account_balance(host, &src).unwrap_or_else(|_| Wei::zero());
-    let src_nonce = storage::read_account_nonce(host, &src).unwrap_or(0u64);
+    let src_path = get_tx_sender(tx)?;
+    let src_balance =
+        storage::read_account_balance(host, &src_path).unwrap_or_else(|_| Wei::zero());
+    let src_nonce = storage::read_account_nonce(host, &src_path).unwrap_or(0u64);
     let nonce = tx.nonce.to_u64().ok_or(Error::Generic)?;
     // For now, we consider there's no gas to pay
     let gas = Wei::zero();
@@ -142,7 +141,6 @@ fn validate_transaction<Host: Runtime + RawRollupCore>(
 // initialize it if it doesn't already appear in the storage.
 fn update_account<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    account_hash: &OwnedHash,
     account_path: &OwnedPath,
     balance: Wei,
     nonce: Option<u64>, // if none is given, only the balance is updated. This
@@ -155,10 +153,7 @@ fn update_account<Host: Runtime + RawRollupCore>(
         };
         Ok(())
     } else {
-        storage::store_account(
-            host,
-            Account::default_account(account_hash.clone(), balance),
-        )
+        storage::store_account(host, Account::default_account(balance), account_path)
     }
 }
 
@@ -168,7 +163,7 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
     transaction: &Transaction,
 ) -> Result<bool, Error> {
     let tx = &transaction.tx;
-    let (src_hash, src_path) = get_tx_sender(tx)?;
+    let src_path = get_tx_sender(tx)?;
     let src_balance =
         storage::read_account_balance(host, &src_path).unwrap_or_else(|_| Wei::zero());
     let nonce = tx.nonce.to_u64().ok_or(Error::Generic)?;
@@ -184,13 +179,13 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
     } else {
         (src_balance_without_gas - value, true)
     };
-    update_account(host, &src_hash, &src_path, src_balance, Some(nonce + 1))?;
+    update_account(host, &src_path, src_balance, Some(nonce + 1))?;
 
     if succeed {
-        let (dst_hash, dst_path) = get_tx_receiver(tx)?;
+        let dst_path = get_tx_receiver(tx)?;
         let dst_balance =
             storage::read_account_balance(host, &dst_path).unwrap_or_else(|_| Wei::zero());
-        update_account(host, &dst_hash, &dst_path, dst_balance + value, None)?;
+        update_account(host, &dst_path, dst_balance + value, None)?;
     };
     Ok(succeed)
 }
