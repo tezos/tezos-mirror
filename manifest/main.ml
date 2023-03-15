@@ -5223,6 +5223,7 @@ module Protocol = Protocol
             octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
+            octez_crawler |> open_;
             tree_encoding;
             data_encoding;
             irmin_pack;

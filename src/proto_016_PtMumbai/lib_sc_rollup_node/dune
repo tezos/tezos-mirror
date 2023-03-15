@@ -27,6 +27,7 @@
   tezos-smart-rollup-layer2-016-PtMumbai
   tezos-layer2-utils-016-PtMumbai
   tezos_layer2_store
+  octez-crawler
   tezos-tree-encoding
   data-encoding
   irmin-pack
@@ -59,5 +60,6 @@
   -open Tezos_smart_rollup_layer2_016_PtMumbai
   -open Tezos_layer2_utils_016_PtMumbai
   -open Tezos_layer2_store
+  -open Octez_crawler
   -open Octez_injector
   -open Tezos_crypto_dal))

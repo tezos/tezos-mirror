@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Configuration
-open Protocol.Alpha_context
-open Plugin
 open Protocol_client_context
 
 (**
@@ -53,24 +51,6 @@ let () =
     (function Cannot_find_block hash -> Some hash | _ -> None)
     (fun hash -> Cannot_find_block hash)
 
-type error += Cannot_find_predecessor of Block_hash.t
-
-let () =
-  register_error_kind
-    ~id:"sc_rollup.node.cannot_find_predecessor"
-    ~title:"Cannot find block predecessor from L1"
-    ~description:"A predecessor couldn't be found from the L1 node"
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "Block with hash %a has no predecessor on the L1 node."
-        Block_hash.pp
-        hash)
-    `Temporary
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
-    (function Cannot_find_predecessor hash -> Some hash | _ -> None)
-    (fun hash -> Cannot_find_predecessor hash)
-
 (**
 
    State
@@ -91,16 +71,46 @@ module Blocks_cache =
   Aches_lwt.Lache.Make_option
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
-type blocks_cache =
-  Protocol_client_context.Alpha_block_services.block_info Blocks_cache.t
+type blocks_cache = Alpha_block_services.block_info Blocks_cache.t
 
-type t = {
-  blocks_cache : blocks_cache;
-  heads : head Lwt_stream.t;
-  cctxt : Protocol_client_context.full;
-  stopper : Tezos_rpc.Context.stopper;
-  genesis_info : Sc_rollup.Commitment.genesis_info;
-}
+(** Global blocks cache for the smart rollup node. *)
+let blocks_cache : blocks_cache = Blocks_cache.create 32
+
+include Octez_crawler.Layer_1
+
+let head_of_block_level (hash, level) = {hash; level}
+
+let block_level_of_head {hash; level} = (hash, level)
+
+let iter_heads l1_ctxt f =
+  iter_heads l1_ctxt @@ fun (hash, {shell = {level; _}; _}) -> f {hash; level}
+
+let get_predecessor_opt state head =
+  let open Lwt_result_syntax in
+  let+ res = get_predecessor_opt state (block_level_of_head head) in
+  Option.map head_of_block_level res
+
+let get_predecessor state head =
+  let open Lwt_result_syntax in
+  let+ res = get_predecessor state (block_level_of_head head) in
+  head_of_block_level res
+
+let nth_predecessor l1_state n block =
+  let open Lwt_result_syntax in
+  let+ res, preds = nth_predecessor l1_state n (block_level_of_head block) in
+  (head_of_block_level res, List.map head_of_block_level preds)
+
+let get_tezos_reorg_for_new_head l1_ctxt old_head new_head =
+  let open Lwt_result_syntax in
+  let old_head =
+    match old_head with
+    | `Level l -> `Level l
+    | `Head h -> `Head (block_level_of_head h)
+  in
+  let+ reorg =
+    get_tezos_reorg_for_new_head l1_ctxt old_head (block_level_of_head new_head)
+  in
+  Reorg.map head_of_block_level reorg
 
 (**
 
@@ -109,138 +119,10 @@ type t = {
 
 *)
 
-(** [predecessors_of_blocks hashes] given a list of successive hashes,
-    returns an associative list that associates a hash to its
-    predecessor in this list. *)
-let predecessors_of_blocks hashes =
-  let rec aux next = function [] -> [] | x :: xs -> (next, x) :: aux x xs in
-  match hashes with [] -> [] | x :: xs -> aux x xs
-
-(** [get_predecessor block_hash] returns the predecessor block hash of
-    some [block_hash] through an RPC to the Tezos node. To limit the
-    number of RPCs, this information is requested for a batch of hashes
-    and cached locally. *)
-let get_predecessor =
-  let max_cached = 1023 and max_read = 8 in
-  let module HM =
-    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
-  in
-  let cache = HM.create max_cached in
-  fun cctxt (chain : Tezos_shell_services.Chain_services.chain) ancestor ->
-    let open Lwt_result_syntax in
-    match HM.find_opt cache ancestor with
-    | Some pred -> return_some pred
-    | None -> (
-        let* blocks =
-          Tezos_shell_services.Chain_services.Blocks.list
-            cctxt
-            ~chain
-            ~heads:[ancestor]
-            ~length:max_read
-            ()
-        in
-        match blocks with
-        | [ancestors] -> (
-            List.iter
-              (fun (h, p) -> HM.replace cache h p)
-              (predecessors_of_blocks ancestors) ;
-            match HM.find_opt cache ancestor with
-            | None ->
-                (* We have just updated the cache with that information. *)
-                assert false
-            | Some predecessor -> return_some predecessor)
-        | _ -> return_none)
-
-let get_predecessor_opt state {level; hash} =
-  let open Lwt_result_syntax in
-  if level = 0l then return_none
-  else
-    let level = Int32.pred level in
-    let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
-    Option.map (fun hash -> {level; hash}) hash
-
-let get_predecessor state ({hash; _} as head) =
-  let open Lwt_result_syntax in
-  let* pred = get_predecessor_opt state head in
-  match pred with
-  | None -> tzfail (Cannot_find_predecessor hash)
-  | Some pred -> return pred
-
-let rec connect ?(count = 0) ~delay cctxt genesis_info =
-  let open Lwt_syntax in
-  let* () =
-    if count = 0 then return_unit
-    else
-      let fcount = float_of_int (count - 1) in
-      (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
-      let delay = delay *. (1.5 ** fcount) in
-      let delay = min delay 3600. in
-      let randomization_factor = 0.5 (* 50% *) in
-      let delay =
-        delay
-        +. Random.float (delay *. 2. *. randomization_factor)
-        -. (delay *. randomization_factor)
-      in
-      let* () = Event.wait_reconnect delay in
-      Lwt_unix.sleep delay
-  in
-  let* res = Tezos_shell_services.Monitor_services.heads cctxt cctxt#chain in
-  match res with
-  | Ok (heads, stopper) ->
-      let heads =
-        Lwt_stream.map_s
-          (fun (hash, Tezos_base.Block_header.{shell = {level; _}; _}) ->
-            let+ () = Layer1_event.switched_new_head hash level in
-            {hash; level})
-          heads
-      in
-      return_ok (heads, stopper)
-  | Error e ->
-      let* () = Event.cannot_connect ~count e in
-      connect ~delay ~count:(count + 1) cctxt genesis_info
-
-let start configuration (cctxt : Protocol_client_context.full) =
-  let open Lwt_result_syntax in
-  let*! () = Layer1_event.starting () in
-  let* kind =
-    RPC.Sc_rollup.kind
-      cctxt
-      (cctxt#chain, cctxt#block)
-      configuration.sc_rollup_address
-      ()
-  in
-  let*! () = Event.rollup_exists ~addr:configuration.sc_rollup_address ~kind in
-  let* genesis_info =
-    RPC.Sc_rollup.genesis_info
-      cctxt
-      (cctxt#chain, cctxt#block)
-      configuration.sc_rollup_address
-  in
-  let+ heads, stopper =
-    connect ~delay:configuration.reconnection_delay cctxt genesis_info
-  in
-  ( {cctxt; heads; blocks_cache = Blocks_cache.create 32; stopper; genesis_info},
-    kind )
-
-let reconnect configuration l1_ctxt =
-  let open Lwt_result_syntax in
-  let* heads, stopper =
-    connect
-      ~count:1
-      ~delay:configuration.reconnection_delay
-      l1_ctxt.cctxt
-      l1_ctxt.genesis_info
-  in
-  return {l1_ctxt with heads; stopper}
-
-let shutdown state =
-  state.stopper () ;
-  Lwt.return_unit
-
-(** [fetch_tezos_block l1_ctxt hash] returns a block shell header of
+(** [fetch_tezos_block cctxt hash] returns a block shell header of
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)
-let fetch_tezos_shell_header l1_ctxt hash =
+let fetch_tezos_shell_header cctxt hash =
   let open Lwt_syntax in
   trace (Cannot_find_block hash)
   @@
@@ -248,7 +130,7 @@ let fetch_tezos_shell_header l1_ctxt hash =
   let fetch hash =
     let* shell_header =
       Tezos_shell_services.Shell_services.Blocks.Header.shell_header
-        l1_ctxt.cctxt
+        cctxt
         ~chain:`Main
         ~block:(`Hash (hash, 0))
         ()
@@ -261,7 +143,7 @@ let fetch_tezos_shell_header l1_ctxt hash =
   in
   let+ shell_header =
     let res =
-      Blocks_cache.bind l1_ctxt.blocks_cache hash (function
+      Blocks_cache.bind blocks_cache hash (function
           | Some block_info -> Lwt.return_some block_info.header.shell
           | None -> Lwt.return_none)
     in
@@ -278,10 +160,10 @@ let fetch_tezos_shell_header l1_ctxt hash =
   | None, Some errs -> Error errs
   | Some shell_header, _ -> Ok shell_header
 
-(** [fetch_tezos_block l1_ctxt hash] returns a block info given a block
+(** [fetch_tezos_block cctxt hash] returns a block info given a block
     hash. Looks for the block in the blocks cache first, and fetches it from the
     L1 node otherwise. *)
-let fetch_tezos_block l1_ctxt hash =
+let fetch_tezos_block cctxt hash =
   let open Lwt_syntax in
   trace (Cannot_find_block hash)
   @@
@@ -289,7 +171,7 @@ let fetch_tezos_block l1_ctxt hash =
   let fetch hash =
     let* block =
       Alpha_block_services.info
-        l1_ctxt.cctxt
+        cctxt
         ~chain:`Main
         ~block:(`Hash (hash, 0))
         ~metadata:`Always
@@ -301,9 +183,7 @@ let fetch_tezos_block l1_ctxt hash =
         return_none
     | Ok block -> return_some block
   in
-  let+ block =
-    Blocks_cache.bind_or_put l1_ctxt.blocks_cache hash fetch Lwt.return
-  in
+  let+ block = Blocks_cache.bind_or_put blocks_cache hash fetch Lwt.return in
   match (block, !errors) with
   | None, None ->
       (* This should not happen if {!find_in_cache} behaves correctly,
@@ -314,64 +194,3 @@ let fetch_tezos_block l1_ctxt hash =
         hash
   | None, Some errs -> Error errs
   | Some block, _ -> Ok block
-
-let nth_predecessor l1_state n block =
-  let open Lwt_result_syntax in
-  assert (n >= 0) ;
-  let rec aux acc n block =
-    if n = 0 then return (block, acc)
-    else
-      let* pred = get_predecessor l1_state block in
-      (aux [@tailcall]) (block :: acc) (n - 1) pred
-  in
-  aux [] n block
-
-let get_tezos_reorg_for_new_head l1_state old_head new_head =
-  let open Lwt_result_syntax in
-  (* old_head and new_head must have the same level when calling aux *)
-  let rec aux reorg old_head new_head =
-    if Block_hash.(old_head.hash = new_head.hash) then return reorg
-    else
-      let* old_head_pred = get_predecessor l1_state old_head in
-      let* new_head_pred = get_predecessor l1_state new_head in
-      let reorg =
-        Injector_common.
-          {
-            old_chain = old_head :: reorg.old_chain;
-            new_chain = new_head :: reorg.new_chain;
-          }
-      in
-      aux reorg old_head_pred new_head_pred
-  in
-  (* computing partial reorganization to make old_head and new_head at same
-     level *)
-  let distance = Int32.(to_int @@ abs @@ sub new_head.level old_head.level) in
-  let* old_head, new_head, reorg =
-    if old_head.level = new_head.level then
-      return (old_head, new_head, Injector_common.no_reorg)
-    else if old_head.level < new_head.level then
-      let+ new_head, new_chain = nth_predecessor l1_state distance new_head in
-      (old_head, new_head, {Injector_common.no_reorg with new_chain})
-    else
-      let+ old_head, old_chain = nth_predecessor l1_state distance old_head in
-      (old_head, new_head, {Injector_common.no_reorg with old_chain})
-  in
-  assert (old_head.level = new_head.level) ;
-  aux reorg old_head new_head
-
-(** Returns the reorganization of L1 blocks (if any) for [new_head]. *)
-let get_tezos_reorg_for_new_head l1_state old_head new_head =
-  let open Lwt_result_syntax in
-  match old_head with
-  | `Level l ->
-      (* No known tezos head, we want all blocks from l. *)
-      if new_head.level < l then return Injector_common.no_reorg
-      else
-        let* _block_at_l, new_chain =
-          nth_predecessor
-            l1_state
-            (Int32.sub new_head.level l |> Int32.to_int)
-            new_head
-        in
-        return Injector_common.{old_chain = []; new_chain}
-  | `Head old_head -> get_tezos_reorg_for_new_head l1_state old_head new_head

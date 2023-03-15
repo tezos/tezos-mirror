@@ -27,6 +27,7 @@
   tezos-smart-rollup-layer2-alpha
   tezos-layer2-utils-alpha
   tezos_layer2_store
+  octez-crawler
   tezos-tree-encoding
   data-encoding
   irmin-pack
@@ -59,5 +60,6 @@
   -open Tezos_smart_rollup_layer2_alpha
   -open Tezos_layer2_utils_alpha
   -open Tezos_layer2_store
+  -open Octez_crawler
   -open Octez_injector
   -open Tezos_crypto_dal))

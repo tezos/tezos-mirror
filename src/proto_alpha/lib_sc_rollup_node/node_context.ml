@@ -124,6 +124,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
         loser_mode;
         l2_blocks_cache_size;
         dal_node_endpoint;
+        reconnection_delay;
         _;
       } as configuration) =
   let open Lwt_result_syntax in
@@ -139,7 +140,9 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
   let*! context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in
-  let* l1_ctxt, kind = Layer1.start configuration cctxt in
+  let* l1_ctxt =
+    Layer1.start ~name:"sc_rollup_node" ~reconnection_delay cctxt
+  in
   let publisher = Configuration.Operator_purpose_map.find Publish operators in
   let* protocol_constants = retrieve_constants cctxt
   and* lcc = get_last_cemented_commitment cctxt rollup_address
@@ -147,7 +150,12 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
     Option.filter_map_es
       (get_last_published_commitment cctxt rollup_address)
       publisher
+  and* kind =
+    RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
+  and* genesis_info =
+    RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, cctxt#block) rollup_address
   in
+  let*! () = Event.rollup_exists ~addr:configuration.sc_rollup_address ~kind in
   let*! () =
     if dal_cctxt = None && protocol_constants.parametric.dal.feature_enable then
       Event.warn_dal_enabled_no_node ()
@@ -162,7 +170,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
       rollup_address;
       mode = operating_mode;
       operators;
-      genesis_info = l1_ctxt.Layer1.genesis_info;
+      genesis_info;
       lcc = Reference.new_ lcc;
       lpc = Reference.new_ lpc;
       kind;
@@ -256,13 +264,13 @@ let hash_of_level node_ctxt level =
   | Some h -> return h
   | None -> failwith "Cannot retrieve hash of level %ld" level
 
-let level_of_hash {l1_ctxt; store; _} hash =
+let level_of_hash {cctxt; store; _} hash =
   let open Lwt_result_syntax in
   let* l2_header = Store.L2_blocks.header store.l2_blocks hash in
   match l2_header with
   | Some {level; _} -> return (Raw_level.to_int32 level)
   | None ->
-      let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
+      let+ {level; _} = Layer1.fetch_tezos_shell_header cctxt hash in
       level
 
 let save_level {store; _} Layer1.{hash; level} =
