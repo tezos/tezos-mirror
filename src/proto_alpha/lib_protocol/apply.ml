@@ -1930,7 +1930,7 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
 let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
-    ~source ~operation_length contents_list =
+    ~source ~operation contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
@@ -1938,9 +1938,7 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     let algo =
       Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
     in
-    Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
-      algo
-      operation_length
+    Operation_costs.check_signature_cost algo operation
   in
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
@@ -2016,7 +2014,7 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
 let apply_contents_list (type kind) ctxt chain_id (mode : mode)
-    ~payload_producer ~operation_length (contents_list : kind contents_list) :
+    ~payload_producer ~operation (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
     match mode with
@@ -2109,7 +2107,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         chain_id
         ~mempool_mode
         ~source
-        ~operation_length
+        ~operation
         contents_list
   | Cons (Manager_operation {source; _}, _) ->
       apply_manager_operations
@@ -2118,7 +2116,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         chain_id
         ~mempool_mode
         ~source
-        ~operation_length
+        ~operation
         contents_list
 
 let apply_operation application_state operation_hash operation =
@@ -2132,14 +2130,13 @@ let apply_operation application_state operation_hash operation =
     in
     let ctxt = Origination_nonce.init application_state.ctxt operation_hash in
     let ctxt = record_operation ctxt operation_hash operation in
-    let operation_length = Operation.unsigned_operation_length operation in
     let* ctxt, result =
       apply_contents_list
         ctxt
         application_state.chain_id
         application_state.mode
         ~payload_producer
-        ~operation_length
+        ~operation
         operation.protocol_data.contents
     in
     let ctxt = Gas.set_unlimited ctxt in

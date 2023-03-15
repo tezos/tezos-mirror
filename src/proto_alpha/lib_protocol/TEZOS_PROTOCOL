@@ -222,6 +222,7 @@
         "Michelson_v1_gas_costs_generated",
         "Michelson_v1_gas_costs",
         "Michelson_v1_gas",
+        "Operation_costs",
         "Script_tc_context",
         "Ticket_token",
         "Ticket_receipt",

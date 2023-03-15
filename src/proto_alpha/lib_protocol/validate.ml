@@ -2187,10 +2187,10 @@ module Manager = struct
     let* batch_state, source_pk =
       check_sanity_and_find_public_key vi contents_list
     in
-    let operation_length = Operation.unsigned_operation_length operation in
     let signature_checking_gas_cost =
-      Michelson_v1_gas.Cost_of.Interpreter.(
-        check_signature_on_algo (algo_of_public_key source_pk) operation_length)
+      Operation_costs.check_signature_cost
+        (Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key source_pk)
+        operation
     in
     let* gas_used =
       check_contents_list
