@@ -16,7 +16,8 @@ module Baker = struct
     let canceler = Lwt_canceler.create () in
     let on_error (err : error trace) =
       Lwt_canceler.cancel canceler >>= fun _ ->
-      failwith "%a" Error_monad.pp_print_trace err
+      Format.printf "%a" Error_monad.pp_print_trace err ;
+      Lwt_exit.exit_and_raise 1
     in
     Baking_scheduling.run
       cctxt
