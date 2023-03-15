@@ -19,6 +19,8 @@
 (package (name octez-crawler))
 (package (name octez-dac-node))
 (package (name octez-dal-node))
+(package (name octez-distributed-internal))
+(package (name octez-distributed-lwt-internal))
 (package (name octez-evm-proxy))
 (package (name octez-injector))
 (package (name octez-mec))

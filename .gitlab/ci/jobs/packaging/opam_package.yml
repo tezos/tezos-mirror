@@ -286,6 +286,10 @@ opam:octez-crawler:
 
 # Ignoring unreleased package octez-dal-node.
 
+# Ignoring unreleased package octez-distributed-internal.
+
+# Ignoring unreleased package octez-distributed-lwt-internal.
+
 # Ignoring unreleased package octez-evm-proxy.
 
 opam:octez-injector:

@@ -365,6 +365,25 @@ let () =
 
 (* INTERNAL LIBS *)
 
+(* Fork of https://github.com/essdotteedot/distributed, used for plonk.
+   uwt has been removed. The directories examples and tests have been dropped.
+*)
+let distributed_internal =
+  public_lib
+    "octez-distributed-internal"
+    ~internal_name:"distributed"
+    ~path:"src/lib_distributed_internal/src"
+    ~synopsis:"Fork of distributed. Use for Octez only"
+    ~deps:[unix]
+
+let _distributed_internal_lwt =
+  public_lib
+    "octez-distributed-lwt-internal"
+    ~internal_name:"distributed_lwt"
+    ~path:"src/lib_distributed_internal/lwt"
+    ~synopsis:"Fork of distributed-lwt. Use for Octez only"
+    ~deps:[unix; distributed_internal; lwt; lwt_unix; logs_lwt]
+
 let tezt_lib =
   external_lib
     ~js_compatible:false
