@@ -49,12 +49,26 @@ type scores = {
   tvalues : (Free_variable.t * float) list;
 }
 
-let pp_scores ppf {r2_score; rmse_score} =
-  Format.fprintf
+let pp_scores ppf {r2_score; rmse_score; tvalues} =
+  let scores =
+    [
+      ("R2: "
+      ^ match r2_score with None -> "NA" | Some s -> Printf.sprintf "%f" s);
+      "RMSE: " ^ Printf.sprintf "%f" rmse_score;
+    ]
+    @ List.map
+        (fun (v, t) ->
+          Printf.sprintf
+            "T-%s: %f"
+            (Free_variable.to_namespace v |> Namespace.basename)
+            t)
+        tvalues
+  in
+  Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf " , ")
+    (fun ppf s -> Format.fprintf ppf "%s" s)
     ppf
-    "R2: %s , RMSE: %f"
-    (match r2_score with None -> "NA" | Some s -> Printf.sprintf "%f" s)
-    rmse_score
+    scores
 
 let scores_to_csv_column (model_name, bench_name) scores =
   let {r2_score; rmse_score; tvalues} = scores in
