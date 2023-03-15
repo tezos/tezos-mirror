@@ -50,10 +50,6 @@ pub struct L2Block {
 }
 
 impl L2Block {
-    // dead code is allowed in this implementation because the following constants
-    // are not used outside the scope of L2Block
-    #![allow(dead_code)]
-
     const DUMMY_QUANTITY: Quantity = 0;
     const DUMMY_HASH: &str = "0000000000000000000000000000000000000000";
 
