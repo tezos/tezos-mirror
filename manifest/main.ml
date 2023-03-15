@@ -178,10 +178,10 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.6.0" && less_than "3.7.0")
+let irmin = external_lib "irmin" V.(at_least "3.6.1" && less_than "3.7.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "3.6.0" && less_than "3.7.0")
+  external_lib "irmin-pack" V.(at_least "3.6.1" && less_than "3.7.0")
 
 let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 

@@ -19,7 +19,7 @@ depends: [
   "tezos-validation"
   "tezos-version"
   "index" { >= "1.6.0" & < "1.7.0" }
-  "irmin-pack" { >= "3.6.0" & < "3.7.0" }
+  "irmin-pack" { >= "3.6.1" & < "3.7.0" }
   "tezos-protocol-environment"
   "tezos-context"
   "tezos-context-ops"
