@@ -274,7 +274,7 @@ let test_rpc_getBalance =
       ~account:Account.prefunded_account_address
       ~endpoint:evm_proxy_server_endpoint
   in
-  Check.((balance = 9999) int)
+  Check.((balance = Wei.of_eth_int 9999) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -365,12 +365,8 @@ let test_l2_transfer =
   let* sender_balance = balance sender.address in
   let* receiver_balance = balance receiver.address in
   let* sender_nonce = get_transaction_count evm_proxy_server sender.address in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5024
-      Introduce a eth/wei module. *)
-  let eth_amount = sender_balance / 2 in
   (* We always send less than the balance, to ensure it always works. *)
-  let amount = Z.(of_int eth_amount * (of_int 10 ** 18)) in
-
+  let value = Wei.(sender_balance - one) in
   let* _tx_hash =
     send_and_wait_until_tx_mined
       ~sc_rollup_node
@@ -378,19 +374,18 @@ let test_l2_transfer =
       ~client
       ~source_private_key:sender.private_key
       ~to_public_key:receiver.address
-      ~value:amount
+      ~value
       ~evm_proxy_server_endpoint
   in
-
   let* new_sender_balance = balance sender.address in
   let* new_receiver_balance = balance receiver.address in
   let* new_sender_nonce =
     get_transaction_count evm_proxy_server sender.address
   in
-  Check.((new_sender_balance = sender_balance - eth_amount) int)
+  Check.(Wei.(new_sender_balance = sender_balance - value) Wei.typ)
     ~error_msg:
       "Unexpected sender balance after transfer, should be %R, but got %L" ;
-  Check.((new_receiver_balance = receiver_balance + eth_amount) int)
+  Check.(Wei.(new_receiver_balance = receiver_balance + value) Wei.typ)
     ~error_msg:
       "Unexpected receiver balance after transfer, should be %R, but got %L" ;
   Check.((new_sender_nonce = Int64.succ sender_nonce) int64)
