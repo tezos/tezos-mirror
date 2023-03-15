@@ -103,38 +103,33 @@ let next_evm_level ~sc_rollup_node ~node ~client =
     sc_rollup_node
     (Node.get_level node)
 
-(** [next_evm_until ?max_next_level ~stop_condition ~sc_rollup_node ~node client]
-    calls {!next_evm_level} until [stop_condition] returns true.
-
-    [max_next_level] limits the number of calls to {!next_evm_level},
-    defaults to [10].
-*)
-let rec next_evm_until ?(max_next_level = 10) ~stop_condition ~sc_rollup_node
-    ~node client =
-  let* stop_condition_ok = stop_condition () in
-  if stop_condition_ok then unit
-  else if max_next_level = 0 then
-    Test.fail "[next_evm_until] is not allowed to move to next level again"
-  else
-    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-    next_evm_until
-      ~max_next_level:(max_next_level - 1)
-      ~stop_condition
-      ~sc_rollup_node
-      ~node
-      client
-
-let wait_until_tx_included ~evm_proxy_server_endpoint ~sc_rollup_node ~node
-    ~tx_hash client =
-  let stop_condition () =
-    let endpoint = evm_proxy_server_endpoint in
-    let* current = Eth_cli.block_number ~endpoint in
-    let* {transactions; _} =
-      Eth_cli.get_block ~block_id:(string_of_int current) ~endpoint
-    in
-    return (List.exists (String.equal tx_hash) transactions)
+let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
+    ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint =
+  let* start_level = Client.level client in
+  let max_iteration = 10 in
+  let tx_hash =
+    Eth_cli.transaction_send
+      ~source_private_key
+      ~to_public_key
+      ~value
+      ~endpoint:evm_proxy_server_endpoint
   in
-  next_evm_until ~stop_condition ~sc_rollup_node ~node client
+  let next_level =
+    let rec go () =
+      (* Sleep few seconds to give a better chance to [tx_hash] of being
+         choosen. *)
+      let* () = Lwt_unix.sleep 5. in
+      let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
+      if start_level + max_iteration < new_level then
+        Test.fail
+          "Baked more than %d blocks and [eth transaction:send] is still \
+           pending"
+          max_iteration
+      else go ()
+    in
+    go ()
+  in
+  Lwt.choose [tx_hash; next_level]
 
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
@@ -375,22 +370,18 @@ let test_l2_transfer =
   let eth_amount = sender_balance / 2 in
   (* We always send less than the balance, to ensure it always works. *)
   let amount = Z.(of_int eth_amount * (of_int 10 ** 18)) in
-  let* tx_hash =
-    Eth_cli.transaction_send
+
+  let* _tx_hash =
+    send_and_wait_until_tx_mined
+      ~sc_rollup_node
+      ~node
+      ~client
       ~source_private_key:sender.private_key
       ~to_public_key:receiver.address
       ~value:amount
-      ~endpoint:evm_proxy_server_endpoint
-  in
-  (* Wait for the transaction to be included in a block. *)
-  let* () =
-    wait_until_tx_included
       ~evm_proxy_server_endpoint
-      ~sc_rollup_node
-      ~tx_hash
-      ~node
-      client
   in
+
   let* new_sender_balance = balance sender.address in
   let* new_receiver_balance = balance receiver.address in
   let* new_sender_nonce =
