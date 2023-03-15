@@ -175,24 +175,24 @@ let get_stakes_for_selected_index ctxt index =
       let*? total_balance =
         balance_and_frozen_bonds +? frozen_deposits.current_amount
       in
-      let* stake_for_cycle =
-        let frozen_deposits_limit =
-          match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
-        in
-        let aux = min total_balance frozen_deposits_limit in
-        if aux <= overflow_bound then
-          let*? aux = aux *? 100L in
-          let*? v = aux /? frozen_deposits_percentage in
+      let frozen_deposits_limit =
+        match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
+      in
+      let frozen = min total_balance frozen_deposits_limit in
+      let* total_stake_for_cycle =
+        if frozen <= overflow_bound then
+          let*? frozen = frozen *? 100L in
+          let*? v = frozen /? frozen_deposits_percentage in
           return (min v staking_balance)
         else
           let*? sbal = staking_balance /? 100L in
-          let*? a = aux /? frozen_deposits_percentage in
+          let*? a = frozen /? frozen_deposits_percentage in
           if sbal <= a then return staking_balance
           else
             let*? r = max_mutez /? frozen_deposits_percentage in
             return r
       in
-      let stake_for_cycle = Stake_repr.make ~total:stake_for_cycle in
+      let stake_for_cycle = Stake_repr.make ~total:total_stake_for_cycle in
       let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
       return ((delegate, stake_for_cycle) :: acc, total_stake))
     ~init:([], Stake_repr.zero)
