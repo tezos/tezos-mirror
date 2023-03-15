@@ -163,7 +163,7 @@ _`Layer 2`
     the security of the L1 chain backs those operations. In Tezos there are a number of layer 2 solutions,
     including :doc:`Smart Optimistic Rollups <smart_rollups>`,
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
-    zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
+    zkChannels, and sidechains such as `Deku <https://deku.marigold.dev/>`_.
 
 _`Michelson`
     The built-in language used by a `smart contract`_.
