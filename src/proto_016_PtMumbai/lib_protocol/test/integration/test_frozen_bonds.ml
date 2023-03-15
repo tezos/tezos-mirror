@@ -39,12 +39,12 @@ open Test_tez
 let ( >>>=? ) x f = x >|= Environment.wrap_tzresult >>=? f
 
 let big_random_amount () =
-  match Tez.of_mutez (Int64.add 1L (Random.int64 10_000L)) with
+  match Tez.of_mutez (Int64.add 100_000L (Random.int64 1_000_000L)) with
   | None -> assert false
   | Some x -> x
 
 let small_random_amount () =
-  match Tez.of_mutez (Int64.add 1L (Random.int64 1_000L)) with
+  match Tez.of_mutez (Int64.add 1_000L (Random.int64 10_000L)) with
   | None -> assert false
   | Some x -> x
 
