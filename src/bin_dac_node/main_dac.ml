@@ -229,7 +229,7 @@ module Config_init = struct
       ~desc:"Configure DAC node in committee member mode."
       (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
       (prefixes
-         ["configure"; "as"; "commmittee"; "member"; "with"; "coordinator"]
+         ["configure"; "as"; "committee"; "member"; "with"; "coordinator"]
       @@ coordinator_rpc_param
       @@ prefixes ["and"; "signer"]
       @@ tz4_address_param @@ stop)
