@@ -479,32 +479,25 @@ let test_tx_kernel_e2e protocol =
     in
     let parameters d =
       Printf.sprintf
-        {|Pair 0x%s (Pair \"%s\" %s)|}
+        {|Pair 0x%s (Pair "%s" %s)|}
         ticketer
         "Hello, Ticket!"
         (Int.to_string d)
+    in
+    let outbox_transaction param =
+      Sc_rollup_client.
+        {
+          destination;
+          entrypoint = Some "receive_tickets";
+          parameters = parameters param;
+          parameters_ty = None;
+        }
     in
     Sc_rollup_client.outbox_proof_batch
       sc_rollup_client
       ~message_index
       ~outbox_level
-      [
-        {
-          destination;
-          entrypoint = Some "receive_tickets";
-          parameters = parameters 220;
-        };
-        {
-          destination;
-          entrypoint = Some "receive_tickets";
-          parameters = parameters 100;
-        };
-        {
-          destination;
-          entrypoint = Some "receive_tickets";
-          parameters = parameters 40;
-        };
-      ]
+      (List.map outbox_transaction [220; 100; 40])
   in
   let* () =
     match answer with

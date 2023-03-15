@@ -154,6 +154,7 @@ val outbox_proof_single :
   ?hooks:Process.hooks ->
   ?expected_error:Base.rex ->
   ?entrypoint:string ->
+  ?parameters_ty:string ->
   t ->
   message_index:int ->
   outbox_level:int ->
@@ -165,6 +166,7 @@ type transaction = {
   destination : string;
   entrypoint : string option;
   parameters : string;
+  parameters_ty : string option;
 }
 
 (** Same as [outbox_proof_single] except that the claim is about a batch
