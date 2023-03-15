@@ -155,7 +155,8 @@ fn update_account<Host: Runtime + RawRollupCore>(
         };
         Ok(())
     } else {
-        storage::store_account(host, Account::with_assets(balance), account_path)
+        let account = Account::with_assets(balance);
+        storage::store_account(host, &account, account_path)
     }
 }
 
