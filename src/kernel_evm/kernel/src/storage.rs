@@ -195,10 +195,11 @@ pub fn read_current_block_number<Host: Runtime + RawRollupCore>(
     }
 }
 
-fn read_current_block_transactions<Host: Runtime>(
+fn read_nth_block_transactions<Host: Runtime>(
     host: &mut Host,
+    block_path: &OwnedPath,
 ) -> Result<Vec<TransactionHash>, Error> {
-    let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
 
     let transactions_bytes = host
         .store_read(&path, 0, MAX_TRANSACTION_HASHES)
@@ -216,7 +217,8 @@ pub fn read_current_block<Host: Runtime + RawRollupCore>(
     host: &mut Host,
 ) -> Result<L2Block, Error> {
     let number = read_current_block_number(host)?;
-    let transactions = read_current_block_transactions(host)?;
+    let block_path = block_path(number)?;
+    let transactions = read_nth_block_transactions(host, &block_path)?;
 
     Ok(L2Block::new(number, transactions))
 }
@@ -274,8 +276,8 @@ pub fn store_current_block<Host: Runtime + RawRollupCore>(
     block: L2Block,
 ) -> Result<(), Error> {
     let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
-    store_block(host, &block, current_block_path)?;
-    /* When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
-    path as well, thus the following line: */
+    // We only need to store current block's number so we avoid the storage of duplicate informations.
+    store_block_number(host, &current_block_path, block.number)?;
+    // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
     store_block_by_number(host, &block)
 }
