@@ -274,11 +274,11 @@ pub fn store_block_by_number<Host: Runtime + RawRollupCore>(
 
 pub fn store_current_block<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    block: L2Block,
+    block: &L2Block,
 ) -> Result<(), Error> {
     let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
     // We only need to store current block's number so we avoid the storage of duplicate informations.
     store_block_number(host, &current_block_path, block.number)?;
-    // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
-    store_block_by_number(host, &block)
+    // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
+    store_block_by_number(host, block)
 }

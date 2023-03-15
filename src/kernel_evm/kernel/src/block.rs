@@ -188,13 +188,11 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
 
 fn validate<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    block: L2Block,
     transactions: &[Transaction],
-) -> Result<L2Block, Error> {
+) -> Result<(), Error> {
     transactions
         .iter()
-        .try_for_each(|tx| validate_transaction(host, tx))?;
-    Ok(block)
+        .try_for_each(|tx| validate_transaction(host, tx))
 }
 
 // This function is only available in nightly, hence the need for redefinition
@@ -230,11 +228,11 @@ pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
         };
 
         let transaction_hashes = proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
-        let candidate_block = L2Block::new(next_level, transaction_hashes);
 
-        match validate(host, candidate_block, &proposal.transactions) {
-            Ok(valid_block) => {
-                storage::store_current_block(host, valid_block).unwrap_or_else(|_| {
+        match validate(host, &proposal.transactions) {
+            Ok(()) => {
+                let valid_block = L2Block::new(next_level, transaction_hashes);
+                storage::store_current_block(host, &valid_block).unwrap_or_else(|_| {
                     panic!("Error while storing the current block: stopping the daemon.")
                 });
                 apply_transactions(host, &proposal.transactions)
