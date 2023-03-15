@@ -447,9 +447,10 @@ let scenario_with_layer1_and_legacy_dac_nodes
       @@ fun dac_node committee_members ->
       scenario protocol node client dac_node threshold committee_members)
 
-let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
-    ?(pvm_name = "arith") ?commitment_period ?challenge_window ~threshold
-    ?committee_member_address ~committee_members variant scenario =
+let scenario_with_layer1_legacy_and_rollup_nodes
+    ?(tags = ["dac"; "dac_node"; "legacy"]) ?(pvm_name = "arith")
+    ?commitment_period ?challenge_window ~threshold ?committee_member_address
+    ~committee_members variant scenario =
   let description = "Testing DAC rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -1454,35 +1455,35 @@ let register ~protocols =
   test_dac_node_startup protocols ;
   test_dac_node_imports_committee_members protocols ;
   test_dac_node_dac_threshold_not_reached protocols ;
-  scenario_with_all_nodes
+  scenario_with_layer1_legacy_and_rollup_nodes
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_merkle_tree_v0"
     test_dac_node_handles_dac_store_preimage_merkle_V0
     protocols
     ~threshold:1
     ~committee_members:1 ;
-  scenario_with_all_nodes
+  scenario_with_layer1_legacy_and_rollup_nodes
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_hash_chain_v0"
     test_dac_node_handles_dac_store_preimage_hash_chain_V0
     protocols
     ~threshold:1
     ~committee_members:1 ;
-  scenario_with_all_nodes
+  scenario_with_layer1_legacy_and_rollup_nodes
     ~tags:["dac"; "dac_node"]
     ~threshold:0
     ~committee_members:0
     "dac_retrieve_preimage"
     test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
-  scenario_with_all_nodes
+  scenario_with_layer1_legacy_and_rollup_nodes
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_uses_reveals"
     test_rollup_arith_uses_reveals
     protocols
     ~threshold:1
     ~committee_members:1 ;
-  scenario_with_all_nodes
+  scenario_with_layer1_legacy_and_rollup_nodes
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_wrong_hash"
     test_reveals_fails_on_wrong_hash
