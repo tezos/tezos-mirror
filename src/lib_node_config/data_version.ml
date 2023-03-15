@@ -93,15 +93,15 @@ end
  *  - (0.)0.1 : original storage
  *  - (0.)0.2 : never released
  *  - (0.)0.3 : store upgrade (introducing history mode)
- *  - (0.)0.4 : context upgrade (switching from LMDB to IRMIN v2)
- *  - (0.)0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
- *  - (0.)0.6 : store upgrade (switching from LMDB)
- *  - (0.)0.7 : new store metadata representation
- *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0)
- *  - 1.0     : context upgrade (upgrade to irmin.3.3)
- *  - 2.0     : introduce context GC (upgrade to irmin.3.4)
- *  - 3.0     : change blocks' context hash semantics and upgrade to
-                irmin.3.5 *)
+ *  - (0.)0.4 : context upgrade (switching from LMDB to IRMIN v2) -- v9.0
+ *  - (0.)0.5 : never released -- v10.0~rc1 and 10.0~rc2
+ *  - (0.)0.6 : store upgrade (switching from LMDB) -- v11.0
+ *  - (0.)0.7 : new store metadata representation -- v12.1
+ *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0) -- v13.0
+ *  - 1.0     : context upgrade (upgrade to irmin.3.3) -- v14.0
+ *  - 2.0     : introduce context GC (upgrade to irmin.3.4) -- v15.0
+ *  - 3.0     : change blocks' context hash semantics and introduce
+                context split (upgrade to irmin.3.5) -- v16.0 *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
@@ -124,7 +124,13 @@ let current_version = v_3_0
    version to the current [data_version] above. If this list grows too
    much, an idea would be to have triples (version, version,
    converter), and to sequence them dynamically instead of
-   statically. *)
+   statically.
+   The list of upgradable version must be updated as soon as a new
+   upgrade function is added. We remove former upgrades if:
+   - the upgrade requires a non-automatic upgrade
+   - two automatic upgrades were already enabled
+   - we want to deprecate a specific upgrade
+*)
 let upgradable_data_version =
   let open Lwt_result_syntax in
   let v_1_0_upgrade ~data_dir =
