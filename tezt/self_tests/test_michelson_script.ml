@@ -500,7 +500,7 @@ let test_version_range7 () =
   in
   unit
 
-let register () =
+let () =
   test_all () ;
   test_find () ;
   test_version_range1 () ;

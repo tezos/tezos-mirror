@@ -1610,31 +1610,11 @@ let tezt_ethereum =
     ~release_status:Unreleased
 
 let _tezt_self_tests =
-  public_exe
-    "tezt-self-tests"
-    ~internal_name:"main"
+  tezt
+    ["test_michelson_script"; "test_daemon"]
+    ~opam:"tezt-tezos"
     ~path:"tezt/self_tests"
-    ~synopsis:"Tests for the Tezos test framework based on Tezt"
-    ~bisect_ppx:No
-    ~static:false
     ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
-    ~cram:true
-    ~dune:
-      Dune.
-        [
-          [
-            S "cram";
-            [S "package"; S "tezt-self-tests"];
-            [S "deps"; S "tezt.sh"; S "main.exe"];
-          ];
-        ]
-
-let _tezt_self_tests_catch_sigterm =
-  private_exe
-    "main"
-    ~path:"tezt/self_tests/bin_catch_sigterm"
-    ~opam:"tezt-self-tests"
-    ~deps:[unix]
 
 let octez_p2p_test_common =
   private_lib
