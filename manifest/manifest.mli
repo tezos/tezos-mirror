@@ -175,6 +175,16 @@ module Dune : sig
       This causes the executed command to be run with [HOME=/tmp] in its environment. *)
   val setenv : string -> string -> s_expr -> s_expr
 
+  (** Make a [progn] user action construction, which allows executing more than
+      one command.
+
+      Example:
+        [~action:(progn [run_exe "main"; [S "diff?"; S "expected"; S "output"];])]
+      results in
+        [(action (progn (run %{exe:main.exe}) (diff? expected output)))]
+  *)
+  val progn : s_expr list -> s_expr
+
   (** Make a [(chdir %{workspace_root} ...)] stanza.
 
       Such stanzas are typically used to wrap [run] stanzas (e.g. built with {!run_exe})
