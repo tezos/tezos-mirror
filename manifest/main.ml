@@ -1222,7 +1222,7 @@ let octez_plonk_aggregation =
     ~preprocess:[pps ppx_repr]
     ~deps:[octez_plonk; octez_bls12_381_polynomial |> open_]
 
-let _octez_aplonk =
+let octez_aplonk =
   public_lib
     "octez-aplonk"
     ~internal_name:"aplonk"
@@ -1400,6 +1400,61 @@ let _octez_plonk_test_plompiler_main =
                         ]);
                  ]);
         ]
+
+let _octez_aplonk_test_main =
+  private_exe
+    "main"
+    ~path:"src/lib_aplonk/test"
+    ~opam:"octez-aplonk"
+    ~deps:[octez_plonk_test_helpers; octez_aplonk]
+    ~modules:["main"; "test_aplonk"; "test_main_protocol"]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-aplonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-aplonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-aplonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
+let _octez_aplonk_test_helpers_bench =
+  private_exe
+    "bench"
+    ~path:"src/lib_aplonk/test"
+    ~opam:"octez-aplonk"
+    ~modules:["bench"]
+    ~bisect_ppx:No
+    ~deps:[octez_plonk_test_helpers; octez_aplonk]
 
 let _octez_srs_extraction_tests =
   tests
