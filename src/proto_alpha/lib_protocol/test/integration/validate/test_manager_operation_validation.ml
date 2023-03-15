@@ -477,9 +477,8 @@ let test_empty_undelegate infos kind =
 
 (** No gas consumer with the minimal gas limit for manager operations
    passes validate. *)
-let test_low_gas_limit_no_consumer kind =
+let test_low_gas_limit_no_consumer infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* op =
     select_op
       {
@@ -489,7 +488,8 @@ let test_low_gas_limit_no_consumer kind =
       }
       infos
   in
-  validate_diagnostic infos [op]
+  let* (_ : infos) = validate_diagnostic infos [op] in
+  return_unit
 
 (* Feature flags.*)
 
@@ -581,6 +581,7 @@ let tests =
   in
   let all = subjects in
   let gas_consum = gas_consumer_in_validate_subjects in
+  let not_gas_consum = not_gas_consumer_in_validate_subjects in
   let revealed = revealed_subjects in
   List.map
     (fun (name, f, subjects, info_builder) ->
@@ -608,7 +609,10 @@ let tests =
         all,
         mk_gas );
       ("empty undelegated source", test_empty_undelegate, all, mk_default);
-      ("minimal gas for manager", test_low_gas_limit, gas_consum, mk_default);
+      ( "minimal gas for manager",
+        test_low_gas_limit_no_consumer,
+        not_gas_consum,
+        mk_default );
       ("check dal disabled", test_feature_flags, all, mk_flags disabled_dal);
       ("check toru disabled", test_feature_flags, all, mk_flags disabled_toru);
       ("check scoru disabled", test_feature_flags, all, mk_flags disabled_scoru);
