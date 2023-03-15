@@ -49,6 +49,8 @@ let pp_do_not_edit ~comment_start fmt () =
     comment_start
     comment_start
 
+let sanitize_path x = Filename.(dirname x // Filename.basename x)
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -1107,6 +1109,7 @@ module Target = struct
   let can_register = ref true
 
   let register_internal ({path; opam; _} as internal) =
+    let path = sanitize_path path in
     if not !can_register then
       invalid_arg
         "cannot register new targets after calling Manifest.check or \
