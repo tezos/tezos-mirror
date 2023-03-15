@@ -23,23 +23,60 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk_test
+open Plompiler
+module CS = Plonk.Circuit
 
-let () =
-  Helpers.with_seed (fun () ->
-      Helpers.with_output_to_file (fun () ->
-          Alcotest.run
-            ~verbose:false
-            "PlonK"
-            [
-              ("Utils", Test_utils.tests);
-              ("Evaluations", Test_evaluations.tests);
-              ("Plonk_Pack", Test_pack.tests);
-              ("Polynomial Commitment", Test_polynomial_commitment.tests);
-              ("Polynomial_protocol", Test_polynomial_protocol.tests);
-              ("Permutations", Test_permutations.tests);
-              ("Plookup", Test_plookup.tests);
-              ("Range_Checks", Test_range_checks.tests);
-              ("Main_Protocol", Test_main_protocol.tests);
-              ("Circuit", Test_circuit.tests);
-            ]))
+module Gen = struct
+  let read_int () =
+    try input_binary_int stdin
+    with End_of_file ->
+      Printf.printf "insufficient input" ;
+      exit 0
+
+  let scalar () =
+    (* Fr.random () *)
+    S.of_z @@ Z.of_int @@ read_int ()
+end
+
+let test_afl () =
+  let module P (L : LIB) = struct
+    open L
+    open L.Num
+
+    let[@warning "-8"] t (x, y) =
+      let* x = input x in
+      let* y = input y in
+      let* o = add x y in
+      let* o = mul o y in
+      div o y
+
+    let ins = Input.(scalar S.zero, scalar S.one)
+  end in
+  let circuit, ins =
+    let module E1 = P (LibCircuit) in
+    (E1.t, E1.ins)
+  in
+
+  let LibCircuit.{cs; tables; solver; _} = LibCircuit.(get_cs (circuit ins)) in
+  (* safety: sat => trace *)
+  let private_inputs = Array.init solver.final_size (fun _ -> Gen.scalar ()) in
+  if CS.sat cs tables private_inputs then (
+    print_endline "satisfied" ;
+    let initial, _ = LibCircuit.(get_inputs (circuit ins)) in
+    let solved_pi = Solver.solve solver initial in
+    assert (Array.for_all2 S.( = ) solved_pi private_inputs))
+  else () ;
+  (* soundness: trace => sat *)
+  let trace =
+    let x = LibCircuit.Input.scalar @@ Gen.scalar () in
+    let y = LibCircuit.Input.scalar @@ Gen.scalar () in
+    let initial, _ = LibCircuit.(get_inputs (circuit (x, y))) in
+    try Solver.solve solver initial |> fun x -> Some x with _ -> None
+  in
+  match trace with
+  | None -> ()
+  | Some trace ->
+      print_endline "found trace" ;
+      assert (CS.sat cs tables trace)
+
+let () = test_afl ()

@@ -1324,6 +1324,15 @@ let _octez_plonk_test_helpers_bench =
     ~bisect_ppx:No
     ~deps:[octez_plonk_test_helpers]
 
+let _octez_plonk_test_plompiler_afl =
+  private_exe
+    "afl"
+    ~path:"src/lib_plonk/test_plompiler"
+    ~opam:"octez-plonk"
+    ~modules:["afl"]
+    ~bisect_ppx:No
+    ~deps:[octez_plompiler; octez_plonk; bls12_381]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]
