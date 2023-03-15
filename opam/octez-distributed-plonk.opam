@@ -13,6 +13,7 @@ depends: [
   "ppx_repr" { >= "0.6.0" }
   "octez-aplonk"
   "octez-plonk"
+  "qcheck-alcotest" { >= "0.20" }
 ]
 build: [
   ["rm" "-r" "vendors"]

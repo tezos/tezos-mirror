@@ -1268,7 +1268,7 @@ let octez_plonk_communication =
     ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
     ~preprocess:[pps ppx_repr]
 
-let _octez_distributed_plonk =
+let octez_distributed_plonk =
   public_lib
     "octez-distributed-plonk"
     ~internal_name:"distributed_plonk"
@@ -1438,6 +1438,55 @@ let _octez_plonk_test_plompiler_main =
                         ]);
                  ]);
         ]
+
+let octez_distributed_plonk_test =
+  private_lib
+    "distributed_plonk_test"
+    ~opam:"octez-distributed-plonk"
+    ~path:"src/lib_distributed_plonk/test"
+    ~deps:
+      [
+        octez_distributed_plonk;
+        octez_plonk;
+        octez_plonk_aggregation;
+        octez_plonk_distribution;
+        octez_plonk_test_helpers;
+        octez_aplonk;
+      ]
+    ~modules:["distribution_helpers"]
+    ~bisect_ppx:No
+
+let _octez_distributed_plonk_test_main =
+  private_exe
+    "main"
+    ~path:"src/lib_distributed_plonk/test"
+    ~opam:"octez-distributed-plonk"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        octez_distributed_plonk_test;
+        octez_distributed_plonk;
+        octez_plonk_test_helpers;
+        qcheck_alcotest;
+      ]
+    ~modules:["main"; "test_distribution"]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-plonk"
+            ~action:[S "run"; S "%{exe:main.exe}"];
+        ]
+
+let _octez_distributed_plonk_worker_runner =
+  private_exe
+    "worker_runner"
+    ~path:"src/lib_distributed_plonk"
+    ~opam:"octez-distributed-plonk"
+    ~bisect_ppx:No
+    ~deps:[octez_distributed_plonk; octez_plonk_distribution]
+    ~modules:["worker_runner"]
 
 let _octez_aplonk_test_main =
   private_exe

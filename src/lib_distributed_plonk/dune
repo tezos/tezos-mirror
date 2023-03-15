@@ -14,3 +14,10 @@
   (:standard)
   -open Plonk)
  (modules distributed_prover filenames master_runner worker))
+
+(executable
+ (name worker_runner)
+ (libraries
+  octez-distributed-plonk
+  octez-plonk.distribution)
+ (modules worker_runner))
