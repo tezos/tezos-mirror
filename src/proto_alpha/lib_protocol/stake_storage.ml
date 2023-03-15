@@ -75,37 +75,33 @@ let get_initialized_stake ctxt delegate =
       Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
       return (balance, ctxt)
 
-let remove_stake ctxt delegate amount =
+let update_stake ~f ctxt delegate =
   get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
-  Tez_repr.(staking_balance_before -? amount) >>?= fun staking_balance ->
+  f staking_balance_before >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
   let minimal_stake = Constants_storage.minimal_stake ctxt in
-  if
-    Tez_repr.(staking_balance_before >= minimal_stake)
-    && Tez_repr.(staking_balance < minimal_stake)
-  then
-    Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if inactive then return ctxt
+  if Tez_repr.(staking_balance < staking_balance_before) then
+    if
+      (* Removing stake. The delegate may become inactive. *)
+      Tez_repr.(staking_balance_before >= minimal_stake)
+      && Tez_repr.(staking_balance < minimal_stake)
+    then
+      Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
+      if inactive then return ctxt
+      else
+        Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
+        >>= fun ctxt -> return ctxt
     else
-      Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
-      >>= fun ctxt -> return ctxt
-  else
-    (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
-        - because it did not have the minimal required stake, in which case it
-          still does not have it;
-        - or because it did have the minimal required stake and still has it,
-          however it was (and is) inactive.
-    *)
-    return ctxt
-
-let add_stake ctxt delegate amount =
-  get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
-  Tez_repr.(amount +? staking_balance_before) >>?= fun staking_balance ->
-  Storage.Stake.Staking_balance.update ctxt delegate staking_balance
-  >>=? fun ctxt ->
-  let minimal_stake = Constants_storage.minimal_stake ctxt in
-  if
+      (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
+          - because it did not have the minimal required stake, in which case it
+            still does not have it;
+          - or because it did have the minimal required stake and still has it,
+            however it was (and is) inactive.
+      *)
+      return ctxt
+  else if
+    (* Adding stake. The delegate may become active. *)
     Tez_repr.(staking_balance_before < minimal_stake)
     && Tez_repr.(staking_balance >= minimal_stake)
   then
@@ -120,8 +116,13 @@ let add_stake ctxt delegate amount =
          have it;
        - or because it did have the minimal required stake, in which case it
          still has it, however it was (and still is) inactive.
-    *)
-    return ctxt
+    *) return ctxt
+
+let remove_stake ctxt delegate amount =
+  update_stake ctxt delegate ~f:(fun stake -> Tez_repr.(stake -? amount))
+
+let add_stake ctxt delegate amount =
+  update_stake ctxt delegate ~f:(fun stake -> Tez_repr.(stake +? amount))
 
 let set_inactive ctxt delegate =
   Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
