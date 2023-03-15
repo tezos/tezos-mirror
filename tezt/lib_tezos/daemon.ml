@@ -428,7 +428,11 @@ module Make (X : PARAMETERS) = struct
 
   let log_events daemon =
     on_event daemon @@ fun event ->
-    Log.info "Received event: %s = %s" event.name (JSON.encode event.value)
+    Log.info
+      "[%s] Received event: %s = %s"
+      daemon.name
+      event.name
+      (JSON.encode event.value)
 
   type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
 
