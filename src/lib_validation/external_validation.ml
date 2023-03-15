@@ -42,7 +42,6 @@ type parameters = {
 }
 
 type request =
-  | Init
   | Validate of {
       chain_id : Chain_id.t;
       block_header : Block_header.t;
@@ -96,7 +95,6 @@ type request =
       Tezos_base_unix.Internal_event_unix.Configuration.t
 
 let request_pp ppf = function
-  | Init -> Format.fprintf ppf "process handshake"
   | Validate {block_header; chain_id; _} ->
       Format.fprintf
         ppf
@@ -432,21 +430,15 @@ let request_encoding =
   let open Data_encoding in
   union
     [
+      case_validate (Tag 0);
       case
-        (Tag 0)
-        ~title:"init"
-        empty
-        (function Init -> Some () | _ -> None)
-        (fun () -> Init);
-      case_validate (Tag 1);
-      case
-        (Tag 2)
+        (Tag 1)
         ~title:"commit_genesis"
         (obj1 (req "chain_id" Chain_id.encoding))
         (function Commit_genesis {chain_id} -> Some chain_id | _ -> None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
-        (Tag 3)
+        (Tag 2)
         ~title:"fork_test_chain"
         (obj3
            (req "chain_id" Chain_id.encoding)
@@ -459,22 +451,21 @@ let request_encoding =
         (fun (chain_id, context_hash, forked_header) ->
           Fork_test_chain {chain_id; context_hash; forked_header});
       case
-        (Tag 4)
+        (Tag 3)
         ~title:"terminate"
         unit
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
-      (* Tag 5 was ["restore_integrity"]. *)
       case
-        (Tag 6)
+        (Tag 4)
         ~title:"reconfigure_event_logging"
         Tezos_base_unix.Internal_event_unix.Configuration.encoding
         (function Reconfigure_event_logging c -> Some c | _ -> None)
         (fun c -> Reconfigure_event_logging c);
-      case_preapply (Tag 7);
-      case_precheck (Tag 8);
-      case_context_gc (Tag 9);
-      case_context_split (Tag 10);
+      case_preapply (Tag 5);
+      case_precheck (Tag 6);
+      case_context_gc (Tag 7);
+      case_context_split (Tag 8);
     ]
 
 let send pin encoding data =
