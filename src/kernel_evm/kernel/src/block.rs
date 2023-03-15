@@ -13,8 +13,10 @@ use host::runtime::Runtime;
 
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::{BlockHash, L2Level, OwnedHash, Quantity, BLOCK_HASH_SIZE};
-use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
+use tezos_ethereum::eth_gen::{Address, BlockHash, L2Level, OwnedHash, Quantity, BLOCK_HASH_SIZE};
+use tezos_ethereum::transaction::{
+    RawTransaction, TransactionHash, TransactionReceipt, TransactionStatus, TransactionType,
+};
 
 use tezos_ethereum::wei::Wei;
 
@@ -90,21 +92,25 @@ impl L2Block {
     }
 }
 
-fn get_tx_sender(tx: &RawTransaction) -> Result<OwnedPath, Error> {
+fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
     match tx.sender() {
         // We reencode in hexadecimal, since the accounts hash are encoded in
         // hexadecimal in the storage.
         Ok(address) => {
             let hash = address_to_hash(address);
-            storage::account_path(&hash)
+            let address: Address = address.into();
+            let path = storage::account_path(&hash)?;
+            Ok((path, address))
         }
         Err(_) => Err(Error::Generic),
     }
 }
 
-fn get_tx_receiver(tx: &RawTransaction) -> Result<OwnedPath, Error> {
+fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
     let hash = address_to_hash(tx.to);
-    storage::account_path(&hash)
+    let address: Address = tx.to.into();
+    let path = storage::account_path(&hash)?;
+    Ok((path, address))
 }
 
 // A transaction is valid if the signature is valid, its nonce is valid and it
@@ -114,7 +120,7 @@ fn validate_transaction<Host: Runtime + RawRollupCore>(
     transaction: &Transaction,
 ) -> Result<(), Error> {
     let tx = &transaction.tx;
-    let src_path = get_tx_sender(tx)?;
+    let (src_path, _src_address) = get_tx_sender(tx)?;
     let src_balance =
         storage::read_account_balance(host, &src_path).unwrap_or_else(|_| Wei::zero());
     let src_nonce = storage::read_account_nonce(host, &src_path).unwrap_or(0u64);
@@ -153,13 +159,39 @@ fn update_account<Host: Runtime + RawRollupCore>(
     }
 }
 
+fn make_receipt(
+    block: &L2Block,
+    tx: &Transaction,
+    status: TransactionStatus,
+    index: u32,
+    from: Address,
+    to: Address,
+) -> TransactionReceipt {
+    TransactionReceipt {
+        hash: tx.tx_hash,
+        index,
+        block_hash: block.hash,
+        block_number: block.number,
+        from,
+        to: Some(to),
+        cumulative_gas_used: U256::zero(),
+        effective_gas_price: U256::zero(),
+        gas_used: U256::zero(),
+        contract_address: None,
+        type_: TransactionType::Legacy,
+        status,
+    }
+}
+
 // invariant: the transaction is valid
 fn apply_transaction<Host: Runtime + RawRollupCore>(
     host: &mut Host,
+    block: &L2Block,
     transaction: &Transaction,
-) -> Result<bool, Error> {
+    index: u32,
+) -> Result<TransactionReceipt, Error> {
     let tx = &transaction.tx;
-    let src_path = get_tx_sender(tx)?;
+    let (src_path, src_address) = get_tx_sender(tx)?;
     let src_balance =
         storage::read_account_balance(host, &src_path).unwrap_or_else(|_| Wei::zero());
     let nonce = tx.nonce.to_u64().ok_or(Error::Generic)?;
@@ -170,20 +202,27 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
     let src_balance_without_gas = src_balance - gas;
     // The gas is paid even if there's not enough balance for the total
     // transaction
-    let (src_balance, succeed) = if src_balance_without_gas < value {
-        (src_balance_without_gas, false)
+    let (src_balance, status) = if src_balance_without_gas < value {
+        (src_balance_without_gas, TransactionStatus::Failure)
     } else {
-        (src_balance_without_gas - value, true)
+        (src_balance_without_gas - value, TransactionStatus::Success)
     };
     update_account(host, &src_path, src_balance, Some(nonce + 1))?;
 
-    if succeed {
-        let dst_path = get_tx_receiver(tx)?;
+    let (dst_path, dst_address) = get_tx_receiver(tx)?;
+    if status == TransactionStatus::Success {
         let dst_balance =
             storage::read_account_balance(host, &dst_path).unwrap_or_else(|_| Wei::zero());
         update_account(host, &dst_path, dst_balance + value, None)?;
     };
-    Ok(succeed)
+    Ok(make_receipt(
+        block,
+        transaction,
+        status,
+        index,
+        src_address,
+        dst_address,
+    ))
 }
 
 fn validate<Host: Runtime + RawRollupCore>(
@@ -209,12 +248,14 @@ fn try_collect<T, E>(vec: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
 
 fn apply_transactions<Host: Runtime + RawRollupCore>(
     host: &mut Host,
+    block: &L2Block,
     transactions: &[Transaction],
-) -> Result<Vec<bool>, Error> {
+) -> Result<Vec<TransactionReceipt>, Error> {
     try_collect(
         transactions
             .iter()
-            .map(|tx| (apply_transaction(host, tx)))
+            .enumerate()
+            .map(|(index, tx)| (apply_transaction(host, block, tx, index as u32)))
             .collect(),
     )
 }
@@ -235,8 +276,9 @@ pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
                 storage::store_current_block(host, &valid_block).unwrap_or_else(|_| {
                     panic!("Error while storing the current block: stopping the daemon.")
                 });
-                apply_transactions(host, &proposal.transactions)
+                let receipts = apply_transactions(host, &valid_block, &proposal.transactions)
                     .unwrap_or_else(|_| panic!("Error while applying the transactions."));
+                storage::store_transaction_receipts(host, &receipts).unwrap()
             }
             Err(e) => debug_msg!(host; "Blueprint is invalid: {:?}\n", e),
         }

@@ -19,6 +19,7 @@ pub enum TransactionType {
     Eip1559,
 }
 
+#[derive(PartialEq)]
 pub enum TransactionStatus {
     Success,
     Failure,
@@ -52,4 +53,25 @@ pub struct TransactionReceipt {
     pub type_: TransactionType,
     /// Transaction status
     pub status: TransactionStatus,
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<&'static [u8]> for &TransactionType {
+    fn into(self) -> &'static [u8] {
+        match self {
+            TransactionType::Legacy => [0u8].as_slice(),
+            TransactionType::Eip2930 => [1u8].as_slice(),
+            TransactionType::Eip1559 => [2u8].as_slice(),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<&'static [u8]> for &TransactionStatus {
+    fn into(self) -> &'static [u8] {
+        match self {
+            TransactionStatus::Success => [1u8].as_slice(),
+            TransactionStatus::Failure => [0u8].as_slice(),
+        }
+    }
 }
