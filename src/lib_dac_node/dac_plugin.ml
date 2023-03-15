@@ -31,8 +31,12 @@ let hash_to_hex hash = Hex.of_bytes hash
 
 type supported_hashes = Blake2B
 
+let non_proto_encoding_unsafe = Data_encoding.bytes' Hex
+
 module type T = sig
   val encoding : hash Data_encoding.t
+
+  val equal : hash -> hash -> bool
 
   val hash_string :
     scheme:supported_hashes -> ?key:string -> string list -> hash

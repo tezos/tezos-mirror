@@ -36,6 +36,12 @@ val hash_to_bytes : hash -> bytes
 
 val hash_to_hex : hash -> Hex.t
 
+(** Protocol independent encoding of Dac_plugin.hash values.
+    Only use in situations where the plugin is not available,
+    and for reporting purposes (e.g. when emitting an event or registering
+    an error). *)
+val non_proto_encoding_unsafe : hash Data_encoding.t
+
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
     Fix static supported_hashes type *)
 type supported_hashes = Blake2B
@@ -43,6 +49,9 @@ type supported_hashes = Blake2B
 module type T = sig
   (** The encoding of reveal hashes. *)
   val encoding : hash Data_encoding.t
+
+  (** [equal h1 h2] determines if [h1] and [h2] are the same hash. *)
+  val equal : hash -> hash -> bool
 
   (** [hash_string ~scheme ?key strings] hashes [strings] using the
     supported hashing [scheme] given in input. *)

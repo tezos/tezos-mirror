@@ -34,8 +34,6 @@
 (** DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4021
     Add tests to check actual (sequences of) bytes in serialized pages. *)
 
-let lift f = Lwt.map Environment.wrap_tzresult f
-
 (* Tests are run against a mock storage backend where a Hash-indexed/Bytes-valued Map
    is used to simulate adding and retrieving files to a directory.
 *)
@@ -205,19 +203,12 @@ module Hashes_map_backend = struct
 
   let init () = ref Hashes_map.empty
 
-  type error +=
-    | Page_already_saved of Dac_plugin.hash
-    | Page_is_missing of Dac_plugin.hash
+  type error += Page_is_missing of Dac_plugin.hash
 
   let save (_plugin : Dac_plugin.t) t ~hash ~content =
     let open Lwt_result_syntax in
-    match Hashes_map.find hash !t with
-    | None ->
-        let () = t := Hashes_map.add hash content !t in
-        return_unit
-    | Some old_bytes ->
-        if Bytes.equal old_bytes content then return_unit
-        else tzfail @@ Page_already_saved hash
+    let () = t := Hashes_map.add hash content !t in
+    return ()
 
   let mem (_plugin : Dac_plugin.t) t hash =
     Lwt_result_syntax.return @@ Hashes_map.mem hash !t
@@ -231,6 +222,28 @@ module Hashes_map_backend = struct
 
   let number_of_pages t = List.length @@ Hashes_map.bindings !t
 end
+
+(* Page store implementation that uses two in-memory stores (p1, p2).
+   Data is loaded from (p2) if present in such a store, otherwise it
+   is fetched from (p1) and, if the contents of the page are valid
+   with respect to the hash provided, then it is saved to p2.
+   Otherwise, an error is returned.
+*)
+
+module With_hash_check :
+  Page_store.S with type configuration = unit and type t = Hashes_map_backend.t =
+  Page_store.Internal_for_tests.With_data_integrity_check (Hashes_map_backend)
+
+module Double_hash_map_backend :
+  Page_store.S
+    with type configuration = Hashes_map_backend.t * Hashes_map_backend.t =
+  Page_store.Internal_for_tests.With_remote_fetch
+    (struct
+      type remote_context = Hashes_map_backend.t
+
+      let fetch = Hashes_map_backend.load
+    end)
+    (With_hash_check)
 
 let assert_equal_bytes ~loc msg a b =
   Assert.equal ~loc Bytes.equal msg String.pp_bytes_hex a b
@@ -367,6 +380,78 @@ module Merkle_tree = struct
         ~loc:__LOC__
         ~max_page_size
         payload
+
+    let deserialization_of_corrupt_data_with_hash_integrity_check_fails () =
+      let open Lwt_result_syntax in
+      let module Page_size = struct
+        let max_page_size = 80
+      end in
+      let module Mock_remote_codec =
+        Make_V0_for_test (Page_size) (Hashes_map_backend)
+      in
+      let module Mock_synch_codec =
+        Make_V0_for_test
+          (struct
+            let max_page_size = 80
+          end)
+          (Double_hash_map_backend)
+      in
+      let mock_remote_store = Hashes_map_backend.init () in
+      let mock_local_store = Hashes_map_backend.init () in
+      let page_store =
+        Double_hash_map_backend.init (mock_remote_store, mock_local_store)
+      in
+      let payload =
+        Bytes.of_string "This is a payload that will be tampered later on"
+      in
+      let corrupt_payload =
+        Bytes.of_string "This is the payload that has been tampered with"
+      in
+      let* root_hash =
+        Mock_remote_codec.serialize_payload
+          dac_plugin
+          ~page_store:mock_remote_store
+          payload
+      in
+      (* We save the corrupt payload in the store and then retrieve it again,
+         to be sure that the content corresponds to a valid page. Then we
+         update the content of the original (non corrupt) payload in the store
+         to the (serialized) corrupt payload. *)
+      let* root_hash_of_corrupt_payload =
+        Mock_remote_codec.serialize_payload
+          dac_plugin
+          ~page_store:mock_remote_store
+          corrupt_payload
+      in
+      let* serialised_corrupt_payload =
+        Hashes_map_backend.load
+          dac_plugin
+          mock_remote_store
+          root_hash_of_corrupt_payload
+      in
+      let* () =
+        Hashes_map_backend.save
+          dac_plugin
+          mock_remote_store
+          ~hash:root_hash
+          ~content:serialised_corrupt_payload
+      in
+      let* () =
+        assert_fails_with
+          ~loc:__LOC__
+          (Mock_synch_codec.deserialize_payload
+             dac_plugin
+             ~page_store
+             root_hash)
+          (Page_store.Incorrect_page_hash
+             {expected = root_hash; actual = root_hash_of_corrupt_payload})
+      in
+      (* Check that pages have not been copied from the remote mock store
+         to the local one. *)
+      Assert.equal_int
+        ~loc:__LOC__
+        (Hashes_map_backend.number_of_pages mock_local_store)
+        0
 
     let multiple_pages_roundtrip_homogeneous_payload () =
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
@@ -615,6 +700,11 @@ let tests =
        repeated pages (Hash chain, V0)"
       `Quick
       Hash_chain.V0.test_serialize;
+    Tztest.tztest
+      "Deserialization with integrity check fails if page contents are corrupt"
+      `Quick
+      Merkle_tree.V0
+      .deserialization_of_corrupt_data_with_hash_integrity_check_fails;
     Merkle_tree.V0.PBT.serialization_roundtrip_pbt;
   ]
 
