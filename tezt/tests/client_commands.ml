@@ -686,15 +686,15 @@ module Dry_run = struct
       let msg = Constant.Error_msg.gas_limit_exceeded in
       let* () = Process.check_error ~msg originate_res_ko in
       Log.info
-        "Originate the contract with a gas_limit of %d (ceil gas_consumed + 1) \
-         and check that the origination succeeds."
-        (succ gas_limit) ;
+        "Originate the contract with a gas_limit of %d and check that the \
+         origination succeeds."
+        gas_limit ;
       let originate_res_ok =
         call_originate_contract
         (* We wait for a new block to force the application of the
            operation, not only its validation. *)
           ~wait:"0"
-          ~gas_limit:(succ gas_limit)
+          ~gas_limit
           ~dry_run:false
           client
       in
