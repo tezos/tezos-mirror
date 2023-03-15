@@ -1333,6 +1333,74 @@ let _octez_plonk_test_plompiler_afl =
     ~bisect_ppx:No
     ~deps:[octez_plompiler; octez_plonk; bls12_381]
 
+let _octez_plonk_test_plompiler_main =
+  private_exe
+    "main"
+    ~path:"src/lib_plonk/test_plompiler"
+    ~opam:"octez-plonk"
+    ~modules:
+      [
+        "bench_poseidon";
+        "benchmark";
+        "main";
+        "test_anemoi";
+        "test_blake";
+        "test_core";
+        "test_edwards";
+        "test_encoding";
+        "test_enum";
+        "test_input_com";
+        "test_linear_algebra";
+        "test_lookup";
+        "test_merkle";
+        "test_merkle_narity";
+        "test_optimizer";
+        "test_poseidon";
+        "test_schnorr";
+        "test_serialization";
+        "test_weierstrass";
+      ]
+    ~bisect_ppx:No
+    ~deps:[octez_plonk_test_helpers]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-plonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]
