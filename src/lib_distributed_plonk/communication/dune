@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name communication)
+ (public_name octez-plonk.communication)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  logs
+  octez-distributed-lwt-internal
+  octez-plonk.distribution)
+ (preprocess (pps ppx_repr))
+ (flags
+  (:standard)
+  -open Plonk_for_distribution))

@@ -286,9 +286,19 @@ opam:octez-crawler:
 
 # Ignoring unreleased package octez-dal-node.
 
-# Ignoring unreleased package octez-distributed-internal.
+opam:octez-distributed-internal:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: octez-distributed-internal
 
-# Ignoring unreleased package octez-distributed-lwt-internal.
+opam:octez-distributed-lwt-internal:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: octez-distributed-lwt-internal
 
 # Ignoring unreleased package octez-evm-proxy.
 

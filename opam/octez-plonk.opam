@@ -16,6 +16,8 @@ depends: [
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "octez-bls12-381-polynomial"
   "octez-plompiler"
+  "logs"
+  "octez-distributed-lwt-internal"
   "qcheck-alcotest" { >= "0.20" }
   "bls12-381" { >= "6.1.0" & < "6.2.0" }
 ]

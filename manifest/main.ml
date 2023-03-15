@@ -376,7 +376,7 @@ let distributed_internal =
     ~synopsis:"Fork of distributed. Use for Octez only"
     ~deps:[unix]
 
-let _distributed_internal_lwt =
+let distributed_internal_lwt =
   public_lib
     "octez-distributed-lwt-internal"
     ~internal_name:"distributed_lwt"
@@ -1258,6 +1258,14 @@ let octez_plonk_distribution =
     ~internal_name:"plonk_for_distribution"
     ~path:"src/lib_distributed_plonk/plonk-distribution"
     ~deps:[octez_plonk; octez_plonk_aggregation]
+    ~preprocess:[pps ppx_repr]
+
+let _octez_plonk_communication =
+  public_lib
+    "octez-plonk.communication"
+    ~internal_name:"communication"
+    ~path:"src/lib_distributed_plonk/communication"
+    ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
     ~preprocess:[pps ppx_repr]
 
 let octez_plonk_test_helpers =
