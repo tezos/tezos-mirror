@@ -463,18 +463,21 @@ module Make (C : CONFIGURATION) :
       | None -> default
       | Some connection -> connection.score
 
-    let get_peers topic ~filter ~max =
+    let select_connections_peers connections rng topic ~filter ~max =
+      Peer.Map.bindings connections
+      |> List.filter_map (fun (peer, connection) ->
+             let topics = connection.topics in
+             if filter peer connection && Topic.Set.mem topic topics then
+               Some peer
+             else None)
+      |> List.shuffle ~rng |> List.take_n max
+
+    let select_peers topic ~filter ~max =
       let open Monad.Syntax in
       let*! connections in
       let*! rng in
-      Peer.Map.to_seq connections
-      |> Seq.filter_map (fun (peer, connections) ->
-             let topics = connections.topics in
-             if filter peer connections && Topic.Set.mem topic topics then
-               Some peer
-             else None)
-      |> List.of_seq |> List.shuffle ~rng |> List.take_n max |> Peer.Set.of_list
-      |> return
+      select_connections_peers connections rng topic ~filter ~max
+      |> Peer.Set.of_list |> return
 
     let set_mesh_topic topic peers state =
       let state = {state with mesh = Topic.Map.add topic peers state.mesh} in
@@ -835,7 +838,7 @@ module Make (C : CONFIGURATION) :
             && Compare.Float.(score |> Score.float >= gossip_publish_threshold)
           in
           let* not_direct_peers =
-            get_peers topic ~filter ~max:expected_peers_per_topic
+            select_peers topic ~filter ~max:expected_peers_per_topic
           in
           let* () = set_fanout_topic topic not_direct_peers in
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5010
@@ -845,7 +848,7 @@ module Make (C : CONFIGURATION) :
           let filter peer ({direct; _} as connection) =
             filter peer connection || direct
           in
-          let* peers = get_peers topic ~filter ~max:Int.max_int in
+          let* peers = select_peers topic ~filter ~max:Int.max_int in
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/4988
 
              lastpub field *)
@@ -890,7 +893,7 @@ module Make (C : CONFIGURATION) :
       let filter _peer {backoff; score; direct; _} =
         not (direct || Topic.Map.mem topic backoff || Score.(score < zero))
       in
-      get_peers topic ~filter ~max
+      select_peers topic ~filter ~max
 
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
