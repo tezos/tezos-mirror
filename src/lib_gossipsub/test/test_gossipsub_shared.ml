@@ -25,6 +25,18 @@
 
 open Gossipsub_intf
 
+module Time = struct
+  let t = ref 0
+
+  let now () = !t
+
+  let elapse dt =
+    assert (dt >= 0) ;
+    t := !t + dt
+
+  let reset () = t := 0
+end
+
 module Automaton_config :
   AUTOMATON_CONFIG
     with type Time.t = int
@@ -44,11 +56,7 @@ module Automaton_config :
 
     let pp = Format.pp_print_int
 
-    let now =
-      let cpt = ref (-1) in
-      fun () ->
-        incr cpt ;
-        !cpt
+    let now = Time.now
 
     let add = ( + )
 
