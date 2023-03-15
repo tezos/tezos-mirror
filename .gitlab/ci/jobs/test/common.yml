@@ -34,8 +34,8 @@
     - .test_template
     - .image_template__runtime_build_e2etest_dependencies_template
     - .template__coverage_files
-  dependencies: ["build_x86_64"]
+  dependencies: ["build_x86_64", "tezt:fetch-records"]
   # Start immediately after 'build_x86_64' and don't wait for
   # intermediate stages to succeed
-  needs: ["build_x86_64"]
+  needs: ["build_x86_64", "tezt:fetch-records"]
 

@@ -37,6 +37,11 @@ test-tezt-self-test:
 	cd ${CI_PROJECT_DIR} && \
 		dune runtest tezt/self_tests/
 
+.PHONY: test-tezt-fetch-records
+test-tezt-fetch-records:
+	cd ${CI_PROJECT_DIR} && \
+		dune exec tezt/records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
+
 .PHONY: integration-test-compiler-rejections
 integration-test-compiler-rejections:
 	cd ${CI_PROJECT_DIR} && \
