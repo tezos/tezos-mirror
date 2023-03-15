@@ -12,7 +12,7 @@ use std::str::from_utf8;
 use crate::block::L2Block;
 use crate::error::Error;
 use tezos_ethereum::account::*;
-use tezos_ethereum::eth_gen::{Hash, L2Level, TransactionHash, TRANSACTION_HASH_SIZE};
+use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level, TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::U256;
@@ -235,7 +235,7 @@ fn store_block_number<Host: Runtime + RawRollupCore>(
 fn store_block_hash<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     block_path: &OwnedPath,
-    block_hash: Hash,
+    block_hash: &BlockHash,
 ) -> Result<(), Error> {
     let path = concat(block_path, &EVM_BLOCKS_HASH)?;
     host.store_write(&path, block_hash, 0).map_err(Error::from)

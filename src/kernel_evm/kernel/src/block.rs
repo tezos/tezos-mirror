@@ -10,8 +10,12 @@ use crate::storage;
 use host::path::OwnedPath;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
+
+use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::{L2Level, OwnedHash, Quantity, RawTransaction, TransactionHash};
+use tezos_ethereum::eth_gen::{
+    BlockHash, L2Level, OwnedHash, Quantity, RawTransaction, TransactionHash, BLOCK_HASH_SIZE,
+};
 use tezos_ethereum::wei::Wei;
 
 use debug::debug_msg;
@@ -25,8 +29,8 @@ pub struct L2Block {
     // arbitrarily based on what is an Ethereum block and is
     // subject to change.
     pub number: L2Level,
-    pub hash: OwnedHash, // 32 bytes
-    pub parent_hash: OwnedHash,
+    pub hash: BlockHash,
+    pub parent_hash: BlockHash,
     pub nonce: Quantity,
     pub sha3_uncles: OwnedHash,
     pub logs_bloom: Option<OwnedHash>,
@@ -57,11 +61,19 @@ impl L2Block {
         L2Block::DUMMY_HASH.into()
     }
 
+    fn dummy_block_hash() -> BlockHash {
+        [0; BLOCK_HASH_SIZE]
+    }
+
     pub fn new(number: L2Level, transactions: Vec<TransactionHash>) -> Self {
+        let hash: BlockHash = {
+            let number: U256 = number.into();
+            number.into()
+        };
         L2Block {
             number,
-            hash: L2Block::dummy_hash(),
-            parent_hash: L2Block::dummy_hash(),
+            hash,
+            parent_hash: L2Block::dummy_block_hash(),
             nonce: L2Block::DUMMY_QUANTITY,
             sha3_uncles: L2Block::dummy_hash(),
             logs_bloom: None,

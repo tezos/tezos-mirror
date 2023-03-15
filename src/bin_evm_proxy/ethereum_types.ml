@@ -42,8 +42,7 @@ type address = Address of string [@@ocaml.unboxed]
 let address_of_string s = Address (String.lowercase_ascii (strip_0x s))
 
 let address_encoding =
-  Data_encoding.(
-    conv (fun (Address a) -> append_0x a) (fun a -> address_of_string a) string)
+  Data_encoding.(conv (fun (Address a) -> append_0x a) address_of_string string)
 
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
@@ -109,10 +108,11 @@ let block_param_encoding =
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of string [@@ocaml.unboxed]
 
-let block_hash_of_string s = Block_hash s
+let block_hash_of_string s = Block_hash (strip_0x s)
 
 let block_hash_encoding =
-  Data_encoding.(conv (fun (Block_hash h) -> h) (fun h -> Block_hash h) string)
+  Data_encoding.(
+    conv (fun (Block_hash h) -> append_0x h) block_hash_of_string string)
 
 (** Ethereum any hash. *)
 type hash = Hash of string [@@ocaml.unboxed]

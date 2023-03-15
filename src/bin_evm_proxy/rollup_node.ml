@@ -54,6 +54,8 @@ module Durable_storage_path = struct
 
   let number = "/number"
 
+  let hash = "/hash"
+
   let transactions = "/transactions"
 
   module Block = struct
@@ -65,8 +67,12 @@ module Durable_storage_path = struct
       | Current -> "current"
       | Nth i -> Z.to_string i
 
-    let transactions block_number =
-      blocks ^ "/" ^ number_to_string block_number ^ transactions
+    let block_field block_number field =
+      blocks ^ "/" ^ number_to_string block_number ^ field
+
+    let hash block_number = block_field block_number hash
+
+    let transactions block_number = block_field block_number transactions
 
     let current_number = blocks ^ "/current" ^ number
   end
@@ -189,6 +195,17 @@ module RPC = struct
             @@ Invalid_block_structure
                  "Unexpected [None] value for [current_number]'s [answer]")
 
+  let block_hash base number =
+    let open Lwt_result_syntax in
+    let key = Durable_storage_path.Block.hash number in
+    let+ hash_answer = call_service ~base durable_state_value () {key} () in
+    match hash_answer with
+    | Some bytes ->
+        Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
+    | None ->
+        raise
+        @@ Invalid_block_structure "Unexpected [None] value for [block.hash]"
+
   let transactions ~full_transaction_object ~number base =
     let open Lwt_result_syntax in
     if full_transaction_object then
@@ -210,11 +227,12 @@ module RPC = struct
   let block ~full_transaction_object ~number base =
     let open Lwt_result_syntax in
     let* transactions = transactions ~full_transaction_object ~number base in
-    let* number = block_number base number in
+    let* level = block_number base number in
+    let* hash = block_hash base number in
     return
       {
-        number = Some number;
-        hash = Some (Ethereum_types.Block_hash "");
+        number = Some level;
+        hash = Some hash;
         parent = Ethereum_types.Block_hash "";
         nonce = Ethereum_types.Hash "";
         sha3Uncles = Ethereum_types.Hash "";

@@ -88,13 +88,14 @@ module Mock = struct
     hash_f @@ "f837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
 
   let block_hash =
-    "0xd28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
+    Block_hash
+      "d28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
 
   let block () =
     {
       number = Some (block_height ());
-      hash = Some (block_hash_of_string block_hash);
-      parent = block_hash_of_string (String.make 32 'a');
+      hash = Some block_hash;
+      parent = Block_hash (String.make 32 'a');
       nonce = hash_f @@ String.make 8 'a';
       sha3Uncles = hash_f @@ String.make 32 'a';
       logsBloom = Some (hash_f @@ String.make 256 'a');
@@ -117,7 +118,7 @@ module Mock = struct
     {
       transactionHash = transaction_hash;
       transactionIndex = qty_f Z.zero;
-      blockHash = block_hash_of_string block_hash;
+      blockHash = block_hash;
       blockNumber = qty_f @@ Z.of_int !block_height_counter;
       from = address_of_string "6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
       to_ = address_of_string "A5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
