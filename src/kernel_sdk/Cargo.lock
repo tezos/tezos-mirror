@@ -432,6 +432,7 @@ dependencies = [
 name = "installer_kernel"
 version = "0.1.0"
 dependencies = [
+ "blst",
  "host",
  "kernel",
  "tezos_rollup_encoding",
@@ -1110,6 +1111,7 @@ dependencies = [
 name = "tezos_smart_rollup_installer"
 version = "0.1.0"
 dependencies = [
+ "blst",
  "clap",
  "hex",
  "tezos_rollup_encoding",

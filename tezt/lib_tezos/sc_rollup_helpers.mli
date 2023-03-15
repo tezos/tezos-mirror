@@ -38,12 +38,23 @@ val hex_encode : string -> string
 *)
 val read_kernel : ?base:string -> string -> string
 
-(** [prepare_installer_kernel ~base_installee ~dac_node installee] feeds the
-    [dac_node] with a kernel ([installee]), and returns the boot sector of the
-    corresponding to the installer for this specific kernel. [installee] is read
-    from [base_installee] on the disk. *)
+(** [prepare_installer_kernel ~base_installee ~preimages_dir installee] feeds the
+    [smart-rollup-installer] with a kernel ([installee]), and returns the boot
+    sector corresponding to the installer for this specific kernel. [installee] is read
+    from [base_installee] on the disk.
+
+    The preimages of the [installee] are saved to [preimages_dir]. This should be the
+    reveal data directory of the rollup node.
+
+    The returned installer is hex-encoded and may be passed to [originate_sc_rollup]
+    directly.
+*)
 val prepare_installer_kernel :
-  ?base_installee:string -> dac_node:Dac_node.t -> string -> string Lwt.t
+  ?runner:Runner.t ->
+  ?base_installee:string ->
+  preimages_dir:string ->
+  string ->
+  string Lwt.t
 
 (** [setup_l1 protocol] initializes a protocol with the given parameters, and
     returns the L1 node and client. *)

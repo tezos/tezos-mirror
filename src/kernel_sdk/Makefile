@@ -3,16 +3,26 @@
 #
 # SPDX-License-Identifier: MIT
 
-CC=$(which clang)
+# The SDK contains some executables, that may be used by tezt.
+# Since the tezt tests run on a different container to the one
+# used for `make build-kernels`, we compile executables using the
+# musl toolchain, to make them fully statically-linked - allowing
+# them to run in the tezt container.
+
+CC=clang
 
 all: build test doc
 
-build:
+check:
 	@cargo fmt --check
 	@cargo clippy --all-targets --all-features -- --deny warnings
 	@cargo check --no-default-features
 	@cargo check --target wasm32-unknown-unknown
-	@cargo build -p tezos_smart_rollup_installer --release
+
+build: check installer.wasm
+	@cargo build -p tezos_smart_rollup_installer \
+		--release \
+		--target x86_64-unknown-linux-musl
 
 installer.wasm:
 	@cargo build -p installer_kernel \
@@ -32,6 +42,7 @@ doc:
 
 build-deps:
 	@rustup target add wasm32-unknown-unknown
+	@rustup target add x86_64-unknown-linux-musl
 	@rustup component add rustfmt clippy
 
 clean:
