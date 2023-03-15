@@ -28,11 +28,12 @@ type t
 
 val zero : t
 
-val make : total:Tez_repr.t -> t
+val make : frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
 
 val encoding : t Data_encoding.t
 
-val total : t -> Tez_repr.t
+(** Sum of the [frozen] and [delegated] parts of a stake. *)
+val total : t -> Tez_repr.t tzresult
 
 (** Weight for staking rights. *)
 val staking_weight : t -> int64

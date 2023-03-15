@@ -68,24 +68,25 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
   List.fold_left_es
     (fun (maxima, delegates_to_remove) (cycle : Cycle_repr.t) ->
       Stake_storage.get_selected_distribution ctxt cycle
-      >|=? fun active_stakes ->
-      List.fold_left
-        (fun (maxima, delegates_to_remove) (delegate, stake) ->
-          let stake = Stake_repr.total stake in
-          let maxima =
-            Signature.Public_key_hash.Map.update
-              delegate
-              (function
-                | None -> Some stake
-                | Some maximum -> Some (Tez_repr.max maximum stake))
-              maxima
-          in
-          let delegates_to_remove =
-            Signature.Public_key_hash.Set.remove delegate delegates_to_remove
-          in
-          (maxima, delegates_to_remove))
-        (maxima, delegates_to_remove)
-        active_stakes)
+      >>=? fun active_stakes ->
+      Lwt.return
+      @@ List.fold_left_e
+           (fun (maxima, delegates_to_remove) (delegate, stake) ->
+             Stake_repr.total stake >|? fun stake ->
+             let maxima =
+               Signature.Public_key_hash.Map.update
+                 delegate
+                 (function
+                   | None -> Some stake
+                   | Some maximum -> Some (Tez_repr.max maximum stake))
+                 maxima
+             in
+             let delegates_to_remove =
+               Signature.Public_key_hash.Set.remove delegate delegates_to_remove
+             in
+             (maxima, delegates_to_remove))
+           (maxima, delegates_to_remove)
+           active_stakes)
     (Signature.Public_key_hash.Map.empty, cleared_cycle_delegates)
     cycles
 

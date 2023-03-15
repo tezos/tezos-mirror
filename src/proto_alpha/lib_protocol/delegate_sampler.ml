@@ -192,7 +192,15 @@ let get_stakes_for_selected_index ctxt index =
             let*? r = max_mutez /? frozen_deposits_percentage in
             return r
       in
-      let stake_for_cycle = Stake_repr.make ~total:total_stake_for_cycle in
+      let delegated =
+        (* This subtraction should not result in a negative value because the
+           staking balance includes the total balance.
+           But since the staking balance is taken from the snapshot and the
+           frozen balance is taken at the end of the cycle we have no strong
+           guarantees. *)
+        sub_opt total_stake_for_cycle frozen |> Option.value ~default:zero
+      in
+      let stake_for_cycle = Stake_repr.make ~frozen ~delegated in
       let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
       return ((delegate, stake_for_cycle) :: acc, total_stake))
     ~init:([], Stake_repr.zero)

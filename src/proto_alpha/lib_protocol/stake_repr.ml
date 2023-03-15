@@ -23,22 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {total : Tez_repr.t}
+type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
 
-let make ~total = {total}
+let make ~frozen ~delegated = {frozen; delegated}
 
-let total {total} = total
+let total {frozen; delegated} = Tez_repr.(frozen +? delegated)
 
 let encoding =
-  Data_encoding.conv total (fun total -> make ~total) Tez_repr.encoding
+  let open Data_encoding in
+  conv
+    (fun {frozen; delegated} -> (frozen, delegated))
+    (fun (frozen, delegated) -> {frozen; delegated})
+    (obj2 (req "frozen" Tez_repr.encoding) (req "delegated" Tez_repr.encoding))
 
-let zero = make ~total:Tez_repr.zero
+let zero = make ~frozen:Tez_repr.zero ~delegated:Tez_repr.zero
 
-let staking_weight stake = Tez_repr.to_mutez (total stake)
+let staking_weight {frozen; delegated} =
+  Int64.add (Tez_repr.to_mutez frozen) (Tez_repr.to_mutez delegated)
 
 let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)
 
-let ( +? ) s1 s2 =
+let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
   let open Result_syntax in
-  let+ total = Tez_repr.(total s1 +? total s2) in
-  make ~total
+  let* frozen = Tez_repr.(f1 +? f2) in
+  let+ delegated = Tez_repr.(d1 +? d2) in
+  {frozen; delegated}
