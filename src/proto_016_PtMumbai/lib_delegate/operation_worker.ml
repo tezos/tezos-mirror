@@ -159,12 +159,24 @@ type event =
   | Prequorum_reached of candidate * Kind.preendorsement operation list
   | Quorum_reached of candidate * Kind.endorsement operation list
 
+module Preendorsement_set = Set.Make (struct
+  type t = Kind.preendorsement operation
+
+  let compare = compare
+end)
+
+module Endorsement_set = Set.Make (struct
+  type t = Kind.endorsement operation
+
+  let compare = compare
+end)
+
 type pqc_watched = {
   candidate_watched : candidate;
   get_preendorsement_voting_power : slot:Slot.t -> int;
   consensus_threshold : int;
   mutable current_voting_power : int;
-  mutable preendorsements_received : Kind.preendorsement operation list;
+  mutable preendorsements_received : Preendorsement_set.t;
   mutable preendorsements_count : int;
 }
 
@@ -173,7 +185,7 @@ type qc_watched = {
   get_endorsement_voting_power : slot:Slot.t -> int;
   consensus_threshold : int;
   mutable current_voting_power : int;
-  mutable endorsements_received : Kind.endorsement operation list;
+  mutable endorsements_received : Endorsement_set.t;
   mutable endorsements_count : int;
 }
 
@@ -254,12 +266,12 @@ let reset_monitoring state =
   | Some (Pqc_watch pqc_watched) ->
       pqc_watched.current_voting_power <- 0 ;
       pqc_watched.preendorsements_count <- 0 ;
-      pqc_watched.preendorsements_received <- [] ;
+      pqc_watched.preendorsements_received <- Preendorsement_set.empty ;
       Lwt.return_unit
   | Some (Qc_watch qc_watched) ->
       qc_watched.current_voting_power <- 0 ;
       qc_watched.endorsements_count <- 0 ;
-      qc_watched.endorsements_received <- [] ;
+      qc_watched.endorsements_received <- Endorsement_set.empty ;
       Lwt.return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
@@ -274,9 +286,16 @@ let update_monitoring ?(should_lock = true) state ops =
            candidate_watched;
            get_preendorsement_voting_power;
            consensus_threshold;
+           preendorsements_received;
            _;
          } as proposal_watched)) ->
       let preendorsements = Operation_pool.filter_preendorsements ops in
+      let preendorsements =
+        List.filter
+          (fun new_preendo ->
+            not (Preendorsement_set.mem new_preendo preendorsements_received))
+          preendorsements
+      in
       let preendorsements_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.preendorsement Operation.t) ->
@@ -296,7 +315,9 @@ let update_monitoring ?(should_lock = true) state ops =
               proposal_watched.current_voting_power <-
                 proposal_watched.current_voting_power + op_power ;
               proposal_watched.preendorsements_received <-
-                op :: proposal_watched.preendorsements_received ;
+                Preendorsement_set.add
+                  op
+                  proposal_watched.preendorsements_received ;
               proposal_watched.preendorsements_count <-
                 proposal_watched.preendorsements_count + 1 ;
               (count + 1, power + op_power))
@@ -315,7 +336,8 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Prequorum_reached
                 ( candidate_watched,
-                  List.rev proposal_watched.preendorsements_received ))) ;
+                  Preendorsement_set.elements
+                    proposal_watched.preendorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
         Lwt.return_unit)
@@ -333,9 +355,16 @@ let update_monitoring ?(should_lock = true) state ops =
            candidate_watched;
            get_endorsement_voting_power;
            consensus_threshold;
+           endorsements_received;
            _;
          } as proposal_watched)) ->
       let endorsements = Operation_pool.filter_endorsements ops in
+      let endorsements =
+        List.filter
+          (fun new_endo ->
+            not (Endorsement_set.mem new_endo endorsements_received))
+          endorsements
+      in
       let endorsements_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.endorsement Operation.t) ->
@@ -355,7 +384,7 @@ let update_monitoring ?(should_lock = true) state ops =
               proposal_watched.current_voting_power <-
                 proposal_watched.current_voting_power + op_power ;
               proposal_watched.endorsements_received <-
-                op :: proposal_watched.endorsements_received ;
+                Endorsement_set.add op proposal_watched.endorsements_received ;
               proposal_watched.endorsements_count <-
                 proposal_watched.endorsements_count + 1 ;
               (count + 1, power + op_power))
@@ -374,7 +403,8 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Quorum_reached
                 ( candidate_watched,
-                  List.rev proposal_watched.endorsements_received ))) ;
+                  Endorsement_set.elements
+                    proposal_watched.endorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
         Lwt.return_unit)
@@ -408,7 +438,7 @@ let monitor_preendorsement_quorum state ~consensus_threshold
            get_preendorsement_voting_power;
            consensus_threshold;
            current_voting_power = 0;
-           preendorsements_received = [];
+           preendorsements_received = Preendorsement_set.empty;
            preendorsements_count = 0;
          })
   in
@@ -424,7 +454,7 @@ let monitor_endorsement_quorum state ~consensus_threshold
            get_endorsement_voting_power;
            consensus_threshold;
            current_voting_power = 0;
-           endorsements_received = [];
+           endorsements_received = Endorsement_set.empty;
            endorsements_count = 0;
          })
   in
