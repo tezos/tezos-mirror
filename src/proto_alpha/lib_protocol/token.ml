@@ -87,13 +87,8 @@ let balance ctxt stored =
       (ctxt, balance)
   | `Frozen_deposits delegate ->
       let contract = Contract_repr.Implicit delegate in
-      Frozen_deposits_storage.find ctxt contract >|=? fun frozen_deposits ->
-      let balance =
-        match frozen_deposits with
-        | None -> Tez_repr.zero
-        | Some frozen_deposits -> frozen_deposits.current_amount
-      in
-      (ctxt, balance)
+      Frozen_deposits_storage.get ctxt contract >|=? fun frozen_deposits ->
+      (ctxt, frozen_deposits.current_amount)
   | `Block_fees -> return (ctxt, Raw_context.get_collected_fees ctxt)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.find_bond ctxt contract bond_id

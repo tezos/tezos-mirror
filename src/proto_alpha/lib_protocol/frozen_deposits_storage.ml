@@ -39,8 +39,6 @@ let get ctxt delegate =
   in
   Option.value ~default:zero frozen_deposits_opt
 
-let find = Storage.Contract.Frozen_deposits.find
-
 let update_balance ctxt delegate f amount =
   let open Lwt_result_syntax in
   let delegate_contract = Contract_repr.Implicit delegate in
