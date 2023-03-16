@@ -630,8 +630,7 @@ let test_read_input ~version () =
       ) ;; Should print "kernel_run called"
 
       (call $read_input
-        (i32.const 100) ;; address to write the level (4b)
-        (i32.const 104) ;; address to write the message counter (8b)
+        (i32.const 100) ;; address to write the level (4b) + message counter (8b)
         (i32.const 112) ;; address to write the read input
         (i32.const 4) ;; length of the input
       ) ;; should fill the bytes 100-116 with level, msg counter and the data "abcd"
@@ -643,7 +642,6 @@ let test_read_input ~version () =
         (i32.const 16) ;; number of bytes
       ) ;; writes the read level, msg counter and the data "abcd"
 
-      (drop) ;; we don't care about the result of write_output
       (drop) ;; we don't care about the result of write_output
     )
   )
