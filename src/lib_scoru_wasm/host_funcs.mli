@@ -23,17 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [lookup name] retrieves or instantiates a host function by the given [name].
-    Currently dispatches [read_input] to {!read_input} using host function global
-    names as registered by {!register_host_funcs}.
+(** [lookup ~version name] retrieves or instantiates a host function
+    by the given [name].
+
     Used to plug host function wrappers in the WASN interpreter linker. *)
 val lookup :
+  version:Wasm_pvm_state.version ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern
 
-(** [lookup_opt name] is exactly [lookup name] but returns an option instead of
+(** [lookup_opt ~version name] is exactly [lookup name] but returns an option instead of
       raising `Not_found`. *)
 val lookup_opt :
+  version:Wasm_pvm_state.version ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
