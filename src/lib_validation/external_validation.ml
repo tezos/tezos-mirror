@@ -504,7 +504,7 @@ let make_socket socket_path = Unix.ADDR_UNIX socket_path
 
 let create_socket ~canceler =
   let open Lwt_syntax in
-  let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
+  let socket = Lwt_unix.socket ~cloexec:true PF_UNIX SOCK_STREAM 0o000 in
   Lwt_unix.set_close_on_exec socket ;
   Lwt_canceler.on_cancel canceler (fun () ->
       let* (_ : unit tzresult) = Lwt_utils_unix.safe_close socket in
