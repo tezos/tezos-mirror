@@ -25,7 +25,7 @@
 
 (** [balance ~account ~endpoint] asks the balance of [account] to the
     JSON-RPC API server listening at [endpoint]. *)
-val balance : account:string -> endpoint:string -> int Lwt.t
+val balance : account:string -> endpoint:string -> Wei.t Lwt.t
 
 (** [transaction_send ~source_private_key ~to_public_key ~value
     ~endpoint] crafts and signs a transaction transferring [value] (as
@@ -34,13 +34,13 @@ val balance : account:string -> endpoint:string -> int Lwt.t
 val transaction_send :
   source_private_key:string ->
   to_public_key:string ->
-  value:Z.t ->
+  value:Wei.t ->
   endpoint:string ->
   string Lwt.t
 
 (** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
     hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
-val get_block : block_id:string -> endpoint:string -> Eth.Block.t Lwt.t
+val get_block : block_id:string -> endpoint:string -> Block.t Lwt.t
 
 (** [block_number ~endpoint] asks the current block number to the
     JSON-RPC API server listening at [endpoint]. *)

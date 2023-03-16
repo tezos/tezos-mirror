@@ -31,7 +31,12 @@ let spawn_command command decode =
   return (JSON.parse ~origin:"eth_spawn_command" output |> decode)
 
 let balance ~account ~endpoint =
-  spawn_command ["address:balance"; account; "--network"; endpoint] JSON.as_int
+  let* balance =
+    spawn_command
+      ["address:balance"; account; "--network"; endpoint]
+      JSON.as_int
+  in
+  return @@ Wei.of_eth_int balance
 
 let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
   spawn_command
@@ -42,14 +47,14 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
       "--to";
       to_public_key;
       "--value";
-      Z.to_string value;
+      Wei.to_string value;
       "--network";
       endpoint;
     ]
     JSON.as_string
 
 let get_block ~block_id ~endpoint =
-  spawn_command ["block:get"; block_id; "--network"; endpoint] Eth.Block.of_json
+  spawn_command ["block:get"; block_id; "--network"; endpoint] Block.of_json
 
 let block_number ~endpoint =
   spawn_command ["block:number"; "--network"; endpoint] JSON.as_int
