@@ -113,7 +113,11 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     Token.balance ctxt `Block_fees >>=? fun (ctxt, block_fees) ->
     Token.transfer ctxt `Block_fees (`Contract contract) block_fees
     >>=? fun (ctxt, balance_updates_block_fees) ->
-    Token.transfer ctxt `Baking_rewards (`Contract contract) baking_reward
+    Token.transfer
+      ctxt
+      `Baking_rewards
+      (`Frozen_deposits delegate)
+      baking_reward
     >|=? fun (ctxt, balance_updates_baking_rewards) ->
     (ctxt, balance_updates_block_fees @ balance_updates_baking_rewards)
   in
