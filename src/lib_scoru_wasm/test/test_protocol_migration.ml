@@ -47,15 +47,15 @@ let test_protocol_migration_message () =
   let open Lwt_syntax in
   let* tree = initial_tree ~version:V0 noop_module in
   let* tree = eval_until_input_requested tree in
-  let* version = Wasm.Internal_for_tests.get_wasm_version tree in
+  let* version = Wasm.get_wasm_version tree in
   assert (version = V0) ;
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
-  let* version = Wasm.Internal_for_tests.get_wasm_version tree in
+  let* version = Wasm.get_wasm_version tree in
   assert (version = V0) ;
   let* tree = set_empty_inbox_step ~migrate_to:Proto_alpha 0l tree in
   let* tree = eval_until_input_requested tree in
-  let* version = Wasm.Internal_for_tests.get_wasm_version tree in
+  let* version = Wasm.get_wasm_version tree in
   assert (version = V1) ;
   Lwt_result_syntax.return_unit
 

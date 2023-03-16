@@ -711,6 +711,4 @@ module Internal_for_tests = struct
   let compute_step_many_with_hooks ?reveal_builtins ?write_debug
       ?after_fast_exec:_ =
     compute_step_many ?reveal_builtins ?write_debug
-
-  let get_wasm_version = get_wasm_version
 end

@@ -57,7 +57,7 @@ let load_kernel durable =
   let store = Lazy.force store in
   Module_cache.load_kernel store durable
 
-let compute ~reveal_builtins ~write_debug durable buffers =
+let compute ~version ~reveal_builtins ~write_debug durable buffers =
   let open Lwt.Syntax in
   let* module_ = load_kernel durable in
 
@@ -67,7 +67,9 @@ let compute ~reveal_builtins ~write_debug durable buffers =
   in
 
   let host_state = Funcs.{retrieve_mem; buffers; durable} in
-  let host_funcs = Funcs.make ~reveal_builtins ~write_debug host_state in
+  let host_funcs =
+    Funcs.make ~version ~reveal_builtins ~write_debug host_state
+  in
 
   let with_durable f =
     let+ durable = f host_state.durable in

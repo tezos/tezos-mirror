@@ -39,6 +39,7 @@ type host_state = {
     implementation for [write_debug] will be picked that prints to the standard
     output. *)
 val make :
+  version:Wasm_pvm_state.version ->
   reveal_builtins:Builtins.reveals ->
   write_debug:Builtins.write_debug ->
   host_state ->
