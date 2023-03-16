@@ -1973,19 +1973,23 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
       let tip = Delegate.Rewards.seed_nonce_revelation_tip ctxt in
-      let contract =
-        Contract.Implicit payload_producer.Consensus_key.delegate
+      let delegate = payload_producer.Consensus_key.delegate in
+      let receiver =
+        if Constants.freeze_rewards ctxt then `Frozen_deposits delegate
+        else `Contract (Contract.Implicit delegate)
       in
-      Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
+      Token.transfer ctxt `Revelation_rewards receiver tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
       Seed.update_seed ctxt solution >>=? fun ctxt ->
       let tip = Delegate.Rewards.vdf_revelation_tip ctxt in
-      let contract =
-        Contract.Implicit payload_producer.Consensus_key.delegate
+      let delegate = payload_producer.Consensus_key.delegate in
+      let receiver =
+        if Constants.freeze_rewards ctxt then `Frozen_deposits delegate
+        else `Contract (Contract.Implicit delegate)
       in
-      Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
+      Token.transfer ctxt `Revelation_rewards receiver tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preendorsement_evidence {op1; op2 = _}) ->
