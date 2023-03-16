@@ -37,6 +37,14 @@ module Make
 
       let section = Parameters.events_section
 
+      let monitoring_error =
+        declare_1
+          ~section
+          ~name:"monitoring_error"
+          ~msg:"error (ignored) in monitoring: {error}"
+          ~level:Warning
+          ("error", trace_encoding)
+
       let declare_1 ~name ~msg ~level ?pp1 enc1 =
         declare_3
           ~section

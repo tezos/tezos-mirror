@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,6 +31,20 @@ type error +=
   | Io_error of [`Close | `Open] Lwt_utils_unix.io_error
   | Unix_error of Unix.error
   | Decoding_error of Data_encoding.Binary.read_error
+
+(** [maybe_read_value ~warn filename encoding] reads the value with [encoding]
+    from the file [filename]. It returns [None] if it fails to read a value and
+    will emit a warning with the [warn] function in this case.  *)
+val maybe_read_value :
+  warn:(string -> error trace -> unit Lwt.t) ->
+  string ->
+  'a Data_encoding.t ->
+  'a option Lwt.t
+
+(** [write_value filename encoding v] write the value [v] to the file [filename]
+    in binary form following the [encoding]. *)
+val write_value :
+  string -> 'a Data_encoding.t -> 'a -> (unit, error trace) result Lwt.t
 
 (** Signature for hash tables with additional information *)
 module type H = sig

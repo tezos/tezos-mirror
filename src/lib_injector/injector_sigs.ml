@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -283,11 +284,17 @@ module type S = sig
       the included information for, must be positive or zero. By default (when
       [0]), the injector will not keep information longer than necessary. It can
       be useful to set this value to something [> 0] if we want to retrieve
-      information about operations included on L1 for a given period. *)
+      information about operations included on L1 for a given period.
+
+      The injector monitors L1 heads to update the statuses of its operations
+      accordingly. The argument [reconnection_delay] gives an initial value for
+      the delay before attempting a reconnection (see {!Layer_1.init}).
+  *)
   val init :
     #Client_context.full ->
     data_dir:string ->
     ?retention_period:int ->
+    ?reconnection_delay:float ->
     state ->
     signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
@@ -300,13 +307,6 @@ module type S = sig
     ?source:Signature.public_key_hash ->
     operation ->
     Inj_operation.Hash.t tzresult Lwt.t
-
-  (** Notify the injector of a new Tezos head. The injector marks the operations
-      appropriately (for instance reverted operations that are part of a
-      reorganization are put back in the pending queue). When an operation is
-      considered as {e confirmed}, it disappears from the injector. *)
-  val new_tezos_head :
-    Block_hash.t * int32 -> (Block_hash.t * int32) Reorg.t -> unit Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending
