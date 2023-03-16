@@ -68,25 +68,24 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
   List.fold_left_es
     (fun (maxima, delegates_to_remove) (cycle : Cycle_repr.t) ->
       Stake_storage.get_selected_distribution ctxt cycle
-      >>=? fun active_stakes ->
-      Lwt.return
-      @@ List.fold_left_e
-           (fun (maxima, delegates_to_remove) (delegate, stake) ->
-             Stake_repr.total stake >|? fun stake ->
-             let maxima =
-               Signature.Public_key_hash.Map.update
-                 delegate
-                 (function
-                   | None -> Some stake
-                   | Some maximum -> Some (Tez_repr.max maximum stake))
-                 maxima
-             in
-             let delegates_to_remove =
-               Signature.Public_key_hash.Set.remove delegate delegates_to_remove
-             in
-             (maxima, delegates_to_remove))
-           (maxima, delegates_to_remove)
-           active_stakes)
+      >|=? fun active_stakes ->
+      List.fold_left
+        (fun (maxima, delegates_to_remove)
+             (delegate, Stake_repr.{frozen; delegated = _}) ->
+          let maxima =
+            Signature.Public_key_hash.Map.update
+              delegate
+              (function
+                | None -> Some frozen
+                | Some maximum -> Some (Tez_repr.max maximum frozen))
+              maxima
+          in
+          let delegates_to_remove =
+            Signature.Public_key_hash.Set.remove delegate delegates_to_remove
+          in
+          (maxima, delegates_to_remove))
+        (maxima, delegates_to_remove)
+        active_stakes)
     (Signature.Public_key_hash.Map.empty, cleared_cycle_delegates)
     cycles
 
@@ -110,17 +109,8 @@ let unfreeze_exceeding_deposits ?(origin = Receipt_repr.Block_application) ctxt
   let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
   >>=? fun (maxima, delegates_to_remove) ->
-  let delegation_over_baking_limit =
-    Constants_storage.delegation_over_baking_limit ctxt
-  in
   Signature.Public_key_hash.Map.fold_es
-    (fun delegate maximum_stake (ctxt, balance_updates) ->
-      let maximum_stake_to_be_deposited =
-        Tez_repr.div_exn maximum_stake (delegation_over_baking_limit + 1)
-      in
-      (* Here we make sure to preserve the following invariant :
-         maximum_stake_to_be_deposited <= frozen_deposits + balance
-         See select_distribution_for_cycle *)
+    (fun delegate maximum_stake_to_be_deposited (ctxt, balance_updates) ->
       let delegate_contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.update_initial_amount
         ctxt
