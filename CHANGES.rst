@@ -75,6 +75,9 @@ Accuser
 - Fixed a bug that made the accuser start without waiting for its
   corresponding protocol.
 
+- The accuser now denounces double consensus operations that have the same
+  level, round, and delegate, but different slots. (MR :gl:`!8084`)
+
 Signer
 ------
 
