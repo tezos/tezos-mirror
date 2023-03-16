@@ -878,7 +878,7 @@ module List_cmd = struct
 
   let base_handler_bench bench_list show_tags =
     Format.printf
-      "%a@."
+      "@[<v>%a@]@."
       (Format.pp_print_list (fun fmt (module Bench : Benchmark.S) ->
            Format.fprintf fmt "%a: %s" Namespace.pp Bench.name Bench.info ;
            if show_tags then
