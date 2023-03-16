@@ -195,6 +195,16 @@ module RPC = struct
     let* _answer = call_service ~base batcher_injection () () [tx] in
     return_unit
 
+  let inject_raw_transaction base ~smart_rollup_address tx_raw =
+    let open Lwt_result_syntax in
+    let tx_hash =
+      Tx_hash.hash_to_string (Ethereum_types.hash_to_string tx_raw)
+    in
+    let tx_raw = Ethereum_types.hash_to_bytes tx_raw in
+    let tx = smart_rollup_address ^ tx_hash ^ tx_raw in
+    let* () = inject_raw_transaction base tx in
+    return (Ethereum_types.Hash Hex.(of_string tx_hash |> show))
+
   exception Invalid_block_structure of string
 
   let block_number base n =
@@ -367,7 +377,8 @@ module type S = sig
 
   val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
-  val inject_raw_transaction : string -> unit tzresult Lwt.t
+  val inject_raw_transaction :
+    smart_rollup_address:string -> hash -> hash tzresult Lwt.t
 
   val current_block :
     full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
