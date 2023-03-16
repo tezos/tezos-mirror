@@ -62,6 +62,9 @@ val to_filename : t -> string
 *)
 type cons = string -> t
 
+(* Add a string at the end of a namespace *)
+val cons : t -> string -> t
+
 (** The basic constructor for namespaces, at the root of every other namespace.
     [root "bench"] would return the namespace ["bench"] for a benchmark *)
 val root : cons
@@ -95,5 +98,3 @@ module Hashtbl : Hashtbl.SeededS with type key = t
 module Set : Set.S with type elt = t
 
 module Map : Map.S with type key = t
-
-val cons : t -> string -> t
