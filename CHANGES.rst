@@ -57,6 +57,9 @@ Client
 Baker
 -----
 
+- Fixed a bug where the baker could count an (pre)endorsement twice
+  while waiting for a (pre)quorum.
+
 Accuser
 -------
 
