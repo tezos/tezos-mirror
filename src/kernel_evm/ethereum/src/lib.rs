@@ -4,4 +4,5 @@
 
 pub mod account;
 pub mod eth_gen;
+pub mod transaction;
 pub mod wei;

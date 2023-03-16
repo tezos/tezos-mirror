@@ -12,7 +12,8 @@ use std::str::from_utf8;
 use crate::block::L2Block;
 use crate::error::Error;
 use tezos_ethereum::account::*;
-use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level, TransactionHash, TRANSACTION_HASH_SIZE};
+use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level};
+use tezos_ethereum::transaction::{TransactionHash, TransactionReceipt, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::U256;
@@ -30,6 +31,16 @@ const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/blocks");
 const EVM_BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
 const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
+
+const TRANSACTIONS_RECEIPTS: RefPath = RefPath::assert_from(b"/transactions_receipts");
+const TRANSACTION_RECEIPT_HASH: RefPath = RefPath::assert_from(b"/hash");
+const TRANSACTION_RECEIPT_INDEX: RefPath = RefPath::assert_from(b"/index");
+const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_hash");
+const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
+const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
+const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
+const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
+const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
 
 const HASH_MAX_SIZE: usize = 32;
 
@@ -87,6 +98,12 @@ fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
     let number_path = OwnedPath::try_from(raw_number_path).map_err(Error::from)?;
     concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
+}
+fn receipt_path(receipt: &TransactionReceipt) -> Result<OwnedPath, Error> {
+    let hash = hex::encode(receipt.hash);
+    let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
+    let receipt_path = OwnedPath::try_from(raw_receipt_path).map_err(Error::from)?;
+    concat(&TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
 }
 
 pub fn has_account<Host: Runtime>(
@@ -273,11 +290,69 @@ pub fn store_block_by_number<Host: Runtime + RawRollupCore>(
 
 pub fn store_current_block<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    block: L2Block,
+    block: &L2Block,
 ) -> Result<(), Error> {
     let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
     // We only need to store current block's number so we avoid the storage of duplicate informations.
     store_block_number(host, &current_block_path, block.number)?;
-    // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
-    store_block_by_number(host, &block)
+    // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
+    store_block_by_number(host, block)
+}
+
+// TODO: This store a transaction receipt with multiple subkeys, it could
+// be stored in a single encoded value. However, this is for now easier
+// for the (OCaml) proxy server to do as is.
+fn store_transaction_receipt<Host: Runtime + RawRollupCore>(
+    receipt_path: &OwnedPath,
+    host: &mut Host,
+    receipt: &TransactionReceipt,
+) -> Result<(), Error> {
+    // Transaction hash
+    let hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_HASH)?;
+    host.store_write(&hash_path, &receipt.hash, 0)
+        .map_err(Error::from)?;
+    // Index
+    let index_path = concat(receipt_path, &TRANSACTION_RECEIPT_INDEX)?;
+    host.store_write(&index_path, &receipt.index.to_le_bytes(), 0)
+        .map_err(Error::from)?;
+    // Block hash
+    let block_hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
+    host.store_write(&block_hash_path, &receipt.block_hash, 0)
+        .map_err(Error::from)?;
+    // Block number
+    let block_number_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
+    host.store_write(
+        &block_number_path,
+        &u64::to_le_bytes(receipt.block_number),
+        0,
+    )
+    .map_err(Error::from)?;
+    // From
+    let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
+    host.store_write(&from_path, &receipt.from, 0)
+        .map_err(Error::from)?;
+    // Type
+    let type_path = concat(receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
+    host.store_write(&type_path, (&receipt.type_).into(), 0)?;
+    // Status
+    let status_path = concat(receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
+    host.store_write(&status_path, (&receipt.status).into(), 0)?;
+    // To
+    if let Some(to) = &receipt.to {
+        let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
+        host.store_write(&to_path, to, 0)?;
+    };
+
+    Ok(())
+}
+
+pub fn store_transaction_receipts<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    receipts: &[TransactionReceipt],
+) -> Result<(), Error> {
+    for receipt in receipts {
+        let receipt_path = receipt_path(receipt)?;
+        store_transaction_receipt(&receipt_path, host, receipt)?;
+    }
+    Ok(())
 }
