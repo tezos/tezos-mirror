@@ -288,4 +288,10 @@ module type AUTOMATON = sig
   (** [handle_unsubscribe topic peer] handles a request from a remote [peer] to
       unsubscribe to a [topic]. *)
   val handle_unsubscribe : Topic.t -> Peer.t -> [`Unsubscribe] monad
+
+  module Internal_for_tests : sig
+    (** [get_subscribed_topics peer state] returns the set of topics
+        that are subscribed by [peer] *)
+    val get_subscribed_topics : Peer.t -> state -> Topic.t list
+  end
 end

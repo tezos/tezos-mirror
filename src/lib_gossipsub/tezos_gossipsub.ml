@@ -1314,4 +1314,11 @@ module Make (C : AUTOMATON_CONFIG) :
   end
 
   let remove_peer : Peer.t -> [`Remove_peer] output Monad.t = Remove_peer.handle
+
+  module Internal_for_tests = struct
+    let get_subscribed_topics peer state =
+      match Peer.Map.find peer state.connections with
+      | None -> []
+      | Some connection -> Topic.Set.elements connection.topics
+  end
 end
