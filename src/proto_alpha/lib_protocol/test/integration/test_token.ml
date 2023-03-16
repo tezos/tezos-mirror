@@ -135,7 +135,7 @@ let test_allocated () =
   let receiver = `Collected_commitments Blinded_public_key_hash.zero in
   test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
   let receiver = `Frozen_deposits pkh in
-  test_allocated_and_still_allocated_when_empty ctxt receiver false
+  test_allocated_and_still_allocated_when_empty ctxt receiver true
   >>=? fun () ->
   let receiver = `Block_fees in
   test_allocated_and_still_allocated_when_empty ctxt receiver true

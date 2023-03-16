@@ -34,10 +34,6 @@
 val init :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-(** [allocated ctxt contract] checks whether [contract] has frozen deposits in
-    [ctxt]. *)
-val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
-
 (** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt].
     It returns zero if there is no such value. *)
 val get : Raw_context.t -> Contract_repr.t -> Storage.deposits tzresult Lwt.t

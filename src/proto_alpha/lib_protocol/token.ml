@@ -69,11 +69,7 @@ let allocated ctxt stored =
       let contract = Contract_repr.Implicit delegate in
       Contract_storage.allocated ctxt contract >|= fun allocated ->
       ok (ctxt, allocated)
-  | `Frozen_deposits delegate ->
-      let contract = Contract_repr.Implicit delegate in
-      Frozen_deposits_storage.allocated ctxt contract >|= fun allocated ->
-      ok (ctxt, allocated)
-  | `Block_fees -> return (ctxt, true)
+  | `Frozen_deposits _ | `Block_fees -> return (ctxt, true)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.bond_allocated ctxt contract bond_id
 

@@ -32,8 +32,6 @@ let init ctxt delegate =
     (Contract_repr.Implicit delegate)
     zero
 
-let allocated = Storage.Contract.Frozen_deposits.mem
-
 let get ctxt delegate =
   let open Lwt_result_syntax in
   let+ frozen_deposits_opt =
