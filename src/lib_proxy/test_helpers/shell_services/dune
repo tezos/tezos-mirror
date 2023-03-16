@@ -2,17 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_shell_services_test_helpers)
- (public_name tezos-shell-services-test-helpers)
+ (name tezos_proxy_test_helpers_shell_services)
  (libraries
   tezos-base
   tezos-shell-services
   tezos-test-helpers
   qcheck-core
   tezos-context.memory
-  alcotest-lwt)
+  lwt.unix
+  octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt))

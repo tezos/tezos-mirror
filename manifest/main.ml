@@ -2995,11 +2995,11 @@ let octez_proxy_rpc =
         uri;
       ]
 
-let octez_shell_services_test_helpers =
-  public_lib
-    "tezos-shell-services-test-helpers"
-    ~path:"src/lib_shell_services/test_helpers"
-    ~synopsis:"Tezos: Tezos shell_services test helpers"
+let octez_proxy_test_helpers_shell_services =
+  private_lib
+    "tezos_proxy_test_helpers_shell_services"
+    ~path:"src/lib_proxy/test_helpers/shell_services"
+    ~opam:""
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3007,34 +3007,37 @@ let octez_shell_services_test_helpers =
         octez_test_helpers |> open_;
         qcheck_core;
         octez_context_memory;
-        alcotest_lwt;
+        lwt_unix;
+        alcotezt;
       ]
     ~bisect_ppx:false
     ~linkall:true
+    ~release_status:Released
 
 let _octez_shell_service_test_helpers_tests =
-  test
-    "test_block_services"
-    ~path:"src/lib_shell_services/test_helpers/test"
-    ~opam:"tezos-shell-services-test-helpers"
+  tezt
+    ["test_block_services"]
+    ~path:"src/lib_proxy/test_helpers/shell_services/test"
+    ~opam:"tezos-proxy"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_test_helpers |> open_;
         octez_shell_services;
-        octez_shell_services_test_helpers;
+        octez_proxy_test_helpers_shell_services;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let _octez_proxy_tests =
-  tests
+  tezt
     [
       "test_proxy";
       "test_fuzzing_proxy_getter";
       "test_light";
       "test_fuzzing_light";
+      "light_lib";
     ]
     ~path:"src/lib_proxy/test"
     ~with_macos_security_framework:true
@@ -3047,9 +3050,9 @@ let _octez_proxy_tests =
         octez_proxy;
         octez_base_test_helpers |> open_;
         octez_test_helpers |> open_;
-        octez_shell_services_test_helpers;
+        octez_proxy_test_helpers_shell_services;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
         uri;
       ]
 

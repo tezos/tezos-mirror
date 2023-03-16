@@ -2,44 +2,32 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_lib_proxy_test_tezt_lib)
+ (name src_lib_proxy_test_helpers_shell_services_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   tezos-base
   tezos-base.unix
-  tezos-stdlib-unix
-  tezos-proxy
-  tezos-base-test-helpers
   tezos-test-helpers
+  tezos-shell-services
   tezos_proxy_test_helpers_shell_services
   qcheck-alcotest
-  octez-alcotezt
-  uri)
+  octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_base_test_helpers
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules
-  test_proxy
-  test_fuzzing_proxy_getter
-  test_light
-  test_fuzzing_light
-  light_lib))
+ (modules test_block_services))
 
 (executable
  (name main)
  (libraries
-  src_lib_proxy_test_tezt_lib
+  src_lib_proxy_test_helpers_shell_services_test_tezt_lib
   tezt)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
 (rule (alias runtezt) (package tezos-proxy) (action (run %{dep:./main.exe})))

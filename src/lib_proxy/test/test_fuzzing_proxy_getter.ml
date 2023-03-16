@@ -35,7 +35,7 @@ module Proxy_getter = Tezos_proxy.Proxy_getter
 module Tree = Proxy_getter.Internal.Tree
 open Qcheck2_helpers
 
-open Tezos_shell_services_test_helpers.Shell_services_test_helpers
+open Tezos_proxy_test_helpers_shell_services.Test_helpers_shell_services
 
 let key_gen =
   (* Using small_list, otherwise the test takes considerably longer.
