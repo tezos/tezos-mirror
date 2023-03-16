@@ -62,18 +62,19 @@ let test_equal () =
   assert (Poly.(equal zero (make [|0; 0|])))
 
 let test_copy () =
-  let module C = Poly.Polynomial_impl in
+  let module C = Poly.Polynomial_unsafe in
   let make a = C.of_dense (Array.map Scalar.of_string a) in
   let p = make [|"0"; "1"; "2"; "0"|] in
   assert (C.equal (C.copy p) p) ;
-  assert (C.equal (C.copy ~offset:1 p) (make [|"1"; "2"; "0"|])) ;
-  assert (C.equal (C.copy ~offset:1 ~len:2 p) (make [|"1"; "2"|])) ;
-  assert (C.equal (C.copy ~len:2 p) (make [|"0"; "1"|])) ;
-  assert (raises_invalid_arg (fun () -> C.copy ~len:5 p)) ;
-  assert (raises_invalid_arg (fun () -> C.copy ~offset:(-2) p)) ;
-  assert (raises_invalid_arg (fun () -> C.copy ~offset:(C.length p) p)) ;
+  assert (C.equal (C.copy_carray ~offset:1 p) (make [|"1"; "2"; "0"|])) ;
+  assert (C.equal (C.copy_carray ~offset:1 ~len:2 p) (make [|"1"; "2"|])) ;
+  assert (C.equal (C.copy_carray ~len:2 p) (make [|"0"; "1"|])) ;
+  assert (raises_invalid_arg (fun () -> C.copy_carray ~len:5 p)) ;
+  assert (raises_invalid_arg (fun () -> C.copy_carray ~offset:(-2) p)) ;
+  assert (raises_invalid_arg (fun () -> C.copy_carray ~offset:(C.length p) p)) ;
   assert (
-    raises_invalid_arg (fun () -> C.copy ~offset:(C.length p - 1) ~len:2 p))
+    raises_invalid_arg (fun () ->
+        C.copy_carray ~offset:(C.length p - 1) ~len:2 p))
 
 let test_split_poly () =
   let make a = Poly.of_dense (Array.map Scalar.of_string a) in
