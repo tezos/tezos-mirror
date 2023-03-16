@@ -9,6 +9,7 @@
   str
   bls12-381
   tezt-tezos
+  tezt_ethereum
   data-encoding
   tezos-base
   tezos-base.unix
@@ -97,4 +98,5 @@
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax))
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_ethereum))

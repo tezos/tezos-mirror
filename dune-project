@@ -236,6 +236,7 @@
 (package (name tezos-webassembly-interpreter))
 (package (name tezos-webassembly-interpreter-extra))
 (package (name tezos-workers))
+(package (name tezt-ethereum)(allow_empty))
 (package (name tezt-performance-regression))
 (package (name tezt-self-tests))
 (package (name tezt-tezos))

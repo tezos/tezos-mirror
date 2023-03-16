@@ -1555,6 +1555,8 @@ opam:tezos-workers:
   variables:
     package: tezos-workers
 
+# Ignoring unreleased package tezt-ethereum.
+
 opam:tezt-performance-regression:
   extends:
     - .opam_template

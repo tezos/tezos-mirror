@@ -1595,6 +1595,20 @@ let tezt_tezos =
     ~cram:true
     ~release_status:Released
 
+let tezt_ethereum =
+  private_lib
+    "tezt_ethereum"
+    ~path:"tezt/lib_ethereum"
+    ~opam:"tezt-ethereum"
+    ~synopsis:"Ethereum test framework based on Tezt"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_performance_regression |> open_;
+      ]
+    ~release_status:Unreleased
+
 let _tezt_self_tests =
   public_exe
     "tezt-self-tests"
@@ -6664,6 +6678,7 @@ let () =
         str;
         bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_ethereum |> open_;
         data_encoding;
         octez_base;
         octez_base_unix;
