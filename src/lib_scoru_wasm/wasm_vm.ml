@@ -104,8 +104,10 @@ let mark_for_reboot {reboot_counter; durable; _} =
    the currently running kernel. *)
 let has_fallback_kernel durable =
   let open Lwt_syntax in
-  let* kernel_hash = Durable.hash durable Constants.kernel_key in
-  let+ fallback_hash = Durable.hash durable Constants.kernel_fallback_key in
+  let* kernel_hash = Durable.hash ~kind:`Value durable Constants.kernel_key in
+  let+ fallback_hash =
+    Durable.hash ~kind:`Value durable Constants.kernel_fallback_key
+  in
   Option.is_some fallback_hash && kernel_hash <> fallback_hash
 
 let initial_boot_state () =
@@ -115,9 +117,9 @@ let initial_boot_state () =
 
 let save_fallback_kernel durable =
   let open Lwt.Syntax in
-  let* kernel_hash = Durable.hash durable Constants.kernel_key in
+  let* kernel_hash = Durable.hash ~kind:`Value durable Constants.kernel_key in
   let* kernel_fallback_hash =
-    Durable.hash durable Constants.kernel_fallback_key
+    Durable.hash ~kind:`Value durable Constants.kernel_fallback_key
   in
   if kernel_hash <> kernel_fallback_hash then
     Durable.copy_tree_exn

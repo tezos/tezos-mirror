@@ -173,15 +173,26 @@ let move_tree_exn tree from_key to_key =
   let* tree = delete tree from_key in
   T.add_tree tree (key_contents to_key) move_tree
 
-let hash tree key =
+let hash ~kind tree key =
   let open Lwt.Syntax in
-  let+ opt = T.find_tree tree @@ to_value_key @@ key_contents key in
+  let key =
+    match kind with
+    | `Value -> to_value_key (key_contents key)
+    | `Subtree -> key_contents key
+  in
+  let+ opt = T.find_tree tree key in
   Option.map (fun subtree -> T.hash subtree) opt
 
-let hash_exn tree key =
+let hash_exn ~kind tree key =
   let open Lwt.Syntax in
-  let+ opt = hash tree key in
-  match opt with None -> raise Value_not_found | Some hash -> hash
+  let+ opt = hash ~kind tree key in
+  match opt with
+  | None ->
+      let exn =
+        match kind with `Value -> Value_not_found | `Subtree -> Tree_not_found
+      in
+      raise exn
+  | Some hash -> hash
 
 let set_value_exn tree ?(edit_readonly = false) key str =
   if not edit_readonly then assert_key_writeable key ;

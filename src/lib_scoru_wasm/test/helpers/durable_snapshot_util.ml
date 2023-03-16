@@ -60,9 +60,9 @@ module type Testable_durable_sig = sig
 
   val delete : ?edit_readonly:bool -> t -> key -> t Lwt.t
 
-  val hash : t -> key -> Context_hash.t option Lwt.t
+  val hash : kind:[`Subtree | `Value] -> t -> key -> Context_hash.t option Lwt.t
 
-  val hash_exn : t -> key -> Context_hash.t Lwt.t
+  val hash_exn : kind:[`Subtree | `Value] -> t -> key -> Context_hash.t Lwt.t
 
   val set_value_exn : t -> ?edit_readonly:bool -> key -> string -> t Lwt.t
 
@@ -369,19 +369,19 @@ end) : Testable_durable_sig with type t = Snapshot.t * Current.t = struct
       (fun () -> Snapshot.delete ?edit_readonly tree_s key_s)
       (fun () -> Current.delete ?edit_readonly tree_c key_c)
 
-  let hash (tree_s, tree_c) (key_s, key_c) =
+  let hash ~kind (tree_s, tree_c) (key_s, key_c) =
     same_values
       ~pp:(Fmt.option Context_hash.pp)
       ~eq:(Option.equal Context_hash.equal)
-      (fun () -> add_tree tree_s @@ Snapshot.hash tree_s key_s)
-      (fun () -> add_tree tree_c @@ Current.hash tree_c key_c)
+      (fun () -> add_tree tree_s @@ Snapshot.hash ~kind tree_s key_s)
+      (fun () -> add_tree tree_c @@ Current.hash ~kind tree_c key_c)
 
-  let hash_exn (tree_s, tree_c) (key_s, key_c) =
+  let hash_exn ~kind (tree_s, tree_c) (key_s, key_c) =
     same_values
       ~pp:Context_hash.pp
       ~eq:Context_hash.equal
-      (fun () -> add_tree tree_s @@ Snapshot.hash_exn tree_s key_s)
-      (fun () -> add_tree tree_c @@ Current.hash_exn tree_c key_c)
+      (fun () -> add_tree tree_s @@ Snapshot.hash_exn ~kind tree_s key_s)
+      (fun () -> add_tree tree_c @@ Current.hash_exn ~kind tree_c key_c)
 
   let set_value_exn (tree_s, tree_c) ?edit_readonly (key_s, key_c) bytes =
     same_trees
@@ -557,16 +557,19 @@ module Traceable_durable = struct
         (Fun.const true)
       @@ fun () -> D.delete ~edit_readonly dur key
 
-    let hash dur key =
-      inspect_op Hash (D.Internal_for_tests.key_to_list key) Option.is_some
-      @@ fun () -> D.hash dur key
+    let hash ~kind dur key =
+      inspect_op
+        Hash
+        (D.Internal_for_tests.key_to_list key, kind)
+        Option.is_some
+      @@ fun () -> D.hash ~kind dur key
 
-    let hash_exn dur key =
+    let hash_exn ~kind dur key =
       inspect_op
         Hash_exn
-        (D.Internal_for_tests.key_to_list key)
+        (D.Internal_for_tests.key_to_list key, kind)
         (Fun.const true)
-      @@ fun () -> D.hash_exn dur key
+      @@ fun () -> D.hash_exn ~kind dur key
 
     let set_value_exn dur ?(edit_readonly = false) key value =
       inspect_op

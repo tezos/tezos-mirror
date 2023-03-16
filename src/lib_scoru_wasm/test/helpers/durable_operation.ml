@@ -32,6 +32,8 @@ let key_to_str key_list = String.concat "/" ("" :: key_list)
 let key_len key_list =
   List.fold_left (fun acc seg -> String.length seg + acc + 1) 0 ("" :: key_list)
 
+let kind_to_str = function `Value -> "Value" | `Subtree -> "Subtree"
+
 (* GADT type, each constructor's type represents a type parameters
    which are taken as input of corresponding operation *)
 type _ operation_kind =
@@ -54,9 +56,9 @@ type _ operation_kind =
   (* key, idx*)
   | Substree_name_at : (key * int) operation_kind
   (* key *)
-  | Hash : key operation_kind
+  | Hash : (key * [`Value | `Subtree]) operation_kind
   (* key *)
-  | Hash_exn : key operation_kind
+  | Hash_exn : (key * [`Value | `Subtree]) operation_kind
   (* edit_readonly, key, offset, value *)
   | Write_value_exn : (bool * key * int64 * string) operation_kind
   (* key, offset, len *)
@@ -144,10 +146,22 @@ let pp fmt (x : t) =
         Substree_name_at
         (key_to_str key)
         idx
-  | Operation (Hash, key) ->
-      Format.fprintf fmt "%a(%s)" pp_operation_kind Hash (key_to_str key)
-  | Operation (Hash_exn, key) ->
-      Format.fprintf fmt "%a(%s)" pp_operation_kind Hash_exn (key_to_str key)
+  | Operation (Hash, (key, kind)) ->
+      Format.fprintf
+        fmt
+        "%a(key: %s, kind: %s)"
+        pp_operation_kind
+        Hash
+        (key_to_str key)
+        (kind_to_str kind)
+  | Operation (Hash_exn, (key, kind)) ->
+      Format.fprintf
+        fmt
+        "%a(key: %s, kind: %s)"
+        pp_operation_kind
+        Hash_exn
+        (key_to_str key)
+        (kind_to_str kind)
   | Operation (Write_value_exn, (edit_readonly, key, offset, _value)) ->
       Format.fprintf
         fmt
