@@ -161,9 +161,10 @@ module Internal_for_tests = struct
 
   let make_atomic_batch transactions = Atomic_transaction_batch {transactions}
 
-  let serialize_outbox_message (Atomic_transaction_batch {transactions}) =
+  let serialize_outbox_message_untyped (Atomic_transaction_batch {transactions})
+      =
     let open Result_syntax in
-    let to_internal_transaction
+    let of_internal_transaction
         (Transaction
           {
             destination;
@@ -175,9 +176,37 @@ module Internal_for_tests = struct
       return
         {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint}
     in
-    let* transactions = List.map_e to_internal_transaction transactions in
+    let* transactions = List.map_e of_internal_transaction transactions in
     let output_message_internal =
       Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}
+    in
+    Sc_rollup.Outbox.Message.serialize output_message_internal
+
+  let serialize_outbox_message_typed (Atomic_transaction_batch {transactions}) =
+    let open Result_syntax in
+    let of_internal_transaction
+        (Transaction
+          {
+            destination;
+            entrypoint;
+            parameters_ty;
+            parameters = _;
+            unparsed_parameters;
+          }) =
+      let unparsed_ty =
+        Script_ir_unparser.serialize_ty_for_error parameters_ty
+      in
+      return
+        {
+          Sc_rollup.Outbox.Message.unparsed_parameters;
+          unparsed_ty;
+          destination;
+          entrypoint;
+        }
+    in
+    let* transactions = List.map_e of_internal_transaction transactions in
+    let output_message_internal =
+      Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed {transactions}
     in
     Sc_rollup.Outbox.Message.serialize output_message_internal
 

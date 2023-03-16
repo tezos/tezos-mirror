@@ -52,12 +52,12 @@ let check_encode_decode_inbox_message message =
     (Sc_rollup.Inbox_message.unsafe_to_string bytes)
     (Sc_rollup.Inbox_message.unsafe_to_string bytes')
 
-let check_encode_decode_outbox_message ctxt message =
+let check_encode_decode_outbox_message_untyped ctxt message =
   let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
-    @@ Internal_for_tests.serialize_outbox_message message
+    @@ Internal_for_tests.serialize_outbox_message_untyped message
   in
   let* message', _ctxt =
     let*? message_repr =
@@ -67,7 +67,29 @@ let check_encode_decode_outbox_message ctxt message =
   in
   let*? bytes' =
     Environment.wrap_tzresult
-    @@ Internal_for_tests.serialize_outbox_message message'
+    @@ Internal_for_tests.serialize_outbox_message_untyped message'
+  in
+  Assert.equal_string
+    ~loc:__LOC__
+    (Sc_rollup.Outbox.Message.unsafe_to_string bytes)
+    (Sc_rollup.Outbox.Message.unsafe_to_string bytes')
+
+let check_encode_decode_outbox_message_typed ctxt message =
+  let open Lwt_result_wrap_syntax in
+  let open Sc_rollup_management_protocol in
+  let*? bytes =
+    Environment.wrap_tzresult
+    @@ Internal_for_tests.serialize_outbox_message_typed message
+  in
+  let* message', _ctxt =
+    let*? message_repr =
+      Environment.wrap_tzresult @@ Sc_rollup.Outbox.Message.deserialize bytes
+    in
+    wrap @@ outbox_message_of_outbox_message_repr ctxt message_repr
+  in
+  let*? bytes' =
+    Environment.wrap_tzresult
+    @@ Internal_for_tests.serialize_outbox_message_typed message'
   in
   Assert.equal_string
     ~loc:__LOC__
@@ -308,7 +330,8 @@ let test_encode_decode_outbox_message () =
     Sc_rollup_management_protocol.Internal_for_tests.make_atomic_batch
       [transaction1; transaction2; transaction3]
   in
-  check_encode_decode_outbox_message ctxt outbox_message
+  let* () = check_encode_decode_outbox_message_untyped ctxt outbox_message in
+  check_encode_decode_outbox_message_typed ctxt outbox_message
 
 let tests =
   [
