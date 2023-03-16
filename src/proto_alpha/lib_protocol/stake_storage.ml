@@ -71,7 +71,6 @@ let get_initialized_stake ctxt delegate =
   Storage.Stake.Staking_balance.find ctxt delegate >>=? function
   | Some staking_balance -> return (staking_balance, ctxt)
   | None ->
-      Frozen_deposits_storage.init ctxt delegate >>=? fun ctxt ->
       let balance = Tez_repr.zero in
       Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
       return (balance, ctxt)

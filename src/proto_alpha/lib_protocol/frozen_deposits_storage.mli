@@ -28,12 +28,6 @@
     This module is responsible for maintaining the
     {!Storage.Contract.Frozen_deposits} table. *)
 
-(** [init ctxt delegate] returns a new context from [ctxt] where the frozen
-   deposits of the implicit contract represented by [delegate] have been initialized to
-   {!val:Tez_repr.zero}. *)
-val init :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
 (** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt].
     It returns zero if there is no such value. *)
 val get : Raw_context.t -> Contract_repr.t -> Storage.deposits tzresult Lwt.t
