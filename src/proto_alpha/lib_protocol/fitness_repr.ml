@@ -229,6 +229,18 @@ let predecessor_round_from_raw = function
   | [] (* genesis fitness *) -> ok Round_repr.zero
   | _ -> error Invalid_fitness
 
+let locked_round_from_raw = function
+  | [version; _level; locked_round; _neg_predecessor_round; _round]
+    when Compare.String.(
+           Bytes.to_string version = Constants_repr.fitness_version_number) ->
+      locked_round_of_bytes locked_round
+  | [version; _]
+    when Compare.String.(
+           Bytes.to_string version < Constants_repr.fitness_version_number) ->
+      ok None
+  | [] (* former genesis fitness *) -> ok None
+  | _ -> error Invalid_fitness
+
 let check_except_locked_round fitness ~level ~predecessor_round =
   let {
     level = expected_level;

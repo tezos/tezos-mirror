@@ -963,10 +963,8 @@ module Scripts = struct
       oph
       packed_operation
     >>=? fun _validate_operation_state ->
-    Raw_level.of_int32 block_header.level >>?= fun predecessor_level ->
     let application_mode =
-      Apply.Partial_construction
-        {predecessor_level; predecessor_fitness = block_header.fitness}
+      Apply.Partial_construction {predecessor_fitness = block_header.fitness}
     in
     let application_state =
       Apply.

@@ -29,8 +29,8 @@ open Alpha_context
 type consensus_info = {
   predecessor_level : Raw_level.t;
   predecessor_round : Round.t;
-  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
-  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
+  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
+  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
 }
 
 let init_consensus_info ctxt (predecessor_level, predecessor_round) =
@@ -440,9 +440,12 @@ module Consensus = struct
       (Zero_frozen_deposits delegate_pkh)
 
   let get_delegate_details slot_map kind slot =
-    Result.of_option
-      (Slot.Map.find slot slot_map)
-      ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
+    match slot_map with
+    | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
+    | Some slot_map -> (
+        match Slot.Map.find slot slot_map with
+        | None -> error (Wrong_slot_used_for_consensus_operation {kind})
+        | Some x -> ok x)
 
   (** When validating a block (ie. in [Application],
       [Partial_validation], and [Construction] modes), any
@@ -549,10 +552,17 @@ module Consensus = struct
       [predecessor_level - 1 <= op_level <= predecessor_level + 1]
       (note that [predecessor_level + 1] is also known as [current_level]).
 
-      Return the slot owner's consensus key and voting power (the
-      latter may be fake because it doesn't matter in Mempool mode, but
-      it is included to mirror the check_..._block_preendorsement
-      functions). *)
+      Note that we also don't check whether the slot is normalized
+      (that is, whether it is the delegate's smallest slot). Indeed,
+      we don't want to compute the right tables by first slot for all
+      three allowed levels. Checking the slot normalization is
+      therefore the responsability of the baker when it selects
+      the consensus operations to include in a new block. Moreover,
+      multiple endorsements pointing to the same block with different
+      slots can be punished by a double-(pre)endorsement operation.
+
+      Return the slot owner's consensus key and a fake voting power (the
+      latter won't be used anyway in Mempool mode). *)
   let check_mempool_consensus vi consensus_info kind {level; slot; _} =
     let open Lwt_result_syntax in
     let*? () =
@@ -564,28 +574,10 @@ module Consensus = struct
         error (Consensus_operation_for_future_level {kind; expected; provided})
       else ok_unit
     in
-    if Raw_level.(level = consensus_info.predecessor_level) then
-      (* The operation points to the mempool head's level, which is
-         the level for which slot maps have been pre-computed. *)
-      let slot_map =
-        match kind with
-        | Preendorsement -> consensus_info.preendorsement_slot_map
-        | Endorsement -> consensus_info.endorsement_slot_map
-        | Dal_attestation -> assert false
-      in
-      Lwt.return (get_delegate_details slot_map kind slot)
-    else
-      (* We don't have a pre-computed slot map for the operation's
-         level, so we retrieve the key directly from the context. We
-         return a fake voting power since it won't be used anyway in
-         Mempool mode. *)
-      let* (_ctxt : t), consensus_key =
-        Stake_distribution.slot_owner
-          vi.ctxt
-          (Level.from_raw vi.ctxt level)
-          slot
-      in
-      return (consensus_key, 0 (* Fake voting power *))
+    let* (_ctxt : t), consensus_key =
+      Stake_distribution.slot_owner vi.ctxt (Level.from_raw vi.ctxt level) slot
+    in
+    return (consensus_key, 0 (* Fake voting power *))
   (* We do not check that the frozen deposits are positive because this
      only needs to be true in the context of a block that actually
      contains the operation, which may not be the same as the current
@@ -1360,19 +1352,24 @@ module Anonymous = struct
           Block_payload_hash.(e1.block_payload_hash = e2.block_payload_hash)
         in
         let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
+        let same_slots = Slot.(e1.slot = e2.slot) in
         let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
         let is_denunciation_consistent =
           same_levels && same_rounds
-          (* Either the payloads or the branches must differ for the
-             double (pre)endorsement to be punishable. Indeed,
-             different payloads would endanger the consensus process,
-             while different branches could be used to spam mempools
-             with a lot of valid operations. On the other hand, if the
-             operations have identical levels, rounds, payloads, and
-             branches (and of course delegates), then only their
+          (* For the double (pre)endorsements to be punishable, they
+             must point to the same block (same level and round), but
+             also have at least a difference that is the delegate's
+             fault: different payloads, different branches, or
+             different slots. Note that different payloads would
+             endanger the consensus process, while different branches
+             or slots could be used to spam mempools with a lot of
+             valid operations (since the minimality of the slot in not
+             checked in mempool mode, only in block-related modes). On
+             the other hand, if the operations have identical levels,
+             rounds, payloads, branches, and slots, then only their
              signatures are different, which is not considered the
              delegate's fault and therefore is not punished. *)
-          && ((not same_payload) || not same_branches)
+          && ((not same_payload) || (not same_branches) || not same_slots)
           && (* we require an order on hashes to avoid the existence of
                    equivalent evidences *)
           ordered_hashes

@@ -1227,6 +1227,9 @@ module Fitness : sig
 
   val predecessor_round_from_raw : raw -> Round.t tzresult
 
+  (** See {!Fitness_repr.locked_round_from_raw}. *)
+  val locked_round_from_raw : raw -> Round.t option tzresult
+
   val level : t -> Raw_level.t
 
   val round : t -> Round.t
@@ -5048,6 +5051,9 @@ module Stake_distribution : sig
 
   val slot_owner :
     context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
+
+  (** See {!Delegate_sampler.load_sampler_for_cycle}. *)
+  val load_sampler_for_cycle : context -> Cycle.t -> context tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,

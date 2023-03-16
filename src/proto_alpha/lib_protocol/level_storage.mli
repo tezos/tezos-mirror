@@ -35,6 +35,9 @@ val from_raw : Raw_context.t -> Raw_level_repr.t -> Level_repr.t
 val from_raw_with_offset :
   Raw_context.t -> offset:int32 -> Raw_level_repr.t -> Level_repr.t tzresult
 
+(** When the given level is two or above, return its predecessor. When
+    the given level is one or less, return [None] (because we cannot
+    build the [Level_repr.t] for level zero). *)
 val pred : Raw_context.t -> Level_repr.t -> Level_repr.t option
 
 val succ : Raw_context.t -> Level_repr.t -> Level_repr.t

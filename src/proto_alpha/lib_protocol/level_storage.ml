@@ -38,7 +38,10 @@ let root c = Raw_context.cycle_eras c |> Level_repr.root_level
 let succ c (l : Level_repr.t) = from_raw c (Raw_level_repr.succ l.level)
 
 let pred c (l : Level_repr.t) =
-  match Raw_level_repr.pred l.Level_repr.level with
+  (* This returns [None] rather than level zero when [l] is level one
+     because {!from_raw} raises an exception when called on zero
+     (because [Level_repr.era_of_level] cannot find level zero's era). *)
+  match Raw_level_repr.pred_dontreturnzero l.Level_repr.level with
   | None -> None
   | Some l -> Some (from_raw c l)
 
