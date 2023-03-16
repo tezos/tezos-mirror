@@ -23,8 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type PRINTABLE = sig
+  type t
+
+  val pp : Format.formatter -> t -> unit
+end
+
 module type ITERABLE = sig
   type t
+
+  include Compare.S with type t := t
+
+  include PRINTABLE with type t := t
 
   module Set : Set.S with type elt = t
 
@@ -38,14 +48,16 @@ module type CONFIGURATION = sig
 
   module Message_id : ITERABLE
 
-  module Message : sig
-    type t
-  end
+  module Message : PRINTABLE
+
+  module Span : PRINTABLE
 
   module Time : sig
     include Compare.S
 
-    type span
+    include PRINTABLE with type t := t
+
+    type span = Span.t
 
     val now : unit -> t
 
@@ -103,14 +115,18 @@ module type S = sig
   (** Module for message_id *)
   module Message_id : ITERABLE
 
-  (** Type for message *)
-  type message
+  (** Module for message *)
+  module Message : PRINTABLE
 
-  (** Type for time *)
-  type time
+  (** Module for time *)
+  module Time : PRINTABLE
 
-  (** Type for time duration *)
-  type span
+  (** Module for time duration *)
+  module Span : PRINTABLE
+
+  type message = Message.t
+
+  type span = Span.t
 
   (** The state managed by the gossipsub automaton. The state is
       purely functional. *)
@@ -218,9 +234,9 @@ end
 
 module Make (C : CONFIGURATION) :
   S
-    with type time = C.Time.t
-     and type span = C.Time.span
+    with type Time.t = C.Time.t
+     and type Span.t = C.Time.span
      and module Peer = C.Peer
      and module Topic = C.Topic
      and module Message_id = C.Message_id
-     and type message = C.Message.t
+     and module Message = C.Message

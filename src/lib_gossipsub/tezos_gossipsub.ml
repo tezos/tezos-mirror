@@ -29,8 +29,18 @@
    as in the go implementation.
 *)
 
+module type PRINTABLE = sig
+  type t
+
+  val pp : Format.formatter -> t -> unit
+end
+
 module type ITERABLE = sig
   type t
+
+  include Compare.S with type t := t
+
+  include PRINTABLE with type t := t
 
   module Set : Set.S with type elt = t
 
@@ -44,14 +54,16 @@ module type CONFIGURATION = sig
 
   module Message_id : ITERABLE
 
-  module Message : sig
-    type t
-  end
+  module Message : PRINTABLE
+
+  module Span : PRINTABLE
 
   module Time : sig
     include Compare.S
 
-    type span
+    include PRINTABLE with type t := t
+
+    type span = Span.t
 
     val now : unit -> t
 
@@ -112,11 +124,15 @@ module type S = sig
 
   module Message_id : ITERABLE
 
-  type message
+  module Message : PRINTABLE
 
-  type time
+  module Time : PRINTABLE
 
-  type span
+  module Span : PRINTABLE
+
+  type message = Message.t
+
+  type span = Span.t
 
   type state
 
@@ -190,21 +206,22 @@ end
 
 module Make (C : CONFIGURATION) :
   S
-    with type time = C.Time.t
-     and type span = C.Time.span
+    with type Time.t = C.Time.t
+     and module Span = C.Span
      and module Peer = C.Peer
      and module Topic = C.Topic
      and module Message_id = C.Message_id
-     and type message = C.Message.t = struct
+     and module Message = C.Message = struct
   module Peer = C.Peer
   module Topic = C.Topic
   module Message_id = C.Message_id
+  module Message = C.Message
+  module Span = C.Span
+  module Time = C.Time
 
-  type message = C.Message.t
+  type message = Message.t
 
-  type time = C.Time.t
-
-  type span = C.Time.span
+  type span = Time.span
 
   type nonrec limits = (Peer.t, Message_id.t, C.Time.span) limits
 
