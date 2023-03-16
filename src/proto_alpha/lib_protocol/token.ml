@@ -132,11 +132,7 @@ let credit ctxt receiver amount origin =
             contract
             amount
           >|=? fun ctxt -> (ctxt, Contract contract)
-      | `Frozen_deposits delegate as receiver ->
-          allocated ctxt receiver >>=? fun (ctxt, allocated) ->
-          (if not allocated then Frozen_deposits_storage.init ctxt delegate
-          else return ctxt)
-          >>=? fun ctxt ->
+      | `Frozen_deposits delegate ->
           Frozen_deposits_storage.credit_only_call_from_token
             ctxt
             delegate
