@@ -29,13 +29,21 @@ open Tezt_core.Base
 module Configuration :
   CONFIGURATION
     with type Time.t = int
-     and type Time.span = int
+     and type Span.t = int
      and type Peer.t = int
      and type Topic.t = string
      and type Message_id.t = int
      and type Message.t = int = struct
+  module Span = struct
+    type t = int
+
+    let pp = Format.pp_print_int
+  end
+
   module Time = struct
-    type span = int
+    type span = Span.t
+
+    let pp = Format.pp_print_int
 
     let now =
       let cpt = ref (-1) in
@@ -49,14 +57,18 @@ module Configuration :
   end
 
   module Peer = struct
-    type t = int
+    include Compare.Int
+
+    let pp = Format.pp_print_int
 
     module Map = Map.Make (Int)
     module Set = Set.Make (Int)
   end
 
   module Topic = struct
-    type t = string
+    include Compare.String
+
+    let pp = Format.pp_print_string
 
     module Map = Map.Make (String)
     module Set = Set.Make (String)
