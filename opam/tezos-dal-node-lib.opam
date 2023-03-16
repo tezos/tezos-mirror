@@ -17,16 +17,10 @@ depends: [
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
   "tezos-crypto-dal"
-  "tezt" { with-test & >= "3.0.0" }
-  "tezos-stdlib" {with-test}
-  "tezos-test-helpers" {with-test}
-  "tezos-base-test-helpers" {with-test}
-  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: `tezos-dal-node` library"

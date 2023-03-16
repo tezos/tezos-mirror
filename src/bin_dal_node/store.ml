@@ -35,7 +35,7 @@ let path = "store"
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
-let shard_store_path = "shard_store"
+let shard_store_dir = "shard_store"
 
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
@@ -45,10 +45,55 @@ let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
 let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 
+module Shards = struct
+  include Key_value_store
+
+  type nonrec t = (Cryptobox.Commitment.t * int, Cryptobox.share) t
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
+     Make storage more resilient to DAL parameters change. *)
+  let are_shards_available store commitment shard_indexes =
+    let open Lwt_result_syntax in
+    List.for_all_es
+      (fun index ->
+        let*! value = read_value store (commitment, index) in
+        match value with
+        | Ok _ -> return true
+        | Error [Stored_data.Missing_stored_data _] -> return false
+        | Error e -> fail e)
+      shard_indexes
+
+  let save_and_notify shards_store shards_watcher commitment shards =
+    let open Lwt_result_syntax in
+    let shards =
+      Seq.map
+        (fun {Cryptobox.index; share} -> ((commitment, index), share))
+        shards
+    in
+    let* () = write_values shards_store shards |> Errors.other_lwt_result in
+    let*! () =
+      Event.(emit stored_slot_shards (commitment, Seq.length shards))
+    in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
+
+       DAL/Node: rehaul the store  abstraction & notification system.
+    *)
+    return @@ Lwt_watcher.notify shards_watcher commitment
+
+  let init node_store_dir shard_store_dir =
+    let ( // ) = Filename.concat in
+    let dir_path = node_store_dir // shard_store_dir in
+    init ~lru_size:Constants.shards_store_lru_size (fun (commitment, index) ->
+        let commitment_string = Cryptobox.Commitment.to_b58check commitment in
+        let filename = string_of_int index in
+        let filepath = dir_path // commitment_string // filename in
+        Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
+end
+
 (** Store context *)
 type node_store = {
   store : t;
-  shard_store : Shard_store.t;
+  shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
@@ -60,15 +105,11 @@ let open_shards_stream {shards_watcher; _} =
 (** [init config] inits the store on the filesystem using the given [config]. *)
 let init config =
   let open Lwt_result_syntax in
-  let dir = Configuration.data_dir_path config path in
+  let base_dir = Configuration.data_dir_path config path in
   let shards_watcher = Lwt_watcher.create_input () in
-  let*! repo = Repo.v (Irmin_pack.config dir) in
+  let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let* shard_store =
-    Shard_store.init
-      ~max_mutexes:Constants.shards_max_mutexes
-      (Filename.concat dir shard_store_path)
-  in
+  let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return {shard_store; store; shards_watcher}
 
@@ -124,6 +165,10 @@ let decode_profile profile =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string Services.Types.profile_encoding profile
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
+
+   DAL/Node: Replace Irmin storage for paths
+*)
 module Legacy = struct
   module Path : sig
     type t = string list
@@ -591,15 +636,4 @@ module Legacy = struct
           (fun header ->
             if header.Services.Types.status = hs then Some header else None)
           accu
-
-  let save_shards store commitment shards =
-    let open Lwt_result_syntax in
-    let* () =
-      Shard_store.write_shards store.shard_store commitment shards
-      |> Errors.other_lwt_result
-    in
-    let*! () =
-      Event.(emit stored_slot_shards (commitment, Seq.length shards))
-    in
-    return @@ Lwt_watcher.notify store.shards_watcher commitment
 end

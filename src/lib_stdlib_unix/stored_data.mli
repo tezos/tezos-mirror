@@ -43,6 +43,9 @@ type 'a eq := 'a -> 'a -> bool
 (** The type for the (persistent) data of a file. *)
 type 'a t
 
+(** This error is returned when the requested data is not found. *)
+type error += Missing_stored_data of string
+
 (** [make_file ?(json=false) ~filepath encoding] represents a file
     located at [filepath]. The content of this value is encoded using
     [encoding]. By default, the content is encoded in binary content

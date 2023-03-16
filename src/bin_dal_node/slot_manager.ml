@@ -132,7 +132,12 @@ let add_commitment_shards node_store cryptobox commitment _with_proof =
   let* slot = get_commitment_slot node_store cryptobox commitment in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  Store.Legacy.save_shards node_store commitment shards
+  Store.(
+    Shards.save_and_notify
+      node_store.shard_store
+      node_store.shards_watcher
+      commitment
+      shards)
 
 let store_slot_headers ~block_level ~block_hash slot_headers node_store =
   Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store

@@ -34,8 +34,7 @@ let add_profile node_store profile =
 
 let get_profiles node_store = Store.Legacy.get_profiles node_store
 
-let get_attestable_slots ctxt store cryptobox proto_parameters pkh
-    ~attested_level =
+let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
   let open Lwt_result_syntax in
   let* shard_indexes =
     Node_context.fetch_assigned_shard_indices ctxt ~pkh ~level:attested_level
@@ -51,7 +50,6 @@ let get_attestable_slots ctxt store cryptobox proto_parameters pkh
       Int32.(
         sub attested_level (of_int proto_parameters.Dal_plugin.attestation_lag))
     in
-    let share_size = Cryptobox.encoded_share_size cryptobox in
     let are_shards_stored slot_index =
       let*! r =
         Slot_manager.get_commitment_by_published_level_and_index
@@ -64,8 +62,7 @@ let get_attestable_slots ctxt store cryptobox proto_parameters pkh
       | Error `Not_found -> return false
       | Error (#decoding as e) -> fail (e :> [Errors.decoding | Errors.other])
       | Ok commitment ->
-          Shard_store.are_shards_available
-            ~share_size
+          Store.Shards.are_shards_available
             store.shard_store
             commitment
             shard_indexes

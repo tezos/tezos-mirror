@@ -39,7 +39,6 @@ val get_profiles :
 val get_attestable_slots :
   Node_context.t ->
   Store.node_store ->
-  Cryptobox.t ->
   Dal_plugin.proto_parameters ->
   Tezos_crypto.Signature.public_key_hash ->
   attested_level:int32 ->
