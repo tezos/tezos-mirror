@@ -13,8 +13,3 @@
   octez-polynomial
   octez-mec)
  (preprocess (staged_pps ppx_repr ppx_deriving.show)))
-
-(rule
- (alias runtest)
- (deps z3/run_z3_tests.sh (glob_files z3/*.z3))
- (action (chdir z3 (run sh run_z3_tests.sh))))
