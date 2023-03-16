@@ -135,6 +135,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Double_bake.register ~protocols ;
   Encoding.register ~protocols ;
   Events.register ~protocols ;
+  External_validation.register ~protocols ;
   Forge.register ~protocols ;
   Fork.register ~protocols ;
   Gas_bound.register ~protocols ;
