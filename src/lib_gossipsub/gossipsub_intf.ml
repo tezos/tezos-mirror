@@ -299,6 +299,23 @@ module type AUTOMATON = sig
     (** [get_subscribed_topics peer state] returns the set of topics
         that are subscribed by [peer] *)
     val get_subscribed_topics : Peer.t -> state -> Topic.t list
+
+    type connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+          (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
+      outbound : bool;
+          (** An outbound connection is a connection we initiated. *)
+      backoff : Time.t Topic.Map.t;
+          (** The backoff times associated to this peer for each topic *)
+      score : Score.t;  (** The score associated to this peer. *)
+      expire : Time.t option;
+          (** The expiring time after having being disconnected from this peer. *)
+    }
+
+    val connections : state -> connection Peer.Map.t
+
+    val limits : state -> limits
   end
 end
 

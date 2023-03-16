@@ -1322,5 +1322,18 @@ module Make (C : AUTOMATON_CONFIG) :
       match Peer.Map.find peer state.connections with
       | None -> []
       | Some connection -> Topic.Set.elements connection.topics
+
+    type nonrec connection = connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      backoff : Time.t Topic.Map.t;
+      score : Score.t;
+      expire : Time.t option;
+    }
+
+    let connections state = state.connections
+
+    let limits state = state.limits
   end
 end
