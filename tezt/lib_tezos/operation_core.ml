@@ -25,7 +25,12 @@
 
 open Runnable.Syntax
 
-type kind = Consensus of {chain_id : string} | Voting | Manager
+type consensus_kind = Endorsement | Preendorsement
+
+type kind =
+  | Consensus of {kind : consensus_kind; chain_id : string}
+  | Voting
+  | Manager
 
 type t = {
   branch : string;
@@ -86,9 +91,16 @@ let hex ?protocol ?signature t client =
 let sign ?protocol ({kind; signer; _} as t) client =
   let watermark =
     match kind with
-    | Consensus {chain_id} ->
-        Tezos_crypto.Signature.Endorsement
-          (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+    | Consensus {kind; chain_id} ->
+        let chain_id =
+          Tezos_crypto.Hashed.Chain_id.to_string
+            (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+        in
+        let prefix =
+          match kind with Preendorsement -> "\x12" | Endorsement -> "\x13"
+        in
+        Tezos_crypto.Signature.Custom
+          (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
     | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
   let* hex = hex ?protocol t client in
@@ -192,11 +204,38 @@ let make_run_operation_input ?chain_id t client =
       ])
 
 module Consensus = struct
-  type t = Dal_attestation of {attestation : bool array; level : int}
+  type t =
+    | Consensus of {
+        kind : consensus_kind;
+        slot : int;
+        level : int;
+        round : int;
+        block_payload_hash : string;
+      }
+    | Dal_attestation of {attestation : bool array; level : int}
+
+  let preendorsement ~slot ~level ~round ~block_payload_hash =
+    Consensus {kind = Preendorsement; slot; level; round; block_payload_hash}
+
+  let endorsement ~slot ~level ~round ~block_payload_hash =
+    Consensus {kind = Endorsement; slot; level; round; block_payload_hash}
 
   let dal_attestation ~attestation ~level = Dal_attestation {attestation; level}
 
   let json signer = function
+    | Consensus {kind; slot; level; round; block_payload_hash} ->
+        `O
+          [
+            ( "kind",
+              Ezjsonm.string
+                (match kind with
+                | Preendorsement -> "preendorsement"
+                | Endorsement -> "endorsement") );
+            ("slot", Ezjsonm.int slot);
+            ("level", Ezjsonm.int level);
+            ("round", Ezjsonm.int round);
+            ("block_payload_hash", Ezjsonm.string block_payload_hash);
+          ]
     | Dal_attestation {attestation; level} ->
         let string_of_bool_vector attestation =
           let aux (acc, n) b =
@@ -225,7 +264,12 @@ module Consensus = struct
       | None -> RPC.Client.call client @@ RPC.get_chain_chain_id ()
       | Some branch -> return branch
     in
-    return (make ~branch ~signer ~kind:(Consensus {chain_id}) json)
+    let kind =
+      match consensus_operation with
+      | Consensus {kind; _} -> kind
+      | Dal_attestation _ -> Endorsement
+    in
+    return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
   let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
