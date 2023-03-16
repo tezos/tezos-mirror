@@ -187,6 +187,45 @@ let get_free_variable_set (type a) (model : a model) =
   let module R = M.Def (T1) in
   T0.prj @@ T1.prj R.model
 
+(* No workload application.  For [Aggregate _], only extract
+   the free variables of the [sub_models].
+*)
+let get_free_variable_set_of_t =
+  let get_free_variables_of_packed_model (Model (module Model) : packed_model) =
+    let module M = Model.Def (Costlang.Free_variables) in
+    M.model
+  in
+  function
+  | Abstract {model; _} -> get_free_variables_of_packed_model (Model model)
+  | Aggregate {sub_models; _} ->
+      List.fold_left
+        (fun acc packed_model ->
+          Free_variable.Set.union acc
+          @@ get_free_variables_of_packed_model packed_model)
+        Free_variable.Set.empty
+        sub_models
+
+let get_free_variable_set_applied (type workload) (model : workload t)
+    (workload : workload) =
+  (* If a parameter is fixed to 0 in the workload data, the application
+      of the workload can eliminate free variables multiplied
+      by the parameter.
+
+      The typical example is the intercept case where some parameters
+      tend to be fixed to 0.  This may not work when the intercept point
+      is not at "zero"s.
+
+      It is unfortunate that we need to apply workload data to a model to
+      know which variables can be optimized out.  We may be able to do it
+      without workload, but it seems not an easy task.
+  *)
+  let applied = apply model workload in
+  let module M = (val applied) in
+  let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
+  let module T1 = Costlang.Beta_normalize (T0) in
+  let module R = M (T1) in
+  T0.prj @@ T1.prj R.applied
+
 (* -------------------------------------------------------------------------- *)
 (* Commonly used models *)
 

@@ -593,3 +593,20 @@ let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t) =
       (fun () -> Stdlib.Hashtbl.to_seq_keys table |> Set.of_seq |> Set.elements);
     get = (fun aspect -> Stdlib.Hashtbl.find_all table aspect);
   }
+
+let get_free_variable_set measurement =
+  let (Measurement ((module Bench), m)) = measurement in
+  let open Free_variable.Set in
+  List.fold_left
+    (fun acc (_local_model_name, model) ->
+      let fvs =
+        List.fold_left
+          (fun acc {workload; _} ->
+            let fvs = Model.get_free_variable_set_applied model workload in
+            union fvs acc)
+          empty
+          m.workload_data
+      in
+      union acc fvs)
+    empty
+    Bench.models

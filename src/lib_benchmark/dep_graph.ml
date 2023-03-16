@@ -235,15 +235,6 @@ let pp_print_set fmtr (set : Free_variable.Set.t) =
     elts ;
   Format.fprintf fmtr " }"
 
-let get_free_variables (type workload) (model : workload Model.t)
-    (workload : workload) : Free_variable.Set.t =
-  let applied = Model.apply model workload in
-  let module M = (val applied) in
-  let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
-  let module T1 = Costlang.Beta_normalize (T0) in
-  let module R = M (T1) in
-  T0.prj @@ T1.prj R.applied
-
 let add_names (state : string Solver.state) (filename : string)
     (names : Free_variable.Set.t) : string Solver.state =
   Format.eprintf "for %s, adding names %a@." filename pp_print_set names ;
@@ -353,7 +344,9 @@ let load_files (model_name : string) (files : string list) =
                 let names =
                   List.fold_left
                     (fun acc {Measure.workload; _} ->
-                      let names = get_free_variables model workload in
+                      let names =
+                        Model.get_free_variable_set_applied model workload
+                      in
                       Free_variable.Set.union names acc)
                     Free_variable.Set.empty
                     m.Measure.workload_data

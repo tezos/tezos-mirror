@@ -79,3 +79,10 @@ let info ((module B) : t) = B.info
 let tags ((module B) : t) = B.tags
 
 let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)
+
+let get_free_variable_set (module Bench : S) =
+  List.fold_left
+    (fun acc (_, model) ->
+      Free_variable.Set.union acc @@ Model.get_free_variable_set_of_t model)
+    Free_variable.Set.empty
+    Bench.models
