@@ -38,7 +38,8 @@ val init :
     [ctxt]. *)
 val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
-(** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt]. *)
+(** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt].
+    It returns zero if there is no such value. *)
 val get : Raw_context.t -> Contract_repr.t -> Storage.deposits tzresult Lwt.t
 
 (** [find ctxt contract] retrieves the frozen deposits of [contract] in

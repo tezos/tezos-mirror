@@ -34,7 +34,12 @@ let init ctxt delegate =
 
 let allocated = Storage.Contract.Frozen_deposits.mem
 
-let get = Storage.Contract.Frozen_deposits.get
+let get ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ frozen_deposits_opt =
+    Storage.Contract.Frozen_deposits.find ctxt delegate
+  in
+  Option.value ~default:zero frozen_deposits_opt
 
 let find = Storage.Contract.Frozen_deposits.find
 

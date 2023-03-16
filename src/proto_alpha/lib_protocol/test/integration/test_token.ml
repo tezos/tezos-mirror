@@ -347,7 +347,7 @@ let test_transferring_from_container ctxt giver amount expected_bupds =
   let error_title =
     match giver with
     | `Contract _ -> "Balance too low"
-    | `Delegate_balance _ | `Frozen_deposits _ | `Frozen_bonds _ ->
+    | `Delegate_balance _ | `Frozen_bonds _ ->
         "Storage error (fatal internal error)"
     | _ -> "Underflowing tez subtraction"
   in
