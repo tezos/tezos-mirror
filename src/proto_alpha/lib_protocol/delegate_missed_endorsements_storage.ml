@@ -108,22 +108,25 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
    Stake_storage.set_active ctxt block_producer
   else return ctxt)
   >>=? fun ctxt ->
+  let freeze_rewards = Constants_storage.freeze_rewards ctxt in
   let pay_payload_producer ctxt delegate =
     let contract = Contract_repr.Implicit delegate in
     Token.balance ctxt `Block_fees >>=? fun (ctxt, block_fees) ->
     Token.transfer ctxt `Block_fees (`Contract contract) block_fees
     >>=? fun (ctxt, balance_updates_block_fees) ->
     let receiver =
-      if Constants_storage.freeze_rewards ctxt then `Frozen_deposits delegate
-      else `Contract contract
+      if freeze_rewards then `Frozen_deposits delegate else `Contract contract
     in
     Token.transfer ctxt `Baking_rewards receiver baking_reward
     >|=? fun (ctxt, balance_updates_baking_rewards) ->
     (ctxt, balance_updates_block_fees @ balance_updates_baking_rewards)
   in
   let pay_block_producer ctxt delegate bonus =
-    let contract = Contract_repr.Implicit delegate in
-    Token.transfer ctxt `Baking_bonuses (`Contract contract) bonus
+    let receiver =
+      if freeze_rewards then `Frozen_deposits delegate
+      else `Contract (Contract_repr.Implicit delegate)
+    in
+    Token.transfer ctxt `Baking_bonuses receiver bonus
   in
   pay_payload_producer ctxt payload_producer
   >>=? fun (ctxt, balance_updates_payload_producer) ->
