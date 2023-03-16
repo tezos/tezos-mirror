@@ -228,7 +228,6 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
   Stake_storage.get_selected_distribution ctxt last_cycle >>=? fun delegates ->
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, active_stake) ->
-      let delegate_contract = Contract_repr.Implicit delegate in
       Delegate_missed_endorsements_storage
       .check_and_reset_delegate_participation
         ctxt
@@ -248,11 +247,12 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
       let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
       if sufficient_participation && has_revealed_nonces then
         (* Sufficient participation: we pay the rewards *)
-        Token.transfer
-          ctxt
-          `Endorsing_rewards
-          (`Contract delegate_contract)
-          rewards
+        let receiver =
+          if Constants_storage.freeze_rewards ctxt then
+            `Frozen_deposits delegate
+          else `Contract (Contract_repr.Implicit delegate)
+        in
+        Token.transfer ctxt `Endorsing_rewards receiver rewards
         >|=? fun (ctxt, payed_rewards_receipts) ->
         (ctxt, payed_rewards_receipts @ balance_updates)
       else
