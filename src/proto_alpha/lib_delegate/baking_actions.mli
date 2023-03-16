@@ -54,7 +54,6 @@ type action =
   | Inject_preendorsements of {
       preendorsements : (consensus_key_and_delegate * consensus_content) list;
     }
-  | Reinject_preendorsements of {preendorsements : packed_operation list}
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
     }
@@ -94,7 +93,7 @@ val inject_block :
 val inject_preendorsements :
   state ->
   preendorsements:(consensus_key_and_delegate * consensus_content) list ->
-  state tzresult Lwt.t
+  unit tzresult Lwt.t
 
 val sign_endorsements :
   state ->
