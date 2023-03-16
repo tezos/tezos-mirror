@@ -123,6 +123,10 @@ module Make (C : AUTOMATON_CONFIG) :
     | Peer_added : [`Add_peer] output
     | Peer_already_known : [`Add_peer] output
     | Removing_peer : [`Remove_peer] output
+    | Subscribed : [`Subscribe] output
+    | Subscribe_to_unknown_peer : [`Subscribe] output
+    | Unsubscribed : [`Unsubscribe] output
+    | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
 
   type connection = {
     topics : Topic.Set.t;
@@ -726,6 +730,48 @@ module Make (C : AUTOMATON_CONFIG) :
       backoff:span ->
       [`Prune] output Monad.t =
     Prune.handle
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5148
+     Consider merging subcribe/unsubscribe with join/leave. *)
+  module Subscribe = struct
+    let handle topic peer =
+      let open Monad.Syntax in
+      let*! connections in
+      match Peer.Map.find peer connections with
+      | None -> return @@ Subscribe_to_unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.add topic connection.topics}
+          in
+          let connections = Peer.Map.add peer connection connections in
+          let* () = set_connections connections in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
+             rust-libp2p adds the peer to the mesh if needed here. *)
+          return Subscribed
+  end
+
+  let handle_subscribe : Topic.t -> Peer.t -> [`Subscribe] output Monad.t =
+    Subscribe.handle
+
+  module Unsubscribe = struct
+    let handle topic peer =
+      let open Monad.Syntax in
+      let*! connections in
+      match Peer.Map.find peer connections with
+      | None -> return @@ Unsubscribe_from_unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.remove topic connection.topics}
+          in
+          let connections = Peer.Map.add peer connection connections in
+          let* () = set_connections connections in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
+             rust-libp2p removes unsubscribed peers from the mesh here. *)
+          return Unsubscribed
+  end
+
+  let handle_unsubscribe : Topic.t -> Peer.t -> [`Unsubscribe] output Monad.t =
+    Unsubscribe.handle
 
   module Publish = struct
     let get_peers_for_unsubscribed_topic topic =
