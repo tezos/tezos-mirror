@@ -1620,6 +1620,7 @@ let test_outboxes_at_each_level ~version () =
 let test_outbox_validity_period ~version () =
   let open Lwt_syntax in
   let open Tezos_webassembly_interpreter.Output_buffer in
+  let open Tezos_webassembly_interpreter.Output_buffer.Internal_for_tests in
   let output_message = "output_message" in
 
   let outbox_validity_period = 2l in

@@ -375,8 +375,7 @@ let show_outbox_gen tree level =
     Tezos_webassembly_interpreter.Output_buffer.get_outbox output_buffer level
   in
   let* messages =
-    Tezos_lazy_containers.Lazy_vector.(
-      Mutable.ZVector.snapshot level_vector |> ZVector.to_list)
+    Tezos_lazy_containers.Lazy_vector.(level_vector |> ZVector.to_list)
   in
   let pp_messages () =
     Format.asprintf
@@ -387,7 +386,7 @@ let show_outbox_gen tree level =
       messages
   in
   let size =
-    Tezos_lazy_containers.Lazy_vector.Mutable.ZVector.num_elements level_vector
+    Tezos_lazy_containers.Lazy_vector.ZVector.num_elements level_vector
   in
   Lwt_io.printf
     "Outbox has %s messages:\n%s\n%!"

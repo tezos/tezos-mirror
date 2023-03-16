@@ -42,3 +42,8 @@ val dequeue : t -> message Lwt.t
     If that fails it will raise the error [Cannot_store_an_earlier_message].
 *)
 val enqueue : t -> message -> unit Lwt.t
+
+(** [snapshot buffer] returns snapshotted buffer.
+    You can modify original one, snapshotted one will stay untouched
+*)
+val snapshot : t -> t

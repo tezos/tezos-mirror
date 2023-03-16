@@ -82,6 +82,13 @@ let rec compute_step_many accum_ticks ?reveal_builtins
   let eligible_for_fast_exec =
     Z.Compare.(pvm_state.max_nb_ticks <= Z.of_int64 max_steps)
   in
+  let inbox_snapshot =
+    Tezos_webassembly_interpreter.Input_buffer.snapshot pvm_state.buffers.input
+  in
+  let* outbox_snapshot =
+    Tezos_webassembly_interpreter.Output_buffer.snapshot
+      pvm_state.buffers.output
+  in
   let backup pvm_state =
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
@@ -89,7 +96,10 @@ let rec compute_step_many accum_ticks ?reveal_builtins
         ~write_debug
         ~stop_at_snapshot
         ~max_steps
-        pvm_state
+        {
+          pvm_state with
+          buffers = {input = inbox_snapshot; output = outbox_snapshot};
+        }
     in
     (pvm_state, Int64.add accum_ticks ticks)
   in

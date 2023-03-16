@@ -58,3 +58,5 @@ let enqueue (input : t) r =
     let* first = get_input (Z.pred num_elements) input in
     if is_successor r first then enqueue ()
     else raise Cannot_store_an_earlier_message
+
+let snapshot v = Vector.of_immutable @@ Vector.snapshot v
