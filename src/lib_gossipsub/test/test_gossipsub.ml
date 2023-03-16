@@ -61,7 +61,7 @@ module Automaton_config :
     include Compare.Int
   end
 
-  module Peer = struct
+  module Int_iterable = struct
     include Compare.Int
 
     let pp = Format.pp_print_int
@@ -70,7 +70,7 @@ module Automaton_config :
     module Set = Set.Make (Int)
   end
 
-  module Topic = struct
+  module String_iterable = struct
     include Compare.String
 
     let pp = Format.pp_print_string
@@ -79,11 +79,14 @@ module Automaton_config :
     module Set = Set.Make (String)
   end
 
-  module Message_id = Peer
-  module Message = Peer
+  module Peer = Int_iterable
+  module Topic = String_iterable
+  module Message_id = Int_iterable
+  module Message = Int_iterable
 end
 
-module GS = Make (Automaton_config)
+module C = Automaton_config
+module GS = Make (C)
 
 (* Most of these limits are the default ones used by the Go implementation. *)
 let default_limits =
@@ -122,8 +125,11 @@ let seed =
       Random.bits ()
   | Some seed -> seed
 
-let init_state ~(peer_no : int) ~(topics : string list) ~(direct : bool)
-    ~(outbound : bool) : GS.state =
+(** [init_state ~peer_no ~topics ~direct ~outbound] initiates a gossipsub state,
+    joins the topics in [topics], and connects to [peer_no] number of peers which
+    will be direct/outbound depending on [direct] and [outbound]. *)
+let init_state ~(peer_no : int) ~(topics : C.Topic.t list) ~(direct : bool)
+    ~(outbound : bool) : GS.state * C.Peer.t array =
   let rng = Random.State.make [|seed|] in
   let state =
     List.fold_left
@@ -145,17 +151,20 @@ let init_state ~(peer_no : int) ~(topics : string list) ~(direct : bool)
       state
       peers
   in
-  state
+  (state, Array.of_list peers)
 
-(** Test that grafting an unknown topic is ignored. *)
+(** Test that grafting an unknown topic is ignored.
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4367 *)
 let test_ignore_graft_from_unknown_topic () =
   Tezt_core.Test.register
     ~__FILE__
     ~title:"Gossipsub: Ignore graft from unknown topic"
     ~tags:["gossipsub"; "graft"]
   @@ fun () ->
-  let state = init_state ~peer_no:0 ~topics:[] ~direct:false ~outbound:false in
-  let _state, output = GS.handle_graft 1 "unknown_topic" state in
+  let state, peers =
+    init_state ~peer_no:1 ~topics:[] ~direct:false ~outbound:false
+  in
+  let _state, output = GS.handle_graft peers.(0) "unknown_topic" state in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
      Use Tezt.Check to assert output *)
   match output with
