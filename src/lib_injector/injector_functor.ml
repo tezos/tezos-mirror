@@ -222,6 +222,9 @@ struct
     retention_period : int;
         (** Number of blocks for which the injector keeps the included
             information. *)
+    mutable last_seen_head : (Block_hash.t * int32) option;
+        (** Last L1 head that the injector has seen (used to compute
+            reorganizations). *)
   }
 
   module Event = struct
@@ -236,6 +239,24 @@ struct
     let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
+  let last_head_encoding = Data_encoding.(tup2 Block_hash.encoding int32)
+
+  let read_last_head ~data_dir ~warn =
+    Disk_persistence.maybe_read_value
+      ~warn
+      (Filename.concat data_dir "last_seen_head")
+      last_head_encoding
+
+  let set_last_head state head =
+    let open Lwt_result_syntax in
+    let+ () =
+      Disk_persistence.write_value
+        (Filename.concat state.save_dir "last_seen_head")
+        last_head_encoding
+        head
+    in
+    state.last_seen_head <- Some head
+
   let init_injector cctxt ~data_dir state ~retention_period ~signer strategy
       tags =
     let open Lwt_result_syntax in
@@ -245,13 +266,11 @@ struct
     let filter op_proj op =
       Tags.mem (Parameters.operation_tag (op_proj op)) tags
     in
-    let warn_unreadable =
-      (* Warn of corrupted files but don't fail *)
-      Some
-        (fun file error ->
-          Event.(emit corrupted_operation_on_disk)
-            (signer.pkh, tags, file, error))
+    (* Warn of corrupted files but don't fail *)
+    let warn file error =
+      Event.(emit corrupted_operation_on_disk) (signer.pkh, tags, file, error)
     in
+    let warn_unreadable = Some warn in
     let emit_event_loaded kind nb =
       Event.(emit loaded_from_disk) (signer.pkh, tags, nb, kind)
     in
@@ -313,7 +332,7 @@ struct
       emit_event_loaded "included_in_blocks"
       @@ Included_in_blocks.length included_in_blocks
     in
-
+    let*! last_seen_head = read_last_head ~data_dir ~warn in
     return
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
@@ -326,6 +345,7 @@ struct
         included = {included_operations; included_in_blocks};
         state;
         retention_period;
+        last_seen_head;
       }
 
   (** Add an operation to the pending queue corresponding to the signer for this
@@ -875,7 +895,7 @@ struct
     that are in the alternative branch of the reorganization and then registers
     the effect of the new branch (the newly included operation and confirmed
     operations).  *)
-  let on_new_tezos_head state (head_hash, head_level)
+  let on_new_tezos_head state ((head_hash, head_level) as head)
       (reorg : (Block_hash.t * int32) Reorg.t) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
@@ -893,8 +913,12 @@ struct
     (* Head is already included in the reorganization, so no need to process it
        separately. *)
     let confirmed_level = Int32.sub head_level (Int32.of_int confirmations) in
-    if confirmed_level >= 0l then register_confirmed_level state confirmed_level
-    else return_unit
+    let* () =
+      if confirmed_level >= 0l then
+        register_confirmed_level state confirmed_level
+      else return_unit
+    in
+    set_last_head state head
 
   (* The request {Request.Inject} triggers an injection of the operations
      the pending queue. *)
