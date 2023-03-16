@@ -309,25 +309,25 @@ let phase_encoding =
       case
         ~title:"Idle"
         (Tag 0)
-        unit
+        (constant "Idle")
         (function Idle -> Some () | _ -> None)
         (fun () -> Idle);
       case
         ~title:"Awaiting_preendorsements"
         (Tag 1)
-        unit
+        (constant "Awaiting_preendorsements")
         (function Awaiting_preendorsements -> Some () | _ -> None)
         (fun () -> Awaiting_preendorsements);
       case
         ~title:"Awaiting_application"
         (Tag 2)
-        unit
+        (constant "Awaiting_application")
         (function Awaiting_application -> Some () | _ -> None)
         (fun () -> Awaiting_application);
       case
         ~title:"Awaiting_endorsements"
         (Tag 3)
-        unit
+        (constant "Awaiting_endorsements")
         (function Awaiting_endorsements -> Some () | _ -> None)
         (fun () -> Awaiting_endorsements);
     ]
@@ -356,17 +356,22 @@ let timeout_kind_encoding =
       case
         (Tag 0)
         ~title:"End_of_round"
-        Round.encoding
+        (obj2
+           (req "kind" (constant "End_of_round"))
+           (req "round" Round.encoding))
         (function
-          | End_of_round {ending_round} -> Some ending_round | _ -> None)
-        (fun ending_round -> End_of_round {ending_round});
+          | End_of_round {ending_round} -> Some ((), ending_round) | _ -> None)
+        (fun ((), ending_round) -> End_of_round {ending_round});
       case
         (Tag 1)
         ~title:"Time_to_bake_next_level"
-        Round.encoding
+        (obj2
+           (req "kind" (constant "Time_to_bake_next_level"))
+           (req "round" Round.encoding))
         (function
-          | Time_to_bake_next_level {at_round} -> Some at_round | _ -> None)
-        (fun at_round -> Time_to_bake_next_level {at_round});
+          | Time_to_bake_next_level {at_round} -> Some ((), at_round)
+          | _ -> None)
+        (fun ((), at_round) -> Time_to_bake_next_level {at_round});
     ]
 
 type event =
@@ -385,46 +390,48 @@ let event_encoding =
       case
         (Tag 0)
         ~title:"New_valid_proposal"
-        proposal_encoding
-        (function New_valid_proposal p -> Some p | _ -> None)
-        (fun p -> New_valid_proposal p);
+        (tup2 (constant "New_valid_proposal") proposal_encoding)
+        (function New_valid_proposal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> New_valid_proposal p);
       case
         (Tag 1)
         ~title:"New_head_proposal"
-        proposal_encoding
-        (function New_head_proposal p -> Some p | _ -> None)
-        (fun p -> New_head_proposal p);
+        (tup2 (constant "New_head_proposal") proposal_encoding)
+        (function New_head_proposal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> New_head_proposal p);
       case
         (Tag 2)
         ~title:"Prequorum_reached"
-        (tup2
+        (tup3
+           (constant "Prequorum_reached")
            Operation_worker.candidate_encoding
            (Data_encoding.list (dynamic_size Operation.encoding)))
         (function
           | Prequorum_reached (candidate, ops) ->
-              Some (candidate, List.map Operation.pack ops)
+              Some ((), candidate, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, ops) ->
+        (fun ((), candidate, ops) ->
           Prequorum_reached
             (candidate, Operation_pool.filter_preendorsements ops));
       case
         (Tag 3)
         ~title:"Quorum_reached"
-        (tup2
+        (tup3
+           (constant "Quorum_reached")
            Operation_worker.candidate_encoding
            (Data_encoding.list (dynamic_size Operation.encoding)))
         (function
           | Quorum_reached (candidate, ops) ->
-              Some (candidate, List.map Operation.pack ops)
+              Some ((), candidate, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, ops) ->
+        (fun ((), candidate, ops) ->
           Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
       case
         (Tag 4)
         ~title:"Timeout"
-        timeout_kind_encoding
-        (function Timeout tk -> Some tk | _ -> None)
-        (fun tk -> Timeout tk);
+        (tup2 (constant "Timeout") timeout_kind_encoding)
+        (function Timeout tk -> Some ((), tk) | _ -> None)
+        (fun ((), tk) -> Timeout tk);
     ]
 
 (* Disk state *)
