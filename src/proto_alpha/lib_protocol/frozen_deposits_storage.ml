@@ -23,11 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let zero : Storage.deposits =
+  {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
+
 let init ctxt delegate =
   Storage.Contract.Frozen_deposits.init
     ctxt
     (Contract_repr.Implicit delegate)
-    {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
+    zero
 
 let allocated = Storage.Contract.Frozen_deposits.mem
 
