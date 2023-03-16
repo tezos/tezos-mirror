@@ -293,7 +293,13 @@ Step 4: Fitting the model
 
 We can now proceed to inferring the free parameters from the model using the data.
 At the time of writing, the tool offloads the regression problem to the `scikit-learn <https://scikit-learn.org/>`_
-(aka sklearn) Python library: install it before proceeding. Let's execute the following command:
+(aka sklearn) and the `statmodels <https://www.statsmodels.org/stable/index.html>`_ Python libraries: install them before proceeding.
+
+.. code-block:: shell
+
+   pip install scikit-learn statsmodels
+
+Let's execute the following command:
 
 .. code-block:: shell
 

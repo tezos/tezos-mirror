@@ -142,3 +142,25 @@ let rmse_score ~output ~prediction =
     [|output; prediction|]
     [("squared", Py.Bool.f)]
   |> Py.Float.to_float
+
+let benchmark_score ~input ~output =
+  let input = Scikit_matrix.to_numpy input in
+  let output = Scikit_matrix.to_numpy_vector output in
+  let model =
+    Py.Module.get_function (Pyinit.statsmodels_api ()) "OLS" [|output; input|]
+  in
+  let result =
+    Py.Module.get_function model "fit" [||]
+    (* We couldn't get tvalue from fit_reguralized for now *)
+    (* Py.Module.get_function_with_keywords model "fit_regularized" [||]
+       [("method",Py.String.of_string "elastic_net");
+       ("alpha", Py.Float.of_float 0.03);
+       ("L1_wt", Py.Float.of_float 1.)] *)
+  in
+  let tvalues =
+    Py.Object.find_attr_string result "tvalues" |> Scikit_matrix.of_numpy
+  in
+  let params =
+    Py.Object.find_attr_string result "params" |> Scikit_matrix.of_numpy
+  in
+  (params, tvalues)
