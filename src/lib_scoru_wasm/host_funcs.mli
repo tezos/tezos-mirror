@@ -233,6 +233,15 @@ module Aux : sig
       max_size:int32 ->
       int32 Lwt.t
 
+    val store_get_hash :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      dst:int32 ->
+      max_size:int32 ->
+      int32 Lwt.t
+
     (** [reveal mem base size payload] is intended to be the function used
         by the PVM to load at most [size] bytes of the result [payload] of
         a reveal step in [mem], at address [base] *)
@@ -337,6 +346,8 @@ module Internal_for_tests : sig
   val store_list_size : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_get_nth_key : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
 
   val write_debug : Tezos_webassembly_interpreter.Instance.func_inst
 end

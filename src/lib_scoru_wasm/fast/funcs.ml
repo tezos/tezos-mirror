@@ -197,6 +197,19 @@ let make ~version ~reveal_builtins ~write_debug state =
           ~dst
           ~max_size)
   in
+  let store_get_hash =
+    fn
+      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun key_offset key_length dst max_size ->
+        with_mem @@ fun memory ->
+        Host_funcs.Aux.store_get_hash
+          ~durable:state.durable
+          ~memory
+          ~key_offset
+          ~key_length
+          ~dst
+          ~max_size)
+  in
   let store_value_size =
     fn
       (i32 @-> i32 @-> returning1 i32)
@@ -262,7 +275,11 @@ let make ~version ~reveal_builtins ~write_debug state =
       ("reveal_metadata", reveal_metadata);
     ]
   in
-  let extra = match version with Wasm_pvm_state.V0 | V1 -> [] in
+  let extra =
+    match version with
+    | Wasm_pvm_state.V0 -> []
+    | V1 -> [("__internal_store_get_hash", store_get_hash)]
+  in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
     (base @ extra)
