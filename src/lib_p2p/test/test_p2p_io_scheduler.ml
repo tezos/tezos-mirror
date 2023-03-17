@@ -124,10 +124,10 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
       ()
   in
   Moving_average.on_update (P2p_io_scheduler.ma_state sched) (fun () ->
-      log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      debug "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       if display_client_stat then
         P2p_io_scheduler.iter_connection sched (fun conn ->
-            log_notice
+            debug
               " client(%d) %a"
               (P2p_io_scheduler.id conn)
               P2p_stat.pp
@@ -139,7 +139,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   let* r = List.iter_ep P2p_io_scheduler.close conns in
   match r with
   | Ok () ->
-      log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       return_ok ()
   | Error _ -> Lwt.fail Alcotest.Test_error
 
@@ -188,7 +188,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   | Error err -> Lwt.fail (Error err)
   | Ok () ->
       let stat = P2p_io_scheduler.stat conn in
-      let* () = lwt_log_notice "Client OK %a" P2p_stat.pp stat in
+      let* () = lwt_debug "Client OK %a" P2p_stat.pp stat in
       return_ok ()
 
 (** Listens to address [addr] on port [port] to open a socket [main_socket].
