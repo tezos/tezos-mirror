@@ -9,7 +9,6 @@
   test_json_stream
   test_json_stream_sizes
   test_classifiers
-  test_sub_string
   json_roundtrip_in_binary)
  (modes native js)
  (js_of_ocaml)
@@ -49,12 +48,6 @@
  (alias runtest)
  (package data-encoding)
  (action
-  (run %{dep:./test_sub_string.exe})))
-
-(rule
- (alias runtest)
- (package data-encoding)
- (action
   (run %{dep:./json_roundtrip_in_binary.exe})))
 
 (rule
@@ -86,12 +79,6 @@
  (package data-encoding)
  (action
   (run node %{dep:./test_classifiers.bc.js})))
-
-(rule
- (alias runtest)
- (package data-encoding)
- (action
-  (run node %{dep:./test_sub_string.bc.js})))
 
 (rule
  (alias runtest)
