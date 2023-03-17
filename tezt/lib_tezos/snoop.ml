@@ -42,7 +42,6 @@ type tag =
   | Gtoc
   | Cache
   | Carbonated_map
-  | Tx_rollup
   | Tickets
   | Big_map
   | Skip_list
@@ -351,7 +350,6 @@ let string_of_tag (tag : tag) =
   | Gtoc -> "global_constants"
   | Cache -> "cache"
   | Carbonated_map -> "carbonated_map"
-  | Tx_rollup -> "tx_rollup"
   | Tickets -> "tickets"
   | Big_map -> "big_map"
   | Skip_list -> "skip_list"
