@@ -79,8 +79,6 @@ end = struct
 
   let module_filename = __FILE__
 
-  let () = ignore module_filename
-
   let value_size_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
     (* FIXME: cleanup and factorize this code between translator benches and these ones. *)
@@ -154,8 +152,6 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let () = ignore module_filename
-
   let models = [(model_name, size_based_model (Namespace.basename name))]
 
   let type_size_benchmark (Script_typed_ir.Ex_ty ty) =
@@ -199,8 +195,6 @@ end = struct
   let info = "Benchmarking Script_typed_ir_size.kinstr_size"
 
   let module_filename = __FILE__
-
-  let () = ignore module_filename
 
   let kinstr_size_benchmark rng_state (expr : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -280,8 +274,6 @@ module Node_size_benchmark : Benchmark.S = struct
     "Benchmarking the time it takes to compute Script_typed_ir_size.node_size"
 
   let module_filename = __FILE__
-
-  let () = ignore module_filename
 
   let size_based_model =
     Model.make

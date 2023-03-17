@@ -137,8 +137,6 @@ module Encoding_micheline : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let () = ignore module_filename
-
   let micheline_serialization_trace (micheline_node : Alpha_context.Script.node)
       =
     match
@@ -206,8 +204,6 @@ module Decoding_micheline : Benchmark.S = struct
   let info = "Decoding of bytes to Micheline"
 
   let module_filename = __FILE__
-
-  let () = ignore module_filename
 
   let micheline_deserialization_trace (micheline_str : string) =
     match

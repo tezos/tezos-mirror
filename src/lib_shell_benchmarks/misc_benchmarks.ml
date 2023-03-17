@@ -48,8 +48,6 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let () = ignore module_filename
-
   let tags = ["misc"]
 
   let models = [("*", lwt_model)]

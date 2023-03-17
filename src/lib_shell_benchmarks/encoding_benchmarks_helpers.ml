@@ -86,8 +86,6 @@ struct
 
       let module_filename = Filename.file
 
-      let () = ignore module_filename
-
       let tags = ["encoding"]
 
       include Shared_constant_time
@@ -116,8 +114,6 @@ struct
       let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
       let module_filename = Filename.file
-
-      let () = ignore module_filename
 
       let tags = ["encoding"]
 
@@ -149,8 +145,6 @@ struct
 
       let module_filename = Filename.file
 
-      let () = ignore module_filename
-
       let tags = ["encoding"]
 
       include Shared_linear
@@ -168,8 +162,6 @@ struct
         Format.asprintf "Benchmarking %a (intercept case)" Namespace.pp name
 
       let module_filename = Filename.file
-
-      let () = ignore module_filename
 
       let tags = ["encoding"]
 

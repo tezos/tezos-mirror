@@ -57,6 +57,8 @@ module Probing_bench = struct
 
   let default_config = {max_bytes = 1 lsl 16}
 
+  let module_filename = __FILE__
+
   (* The encoding is used by `tezos-snoop` to load the config from json
      files. *)
   let config_encoding =

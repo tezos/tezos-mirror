@@ -48,6 +48,8 @@ module Blake2b_bench : Benchmark.S = struct
 
   let info = "Illustrating tezos-benchmark by benchmarking blake2b"
 
+  let module_filename = __FILE__
+
   let tags = ["example"]
 
   (* We will measure hashing time on random bytes with length
