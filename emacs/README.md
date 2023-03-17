@@ -15,7 +15,7 @@ and are available under a free software license.
 
 ## Required Configuration
 The dependency `deferred` can be installed by running `M-x package-install-file`.
-The package file is located in the emacs folder of the Tezos code base.
+The package file is located in the emacs folder of the Octez code base.
 
 If you use the Spacemacs distribution, you can add the package in `dotspacemacs-additional-packages`, like so:
 ```elisp
@@ -27,21 +27,21 @@ dotspacemacs-additional-packages '(
 
 Before using the Emacs mode, you must configure the `michelson-client-command`.
 If you have compiled the Tezos Git repository,
-set this to be the path to the `tezos-client` binary on your system.
+set this to be the path to the `octez-client` binary on your system.
 Make sure you have an up-to-date version of the client compiled.
-You must also start a tezos node to enable typechecking features.
+You must also start an Octez node to enable typechecking features.
 This option is recommended because it is faster than operating through
 the docker container.
 
 Here are examples of the client configuration:
 ```elisp
-(setq michelson-client-command "~/tezos/tezos-client")
+(setq michelson-client-command "~/tezos/octez-client")
 (setq michelson-alphanet nil)
 ```
 
-##### Alternatively, to set up the Michelson mode to use the Tezos client in mockup mode (to typecheck Michelson scripts without interacting with a Tezos node)
+##### Alternatively, to set up the Michelson mode to use the Octez client in mockup mode (to typecheck Michelson scripts without interacting with an Octez node)
 ```elisp
-(setq michelson-client-command "~/tezos/tezos-client --base-dir /tmp/mockup --mode mockup --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")
+(setq michelson-client-command "~/tezos/octez-client --base-dir /tmp/mockup --mode mockup --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")
 (setq michelson-alphanet nil)
 ```
 
@@ -53,7 +53,7 @@ the state of the stack before (left) and after (right) the application of the in
 The Emacs mode automatically type-checks your program and reports errors; once you are happy with the result you can ask the client to run it locally:
 
 ```elisp
-tezos-client run script ./michelson_test_scripts/attic/id.tz \
+octez-client run script ./michelson_test_scripts/attic/id.tz \
              on storage '"hello"' and input '"world"'
 ```
 
