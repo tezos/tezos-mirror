@@ -617,7 +617,7 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
+let test_misc_protocol _test_mode_tag protocol ?endpoint client =
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_constants ()
@@ -645,6 +645,21 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
     @@ RPC.get_chain_block_helper_endorsing_rights
          ~delegate:Constant.bootstrap4.public_key_hash
          ()
+  in
+  let* () =
+    if Protocol.(number protocol > number Mumbai) then
+      let* _ =
+        RPC.Client.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_attestation_rights ()
+      in
+      let* _ =
+        RPC.Client.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_attestation_rights
+             ~delegate:Constant.bootstrap4.public_key_hash
+             ()
+      in
+      unit
+    else unit
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
