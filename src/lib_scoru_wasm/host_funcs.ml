@@ -32,13 +32,13 @@ module Error = struct
     | Store_not_a_value
     | Store_invalid_access
     | Store_value_size_exceeded
-    | Store_invalid_subkey_index
     | Memory_invalid_access
     | Input_output_too_large
     | Generic_invalid_access
     | Store_readonly_value
     | Store_not_a_node
     | Full_outbox
+    | Store_invalid_subkey_index
 
   (** [code error] returns the error code associated to the error. *)
   let code = function

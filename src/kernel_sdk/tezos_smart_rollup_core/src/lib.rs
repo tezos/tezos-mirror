@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -59,6 +59,15 @@ pub const GENERIC_INVALID_ACCESS: i32 = -8;
 
 /// A value cannot be modified if it is readonly.
 pub const STORE_READONLY_VALUE: i32 = -9;
+
+/// There is no tree at key. It has no value, nor any subtrees.
+pub const STORE_NOT_A_NODE: i32 = -10;
+
+/// The outbox is full an cannot accept new messages at this level.
+pub const FULL_OUTBOX: i32 = -11;
+
+/// Trying to get the nth subkey, where n is too big.
+pub const STORE_INVALID_SUBKEY_INDEX: i32 = -12;
 
 /// None ValueType discriminant.
 pub const VALUE_TYPE_NONE: i32 = 0;

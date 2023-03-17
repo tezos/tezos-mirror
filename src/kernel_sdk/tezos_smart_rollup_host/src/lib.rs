@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2022-2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -55,6 +56,12 @@ pub enum Error {
     GenericInvalidAccess = tezos_smart_rollup_core::GENERIC_INVALID_ACCESS,
     /// A value cannot be modified if it is readonly.
     StoreReadonlyValue = tezos_smart_rollup_core::STORE_READONLY_VALUE,
+    /// The key was not found in storage
+    StoreNotANode = tezos_smart_rollup_core::STORE_NOT_A_NODE,
+    /// The outbox is full
+    FullOutbox = tezos_smart_rollup_core::FULL_OUTBOX,
+    /// Given index is out of bounds
+    StoreInvalidSubkeyIndex = tezos_smart_rollup_core::STORE_INVALID_SUBKEY_INDEX,
 }
 
 impl From<i32> for Error {
@@ -71,6 +78,11 @@ impl From<i32> for Error {
             tezos_smart_rollup_core::INPUT_OUTPUT_TOO_LARGE => Self::InputOutputTooLarge,
             tezos_smart_rollup_core::GENERIC_INVALID_ACCESS => Self::GenericInvalidAccess,
             tezos_smart_rollup_core::STORE_READONLY_VALUE => Self::StoreReadonlyValue,
+            tezos_smart_rollup_core::STORE_NOT_A_NODE => Self::StoreNotANode,
+            tezos_smart_rollup_core::FULL_OUTBOX => Self::FullOutbox,
+            tezos_smart_rollup_core::STORE_INVALID_SUBKEY_INDEX => {
+                Self::StoreInvalidSubkeyIndex
+            }
             _ => Error::GenericInvalidAccess,
         }
     }

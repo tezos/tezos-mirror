@@ -992,6 +992,9 @@ conveying errors, as shown in the next table.
   -7     Tried to read from the inbox or write to the outbox more than 4,096 bytes
   -8     Unknown error due to an invalid access
   -9     Attempt to modify a readonly value
+  -10    Key has no tree in the storage
+  -11    Outbox is full, no new message can be appended
+  -12    No subkey at provided index. The index is out of bounds
 ======= =======================================================================================================
 
 Implementing a WASM Kernel in Rust
