@@ -63,7 +63,6 @@ let main () =
       "cache_model";
       "ir_size_model";
       "carbonated_map";
-      "tx_rollup";
       "size_collect_tickets_step_model";
       "size_has_tickets_model";
       "compare_tickets";

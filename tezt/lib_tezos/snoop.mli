@@ -135,7 +135,6 @@ type tag =
   | Gtoc
   | Cache
   | Carbonated_map
-  | Tx_rollup
   | Tickets
   | Big_map
   | Skip_list
