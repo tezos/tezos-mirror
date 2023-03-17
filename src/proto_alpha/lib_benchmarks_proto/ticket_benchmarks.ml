@@ -83,6 +83,10 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let info = "Compare cost for Ticket_hash"
 
+  let module_filename = __FILE__
+
+  let () = ignore module_filename
+
   let compare_model =
     Model.make
       ~conv:(fun () -> ())
@@ -133,6 +137,10 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
   let name = ns "COMPARE_CONTRACT"
 
   let info = "Compare cost for Contracts"
+
+  let module_filename = __FILE__
+
+  let () = ignore module_filename
 
   let compare_model =
     Model.make
@@ -192,6 +200,10 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let info = "Benchmarking type_has_tickets"
 
+  let module_filename = __FILE__
+
+  let () = ignore module_filename
+
   let make_bench_helper rng_state config () =
     let open Result_syntax in
     let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state) in
@@ -244,6 +256,10 @@ module Collect_tickets_benchmark : Benchmark.S = struct
   let name = ns "COLLECT_TICKETS_STEP"
 
   let info = "Benchmarking tickets_of_value"
+
+  let module_filename = __FILE__
+
+  let () = ignore module_filename
 
   let make_bench_helper rng_state config () =
     let open Script_typed_ir in
