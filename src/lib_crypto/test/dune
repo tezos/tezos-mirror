@@ -47,6 +47,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (modes native)
  (libraries
   src_lib_crypto_test_tezt_lib
@@ -61,6 +62,7 @@
 
 (executable
  (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (modes js)
  (libraries
   src_lib_crypto_test_tezt_lib

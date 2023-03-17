@@ -45,6 +45,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_proto_alpha_lib_protocol_test_integration_consensus_tezt_lib
   tezt)

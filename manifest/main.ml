@@ -718,7 +718,7 @@ let _octez_hacl_gen0 =
     ~path:"src/lib_hacl/gen/"
     ~opam:"tezos-hacl"
     ~with_macos_security_framework:true
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~modules:["gen0"]
     ~deps:[compiler_libs_common]
 
@@ -727,7 +727,7 @@ let _octez_hacl_gen =
     "gen"
     ~path:"src/lib_hacl/gen/"
     ~opam:"tezos-hacl"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~deps:[ctypes_stubs; ctypes; hacl_star_raw; ezjsonm]
     ~modules:["gen"; "bindings"; "api_json"]
     ~dune:
@@ -1023,7 +1023,7 @@ let octez_event_logging_test_helpers =
       ]
     ~js_compatible:true
     ~linkall:true
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let octez_stdlib_unix =
   public_lib
@@ -1108,7 +1108,7 @@ let _octez_clic_example =
     ~path:"src/lib_clic/examples"
     ~opam:""
     ~deps:[octez_clic; lwt_unix]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~static:false
 
 let octez_micheline =
@@ -1258,7 +1258,7 @@ let octez_base_test_helpers =
         qcheck_alcotest;
       ]
     ~linkall:true
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let lazy_containers =
   public_lib
@@ -1391,7 +1391,7 @@ let _octez_version_get_git_info =
     ~opam:"tezos-version"
     ~deps:[dune_configurator; octez_version_parser]
     ~modules:["get_git_info"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _octez_print_version_exe =
   public_exe
@@ -1400,7 +1400,7 @@ let _octez_print_version_exe =
     ~path:"src/lib_version/exe"
     ~deps:[octez_version |> open_; octez_base_unix]
     ~modules:["tezos_print_version"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _octez_version_tests =
   test
@@ -1572,7 +1572,7 @@ let tezt_performance_regression =
     "tezt-performance-regression"
     ~path:"tezt/lib_performance_regression"
     ~synopsis:"Performance regression test framework based on Tezt"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
 
 let tezt_tezos =
@@ -1580,7 +1580,7 @@ let tezt_tezos =
     "tezt-tezos"
     ~path:"tezt/lib_tezos"
     ~synopsis:"Tezos test framework based on Tezt"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~deps:
       [
         tezt_lib |> open_ |> open_ ~m:"Base";
@@ -1601,7 +1601,7 @@ let _tezt_self_tests =
     ~internal_name:"main"
     ~path:"tezt/self_tests"
     ~synopsis:"Tests for the Tezos test framework based on Tezt"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~static:false
     ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
     ~cram:true
@@ -2085,7 +2085,7 @@ let _octez_sapling_ctypes_gen =
     ["rustzcash_ctypes_gen"; "gen_runtime_js"]
     ~path:"src/lib_sapling/bindings"
     ~opam:"tezos-sapling"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~deps:[ctypes_stubs; ctypes]
     ~modules:
       ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
@@ -2747,7 +2747,7 @@ let _bip39_generator =
     "bip39_generator"
     ~path:"src/lib_client_base/gen"
     ~opam:"tezos-client-base"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let octez_signer_services =
   public_lib
@@ -3011,7 +3011,7 @@ let octez_proxy_test_helpers_shell_services =
         lwt_unix;
         alcotezt;
       ]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~linkall:true
     ~release_status:Released
 
@@ -3231,7 +3231,7 @@ let _tezt_testnet_scenarios =
     ~internal_name:"main"
     ~path:"src/bin_testnet_scenarios"
     ~synopsis:"Run scenarios on testnets"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~static:false
     ~deps:
       [
@@ -4454,7 +4454,7 @@ module Protocol = Protocol
           ~modules:["Functor"]
             (* The instrumentation is removed as it can lead to a stack overflow *)
             (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
-          ~bisect_ppx:false
+          ~bisect_ppx:No
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~opam_only_deps:[octez_protocol_compiler_tezos_protocol_packer]
           ~deps:[octez_protocol_environment; tezos_protocol_environment_sigs]
@@ -4689,7 +4689,7 @@ module Protocol = Protocol
                 ~package:(sf "tezos-protocol-%s" name_dash)
                 ~section:"lib";
             ])
-        ~bisect_ppx:false
+        ~bisect_ppx:No
     in
     let octez_sc_rollup =
       only_if N.(number >= 016) @@ fun () ->
@@ -4717,7 +4717,7 @@ module Protocol = Protocol
             octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
           ]
         ~all_modules_except:["Plugin_registerer"]
-        ~bisect_ppx:N.(number >= 008)
+        ~bisect_ppx:(if N.(number >= 008) then Yes else No)
     in
     let plugin_registerer =
       opt_map plugin @@ fun plugin ->
@@ -4735,7 +4735,7 @@ module Protocol = Protocol
             octez_shell |> open_;
           ]
         ~modules:["Plugin_registerer"]
-        ~bisect_ppx:N.(number >= 008)
+        ~bisect_ppx:(if N.(number >= 008) then Yes else No)
     in
     let client =
       only_if not_overridden @@ fun () ->
@@ -4763,7 +4763,7 @@ module Protocol = Protocol
             octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
             uri |> if_ N.(number >= 001);
           ]
-        ~bisect_ppx:N.(number >= 008)
+        ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ?inline_tests:(if N.(number >= 009) then Some ppx_expect else None)
         ~linkall:true
     in
@@ -4886,7 +4886,7 @@ module Protocol = Protocol
             (* uri used by the stresstest command introduced in 011 *)
             uri |> if_ N.(number >= 011);
           ]
-        ~bisect_ppx:N.(number >= 008)
+        ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ~linkall:true
         ~all_modules_except:["alpha_commands_registration"]
     in
@@ -4938,7 +4938,7 @@ module Protocol = Protocol
             octez_rpc;
             plugin |> if_some |> if_ N.(number >= 008) |> open_;
           ]
-        ~bisect_ppx:N.(number >= 008)
+        ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ~linkall:true
         ~modules:["alpha_commands_registration"]
     in
@@ -5001,7 +5001,7 @@ module Protocol = Protocol
             octez_client_base |> open_;
             client |> if_some |> open_;
           ]
-        ~bisect_ppx:false
+        ~bisect_ppx:No
     in
     let _tenderbrute_exe =
       only_if (active && N.(number >= 013)) @@ fun () ->
@@ -5048,7 +5048,7 @@ module Protocol = Protocol
               octez_mockup_commands;
               tenderbrute |> if_some |> if_ N.(number >= 013) |> open_;
             ]
-          ~bisect_ppx:false
+          ~bisect_ppx:No
       in
       tezt
         ["test_scenario"]
@@ -5549,7 +5549,7 @@ module Protocol = Protocol
           ]
         ~linkall:true
         ~private_modules:["kernel"; "rules"; "state_space"]
-        ~bisect_ppx:N.(number <= 012)
+        ~bisect_ppx:(if N.(number <= 012) then Yes else No)
     in
     let _benchmark_tests =
       opt_map (both benchmark test_helpers) @@ fun (benchmark, test_helpers) ->
@@ -5874,7 +5874,7 @@ let _node_wrapper =
     ~opam:""
     ~deps:[unix]
     ~modules:["node_wrapper"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _git_gas_diff =
   public_exe
@@ -5885,7 +5885,7 @@ let _git_gas_diff =
     ~opam:"internal-devtools"
     ~deps:[external_lib "num" V.True; re]
     ~static:false
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _gas_parameter_diff =
   public_exe
@@ -5896,7 +5896,7 @@ let _gas_parameter_diff =
     ~opam:"internal-devtools"
     ~deps:[]
     ~static:false
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let remove_if_exists fname = if Sys.file_exists fname then Sys.remove fname
 
@@ -5948,7 +5948,7 @@ let get_contracts_lib =
        ]
       @ List.flatten protocols)
     ~all_modules_except:["get_contracts"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~linkall:true
 
 let _get_contracts =
@@ -5965,7 +5965,7 @@ let _get_contracts =
         get_contracts_lib |> open_;
       ]
     ~modules:["get_contracts"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let yes_wallet_lib =
   let get_delegates_module proto =
@@ -6013,7 +6013,7 @@ let yes_wallet_lib =
        ]
       @ protocols)
     ~all_modules_except:["yes_wallet"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~linkall:true
 
 let _yes_wallet =
@@ -6026,7 +6026,7 @@ let _yes_wallet =
     ~opam:""
     ~deps:[yes_wallet_lib |> open_]
     ~modules:["yes_wallet"]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _yes_wallet_test =
   private_exe
@@ -6048,7 +6048,7 @@ let _yes_wallet_test =
         octez_test_helpers |> open_;
         ptime;
       ]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let simdal_lib =
   private_lib
@@ -6058,7 +6058,7 @@ let simdal_lib =
     ~opam:""
     ~deps:[ocamlgraph; prbnmcn_stats; unix]
     ~static:false
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _simdal =
   private_exes
@@ -6068,14 +6068,14 @@ let _simdal =
     ~opam:""
     ~deps:[simdal_lib]
     ~static:false
-    ~bisect_ppx:false
+    ~bisect_ppx:No
 
 let _ppinclude =
   private_exe
     "ppinclude"
     ~path:"src/lib_protocol_environment/ppinclude"
     ~opam:"tezos-protocol-environment"
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~deps:[compiler_libs_common]
 
 let _octez_node =
@@ -6329,7 +6329,7 @@ let _tztop =
     ~internal_name:"tztop_main"
     ~opam:"internal-devtools"
     ~modes:[Byte]
-    ~bisect_ppx:false
+    ~bisect_ppx:No
     ~static:false
     ~profile:"octez-dev-deps"
     ~deps:
@@ -6578,7 +6578,7 @@ let _evm_proxy =
         octez_version;
         lwt_exit;
       ]
-    ~bisect_ppx:true
+    ~bisect_ppx:Yes
 
 (* Add entries to this function to declare that some dune and .opam files are
    not generated by the manifest on purpose.
@@ -6649,6 +6649,9 @@ let () =
       ~with_macos_security_framework:true
       ~alias:""
       ~path:"tezt/tests"
+        (* Instrument with sigterm handler, to ensure that coverage from
+           Tezt worker processes are collected. *)
+      ~bisect_ppx:With_sigterm
       ~opam:""
       ~deps:(deps @ test_libs)
   in

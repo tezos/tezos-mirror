@@ -35,6 +35,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   src_proto_013_PtJakart_lib_client_test_tezt_lib
   tezt)
