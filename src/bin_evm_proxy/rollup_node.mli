@@ -34,9 +34,16 @@ module type S = sig
   (** [nonce address] returns the [address]'s nonce. *)
   val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
-  (** [inject_raw_transaction tx] injects [tx] in the rollup node's
-      batcher queue. *)
-  val inject_raw_transaction : string -> unit tzresult Lwt.t
+  (** [inject_raw_transaction ~smart_rollup_address tx_raw] crafts the hash of [tx_raw] and sends to
+      the injector a message consisting of:
+      - First 20 bytes: [smart_rollup_address].
+      - Following 32 bytes: crafted transaction hash.
+      - Remaining bytes: [tx_raw] in binary format.
+  *)
+  val inject_raw_transaction :
+    smart_rollup_address:string ->
+    Ethereum_types.hash ->
+    Ethereum_types.hash tzresult Lwt.t
 
   (** [current_block ~full_transaction_object] returns the most recent
       processed and stored block.

@@ -105,9 +105,10 @@ let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
           let base = endpoint
         end) in
         let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-        return_some
-          ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
-    | Mockup -> return_none
+        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+    | Mockup ->
+        let* smart_rollup_address = Mockup.smart_rollup_address in
+        return ((module Mockup : Rollup_node.S), smart_rollup_address)
   in
   let directory = Services.directory rollup_node_config in
   let server =
