@@ -97,6 +97,7 @@ type _ successful_manager_operation_result =
   | Sc_rollup_cement_result : {
       consumed_gas : Gas.Arith.fp;
       inbox_level : Raw_level.t;
+      commitment_hash : Sc_rollup.Commitment.Hash.t;
     }
       -> Kind.sc_rollup_cement successful_manager_operation_result
   | Sc_rollup_publish_result : {
@@ -715,18 +716,20 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_cement_case
       ~encoding:
-        (obj2
+        (obj3
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "inbox_level" Raw_level.encoding))
+           (req "inbox_level" Raw_level.encoding)
+           (req "commitment_hash" Sc_rollup.Commitment.Hash.encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_cement_result _ as op) -> Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_cement_result {consumed_gas; inbox_level} ->
-            (consumed_gas, inbox_level))
+        | Sc_rollup_cement_result {consumed_gas; inbox_level; commitment_hash}
+          ->
+            (consumed_gas, inbox_level, commitment_hash))
       ~kind:Kind.Sc_rollup_cement_manager_kind
-      ~inj:(fun (consumed_gas, inbox_level) ->
-        Sc_rollup_cement_result {consumed_gas; inbox_level})
+      ~inj:(fun (consumed_gas, inbox_level, commitment_hash) ->
+        Sc_rollup_cement_result {consumed_gas; inbox_level; commitment_hash})
 
   let sc_rollup_publish_case =
     make

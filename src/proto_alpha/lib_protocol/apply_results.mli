@@ -200,6 +200,7 @@ and _ successful_manager_operation_result =
   | Sc_rollup_cement_result : {
       consumed_gas : Gas.Arith.fp;
       inbox_level : Raw_level.t;
+      commitment_hash : Sc_rollup.Commitment.Hash.t;
     }
       -> Kind.sc_rollup_cement successful_manager_operation_result
   | Sc_rollup_publish_result : {

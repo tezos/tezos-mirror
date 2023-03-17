@@ -131,6 +131,7 @@ This sequence of operations was run:
       This smart rollup commitment cementing was successfully applied
       Consumed gas: 4380.102
       Inbox level: 12
+      Commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
 
 
 ./octez-client --wait none recover bond of '[PUBLIC_KEY_HASH]' for smart rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' --fee 1
