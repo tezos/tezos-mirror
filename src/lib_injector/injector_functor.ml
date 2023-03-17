@@ -351,22 +351,44 @@ struct
         last_seen_head;
       }
 
+  (** We consider an operation to already exist in the injector if either:
+      - It is already in the queue
+      - It is injected but not included
+      - It is included but not confirmed. *)
+  let already_exists state op_hash =
+    Op_queue.find_opt state.queue op_hash <> None
+    || Injected_operations.mem state.injected.injected_operations op_hash
+    ||
+    match
+      Included_operations.find state.included.included_operations op_hash
+    with
+    | None -> false
+    | Some {l1_level; _} -> (
+        match state.last_seen_head with
+        | None -> false
+        | Some (_, head_level) ->
+            Int32.sub head_level l1_level < Int32.of_int confirmations)
+
   (** Add an operation to the pending queue corresponding to the signer for this
     operation.  *)
-  let add_pending_operation ?(retry = false) state op =
+  let add_pending_operation ?(retry = false) state (op : Inj_operation.t) =
     let open Lwt_result_syntax in
-    let*! () =
-      Event.(emit1 (if retry then retry_operation else add_pending))
-        state
-        op.Inj_operation.operation
-    in
-    let* () = Op_queue.replace state.queue op.hash op in
-    let*! () =
-      Event.(emit1 number_of_operations_in_queue)
-        state
-        (Op_queue.length state.queue)
-    in
-    return_unit
+    if already_exists state op.hash then
+      (* Ignore operations which already exist in the injector *)
+      return_unit
+    else
+      let*! () =
+        Event.(emit1 (if retry then retry_operation else add_pending))
+          state
+          op.operation
+      in
+      let* () = Op_queue.replace state.queue op.hash op in
+      let*! () =
+        Event.(emit1 number_of_operations_in_queue)
+          state
+          (Op_queue.length state.queue)
+      in
+      return_unit
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state oph operations =
