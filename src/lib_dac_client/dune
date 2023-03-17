@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dac_node_lib)
- (package tezos-dac-node-lib)
+ (name tezos_dac_client_lib)
+ (public_name tezos-dac-client-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -11,16 +11,11 @@
   tezos-client-base
   tezos-client-base-unix
   tezos-stdlib-unix
-  tezos_layer2_store
-  tezos-rpc-http-server
-  tezos-dac-lib
-  tezos-dac-client-lib)
+  tezos-dac-lib)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_stdlib_unix
-  -open Tezos_layer2_store
-  -open Tezos_dac_lib
-  -open Tezos_dac_client_lib))
+  -open Tezos_dac_lib))

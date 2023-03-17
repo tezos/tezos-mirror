@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_dac_test_tezt_lib)
+ (name src_proto_alpha_lib_dac_plugin_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -11,6 +11,7 @@
   tezos-protocol-alpha
   tezos-base-test-helpers
   tezos-alpha-test-helpers
+  tezos-dac-lib
   tezos_dac_node_lib
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -24,6 +25,7 @@
   -open Tezos_protocol_alpha
   -open Tezos_base_test_helpers
   -open Tezos_alpha_test_helpers
+  -open Tezos_dac_lib
   -open Tezos_dac_node_lib
   -open Octez_alcotezt)
  (modules test_dac_pages_encoding test_dac_plugin_registration test_helpers))
@@ -32,7 +34,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_dac_test_tezt_lib
+  src_proto_alpha_lib_dac_plugin_test_tezt_lib
   tezt)
  (link_flags
   (:standard)

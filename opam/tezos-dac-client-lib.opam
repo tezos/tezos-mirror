@@ -14,14 +14,11 @@ depends: [
   "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
-  "tezos-layer2-store"
-  "tezos-rpc-http-server"
   "tezos-dac-lib"
-  "tezos-dac-client-lib"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-dac-node` library"
+synopsis: "Tezos: `tezos-dac-client` library"
