@@ -1315,6 +1315,15 @@ let _octez_plonk_test_helpers_main =
         octez_bls12_381_polynomial |> open_;
       ]
 
+let _octez_plonk_test_helpers_bench =
+  private_exe
+    "bench"
+    ~path:"src/lib_plonk/test"
+    ~opam:"octez-plonk"
+    ~modules:["bench"]
+    ~bisect_ppx:No
+    ~deps:[octez_plonk_test_helpers]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]

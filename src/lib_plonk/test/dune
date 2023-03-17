@@ -52,3 +52,9 @@
   test_polynomial_protocol
   test_range_checks
   test_utils))
+
+(executable
+ (name bench)
+ (libraries
+  octez-plonk.plonk-test)
+ (modules bench))
