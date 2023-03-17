@@ -178,18 +178,26 @@ let daemonize handlers =
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let* ({rpc_address; rpc_port; reveal_data_dir; mode; _} as config) =
+  let* (Configuration.
+          {rpc_address; rpc_port; reveal_data_dir; mode; data_dir = _} as
+       config) =
     Configuration.load ~data_dir
   in
   let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
-  let* addresses, threshold, coordinator_config_opt =
+  let* addresses, threshold, coordinator_cctxt_opt =
     match mode with
-    | Configuration.Legacy {dac_members_addresses; threshold; dac_cctxt_config}
-      ->
-        return (dac_members_addresses, threshold, dac_cctxt_config)
-    | Configuration.Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
-    | Configuration.Dac_member _ -> tzfail @@ Mode_not_supported "dac_member"
-    | Configuration.Observer _ -> tzfail @@ Mode_not_supported "observer"
+    | Legacy configuration ->
+        let committee_members_addresses =
+          Configuration.Legacy.committee_members_addresses configuration
+        in
+        let threshold = Configuration.Legacy.threshold configuration in
+        let dac_cctxt_config =
+          Configuration.Legacy.dac_cctxt_config configuration
+        in
+        return (committee_members_addresses, threshold, dac_cctxt_config)
+    | Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
+    | Committee_member _ -> tzfail @@ Mode_not_supported "committee_member"
+    | Observer _ -> tzfail @@ Mode_not_supported "observer"
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
      Stop DAC node when in Legacy mode, if threshold is not reached. *)
@@ -206,7 +214,7 @@ let run ~data_dir cctxt =
     Option.map
       (fun Configuration.{host; port} ->
         Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
-      coordinator_config_opt
+      coordinator_cctxt_opt
   in
   let* ctxt = Node_context.init config cctxt coordinator_cctxt_opt in
   let* rpc_server =
@@ -221,9 +229,7 @@ let run ~data_dir cctxt =
         dac_sk_uris)
   in
   let _ = RPC_server.install_finalizer rpc_server in
-  let*! () =
-    Event.(emit rpc_server_is_ready (config.rpc_address, config.rpc_port))
-  in
+  let*! () = Event.(emit rpc_server_is_ready (rpc_address, rpc_port)) in
   (* Start daemon to resolve current protocol plugin *)
   let* () = daemonize [Handler.resolve_plugin_and_set_ready ctxt cctxt] in
   (* Start never-ending monitoring daemons. [coordinator_cctxt] is required to

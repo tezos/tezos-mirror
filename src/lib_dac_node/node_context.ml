@@ -69,7 +69,8 @@ let init config cctxt coordinator_opt =
     config;
     tezos_node_cctxt = cctxt;
     coordinator_opt;
-    page_store = Page_store.Filesystem.init config.reveal_data_dir;
+    page_store =
+      Page_store.Filesystem.init (Configuration.reveal_data_dir config);
     node_store;
   }
 
@@ -146,16 +147,18 @@ let get_node_store (type a) ctxt (access_mode : a Store_sigs.mode) :
   | Store_sigs.Read_only -> Store.Irmin_store.readonly ctxt.node_store
   | Store_sigs.Read_write -> ctxt.node_store
 
-let get_dac_committee ctxt =
+let get_committee_members ctxt =
   let open Result_syntax in
-  match ctxt.config.mode with
-  | Legacy legacy -> Ok legacy.dac_members_addresses
-  | Coordinator coordinator -> Ok coordinator.dac_members_addresses
+  match Configuration.mode ctxt.config with
+  | Legacy legacy ->
+      Ok (Configuration.Legacy.committee_members_addresses legacy)
+  | Coordinator coordinator ->
+      Ok (Configuration.Coordinator.committee_members_addresses coordinator)
   | Observer _ ->
       tzfail
       @@ Invalid_operation_for_mode
-           {mode = "observer"; operation = "get_dac_committee"}
-  | Dac_member _ ->
+           {mode = "observer"; operation = "get_committee_members"}
+  | Committee_member _ ->
       tzfail
       @@ Invalid_operation_for_mode
-           {mode = "dac_member"; operation = "get_dac_committee"}
+           {mode = "dac_member"; operation = "get_committee_members"}

@@ -317,7 +317,7 @@ module Coordinator = struct
     let Signature_repr.{signer_pkh; root_hash; signature} =
       dac_member_signature
     in
-    let*? dac_committee = Node_context.get_dac_committee ctx in
+    let*? dac_committee = Node_context.get_committee_members ctx in
     let* () =
       fail_unless
         (check_is_dac_member dac_committee signer_pkh)
