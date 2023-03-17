@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_smart_rollup_panic_hook"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.tezos_smart_rollup_core]
+path = "../tezos_smart_rollup_core"
+
+[features]
+default = ["abort", "debug"]
+abort = []
+debug = []

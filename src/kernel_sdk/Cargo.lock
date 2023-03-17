@@ -1120,6 +1120,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos_smart_rollup_panic_hook"
+version = "0.1.0"
+dependencies = [
+ "tezos_smart_rollup_core 0.1.0",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
