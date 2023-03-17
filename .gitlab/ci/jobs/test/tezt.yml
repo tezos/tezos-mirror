@@ -38,6 +38,9 @@ tezt:
     - .template__coverage_files
     - .tezt_template
   variables:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/4459
+    # Re-enable the "synchronisation_threshold" tests once the flakiness has
+    # been fixed.
     TESTS: "/synchronisation_threshold"
   dependencies:
     - "build_x86_64"
