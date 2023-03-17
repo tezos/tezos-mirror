@@ -24,6 +24,12 @@
 (*****************************************************************************)
 
 open Protocol
+
+module Encodings =
+Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+end)
+
 module Size = Gas_input_size
 
 let ns = Namespace.make Registration_helpers.ns "encoding"
@@ -258,25 +264,26 @@ end
 let () = Registration_helpers.register (module Decoding_micheline)
 
 module Timestamp = struct
+  open Encodings
+
   let () =
     Registration_helpers.register
-    @@
-    let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
-    fixed_size_shared
-      ~name:"TIMESTAMP_READABLE_ENCODING"
-      ~generator:(fun rng_state ->
-        let seconds_in_year = 30_000_000 in
-        let offset = Random.State.int rng_state seconds_in_year in
-        Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
-      ~make_bench:(fun generator () ->
-        let tstamp_string = generator () in
-        let closure () = ignore (Script_timestamp.to_notation tstamp_string) in
-        Generator.Plain {workload = (); closure})
-      ()
+    @@ fixed_size_shared
+         ~name:"TIMESTAMP_READABLE_ENCODING"
+         ~generator:(fun rng_state ->
+           let seconds_in_year = 30_000_000 in
+           let offset = Random.State.int rng_state seconds_in_year in
+           Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
+         ~make_bench:(fun generator () ->
+           let tstamp_string = generator () in
+           let closure () =
+             ignore (Script_timestamp.to_notation tstamp_string)
+           in
+           Generator.Plain {workload = (); closure})
+         ()
 
   let () =
     let b, b_intercept =
-      let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
       nsqrtn_shared_with_intercept
         ~name:"TIMESTAMP_READABLE_DECODING"
         ~generator:(fun rng_state ->
@@ -312,7 +319,7 @@ end
    https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
 *)
 module BLS = struct
-  open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
+  open Encodings
 
   let check () =
     if not Bls12_381.built_with_blst_portable then (
@@ -406,7 +413,7 @@ module BLS = struct
 end
 
 module Timelock = struct
-  open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
+  open Encodings
 
   let generator rng_state =
     let log_time =

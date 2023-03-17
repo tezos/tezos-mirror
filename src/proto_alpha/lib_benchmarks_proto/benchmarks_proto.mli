@@ -36,7 +36,7 @@ module Benchmark : sig
     val info : string
 
     (** Filename of the benchmark module *)
-    val module_location : string
+    val module_filename : string
 
     (** Tags of the benchmark *)
     val tags : string list

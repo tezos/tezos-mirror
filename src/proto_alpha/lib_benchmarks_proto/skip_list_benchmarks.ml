@@ -54,7 +54,7 @@ module Next : Benchmark.S = struct
 
   let default_config = {max_items = 10000}
 
-  let module_location = __FILE__
+  let module_filename = __FILE__
 
   let config_encoding =
     let open Data_encoding in
@@ -106,7 +106,7 @@ module Hash_cell : Benchmark.S = struct
 
   let tags = ["skip_list"]
 
-  let module_location = __FILE__
+  let module_filename = __FILE__
 
   include Skip_list
   module Hash = Sc_rollup_inbox_repr.Hash

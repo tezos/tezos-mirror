@@ -24,8 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Benchmarks_shell
-open Encoding_benchmarks_helpers
 
+open Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+end)
 (* ------------------------------------------------------------------------- *)
 
 module Make_elliptic_curve_encoding_benchmarks (A : sig

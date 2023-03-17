@@ -24,6 +24,12 @@
 (*****************************************************************************)
 
 open Protocol
+
+module Encodings =
+Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+end)
+
 module Size = Gas_input_size
 
 let ns = Translator_model.ns
@@ -502,6 +508,7 @@ let rec check_printable_ascii v i =
 
 let check_printable_benchmark =
   let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
+  let open Encodings in
   linear_shared
     ~name:"CHECK_PRINTABLE"
     ~generator:(fun rng_state ->
