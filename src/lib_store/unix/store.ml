@@ -2981,10 +2981,15 @@ let v_3_0_upgrade ~store_dir genesis =
   in
   protect
     ~on_error:(fun err ->
-      let*! () = Store_events.(emit upgrade_store_failed) err in
+      let*! () = Store_events.(emit upgrade_store_failed) () in
       let*! () = List.iter_s (fun f -> f ()) !cleanups in
       Lwt.return_error err)
     (fun () ->
+      let* () =
+        let chain_dir_path = Naming.dir_path chain_dir in
+        let*! chain_dir_exists = Lwt_unix.file_exists chain_dir_path in
+        fail_unless chain_dir_exists (Cannot_find_chain_dir chain_dir_path)
+      in
       let* () = upgrade_protocol_levels ~chain_dir ~cleanups ~finalizers in
       let* () = Block_store.v_3_0_upgrade chain_dir ~cleanups ~finalizers in
       let*! () = List.iter_s (fun f -> f ()) !finalizers in

@@ -1296,3 +1296,23 @@ let () =
     Data_encoding.(obj1 (req "kind" corruption_kind_encoding))
     (function Corrupted_store k -> Some k | _ -> None)
     (fun k -> Corrupted_store k)
+
+(* Store upgrade errors *)
+type error += Cannot_find_chain_dir of string
+
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"store.cannot_find_chain_dir"
+    ~title:"Cannot find chain dir"
+    ~description:"Cannot find chain dir while upgrading storage"
+    ~pp:(fun ppf path ->
+      Format.fprintf
+        ppf
+        "Failed to upgrade the storage. The chain directory %s cannot be \
+         found. Make sure that the data directory contains data of the \
+         expected network."
+        path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Cannot_find_chain_dir p -> Some p | _ -> None)
+    (fun p -> Cannot_find_chain_dir p)
