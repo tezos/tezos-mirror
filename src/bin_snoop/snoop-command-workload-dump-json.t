@@ -2,7 +2,7 @@ Run benchmark to dump json data later
   $ ./main_snoop.exe benchmark interpreter/N_IBlake2b and save to data.workload --bench-num 2 --nsamples 3 > /dev/null 2> /dev/null
 
 Dump workload json to file
-  $ ./main_snoop.exe workload dump data.workload to data.json 2>&1 |grep -v "already registered for code"
+  $ ./main_snoop.exe workload dump data.workload -o data.json 2>&1 |grep -v "already registered for code"
   Measure.load: loaded data.workload
   Measure.packed_measurement_save_json: saved to data.json
 
