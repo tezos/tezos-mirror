@@ -1214,6 +1214,13 @@ let octez_plonk =
 (*       ] *)
 (*       ~modules:["helpers"; "cases"] *)
 
+let octez_plonk_aggregation =
+  public_lib
+    "octez-plonk.aggregation"
+    ~path:"src/lib_aplonk/plonk-aggregation"
+    ~internal_name:"aggregation"
+    ~preprocess:[pps ppx_repr]
+    ~deps:[octez_plonk; octez_bls12_381_polynomial |> open_]
 
 let _octez_srs_extraction_tests =
   tests
