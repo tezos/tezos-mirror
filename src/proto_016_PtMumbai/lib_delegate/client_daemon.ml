@@ -147,6 +147,9 @@ module Accuser = struct
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
+    cctxt#message "Waiting for protocol %s to start..." Protocol.name
+    >>= fun () ->
+    Node_rpc.await_protocol_activation cctxt ~chain () >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
