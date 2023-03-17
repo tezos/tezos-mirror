@@ -114,6 +114,13 @@ bls (tz4)        1671 gas units
 RPC Changes
 -----------
 
+- Add ``GET /helpers/attestation_rights`` that returns the attestation power for
+  delegates, replacing ``GET /helpers/endorsing_rights``, which is now
+  deprecated (MR :gl:`!8096`)
+
+- Deprecate ``endorsing_rights`` in favour of ``attestation_rights``. (MR
+  :gl:`!8096`)
+
 Operation receipts
 ------------------
 
