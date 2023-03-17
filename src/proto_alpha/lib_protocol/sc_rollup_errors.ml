@@ -90,11 +90,6 @@ type error +=
       Sc_rollup_wrong_staker_for_conflict_commitment of
       Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
   | (* `Permanent *)
-      Sc_rollup_invalid_commitment_to_cement of {
-      valid_candidate : Sc_rollup_commitment_repr.Hash.t;
-      invalid_candidate : Sc_rollup_commitment_repr.Hash.t;
-    }
-  | (* `Permanent *)
       Sc_rollup_commitment_too_old of {
       last_cemented_inbox_level : Raw_level_repr.t;
       commitment_inbox_level : Raw_level_repr.t;
@@ -620,35 +615,6 @@ let () =
       | _ -> None)
     (fun (staker, commitment) ->
       Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment)) ;
-  let description = "Given commitment cannot be cemented" in
-  register_error_kind
-    `Permanent
-    ~id:"smart_rollup_invalid_commitment_to_cement"
-    ~title:description
-    ~pp:(fun ppf (valid_candidate, invalid_candidate) ->
-      Format.fprintf
-        ppf
-        "The commitment %a cannot be cemented. %a is a valid candidate to \
-         cementation, but %a is not."
-        Sc_rollup_commitment_repr.Hash.pp
-        invalid_candidate
-        Sc_rollup_commitment_repr.Hash.pp
-        valid_candidate
-        Sc_rollup_commitment_repr.Hash.pp
-        invalid_candidate)
-    ~description
-    Data_encoding.(
-      obj2
-        (req "valid_candidate" Sc_rollup_commitment_repr.Hash.encoding)
-        (req "invalid_candidate" Sc_rollup_commitment_repr.Hash.encoding))
-    (function
-      | Sc_rollup_invalid_commitment_to_cement
-          {valid_candidate; invalid_candidate} ->
-          Some (valid_candidate, invalid_candidate)
-      | _ -> None)
-    (fun (valid_candidate, invalid_candidate) ->
-      Sc_rollup_invalid_commitment_to_cement
-        {valid_candidate; invalid_candidate}) ;
 
   let description = "Published commitment is too old" in
   register_error_kind

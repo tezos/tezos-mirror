@@ -2458,13 +2458,14 @@ module Sc_rollup = struct
       S.can_be_cemented
       (fun context rollup commitment_hash () () ->
         let open Lwt_result_syntax in
-        let*! res =
-          Sc_rollup.Stake_storage.cement_commitment
-            context
-            rollup
-            commitment_hash
-        in
-        match res with Ok _context -> return_true | Error _ -> return_false)
+        let*! res = Sc_rollup.Stake_storage.cement_commitment context rollup in
+        match res with
+        | Ok (_context, _cemented_commitment, cemented_commitment_hash)
+          when Sc_rollup.Commitment.Hash.equal
+                 commitment_hash
+                 cemented_commitment_hash ->
+            return_true
+        | Ok _ | Error _ -> return_false)
 
   let register () =
     register_kind () ;

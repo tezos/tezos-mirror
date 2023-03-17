@@ -897,7 +897,12 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
-              (req "commitment" Sc_rollup_commitment_repr.Hash.encoding);
+              (req
+                 ~description:
+                   "DEPRECATED: This field is not used anymore by the protocol \
+                    and will be removed in a future proposal."
+                 "commitment"
+                 Sc_rollup_commitment_repr.Hash.encoding);
           select =
             (function
             | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);

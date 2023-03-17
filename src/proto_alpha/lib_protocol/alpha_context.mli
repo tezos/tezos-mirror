@@ -4155,8 +4155,7 @@ module Sc_rollup : sig
     val cement_commitment :
       context ->
       t ->
-      Commitment.Hash.t ->
-      (context * Commitment.t) tzresult Lwt.t
+      (context * Commitment.t * Commitment.Hash.t) tzresult Lwt.t
 
     val withdraw_stake :
       context ->

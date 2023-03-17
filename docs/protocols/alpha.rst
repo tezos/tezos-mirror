@@ -47,8 +47,13 @@ Smart Rollups
   checks if it needs to upgrade to a new revision when it receives a ``Protocol_migration``
   message. (MR :gl:`!7730`)
 
-- Remove the failsafe mechanism in inbox construction, aimed at errors that can 
+- Remove the failsafe mechanism in inbox construction, aimed at errors that can
   never happen at begin application, block finalization, and migration. (MR :gl:`!7833`)
+
+- The field ``commitment`` in the operation ``Sc_rollup_cement`` is now deprecated.
+  The protocol computes the valid candidate commitment to cement, and cements it.
+  The provided ``commitment`` is omitted by the protocol and unchecked with the
+  found one. (MR :gl:`!7316`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -95,6 +100,10 @@ secp256k1 (tz2)  152 gas units
 p256 (tz3)       1091 gas units
 bls (tz4)        1671 gas units
 ================ ============================
+
+- The operation's result ``Sc_rollup_cement_result`` now have a new field
+  ``commitment``, which is the commitment cemented by the application of
+  the operation ``Sc_rollup_cement``.  (MR :gl:`!7316`)
 
 RPC Changes
 -----------
