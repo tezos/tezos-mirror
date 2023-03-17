@@ -64,6 +64,8 @@ let run ~data_dir cctxt =
        config) =
     Configuration.load ~data_dir
   in
+  let operating_mode_string = Configuration.mode_name config in
+  let*! () = Event.(emit operating_mode operating_mode_string) in
   let* () = Page_store.ensure_reveal_data_dir_exists reveal_data_dir in
   let* ctxt = Node_context.init config cctxt in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725

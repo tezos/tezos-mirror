@@ -68,6 +68,8 @@ module Coordinator = struct
               (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))))
 
   let committee_members_addresses t = t.committee_members_addresses
+
+  let name = "Coordinator"
 end
 
 module Committee_member = struct
@@ -93,6 +95,8 @@ module Committee_member = struct
            (req
               "address"
               Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
+
+  let name = "Committee_member"
 end
 
 module Observer = struct
@@ -111,6 +115,8 @@ module Observer = struct
         (obj2
            (req "coordinator_rpc_address" string)
            (req "coordinator_rpc_port" uint16)))
+
+  let name = "Observer"
 end
 
 module Legacy = struct
@@ -180,6 +186,8 @@ module Legacy = struct
            (opt
               "committee_member_address_opt"
               Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
+
+  let name = "Legacy"
 end
 
 type mode =
@@ -222,6 +230,13 @@ type t = {
           DAC. *)
 }
 
+let mode_name t =
+  match t.mode with
+  | Coordinator _ -> Coordinator.name
+  | Committee_member _ -> Committee_member.name
+  | Observer _ -> Observer.name
+  | Legacy _ -> Legacy.name
+
 let make ~data_dir ~reveal_data_dir rpc_address rpc_port mode =
   {data_dir; reveal_data_dir; rpc_address; rpc_port; mode}
 
@@ -240,26 +255,26 @@ let mode_encoding =
     union
       [
         case
-          ~title:"Coordinator"
-          (Tag (0, "coordinator"))
+          ~title:Coordinator.name
+          (Tag (0, Coordinator.name))
           Coordinator.encoding
           (function Coordinator t -> Some t | _ -> None)
           (fun t -> Coordinator t);
         case
-          ~title:"Committee_member"
-          (Tag (1, "committee_member"))
+          ~title:Committee_member.name
+          (Tag (1, Committee_member.name))
           Committee_member.encoding
           (function Committee_member t -> Some t | _ -> None)
           (fun t -> Committee_member t);
         case
-          ~title:"Observer"
-          (Tag (2, "observer"))
+          ~title:Observer.name
+          (Tag (2, Observer.name))
           Observer.encoding
           (function Observer t -> Some t | _ -> None)
           (fun t -> Observer t);
         case
-          ~title:"Legacy"
-          (Tag (3, "legacy"))
+          ~title:Legacy.name
+          (Tag (3, Legacy.name))
           Legacy.encoding
           (function Legacy t -> Some t | _ -> None)
           (fun t -> Legacy t);
