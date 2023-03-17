@@ -1543,6 +1543,59 @@ let _octez_aplonk_test_helpers_bench =
     ~bisect_ppx:No
     ~deps:[octez_plonk_test_helpers; octez_aplonk]
 
+let octez_epoxy_tx =
+  public_lib
+    "octez-epoxy-tx"
+    ~path:"src/lib_epoxy_tx"
+    ~synopsis:"Circuits for transaction Epoxy rollup"
+    ~internal_name:"epoxy_tx"
+    ~deps:[octez_plompiler; hex; stdint; octez_plonk; octez_mec]
+
+let _octez_epoxy_tx_tests =
+  private_exe
+    "main"
+    ~path:"src/lib_epoxy_tx/test"
+    ~opam:"octez-epoxy-tx"
+    ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-epoxy-tx"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-epoxy-tx"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-epoxy-tx"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
 let _octez_srs_extraction_tests =
   tests
     ["main"]

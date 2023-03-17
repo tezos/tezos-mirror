@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name epoxy_tx)
+ (public_name octez-epoxy-tx)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-plompiler
+  hex
+  stdint
+  octez-plonk
+  octez-mec))
