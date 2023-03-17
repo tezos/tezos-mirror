@@ -62,21 +62,29 @@ module type CONFIGURATION = sig
     val now : unit -> t
 
     val add : t -> span -> t
+
+    val sub : t -> span -> t
+
+    (** [mul_span s n] returns [n * s]. *)
+    val mul_span : span -> int -> span
   end
 end
 
 type ('peer, 'message_id, 'span) limits = {
   max_recv_ihave_per_heartbeat : int;
       (** The maximum number of control message [IHave] we can receive
-      from our peers between two heartbeats. *)
+          from our peers between two heartbeats. *)
   max_sent_iwant_per_heartbeat : int;
       (** The maximum number of control messages [IWant] we can sent
           to our peers between two heartbeats. *)
-  expected_peers_per_topic : int;
-      (** The number of expected full connections per topic. *)
+  degree_optimal : int;
+      (** The optimal number of full connections per topic. For
+          example, if it is 6, each peer will want to have about six peers in
+          their mesh for each topic they're subscribed to. It should be set
+          somewhere between {degree_low} and {degree_high}. *)
   gossip_publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
-      message to our peers. *)
+          message to our peers. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
   unsubscribe_backoff : 'span;
@@ -86,8 +94,34 @@ type ('peer, 'message_id, 'span) limits = {
           too soon. *)
   prune_backoff : 'span;  (** The duration added when we prune a peer. *)
   retain_duration : 'span;
-      (** The duration added to remove metadata
-                               about a disconnected peer. *)
+      (** The duration added to remove metadata about a disconnected peer. *)
+  heartbeat_interval : 'span;
+      (** [heartbeat_interval] controls the time between heartbeats. *)
+  backoff_cleanup_ticks : int;
+      (** [backoff_cleanup_ticks] is the number of heartbeat ticks setting the
+          frequency at which the backoffs are checked and potentially cleared. *)
+  degree_low : int;
+      (** [degree_low] sets the lower bound on the number of peers we keep in a
+          topic mesh. If we have fewer than [degree_low] peers, the heartbeat will attempt
+          to graft some more into the mesh at the next heartbeat. *)
+  degree_high : int;
+      (** [degree_high] sets the upper bound on the number of peers we keep in a
+          topic mesh.  If there are more than [degree_high] peers, the heartbeat will select
+          some to prune from the mesh at the next heartbeat. *)
+  degree_score : int;
+      (** [degree_score] affects how peers are selected when pruning a mesh due
+          to over subscription. At least [degree_score] of the retained peers
+          will be high-scoring, while the remainder are chosen randomly. *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
+     [degree_score] must not exceed [degree_optimal - degree_out]. *)
+  degree_out : int;
+      (** [degree_out] is the quota for the number of outbound connections to
+          maintain in a topic mesh.  When the mesh is pruned due to over
+          subscription, we make sure that we have outbound connections to at
+          least [degree_out] of the survivor peers. This prevents Sybil
+          attackers from overwhelming our mesh with incoming connections.
+	        [degree_out] must be set below {degree_low}, and must not exceed
+          [degree_optimal / 2]. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -102,7 +136,7 @@ module Score : sig
 
   val zero : t
 
-  val penality : t -> int -> t
+  val penalty : t -> int -> t
 end
 
 module type S = sig
@@ -168,6 +202,15 @@ module type S = sig
     | Joining_topic : Peer.Set.t -> [`Join] output
     | Not_subscribed : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Heartbeat : {
+        (* topics per peer to graft to *)
+        to_graft : Topic.Set.t Peer.Map.t;
+        (* topics per peer to prune from *)
+        to_prune : Topic.Set.t Peer.Map.t;
+        (* set of peers for which peer exchange (PX) will not be proposed *)
+        noPX_peers : Peer.Set.t;
+      }
+        -> [`Heartbeat] output
     | Peer_added : [`Add_peer] output
     | Peer_already_known : [`Add_peer] output
     | Removing_peer : [`Remove_peer] output
@@ -178,10 +221,10 @@ module type S = sig
   (** Initialise a state. *)
   val make : Random.State.t -> limits -> parameters -> state
 
-  (** [add_peer ~direct ~outbound peer] is called to notify a new
-      connection. If [direct] is [true], the gossipsub always
-      forward messages to those peers. [outbound] is [true] if it is
-      an outbound connection. *)
+  (** [add_peer ~direct ~outbound peer] is called to notify a new connection. If
+      [direct] is [true], the gossipsub always forwards messages to those
+      peers. [outbound] is [true] if it is an outbound connection, that is, a
+      connection initiated by the local (not the remote) peer. *)
   val add_peer : direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] monad
 
   (** [remove_peer peer] notifies gossipsub that we are disconnected

@@ -68,13 +68,17 @@ module type CONFIGURATION = sig
     val now : unit -> t
 
     val add : t -> span -> t
+
+    val sub : t -> span -> t
+
+    val mul_span : span -> int -> span
   end
 end
 
 type ('peer, 'message_id, 'span) limits = {
   max_recv_ihave_per_heartbeat : int;
   max_sent_iwant_per_heartbeat : int;
-  expected_peers_per_topic : int;
+  degree_optimal : int;
   gossip_publish_threshold : float;
   accept_px_threshold : float;
   unsubscribe_backoff : 'span;
@@ -83,6 +87,12 @@ type ('peer, 'message_id, 'span) limits = {
          actually [graft_flood_threshold - prune_backoff] *)
   prune_backoff : 'span;
   retain_duration : 'span;
+  heartbeat_interval : 'span;
+  backoff_cleanup_ticks : int;
+  degree_low : int;
+  degree_high : int;
+  degree_score : int;
+  degree_out : int;
 }
 
 type ('peer, 'message_id) parameters = {
@@ -95,22 +105,33 @@ module Score : sig
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
 
      This is incomplete *)
-  type t
+  include Compare.S
 
   val float : t -> float
 
   val zero : t
 
-  val penality : t -> int -> t
+  val penalty : t -> int -> t
 end = struct
-  type t = {behaviour_penality : int}
+  type t = {behaviour_penalty : int}
 
-  let zero = {behaviour_penality = 0}
+  let zero = {behaviour_penalty = 0}
 
-  let float {behaviour_penality} = behaviour_penality |> float_of_int
+  let float {behaviour_penalty} = -behaviour_penalty |> float_of_int
 
-  let penality {behaviour_penality} penality =
-    {behaviour_penality = behaviour_penality + penality}
+  let penalty {behaviour_penalty} penalty =
+    {behaviour_penalty = behaviour_penalty + penalty}
+
+  let compare s1 s2 =
+    let f1 = float s1 in
+    let f2 = float s2 in
+    Float.compare f1 f2
+
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
 end
 
 module type S = sig
@@ -171,6 +192,12 @@ module type S = sig
     | Joining_topic : Peer.Set.t -> [`Join] output
     | Not_subscribed : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Heartbeat : {
+        to_graft : Topic.Set.t Peer.Map.t;
+        to_prune : Topic.Set.t Peer.Map.t;
+        noPX_peers : Peer.Set.t;
+      }
+        -> [`Heartbeat] output
     | Peer_added : [`Add_peer] output
     | Peer_already_known : [`Add_peer] output
     | Removing_peer : [`Remove_peer] output
@@ -221,9 +248,11 @@ module Make (C : CONFIGURATION) :
 
   type message = Message.t
 
+  type time = Time.t
+
   type span = Time.span
 
-  type nonrec limits = (Peer.t, Message_id.t, C.Time.span) limits
+  type nonrec limits = (Peer.t, Message_id.t, span) limits
 
   type nonrec parameters = (Peer.t, Message_id.t) parameters
 
@@ -258,6 +287,12 @@ module Make (C : CONFIGURATION) :
     | Joining_topic : Peer.Set.t -> [`Join] output
     | Not_subscribed : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Heartbeat : {
+        to_graft : Topic.Set.t Peer.Map.t;
+        to_prune : Topic.Set.t Peer.Map.t;
+        noPX_peers : Peer.Set.t;
+      }
+        -> [`Heartbeat] output
     | Peer_added : [`Add_peer] output
     | Peer_already_known : [`Add_peer] output
     | Removing_peer : [`Remove_peer] output
@@ -268,14 +303,13 @@ module Make (C : CONFIGURATION) :
 
        When does this field should be updated? *)
     direct : bool;
-        (** A direct connection is a connection to which we forward all the messages. *)
+        (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
     outbound : bool;
-        (** An outbound connection is a connection we
-                          connected to. *)
-    backoff : C.Time.t Topic.Map.t;
+        (** An outbound connection is a connection we initiated. *)
+    backoff : time Topic.Map.t;
         (** The backoff times associated to this peer for each topic *)
     score : Score.t;  (** The score associated to this peer. *)
-    expire : C.Time.t option;
+    expire : time option;
         (** The expiring time after having being disconnected from this peer. *)
   }
 
@@ -287,12 +321,12 @@ module Make (C : CONFIGURATION) :
   module Memory_cache = struct
     type value = {message : message; access : int Peer.Map.t}
 
-    type t = {messages : value C.Message_id.Map.t}
+    type t = {messages : value Message_id.Map.t}
 
-    let create () = {messages = C.Message_id.Map.empty}
+    let create () = {messages = Message_id.Map.empty}
 
     let record_message_access peer message_id t =
-      match C.Message_id.Map.find message_id t.messages with
+      match Message_id.Map.find message_id t.messages with
       | None -> None
       | Some {message; access} ->
           let access =
@@ -304,14 +338,14 @@ module Make (C : CONFIGURATION) :
           let t =
             {
               messages =
-                C.Message_id.Map.add message_id {message; access} t.messages;
+                Message_id.Map.add message_id {message; access} t.messages;
             }
           in
           Some (t, message)
 
     let add_message message_id message t =
       let value = {message; access = Peer.Map.empty} in
-      {messages = C.Message_id.Map.add message_id value t.messages}
+      {messages = Message_id.Map.add message_id value t.messages}
   end
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
@@ -325,23 +359,27 @@ module Make (C : CONFIGURATION) :
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
     fanout : Peer.Set.t Topic.Map.t;
-    last_published_time : C.Time.t Topic.Map.t;
-    seen_messages : C.Message_id.Set.t;
+    last_published_time : time Topic.Map.t;
+    seen_messages : Message_id.Set.t;
     memory_cache : Memory_cache.t;
     rng : Random.State.t;
+    heartbeat_ticks : int64;
   }
   (* Invariants:
 
      - Forall t set, Topic.Map.find t mesh = Some set -> Peer.Set set <> Peer.Set.empty
 
      - Forall t set, Topic.Map.find t fanout = Some set -> Peer.Set set <> Peer.Set.empty
+
+     - Forall t p c, Peer.Map.find connections p = Some c && c.expired = Some _ ->
+         Topic.Map.find t mesh = None &&
+         Topic.Map.find t fanout = None
   *)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4984
 
      Test the those invariants
   *)
-
   module Monad = struct
     type 'a t = (state, 'a) State_monad.t
 
@@ -350,8 +388,24 @@ module Make (C : CONFIGURATION) :
     include State_monad.M
   end
 
+  let check_limits l =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5129
+       Replace the asserts by something more informative. *)
+    assert (l.degree_low > 0) ;
+    assert (l.degree_out >= 0) ;
+    assert (l.degree_score >= 0) ;
+    assert (l.degree_low < l.degree_optimal) ;
+    assert (l.degree_high > l.degree_optimal) ;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
+       This requirement is not imposed in the spec/Go implementation. Relax this
+       requirement or delete the todo. *)
+    assert (l.degree_score + l.degree_out <= l.degree_optimal) ;
+    assert (l.degree_out < l.degree_low) ;
+    assert (l.degree_out <= l.degree_optimal / 2)
+
   let make : Random.State.t -> limits -> parameters -> state =
    fun rng limits parameters ->
+    check_limits limits ;
     {
       limits;
       parameters;
@@ -361,20 +415,21 @@ module Make (C : CONFIGURATION) :
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
       last_published_time = Topic.Map.empty;
-      seen_messages = C.Message_id.Set.empty;
+      seen_messages = Message_id.Set.empty;
       memory_cache = Memory_cache.create ();
       rng;
+      heartbeat_ticks = 0L;
     }
 
   module Helpers = struct
-    (* Those projections enable let-punning. *)
+    (* These projections enable let-punning. *)
     let max_recv_ihave_per_heartbeat state =
       state.limits.max_recv_ihave_per_heartbeat
 
     let max_sent_iwant_per_heartbeat state =
       state.limits.max_sent_iwant_per_heartbeat
 
-    let expected_peers_per_topic state = state.limits.expected_peers_per_topic
+    let degree_optimal state = state.limits.degree_optimal
 
     let gossip_publish_threshold state = state.limits.gossip_publish_threshold
 
@@ -387,6 +442,18 @@ module Make (C : CONFIGURATION) :
     let graft_flood_backoff state = state.limits.graft_flood_backoff
 
     let retain_duration state = state.limits.retain_duration
+
+    let heartbeat_interval state = state.limits.heartbeat_interval
+
+    let backoff_cleanup_ticks state = state.limits.backoff_cleanup_ticks
+
+    let degree_low state = state.limits.degree_low
+
+    let degree_high state = state.limits.degree_high
+
+    let degree_score state = state.limits.degree_score
+
+    let degree_out state = state.limits.degree_out
 
     let mesh state = state.mesh
 
@@ -439,6 +506,17 @@ module Make (C : CONFIGURATION) :
     let find_iwant_per_heartbeat ?default key state =
       find ?default key state.iwant_per_heartbeat
 
+    let reset_ihave_per_heartbeat state =
+      ({state with ihave_per_heartbeat = Peer.Map.empty}, ())
+
+    let reset_iwant_per_heartbeat state =
+      ({state with iwant_per_heartbeat = Peer.Map.empty}, ())
+
+    let heartbeat_ticks state = state.heartbeat_ticks
+
+    let set_heartbeat_ticks heartbeat_ticks state =
+      ({state with heartbeat_ticks}, ())
+
     let set_connections connections state = ({state with connections}, ())
 
     let topic_is_tracked topic state =
@@ -447,23 +525,34 @@ module Make (C : CONFIGURATION) :
 
     let set_memory_cache memory_cache state = ({state with memory_cache}, ())
 
-    let get_score ~default peer state =
-      match Peer.Map.find peer state.connections with
+    let get_connections_score connections ~default peer =
+      match Peer.Map.find peer connections with
       | None -> default
       | Some connection -> connection.score
 
-    let get_peers topic ~filter ~max =
+    let get_score ~default peer state =
+      get_connections_score state.connections ~default peer
+
+    let peer_has_outbound_connection connections ~default peer =
+      Peer.Map.find_opt peer connections
+      |> Option.map (fun c -> c.outbound)
+      |> Option.value ~default
+
+    let select_connections_peers connections rng topic ~filter ~max =
+      Peer.Map.bindings connections
+      |> List.filter_map (fun (peer, connection) ->
+             let topics = connection.topics in
+             if filter peer connection && Topic.Set.mem topic topics then
+               Some peer
+             else None)
+      |> List.shuffle ~rng |> List.take_n max
+
+    let select_peers topic ~filter ~max =
       let open Monad.Syntax in
       let*! connections in
       let*! rng in
-      Peer.Map.to_seq connections
-      |> Seq.filter_map (fun (peer, connections) ->
-             let topics = connections.topics in
-             if filter peer connections && Topic.Set.mem topic topics then
-               Some peer
-             else None)
-      |> List.of_seq |> List.shuffle ~rng |> List.take_n max |> Peer.Set.of_list
-      |> return
+      select_connections_peers connections rng topic ~filter ~max
+      |> Peer.Set.of_list |> return
 
     let set_mesh_topic topic peers state =
       let state = {state with mesh = Topic.Map.add topic peers state.mesh} in
@@ -538,7 +627,7 @@ module Make (C : CONFIGURATION) :
                   (function
                     | None -> Some expire
                     | Some old_backoff ->
-                        if C.Time.(old_backoff < expire) then Some expire
+                        if Time.(old_backoff < expire) then Some expire
                         else Some old_backoff)
                   connection.backoff
               in
@@ -546,8 +635,8 @@ module Make (C : CONFIGURATION) :
         connections
 
     let add_connections_backoff time topic peer connections =
-      let now = C.Time.now () in
-      let expire = C.Time.add now time in
+      let now = Time.now () in
+      let expire = Time.add now time in
       update_backoff peer topic expire connections
 
     let add_backoff time topic peer =
@@ -570,8 +659,7 @@ module Make (C : CONFIGURATION) :
     let _check_peer_score peer =
       let open Monad.Syntax in
       let*! peer_score = get_score ~default:Score.zero peer in
-      if Compare.Float.(peer_score |> Score.float < 0.) then
-        Negative_peer_score peer_score |> fail
+      if Score.(peer_score < zero) then Negative_peer_score peer_score |> fail
       else unit
   end
 
@@ -615,7 +703,7 @@ module Make (C : CONFIGURATION) :
       let*! peer_filter in
       let*! seen_messages in
       let should_handle_message_id message_id : bool =
-        (not (C.Message_id.Set.mem message_id seen_messages))
+        (not (Message_id.Set.mem message_id seen_messages))
         && peer_filter peer (`IHave message_id)
       in
       List.filter should_handle_message_id message_ids |> return
@@ -671,7 +759,7 @@ module Make (C : CONFIGURATION) :
 
          Score check is missing.
       *)
-      let routed_message_ids = C.Message_id.Map.empty in
+      let routed_message_ids = Message_id.Map.empty in
       let*! memory_cache in
       let*! peer_filter in
       let memory_cache, routed_message_ids =
@@ -685,13 +773,12 @@ module Make (C : CONFIGURATION) :
               Memory_cache.record_message_access peer message_id memory_cache
             with
             | None ->
-                ( memory_cache,
-                  C.Message_id.Map.add message_id `Not_found messages )
+                (memory_cache, Message_id.Map.add message_id `Not_found messages)
             | Some (memory_cache, message) ->
                 let messages =
                   if peer_filter peer (`IWant message_id) then
-                    C.Message_id.Map.add message_id (`Message message) messages
-                  else C.Message_id.Map.add message_id `Ignored messages
+                    Message_id.Map.add message_id (`Message message) messages
+                  else Message_id.Map.add message_id `Ignored messages
                 in
                 (memory_cache, messages))
           (memory_cache, routed_message_ids)
@@ -742,14 +829,14 @@ module Make (C : CONFIGURATION) :
       match Topic.Map.find topic backoff with
       | None -> unit
       | Some backoff ->
-          let current = C.Time.now () in
-          if C.Time.(current >= backoff) then unit
+          let current = Time.now () in
+          if Time.(current >= backoff) then unit
           else
-            let score = Score.penality score 1 in
+            let score = Score.penalty score 1 in
             let*! graft_flood_backoff in
             let score =
-              if C.Time.(current < add backoff graft_flood_backoff) then
-                Score.penality score 1
+              if Time.(current < add backoff graft_flood_backoff) then
+                Score.penalty score 1
               else score
             in
             let* () = add_backoff prune_backoff topic peer in
@@ -766,6 +853,9 @@ module Make (C : CONFIGURATION) :
       let*? () = check_backoff peer topic connection in
       let*? () = check_score peer topic connection in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
+         Probably the [topics] field needs to be updated here.
+      *)
       (* FIXME https://gitlab.com/tezos/tezos/-/issues/5007
 
          Handle negative score  and the size check is missing *)
@@ -806,7 +896,7 @@ module Make (C : CONFIGURATION) :
       Peer.t ->
       Topic.t ->
       px:Peer.t Seq.t ->
-      backoff:C.Time.span ->
+      backoff:span ->
       [`Prune] output Monad.t =
     Prune.handle
 
@@ -814,10 +904,10 @@ module Make (C : CONFIGURATION) :
     let get_peers_for_unsubscribed_topic topic =
       let open Monad.Syntax in
       let*! fanout_opt = find_fanout topic in
-      let now = C.Time.now () in
+      let now = Time.now () in
       let* () = set_last_published_time topic now in
       let*! gossip_publish_threshold in
-      let*! expected_peers_per_topic in
+      let*! degree_optimal in
       match fanout_opt with
       | None ->
           let filter _peer {direct; score; _} =
@@ -825,7 +915,7 @@ module Make (C : CONFIGURATION) :
             && Compare.Float.(score |> Score.float >= gossip_publish_threshold)
           in
           let* not_direct_peers =
-            get_peers topic ~filter ~max:expected_peers_per_topic
+            select_peers topic ~filter ~max:degree_optimal
           in
           let* () = set_fanout_topic topic not_direct_peers in
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5010
@@ -835,7 +925,7 @@ module Make (C : CONFIGURATION) :
           let filter peer ({direct; _} as connection) =
             filter peer connection || direct
           in
-          let* peers = get_peers topic ~filter ~max:Int.max_int in
+          let* peers = select_peers topic ~filter ~max:Int.max_int in
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/4988
 
              lastpub field *)
@@ -880,11 +970,11 @@ module Make (C : CONFIGURATION) :
       let filter _peer {backoff; score; direct; _} =
         not (direct || Topic.Map.mem topic backoff || Score.(score < zero))
       in
-      get_peers topic ~filter ~max
+      select_peers topic ~filter ~max
 
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
-      let*! expected_peers_per_topic in
+      let*! degree_optimal in
       let*! connections in
       let is_valid peer =
         match Peer.Map.find peer connections with
@@ -907,13 +997,11 @@ module Make (C : CONFIGURATION) :
         (* We prioritize fanout peers to be in the mesh for this
            topic. If we need more peers, we look at all our peers
            subscribed to this topic. *)
-        if Peer.Set.cardinal valid_fanout_peers >= expected_peers_per_topic then
+        if Peer.Set.cardinal valid_fanout_peers >= degree_optimal then
           return valid_fanout_peers
         else
           let max =
-            max
-              0
-              (expected_peers_per_topic - Peer.Set.cardinal valid_fanout_peers)
+            max 0 (degree_optimal - Peer.Set.cardinal valid_fanout_peers)
           in
           let* more_peers = get_more_peers topic ~max in
           return (Peer.Set.union more_peers valid_fanout_peers)
@@ -965,11 +1053,335 @@ module Make (C : CONFIGURATION) :
   let leave : Topic.t -> [`Leave] output Monad.t = Leave.handle
 
   module Heartbeat = struct
-    let handle _ =
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4949
+    let clear_backoff =
+      let open Monad.Syntax in
+      let*! heartbeat_ticks in
+      let*! heartbeat_interval in
+      let*! backoff_cleanup_ticks in
+      (* NOTE: Probably the cleanup can also be done lazily: at use, if a
+         backoff time is expired, then remove it *)
+      (* We only clear once every [backoff_cleanup_ticks] ticks to avoid
+         iterating over the map(s) too much *)
+      if Int64.(rem heartbeat_ticks (of_int backoff_cleanup_ticks)) != 0L then
+        return ()
+      else
+        let current = Time.now () in
+        let current_with_slack =
+          (* Subtract some slack time to the current time to account for
+             the message latency; for details, see
+             https://github.com/libp2p/go-libp2p-pubsub/issues/368 *)
+          Time.sub current (Time.mul_span heartbeat_interval 2)
+        in
+        let*! connections in
+        Peer.Map.filter_map
+          (fun _peer connection ->
+            let backoff =
+              Topic.Map.filter
+                (fun _topic expire -> Time.(expire > current_with_slack))
+                connection.backoff
+            in
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5095
+               Check the reasoning *)
+            match connection.expire with
+            | Some expire
+              when Time.(expire > current)
+                   && Topic.Map.is_empty connection.backoff ->
+                None
+            | _ -> Some {connection with backoff})
+          connections
+        |> set_connections
 
-         Implement this. *)
-      assert false
+    let cleanup =
+      let open Monad.Syntax in
+      (* Clean up expired backoffs *)
+      let* () = clear_backoff in
+
+      (* Clean up IHave and IWant counters *)
+      let* () = reset_ihave_per_heartbeat in
+      let* () = reset_iwant_per_heartbeat in
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
+         Apply IWANT request penalties *)
+      return ()
+
+    (* Mesh maintenance. For each topic, do in order:
+
+       - Prune all peers with negative score, do not enable peer exchange for
+       these peers.
+
+       - If the number of remaining peers in the topic mesh is less than
+       [degree_low], then select as many random peers (not already in the mesh
+       topic) to graft as possible so that to have [degree_optimal] in the topic
+       mesh. The selected peers should have a non-negative score, should not
+       backedoff, and should not be direct peers.
+
+       - If the number of remaining peers in the topic mesh is higher than
+       [degree_high], then select as many peers (not already in the mesh topic)
+       to prune as possible so that to have [degree_optimal] in the topic mesh.
+       See [select_peers_to_prune] to see how the selection is performed.
+
+       - If the number of remaining peers in the topic mesh is higher than
+       [degree_low] and the number of outbound peers therein is smaller than
+       [degree_out], then select an additional number of peers to graft (with
+       the same conditions for grafting) to ensure that here at least
+       [degree_out] outbound peers in the mesh.
+
+       Finally, for pruned peers, back them off for [prune_backoff] time.
+    *)
+    let maintain_mesh =
+      let open Monad.Syntax in
+      let*! connections in
+      let*! rng in
+      let*! mesh in
+      let*! prune_backoff in
+      let*! degree_optimal in
+      let*! degree_low in
+      let*! degree_high in
+      let*! degree_score in
+      let*! degree_out in
+
+      let has_outbound_connection =
+        peer_has_outbound_connection connections ~default:false
+      in
+
+      let get_score = get_connections_score connections ~default:Score.zero in
+
+      (* [add_to_peers_topic_set peers_topicset topic peers] adds [topic] to
+         each [peer] from the [peers] list into the [peers_topicset], which is a
+         peer to topicset map. It returns the new map.
+
+         Note that the following invariant is maintained by the caller: the
+         topicset for [peer] does not already contain [topic]. *)
+      let add_to_peers_topic_set map topic peers =
+        List.fold_left
+          (fun acc peer ->
+            Peer.Map.update
+              peer
+              (function
+                | None -> Some (Topic.Set.singleton topic)
+                | Some topics -> Some (Topic.Set.add topic topics))
+              acc)
+          map
+          peers
+      in
+
+      (* Update [to_prune] and [old_peers] as follows:
+         - In [to_prune], add [topic] for each of the peers in [new_peers].
+         - Remove [new_peers] from [old_peers]. *)
+      let prune topic to_prune ~old_peers new_peers =
+        let to_prune = add_to_peers_topic_set to_prune topic new_peers in
+        let peers =
+          List.fold_left
+            (fun acc peer -> Peer.Set.remove peer acc)
+            old_peers
+            new_peers
+        in
+        (to_prune, peers)
+      in
+
+      (* Keep the first [degree_score] peers by score and the remaining up to
+         [degree_optimal] randomly, under the constraint that we keep
+         [degree_out] peers in the mesh (if we have that many). *)
+      let select_peers_to_prune peers =
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
+           Consider first selecting [degree_out] peers and then ordering on the score. *)
+        (* Sort descendingly by score, but shuffle first for the case we
+           don't use the score. Head of list has highest score. *)
+        let peers =
+          peers |> Peer.Set.elements |> List.shuffle ~rng
+          |> List.sort (fun peer1 peer2 ->
+                 let s1 = get_score peer1 in
+                 let s2 = get_score peer2 in
+                 Score.compare s2 s1)
+        in
+
+        let peers_high_score, peers_low_score =
+          List.split_n degree_score peers
+        in
+        let peers_low_score = List.shuffle ~rng peers_low_score in
+        let peers_to_keep, peers_to_prune =
+          let to_keep, peers_to_prune =
+            (* Recall that [degree_score <= degree_optimal] *)
+            List.split_n (degree_optimal - degree_score) peers_low_score
+          in
+          (peers_high_score @ to_keep, peers_to_prune)
+        in
+
+        (* Count the outbound peers we are keeping. *)
+        let outbound_peers_to_keep, inbound_peers_to_keep =
+          List.partition has_outbound_connection peers_to_keep
+        in
+        let num_outbound_to_keep = List.length outbound_peers_to_keep in
+
+        (* If [num_outbound] is less than [degree_out], swap some
+           outbound peers from the peers to prune with inbound peers
+           from the peers to keep. *)
+        if num_outbound_to_keep < degree_out then
+          let outbound_peers_to_prune, inbound_peers_to_prune =
+            List.partition has_outbound_connection peers_to_prune
+          in
+          let num_outbound_to_prune = List.length outbound_peers_to_prune in
+          let num_inbound_to_keep = List.length inbound_peers_to_keep in
+          let num_to_swap =
+            min
+              (max 0 (degree_out - num_outbound_to_keep))
+              (min num_outbound_to_prune num_inbound_to_keep)
+          in
+          if num_to_swap > 0 then
+            (* We additionally prune the [num_to_swap] inbound peers among the ones with
+               a low score (or were shuffled); that's why we revert [inbound_peers_to_keep]. *)
+            let inbound_peers_to_prune =
+              List.take_n num_to_swap (List.rev inbound_peers_to_keep)
+              @ inbound_peers_to_prune
+            in
+            (* Actually keep [num_to_swap] outbound peers. *)
+            let outbound_peers_to_prune =
+              List.drop_n num_to_swap outbound_peers_to_prune
+            in
+            inbound_peers_to_prune @ outbound_peers_to_prune
+          else peers_to_prune
+        else peers_to_prune
+      in
+
+      (* [maintain_topic_mesh topic peers (to_prune, to_graft, noPX_peers)]
+         maintains the mesh for [topic] where [peers] are the original [peers]
+         in this topic. [to_prune], [to_graft], [noPX_peers] are the peers to be
+         pruned, grafted, and those for which no peer exchange should be done
+         performed, accumulated from the maintenance for other mesh topics. *)
+      let maintain_topic_mesh topic peers (to_prune, to_graft, noPX_peers) =
+        let to_prune, peers, noPX_peers =
+          (* Drop all peers with negative score, without PX *)
+          Peer.Set.fold
+            (fun peer (to_prune, peers, noPX_peers) ->
+              if Score.(get_score peer < zero) then
+                let to_prune, peers =
+                  prune topic to_prune ~old_peers:peers [peer]
+                in
+                let noPX_peers = Peer.Set.add peer noPX_peers in
+                (to_prune, peers, noPX_peers)
+              else (to_prune, peers, noPX_peers))
+            peers
+            (to_prune, peers, noPX_peers)
+        in
+
+        (* Do we have too few peers? *)
+        let num_peers = Peer.Set.cardinal peers in
+        let to_graft =
+          if num_peers < degree_low then
+            let max = degree_optimal - num_peers in
+            (* Filter out our current and direct peers, peers we are backing
+               off, and peers with negative score. *)
+            let filter peer connection =
+              let in_mesh = Peer.Set.mem peer peers in
+              let backedoff =
+                Option.is_some (Topic.Map.find_opt topic connection.backoff)
+              in
+              (not in_mesh) && (not backedoff) && (not connection.direct)
+              && Score.(connection.score >= zero)
+            in
+            select_connections_peers connections rng topic ~filter ~max
+            |> add_to_peers_topic_set to_graft topic
+          else to_graft
+        in
+
+        (* Do we have too many peers? *)
+        let to_prune, peers =
+          if num_peers > degree_high then
+            (* We'll prune [num_peers - degree_optimal] peers. *)
+            select_peers_to_prune peers |> prune topic to_prune ~old_peers:peers
+          else (to_prune, peers)
+        in
+
+        (* Do we have enough outbound peers? *)
+        let num_peers = Peer.Set.cardinal peers in
+        let to_graft =
+          if num_peers >= degree_low then
+            let num_outbound =
+              Peer.Set.fold
+                (fun peer count ->
+                  if has_outbound_connection peer then count + 1 else count)
+                peers
+                0
+            in
+            if num_outbound < degree_out then
+              let max = degree_out - num_outbound in
+              (* Filter out our current and direct peers, peers we are backing
+                 off, and peers with negative score *)
+              let filter peer connection =
+                let in_mesh = Peer.Set.mem peer peers in
+                let backedoff =
+                  Option.is_some (Topic.Map.find_opt topic connection.backoff)
+                in
+                (not in_mesh) && (not backedoff) && (not connection.direct)
+                && Score.(connection.score >= zero)
+                && has_outbound_connection peer
+              in
+              select_connections_peers connections rng topic ~filter ~max
+              |> add_to_peers_topic_set to_graft topic
+            else to_graft
+          else to_graft
+        in
+
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
+           Try to improve the mesh with opportunistic grafting *)
+
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5066
+           Prepare gossip messages, that is, IHave control messages
+           referring to recently seen messages, to be sent to a random
+           selection of peers.*)
+        (to_graft, to_prune, noPX_peers)
+      in
+
+      let to_graft, to_prune, noPX_peers =
+        Topic.Map.fold
+          maintain_topic_mesh
+          mesh
+          (Peer.Map.empty, Peer.Map.empty, Peer.Set.empty)
+      in
+
+      (* Update backoff for pruned peers. *)
+      let* () =
+        Peer.Map.fold
+          (fun peer topicset connections ->
+            Topic.Set.fold
+              (fun topic connections ->
+                add_connections_backoff prune_backoff topic peer connections)
+              topicset
+              connections)
+          to_prune
+          connections
+        |> set_connections
+      in
+      return (to_graft, to_prune, noPX_peers)
+
+    let handle =
+      let open Monad.Syntax in
+      let*! heartbeat_ticks in
+      let* () = set_heartbeat_ticks (Int64.succ heartbeat_ticks) in
+
+      (* cleaning up *)
+      let* () = cleanup in
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
+         Cache scores throughout the heartbeat *)
+
+      (* Maintain the mesh for topics we have joined. Concretely, in case the
+         number of peers per topic (in the mesh) is lower than [degree_low] or
+         higher than [degree_high], then select peers to graft or prune
+         respectively, so that the new number of peers per topic becomes
+         [degree_optimal]. *)
+      let* to_graft, to_prune, noPX_peers = maintain_mesh in
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4988
+         Expire fanout for topics we haven't published to in a while *)
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5066
+         Maintain our fanout for topics we are publishing to, but we have not
+         joined. *)
+
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4982
+         Advance the message history window *)
+      Heartbeat {to_graft; to_prune; noPX_peers} |> return
   end
 
   let heartbeat : [`Heartbeat] output Monad.t = Heartbeat.handle
@@ -1019,8 +1431,8 @@ module Make (C : CONFIGURATION) :
           (function
             | None -> None
             | Some connection ->
-                let now = C.Time.now () in
-                let expire = Some (C.Time.add now retain_duration) in
+                let now = Time.now () in
+                let expire = Some (Time.add now retain_duration) in
                 Some {connection with expire})
           connections
       in
