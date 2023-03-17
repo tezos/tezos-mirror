@@ -139,6 +139,7 @@ type tag =
   | Big_map
   | Skip_list
   | Sc_rollup
+  | Shell
 
 type list_mode = All | Any | Exactly
 

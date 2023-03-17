@@ -46,6 +46,7 @@ type tag =
   | Big_map
   | Skip_list
   | Sc_rollup
+  | Shell
 
 type michelson_term_kind = Data | Code
 
@@ -354,6 +355,7 @@ let string_of_tag (tag : tag) =
   | Big_map -> "big_map"
   | Skip_list -> "skip_list"
   | Sc_rollup -> "sc_rollup"
+  | Shell -> "shell"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in

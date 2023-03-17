@@ -247,7 +247,7 @@ let perform_encoding_benchmarks snoop proto =
     ]
   in
   let* proto_indepenent =
-    Snoop.(list_benchmarks ~mode:Exactly ~tags:[Encoding] snoop)
+    Snoop.(list_benchmarks ~mode:Exactly ~tags:[Encoding; Shell] snoop)
   in
   let* proto_specific =
     Snoop.(list_benchmarks ~mode:All ~tags:[Encoding; Proto proto] snoop)
