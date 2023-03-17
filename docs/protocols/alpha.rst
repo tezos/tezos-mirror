@@ -166,3 +166,6 @@ Internal
 - Synchronized nodes' mempool are now able to consider early (pre)endorsements. (MR :gl:`!7828`)
 
 - Removed obsolete TORU manager operations. (MR :gl:`!7650`)
+
+- Validate: add preendorsement power and locked round checks during
+  block finalization in ``Partial_validation`` mode. (MR :gl:`!7949`)
