@@ -78,12 +78,12 @@ in more detail.
                     ..
                        MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
 
-.. csv-table:: Testing frameworks and their applications in Octez. EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, QC: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
+.. csv-table:: Testing frameworks and their applications in Octez. EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotezt_section`, QC: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression","Performance"
 
-   "Node",":ref:`AT <alcotest_section>`",":ref:`QC <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
-   "-- Protocol",":ref:`AT <alcotest_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`",""
-   "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
+   "Node",":ref:`AT <alcotezt_section>`",":ref:`QC <property_based_test>`",":ref:`AT <alcotezt_section>`",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
+   "-- Protocol",":ref:`AT <alcotezt_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`",""
+   "-- -- Michelson interpreter",":ref:`AT <alcotezt_section>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
    "Client",":ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`","",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "Networked nodes","--","",":ref:`TZ <tezt_section>`","", ""
    "Endorser","","","",""
@@ -92,33 +92,6 @@ in more detail.
 
 Testing frameworks
 ------------------
-
-.. _alcotest_section:
-
-Alcotest
-~~~~~~~~
-
-`Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
-and integration testing in OCaml. Alcotest is the primary tool in
-Octez for unit and integration testing of OCaml code.
-
-Typical use cases:
- - Verifying simple input-output specifications for functions with a
-   hard-coded set of input-output pairs.
- - OCaml integration tests.
-
-Example tests:
- - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
-   execute them locally, run ``dune build @src/lib_requester/runtest`` in
-   the Octez root.
- - Integration tests for the P2P layer in the shell.  For instance
-   :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
-   processes that exercise large parts of the P2P layer.  To execute
-   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
-   root.
-
-References:
- - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
 .. _ppx_expect_section:
 
@@ -208,6 +181,66 @@ tests are run on dedicated machines and can send data points to an
 `InfluxDB <https://github.com/influxdata/influxdb>`__ instance to produce
 graphs using `Grafana <https://github.com/grafana/grafana>`__ and/or
 detect performance regressions. See :doc:`long-tezts`.
+
+.. _alcotezt_section:
+
+Alcotezt
+~~~~~~~~
+
+Alcotezt is an :ref:`Alcotest <alcotest_section>`-compatible wrapper
+for :ref:`Tezt <tezt_section>`. With it, unit tests originally written
+for Alcotest (now deprecated) can be executed using Tezt instead. We are currently in
+the progress of migrating all Alcotests to Tezt, and we are using
+Alcotezt as a stop gap towards this goal. For new unit and integration
+testing suites, prefer using Tezt directly.
+
+Typical use cases:
+ - Conversion of pre-existing Alcotests to Tezt
+
+Example tests:
+ - Unit tests for :package:`tezos-clic`. To execute them locally, run ``dune build @src/lib_clic/runtezt``.
+ - Unit tests for :package:`tezos-version`. To execute them locally, run ``dune build @src/lib_version/runtezt``.
+
+See :doc:`alcotezt` for more information on how to convert tests to
+Alcotezt, and how to execute them.
+
+.. FIXME tezos/tezos#5090:
+
+   This passage should be removed when the alcotest dependency is
+   completely eliminated from the repo.
+
+.. _alcotest_section:
+
+Alcotest (usage deprecated)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
+and integration testing in OCaml. Alcotest was historically the
+primary tool in Octez for unit and integration testing of OCaml code.
+However, we are currently migrating to :doc:`Tezt <tezt>` for unit,
+integration and system testing. To ease migration from Alcotest to
+Tezt, the :ref:`Alcotezt <alcotezt_section>` wrapper was introduced.
+Alcotezt is briefly described above and in more detail in
+:doc:`alcotezt`. The below Alcotest description applies to tests that
+have not yet been converted to Alcotezt.
+
+Typical use cases:
+ - Verifying simple input-output specifications for functions with a
+   hard-coded set of input-output pairs.
+ - OCaml integration tests.
+
+Example tests:
+ - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
+   execute them locally, run ``dune build @src/lib_requester/runtest`` in
+   the Octez root.
+ - Integration tests for the P2P layer in the shell.  For instance
+   :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
+   processes that exercise large parts of the P2P layer.  To execute
+   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
+   root.
+
+References:
+ - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
 ..
    .. _michelson_unit_tests:
