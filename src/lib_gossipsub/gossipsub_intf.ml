@@ -41,7 +41,7 @@ module type ITERABLE = sig
   module Map : Map.S with type key = t
 end
 
-module type CONFIGURATION = sig
+module type AUTOMATON_CONFIG = sig
   module Peer : ITERABLE
 
   module Topic : ITERABLE
@@ -139,7 +139,7 @@ module type SCORE = sig
   val penalty : t -> int -> t
 end
 
-module type S = sig
+module type AUTOMATON = sig
   (** Module for peer *)
   module Peer : ITERABLE
 

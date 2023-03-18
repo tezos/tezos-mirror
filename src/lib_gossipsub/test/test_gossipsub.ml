@@ -27,8 +27,8 @@ open Tezos_gossipsub
 open Gossipsub_intf
 open Tezt_core.Base
 
-module Configuration :
-  CONFIGURATION
+module Automaton_config :
+  AUTOMATON_CONFIG
     with type Time.t = int
      and type Span.t = int
      and type Peer.t = int
@@ -83,7 +83,7 @@ module Configuration :
   module Message = Peer
 end
 
-module GS = Make (Configuration)
+module GS = Make (Automaton_config)
 
 (* Most of these limits are the default ones used by the Go implementation. *)
 let default_limits =

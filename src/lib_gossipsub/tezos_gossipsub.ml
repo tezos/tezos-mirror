@@ -32,8 +32,8 @@
 module Gossipsub_intf = Gossipsub_intf
 open Gossipsub_intf
 
-module Make (C : CONFIGURATION) :
-  S
+module Make (C : AUTOMATON_CONFIG) :
+  AUTOMATON
     with type Time.t = C.Time.t
      and module Span = C.Span
      and module Peer = C.Peer
