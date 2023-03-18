@@ -747,68 +747,14 @@ A detailed description of the following instructions can be found in the `intera
 Operations on lists
 ~~~~~~~~~~~~~~~~~~~
 
--  ``CONS``: Prepend an element to a list.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : list 'a : 'S   ->   list 'a : 'S
-
-    > CONS / a : { <l> } : S  =>  { a ; <l> } : S
-
--  ``NIL 'a``: The empty list.
-
-::
-
-    :: 'S   ->   list 'a : 'S
-
-    > NIL / S  =>  {} : S
-
--  ``IF_CONS bt bf``: Inspect a list.
-
-::
-
-    :: list 'a : 'A   ->   'B
-       iff   bt :: [ 'a : list 'a : 'A -> 'B]
-             bf :: [ 'A -> 'B]
-
-    > IF_CONS bt bf / { a ; <rest> } : S  =>  bt / a : { <rest> } : S
-    > IF_CONS bt bf / {} : S  =>  bf / S
-
--  ``MAP body``: Apply the body expression to each element of the list.
-   The body sequence has access to the stack.
-
-::
-
-    :: (list 'elt) : 'A   ->  (list 'b) : 'A
-       iff   body :: [ 'elt : 'A -> 'b : 'A ]
-
-    > MAP body / {} : S  =>  {} : S
-    > MAP body / { a ; <rest> } : S  =>  { b ; <rest'> } : S''
-        where body / a : S  =>  b : S'
-        and MAP body / { <rest> } : S'  =>  { <rest'> } : S''
-
--  ``SIZE``: Get the number of elements in the list.
-
-::
-
-    :: list 'elt : 'S -> nat : 'S
-
-    > SIZE / { _ ; <rest> } : S  =>  1 + s : S
-        where  SIZE / { <rest> } : S  =>  s : S
-    > SIZE / {} : S  =>  0 : S
-
-
--  ``ITER body``: Apply the body expression to each element of a list.
-   The body sequence has access to the stack.
-
-::
-
-    :: (list 'elt) : 'A   ->  'A
-         iff body :: [ 'elt : 'A -> 'A ]
-    > ITER body / {} : S  =>  S
-    > ITER body / { a ; <rest> } : S  =>  ITER body / { <rest> } : S'
-       iff body / a : S  =>  S'
-
+-  ``CONS``: Prepend an element to a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONS>`__).
+-  ``NIL 'a``: Push an empty list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NIL>`__).
+-  ``IF_CONS bt bf``: Inspect a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_CONS>`__).
+-  ``MAP body``: Apply the body expression to each element of the list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
+-  ``SIZE``: Get the number of elements in the list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``ITER body``: Iterate the body expression over each element of a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
 
 Domain specific data types
 --------------------------
