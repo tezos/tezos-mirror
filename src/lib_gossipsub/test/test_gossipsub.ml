@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_gossipsub
+open Tezos_gossipsub
+open Gossipsub_intf
 open Tezt_core.Base
 
 module Configuration :

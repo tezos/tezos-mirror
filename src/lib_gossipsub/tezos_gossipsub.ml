@@ -29,207 +29,8 @@
    as in the go implementation.
 *)
 
-module type PRINTABLE = sig
-  type t
-
-  val pp : Format.formatter -> t -> unit
-end
-
-module type ITERABLE = sig
-  type t
-
-  include Compare.S with type t := t
-
-  include PRINTABLE with type t := t
-
-  module Set : Set.S with type elt = t
-
-  module Map : Map.S with type key = t
-end
-
-module type CONFIGURATION = sig
-  module Peer : ITERABLE
-
-  module Topic : ITERABLE
-
-  module Message_id : ITERABLE
-
-  module Message : PRINTABLE
-
-  module Span : PRINTABLE
-
-  module Time : sig
-    include Compare.S
-
-    include PRINTABLE with type t := t
-
-    type span = Span.t
-
-    val now : unit -> t
-
-    val add : t -> span -> t
-
-    val sub : t -> span -> t
-
-    val mul_span : span -> int -> span
-  end
-end
-
-type ('peer, 'message_id, 'span) limits = {
-  max_recv_ihave_per_heartbeat : int;
-  max_sent_iwant_per_heartbeat : int;
-  degree_optimal : int;
-  gossip_publish_threshold : float;
-  accept_px_threshold : float;
-  unsubscribe_backoff : 'span;
-  graft_flood_backoff : 'span;
-      (* WRT to go implementation, the value of this constant is
-         actually [graft_flood_threshold - prune_backoff] *)
-  prune_backoff : 'span;
-  retain_duration : 'span;
-  heartbeat_interval : 'span;
-  backoff_cleanup_ticks : int;
-  degree_low : int;
-  degree_high : int;
-  degree_score : int;
-  degree_out : int;
-}
-
-type ('peer, 'message_id) parameters = {
-  peer_filter :
-    'peer -> [`IHave of 'message_id | `IWant of 'message_id | `Graft] -> bool;
-}
-
-(** This module allows to compute a score for each peers. *)
-module Score : sig
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
-
-     This is incomplete *)
-  include Compare.S
-
-  val float : t -> float
-
-  val zero : t
-
-  val penalty : t -> int -> t
-end = struct
-  type t = {behaviour_penalty : int}
-
-  let zero = {behaviour_penalty = 0}
-
-  let float {behaviour_penalty} = -behaviour_penalty |> float_of_int
-
-  let penalty {behaviour_penalty} penalty =
-    {behaviour_penalty = behaviour_penalty + penalty}
-
-  let compare s1 s2 =
-    let f1 = float s1 in
-    let f2 = float s2 in
-    Float.compare f1 f2
-
-  include Compare.Make (struct
-    type nonrec t = t
-
-    let compare = compare
-  end)
-end
-
-module type S = sig
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/5012
-
-     Maybe it would be better if the interface would be more generic
-     and would look like an automaton? *)
-  module Peer : ITERABLE
-
-  module Topic : ITERABLE
-
-  module Message_id : ITERABLE
-
-  module Message : PRINTABLE
-
-  module Time : PRINTABLE
-
-  module Span : PRINTABLE
-
-  type message = Message.t
-
-  type span = Span.t
-
-  type state
-
-  type limits := (Peer.t, Message_id.t, span) limits
-
-  type parameters := (Peer.t, Message_id.t) parameters
-
-  val make : Random.State.t -> limits -> parameters -> state
-
-  type _ output =
-    | Negative_peer_score : Score.t -> [`IHave] output
-    | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
-    | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
-    | Message_topic_not_tracked : [`IHave] output
-    | Message_requested_message_ids : Message_id.t list -> [`IHave] output
-    | On_iwant_messages_to_route : {
-        peer : Peer.t;
-        routed_message_ids :
-          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
-      }
-        -> [`IWant] output
-    | Peer_filtered : [`Graft] output
-    | Unknown_topic : [`Graft] output
-    | Peer_already_in_mesh : [`Graft] output
-    | Grafting_direct_peer : [`Graft] output
-    | Unexpected_grafting_peer : [`Graft] output
-    | Grafting_peer_with_negative_score : [`Graft] output
-    | Grafting_successfully : [`Graft] output
-    | Peer_backed_off : [`Graft] output
-    | No_peer_in_mesh : [`Prune] output
-    | Ignore_PX_score_too_low : Score.t -> [`Prune] output
-    | No_PX : [`Prune] output
-    | PX : Peer.Set.t -> [`Prune] output
-    | Publish_message : Peer.Set.t -> [`Publish] output
-    | Already_subscribed : [`Join] output
-    | Joining_topic : Peer.Set.t -> [`Join] output
-    | Not_subscribed : [`Leave] output
-    | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
-    | Heartbeat : {
-        to_graft : Topic.Set.t Peer.Map.t;
-        to_prune : Topic.Set.t Peer.Map.t;
-        noPX_peers : Peer.Set.t;
-      }
-        -> [`Heartbeat] output
-    | Peer_added : [`Add_peer] output
-    | Peer_already_known : [`Add_peer] output
-    | Removing_peer : [`Remove_peer] output
-
-  type 'a monad := state -> state * 'a output
-
-  val add_peer : direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] monad
-
-  val remove_peer : Peer.t -> [`Remove_peer] monad
-
-  val handle_ihave : Peer.t -> Topic.t -> Message_id.t list -> [`IHave] monad
-
-  val handle_iwant : Peer.t -> Message_id.t list -> [`IWant] monad
-
-  val handle_graft : Peer.t -> Topic.t -> [`Graft] monad
-
-  val handle_prune :
-    Peer.t -> Topic.t -> px:Peer.t Seq.t -> backoff:span -> [`Prune] monad
-
-  val publish :
-    sender:Peer.t option ->
-    Topic.t ->
-    Message_id.t ->
-    message ->
-    [`Publish] monad
-
-  val heartbeat : [`Heartbeat] monad
-
-  val join : Topic.t -> [`Join] monad
-
-  val leave : Topic.t -> [`Leave] monad
-end
+module Gossipsub_intf = Gossipsub_intf
+open Gossipsub_intf
 
 module Make (C : CONFIGURATION) :
   S
@@ -245,6 +46,32 @@ module Make (C : CONFIGURATION) :
   module Message = C.Message
   module Span = C.Span
   module Time = C.Time
+
+  (** This module allows to compute a score for each peers. *)
+  module Score : SCORE = struct
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
+
+       This is incomplete *)
+    type t = {behaviour_penalty : int}
+
+    let zero = {behaviour_penalty = 0}
+
+    let float {behaviour_penalty} = -behaviour_penalty |> float_of_int
+
+    let penalty {behaviour_penalty} penalty =
+      {behaviour_penalty = behaviour_penalty + penalty}
+
+    let compare s1 s2 =
+      let f1 = float s1 in
+      let f2 = float s2 in
+      Float.compare f1 f2
+
+    include Compare.Make (struct
+      type nonrec t = t
+
+      let compare = compare
+    end)
+  end
 
   type message = Message.t
 
