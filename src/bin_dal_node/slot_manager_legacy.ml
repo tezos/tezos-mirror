@@ -115,11 +115,10 @@ let () =
     ~title:"Invalid degree"
     ~description:"The degree of the polynomial is too high"
     ~pp:(fun ppf (given, expected) ->
-      Format.fprintf
+      Cryptobox.pp_commit_error
         ppf
-        "Got %d, expecting a value strictly less than %d"
-        given
-        expected)
+        (`Invalid_degree_strictly_less_than_expected
+          Cryptobox.{given; expected}))
     Data_encoding.(obj2 (req "given" int31) (req "expected" int31))
     (function
       | Invalid_degree_strictly_less_than_expected {given; expected} ->

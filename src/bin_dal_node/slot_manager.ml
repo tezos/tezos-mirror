@@ -72,18 +72,10 @@ let commit cryptobox polynomial =
   let open Result_syntax in
   match Cryptobox.commit cryptobox polynomial with
   | Ok cm -> return cm
-  | Error
-      (`Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected})
-    ->
+  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
       Error
         (Errors.other
-           [
-             Invalid_degree
-               (Format.sprintf
-                  "Got %d, expecting a value strictly less than %d"
-                  given
-                  expected);
-           ])
+           [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
 
 let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in

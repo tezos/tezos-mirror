@@ -1135,6 +1135,17 @@ module Inner = struct
           {given = degree; expected = srs_g1_size})
     else Ok (Srs_g1.pippenger t.srs.raw.srs_g1 p)
 
+  let pp_commit_error fmt
+      (`Invalid_degree_strictly_less_than_expected {given; expected}) =
+    Format.fprintf
+      fmt
+      "Invalid degree: expecting input polynomial to commit function to have a \
+       degree strictly less than %d. Got %d."
+      expected
+      given
+
+  let string_of_commit_error err = Format.asprintf "%a" pp_commit_error err
+
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = t.max_polynomial_length - 1 since we don't want to commit
      polynomials with degree greater than polynomials to be erasure-encoded.
