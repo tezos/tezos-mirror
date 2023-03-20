@@ -37,9 +37,12 @@ let typecheck_module module_ =
   Repl_helpers.trap_exn (fun () ->
       Tezos_webassembly_interpreter.Valid.check_module module_)
 
-(* [import_pvm_host_functions ()] registers the host functions of the PVM. *)
-let import_pvm_host_functions () =
-  let lookup name = Lwt.return (Tezos_scoru_wasm.Host_funcs.lookup name) in
+(* [import_pvm_host_functions ~version ()] registers the host
+   functions of the PVM. *)
+let import_pvm_host_functions ~version () =
+  let lookup name =
+    Lwt.return (Tezos_scoru_wasm.Host_funcs.lookup ~version name)
+  in
   Repl_helpers.trap_exn (fun () ->
       Lwt.return
         (Tezos_webassembly_interpreter.Import.register
@@ -64,7 +67,7 @@ let handle_module version binary name module_ =
         else Lwt.return (parse_module module_))
   in
   let* () = typecheck_module ast in
-  let* () = import_pvm_host_functions () in
+  let* () = import_pvm_host_functions ~version () in
   let* _ = link ast in
   let*! tree =
     initial_tree

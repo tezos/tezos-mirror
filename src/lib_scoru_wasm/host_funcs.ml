@@ -1142,7 +1142,7 @@ let store_write =
             store_write_ticks key_length num_bytes code )
       | _ -> raise Bad_input)
 
-let lookup_opt name =
+let lookup_opt ~version:_ name =
   match name with
   | "read_input" ->
       Some (ExternFunc (HostFunc (read_input_type, read_input_name)))
@@ -1175,8 +1175,8 @@ let lookup_opt name =
       Some (ExternFunc (HostFunc (store_write_type, store_write_name)))
   | _ -> None
 
-let lookup name =
-  match lookup_opt name with Some f -> f | None -> raise Not_found
+let lookup ~version name =
+  match lookup_opt ~version name with Some f -> f | None -> raise Not_found
 
 let base =
   List.fold_left

@@ -127,7 +127,7 @@ let save_fallback_kernel durable =
       Constants.kernel_fallback_key
   else Lwt.return durable
 
-let unsafe_next_tick_state ~stack_size_limit host_funcs
+let unsafe_next_tick_state ~version ~stack_size_limit host_funcs
     ({buffers; durable; tick_state; _} as pvm_state) =
   let open Lwt_syntax in
   let return ?(status = Running) ?(durable = durable) state =
@@ -204,7 +204,7 @@ let unsafe_next_tick_state ~stack_size_limit host_funcs
         Wasm.Ast.Vector.get imports_offset ast_module.it.imports
       in
       if module_name = Constants.wasm_host_funcs_virual_module then
-        match Host_funcs.lookup_opt item_name with
+        match Host_funcs.lookup_opt ~version item_name with
         | Some extern ->
             let externs, _ = Wasm.Ast.Vector.append extern externs in
             return
@@ -320,11 +320,16 @@ let exn_to_stuck pvm_state exn =
   in
   Lwt.return (Stuck wasm_error)
 
-let next_tick_state ~stack_size_limit host_function_registry pvm_state =
+let next_tick_state ~version ~stack_size_limit host_function_registry pvm_state
+    =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
-      unsafe_next_tick_state ~stack_size_limit host_function_registry pvm_state)
+      unsafe_next_tick_state
+        ~version
+        ~stack_size_limit
+        host_function_registry
+        pvm_state)
     (fun exn ->
       let+ tick_state = exn_to_stuck pvm_state exn in
       (pvm_state.durable, tick_state, Failing))
@@ -409,11 +414,12 @@ let clean_up_input_buffer buffers =
 (** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.
 *)
-let compute_step_with_host_functions ~stack_size_limit registry pvm_state =
+let compute_step_with_host_functions ~version ~stack_size_limit registry
+    pvm_state =
   let open Lwt_syntax in
   (* Calculate the next tick state. *)
   let* durable, tick_state, status =
-    next_tick_state ~stack_size_limit registry pvm_state
+    next_tick_state ~version ~stack_size_limit registry pvm_state
   in
   let current_tick = Z.succ pvm_state.current_tick in
   let last_top_level_call = next_last_top_level_call pvm_state status in
@@ -439,6 +445,7 @@ let compute_step pvm_state =
   let* version = get_wasm_version pvm_state in
   let stack_size_limit = stack_size_limit version in
   compute_step_with_host_functions
+    ~version
     ~stack_size_limit
     (Host_funcs.all ~version)
     pvm_state
@@ -452,6 +459,7 @@ let compute_step_with_debug ~write_debug pvm_state =
     | Noop -> Host_funcs.all ~version
   in
   compute_step_with_host_functions
+    ~version
     ~stack_size_limit:(stack_size_limit version)
     registry
     pvm_state
@@ -547,11 +555,13 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
               reveal_step (Bytes.of_string res) pvm_state
           | _ ->
               compute_step_with_host_functions
+                ~version
                 ~stack_size_limit
                 host_function_registry
                 pvm_state)
     | None ->
         compute_step_with_host_functions
+          ~version
           ~stack_size_limit
           host_function_registry
   in
@@ -583,6 +593,7 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
        we were asked to perform at least 1. *)
     let* pvm_state =
       compute_step_with_host_functions
+        ~version
         ~stack_size_limit
         host_function_registry
         pvm_state
