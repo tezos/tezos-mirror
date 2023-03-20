@@ -931,7 +931,7 @@ let _octez_crypto_tests =
       "test_merkle";
       "test_signature";
       "test_signature_encodings";
-      "test_timelock";
+      "test_timelock_legacy";
       "test_context_hash";
     ]
     ~path:"src/lib_crypto/test"
