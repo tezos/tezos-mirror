@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Proxy getter
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune exec src/lib_proxy/test/main.exe
     Subject:      Fuzzing tests of internals of the client's --mode proxy
 *)
 
