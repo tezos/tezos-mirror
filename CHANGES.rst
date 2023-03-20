@@ -66,6 +66,10 @@ Accuser
 Signer
 ------
 
+- Reordered the display of ``octez-client list connected ledgers``
+  command. It is now ``Ed25519``, ``Secp256k1``, ``Secp256r1`` and
+  ``Bip32_ed25519``.
+
 Proxy Server
 ------------
 
