@@ -263,7 +263,7 @@ let save :
     options:options ->
     bench:(c, t) Benchmark.poly ->
     workload_data:t workload_data ->
-    unit =
+    packed_measurement =
  fun ~filename ~options ~bench ~workload_data ->
   let (module Bench) = bench in
   let date = Unix.gmtime (Unix.time ()) in
@@ -300,7 +300,7 @@ let save :
   let _nwritten =
     Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
   in
-  ()
+  Measurement (bench, measurement)
 
 let packed_measurement_save_json measurement_packed output_path =
   let (Measurement (bench, measurement)) = measurement_packed in
