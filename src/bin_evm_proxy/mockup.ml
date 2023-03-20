@@ -110,6 +110,24 @@ let transaction_receipt () =
     status = qty_f Z.one;
   }
 
+let transaction_object =
+  {
+    blockHash = block_hash;
+    blockNumber = qty_f @@ Z.of_int 42;
+    from = Address "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
+    gas = qty_f Z.zero;
+    gasPrice = qty_f Z.zero;
+    hash = transaction_hash;
+    input = None;
+    nonce = qty_f Z.zero;
+    to_ = Address "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+    transactionIndex = qty_f Z.zero;
+    value = qty_f Z.zero;
+    v = qty_f Z.zero;
+    r = qty_f Z.zero;
+    s = qty_f Z.zero;
+  }
+
 let call = hash_f "0x"
 
 let return = Lwt_result_syntax.return
