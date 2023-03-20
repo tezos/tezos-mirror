@@ -54,10 +54,6 @@
   src_proto_015_PtLimaPt_lib_plugin_test_tezt_lib
   src_proto_015_PtLimaPt_lib_delegate_test_tezt_lib
   src_proto_015_PtLimaPt_lib_client_test_tezt_lib
-  src_proto_014_PtKathma_lib_client_test_tezt_lib
-  src_proto_013_PtJakart_lib_client_test_tezt_lib
-  src_proto_012_Psithaca_lib_client_test_tezt_lib
-  src_proto_011_PtHangz2_lib_client_test_tezt_lib
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
   src_lib_stdlib_unix_test__tezt_lib
