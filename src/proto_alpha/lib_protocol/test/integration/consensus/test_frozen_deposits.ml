@@ -191,35 +191,6 @@ let test_set_limit balance_percentage () =
   >>=? fun frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits limit
 
-let test_set_too_high_limit () =
-  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
-  let (contract1, _account1), _ = get_first_2_accounts_contracts contracts in
-  let max_limit =
-    Tez.of_mutez_exn
-      Int64.(
-        add
-          (mul
-             (of_int constants.frozen_deposits_percentage)
-             Int64.(div max_int 100L))
-          1L)
-  in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error err :: _ ->
-        Assert.test_error_encodings err ;
-        let error_info =
-          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-        in
-        if error_info.title = "Set deposits limit to a too high value" then
-          return_unit
-        else failwith "unexpected error"
-    | _ -> failwith "should fail"
-  in
-  Incremental.begin_construction genesis >>=? fun b ->
-  Op.set_deposits_limit (B genesis) contract1 (Some max_limit)
-  >>=? fun operation ->
-  Incremental.add_operation ~expect_apply_failure b operation >>=? fun b ->
-  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
-
 let test_unset_limit () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let (contract1, account1), (_contract2, account2) =
@@ -685,7 +656,6 @@ let tests =
       tztest "test invariants" `Quick test_invariants;
       tztest "set deposits limit to 0%" `Quick (test_set_limit 0);
       tztest "set deposits limit to 5%" `Quick (test_set_limit 5);
-      tztest "set a too high deposits limit" `Quick test_set_too_high_limit;
       tztest "unset deposits limit" `Quick test_unset_limit;
       tztest
         "cannot bake with zero deposits"

@@ -33,7 +33,6 @@ type error +=
   | Not_enough_endorsements of {required : int; provided : int}
   | Faulty_validation_wrong_slot
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
-  | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
@@ -95,27 +94,6 @@ let () =
     (function
       | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
     (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.set_deposits_limit_too_high"
-    ~title:"Set deposits limit to a too high value"
-    ~description:
-      "Cannot set deposits limit such that the active stake overflows."
-    ~pp:(fun ppf (limit, max_limit) ->
-      Format.fprintf
-        ppf
-        "Cannot set deposits limit to %a as it is higher the allowed maximum \
-         %a."
-        Tez.pp
-        limit
-        Tez.pp
-        max_limit)
-    Data_encoding.(
-      obj2 (req "limit" Tez.encoding) (req "max_limit" Tez.encoding))
-    (function
-      | Set_deposits_limit_too_high {limit; max_limit} -> Some (limit, max_limit)
-      | _ -> None)
-    (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit}) ;
 
   let error_while_taking_fees_description =
     "There was an error while taking the fees, which should not happen and \
@@ -1088,21 +1066,6 @@ let apply_manager_operation :
       in
       return (ctxt, result, [])
   | Set_deposits_limit limit ->
-      (match limit with
-      | None -> Result.return_unit
-      | Some limit ->
-          let frozen_deposits_percentage =
-            Constants.frozen_deposits_percentage ctxt
-          in
-          let max_limit =
-            Tez.of_mutez_exn
-              Int64.(
-                mul (of_int frozen_deposits_percentage) Int64.(div max_int 100L))
-          in
-          error_when
-            Tez.(limit > max_limit)
-            (Set_deposits_limit_too_high {limit; max_limit}))
-      >>?= fun () ->
       Delegate.registered ctxt source >>= fun is_registered ->
       error_unless
         is_registered
