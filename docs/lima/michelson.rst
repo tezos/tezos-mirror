@@ -49,7 +49,7 @@ tokens (and be the destinations of transactions).
 
 From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
-always succeed to receive tokens, and does nothing else.
+always succeed in receiving tokens, and do nothing else.
 
 Another kind of addresses, prefixed by ``txr1`` and ``tz4``, are
 related to :doc:`transaction rollups <./transaction_rollups>`.

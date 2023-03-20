@@ -48,7 +48,7 @@ tokens (and be the destinations of transactions).
 
 From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
-always succeed to receive tokens, and does nothing else.
+always succeed in receiving tokens, and do nothing else.
 
 Finally, addresses prefixed with ``sr1`` identify :doc:`smart rollups <./smart_rollups>`.
 
