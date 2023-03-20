@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
+    Invocation:   dune exec src/lib_crypto/test-unix/main.exe
     Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
