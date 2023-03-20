@@ -54,4 +54,4 @@ module Crypto_box = Crypto_box
 module Hacl = Hacl
 module Helpers = Helpers
 module Rand = Rand
-module Timelock = Timelock_legacy
+module Timelock_legacy = Timelock_legacy
