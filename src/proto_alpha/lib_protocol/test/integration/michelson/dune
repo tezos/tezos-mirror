@@ -55,7 +55,6 @@
   test_ticket_operations_diff
   test_ticket_scanner
   test_ticket_storage
-  test_timelock
   test_typechecking
   test_lambda_normalization))
 
