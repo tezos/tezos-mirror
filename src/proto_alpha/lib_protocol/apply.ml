@@ -740,20 +740,18 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      (* Only allow [Unit] parameter to implicit accounts. *)
-      (match Micheline.root parameters with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
-      | _ -> error (Script_interpreter.Bad_contract_parameter source_contract))
-      >>?= fun () ->
-      (if Entrypoint.is_default entrypoint then Result.return_unit
-      else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>?= fun () ->
-      apply_transaction_to_implicit
-        ~ctxt
-        ~sender:source_contract
-        ~amount
-        ~pkh
-        ~before_operation:ctxt_before_op
+      (match (Entrypoint.to_string entrypoint, Micheline.root parameters) with
+      | "default", Prim (_, D_Unit, [], _) ->
+          apply_transaction_to_implicit
+            ~ctxt
+            ~sender:source_contract
+            ~amount
+            ~pkh
+            ~before_operation:ctxt_before_op
+      | "default", _ ->
+          (* Only allow [Unit] parameter to implicit accounts' default entrypoint. *)
+          tzfail (Script_interpreter.Bad_contract_parameter source_contract)
+      | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
       {amount; parameters; destination = Originated contract_hash; entrypoint}
