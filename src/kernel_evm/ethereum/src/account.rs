@@ -14,7 +14,11 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn default_account(balance: Wei) -> Self {
+    pub fn blank() -> Self {
+        Self::with_assets(Wei::zero())
+    }
+
+    pub fn with_assets(balance: Wei) -> Self {
         Self {
             balance,
             nonce: 0,

@@ -66,7 +66,7 @@ let get_transaction_count proxy_server address =
   return JSON.(transaction_count |-> "result" |> as_int64)
 
 module Account = struct
-  type t = {address : string; private_key : string}
+  type t = {address : string; private_key : string; genesis_mint_tx : string}
 
   let accounts =
     [|
@@ -74,16 +74,22 @@ module Account = struct
         address = "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c";
         private_key =
           "0x9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0";
+        genesis_mint_tx =
+          "0x47454e4553495341444452455353000000000000000000000000000000000001";
       };
       {
         address = "0xB53dc01974176E5dFf2298C5a94343c2585E3c54";
         private_key =
           "0x3a6a6ca30c1ef1ce605a63a7a1a4ff4c689f8414ca0838bca29423f0ec280ff5";
+        genesis_mint_tx =
+          "0x47454e4553495341444452455353000000000000000000000000000000000002";
       };
       {
         address = "0x9b49c988b5817Be31DfB00F7a5a4671772dCce2B";
         private_key =
           "0x0eb9bfa77d6cd145cdc0e3d6f902ee1464aeb5f62b02e38f111c9b60cd3adab5";
+        genesis_mint_tx =
+          "0x47454e4553495341444452455353000000000000000000000000000000000003";
       };
     |]
 
@@ -304,7 +310,12 @@ let test_rpc_getBlockByNumber =
   (* For our needs, we just test these two relevant fields for now: *)
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
-  Check.(block.transactions = [])
+  let expected_transactions =
+    Array.(
+      map (fun accounts -> accounts.Account.genesis_mint_tx) Account.accounts
+      |> to_list)
+  in
+  Check.(block.transactions = expected_transactions)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
@@ -344,8 +355,8 @@ let test_l2_blocks_progression =
     @@ Check.((block_number = expected_block_level) int)
          ~error_msg:"Unexpected block number, should be %%R, but got %%L"
   in
-  let* () = check_block_progression ~expected_block_level:0 in
   let* () = check_block_progression ~expected_block_level:1 in
+  let* () = check_block_progression ~expected_block_level:2 in
   unit
 
 let test_l2_transfer =
