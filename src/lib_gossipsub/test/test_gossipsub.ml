@@ -76,7 +76,7 @@ let init_state ~(peer_no : int) ~(topics : C.Topic.t list) ~(direct : bool)
   let state =
     List.fold_left
       (fun state topic ->
-        let state, _output = GS.join topic state in
+        let state, _output = GS.join {topic} state in
         state)
       (GS.make rng default_limits parameters)
       topics
@@ -88,7 +88,7 @@ let init_state ~(peer_no : int) ~(topics : C.Topic.t list) ~(direct : bool)
   let state =
     List.fold_left
       (fun state peer ->
-        let state, _output = GS.add_peer ~direct ~outbound peer state in
+        let state, _output = GS.add_peer {direct; outbound; peer} state in
         state)
       state
       peers
@@ -115,7 +115,9 @@ let test_ignore_graft_from_unknown_topic () =
   let state, peers =
     init_state ~peer_no:1 ~topics:[] ~direct:false ~outbound:false
   in
-  let _state, output = GS.handle_graft peers.(0) "unknown_topic" state in
+  let _state, output =
+    GS.handle_graft {peer = peers.(0); topic = "unknown_topic"} state
+  in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
      Use Tezt.Check to assert output *)
   match output with
@@ -152,11 +154,13 @@ let test_handle_received_subscriptions () =
              ["topic1"; "topic2"; "topic3"]
              |> List.fold_left
                   (fun state topic ->
-                    let state, _ = GS.handle_subscribe topic peer state in
+                    let state, _ = GS.handle_subscribe {topic; peer} state in
                     state)
                   state
            in
-           let state, _ = GS.handle_unsubscribe "topic4" peer state in
+           let state, _ =
+             GS.handle_unsubscribe {topic = "topic4"; peer} state
+           in
            state)
          state
   in
@@ -176,7 +180,9 @@ let test_handle_received_subscriptions () =
   assert_subscribed_topics ~__LOC__ ~peer:unknown_peer ~expected_topics:[] state ;
 
   (* Peer 0 unsubscribes from the first topic *)
-  let state, _ = GS.handle_unsubscribe "topic1" peers.(0) state in
+  let state, _ =
+    GS.handle_unsubscribe {topic = "topic1"; peer = peers.(0)} state
+  in
   (* Peer 0 should be subscribed to two topics *)
   assert_subscribed_topics
     ~__LOC__

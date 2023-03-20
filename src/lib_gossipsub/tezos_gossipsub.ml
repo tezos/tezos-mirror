@@ -83,6 +83,38 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type nonrec parameters = (Peer.t, Message_id.t) parameters
 
+  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+
+  type remove_peer = {peer : Peer.t}
+
+  type ihave = {peer : Peer.t; topic : Topic.t; message_ids : Message_id.t list}
+
+  type iwant = {peer : Peer.t; message_ids : Message_id.t list}
+
+  type graft = {peer : Peer.t; topic : Topic.t}
+
+  type prune = {
+    peer : Peer.t;
+    topic : Topic.t;
+    px : Peer.t Seq.t;
+    backoff : span;
+  }
+
+  type publish = {
+    sender : Peer.t option;
+    topic : Topic.t;
+    message_id : Message_id.t;
+    message : message;
+  }
+
+  type join = {topic : Topic.t}
+
+  type leave = {topic : Topic.t}
+
+  type subscribe = {topic : Topic.t; peer : Peer.t}
+
+  type unsubscribe = {topic : Topic.t; peer : Peer.t}
+
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
   type _ output =
@@ -566,9 +598,8 @@ module Make (C : AUTOMATON_CONFIG) :
       Message_requested_message_ids requested_message_ids |> return
   end
 
-  let handle_ihave :
-      Peer.t -> Topic.t -> Message_id.t list -> [`IHave] output Monad.t =
-    IHave.handle
+  let handle_ihave : ihave -> [`IHave] output Monad.t =
+   fun {peer; topic; message_ids} -> IHave.handle peer topic message_ids
 
   module IWant = struct
     let handle peer message_ids : [`IWant] output Monad.t =
@@ -606,8 +637,8 @@ module Make (C : AUTOMATON_CONFIG) :
       On_iwant_messages_to_route {peer; routed_message_ids} |> return
   end
 
-  let handle_iwant : Peer.t -> Message_id.t list -> [`IWant] output Monad.t =
-    IWant.handle
+  let handle_iwant : iwant -> [`IWant] output Monad.t =
+   fun {peer; message_ids} -> IWant.handle peer message_ids
 
   module Graft = struct
     let check_filter peer =
@@ -680,7 +711,8 @@ module Make (C : AUTOMATON_CONFIG) :
       Grafting_successfully |> return
   end
 
-  let handle_graft : Peer.t -> Topic.t -> [`Graft] output Monad.t = Graft.handle
+  let handle_graft : graft -> [`Graft] output Monad.t =
+   fun {peer; topic} -> Graft.handle peer topic
 
   module Prune = struct
     let check_px_score peer =
@@ -710,13 +742,8 @@ module Make (C : AUTOMATON_CONFIG) :
             return (PX px)
   end
 
-  let handle_prune :
-      Peer.t ->
-      Topic.t ->
-      px:Peer.t Seq.t ->
-      backoff:span ->
-      [`Prune] output Monad.t =
-    Prune.handle
+  let handle_prune : prune -> [`Prune] output Monad.t =
+   fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5148
      Consider merging subcribe/unsubscribe with join/leave. *)
@@ -737,8 +764,8 @@ module Make (C : AUTOMATON_CONFIG) :
           return Subscribed
   end
 
-  let handle_subscribe : Topic.t -> Peer.t -> [`Subscribe] output Monad.t =
-    Subscribe.handle
+  let handle_subscribe : subscribe -> [`Subscribe] output Monad.t =
+   fun {topic; peer} -> Subscribe.handle topic peer
 
   module Unsubscribe = struct
     let handle topic peer =
@@ -757,8 +784,8 @@ module Make (C : AUTOMATON_CONFIG) :
           return Unsubscribed
   end
 
-  let handle_unsubscribe : Topic.t -> Peer.t -> [`Unsubscribe] output Monad.t =
-    Unsubscribe.handle
+  let handle_unsubscribe : unsubscribe -> [`Unsubscribe] output Monad.t =
+   fun {topic; peer} -> Unsubscribe.handle topic peer
 
   module Publish = struct
     let get_peers_for_unsubscribed_topic topic =
@@ -807,13 +834,9 @@ module Make (C : AUTOMATON_CONFIG) :
       Publish_message peers |> return
   end
 
-  let publish :
-      sender:Peer.t option ->
-      Topic.t ->
-      Message_id.t ->
-      message ->
-      [`Publish] output Monad.t =
-    Publish.handle
+  let publish : publish -> [`Publish] output Monad.t =
+   fun {sender; topic; message_id; message} ->
+    Publish.handle ~sender topic message_id message
 
   module Join = struct
     let check_is_not_subscribed topic : (unit, [`Join] output) Monad.check =
@@ -873,7 +896,7 @@ module Make (C : AUTOMATON_CONFIG) :
       init_mesh topic
   end
 
-  let join : Topic.t -> [`Join] output Monad.t = Join.handle
+  let join : join -> [`Join] output Monad.t = fun {topic} -> Join.handle topic
 
   module Leave = struct
     type mesh = Peer.Set.t
@@ -906,7 +929,8 @@ module Make (C : AUTOMATON_CONFIG) :
       handle_mesh topic mesh
   end
 
-  let leave : Topic.t -> [`Leave] output Monad.t = Leave.handle
+  let leave : leave -> [`Leave] output Monad.t =
+   fun {topic} -> Leave.handle topic
 
   module Heartbeat = struct
     let clear_backoff =
@@ -1280,9 +1304,8 @@ module Make (C : AUTOMATON_CONFIG) :
       | Some _ -> return Peer_already_known
   end
 
-  let add_peer :
-      direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] output Monad.t =
-    Add_peer.handle
+  let add_peer : add_peer -> [`Add_peer] output Monad.t =
+   fun {direct; outbound; peer} -> Add_peer.handle ~direct ~outbound peer
 
   module Remove_peer = struct
     let handle peer : [`Remove_peer] output Monad.t =
@@ -1315,7 +1338,96 @@ module Make (C : AUTOMATON_CONFIG) :
       Removing_peer |> return
   end
 
-  let remove_peer : Peer.t -> [`Remove_peer] output Monad.t = Remove_peer.handle
+  let remove_peer : remove_peer -> [`Remove_peer] output Monad.t =
+   fun {peer} -> Remove_peer.handle peer
+
+  (* Helpers. *)
+
+  let pp_add_peer fmtr ({direct; outbound; peer} : add_peer) =
+    let open Format in
+    fprintf
+      fmtr
+      "{ direct=%b; outbound=%b; peer=%a }"
+      direct
+      outbound
+      Peer.pp
+      peer
+
+  let pp_remove_peer fmtr ({peer} : remove_peer) =
+    let open Format in
+    fprintf fmtr "{ peer=%a }" Peer.pp peer
+
+  let pp_ihave fmtr ({peer; topic; message_ids} : ihave) =
+    let open Format in
+    fprintf
+      fmtr
+      "{ peer=%a; topic=%a; message_ids=[%a] }"
+      Peer.pp
+      peer
+      Topic.pp
+      topic
+      (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr ";") Message_id.pp)
+      message_ids
+
+  let pp_iwant fmtr ({peer : Peer.t; message_ids : Message_id.t list} : iwant) =
+    let open Format in
+    fprintf
+      fmtr
+      "{ peer=%a; message_ids=[%a] }"
+      Peer.pp
+      peer
+      (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr ";") Message_id.pp)
+      message_ids
+
+  let pp_graft fmtr ({peer; topic} : graft) =
+    let open Format in
+    fprintf fmtr "{ peer=%a; topic=%a }" Peer.pp peer Topic.pp topic
+
+  let pp_prune fmtr ({peer; topic; px; backoff} : prune) =
+    let open Format in
+    fprintf
+      fmtr
+      "{ peer=%a; topic=%a; px=%a; backoff=%a }"
+      Peer.pp
+      peer
+      Topic.pp
+      topic
+      (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr ";") Peer.pp)
+      (List.of_seq px)
+      Span.pp
+      backoff
+
+  let pp_publish fmtr ({sender; topic; message_id; message} : publish) =
+    let open Format in
+    fprintf
+      fmtr
+      "{ sender=%a; topic=%a; message_id=%a; message=%a }"
+      (pp_print_option
+         ~none:(fun fmtr () -> pp_print_string fmtr "None")
+         Peer.pp)
+      sender
+      Topic.pp
+      topic
+      Message_id.pp
+      message_id
+      Message.pp
+      message
+
+  let pp_join fmtr ({topic} : join) =
+    let open Format in
+    fprintf fmtr "{ topic=%a }" Topic.pp topic
+
+  let pp_leave fmtr ({topic} : leave) =
+    let open Format in
+    fprintf fmtr "{ topic=%a }" Topic.pp topic
+
+  let pp_subscribe fmtr ({topic; peer} : subscribe) =
+    let open Format in
+    fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
+
+  let pp_unsubscribe fmtr ({topic; peer} : unsubscribe) =
+    let open Format in
+    fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
   module Internal_for_tests = struct
     let get_subscribed_topics peer state =

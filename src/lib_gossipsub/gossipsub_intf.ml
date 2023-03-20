@@ -181,6 +181,40 @@ module type AUTOMATON = sig
   (** Parameters of the gossipsub protocol. *)
   type parameters := (Peer.t, Message_id.t) parameters
 
+  (** The types of payloads for inputs to the gossipsub automaton. *)
+
+  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+
+  type remove_peer = {peer : Peer.t}
+
+  type ihave = {peer : Peer.t; topic : Topic.t; message_ids : Message_id.t list}
+
+  type iwant = {peer : Peer.t; message_ids : Message_id.t list}
+
+  type graft = {peer : Peer.t; topic : Topic.t}
+
+  type prune = {
+    peer : Peer.t;
+    topic : Topic.t;
+    px : Peer.t Seq.t;
+    backoff : span;
+  }
+
+  type publish = {
+    sender : Peer.t option;
+    topic : Topic.t;
+    message_id : Message_id.t;
+    message : message;
+  }
+
+  type join = {topic : Topic.t}
+
+  type leave = {topic : Topic.t}
+
+  type subscribe = {topic : Topic.t; peer : Peer.t}
+
+  type unsubscribe = {topic : Topic.t; peer : Peer.t}
+
   (** Output produced by one of the actions below. *)
   type _ output =
     | Negative_peer_score : Score.t -> [`IHave] output
@@ -234,66 +268,82 @@ module type AUTOMATON = sig
   (** Initialise a state. *)
   val make : Random.State.t -> limits -> parameters -> state
 
-  (** [add_peer ~direct ~outbound peer] is called to notify a new connection. If
+  (** [add_peer { direct; outbound; peer }] is called to notify a new connection. If
       [direct] is [true], the gossipsub always forwards messages to those
       peers. [outbound] is [true] if it is an outbound connection, that is, a
       connection initiated by the local (not the remote) peer. *)
-  val add_peer : direct:bool -> outbound:bool -> Peer.t -> [`Add_peer] monad
+  val add_peer : add_peer -> [`Add_peer] monad
 
-  (** [remove_peer peer] notifies gossipsub that we are disconnected
+  (** [remove_peer { peer }] notifies gossipsub that we are disconnected
       from a peer. Do note that the [state] still maintain information
       for this connection for [retain_duration] seconds. *)
-  val remove_peer : Peer.t -> [`Remove_peer] monad
+  val remove_peer : remove_peer -> [`Remove_peer] monad
 
-  (** [handle_ihave peer topic message_ids] handles the gossip message
+  (** [handle_ihave { peer; topic; message_ids }] handles the gossip message
       [IHave] emitted by [peer] for [topic] with the [message_ids].  *)
-  val handle_ihave : Peer.t -> Topic.t -> Message_id.t list -> [`IHave] monad
+  val handle_ihave : ihave -> [`IHave] monad
 
-  (** [handle_iwant peer message_ids] handles the gossip message
+  (** [handle_iwant { peer; message_ids }] handles the gossip message
       [IWant] emitted by [peer] for [topic] with the [message_ids]. *)
-  val handle_iwant : Peer.t -> Message_id.t list -> [`IWant] monad
+  val handle_iwant : iwant -> [`IWant] monad
 
-  (** [handle_graft peer topic] handles the gossip message [Graft]
+  (** [handle_graft { peer; topic }] handles the gossip message [Graft]
       emitted by [peer] for [topic]. This action allows to graft a
       connection to a full connection allowing the transmission of
       full messages for the given topic. *)
-  val handle_graft : Peer.t -> Topic.t -> [`Graft] monad
+  val handle_graft : graft -> [`Graft] monad
 
-  (** [handle_prune peer topic ~px ~backoff] handles the gossip
+  (** [handle_prune { peer; topic; px; backoff }] handles the gossip
       message [Prune] emitted by [peer] for [topic]. This action
       allows to prune a full connection. In that case, the remote peer
       can send a list of peers to connect to as well as a backoff
       time, which is a duration for which we cannot [Graft] this peer
       on this topic. *)
-  val handle_prune :
-    Peer.t -> Topic.t -> px:Peer.t Seq.t -> backoff:span -> [`Prune] monad
+  val handle_prune : prune -> [`Prune] monad
 
-  (** [publish ~sender topic message_id message] allows to route a
+  (** [publish { sender; topic; message_id; message }] allows to route a
       message on the gossip network. If [sender=None], the message
       comes from the application layer and we are the sender. *)
-  val publish :
-    sender:Peer.t option ->
-    Topic.t ->
-    Message_id.t ->
-    message ->
-    [`Publish] monad
+  val publish : publish -> [`Publish] monad
 
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
   val heartbeat : [`Heartbeat] monad
 
-  (** [join topic] joins/subscribes the local node to a new topic. *)
-  val join : Topic.t -> [`Join] monad
-
-  (** [leave topic] leave/unscribe the local node from a topic. *)
-  val leave : Topic.t -> [`Leave] monad
-
-  (** [handle_subscribe topic peer] handles a request from a remote [peer] to
+  (** [handle_subscribe {topic; peer}] handles a request from a remote [peer] to
       subscribe to a [topic]. *)
-  val handle_subscribe : Topic.t -> Peer.t -> [`Subscribe] monad
+  val handle_subscribe : subscribe -> [`Subscribe] monad
 
-  (** [handle_unsubscribe topic peer] handles a request from a remote [peer] to
+  (** [handle_unsubscribe {topic; peer}] handles a request from a remote [peer] to
       unsubscribe to a [topic]. *)
-  val handle_unsubscribe : Topic.t -> Peer.t -> [`Unsubscribe] monad
+  val handle_unsubscribe : unsubscribe -> [`Unsubscribe] monad
+
+  (** [join { topic }] join/subscribe to a new topic. *)
+  val join : join -> [`Join] monad
+
+  (** [leave { topic }] leave/unscribe a topic. *)
+  val leave : leave -> [`Leave] monad
+
+  val pp_add_peer : Format.formatter -> add_peer -> unit
+
+  val pp_remove_peer : Format.formatter -> remove_peer -> unit
+
+  val pp_ihave : Format.formatter -> ihave -> unit
+
+  val pp_iwant : Format.formatter -> iwant -> unit
+
+  val pp_graft : Format.formatter -> graft -> unit
+
+  val pp_prune : Format.formatter -> prune -> unit
+
+  val pp_publish : Format.formatter -> publish -> unit
+
+  val pp_join : Format.formatter -> join -> unit
+
+  val pp_leave : Format.formatter -> leave -> unit
+
+  val pp_subscribe : Format.formatter -> subscribe -> unit
+
+  val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
   module Internal_for_tests : sig
     (** [get_subscribed_topics peer state] returns the set of topics
