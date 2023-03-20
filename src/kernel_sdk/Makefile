@@ -4,14 +4,20 @@
 # SPDX-License-Identifier: MIT
 
 # The SDK contains some executables, that may be used by tezt.
-# Since the tezt tests run on a different container to the one
-# used for `make build-kernels`, we compile executables using the
-# musl toolchain, to make them fully statically-linked - allowing
-# them to run in the tezt container.
+# Since the tezt tests run on a different container to the one used
+# for `make build-kernels`, we allow to compile executables using the
+# musl toolchain, to make them fully statically-linked - allowing them
+# to run in the tezt container, by setting the `NATIVE_TARGET`
+# environment variable.
 
 CC=clang
 
 all: build test doc
+
+NATIVE_TARGET ?=
+ifneq ($(NATIVE_TARGET),)
+NATIVE_OPT := --target "$(NATIVE_TARGET)"
+endif
 
 check:
 	@cargo fmt --check
@@ -22,7 +28,7 @@ check:
 build: check installer.wasm
 	@cargo build -p tezos_smart_rollup_installer \
 		--release \
-		--target x86_64-unknown-linux-musl
+	        $(NATIVE_OPT)
 
 installer.wasm:
 	@cargo build -p installer_kernel \
@@ -41,8 +47,7 @@ doc:
 	@cargo doc  --no-deps --all-features
 
 build-deps:
-	@rustup target add wasm32-unknown-unknown
-	@rustup target add x86_64-unknown-linux-musl
+	@rustup target add wasm32-unknown-unknown $(NATIVE_TARGET)
 	@rustup component add rustfmt clippy
 
 clean:
