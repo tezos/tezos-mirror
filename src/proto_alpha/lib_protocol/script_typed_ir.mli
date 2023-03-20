@@ -1133,7 +1133,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       Script.location * 'a comparable_ty * ('a ticket option, 'S, 'r, 'F) kinstr
       -> (('a ticket, 'a ticket) pair, 'S, 'r, 'F) kinstr
   | IOpen_chest :
-      Script.location * ((bytes, bool) or_, 'S, 'r, 'F) kinstr
+      Script.location * (bytes option, 'S, 'r, 'F) kinstr
       -> ( Script_timelock.chest_key,
            Script_timelock.chest * (n num * 'S),
            'r,

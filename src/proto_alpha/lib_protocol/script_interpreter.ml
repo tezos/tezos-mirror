@@ -1637,12 +1637,11 @@ module Raw = struct
                Therefore no proof can be correct.*)
             let accu =
               match Script_int.to_int time_z with
-              | None -> R false
+              | None -> None
               | Some time -> (
                   match Script_timelock.open_chest chest chest_key ~time with
-                  | Correct bytes -> L bytes
-                  | Bogus_cipher -> R false
-                  | Bogus_opening -> R true)
+                  | Correct bytes -> Some bytes
+                  | Bogus_opening -> None)
             in
             (step [@ocaml.tailcall]) g gas k ks accu stack
         | IEmit {tag; ty = event_type; unparsed_ty; k; loc = _} ->
