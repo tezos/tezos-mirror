@@ -96,7 +96,7 @@ let run ~data_dir cctxt =
        config) =
     Configuration.load ~data_dir
   in
-  let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
+  let* () = Page_store.ensure_reveal_data_dir_exists reveal_data_dir in
   let* ctxt = Node_context.init config cctxt in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
      Stop DAC node when in Legacy mode, if threshold is not reached. *)

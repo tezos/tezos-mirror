@@ -25,6 +25,27 @@
 
 type t = unit tzresult Lwt.t * Tezos_rpc__RPC_context.stopper
 
+let resolve_plugin
+    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) =
+  let open Lwt_syntax in
+  let current_protocol = protocols.current_protocol in
+  let next_protocol = protocols.next_protocol in
+  let plugin_opt =
+    Option.either
+      (Dac_plugin.get current_protocol)
+      (Dac_plugin.get next_protocol)
+  in
+  match plugin_opt with
+  | None ->
+      let+ () =
+        Event.emit_protocol_plugin_not_resolved current_protocol next_protocol
+      in
+      None
+  | Some dac_plugin ->
+      let (module Dac_plugin : Dac_plugin.T) = dac_plugin in
+      let+ () = Event.emit_protocol_plugin_resolved Dac_plugin.Proto.hash in
+      Some dac_plugin
+
 (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
       received value from [streamed_call].
       It returns a couple [(p, stopper)] where [p] is a promise resolving when
@@ -62,7 +83,7 @@ let resolve_plugin_and_set_ready ctxt =
     let* protocols =
       Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
     in
-    let*! dac_plugin = Dac_manager.resolve_plugin protocols in
+    let*! dac_plugin = resolve_plugin protocols in
     match dac_plugin with
     | Some dac_plugin ->
         Node_context.set_ready ctxt dac_plugin ;
