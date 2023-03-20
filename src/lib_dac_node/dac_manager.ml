@@ -67,7 +67,7 @@ module Keys = struct
 
   let public_key_opt t = t.public_key_opt
 
-  let aggregate_sk_uris t = t.aggregate_sk_uri
+  let aggregate_sk_uri t = t.aggregate_sk_uri
 
   let get_wallet_info cctxt address =
     let open Lwt_result_syntax in

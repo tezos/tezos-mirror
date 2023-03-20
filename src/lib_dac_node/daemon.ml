@@ -133,49 +133,41 @@ module Handler = struct
       only when payload corresponding to provided [root_hash] 
       had been well dezerialized.
       Once it is done, call PUT /dac_member_signature to submit member signature *)
-  let push_payload_signature dac_plugin ctxt coordinator_cctxt public_key_hash
-      root_hash =
+  let push_payload_signature dac_plugin coordinator_cctxt wallet keys root_hash
+      =
     let open Lwt_result_syntax in
-    let wallet = Node_context.get_tezos_node_cctxt ctxt in
-    let* keys_opt = Dac_manager.Keys.get_wallet_info wallet public_key_hash in
-    match keys_opt with
-    | Some keys ->
-        let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
-        let* signature =
-          Tezos_client_base.Client_keys.aggregate_sign
-            wallet
-            (Dac_manager.Keys.aggregate_sk_uris keys)
-            bytes_to_sign
-        in
-        let signature_repr =
-          Signature_repr.
-            {
-              root_hash;
-              signature;
-              signer_pkh = Dac_manager.Keys.public_key_hash keys;
-            }
-        in
-        let* () =
-          Dac_node_client.call
-            coordinator_cctxt
-            (RPC_services.store_dac_member_signature dac_plugin)
-            ()
-            ()
-            signature_repr
-        in
-        let*! () = Event.emit_signature_pushed_to_coordinator signature in
-        return_unit
-    | None ->
-        tzfail
-        @@ Cannot_retrieve_node_keys
-             (Tezos_crypto.Aggregate_signature.Public_key_hash.to_string
-                public_key_hash)
+    let bytes_to_sign = Dac_plugin.hash_to_bytes root_hash in
+    let* signature =
+      Tezos_client_base.Client_keys.aggregate_sign
+        wallet
+        (Dac_manager.Keys.aggregate_sk_uri keys)
+        bytes_to_sign
+    in
+    let signature_repr =
+      Signature_repr.
+        {
+          root_hash;
+          signature;
+          signer_pkh = Dac_manager.Keys.public_key_hash keys;
+        }
+    in
+    let* () =
+      Dac_node_client.call
+        coordinator_cctxt
+        (RPC_services.store_dac_member_signature dac_plugin)
+        ()
+        ()
+        signature_repr
+    in
+    let*! () = Event.emit_signature_pushed_to_coordinator signature in
+    return_unit
 
   (** This handler will be invoked only when a [coordinator_cctxt] is specified
       in the DAC node configuration. The DAC node tries to subscribes to the
       stream of root hashes via the streamed GET /monitor/root_hashes RPC call
       to the dac node corresponding to [coordinator_cctxt]. *)
-  let new_root_hash ctxt coordinator_cctxt committee_member_address_opt =
+  let new_root_hash ctxt coordinator_cctxt ?committee_member_keys
+      ?committee_member_address wallet_cctxt =
     let open Lwt_result_syntax in
     let handler dac_plugin remote_store _stopper root_hash =
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
@@ -190,24 +182,27 @@ module Handler = struct
           let*! () =
             Event.emit_received_root_hash_processed dac_plugin root_hash
           in
-          (* If there is a [public_key_hash], it means the node is run as a member,
-              so we must sign the payload and post the signature to the coordinator
-             If there is no [public_key_hash] provided, it means the node is run as an observer
-               then we simply [return ()] *)
-          match committee_member_address_opt with
-          | Some committee_member_address ->
+          match (committee_member_keys, committee_member_address) with
+          | Some committee_member_keys, _ ->
+              (* If there is a [public_key_hash], it means the node is run as a member,
+                   so we must sign the payload and post the signature to the coordinator
+                 If there is no [public_key_hash] provided, it means the node is run as an observer
+                   then we simply [return ()] *)
               push_payload_signature
                 dac_plugin
-                ctxt
                 coordinator_cctxt
-                committee_member_address
+                wallet_cctxt
+                committee_member_keys
                 root_hash
-          | None ->
-              let*! () = Event.emit_no_committee_member_address () in
-              return ())
+          | None, Some committee_member_address ->
+              tzfail
+              @@ Cannot_retrieve_node_keys
+                   (Tezos_crypto.Aggregate_signature.Public_key_hash.to_string
+                      committee_member_address)
+          | None, None -> return ())
       | Error errs ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
-             Improve handling of errors. *)
+              Improve handling of errors. *)
           let*! () =
             Event.emit_processing_root_hash_failed dac_plugin root_hash errs
           in
@@ -269,7 +264,11 @@ let run ~data_dir cctxt =
         let committee_member_address_opt =
           Configuration.Legacy.committee_member_address_opt configuration
         in
-        return (committee_members_addresses, threshold, dac_cctxt_config, committee_member_address_opt)
+        return
+          ( committee_members_addresses,
+            threshold,
+            dac_cctxt_config,
+            committee_member_address_opt )
     | Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
     | Committee_member _ -> tzfail @@ Mode_not_supported "committee_member"
     | Observer _ -> tzfail @@ Mode_not_supported "observer"
@@ -283,7 +282,7 @@ let run ~data_dir cctxt =
            match account_opt with
            | Some account ->
                ( Dac_manager.Keys.public_key_opt account,
-                 Some (Dac_manager.Keys.aggregate_sk_uris account) )
+                 Some (Dac_manager.Keys.aggregate_sk_uri account) )
            | None -> (None, None))
     |> List.split
   in
@@ -311,14 +310,26 @@ let run ~data_dir cctxt =
   let* () = daemonize [Handler.resolve_plugin_and_set_ready ctxt cctxt] in
   (* Start never-ending monitoring daemons. [coordinator_cctxt] is required to
      monitor new root hashes in legacy mode. *)
-  match coordinator_cctxt_opt with
-  | None -> daemonize [Handler.new_head ctxt cctxt]
-  | Some coordinator_cctxt ->
+  let wallet_cctxt = Node_context.get_tezos_node_cctxt ctxt in
+  match (coordinator_cctxt_opt, committee_member_address_opt) with
+  | Some coordinator_cctxt, Some committee_member_address ->
+      let* committee_member_keys_opt =
+        Dac_manager.Keys.get_wallet_info wallet_cctxt committee_member_address
+      in
       daemonize
         [
           Handler.new_head ctxt cctxt;
           Handler.new_root_hash
             ctxt
             coordinator_cctxt
-            committee_member_address_opt;
+            ?committee_member_keys:committee_member_keys_opt
+            ?committee_member_address:committee_member_address_opt
+            wallet_cctxt;
         ]
+  | Some coordinator_cctxt, _ ->
+      daemonize
+        [
+          Handler.new_head ctxt cctxt;
+          Handler.new_root_hash ctxt coordinator_cctxt wallet_cctxt;
+        ]
+  | _ -> daemonize [Handler.new_head ctxt cctxt]

@@ -163,8 +163,8 @@ let with_layer1 ?additional_bootstrap_accounts ?commitment_period
   f node client bootstrap1_key
 
 let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~threshold ?committee_member_address
-    ~committee_members tezos_client f =
+    ?(wait_ready = true) ~threshold ?committee_member_address ~committee_members
+    tezos_client f =
   let range i = List.init i Fun.id in
   let reveal_data_dir =
     Option.map
@@ -732,8 +732,8 @@ module Legacy = struct
     in
     return @@ check_valid_root_hash expected_rh actual_rh
 
-  let test_streaming_of_root_hashes_as_observer _protocol node client coordinator threshold
-      committee_members =
+  let test_streaming_of_root_hashes_as_observer _protocol node client
+      coordinator threshold committee_members =
     (* 1. Create two new dac nodes; [observer_1] and [observer_2].
        2. Initialize their default configuration.
        3. Update their configuration so that their dac node client context
@@ -744,20 +744,10 @@ module Legacy = struct
         committee_members
     in
     let observer_1 =
-      Dac_node.create_legacy
-        ~threshold
-        ~committee_members
-        ~node
-        ~client
-        ()
+      Dac_node.create_legacy ~threshold ~committee_members ~node ~client ()
     in
     let observer_2 =
-      Dac_node.create_legacy
-        ~threshold
-        ~committee_members
-        ~node
-        ~client
-        ()
+      Dac_node.create_legacy ~threshold ~committee_members ~node ~client ()
     in
     let* _ = Dac_node.init_config observer_1 in
     let* _ = Dac_node.init_config observer_2 in
@@ -846,7 +836,7 @@ module Legacy = struct
 
   let test_streaming_of_root_hashes_as_member _protocol node client coordinator
       threshold dac_members =
-    (* This test doesn't have any meaning if run without any committee member *)
+    (* This test doesn't have any meaning if run without any committee member. *)
     assert (List.length dac_members > 0) ;
     let member_key : Account.aggregate_key = List.nth dac_members 0 in
     let dac_member_pkh = member_key.aggregate_public_key_hash in

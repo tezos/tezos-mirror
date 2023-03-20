@@ -284,7 +284,14 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
 let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
     ~committee_members ?committee_member_address ~node ~client () =
-  let mode = Legacy {threshold; committee_members; committee_member_address_opt = committee_member_address;} in
+  let mode =
+    Legacy
+      {
+        threshold;
+        committee_members;
+        committee_member_address_opt = committee_member_address;
+      }
+  in
   create
     ~path
     ?name
