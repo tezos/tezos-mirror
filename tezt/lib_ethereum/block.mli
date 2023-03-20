@@ -23,50 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Block = struct
-  type t = {
-    number : int32;
-    hash : string option;
-    parent : string;
-    nonce : string;
-    sha3Uncles : string;
-    logsBloom : string option;
-    transactionRoot : string;
-    stateRoot : string;
-    receiptRoot : string;
-    miner : string;
-    difficulty : int64;
-    totalDifficulty : int64;
-    extraData : string;
-    size : int32;
-    gasLimit : int32;
-    gasUsed : int32;
-    timestamp : int32;
-    transactions : string list;
-    uncles : string list;
-  }
+(** Simplified Ethereum block representation. *)
+type t = {
+  number : int32;
+  hash : string option;
+  parent : string;
+  nonce : string;
+  sha3Uncles : string;
+  logsBloom : string option;
+  transactionRoot : string;
+  stateRoot : string;
+  receiptRoot : string;
+  miner : string;
+  difficulty : int64;
+  totalDifficulty : int64;
+  extraData : string;
+  size : int32;
+  gasLimit : int32;
+  gasUsed : int32;
+  timestamp : int32;
+  transactions : string list;
+  uncles : string list;
+}
 
-  let of_json json =
-    let open JSON in
-    {
-      number = json |-> "number" |> as_int32;
-      hash = json |-> "hash" |> as_string_opt;
-      parent = json |-> "parent" |> as_string;
-      nonce = json |-> "nonce" |> as_string;
-      sha3Uncles = json |-> "sha3Uncles" |> as_string;
-      logsBloom = json |-> "logsBloom" |> as_string_opt;
-      transactionRoot = json |-> "transactionRoot" |> as_string;
-      stateRoot = json |-> "stateRoot" |> as_string;
-      receiptRoot = json |-> "receiptRoot" |> as_string;
-      miner = json |-> "miner" |> as_string;
-      difficulty = json |-> "difficulty" |> as_int64;
-      totalDifficulty = json |-> "totalDifficulty" |> as_int64;
-      extraData = json |-> "extraData" |> as_string;
-      size = json |-> "size" |> as_int32;
-      gasLimit = json |-> "gasLimit" |> as_int32;
-      gasUsed = json |-> "gasUsed" |> as_int32;
-      timestamp = json |-> "timestamp" |> as_int32;
-      transactions = json |-> "transactions" |> as_list |> List.map as_string;
-      uncles = json |-> "uncles" |> as_list |> List.map as_string;
-    }
-end
+(** Extracts a block {!t} from a JSON. *)
+val of_json : JSON.t -> t

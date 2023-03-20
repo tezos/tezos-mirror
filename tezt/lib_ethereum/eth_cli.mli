@@ -23,33 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let path = "eth"
+(** [balance ~account ~endpoint] asks the balance of [account] to the
+    JSON-RPC API server listening at [endpoint]. *)
+val balance : account:string -> endpoint:string -> Wei.t Lwt.t
 
-let spawn_command command decode =
-  let process = Process.spawn path command in
-  let* output = Process.check_and_read_stdout process in
-  return (JSON.parse ~origin:"eth_spawn_command" output |> decode)
+(** [transaction_send ~source_private_key ~to_public_key ~value
+    ~endpoint] crafts and signs a transaction transferring [value] (as
+    Wei) from [source_private_key] to [to_public_key], sends the raw
+    transaction to the JSON-RPI API server listening at [endpoint]. *)
+val transaction_send :
+  source_private_key:string ->
+  to_public_key:string ->
+  value:Wei.t ->
+  endpoint:string ->
+  string Lwt.t
 
-let balance ~account ~endpoint =
-  spawn_command ["address:balance"; account; "--network"; endpoint] JSON.as_int
+(** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
+    hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
+val get_block : block_id:string -> endpoint:string -> Block.t Lwt.t
 
-let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
-  spawn_command
-    [
-      "transaction:send";
-      "--pk";
-      source_private_key;
-      "--to";
-      to_public_key;
-      "--value";
-      Z.to_string value;
-      "--network";
-      endpoint;
-    ]
-    JSON.as_string
-
-let get_block ~block_id ~endpoint =
-  spawn_command ["block:get"; block_id; "--network"; endpoint] Eth.Block.of_json
-
-let block_number ~endpoint =
-  spawn_command ["block:number"; "--network"; endpoint] JSON.as_int
+(** [block_number ~endpoint] asks the current block number to the
+    JSON-RPC API server listening at [endpoint]. *)
+val block_number : endpoint:string -> int Lwt.t

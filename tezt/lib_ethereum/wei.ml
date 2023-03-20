@@ -23,25 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [balance ~account ~endpoint] asks the balance of [account] to the
-    JSON-RPC API server listening at [endpoint]. *)
-val balance : account:string -> endpoint:string -> int Lwt.t
+type t = Z.t
 
-(** [transaction_send ~source_private_key ~to_public_key ~value
-    ~endpoint] crafts and signs a transaction transferring [value] (as
-    Wei) from [source_private_key] to [to_public_key], sends the raw
-    transaction to the JSON-RPI API server listening at [endpoint]. *)
-val transaction_send :
-  source_private_key:string ->
-  to_public_key:string ->
-  value:Z.t ->
-  endpoint:string ->
-  string Lwt.t
+let shift = 18
 
-(** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
-    hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
-val get_block : block_id:string -> endpoint:string -> Eth.Block.t Lwt.t
+let wei_pow = String.make shift '0'
 
-(** [block_number ~endpoint] asks the current block number to the
-    JSON-RPC API server listening at [endpoint]. *)
-val block_number : endpoint:string -> int Lwt.t
+let zero = Z.zero
+
+let one = Z.of_string @@ "1" ^ wei_pow
+
+let to_string = Z.to_string
+
+let of_string = Z.of_string
+
+let to_wei_z z = z
+
+let of_wei_z z = z
+
+let of_eth_int eth = Z.of_string @@ Int.to_string eth ^ wei_pow
+
+let ( + ) = Z.add
+
+let ( - ) = Z.sub
+
+let ( * ) = Z.mul
+
+let ( / ) = Z.div
+
+let typ =
+  Check.comparable
+    (fun fmt t -> Format.fprintf fmt "%s" (to_string t))
+    (fun a b -> Z.compare a b)
