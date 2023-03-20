@@ -1766,6 +1766,9 @@ module Contract : sig
     script:Script.t * Lazy_storage.diffs option ->
     context tzresult Lwt.t
 
+  (** See {!Contract_delegate_storage.is_delegate}. *)
+  val is_delegate : context -> public_key_hash -> bool tzresult Lwt.t
+
   module Legacy_big_map_diff : sig
     type item = private
       | Update of {
