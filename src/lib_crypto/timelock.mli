@@ -200,7 +200,7 @@ val chest_key_encoding : chest_key Data_encoding.t
     fault. Otherwise we return [Correct payload] where [payload] is
     the content that had originally been put in the chest. *)
 
-type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
+type opening_result = Correct of Bytes.t | Bogus_opening
 
 (** Takes a chest, chest key and time and tries to recover the underlying
     plaintext. See the documentation of opening_result. *)
