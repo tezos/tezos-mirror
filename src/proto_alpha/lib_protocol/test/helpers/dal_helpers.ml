@@ -104,36 +104,17 @@ struct
     let open Result_syntax in
     match Cryptobox.commit cryptobox polynomial with
     | Ok cm -> return cm
-    | Error
-        (`Invalid_degree_strictly_less_than_expected
-          Cryptobox.{given; expected}) ->
-        fail
-          [
-            Test_failure
-              (Format.sprintf
-                 "commit: Invalid_degree (got %d, expecting a value strictly \
-                  less than %d)"
-                 given
-                 expected);
-          ]
+    | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+        fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let dal_mk_prove_page polynomial page_id =
     let open Result_syntax in
     match Cryptobox.prove_page cryptobox polynomial page_id.P.page_index with
     | Ok p -> return p
-    | Error `Segment_index_out_of_range ->
-        fail [Test_failure "compute_proof_segment: Segment_index_out_of_range"]
-    | Error
-        (`Invalid_degree_strictly_less_than_expected
-          Cryptobox.{given; expected}) ->
-        fail
-          [
-            Test_failure
-              (Format.sprintf
-                 "Got %d, expecting a value strictly less than %d"
-                 given
-                 expected);
-          ]
+    | Error `Page_index_out_of_range ->
+        fail [Test_failure "compute_proof_segment: Page_index_out_of_range"]
+    | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+        fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let mk_slot ?(level = level_one) ?(index = Slot_index.zero)
       ?(fill_function = fun _i -> 'x') () =

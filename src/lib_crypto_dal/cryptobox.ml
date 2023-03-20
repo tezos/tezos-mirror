@@ -364,7 +364,6 @@ module Inner = struct
     remaining_bytes : int;
     (* Log of the number of evaluations that constitute an erasure encoded
        polynomial. *)
-    shard_proofs_log : int; (* Log of the number of shards proofs. *)
     srs : srs;
   }
 
@@ -690,7 +689,6 @@ module Inner = struct
         page_length;
         page_length_domain;
         remaining_bytes = page_size mod scalar_bytes_amount;
-        shard_proofs_log = Z.(log2 (of_int number_of_shards));
         srs;
       }
 
@@ -1103,18 +1101,16 @@ module Inner = struct
       in
       let n_poly = compute_n t eval_a' shards in
 
-      let len p =
-        if Polynomials.is_zero p then 1
-        else min t.max_polynomial_length (Polynomials.degree p + 1)
-      in
-
       (* 5. Computing B(x).
          B(x) = P(x) / A(x) = -sum_{i=0}^{k-1} N(w^{-i}) x^i.
 
          B(x) is thus given by the first k components
          of -n * IFFT_n(N). *)
-      let b = ifft_inplace t.erasure_encoded_polynomial_length n_poly in
-      let b = Polynomials.copy ~len:(len b) b in
+      let b =
+        Polynomials.truncate
+          ~len:t.max_polynomial_length
+          (ifft_inplace t.erasure_encoded_polynomial_length n_poly)
+      in
 
       Polynomials.mul_by_scalar_inplace
         b
@@ -1128,7 +1124,7 @@ module Inner = struct
       let p = polynomials_product (2 * t.max_polynomial_length) [a_poly; b] in
       (* P has degree [<= max_polynomial_length - 1] so [<= max_polynomial_length]
          coefficients. *)
-      Ok (Polynomials.copy ~len:(len p) p)
+      Ok (Polynomials.truncate ~len:t.max_polynomial_length p)
 
   let commit t p =
     let degree = Polynomials.degree p in
@@ -1138,6 +1134,17 @@ module Inner = struct
         (`Invalid_degree_strictly_less_than_expected
           {given = degree; expected = srs_g1_size})
     else Ok (Srs_g1.pippenger t.srs.raw.srs_g1 p)
+
+  let pp_commit_error fmt
+      (`Invalid_degree_strictly_less_than_expected {given; expected}) =
+    Format.fprintf
+      fmt
+      "Invalid degree: expecting input polynomial to commit function to have a \
+       degree strictly less than %d. Got %d."
+      expected
+      given
+
+  let string_of_commit_error err = Format.asprintf "%a" pp_commit_error err
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = t.max_polynomial_length - 1 since we don't want to commit
@@ -1405,8 +1412,7 @@ module Inner = struct
                 (t.max_polynomial_length - j - ((i + 1) * t.shard_length))
             else Bls12_381.G1.(copy zero))
       in
-      G1_array.evaluation_ecfft_inplace ~domain ~points ;
-      points
+      G1_array.evaluation_ecfft ~domain ~points
     in
     (domain, Array.init t.shard_length s_j)
 
@@ -1416,10 +1422,6 @@ module Inner = struct
      Implements the "Multiple multi-reveals" section above. *)
   let multiple_multi_reveals t ~preprocess:(domain, sj) ~coefficients :
       shard_proof array =
-    (* The log2 of the number of proofs [t.shard_proofs_log] is > 0
-       because [2^t.shard_proofs_log = t.number_of_shards > 0]. *)
-    assert (
-      t.shard_proofs_log > 0 && t.number_of_shards = 1 lsl t.shard_proofs_log) ;
     (* [t.max_polynomial_length > l] where [l = t.shard_length]. *)
     assert (t.shard_length < t.max_polynomial_length) ;
     (* Step 2. *)
@@ -1470,13 +1472,8 @@ module Inner = struct
     let len = Domains.length domain / 2 in
     let points = G1_array.sub sum ~off:0 ~len in
     (* Step 4. *)
-    let domain = Domains.build_power_of_two t.shard_proofs_log in
-    let proofs =
-      G1_array.init t.number_of_shards (fun _ -> Bls12_381.G1.(copy zero))
-    in
-    G1_array.blit points ~src_off:0 proofs ~dst_off:0 ~len ;
-    G1_array.evaluation_ecfft_inplace ~domain ~points:proofs ;
-    G1_array.to_array proofs
+    let domain = Domains.build t.number_of_shards in
+    G1_array.(to_array (evaluation_ecfft ~domain ~points))
 
   (* [interpolation_poly root domain evaluations] returns the unique
      polynomial P of degree [< Domains.length domain] verifying
@@ -1488,20 +1485,18 @@ module Inner = struct
     assert (Array.length evaluations = Domains.length domain) ;
     let size = Domains.length domain in
     let evaluations =
-      Polynomials.to_dense_coefficients
-        (ifft_inplace size (Evaluations.of_array (size - 1, evaluations)))
+      ifft_inplace size (Evaluations.of_array (size - 1, evaluations))
     in
     (* Computes root_inverse = 1/root. *)
     let root_inverse = Scalar.inverse_exn root in
     (* Computes evaluations[i] = evaluations[i] * root_inverse^i. *)
-    Polynomials.of_dense
-      (snd
-         (Array.fold_left_map
-            (fun root_pow_inverse coefficient ->
-              ( Scalar.mul root_pow_inverse root_inverse,
-                Scalar.mul coefficient root_pow_inverse ))
-            Scalar.(copy one)
-            evaluations))
+    snd
+      (Polynomials.fold_left_map
+         (fun root_pow_inverse coefficient ->
+           ( Scalar.mul root_pow_inverse root_inverse,
+             Scalar.mul coefficient root_pow_inverse ))
+         Scalar.(copy one)
+         evaluations)
 
   (* [verify t commitment srs_point domain root evaluations proof]
      verifies that P(root * domain.(i)) = evaluations.(i),
@@ -1632,7 +1627,7 @@ module Inner = struct
 
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then
-      Error `Segment_index_out_of_range
+      Error `Page_index_out_of_range
     else
       let wi = Domains.get t.domain_polynomial_length page_index in
       let quotient, _ =
@@ -1647,7 +1642,7 @@ module Inner = struct
      evaluation points are given by the [slot_page_index]. *)
   let verify_page t commitment ~page_index page proof =
     if page_index < 0 || page_index >= t.pages_per_slot then
-      Error `Segment_index_out_of_range
+      Error `Page_index_out_of_range
     else
       let expected_page_length = t.page_size in
       let got_page_length = Bytes.length page in

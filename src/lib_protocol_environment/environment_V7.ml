@@ -1414,7 +1414,7 @@ struct
     let verify_page t sh page proof =
       match verify_page t sh ~page_index:page.index page.content proof with
       | Error `Page_length_mismatch -> Ok false
-      | Error `Segment_index_out_of_range -> Error `Segment_index_out_of_range
+      | Error `Page_index_out_of_range -> Error `Segment_index_out_of_range
       | Error (`Invalid_page | `Invalid_degree_strictly_less_than_expected _) ->
           Ok false
       | Ok () -> Ok true

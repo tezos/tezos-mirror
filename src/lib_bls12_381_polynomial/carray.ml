@@ -61,7 +61,7 @@ module type Carray_sig = sig
       [dst] starting at the respective offsets. *)
   val blit : t -> src_off:int -> t -> dst_off:int -> len:int -> unit
 
-  (** [equal a offset1 b offset2] returns true if the segments of [len] elements of 
+  (** [equal a offset1 b offset2] returns true if the segments of [len] elements of
       [a] and [b] are equal starting from their respective offsets [offset1] (for [a])
       and [offset2] (for [b]). *)
   val equal : t -> offset1:int -> t -> offset2:int -> len:int -> bool
@@ -81,6 +81,10 @@ module type Carray_sig = sig
 
   (** [sub a off len] extracts a sub-array of [a] *)
   val sub : t -> off:int -> len:int -> t
+
+  (** [fold_left_map] is a combination of fold_left and map that threads an
+    accumulator through calls to [f]. *)
+  val fold_left_map : ('acc -> elt -> 'acc * elt) -> 'acc -> t -> 'acc * t
 end
 
 (** Note that an unsafe type casting is performed by this module.
@@ -242,4 +246,19 @@ module Make (Elt : Elt_sig) : Carray_sig with type elt = Elt.t = struct
   let of_bigstring b = b
 
   let to_bigstring b = b
+
+  let fold_left_map f acc input_array =
+    let len = length input_array in
+    if len < 1 then raise @@ Invalid_argument "allocate: size should be >= 1"
+    else
+      let acc, elt = f acc (get_unsafe input_array 0) in
+      let output_array = allocate len in
+      set output_array elt 0 ;
+      let acc = ref acc in
+      for i = 1 to len - 1 do
+        let acc', elt = f !acc (get_unsafe input_array i) in
+        acc := acc' ;
+        set output_array elt i
+      done ;
+      (!acc, output_array)
 end

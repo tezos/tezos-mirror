@@ -180,7 +180,9 @@ module Polynomial_impl = struct
 
   let allocate = Fr_carray.allocate
 
-  let copy = Fr_carray.copy
+  let copy p = Fr_carray.copy ~offset:0 ~len:(length p) p
+
+  let copy_carray = Fr_carray.copy
 
   let get = Fr_carray.get
 
@@ -345,6 +347,20 @@ module Polynomial_impl = struct
 
   let is_zero p = if degree p = -1 then true else false
 
+  let truncate ~len p =
+    if len < 0 then
+      raise (Invalid_argument "truncate: expected positive length.")
+    else
+      (* [min_len_capacity p] returns the minimum of [len] and [degree p + 1].
+         Here, [degree p + 1] is the minimal length of the {!type:Carray.t}
+         representing the polynomial [p].
+         When [p] is the zero polynomial its degree is -1, so we return 1 for
+         one coefficient holding the value. *)
+      let min_len_capacity p =
+        if is_zero p then 1 else min len (degree p + 1)
+      in
+      Fr_carray.copy ~len:(min_len_capacity p) p
+
   let evaluate p scalar =
     let n = length p in
     let res = Fr.copy scalar in
@@ -388,10 +404,10 @@ module Polynomial_impl = struct
     else
       List.init nb_chunks (fun i ->
           if (i + 1) * size_chunks <= nb_coeff_P then
-            if i = nb_chunks - 1 then copy ~offset:(i * size_chunks) p
-            else copy ~offset:(i * size_chunks) ~len:size_chunks p
+            if i = nb_chunks - 1 then Fr_carray.copy ~offset:(i * size_chunks) p
+            else Fr_carray.copy ~offset:(i * size_chunks) ~len:size_chunks p
           else if i * size_chunks < nb_coeff_P then
-            copy
+            Fr_carray.copy
               ~offset:(i * size_chunks)
               ~len:(nb_coeff_P - (i * size_chunks))
               p
@@ -410,6 +426,8 @@ module Polynomial_impl = struct
   let ( * ) = mul
 
   let constant c = of_coefficients [(c, 0)]
+
+  let fold_left_map = Fr_carray.fold_left_map
 end
 
 module type Polynomial_sig = sig
@@ -461,7 +479,14 @@ module type Polynomial_sig = sig
   val to_string : t -> string
 
   (** [copy p] returns a copy of a polynomial [p] *)
-  val copy : ?offset:int -> ?len:int -> t -> t
+  val copy : t -> t
+
+  (** [truncate ~len p] returns a new polynomial made of the first [len]
+      coefficients of [p]. If [degree p + 1] is less than [len] then
+      [copy p] is returned.
+
+      @raise [Invalid_argument] if [len] is negative. *)
+  val truncate : len:int -> t -> t
 
   (** [to_dense_coefficients p] returns the dense representation of
   a polynomial [p], i.e., it converts a C array to an OCaml array *)
@@ -570,6 +595,10 @@ module type Polynomial_sig = sig
 
   (** [constant s] creates a value of type [t] from a blst_fr element [s] *)
   val constant : scalar -> t
+
+  (** [fold_left_map] is a combination of fold_left and map that threads an
+    accumulator through calls to [f]. *)
+  val fold_left_map : ('acc -> scalar -> 'acc * scalar) -> 'acc -> t -> 'acc * t
 end
 
 module type Polynomial_unsafe_sig = sig
@@ -584,6 +613,18 @@ module type Polynomial_unsafe_sig = sig
 
       Note: [of_carray p] doesn't create a copy of [p] *)
   val of_carray : Fr_carray.t -> t
+
+  (** [copy_carray ?offset ?len p] returns a polynomial made of [len] contiguous
+      coefficients starting from the coefficient of index [offset].
+      By default, [offset = 0] and [len = length p - offset].
+
+      @raise [Invalid_argument] if [offset] is not in the range 0 to [(length p - 1)],
+      or if [len] is not positive, or if [offset + length] is not in the range 0 to
+      [(length p - 1)]. *)
+  val copy_carray : ?offset:int -> ?len:int -> t -> t
+
+  (** [length p] returns the length of the underlying {!Fr_carray.t}. *)
+  val length : t -> int
 end
 
 module Polynomial_unsafe :

@@ -840,13 +840,9 @@ module Dal = struct
           function
           | `Slot_wrong_size str ->
               Test.fail "Rollup.Dal.dummy_commitment failed: %s" str
-          | `Invalid_degree_strictly_less_than_expected
-              Cryptobox.{given; expected} ->
-              Test.fail
-                "Rollup.Dal.dummy_commitment failed: got %d, expecting a value \
-                 strictly less than %d"
-                given
-                expected) cryptobox message =
+          | `Invalid_degree_strictly_less_than_expected _ as commit_error ->
+              Test.fail "%s" (Cryptobox.string_of_commit_error commit_error))
+        cryptobox message =
       let parameters = Cryptobox.Verifier.parameters cryptobox in
       let padding_length = parameters.slot_size - String.length message in
       let padded_message =
