@@ -1,7 +1,7 @@
 (** Testing
     -------
     Component:    Client Base
-    Invocation:   dune build @src/lib_client_base/runtest
+    Invocation:   dune exec src/lib_client_base/test/main.exe
     Subject:      On Password-Based Key Derivation Function 2 (PBKDF2)
                   when using hash functions SHA256 and SHA512.
 *)
