@@ -26,6 +26,7 @@
 
 type error +=
   | (* `Temporary *) Sc_rollup_disputed
+  | (* `Temporary *) Sc_rollup_no_valid_commitment_to_cement
   | (* `Temporary *) Sc_rollup_does_not_exist of Sc_rollup_repr.t
   | (* `Temporary *) Sc_rollup_no_conflict
   | (* `Temporary *) Sc_rollup_no_stakers
@@ -242,6 +243,19 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_add_zero_messages -> Some () | _ -> None)
     (fun () -> Sc_rollup_add_zero_messages) ;
+  let description =
+    "Attempted to cement a commitment but there is no valid commitment to \
+     cement."
+  in
+  register_error_kind
+    `Temporary
+    ~id:"smart_rollup_no_valid_commitment_to_cement"
+    ~title:"No valid commitment to cement"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Sc_rollup_no_valid_commitment_to_cement -> Some () | _ -> None)
+    (fun () -> Sc_rollup_no_valid_commitment_to_cement) ;
   let description = "Attempted to cement a disputed commitment." in
   register_error_kind
     `Temporary
