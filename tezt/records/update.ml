@@ -60,27 +60,42 @@ module Gitlab = struct
          job_id
          artifact_path)
 
-  let get uri =
-    let url = Uri.to_string uri in
-    let* raw_json = Process.run_and_read_stdout "curl" [url] in
-    return (JSON.parse ~origin:url raw_json)
+  let curl_params ?(fail_on_http_errors = true) ?output_path ?(location = false)
+      uri =
+    (if fail_on_http_errors then ["--fail"] else [])
+    @ (match output_path with
+      | Some output_path -> ["--output"; output_path]
+      | None -> [])
+    @ (if location then ["--location"] else [])
+    @ [Uri.to_string uri]
 
-  let get_output ~output_path uri =
-    let url = Uri.to_string uri in
-    Process.run "curl" ["--location"; url; "--output"; output_path]
+  let get ?fail_on_http_errors uri =
+    let* raw_json =
+      Process.run_and_read_stdout "curl" (curl_params ?fail_on_http_errors uri)
+    in
+    return (JSON.parse ~origin:(Uri.to_string uri) raw_json)
+
+  let get_output ?fail_on_http_errors ~output_path uri =
+    Process.run
+      "curl"
+      (curl_params ?fail_on_http_errors ~location:true ~output_path uri)
 
   let get_all uri =
     let rec aux from acc =
-      (* GitLab uses a lot of redirections so we use --location to follow them. *)
-      let full_url =
+      let full_uri =
         Uri.(
           add_query_params'
             uri
-            [("per_page", "200"); ("page", string_of_int from)]
-          |> to_string)
+            [("per_page", "200"); ("page", string_of_int from)])
       in
-      let* response_body = Process.run_and_read_stdout "curl" [full_url] in
-      let list = JSON.parse ~origin:full_url response_body |> JSON.as_list in
+      (* GitLab uses a lot of redirections so we use --location to follow them. *)
+      let* response_body =
+        Process.run_and_read_stdout "curl" (curl_params ~location:true full_uri)
+      in
+      let list =
+        JSON.parse ~origin:Uri.(to_string full_uri) response_body
+        |> JSON.as_list
+      in
       Log.info
         "Found %d items in page %d of %s."
         (List.length list)
