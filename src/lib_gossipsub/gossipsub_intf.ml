@@ -217,6 +217,10 @@ module type AUTOMATON = sig
     | Peer_added : [`Add_peer] output
     | Peer_already_known : [`Add_peer] output
     | Removing_peer : [`Remove_peer] output
+    | Subscribed : [`Subscribe] output
+    | Subscribe_to_unknown_peer : [`Subscribe] output
+    | Unsubscribed : [`Unsubscribe] output
+    | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
 
   (** A type alias for the state monad. *)
   type 'a monad := state -> state * 'a output
@@ -271,9 +275,23 @@ module type AUTOMATON = sig
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
   val heartbeat : [`Heartbeat] monad
 
-  (** [join topic] join/subscribe to a new topic. *)
+  (** [join topic] joins/subscribes the local node to a new topic. *)
   val join : Topic.t -> [`Join] monad
 
-  (** [leave topic] leave/unscribe a topic. *)
+  (** [leave topic] leave/unscribe the local node from a topic. *)
   val leave : Topic.t -> [`Leave] monad
+
+  (** [handle_subscribe topic peer] handles a request from a remote [peer] to
+      subscribe to a [topic]. *)
+  val handle_subscribe : Topic.t -> Peer.t -> [`Subscribe] monad
+
+  (** [handle_unsubscribe topic peer] handles a request from a remote [peer] to
+      unsubscribe to a [topic]. *)
+  val handle_unsubscribe : Topic.t -> Peer.t -> [`Unsubscribe] monad
+
+  module Internal_for_tests : sig
+    (** [get_subscribed_topics peer state] returns the set of topics
+        that are subscribed by [peer] *)
+    val get_subscribed_topics : Peer.t -> state -> Topic.t list
+  end
 end

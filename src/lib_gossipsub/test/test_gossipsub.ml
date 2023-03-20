@@ -25,6 +25,7 @@
 
 open Tezos_gossipsub
 open Gossipsub_intf
+open Tezt
 open Tezt_core.Base
 
 module Automaton_config :
@@ -61,7 +62,7 @@ module Automaton_config :
     include Compare.Int
   end
 
-  module Peer = struct
+  module Int_iterable = struct
     include Compare.Int
 
     let pp = Format.pp_print_int
@@ -70,7 +71,7 @@ module Automaton_config :
     module Set = Set.Make (Int)
   end
 
-  module Topic = struct
+  module String_iterable = struct
     include Compare.String
 
     let pp = Format.pp_print_string
@@ -79,11 +80,14 @@ module Automaton_config :
     module Set = Set.Make (String)
   end
 
-  module Message_id = Peer
-  module Message = Peer
+  module Peer = Int_iterable
+  module Topic = String_iterable
+  module Message_id = Int_iterable
+  module Message = Int_iterable
 end
 
-module GS = Make (Automaton_config)
+module C = Automaton_config
+module GS = Make (C)
 
 (* Most of these limits are the default ones used by the Go implementation. *)
 let default_limits =
@@ -122,8 +126,11 @@ let seed =
       Random.bits ()
   | Some seed -> seed
 
-let init_state ~(peer_no : int) ~(topics : string list) ~(direct : bool)
-    ~(outbound : bool) : GS.state =
+(** [init_state ~peer_no ~topics ~direct ~outbound] initiates a gossipsub state,
+    joins the topics in [topics], and connects to [peer_no] number of peers which
+    will be direct/outbound depending on [direct] and [outbound]. *)
+let init_state ~(peer_no : int) ~(topics : C.Topic.t list) ~(direct : bool)
+    ~(outbound : bool) : GS.state * C.Peer.t array =
   let rng = Random.State.make [|seed|] in
   let state =
     List.fold_left
@@ -145,23 +152,99 @@ let init_state ~(peer_no : int) ~(topics : string list) ~(direct : bool)
       state
       peers
   in
-  state
+  (state, Array.of_list peers)
 
-(** Test that grafting an unknown topic is ignored. *)
+let assert_subscribed_topics ~__LOC__ ~peer ~expected_topics state =
+  let actual_topics = GS.Internal_for_tests.get_subscribed_topics peer state in
+  Check.(
+    (actual_topics = expected_topics)
+      (list string)
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__)
+
+(** Test that grafting an unknown topic is ignored.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4367 *)
 let test_ignore_graft_from_unknown_topic () =
   Tezt_core.Test.register
     ~__FILE__
     ~title:"Gossipsub: Ignore graft from unknown topic"
     ~tags:["gossipsub"; "graft"]
   @@ fun () ->
-  let state = init_state ~peer_no:0 ~topics:[] ~direct:false ~outbound:false in
-  let _state, output = GS.handle_graft 1 "unknown_topic" state in
+  let state, peers =
+    init_state ~peer_no:1 ~topics:[] ~direct:false ~outbound:false
+  in
+  let _state, output = GS.handle_graft peers.(0) "unknown_topic" state in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
      Use Tezt.Check to assert output *)
   match output with
   | Unknown_topic -> unit
   | _ -> Tezt.Test.fail "Expected output [Unknown_topic]"
 
+(** Test that:
+    - Subscribing a known peer to a topic adds the topic to their subscriptions.
+    - Subscribing an unknown peer to a topic does nothing.
+    - Unsubscribing a peer from a topic removes the topic from their subscriptions.
+    - Unsubscribing a non-subscribed topic from a peer has no effect.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L852
+*)
+let test_handle_received_subscriptions () =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Handle received subscriptions"
+    ~tags:["gossipsub"; "subscribe"]
+  @@ fun () ->
+  let topics = ["topic1"; "topic2"; "topic3"; "topic4"] in
+  let state, peers =
+    init_state ~peer_no:20 ~topics ~direct:false ~outbound:false
+  in
+
+  (* The first peer, second peer, and an unknown peer sends
+     3 subscriptions and 1 unsubscription *)
+  let unknown_peer = 99 in
+  let state =
+    [peers.(0); peers.(1); unknown_peer]
+    |> List.fold_left
+         (fun state peer ->
+           let state =
+             ["topic1"; "topic2"; "topic3"]
+             |> List.fold_left
+                  (fun state topic ->
+                    let state, _ = GS.handle_subscribe topic peer state in
+                    state)
+                  state
+           in
+           let state, _ = GS.handle_unsubscribe "topic4" peer state in
+           state)
+         state
+  in
+
+  (* First and second peer should be subscribed to three topics *)
+  assert_subscribed_topics
+    ~__LOC__
+    ~peer:peers.(0)
+    ~expected_topics:["topic1"; "topic2"; "topic3"]
+    state ;
+  assert_subscribed_topics
+    ~__LOC__
+    ~peer:peers.(1)
+    ~expected_topics:["topic1"; "topic2"; "topic3"]
+    state ;
+  (* Unknown peer should not be subscribed to any topic *)
+  assert_subscribed_topics ~__LOC__ ~peer:unknown_peer ~expected_topics:[] state ;
+
+  (* Peer 0 unsubscribes from the first topic *)
+  let state, _ = GS.handle_unsubscribe "topic1" peers.(0) state in
+  (* Peer 0 should be subscribed to two topics *)
+  assert_subscribed_topics
+    ~__LOC__
+    ~peer:peers.(0)
+    ~expected_topics:["topic2"; "topic3"]
+    state ;
+  unit
+
 let () =
   test_ignore_graft_from_unknown_topic () ;
+  test_handle_received_subscriptions () ;
   Tezt.Test.run ()
