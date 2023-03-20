@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori,     <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -294,4 +295,89 @@ module type AUTOMATON = sig
         that are subscribed by [peer] *)
     val get_subscribed_topics : Peer.t -> state -> Topic.t list
   end
+end
+
+module type WORKER_CONFIGURATION = sig
+  (** The gossipsub automaton that will be used by the worker. *)
+  module GS : AUTOMATON
+
+  (** Abstraction of the IO monad used by the worker. *)
+  module Monad : sig
+    (** The monad type. *)
+    type 'a t
+
+    (** Equivalent to [bind m f] function, in infix notation. *)
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
+    (** The monad's return function. *)
+    val return : 'a -> 'a t
+
+    (** [sleep span] will block for the amount of time specified by [span]. *)
+    val sleep : GS.span -> unit t
+  end
+
+  (** A mutable (FIFO) stream of data. *)
+  module Stream : sig
+    (** The stream data structure. *)
+    type 'a t
+
+    (** Create a new empty stream. *)
+    val empty : 'a t
+
+    (** Push the given value into the stream. *)
+    val push : 'a -> 'a t -> unit
+
+    (** Pops the oldest value that has been pushed to the stream. In case the
+        stream is empty, the function will wait until some value is pushed. *)
+    val pop : 'a t -> 'a Monad.t
+  end
+
+  (** The interface for the P2P Network from the worker's point of view. It is
+      made of a [Connections_handler] module. *)
+  module P2P : sig
+    (** Interface for [Connections_handler] module. *)
+    module Connections_handler : sig
+      (** A connection is defined by a [peer] and two flags [direct] and
+          [outbound] to tell whether it is direct and outgoing, or not. *)
+      type connection = {peer : GS.Peer.t; direct : bool; outbound : bool}
+
+      (** A callback to run on each new connection. *)
+      val on_connection : (connection -> unit) -> unit
+
+      (** A callback to run on each disconnection. *)
+      val on_diconnection : (GS.Peer.t -> unit) -> unit
+
+      (** This function allows disconnecting the given peer. *)
+      val disconnect : GS.Peer.t -> unit Monad.t
+    end
+  end
+end
+
+(** The interface of a gossipsub worker. *)
+module type WORKER = sig
+  (** The state of a gossipsub worker. *)
+  type t
+
+  (** The Gossipsub automaton of the worker. *)
+  module GS : AUTOMATON
+
+  (** [make rng limits parameters] initializes a new Gossipsub automaton with
+      the given arguments. Then, it initializes and returns a worker for it. *)
+  val make :
+    Random.State.t ->
+    (GS.Peer.t, GS.Message_id.t, GS.span) limits ->
+    (GS.Peer.t, GS.Message_id.t) parameters ->
+    t
+
+  (** [start ~heartbeat_span topics state] runs the (not already started) worker
+      whose [state] is given. The worker is started with the given
+      [heartbeat_span] and the list of [topics] the caller is interested in. *)
+  val start : heartbeat_span:GS.Span.t -> GS.Topic.t list -> t -> t
+
+  (** [shutdown state] allows stopping the worker whose [state] is given. *)
+  val shutdown : t -> unit
+
+  (** [publish state msg_id msg topic] is used to publish a message [msg] with
+      ID [msg_id] and that belongs to [topic] to the network. *)
+  val publish : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
 end
