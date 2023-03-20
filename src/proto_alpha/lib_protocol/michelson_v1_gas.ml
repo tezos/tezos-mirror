@@ -38,7 +38,7 @@ module Cost_of = struct
 
   let int_size_in_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
 
-  let manager_operation_int = 1_000
+  let manager_operation_int = 100
 
   let manager_operation = step_cost @@ S.safe_int manager_operation_int
 
@@ -295,15 +295,31 @@ module Cost_of = struct
 
     let view = atomic_step_cost cost_N_IView
 
-    let check_signature (pkey : Signature.public_key) b =
-      let cost =
-        match pkey with
-        | Ed25519 _ -> cost_N_ICheck_signature_ed25519 (Bytes.length b)
-        | Secp256k1 _ -> cost_N_ICheck_signature_secp256k1 (Bytes.length b)
-        | P256 _ -> cost_N_ICheck_signature_p256 (Bytes.length b)
-        | Bls _ -> cost_N_ICheck_signature_bls (Bytes.length b)
-      in
-      atomic_step_cost cost
+    type algo = Ed25519 | Secp256k1 | P256 | Bls
+
+    let algo_of_public_key (pkey : Signature.public_key) =
+      match pkey with
+      | Ed25519 _ -> Ed25519
+      | Secp256k1 _ -> Secp256k1
+      | P256 _ -> P256
+      | Bls _ -> Bls
+
+    let algo_of_public_key_hash (pkh : Signature.public_key_hash) =
+      match pkh with
+      | Ed25519 _ -> Ed25519
+      | Secp256k1 _ -> Secp256k1
+      | P256 _ -> P256
+      | Bls _ -> Bls
+
+    let check_signature_on_algo algo length =
+      match algo with
+      | Ed25519 -> cost_N_ICheck_signature_ed25519 length
+      | Secp256k1 -> cost_N_ICheck_signature_secp256k1 length
+      | P256 -> cost_N_ICheck_signature_p256 length
+      | Bls -> cost_N_ICheck_signature_bls length
+
+    let check_signature pkey b =
+      check_signature_on_algo (algo_of_public_key pkey) (Bytes.length b)
 
     let blake2b b = atomic_step_cost (cost_N_IBlake2b (Bytes.length b))
 

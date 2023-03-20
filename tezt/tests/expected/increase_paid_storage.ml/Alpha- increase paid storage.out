@@ -1,30 +1,30 @@
 Node is bootstrapped.
-Estimated gas: 1000 units (will add 0 for safety)
+Estimated gas: 168.648 units (will add 0 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov'
+Operation hash is 'opLmHCaBw2FU5dvWgUE92uyVkKj9yahPCxmLnno1Woa6Dbd5ajr'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
+  octez-client wait for opLmHCaBw2FU5dvWgUE92uyVkKj9yahPCxmLnno1Woa6Dbd5ajr to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-    Fee to the baker: ꜩ0.000348
+    Fee to the baker: ꜩ0.000265
     Expected counter: 1
-    Gas limit: 1000
+    Gas limit: 169
     Storage limit: 0 bytes
     Balance updates:
-      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000348
-      payload fees(the block proposer) ....... +ꜩ0.000348
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000265
+      payload fees(the block proposer) ....... +ꜩ0.000265
     Increase paid storage:
       Increased size: 1000 bytes
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-      To: KT1H5YzqTpJRQcvW59E8qT1HSq97p5FDuTYa
+      To: KT1FVJKsW99mkHyATPUZm8oybDNUbBZgdzAH
       This paid storage increase was successfully applied
       Balance updates:
         tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.25
         storage fees ........................... +ꜩ0.25
-      Consumed gas: 1000
+      Consumed gas: 168.582
 
 

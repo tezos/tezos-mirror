@@ -1,26 +1,26 @@
 Node is bootstrapped.
-Estimated gas: 1000 units (will add 0 for safety)
+Estimated gas: 167.886 units (will add 0 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'onqFPeWE1g1A8kQ9hcyLW22Z71kd8t7Wmpfc15Yzi8ph2eprrUn'
+Operation hash is 'oo1PJ41t8u2VYdoeFVgREH9LKKtASE141H3wWRmKRbuBcshW3hR'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for onqFPeWE1g1A8kQ9hcyLW22Z71kd8t7Wmpfc15Yzi8ph2eprrUn to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
+  octez-client wait for oo1PJ41t8u2VYdoeFVgREH9LKKtASE141H3wWRmKRbuBcshW3hR to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000325
+    Fee to the baker: ꜩ0.000242
     Expected counter: 1
-    Gas limit: 1000
+    Gas limit: 168
     Storage limit: 0 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000325
-      payload fees(the block proposer) ....... +ꜩ0.000325
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000242
+      payload fees(the block proposer) ....... +ꜩ0.000242
     Set deposits limit:
       Delegate: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
       Unlimited deposits
       This deposits limit modification was successfully applied
-      Consumed gas: 1000
+      Consumed gas: 167.820
 
 

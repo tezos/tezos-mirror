@@ -33,6 +33,11 @@
 open Alpha_context
 
 module Cost_of : sig
+  (* The [manager_operation] cost is consumed each time a manager
+     operation (internal or external alike) is applied. This cost is
+     meant to cover the resources used in {!Apply} either directly
+     (dispatching on operation kinds) or indirectly (in particular in
+     the production of operation results). *)
   val manager_operation : Gas.cost
 
   module Interpreter : sig
@@ -225,6 +230,14 @@ module Cost_of : sig
     val loop_left : Gas.cost
 
     val dip : Gas.cost
+
+    type algo = Ed25519 | Secp256k1 | P256 | Bls
+
+    val algo_of_public_key : Signature.public_key -> algo
+
+    val algo_of_public_key_hash : Signature.public_key_hash -> algo
+
+    val check_signature_on_algo : algo -> int -> Gas.cost
 
     val check_signature : Signature.public_key -> bytes -> Gas.cost
 

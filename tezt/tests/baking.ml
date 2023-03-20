@@ -575,7 +575,7 @@ let baking_operation_exception =
                  minimal manager operation gas cost to cover this
                  possibility. See issue
                  https://gitlab.com/tezos/tezos/-/issues/3188 *)
-            ~gas_limit:(Constant.manager_operation_gas_cost + 400)
+            ~gas_limit:(Constant.manager_operation_gas_cost ~protocol + 400)
           @@ delegation ~delegate:new_account ();
         ]
         client)

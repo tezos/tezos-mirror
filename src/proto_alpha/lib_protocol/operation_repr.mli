@@ -634,6 +634,14 @@ type error += Missing_signature (* `Permanent *)
 
 type error += Invalid_signature (* `Permanent *)
 
+(** Measuring the length of an operation, ignoring its signature.
+    This is useful to define a gas model for the check of the
+    signature. *)
+val unsigned_operation_length : _ operation -> int
+
+(** Check the signature of an operation. This function serializes the
+    operation before calling the [Signature.check] function with the
+    appropriate watermark. *)
 val check_signature :
   Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
 
@@ -784,4 +792,9 @@ module Encoding : sig
 
     val zk_rollup_update_case : Kind.zk_rollup_update case
   end
+end
+
+module Internal_for_benchmarking : sig
+  (* Serialize an operation, ignoring its signature. *)
+  val serialize_unsigned_operation : _ operation -> bytes
 end

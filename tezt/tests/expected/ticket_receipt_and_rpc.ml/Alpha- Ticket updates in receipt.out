@@ -1,7 +1,7 @@
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '(Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")'
 Node is bootstrapped.
-Estimated gas: 10529.631 units (will add 100 for safety)
+Estimated gas: 7901.227 units (will add 100 for safety)
 Estimated storage: 475 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001401
+    Fee to the baker: ꜩ0.001139
     Expected counter: 1
-    Gas limit: 10630
+    Gas limit: 8002
     Storage limit: 495 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001401
-      payload fees(the block proposer) ....... +ꜩ0.001401
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001139
+      payload fees(the block proposer) ....... +ꜩ0.001139
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -26,40 +26,40 @@ This sequence of operations was run:
       Parameter: (Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "red" 1) ;
-          Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "green" 1) ;
-          Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "green" 1) }
+        { Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "red" 1) ;
+          Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "green" 1) ;
+          Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "green" 1) }
       Storage size: 525 bytes
       Paid storage size diff: 325 bytes
-      Consumed gas: 4022.540
+      Consumed gas: 3194.103
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.08125
         storage fees ........................... +ꜩ0.08125
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
-        Content: "green"
-        Account updates:
-          [CONTRACT_HASH] ... +2
-        Ticketer: [CONTRACT_HASH]
-        Content type: string
         Content: "red"
         Account updates:
           [CONTRACT_HASH] ... +1
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "green"
+        Account updates:
+          [CONTRACT_HASH] ... +2
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [CONTRACT_HASH]
-          Parameter: (Pair (Pair (Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "blue" 1))
-                                 (Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "blue" 1)))
-                           0x019f6eb0d7baa758f9b63f59a2c85e261d9658924600)
+          Parameter: (Pair (Pair (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1))
+                                 (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1)))
+                           0x0192ce5ac8f542c49e64c7b6c73c445515ddc20f9400)
           This transaction was successfully applied
           Updated storage:
-            (Some (Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "blue" 1)))
+            (Some (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1)))
           Storage size: 169 bytes
           Paid storage size diff: 108 bytes
-          Consumed gas: 3718.488
+          Consumed gas: 2818.488
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.027
             storage fees ........................... +ꜩ0.027
@@ -73,13 +73,13 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [CONTRACT_HASH]
-          Parameter: (Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "blue" 1))
+          Parameter: (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1))
           This transaction was successfully applied
           Updated storage:
-            (Some (Pair 0x012337a0bac2cdba3aa8fcb8ae8dc02e417301533700 (Pair "blue" 1)))
+            (Some (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1)))
           Storage size: 88 bytes
           Paid storage size diff: 42 bytes
-          Consumed gas: 2789.850
+          Consumed gas: 1889.850
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.0105
             storage fees ........................... +ꜩ0.0105
@@ -108,22 +108,22 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/all_ticket_balances'
 [ { "ticketer": "[CONTRACT_HASH]",
-    "content_type": { "prim": "string" }, "content": { "string": "green" },
-    "amount": "2" },
-  { "ticketer": "[CONTRACT_HASH]",
     "content_type": { "prim": "string" }, "content": { "string": "red" },
-    "amount": "1" } ]
+    "amount": "1" },
+  { "ticketer": "[CONTRACT_HASH]",
+    "content_type": { "prim": "string" }, "content": { "string": "green" },
+    "amount": "2" } ]
 
 ./octez-client --mode mockup get all ticket balances for '[CONTRACT_HASH]'
 Ticketer: [CONTRACT_HASH]
 Content type: string
-Content: "green"
-Amount: 2
+Content: "red"
+Amount: 1
 
 Ticketer: [CONTRACT_HASH]
 Content type: string
-Content: "red"
-Amount: 1
+Content: "green"
+Amount: 2
 
 ./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/all_ticket_balances'
 [ { "ticketer": "[CONTRACT_HASH]",

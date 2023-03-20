@@ -1,7 +1,7 @@
 
 ./octez-client --mode mockup --wait none originate contract split_string transferring 0 from bootstrap1 running michelson_test_scripts/opcodes/split_string.tz --init '{}' --burn-cap 10 --force
 Node is bootstrapped.
-Estimated gas: 1473.672 units (will add 100 for safety)
+Estimated gas: 650.005 units (will add 100 for safety)
 Estimated storage: 511 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000639
+    Fee to the baker: ꜩ0.000557
     Expected counter: 1
-    Gas limit: 1574
+    Gas limit: 751
     Storage limit: 531 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000639
-      payload fees(the block proposer) ....... +ꜩ0.000639
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000557
+      payload fees(the block proposer) ....... +ꜩ0.000557
     Origination:
       From: [PUBLIC_KEY_HASH]
       Credit: ꜩ0
@@ -55,7 +55,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 254 bytes
         Paid storage size diff: 254 bytes
-        Consumed gas: 1473.672
+        Consumed gas: 649.972
         Balance updates:
           [PUBLIC_KEY_HASH] ... -ꜩ0.0635
           storage fees ........................... +ꜩ0.0635
@@ -67,7 +67,7 @@ Contract memorized as split_string.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"abc"'
 Node is bootstrapped.
-Estimated gas: 2151.081 units (will add 100 for safety)
+Estimated gas: 1320.160 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -78,13 +78,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000487
+    Fee to the baker: ꜩ0.000404
     Expected counter: 2
-    Gas limit: 2252
+    Gas limit: 1421
     Storage limit: 38 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000487
-      payload fees(the block proposer) ....... +ꜩ0.000487
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000404
+      payload fees(the block proposer) ....... +ꜩ0.000404
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -94,7 +94,7 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" }
       Storage size: 272 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 2151.683
+      Consumed gas: 1320.696
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045
@@ -105,7 +105,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"def"'
 Node is bootstrapped.
-Estimated gas: 2153.769 units (will add 100 for safety)
+Estimated gas: 1322.848 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -116,13 +116,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000487
+    Fee to the baker: ꜩ0.000404
     Expected counter: 3
-    Gas limit: 2254
+    Gas limit: 1423
     Storage limit: 38 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000487
-      payload fees(the block proposer) ....... +ꜩ0.000487
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000404
+      payload fees(the block proposer) ....... +ꜩ0.000404
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -132,7 +132,7 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" ; "d" ; "e" ; "f" }
       Storage size: 290 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 2154.371
+      Consumed gas: 1323.384
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045

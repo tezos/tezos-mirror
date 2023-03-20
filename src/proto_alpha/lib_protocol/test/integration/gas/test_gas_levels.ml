@@ -366,9 +366,12 @@ let bake_operations_with_gas block list_list_dst =
   bake_with_gas ~operations block >>=? fun (block, consumed_gas) ->
   return (block, consumed_gas, gas_limit_total)
 
+(* A sampler for gas limits, the returned value should always be high
+   enough to apply a simple manager operation but lower than the
+   operation gas limit. *)
 let basic_gas_sampler () =
   Alpha_context.Gas.Arith.integral_of_int_exn
-    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100
+    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 1000
    + Random.int 900)
 
 let generic_test_block_one_origination contract gas_sampler structure =
@@ -504,11 +507,7 @@ let test_emptying_account_gas () =
   Block.bake ~operation:op1 b >>=? fun b ->
   Op.revelation ~fee:Tez.zero (B b) pk >>=? fun op2 ->
   Block.bake ~operation:op2 b >>=? fun b ->
-  let gas_limit =
-    Op.Custom_gas
-      (Gas.Arith.integral_of_int_exn
-         Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
-  in
+  let gas_limit = Op.Low in
   Op.delegation ~fee:amount ~gas_limit (B b) contract (Some bootstrap_pkh)
   >>=? fun op ->
   Incremental.begin_construction b >>=? fun i ->

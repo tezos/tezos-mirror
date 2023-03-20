@@ -64,8 +64,37 @@ Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
 
 Distribution of rollups data through reveal data channel. (MRs :gl:`!7571`)
 
+Gas improvements
+----------------
+
+Gas for signature checking of manager operations is made much more
+precise. It is now only consumed when a signature is actually checked
+(never for internal operations and only once per operation batch) and
+it depends on both the signature scheme and the length of the signed
+operation. This change leads to important reductions in the gas cost
+of manager operations and to considerable increase in transaction
+throughput. (MR :gl:`!7591`)
+
 Breaking Changes
 ----------------
+
+Some manager operations such as revelations of public keys used to
+have constant gas costs. Due to the gas improvements of MR
+:gl:`!7591`), their gas cost now depends on the signature scheme and
+the length of the operation. For some schemes, the gas cost may even
+be larger than in previous protocol versions. In particular, revealing
+the public key of an implicit account consumed 1000 gas units
+previously, it now has the following gas costs depending on the
+signature scheme:
+
+================ ============================
+Signature scheme Gas cost of reveal operation
+================ ============================
+ed25519 (tz1)    166 gas units
+secp256k1 (tz2)  152 gas units
+p256 (tz3)       1091 gas units
+bls (tz4)        1671 gas units
+================ ============================
 
 RPC Changes
 -----------

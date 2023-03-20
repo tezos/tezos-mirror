@@ -89,7 +89,8 @@ let max_op_ttl = 120
 
 (** Constant gas cost required for every manager operation. Should
     match [Michelson_v1_gas.Cost_of.manager_operation]. *)
-let manager_operation_gas_cost = 1000
+let manager_operation_gas_cost ~protocol =
+  match protocol with Protocol.Alpha -> 100 | Lima | Mumbai -> 1000
 
 (** A valid base58 encoded layer-2 address to be used to test
     transaction rollups. *)
