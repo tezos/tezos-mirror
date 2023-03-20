@@ -251,6 +251,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlmalloc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "203540e710bfadb90e5e29930baf5d10270cec1f43ab34f46f78b147b2de715a"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1096,6 +1105,16 @@ version = "0.1.0"
 dependencies = [
  "tezos_smart_rollup_core 0.1.0",
  "tezos_smart_rollup_host",
+]
+
+[[package]]
+name = "tezos_smart_rollup_entrypoint"
+version = "0.1.0"
+dependencies = [
+ "dlmalloc",
+ "tezos_smart_rollup_debug",
+ "tezos_smart_rollup_host",
+ "tezos_smart_rollup_panic_hook",
 ]
 
 [[package]]
