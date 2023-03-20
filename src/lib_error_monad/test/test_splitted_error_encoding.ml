@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Error Monad
-    Invocation:   dune build @src/lib_error_monad/runtest
+    Invocation:   dune exec src/lib_error_monad/test/main.exe
     Subject:      On the wrapping of error_encoding in a splitted.
 *)
 
