@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Environment structs
-    Invocation:   dune exec src/lib_protocol_environment/test/test.exe -- test "^data_encoding$"
+    Invocation:   dune exec src/lib_protocol_environment/test/main.exe
     Subject:      Environment structs modifications to Data_encoding
                   e.g. in src/lib_protocol_environment/structs/v5_data_encoding.ml
 *)

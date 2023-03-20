@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Protocol Cache
-    Invocation:   dune exec src/lib_protocol_environment/test/test.exe -- test "^cache$"
+    Invocation:   dune exec src/lib_protocol_environment/test/main.exe
     Dependencies: src/lib_protocol_environment/test/assert.ml
     Subject:      Low-level operations on protocol cache
 *)
