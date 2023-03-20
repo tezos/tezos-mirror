@@ -55,7 +55,7 @@ let link module_ =
 (* Starting point of the module after reading the kernel file: parsing,
    typechecking and linking for safety before feeding kernel to the PVM, then
    installation into a tree for the PVM interpreter. *)
-let handle_module binary name module_ =
+let handle_module version binary name module_ =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
   let* ast =
@@ -68,7 +68,7 @@ let handle_module binary name module_ =
   let* _ = link ast in
   let*! tree =
     initial_tree
-      ~version:V1
+      ~version
       ~ticks_per_snapshot:(Z.to_int64 Wasm_2_0_0PVM.ticks_per_snapshot)
       ~outbox_validity_period:Wasm_2_0_0PVM.outbox_validity_period
       ~outbox_message_limit:Wasm_2_0_0PVM.outbox_message_limit
@@ -78,11 +78,11 @@ let handle_module binary name module_ =
   let*! tree = eval_until_input_requested tree in
   return tree
 
-let start binary file =
+let start version binary file =
   let open Lwt_result_syntax in
   let module_name = Filename.(file |> basename |> chop_extension) in
   let*! buffer = Repl_helpers.read_file file in
-  handle_module binary module_name buffer
+  handle_module version binary module_name buffer
 
 (* REPL main loop: reads an input, does something out of it, then loops. *)
 let repl tree inboxes level config =
@@ -178,7 +178,13 @@ let main_command =
     ~desc:"Start the eval loop"
     (args3 input_arg rollup_arg preimage_directory_arg)
     (wasm_param @@ stop)
-    (fun (inputs, rollup_arg, preimage_directory) wasm_file () ->
+    (fun (inputs, rollup_arg, preimage_directory) wasm_file version ->
+      let version =
+        Option.value
+          ~default:
+            Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.current_version
+          version
+      in
       let config =
         Config.config ?destination:rollup_arg ?preimage_directory ()
       in
@@ -187,7 +193,7 @@ let main_command =
         else if Filename.check_suffix wasm_file ".wast" then Ok false
         else error_with "Kernels should have .wasm or .wast file extension"
       in
-      let* tree = start binary wasm_file in
+      let* tree = start version binary wasm_file in
       let* inboxes =
         match inputs with
         | Some inputs -> Messages.parse_inboxes inputs config
@@ -199,7 +205,30 @@ let main_command =
 (* List of program commands *)
 let commands = [main_command]
 
-let global_options = Tezos_clic.no_options
+let version_parameter =
+  Tezos_clic.parameter (fun _ v ->
+      let open Tezos_scoru_wasm.Wasm_pvm_state in
+      match Data_encoding.Binary.of_string_opt version_encoding v with
+      | Some v -> Lwt_result_syntax.return v
+      | None ->
+          Error_monad.failwith
+            "%s is not a valid WASM PVM version. Expected one of: %a."
+            v
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+                (fun fmt str -> fprintf fmt "'%s'" str))
+            (List.map fst versions))
+
+let global_options =
+  Tezos_clic.(
+    args1
+      (arg
+         ~doc:"The initial version of the WASM PVM"
+         ~short:'p'
+         ~long:"pvm-version"
+         ~placeholder:"VERSION"
+         version_parameter))
 
 let dispatch initial_ctx args =
   let open Lwt_result_syntax in

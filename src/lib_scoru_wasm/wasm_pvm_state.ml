@@ -26,6 +26,10 @@
 
 type version = V0 | V1
 
+let versions = [("2.0.0", V0); ("2.0.0-r1", V1)]
+
+let versions_flip = List.map (fun (x, y) -> (y, x)) versions
+
 let version_encoding =
   (* This encoding is directly used by the protocol. As a consequence,
      any change done to it needs to be backward compatible!
@@ -35,11 +39,11 @@ let version_encoding =
      bytes. *)
   Data_encoding.(
     conv_with_guard
-      (function V0 -> "2.0.0" | V1 -> "2.0.0-r1")
-      (function
-        | "2.0.0" -> Ok V0
-        | "2.0.0-r1" -> Ok V1
-        | _ -> Error "not a valid version")
+      (fun v -> Stdlib.List.assoc v versions_flip)
+      (fun str ->
+        match List.assoc_opt ~equal:Compare.String.equal str versions with
+        | Some v -> Ok v
+        | None -> Error "not a valid version")
       Variable.string)
 
 (** Represents the location of an input message. *)
