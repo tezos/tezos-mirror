@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base
-   Invocation:   dune exec src/lib_base/test/test_time.exe
+   Invocation:   dune exec src/lib_base/test/main.exe
    Subject:      Check that the Protocol and System times behave correctly
                  regarding addition and encoding (binary and JSON)
 *)
