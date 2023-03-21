@@ -31,16 +31,11 @@ type error +=
   | Cannot_create_reveal_data_dir of string
 
 module Keys : sig
-  type t
-
-  (** [public_key_hash] returns the [Tezos_crypto.Aggregate_signature.public_key_hash] given a [t]. *)
-  val public_key_hash : t -> Tezos_crypto.Aggregate_signature.public_key_hash
-
-  (** [public_key_opt] returns the [Tezos_crypto.Aggregate_signature.public_key option] given a [t]. *)
-  val public_key_opt : t -> Tezos_crypto.Aggregate_signature.public_key option
-
-  (** [aggregate_sk_uri] returns the [Client_keys.aggregate_sk_uri] given a [t]. *)
-  val aggregate_sk_uri : t -> Client_keys.aggregate_sk_uri
+  type t = private {
+    public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
+    public_key_opt : Tezos_crypto.Aggregate_signature.public_key option;
+    aggregate_sk_uri : Client_keys.aggregate_sk_uri;
+  }
 
   (** Retrieve [Keys.t] from the provided [#Client_context.wallet] 
       and [Tezos_crypto.Aggregate_signature.public_key_hash] *)

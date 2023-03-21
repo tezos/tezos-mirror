@@ -63,12 +63,6 @@ module Keys = struct
     aggregate_sk_uri : Client_keys.aggregate_sk_uri;
   }
 
-  let public_key_hash t = t.public_key_hash
-
-  let public_key_opt t = t.public_key_opt
-
-  let aggregate_sk_uri t = t.aggregate_sk_uri
-
   let get_wallet_info cctxt address =
     let open Lwt_result_syntax in
     let open Tezos_client_base.Client_keys in
@@ -96,7 +90,7 @@ module Keys = struct
   let get_public_key cctxt address =
     let open Lwt_result_syntax in
     let+ address_keys_opt = get_wallet_info cctxt address in
-    Option.bind address_keys_opt (fun t -> public_key_opt t)
+    Option.bind address_keys_opt (fun t -> t.public_key_opt)
 
   let get_keys ~addresses ~threshold cctxt =
     let open Lwt_result_syntax in

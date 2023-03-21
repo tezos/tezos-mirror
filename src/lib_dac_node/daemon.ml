@@ -126,7 +126,7 @@ module Handler = struct
     let* signature =
       Tezos_client_base.Client_keys.aggregate_sign
         wallet
-        (Dac_manager.Keys.aggregate_sk_uri keys)
+        Dac_manager.Keys.(keys.aggregate_sk_uri)
         bytes_to_sign
     in
     let signature_repr =
@@ -134,7 +134,7 @@ module Handler = struct
         {
           root_hash;
           signature;
-          signer_pkh = Dac_manager.Keys.public_key_hash keys;
+          signer_pkh = Dac_manager.Keys.(keys.public_key_hash);
         }
     in
     let* () =
@@ -270,8 +270,8 @@ let run ~data_dir cctxt =
     |> List.map (fun account_opt ->
            match account_opt with
            | Some account ->
-               ( Dac_manager.Keys.public_key_opt account,
-                 Some (Dac_manager.Keys.aggregate_sk_uri account) )
+               ( Dac_manager.Keys.(account.public_key_opt),
+                 Some Dac_manager.Keys.(account.aggregate_sk_uri) )
            | None -> (None, None))
     |> List.split
   in
