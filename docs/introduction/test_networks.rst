@@ -53,7 +53,7 @@ Mumbainet
 
 - Built-in network alias: ``mumbainet`` (see :ref:`builtin_networks`)
 
-  * Available from version 16.0~rc2.
+  * Available from version 16.0.
 
 Mumbainet is a test network which runs the Mumbai protocol.
 Mumbainet will run until Mumbai is refused through the amendment process
