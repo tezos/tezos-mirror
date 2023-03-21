@@ -306,60 +306,37 @@ let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
           ~error_msg:"expected a non migration block ")) ;
   Lwt.return_unit
 
-(** [get_endorsement_power ~level client] retrieves the number of endorsements,
-    aka its power, for level [level - 1] at block [level]. *)
-let get_endorsement_power ~level client =
-  let block = string_of_int level in
+(** Number of elements in [l] that satisfy the predicate [p]. *)
+let list_count_p p l =
+  let rec aux acc = function
+    | [] -> acc
+    | x :: t ->
+        let acc = if p x then acc + 1 else acc in
+        aux acc t
+  in
+  aux 0 l
+
+let is_endorsement op =
+  let kind = JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string) in
+  String.equal kind "endorsement"
+
+(** Check that the given json list of operations contains
+    [expected_count] endorsements. *)
+let check_endorsements ~expected_count consensus_ops =
+  let actual_count = list_count_p is_endorsement (JSON.as_list consensus_ops) in
+  Check.((expected_count = actual_count) int)
+    ~error_msg:"Expected %L endorsements but got %R."
+
+(** Check that the block at [level] contains [expected_count] endorsements. *)
+let check_endorsements_in_block ~level ~expected_count client =
   let* consensus_operations =
-    let consensus_pass = 0 in
     RPC.Client.call client
     @@ RPC.get_chain_block_operations_validation_pass
-         ~block
-         ~validation_pass:consensus_pass
+         ~block:(string_of_int level)
+         ~validation_pass:0 (* consensus operations pass *)
          ()
   in
-  Lwt.return
-  @@
-  let open JSON in
-  as_list consensus_operations
-  |> List.fold_left
-       (fun acc ops ->
-         acc
-         + (JSON.get "contents" ops |> JSON.as_list
-           |> List.fold_left
-                (fun acc elt ->
-                  if
-                    String.equal
-                      JSON.(get "kind" elt |> as_string)
-                      "endorsement"
-                    && JSON.(get "level" elt |> as_int) = level - 1
-                  then
-                    let power =
-                      JSON.(
-                        get "metadata" elt |> get "endorsement_power" |> as_int)
-                    in
-                    power + acc
-                  else acc)
-                0))
-       0
-
-(** [check_block_has_no_endorsements ~level ~client] checks that the block at
-   [level] contains no endorsements. *)
-let check_block_has_no_endorsements ~level client =
-  let* endorsement_power = get_endorsement_power ~level client in
-  Lwt.return
-  @@ Check.(
-       (endorsement_power = 0)
-         int
-         ~error_msg:"Expected zero endorsements, got %L")
-
-(** [check_block_has_no_endorsements ~level ~client] checks that the block at
-   [level] contains no endorsements. *)
-let check_block_has_endorsements ~level client =
-  let* endorsement_power = get_endorsement_power ~level client in
-  Lwt.return
-  @@ Check.(
-       (endorsement_power >= 0) int ~error_msg:"Expected non-zero endorsements")
+  Lwt.return (check_endorsements ~expected_count consensus_operations)
 
 (** [start_protocol ~expected_bake_for_blocks ~protocol client] sets up a
    protocol with some specific easily tunable parameters (consensus threshold,
@@ -486,7 +463,10 @@ let test_migration_with_bakers ?(migration_level = 4)
   Log.info
     "Checking migration block has not been endorsed -- this is a special case" ;
   let* () =
-    check_block_has_no_endorsements ~level:(migration_level + 1) client
+    check_endorsements_in_block
+      ~level:(migration_level + 1)
+      ~expected_count:0
+      client
   in
 
   (* Check block metadata *)
@@ -903,6 +883,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
      level.)"
     level_from
     level_to ;
+  let n_delegates = Array.length Account.Bootstrap.keys in
   let rec check_blocks ~level_from ~level_to =
     if level_from > level_to then Lwt.return_unit
     else (
@@ -915,13 +896,11 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
           level_from
           (JSON.encode block1)
           (JSON.encode block3) ;
-      let* () =
-        (if level_from = migration_level + 1 then
-         check_block_has_no_endorsements
-        else check_block_has_endorsements)
-          ~level:level_from
-          client1
+      let consensus_ops = JSON.(block1 |-> "operations" |=> 0) in
+      let expected_count =
+        if level_from = post_migration_level then 0 else n_delegates
       in
+      check_endorsements ~expected_count consensus_ops ;
       check_blocks ~level_from:(level_from + 1) ~level_to)
   in
   check_blocks ~level_from ~level_to
