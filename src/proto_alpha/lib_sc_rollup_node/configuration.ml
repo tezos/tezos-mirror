@@ -408,8 +408,7 @@ let description_of_mode = function
   | Observer -> "Only follows the chain, reconstructs and interprets inboxes"
   | Accuser ->
       "Only publishes commitments for conflicts and play refutation games"
-  | Batcher ->
-      "Accepts transactions in its queue and batches them on the L1 (TODO)"
+  | Batcher -> "Accepts transactions in its queue and batches them on the L1"
   | Maintenance ->
       "Follows the chain and publishes commitments, cement and refute"
   | Operator -> "Equivalent to maintenance + batcher"
