@@ -48,3 +48,6 @@ val of_manager_operation : 'a manager_operation -> t option
 
 (** Pretty printer (human readable) for L1 operations. *)
 val pp : Format.formatter -> t -> unit
+
+(** [false] if the injector will accept duplicate such operations. *)
+val unique : t -> bool

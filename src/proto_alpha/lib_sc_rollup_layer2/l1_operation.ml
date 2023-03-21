@@ -176,3 +176,7 @@ let of_manager_operation : type kind. kind manager_operation -> t option =
       Some (Refute {rollup; opponent; refutation})
   | Sc_rollup_timeout {rollup; stakers} -> Some (Timeout {rollup; stakers})
   | _ -> None
+
+let unique = function
+  | Add_messages _ -> false
+  | Cement _ | Publish _ | Refute _ | Timeout _ -> true
