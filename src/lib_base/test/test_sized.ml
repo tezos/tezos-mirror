@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base
-   Invocation:   dune exec src/lib_base/test/test_sized.exe
+   Invocation:   dune exec src/lib_base/test/main.exe
    Subject:      Check that the sized map and set functions behave correctly
 *)
 

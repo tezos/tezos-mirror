@@ -1,7 +1,7 @@
 (** Testing
     -------
     Component:    Client Base
-    Invocation:   dune build @src/lib_client_base/runtest
+    Invocation:   dune exec src/lib_client_base/test/main.exe
     Subject:      BIP39 seed phrases. Mnemonic sentences for the
                   generation of deterministic wallets.
 *)

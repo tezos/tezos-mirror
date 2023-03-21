@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Proxy context (without delegation for now)
-    Invocation:   dune exec src/lib_protocol_environment/test_shell_context/test_proxy_context.exe
+    Invocation:   dune exec src/lib_protocol_environment/test_shell_context/main.exe
     Dependencies: src/lib_protocol_environment/test_shell_context/assert.ml
     Subject:      Low-level operations on proxy contexts.
 *)

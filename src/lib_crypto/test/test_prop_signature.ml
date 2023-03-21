@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
+    Invocation:   dune exec src/lib_crypto/test/main.exe
     Subject:      Property-tests over the interface S.SIGNATURE and its
                   instantiations.
 *)

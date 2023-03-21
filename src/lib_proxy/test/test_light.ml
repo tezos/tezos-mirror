@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune exec src/lib_proxy/test/main.exe
     Dependencies: src/lib_proxy/test/light_lib.ml
 *)
 

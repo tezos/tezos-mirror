@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
+    Invocation:   dune exec src/lib_crypto/test/main.exe
     Dependencies: src/lib_crypto/test/context_hash.ml
     Subject:      On context hash
 *)

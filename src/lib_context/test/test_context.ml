@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Context
-   Invocation:   dune build @src/lib_context/runtest
+   Invocation:   dune exec src/lib_context/test/main.exe
    Subject:      On context features.
 *)
 

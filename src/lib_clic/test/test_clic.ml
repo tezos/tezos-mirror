@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Tezos_clic library
-    Invocation:   dune build @src/lib_clic/runtest
+    Invocation:   dune exec src/lib_clic/test/main.exe
     Subject:      Test the functionality of the Tezos_clic library, such as CLI
                   command dispatch, parameters and auto-completion.
 *)

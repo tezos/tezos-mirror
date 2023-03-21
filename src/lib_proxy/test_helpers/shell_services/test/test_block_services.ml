@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Block services
-    Invocation:   dune exec src/lib_shell_services/test_helpers/test/test_block_services.exe
+    Invocation:   dune exec src/lib_proxy/test_helpers/shell_services/test/main.exe
     Subject:      Fuzzing tests of equalities
 *)
 
