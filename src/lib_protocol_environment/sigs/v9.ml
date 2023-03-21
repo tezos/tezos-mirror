@@ -6504,11 +6504,6 @@ end
 
     {3 Special considerations}
 
-    Because they traverse the list from right-to-left, the {!fold_right2}
-    function and all its variants fail with [when_different_lengths] before any
-    of the processing starts. Whilst this is still within the fail-early
-    behaviour, it may be surprising enough that it requires mentioning here.
-
     Because they may return early, {!for_all2} and {!exists2} and all their
     variants may return [Ok _] even though the arguments have different lengths.
 *)
@@ -6787,21 +6782,6 @@ val fold_left2 :
   'b list ->
   'c list ->
   ('a, 'trace) result
-
-(** [fold_right2 ~when_different_lengths f xs ys init] is
-    [f x0 y0 (f x1 y1 (…))].
-
-    This function is not tail-recursive.
-
-    Note that unlike the left-to-right double-list traversors, [fold_right2]
-    only calls [f] if the lists are of the same length. *)
-val fold_right2 :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> 'c) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result
 
 (** [for_all2 ~when_different_lengths f xs ys] is
     [f x0 y0 && f x1 y1 && …].
@@ -7416,23 +7396,6 @@ val fold_left_i_es :
   'b list ->
   ('a, 'trace) result Lwt.t
 
-(** This function is not tail-recursive *)
-val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-
-(** This function is not tail-recursive *)
-val fold_right_e :
-  ('a -> 'b -> ('b, 'trace) result) -> 'a list -> 'b -> ('b, 'trace) result
-
-(** This function is not tail-recursive *)
-val fold_right_s : ('a -> 'b -> 'b Lwt.t) -> 'a list -> 'b -> 'b Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right_es :
-  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
-  'a list ->
-  'b ->
-  ('b, 'trace) result Lwt.t
-
 (** {3 Double-traversal variants}
 
     As mentioned above, there are no [_p] and [_ep] double-traversors. Use
@@ -7524,33 +7487,6 @@ val fold_left2_es :
   'b list ->
   'c list ->
   ('a, 'trace) result Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right2_e :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> ('c, 'trace) result) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result
-
-(** This function is not tail-recursive *)
-val fold_right2_s :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> 'c Lwt.t) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right2_es :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> ('c, 'trace) result Lwt.t) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result Lwt.t
 
 (** {3 Scanning variants} *)
 
