@@ -410,38 +410,21 @@ Now that the rollup is originated, anyone can make it progress by deploying a
 rollup node.
 
 First, we need to decide on a directory where the rollup node stores
-its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path. The
-rollup node is configured with the following command:
+its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path.
+
+
+The rollup node can then be run with:
 
 .. code:: sh
 
-   octez-smart-rollup-node-PtMumbai --base-dir "${OCLIENT_DIR}" \
-                    init operator config for "${SOR_ADDR}" \
+   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
+                    run operator for "${SOR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
-This creates a configuration file:
+The log should show that the rollup node follows the Layer 1 chain and
+processes the inbox of each level.
 
-::
-
-   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
-
-Here is the content of the file:
-
-::
-
-  {
-    "data-dir": "${ROLLUP_NODE_DIR}",
-    "smart-rollup-address": "${SOR_ADDR}",
-    "smart-rollup-node-operator": {
-      "publish": "${OPERATOR_ADDR}",
-      "add_messages": "${OPERATOR_ADDR}",
-      "cement": "${OPERATOR_ADDR}",
-      "refute": "${OPERATOR_ADDR}"
-    },
-    "fee-parameters": {},
-    "mode": "operator"
-  }
 
 Notice that distinct Layer 1 adresses could be used for the Layer 1
 operations issued by the rollup node simply by editing the
@@ -497,14 +480,49 @@ operations which are injected by the rollup node in each mode.
 .. [*] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
 
-Second, the configured rollup node can be run:
+Configuration file
+""""""""""""""""""
+
+The rollup node can also be configured with the following command that
+uses the same arguments as the ``run`` command:
 
 .. code:: sh
 
-   octez-smart-rollup-node-PtMumbai -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
+                    init operator config for "${SOR_ADDR}" \
+                    with operators "${OPERATOR_ADDR}" \
+                    --data-dir "${ROLLUP_NODE_DIR}"
 
-The log should show that the rollup node follows the Layer 1 chain and
-processes the inbox of each level.
+This creates a configuration file:
+
+::
+
+   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
+
+Here is the content of the file:
+
+::
+
+  {
+    "data-dir": "${ROLLUP_NODE_DIR}",
+    "smart-rollup-address": "${SOR_ADDR}",
+    "smart-rollup-node-operator": {
+      "publish": "${OPERATOR_ADDR}",
+      "add_messages": "${OPERATOR_ADDR}",
+      "cement": "${OPERATOR_ADDR}",
+      "refute": "${OPERATOR_ADDR}"
+    },
+    "fee-parameters": {},
+    "mode": "operator"
+  }
+
+The rollup node can now be run with just:
+
+.. code:: sh
+
+   octez-smart-rollup-node-alpha -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+
+The configuration will be read from ``${ROLLUP_NODE_DIR}/config.json``.
 
 Rollup node in a sandbox
 """"""""""""""""""""""""
