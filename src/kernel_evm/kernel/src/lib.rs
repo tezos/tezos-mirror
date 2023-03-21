@@ -56,7 +56,7 @@ fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(host: &mut Host)
         Ok(smart_rollup_address) => smart_rollup_address,
         Err(_) => {
             let address = Runtime::reveal_metadata(host).unwrap().raw_rollup_address;
-            store_smart_rollup_address(host, address).unwrap();
+            store_smart_rollup_address(host, &address).unwrap();
             address
         }
     }

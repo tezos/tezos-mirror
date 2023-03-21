@@ -41,10 +41,10 @@ const MINT_ACCOUNTS: [MintAccount; MINT_ACCOUNTS_NUMBER] = [
 
 fn store_genesis_mint_account<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    account: Account,
-    path: OwnedPath,
+    account: &Account,
+    path: &OwnedPath,
 ) -> Result<(), Error> {
-    match storage::store_account(host, account, &path) {
+    match storage::store_account(host, account, path) {
         Ok(_) => Ok(()),
         Err(_) => {
             debug_msg!(host; "Error, cannot initialize genesis' mint account.");
@@ -61,7 +61,7 @@ fn forge_genesis_mint_account<Host: Runtime + RawRollupCore>(
     let account = Account::with_assets(balance);
 
     match storage::account_path(&mint_address.as_bytes().to_vec()) {
-        Ok(path) => store_genesis_mint_account(host, account, path),
+        Ok(path) => store_genesis_mint_account(host, &account, &path),
         Err(_) => {
             debug_msg!(host; "Error, cannot forge genesis' mint account path.");
             Err(Error::Generic)

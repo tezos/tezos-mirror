@@ -51,6 +51,15 @@ pub struct L2Block {
     pub uncles: Vec<OwnedHash>,
 }
 
+pub struct ValidTransaction {
+    pub sender_address: Address,
+    pub sender_path: OwnedPath,
+    pub sender_nonce: u64,
+    pub sender_balance: Wei,
+    pub tx_hash: TransactionHash,
+    pub transaction: RawTransaction,
+}
+
 impl L2Block {
     const DUMMY_QUANTITY: Quantity = 0;
     const DUMMY_HASH: &str = "0000000000000000000000000000000000000000";
@@ -117,25 +126,32 @@ fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
 // can pay for the gas
 fn validate_transaction<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    transaction: &Transaction,
-) -> Result<(), Error> {
-    let tx = &transaction.tx;
-    let (src_path, _src_address) = get_tx_sender(tx)?;
-    let src_balance =
-        storage::read_account_balance(host, &src_path).unwrap_or_else(|_| Wei::zero());
-    let src_nonce = storage::read_account_nonce(host, &src_path).unwrap_or(0u64);
+    transaction: Transaction,
+) -> Result<ValidTransaction, Error> {
+    let tx = transaction.tx;
+    let (sender_path, sender_address) = get_tx_sender(&tx)?;
+    let sender_balance =
+        storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
+    let sender_nonce = storage::read_account_nonce(host, &sender_path).unwrap_or(0u64);
     let nonce = tx.nonce.to_u64().ok_or(Error::Generic)?;
     // For now, we consider there's no gas to pay
     let gas = Wei::zero();
 
     if !tx.is_valid() {
         Err(Error::Transfer(TransferError::InvalidSignature))
-    } else if src_nonce != nonce {
+    } else if sender_nonce != nonce {
         Err(Error::Transfer(TransferError::InvalidNonce))
-    } else if src_balance < gas {
+    } else if sender_balance < gas {
         Err(Error::Transfer(TransferError::NotEnoughBalance))
     } else {
-        Ok(())
+        Ok(ValidTransaction {
+            sender_address,
+            sender_path,
+            sender_nonce,
+            sender_balance,
+            tx_hash: transaction.tx_hash,
+            transaction: tx,
+        })
     }
 }
 
@@ -155,16 +171,16 @@ fn update_account<Host: Runtime + RawRollupCore>(
         };
         Ok(())
     } else {
-        storage::store_account(host, Account::with_assets(balance), account_path)
+        let account = Account::with_assets(balance);
+        storage::store_account(host, &account, account_path)
     }
 }
 
 fn make_receipt(
     block: &L2Block,
-    tx: &Transaction,
+    tx: &ValidTransaction,
     status: TransactionStatus,
     index: u32,
-    from: Address,
     to: Address,
 ) -> TransactionReceipt {
     TransactionReceipt {
@@ -172,7 +188,7 @@ fn make_receipt(
         index,
         block_hash: block.hash,
         block_number: block.number,
-        from,
+        from: tx.sender_address,
         to: Some(to),
         cumulative_gas_used: U256::zero(),
         effective_gas_price: U256::zero(),
@@ -187,19 +203,15 @@ fn make_receipt(
 fn apply_transaction<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     block: &L2Block,
-    transaction: &Transaction,
+    transaction: &ValidTransaction,
     index: u32,
 ) -> Result<TransactionReceipt, Error> {
-    let tx = &transaction.tx;
-    let (src_path, src_address) = get_tx_sender(tx)?;
-    let src_balance =
-        storage::read_account_balance(host, &src_path).unwrap_or_else(|_| Wei::zero());
-    let nonce = tx.nonce.to_u64().ok_or(Error::Generic)?;
+    let tx = &transaction.transaction;
     let value = Wei::from_little_endian(&tx.value.to_le_bytes());
     let gas = Wei::zero();
 
     // First pay for the gas
-    let src_balance_without_gas = src_balance - gas;
+    let src_balance_without_gas = transaction.sender_balance - gas;
     // The gas is paid even if there's not enough balance for the total
     // transaction
     let (src_balance, status) = if src_balance_without_gas < value {
@@ -207,7 +219,12 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
     } else {
         (src_balance_without_gas - value, TransactionStatus::Success)
     };
-    update_account(host, &src_path, src_balance, Some(nonce + 1))?;
+    update_account(
+        host,
+        &transaction.sender_path,
+        src_balance,
+        Some(transaction.sender_nonce + 1),
+    )?;
 
     let (dst_path, dst_address) = get_tx_receiver(tx)?;
     if status == TransactionStatus::Success {
@@ -215,23 +232,21 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
             storage::read_account_balance(host, &dst_path).unwrap_or_else(|_| Wei::zero());
         update_account(host, &dst_path, dst_balance + value, None)?;
     };
-    Ok(make_receipt(
-        block,
-        transaction,
-        status,
-        index,
-        src_address,
-        dst_address,
-    ))
+    Ok(make_receipt(block, transaction, status, index, dst_address))
 }
 
 fn validate<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    transactions: &[Transaction],
-) -> Result<(), Error> {
-    transactions
-        .iter()
-        .try_for_each(|tx| validate_transaction(host, tx))
+    transactions: Vec<Transaction>,
+) -> Result<Vec<ValidTransaction>, Error> {
+    let mut validated_transactions = Vec::new();
+    for transaction in transactions {
+        match validate_transaction(host, transaction) {
+            Ok(valid_transaction) => validated_transactions.push(valid_transaction),
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(validated_transactions)
 }
 
 // This function is only available in nightly, hence the need for redefinition
@@ -249,7 +264,7 @@ fn try_collect<T, E>(vec: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
 fn apply_transactions<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     block: &L2Block,
-    transactions: &[Transaction],
+    transactions: &[ValidTransaction],
 ) -> Result<Vec<TransactionReceipt>, Error> {
     try_collect(
         transactions
@@ -261,7 +276,7 @@ fn apply_transactions<Host: Runtime + RawRollupCore>(
 }
 
 pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
-    for proposal in queue.proposals.iter() {
+    for proposal in queue.proposals {
         let current_level = storage::read_current_block_number(host);
         let next_level = match current_level {
             Ok(current_level) => current_level + 1,
@@ -270,13 +285,13 @@ pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
 
         let transaction_hashes = proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
 
-        match validate(host, &proposal.transactions) {
-            Ok(()) => {
+        match validate(host, proposal.transactions) {
+            Ok(transactions) => {
                 let valid_block = L2Block::new(next_level, transaction_hashes);
                 storage::store_current_block(host, &valid_block).unwrap_or_else(|_| {
                     panic!("Error while storing the current block: stopping the daemon.")
                 });
-                let receipts = apply_transactions(host, &valid_block, &proposal.transactions)
+                let receipts = apply_transactions(host, &valid_block, &transactions)
                     .unwrap_or_else(|_| panic!("Error while applying the transactions."));
                 storage::store_transaction_receipts(host, &receipts).unwrap()
             }

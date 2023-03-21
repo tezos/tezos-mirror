@@ -61,9 +61,9 @@ pub fn read_smart_rollup_address<Host: Runtime + RawRollupCore>(
 
 pub fn store_smart_rollup_address<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    smart_rollup_address: [u8; 20],
+    smart_rollup_address: &[u8; 20],
 ) -> Result<(), Error> {
-    host.store_write(&SMART_ROLLUP_ADDRESS, &smart_rollup_address, 0)
+    host.store_write(&SMART_ROLLUP_ADDRESS, smart_rollup_address, 0)
         .map_err(Error::from)
 }
 
@@ -84,7 +84,7 @@ fn write_u256(host: &mut impl Runtime, path: &OwnedPath, value: U256) -> Result<
 
 fn address_path(address: Hash) -> Result<OwnedPath, Error> {
     let address: &str = from_utf8(address)?;
-    let address_path: Vec<u8> = format!("/{}", &address).into();
+    let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
 
@@ -192,7 +192,7 @@ fn store_code_hash<Host: Runtime + RawRollupCore>(
 
 pub fn store_account<Host: Runtime + RawRollupCore>(
     host: &mut Host,
-    account: Account,
+    account: &Account,
     account_path: &OwnedPath,
 ) -> Result<(), Error> {
     store_nonce(host, account_path, account.nonce)?;
@@ -273,11 +273,11 @@ fn store_block_transactions<Host: Runtime + RawRollupCore>(
 fn store_block<Host: Runtime + RawRollupCore>(
     host: &mut Host,
     block: &L2Block,
-    block_path: OwnedPath,
+    block_path: &OwnedPath,
 ) -> Result<(), Error> {
-    store_block_number(host, &block_path, block.number)?;
-    store_block_hash(host, &block_path, &block.hash)?;
-    store_block_transactions(host, &block_path, &block.transactions)
+    store_block_number(host, block_path, block.number)?;
+    store_block_hash(host, block_path, &block.hash)?;
+    store_block_transactions(host, block_path, &block.transactions)
 }
 
 pub fn store_block_by_number<Host: Runtime + RawRollupCore>(
@@ -285,7 +285,7 @@ pub fn store_block_by_number<Host: Runtime + RawRollupCore>(
     block: &L2Block,
 ) -> Result<(), Error> {
     let block_path = block_path(block.number)?;
-    store_block(host, block, block_path)
+    store_block(host, block, &block_path)
 }
 
 pub fn store_current_block<Host: Runtime + RawRollupCore>(
