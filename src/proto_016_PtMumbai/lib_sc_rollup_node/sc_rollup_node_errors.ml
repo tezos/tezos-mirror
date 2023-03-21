@@ -35,6 +35,10 @@ type error +=
       on_l1 : Sc_rollup.Commitment.Hash.t;
     }
   | Unreliable_tezos_node_returning_inconsistent_game
+  | Wrong_initial_pvm_state of {
+      initial_state_hash : Sc_rollup.State_hash.t;
+      expected_state_hash : Sc_rollup.State_hash.t;
+    }
   | Inconsistent_inbox of {
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
@@ -149,6 +153,31 @@ let () =
       | _ -> None)
     (fun (mode, missing_operators) ->
       Missing_mode_operators {mode; missing_operators}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.Wrong_initial_pvm_state"
+    ~title:"Initial state produced by PVM is incorrect"
+    ~description:"Initial state produced by PVM is incorrect."
+    ~pp:(fun ppf (actual, expected) ->
+      Format.fprintf
+        ppf
+        "The initial state hash produced by the PVM %a is not consistent\n\
+        \     with the one expected by the Layer 1 PVM implementation %a"
+        Sc_rollup.State_hash.pp
+        actual
+        Sc_rollup.State_hash.pp
+        expected)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "initial_state_hash" Sc_rollup.State_hash.encoding)
+        (req "expected_state_hash" Sc_rollup.State_hash.encoding))
+    (function
+      | Wrong_initial_pvm_state {initial_state_hash; expected_state_hash} ->
+          Some (initial_state_hash, expected_state_hash)
+      | _ -> None)
+    (fun (initial_state_hash, expected_state_hash) ->
+      Wrong_initial_pvm_state {initial_state_hash; expected_state_hash}) ;
 
   register_error_kind
     ~id:"internal.inconsistent_inbox"
