@@ -172,6 +172,9 @@ pub trait Runtime {
 
     /// Returns [RollupMetadata]
     fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError>;
+
+    /// True if the last kernel run was aborted.
+    fn last_run_aborted(&self) -> Result<bool, RuntimeError>;
 }
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -455,6 +458,13 @@ where
 
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.store_write(&REBOOT_PATH, &[0_u8], 0)
+    }
+
+    fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
+        const PATH_STUCK_FLAG: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/stuck");
+        let last_run_aborted = Runtime::store_has(self, &PATH_STUCK_FLAG)?.is_some();
+        Ok(last_run_aborted)
     }
 }
 
