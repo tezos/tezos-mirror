@@ -11,11 +11,25 @@ edition = '2021'
 [lib]
 crate-type = ["cdylib"]
 
+[dependencies.tezos_smart_rollup_core]
+path = "../../kernel_sdk/tezos_smart_rollup_core"
+
+[dependencies.tezos_smart_rollup_host]
+path = "../../kernel_sdk/tezos_smart_rollup_host"
+
+[dependencies.tezos_smart_rollup_entrypoint]
+path = "../../kernel_sdk/tezos_smart_rollup_entrypoint"
+
+[dependencies.tezos_smart_rollup_debug]
+path = "../../kernel_sdk/tezos_smart_rollup_debug"
+
+[dev-dependencies.tezos_smart_rollup_encoding]
+path = "../../kernel_sdk/tezos_smart_rollup_encoding"
+
+[dev-dependencies.tezos_smart_rollup_mock]
+path = "../../kernel_sdk/tezos_smart_rollup_mock"
+
 [dependencies]
-kernel = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
-host = { git = "https://gitlab.com/tezos/kernel", branch = "main"  }
-debug = { git = "https://gitlab.com/tezos/kernel", branch = "main" }
-mock_runtime = { git = "https://gitlab.com/tezos/kernel", branch = "main", default-features = false }
 tezos_ethereum = { path = "../ethereum" }
 
 primitive-types = { version = "0.11.1", default-features = false }

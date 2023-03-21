@@ -7,9 +7,9 @@ use crate::error::{Error, TransferError};
 use crate::helpers::address_to_hash;
 use crate::inbox::Transaction;
 use crate::storage;
-use host::path::OwnedPath;
-use host::rollup_core::RawRollupCore;
-use host::runtime::Runtime;
+use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
@@ -19,8 +19,6 @@ use tezos_ethereum::transaction::{
 };
 
 use tezos_ethereum::wei::Wei;
-
-use debug::debug_msg;
 
 // Used by Transaction.nonce.to_u64, the trait must be in scope for the function
 // to be available
@@ -124,7 +122,7 @@ fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
 
 // A transaction is valid if the signature is valid, its nonce is valid and it
 // can pay for the gas
-fn validate_transaction<Host: Runtime + RawRollupCore>(
+fn validate_transaction<Host: Runtime>(
     host: &mut Host,
     transaction: Transaction,
 ) -> Result<ValidTransaction, Error> {
@@ -157,7 +155,7 @@ fn validate_transaction<Host: Runtime + RawRollupCore>(
 
 // Update an account with the given balance and nonce (if one is given), and
 // initialize it if it doesn't already appear in the storage.
-fn update_account<Host: Runtime + RawRollupCore>(
+fn update_account<Host: Runtime>(
     host: &mut Host,
     account_path: &OwnedPath,
     balance: Wei,
@@ -200,7 +198,7 @@ fn make_receipt(
 }
 
 // invariant: the transaction is valid
-fn apply_transaction<Host: Runtime + RawRollupCore>(
+fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
     transaction: &ValidTransaction,
@@ -235,7 +233,7 @@ fn apply_transaction<Host: Runtime + RawRollupCore>(
     Ok(make_receipt(block, transaction, status, index, dst_address))
 }
 
-fn validate<Host: Runtime + RawRollupCore>(
+fn validate<Host: Runtime>(
     host: &mut Host,
     transactions: Vec<Transaction>,
 ) -> Result<Vec<ValidTransaction>, Error> {
@@ -261,7 +259,7 @@ fn try_collect<T, E>(vec: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
     Ok(new_vec)
 }
 
-fn apply_transactions<Host: Runtime + RawRollupCore>(
+fn apply_transactions<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
     transactions: &[ValidTransaction],
@@ -275,13 +273,16 @@ fn apply_transactions<Host: Runtime + RawRollupCore>(
     )
 }
 
-pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) -> Result<(), Error> {
+pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     for proposal in queue.proposals {
         let current_level = storage::read_current_block_number(host);
         let next_level = match current_level {
             Ok(current_level) => Ok(current_level + 1),
             Err(_) => {
-                debug_msg!(host; "Error, cannot produce a new block from a non existing block number.");
+                debug_msg!(
+                    host,
+                    "Error, cannot produce a new block from a non existing block number."
+                );
                 Err(Error::Generic)
             }
         }?;
@@ -292,20 +293,20 @@ pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) -> 
             Ok(transactions) => {
                 let valid_block = L2Block::new(next_level, transaction_hashes);
                 storage::store_current_block(host, &valid_block).map_err(|_| {
-                    debug_msg!(host; "Error while storing the current block.");
+                    debug_msg!(host, "Error while storing the current block.");
                     Error::Generic
                 })?;
                 let receipts =
                     apply_transactions(host, &valid_block, &transactions).map_err(|_| {
-                        debug_msg!(host; "Error while applying the transactions.");
+                        debug_msg!(host, "Error while applying the transactions.");
                         Error::Generic
                     })?;
                 storage::store_transaction_receipts(host, &receipts).map_err(|_| {
-                    debug_msg!(host; "Error while storing the transactions receipts.");
+                    debug_msg!(host, "Error while storing the transactions receipts.");
                     Error::Generic
                 })?;
             }
-            Err(e) => debug_msg!(host; "Blueprint is invalid: {:?}\n", e),
+            Err(e) => debug_msg!(host, "Blueprint is invalid: {:?}\n", e),
         }
     }
     Ok(())

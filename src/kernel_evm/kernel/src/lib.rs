@@ -3,11 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use block::L2Block;
-use host::rollup_core::RawRollupCore;
-use host::runtime::Runtime;
-
-use debug::debug_msg;
-use kernel::kernel_entry;
+use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_entrypoint::kernel_entry;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::blueprint::{fetch, Queue};
 use crate::error::Error;
@@ -21,23 +19,22 @@ mod helpers;
 mod inbox;
 mod storage;
 
-pub fn stage_one<Host: Runtime + RawRollupCore>(
-    host: &mut Host,
-    smart_rollup_address: [u8; 20],
-) -> Queue {
+pub fn stage_one<Host: Runtime>(host: &mut Host, smart_rollup_address: [u8; 20]) -> Queue {
     let queue = fetch(host, smart_rollup_address);
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
-        debug_msg!(host; "Blueprint {} contains {} transactions.\n", i, blueprint.transactions.len());
+        debug_msg!(
+            host,
+            "Blueprint {} contains {} transactions.\n",
+            i,
+            blueprint.transactions.len()
+        );
     }
 
     queue
 }
 
-pub fn stage_two<Host: Runtime + RawRollupCore>(
-    host: &mut Host,
-    queue: Queue,
-) -> Result<(), Error> {
+pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     block::produce(host, queue)?;
 
     if let Ok(L2Block {
@@ -47,7 +44,9 @@ pub fn stage_two<Host: Runtime + RawRollupCore>(
         ..
     }) = storage::read_current_block(host)
     {
-        debug_msg!(host; "Block {} at number {} contains {} transaction(s).\n",
+        debug_msg!(
+            host,
+            "Block {} at number {} contains {} transaction(s).\n",
             String::from_utf8(hash.to_vec()).expect("INVALID HASH"),
             number,
             transactions.len()
@@ -57,19 +56,17 @@ pub fn stage_two<Host: Runtime + RawRollupCore>(
     Ok(())
 }
 
-fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(
-    host: &mut Host,
-) -> Result<[u8; 20], Error> {
+fn retrieve_smart_rollup_address<Host: Runtime>(host: &mut Host) -> Result<[u8; 20], Error> {
     match read_smart_rollup_address(host) {
         Ok(smart_rollup_address) => Ok(smart_rollup_address),
         Err(_) => {
             let rollup_metadata = Runtime::reveal_metadata(host).map_err(|_| {
-                debug_msg!(host; "Error while storing the transactions receipts.");
+                debug_msg!(host, "Error while storing the transactions receipts.");
                 Error::Generic
             })?;
             let address = rollup_metadata.raw_rollup_address;
             store_smart_rollup_address(host, &address).map_err(|_| {
-                debug_msg!(host; "Error while storing the smart rollup's address.");
+                debug_msg!(host, "Error while storing the smart rollup's address.");
                 Error::Generic
             })?;
             Ok(address)
@@ -77,9 +74,9 @@ fn retrieve_smart_rollup_address<Host: Runtime + RawRollupCore>(
     }
 }
 
-fn genesis_initialisation<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
+fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let block_path = storage::block_path(0).map_err(|_| {
-        debug_msg!(host; "Error while retrieving genesis block's path.");
+        debug_msg!(host, "Error while retrieving genesis block's path.");
         Error::Generic
     })?;
     match Runtime::store_has(host, &block_path) {
@@ -88,7 +85,7 @@ fn genesis_initialisation<Host: Runtime + RawRollupCore>(host: &mut Host) -> Res
     }
 }
 
-pub fn main<Host: Runtime + RawRollupCore>(host: &mut Host) {
+pub fn main<Host: Runtime>(host: &mut Host) {
     let smart_rollup_address = match retrieve_smart_rollup_address(host) {
         Ok(smart_rollup_address) => smart_rollup_address,
         Err(_) => panic!("Error while retrieving smart rollup's address: stopping the daemon."),
