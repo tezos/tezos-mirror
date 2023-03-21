@@ -47,6 +47,10 @@ module Config_and_workload = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
+  let () = ignore generated_code_destination
+
   let tags = ["carbonated_map"]
 
   let workload_encoding = config_encoding
@@ -164,6 +168,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
       Printf.sprintf "Carbonated map compare cost for %s keys" CS.type_name
 
     let module_filename = __FILE__
+
+    let generated_code_destination = None
+
+    let () = ignore generated_code_destination
 
     let models =
       [
@@ -303,6 +311,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let info = Printf.sprintf "Carbonated find model (intercept case)"
 
     let module_filename = __FILE__
+
+    let generated_code_destination = None
+
+    let () = ignore generated_code_destination
 
     let models =
       [
