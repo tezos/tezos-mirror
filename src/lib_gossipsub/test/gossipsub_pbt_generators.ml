@@ -56,6 +56,8 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     | Heartbeat (* case 7 *)
     | Join of GS.join (* case 8 *)
     | Leave of GS.leave (* case 9 *)
+    | Subscribe of GS.subscribe (* case 10 *)
+    | Unsubscribe of GS.unsubscribe (* case 11 *)
 
   type output = O : _ GS.output -> output
 
@@ -85,6 +87,10 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     | Heartbeat -> fprintf fmtr "Heartbeat"
     | Join join -> fprintf fmtr "Join %a" GS.pp_join join
     | Leave leave -> fprintf fmtr "Leave %a" GS.pp_leave leave
+    | Subscribe subscribe ->
+        fprintf fmtr "Subscribe %a" GS.pp_subscribe subscribe
+    | Unsubscribe unsubscribe ->
+        fprintf fmtr "Unsubscribe %a" GS.pp_unsubscribe unsubscribe
 
   let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
     let open Format in
@@ -150,6 +156,14 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     let+ topic = gen_topic in
     ({topic} : GS.leave)
 
+  let subscribe ~gen_topic ~gen_peer =
+    let+ topic = gen_topic and+ peer = gen_peer in
+    ({topic; peer} : GS.subscribe)
+
+  let unsubscribe ~gen_topic ~gen_peer =
+    let+ topic = gen_topic and+ peer = gen_peer in
+    ({topic; peer} : GS.unsubscribe)
+
   let wrap : GS.state * _ GS.output -> GS.state * output =
    fun (state, out) -> (state, O out)
 
@@ -168,6 +182,8 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     | Heartbeat -> GS.heartbeat state |> wrap
     | Join m -> GS.join m state |> wrap
     | Leave m -> GS.leave m state |> wrap
+    | Subscribe m -> GS.handle_subscribe m state |> wrap
+    | Unsubscribe m -> GS.handle_unsubscribe m state |> wrap
 
   (** A fragment is a sequence of events encoding a basic interaction with
       the gossipsub automaton. Fragments can be composed sequentially

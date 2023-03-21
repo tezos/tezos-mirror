@@ -46,6 +46,8 @@ type input =
   | Heartbeat (* case 7 *)
   | Join of GS.join (* case 8 *)
   | Leave of GS.leave (* case 9 *)
+  | Subscribe of GS.subscribe (* case 10 *)
+  | Unsubscribe of GS.unsubscribe (* case 11 *)
 
 (** The type of outputs of the gossipsub automaton, wrapped for convenience. *)
 type output = O : _ GS.output -> output
@@ -118,6 +120,10 @@ val publish :
 val join : gen_topic:Topic.t t -> GS.join t
 
 val leave : gen_topic:Topic.t t -> GS.leave t
+
+val subscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.subscribe t
+
+val unsubscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.unsubscribe t
 
 (** We fuzz the automaton by composing basic sequences of inputs, called {e fragments}.
     Fragments can be composed sequentially (see {!SeqM}), but most importantly
