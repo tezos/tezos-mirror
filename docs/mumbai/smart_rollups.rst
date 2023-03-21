@@ -273,7 +273,7 @@ two players can last at most 2 weeks.
 
 There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
-a honest participant, she will start the refutation game with all
+an honest participant, she will start the refutation game with all
 concurrent stakers to avoid the rollup being stuck.
 
 Workflows
@@ -298,7 +298,7 @@ Prerequisites
 ^^^^^^^^^^^^^
 
 An Octez rollup node needs an Octez node to run. We assume that
-a rollup node has been launched locally, typically by issuing:
+an Octez node has been launched locally, typically by issuing:
 
 .. code:: sh
 
@@ -456,8 +456,7 @@ In addition, a rollup node can run under different modes:
    inboxes, updating the states, publishing and cementing commitments
    regularly, and playing the refutation games. In this mode, the
    rollup node will accept transactions in its queue and batch them on
-   the Layer 1.  It does not include the message batching service,
-   either.
+   the Layer 1.
 
 #. ``batcher`` means that the rollup node will accept transactions in
    its queue and batch them on the Layer 1. In this mode, the rollup
@@ -465,12 +464,10 @@ In addition, a rollup node can run under different modes:
    and does not reconstruct inboxes. Consequently, it does not publish
    commitments nor play refutation games.
 
-
 #. ``observer`` means that the rollup node follows the Layer 1 chain
    to reconstruct inboxes, to update its state. However, it will
    neither publish commitments, nor play a refutation game.
-   It does not include the message batching service, either.
-
+   It does not include the message batching service either.
 
 #. ``maintenance`` is the same as the operator mode except that it does not
    include the message batching service.
@@ -537,7 +534,7 @@ to inject such an external message.
 So let us focus now on producing a viable contents for ``${EMESSAGE}``.
 
 The kernel used previously in our running example is a simple "echo"
-kernel that copies its input as a new message of its outbox.
+kernel that copies its input as a new message to its outbox.
 Therefore, the input must be a valid binary encoding of an outbox
 message to make this work. Specifically, assuming that we have
 originated a Layer 1 smart contract as follows:
@@ -571,7 +568,7 @@ Triggering the execution of an outbox message
 Once an outbox message has been pushed to the outbox by the kernel at
 some level ``${L}``, the user needs to wait for the commitment that
 includes this level to be cemented. On Dailynet, the cementation
-process of a non disputed commitment is 40 blocks long while on
+process of a non-disputed commitment is 40 blocks long while on
 Mainnet, it is 2 weeks long.
 
 When the commitment is cemented, one can observe that the outbox is
@@ -595,7 +592,7 @@ Here is the output for this command:
 
 
 At this point, the actual execution of a given outbox message can be
-triggered. This requires to precompute a proof that this outbox message
+triggered. This requires precomputing a proof that this outbox message
 is indeed in the outbox. In the case of our running example, this
 proof is retrieved as follows:
 
@@ -741,7 +738,7 @@ More precisely, determinism is ensured by the following restrictions:
 
 #. Instructions and types related to floating-point arithmetic are not
    supported. This is because IEEE floats are not deterministic, as
-   the standard includes undefined behaviors operations.
+   the standard includes undefined behavior operations.
 #. The length of the call stack of the WASM kernel is restricted to 300.
 
 Modulo the limitations above, a valid kernel is a WASM module that satisfies the following
@@ -750,7 +747,7 @@ constraints:
 #. It exports a function ``kernel_run`` that takes no argument and
    returns nothing.
 #. It declares and exports exactly one memory.
-#. It only imports the host functions, exported by the (virtual)
+#. It only imports the host functions exported by the (virtual)
    module ``smart_rollup_core``.
 
 For instance, the mandatory example of a ``hello, world!`` kernel is
@@ -805,9 +802,9 @@ The rest of the section proceeds as follows.
 
 Though Rust has become the primary language whose WASM backend has
 been tested in the context of smart rollups, the WASM VM has not been
-modified in anyway to favor this language. We fully expect that other
-mainstream languages like Go for instance are also good candidate to
-implement WASM kernels.
+modified in any way to favor this language. We fully expect that other
+mainstream languages such as Go are also good candidates for
+implementing WASM kernels.
 
 Execution Environment
 ^^^^^^^^^^^^^^^^^^^^^
@@ -861,7 +858,7 @@ state. More precisely, the WASM kernel is re-initialized,
 then ``kernel_run`` is called.
 
 By default, the WASM kernel yields when ``kernel_run`` returns. In
-this case, the WASM kernel execution is put on hold while the input of
+this case, the WASM kernel execution is put on hold while the inputs of
 the next inbox are being loaded. The inputs that were not consumed by
 ``kernel_run`` are dropped. ``kernel_run`` can prevent the WASM
 kernel from yielding by writing arbitrary data under the path
@@ -1003,9 +1000,9 @@ Implementing a WASM Kernel in Rust
 Though WASM is a good fit for efficiently executing computation-intensive, arbitrary
 programs, it is a low-level, stack-based, memory unsafe language.
 Fortunately, it was designed to be a compilation target, not a
-language whose program would be written directly by developers.
+language in which developers would directly write their programs.
 
-Rust has several advantages that makes it a good candidate to write
+Rust has several advantages that makes it a good candidate for writing
 the kernel of a smart rollup. Not only does the Rust compiler treat
 WASM as a first class citizen when it comes to compilation targets,
 but its approach to memory safety eliminates large classes of bugs and
@@ -1282,7 +1279,7 @@ representation of WebAssembly modules) or as a ``.wast`` file (its textual
 representation), and actually parses and typechecks the kernel before
 giving it to the PVM.
 
-Besides the kernel file, the debugger can optionally take an input file containing inboxes and a
+Beside the kernel file, the debugger can optionally take an input file containing inboxes and a
 rollup address. The expected contents of the inboxes is a JSON value,
 with the following schema:
 
@@ -1300,7 +1297,7 @@ with the following schema:
     ]
   ]
 
-The contents of the input file is a JSON array of array of inputs,
+The contents of the input file is a JSON array of arrays of inputs,
 which encodes a sequence of inboxes, where an inbox is a set of
 messages. These inboxes are read in the same order as they appear in
 the JSON file. For example, here is a valid input file that defines
@@ -1347,12 +1344,12 @@ after its origination. Its current state can be inspected with the command
   Status: Waiting for inputs
   Internal state: Collect
 
-At start, internally the kernel is in collection mode. It means it is
-not executing any WASM code, and initially it is waiting for inputs to
-proceed. It needs some inputs to continue its execution. The command
+When started, the kernel is in collection mode internally. This means that it is
+not executing any WASM code, and is waiting for inputs in order to
+proceed. The command
 ``load inputs`` will load the first inbox from the file given with the
-option ``--inputs``, putting ``Start_of_level`` and ``Info_per_level`` (and
-``End_of_level``) before (resp. after) these inputs.
+option ``--inputs``, putting ``Start_of_level`` and ``Info_per_level`` before
+these inputs and ``End_of_level`` after the inputs.
 
 .. code::
 
@@ -1433,7 +1430,7 @@ snapshot internal state, with ``step result``, and inspect the memory at pointer
   Status: Evaluating
   Internal state: Snapshot
 
-Once again, note that values from the memory are outputted as is,
+Once again, note that values from the memory are output as is,
 since the representation is internal to WASM.
 
 Finally, it is possible to evaluate the whole inbox with ``step inbox``. It will
@@ -1479,7 +1476,7 @@ hexadecimal value of the preimage:
 Metadata are automatically filled with level ``0`` as origination level
 and the configured smart rollup address (or the default one).
 
-Note that when stepping tick per tick (using the ``step tick`` command), it is
+Note that when stepping tick by tick (using the ``step tick`` command), it is
 possible to end up in a situation were the evaluation stops on ``Waiting for
 reveal``. If the expected value is a metadata, the command ``reveal metadata``
 will give the default metadata to the kernel. If the value expected is the

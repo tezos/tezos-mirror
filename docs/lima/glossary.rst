@@ -159,7 +159,7 @@ _`Layer 2`
     including :doc:`TORUs (Transaction Optimistic Rollups) <transaction_rollups>`,
     `Smart Optimistic Rollups`_,
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
-    zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
+    zkChannels, and sidechains such as `Deku <https://deku.marigold.dev/>`_.
 
 _`Michelson`
     The built-in language used by a `smart contract`_.

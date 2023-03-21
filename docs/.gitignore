@@ -7,6 +7,7 @@ octez-client.html
 /api/octez-admin-client.html
 /api/octez-signer.html
 /api/octez-node.txt
+/api/octez-proxy-server.txt
 
 /alpha/rpc.rst
 /shell/rpc.rst

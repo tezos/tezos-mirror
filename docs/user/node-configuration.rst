@@ -305,7 +305,7 @@ Note that the IP address is only used for selecting an active network interface
 (technically, it is only passed to the ``bind()`` function of the socket API).
 It is also possible to advertise to peers a different port than
 the binding port using ``--advertised-net-port`` configuration option or the P2P
-`advertised-net-port`` configuration parameter. Currently it is only possible to
+``advertised-net-port`` configuration parameter. Currently it is only possible to
 specify an advertised port, but not an IP address.
 
 .. note::
@@ -314,7 +314,7 @@ specify an advertised port, but not an IP address.
     subject to NAT, a port forwarding rule has
     to be added on the NAT server ``S`` on the listening port towards
     machine ``M``: ``S:p1 -> M:p2``, where ``p1`` is ``advertised-net-port`` and
-    ``p2`` is the port specified by ``listening-addr``. Alternatively, if the
+    ``p2`` is the port specified by ``listen-addr``. Alternatively, if the
     ``advertised-net-port`` is not configured, ``p1`` must be the same as ``p2``.
 
     As a consequence, if a second node has to be run behind the

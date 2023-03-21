@@ -257,4 +257,7 @@ there are some restrictions when switching from one mode to another.
 (*) Switching from a ``full`` node to an ``archive`` one is possible
 using the ``reconstruct`` feature. To do so, run ``octez-node
 reconstruct`` on your node. Note that the storage reconstruction is a
-long process that, on the main network, may requires days to complete.
+long process that, on the main network, may require more than a week to
+complete. Reconstruction also requires a machine with at least 16GB of
+memory (for the flattening of the context storage operation) and takes up
+about 1TB of storage once completed.

@@ -132,7 +132,7 @@ The semantics of, respectively, operations and blocks is indeed also
 dependent on each economic protocol. The :doc:`Validation and
 Application<validation>` entry explains the internals of *validation*
 -- that is, how to determine whether operations and blocks can be
-safely be included in the Tezos blockchain -- and *application* --
+safely included in the Tezos blockchain -- and *application* --
 that is, how the effects of operations and blocks are taken into
 account -- for this economic protocol.
 

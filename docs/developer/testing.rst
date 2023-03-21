@@ -195,8 +195,8 @@ Example tests:
 
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
- - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
- - `Octez-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
+ - `General API documentation <https://nomadic-labs.gitlab.io/tezt/dev/tezt/Tezt/index.html>`__
+ - :package-api:`Octez-specific API documentation <tezt-tezos/index.html>`
 
 .. _long_tezt_section:
 
