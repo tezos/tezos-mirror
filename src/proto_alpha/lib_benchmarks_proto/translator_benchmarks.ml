@@ -28,6 +28,8 @@ open Protocol
 module Encodings =
 Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
+
+  let generated_code_destination = None
 end)
 
 module Size = Gas_input_size

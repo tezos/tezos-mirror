@@ -44,6 +44,10 @@ let make_bench ~name ~info ~model ~generator ~make_bench :
 
     let module_filename = __FILE__
 
+    let generated_code_destination = None
+
+    let () = ignore generated_code_destination
+
     let config_encoding = Data_encoding.unit
 
     type workload = unit
