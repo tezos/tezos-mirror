@@ -4872,7 +4872,7 @@ module Protocol = Protocol
           ]
     in
     let _client_tests =
-      only_if N.(number >= 011) @@ fun () ->
+      only_if active @@ fun () ->
       tezt
         [
           "test_michelson_v1_macros";

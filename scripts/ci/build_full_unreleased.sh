@@ -22,18 +22,15 @@ diff pyproject.toml /home/tezos/pyproject.toml
 # 2. Actually build
 make
 
-# 3. Also build the tps evaluation tool which is not part of the default build.
+# 3. Also build the tps evaluation tool which is not part of the default build,
+#    and the tezt main entrypoint for integration tests.
+#    NOTE: Making one call to `dune build` instead of two saves a lot
+#    of times `dune` would otherwise need to reconstruct its rules. Do
+#    not split this invocation into two.
 #    NOTE: We add $COVERAGE_OPTIONS to all dune build commands to enable reuse of
 #    build artifacts.
 # shellcheck disable=SC2086
-dune build ${COVERAGE_OPTIONS} src/bin_tps_evaluation
-
-# 4. Also build the tezt main entrypoint for integration tests. As
-#    above, we add $COVERAGE_OPTIONS. Tezt depends on the old
-#    protocols removed above, so we restore them first.
-./scripts/restore-old-protocols.sh "$old_protocol_store"
-# shellcheck disable=SC2086
-dune build ${COVERAGE_OPTIONS} tezt/tests/main.exe
+dune build ${COVERAGE_OPTIONS} src/bin_tps_evaluation tezt/tests/main.exe
 
 # 4. clean-up caches before uploading the cache
 opam clean

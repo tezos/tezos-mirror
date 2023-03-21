@@ -29,17 +29,10 @@ depends: [
   "tezos-client-commands"
   "tezos-client-base-unix"
   "tezos-crypto"
-  "tezt" { with-test & >= "3.0.0" }
-  "tezos-micheline" {with-test}
-  "tezos-base-test-helpers" {with-test}
-  "tezos-test-helpers" {with-test}
-  "octez-alcotezt" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.20" }
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: protocol specific library for `tezos-client`"
