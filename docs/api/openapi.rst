@@ -46,7 +46,7 @@ Shell RPCs
 The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 16.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -70,12 +70,12 @@ Mumbai RPCs
 The OpenAPI specification for RPCs which are specific to the Mumbai (``PtMumbai``)
 protocol can be found at:
 
-- `mumbai-openapi.json (version 16.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-openapi.json>`_
+- `mumbai-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
 and specific to the Lima protocol can be found at:
 
-- `mumbai-mempool-openapi.json (version 16.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-mempool-openapi.json>`_
+- `mumbai-mempool-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-mempool-openapi.json>`_
 
 .. _openapi_generate:
 
