@@ -433,7 +433,7 @@ module Traceable_durable = struct
 
   module Default_traceable_config = struct
     let print_operations : Durable_operation.Set.t =
-      Durable_operation.Set.of_list Durable_operation.all_operations
+      Durable_operation.Set.of_list Durable_operation.all_operation_tags
 
     let count_methods_invocations = true
   end
@@ -446,7 +446,7 @@ module Traceable_durable = struct
 
     type st = {succ : int; fails : int}
 
-    let method_invocations : st Map.t ref = ref Durable_operation.Map.empty
+    let method_invocations : st Map.t ref = ref Map.empty
 
     let tot_method_invocations : int ref = ref 0
 
@@ -454,16 +454,16 @@ module Traceable_durable = struct
 
     type key = D.key
 
-    let is_op_printable (op : _ Durable_operation.t) =
-      Set.mem (Some_op op) Config.print_operations
+    let is_op_printable (kind : _ operation_kind) =
+      Set.mem (Operation_tag kind) Config.print_operations
 
-    let inspect_op (type input) (op : input Durable_operation.t) (inp : input)
+    let inspect_op (type input) (op : input operation_kind) (inp : input)
         (is_succ : 'a -> bool) (operation : unit -> 'a Lwt.t) : 'a Lwt.t =
       let inc f =
         if Config.count_methods_invocations then
           method_invocations :=
             Map.update
-              (Some_op op)
+              (Operation_tag op)
               (Option.fold
                  ~none:(Some (f {succ = 0; fails = 0}))
                  ~some:(fun x -> Some (f x)))
@@ -480,8 +480,8 @@ module Traceable_durable = struct
             Format.printf
               "%4d: %a completed normally\n\n"
               !tot_method_invocations
-              Durable_operation.pp_some_input
-              (Some_input (op, inp)) ;
+              Durable_operation.pp
+              (Operation (op, inp)) ;
           Lwt.return a)
         (fun exn ->
           inc_fails () ;
@@ -489,8 +489,8 @@ module Traceable_durable = struct
             Format.printf
               "%4d: %a completed with an exception: %s\n\n"
               !tot_method_invocations
-              Durable_operation.pp_some_input
-              (Some_input (op, inp))
+              Durable_operation.pp
+              (Operation (op, inp))
               (Printexc.to_string exn) ;
           raise exn)
 
@@ -603,7 +603,7 @@ module Traceable_durable = struct
           Format.printf
             "%4s%a: %.1f%% of all ops\n%8sSuccessful: %.1f%% / Fails: %.1f%%\n"
             ""
-            Durable_operation.pp_some_op
+            Durable_operation.pp_operation_tag
             op
             (to_perc (st.succ + st.fails) sm)
             ""
