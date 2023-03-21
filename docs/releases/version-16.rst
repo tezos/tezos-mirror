@@ -53,6 +53,9 @@ To update from sources::
   eval $(opam env)
   make
 
+Note that, as the minimal required OCaml version is now 4.14.1, you may have to remove the ``_opam/`` directory when updating from Octez v15.1 or older released versions.
+See more details :ref:`here <update_from_sources>`.
+
 If you are using Docker instead, use the ``v16.0`` Docker images of Octez.
 
 If you are installing Octez using Opam, note that the minimal required
