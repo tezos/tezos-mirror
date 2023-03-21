@@ -164,7 +164,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-    let* () = Sc_rollup_node.run sc_rollup_node [] in
+    let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
     let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
     let* level =

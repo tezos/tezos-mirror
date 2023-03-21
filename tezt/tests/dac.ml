@@ -534,7 +534,7 @@ let test_rollup_arith_uses_reveals protocol dac_node sc_rollup_node
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
@@ -606,7 +606,7 @@ let test_reveals_fails_on_wrong_hash _protocol dac_node sc_rollup_node
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   (* Prepare the handler to wait for the rollup node to fail before
      sending the L1 message that will trigger the failure. This
      ensures that the failure handler can access the status code

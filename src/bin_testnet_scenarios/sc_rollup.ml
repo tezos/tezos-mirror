@@ -53,7 +53,7 @@ let setup_l2_node ~(testnet : Testnet.t) ?runner ?name ?loser_mode ~operator
 
   let* _ = Sc_rollup_node.config_init ?loser_mode rollup_node rollup in
   Log.info "Starting a smart rollup node to track %s" rollup ;
-  let* () = Sc_rollup_node.run rollup_node [] in
+  let* () = Sc_rollup_node.run rollup_node rollup [] in
   let* () = Sc_rollup_node.wait_for_ready rollup_node in
   Log.info "Smart rollup node started." ;
   return rollup_node

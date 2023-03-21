@@ -1544,7 +1544,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
 
@@ -2226,7 +2226,7 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
         Sc_rollup_node.config_init sc_rollup_node rollup_address
       in
       (* We start the rollup node and create a client for it. *)
-      let* () = Sc_rollup_node.run sc_rollup_node [] in
+      let* () = Sc_rollup_node.run sc_rollup_node rollup_address [] in
       let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
       return (fresh_dal_node, sc_rollup_node, sc_rollup_client))
     extra_node_operators
@@ -2256,7 +2256,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
   (* Generate new DAL and rollup nodes if requested. *)
