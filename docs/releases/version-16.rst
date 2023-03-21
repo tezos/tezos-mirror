@@ -47,6 +47,8 @@ To update from sources::
 
   git fetch
   git checkout v16.0
+  make clean
+  rm -rf _opam  # if updating from v15 or older
   make build-deps
   eval $(opam env)
   make
