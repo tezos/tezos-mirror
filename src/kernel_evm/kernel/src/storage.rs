@@ -99,7 +99,7 @@ pub fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
     let number_path = OwnedPath::try_from(raw_number_path).map_err(Error::from)?;
     concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
 }
-fn receipt_path(receipt: &TransactionReceipt) -> Result<OwnedPath, Error> {
+pub fn receipt_path(receipt: &TransactionReceipt) -> Result<OwnedPath, Error> {
     let hash = hex::encode(receipt.hash);
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
     let receipt_path = OwnedPath::try_from(raw_receipt_path).map_err(Error::from)?;
@@ -302,7 +302,7 @@ pub fn store_current_block<Host: Runtime + RawRollupCore>(
 // TODO: This store a transaction receipt with multiple subkeys, it could
 // be stored in a single encoded value. However, this is for now easier
 // for the (OCaml) proxy server to do as is.
-fn store_transaction_receipt<Host: Runtime + RawRollupCore>(
+pub fn store_transaction_receipt<Host: Runtime + RawRollupCore>(
     receipt_path: &OwnedPath,
     host: &mut Host,
     receipt: &TransactionReceipt,

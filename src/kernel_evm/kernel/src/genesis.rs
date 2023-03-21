@@ -4,13 +4,21 @@
 
 use crate::error::Error;
 use crate::storage;
+use crate::storage::receipt_path;
 use crate::L2Block;
 use debug::debug_msg;
 use host::path::OwnedPath;
 use host::rollup_core::RawRollupCore;
 use host::runtime::Runtime;
+use primitive_types::U256;
 use tezos_ethereum::account::Account;
+use tezos_ethereum::eth_gen::Address;
+use tezos_ethereum::eth_gen::L2Level;
+use tezos_ethereum::eth_gen::ADDRESS_SIZE;
 use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::TransactionReceipt;
+use tezos_ethereum::transaction::TransactionStatus;
+use tezos_ethereum::transaction::TransactionType;
 use tezos_ethereum::wei::{self, Wei};
 
 struct MintAccount {
@@ -18,6 +26,10 @@ struct MintAccount {
     genesis_tx_hash: &'static str,
     eth_amount: u64,
 }
+
+const GENESIS_ADDRESSS: &str = "0000000000000000000000000000000000000000";
+
+const GENESIS_LEVEL: L2Level = 0;
 
 const MINT_ACCOUNTS_NUMBER: usize = 3;
 
@@ -106,19 +118,59 @@ fn bootstrap_genesis_accounts<Host: Runtime + RawRollupCore>(
     collect_mint_transactions(transactions_hashes)
 }
 
+fn craft_mint_address(genesis_mint_address: &str) -> Option<Address> {
+    let mut mint_address: Address = Default::default();
+    let encoded_genesis_mint_address = hex::decode(genesis_mint_address).ok()?;
+    mint_address.copy_from_slice(&encoded_genesis_mint_address[0..ADDRESS_SIZE]);
+    Some(mint_address)
+}
+
+fn store_genesis_receipts<Host: Runtime + RawRollupCore>(
+    host: &mut Host,
+    genesis_block: L2Block,
+) -> Result<(), Error> {
+    let mut genesis_address: Address = Default::default();
+    genesis_address.copy_from_slice(&GENESIS_ADDRESSS.as_bytes()[0..ADDRESS_SIZE]);
+
+    for (i, hash) in genesis_block.transactions.iter().enumerate() {
+        let mint_account = &MINT_ACCOUNTS[i];
+        let index = u32::try_from(i).map_err(|_| Error::Generic)?;
+
+        let receipt = TransactionReceipt {
+            hash: *hash,
+            index,
+            block_hash: genesis_block.hash,
+            block_number: genesis_block.number,
+            from: genesis_address,
+            to: craft_mint_address(mint_account.mint_address),
+            cumulative_gas_used: U256::zero(),
+            effective_gas_price: U256::zero(),
+            gas_used: U256::zero(),
+            contract_address: None,
+            type_: TransactionType::Legacy,
+            status: TransactionStatus::Success,
+        };
+
+        let receipt_path = receipt_path(&receipt)?;
+        storage::store_transaction_receipt(&receipt_path, host, &receipt)?;
+    }
+
+    Ok(())
+}
+
 pub fn init_block<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
     // Forge the genesis' transactions that will mint the very first accounts
     let transaction_hashes = bootstrap_genesis_accounts(host)?;
 
     // Produce and store genesis' block
-    let genesis_block = L2Block::new(0, transaction_hashes);
+    let genesis_block = L2Block::new(GENESIS_LEVEL, transaction_hashes);
     storage::store_current_block(host, &genesis_block).map_err(|_| {
         debug_msg!(host; "Error while storing the genesis block.");
         Error::Generic
     })?;
-
     debug_msg!(host; "Genesis block was initialized.\n");
-    Ok(())
+
+    store_genesis_receipts(host, genesis_block)
 }
 
 #[cfg(test)]
