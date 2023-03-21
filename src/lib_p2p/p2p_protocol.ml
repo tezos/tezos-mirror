@@ -24,6 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Result = struct
+  include Stdlib.Result
+
+  let get_or_recover_from : ('e -> 'a) -> ('a, 'e) result -> 'a =
+   fun f -> function Ok v -> v | Error e -> f e
+end
+
 module Events = P2p_events.P2p_protocol
 
 type ('msg, 'peer, 'conn) config = {
@@ -188,31 +195,39 @@ module Default_answerer = struct
       Prometheus.Counter.inc_one P2p_metrics.Swap.ignored ;
       Events.(emit swap_request_ignored) source_peer_id)
     else
-      match P2p_pool.Connection.find_by_peer_id pool source_peer_id with
-      | None ->
+      let open Result_syntax in
+      let do_swap =
+        let* source_conn =
+          P2p_pool.Connection.find_by_peer_id pool source_peer_id
+          |> Option.to_result ~none:`Couldnt_find_by_peer
+        in
+        let* proposed_point, proposed_peer_id =
+          P2p_pool.Connection.random_addr
+            pool
+            ~different_than:source_conn
+            ~no_private:true
+          |> Option.to_result ~none:(`No_swap_candidate source_peer_id)
+        in
+        let* can_swap =
+          conn.write_swap_ack proposed_point proposed_peer_id
+          |> Result.map_error (fun e -> `Couldnt_write_swap_ack e)
+        in
+        if can_swap then (
+          log (Swap_ack_sent {source = source_peer_id}) ;
+          Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
+          return
+          @@ swap config pool source_peer_id ~connect proposed_peer_id new_point)
+        else Error `Couldnt_swap
+      in
+      Result.get_or_recover_from
+        (function
+          | `No_swap_candidate source_peer_id ->
+              Events.(emit no_swap_candidate) source_peer_id
+          | `Couldnt_find_by_peer
           (* The connection has been lost so ignore the request *)
-          Lwt.return_unit
-      | Some source_conn -> (
-          match
-            P2p_pool.Connection.random_addr
-              pool
-              ~different_than:source_conn
-              ~no_private:true
-          with
-          | None -> Events.(emit no_swap_candidate) source_peer_id
-          | Some (proposed_point, proposed_peer_id) -> (
-              match conn.write_swap_ack proposed_point proposed_peer_id with
-              | Ok true ->
-                  log (Swap_ack_sent {source = source_peer_id}) ;
-                  Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
-                  swap
-                    config
-                    pool
-                    source_peer_id
-                    ~connect
-                    proposed_peer_id
-                    new_point
-              | Ok false | Error _ -> Lwt.return_unit))
+          | `Couldnt_write_swap_ack _ | `Couldnt_swap ->
+              Lwt.return_unit)
+        do_swap
 
   let create config conn =
     P2p_answerer.
