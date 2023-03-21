@@ -3569,7 +3569,18 @@ module Sc_rollup : sig
         entrypoint : Entrypoint.t;
       }
 
-      type t = Atomic_transaction_batch of {transactions : transaction list}
+      type typed_transaction = {
+        unparsed_parameters : Script.expr;
+        unparsed_ty : Script.expr;
+        destination : Contract_hash.t;
+        entrypoint : Entrypoint.t;
+      }
+
+      type t =
+        | Atomic_transaction_batch of {transactions : transaction list}
+        | Atomic_transaction_batch_typed of {
+            transactions : typed_transaction list;
+          }
 
       type serialized
 

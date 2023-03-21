@@ -151,10 +151,11 @@ let commit_too_recent =
 
 let disputed_commit = "Attempted to cement a disputed commitment"
 
-let register_test ?(regression = false) ~__FILE__ ~tags ~title f =
+let register_test ?supports ?(regression = false) ~__FILE__ ~tags ~title f =
   let tags = "sc_rollup" :: tags in
-  if regression then Protocol.register_regression_test ~__FILE__ ~title ~tags f
-  else Protocol.register_test ~__FILE__ ~title ~tags f
+  if regression then
+    Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags f
+  else Protocol.register_test ?supports ~__FILE__ ~title ~tags f
 
 let get_sc_rollup_commitment_period_in_blocks client =
   let* constants = get_sc_rollup_constants client in
@@ -262,11 +263,12 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
   let* sc_rollup = originate_sc_rollup ~kind ?boot_sector ~src tezos_client in
   scenario sc_rollup tezos_node tezos_client
 
-let test_full_scenario ?regression ~kind ?mode ?boot_sector ?commitment_period
-    ?(parameters_ty = "string") ?challenge_window ?timeout
+let test_full_scenario ?supports ?regression ~kind ?mode ?boot_sector
+    ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
+    ?supports
     ?regression
     ~__FILE__
     ~tags
@@ -3478,15 +3480,20 @@ let test_refutation_reward_and_punishment ~kind =
 
    The input depends on the PVM.
 *)
-let test_outbox_message_generic ?regression ?expected_error ~earliness
-    ?entrypoint ?boot_sector ~input_message ~expected_storage ~kind
+let test_outbox_message_generic ?supports ?regression ?expected_error
+    ?expected_l1_error ~earliness ?entrypoint ~init_storage ~storage_ty
+    ?outbox_parameters_ty ?boot_sector ~input_message ~expected_storage ~kind
     ~message_kind =
   let commitment_period = 2 and challenge_window = 5 in
   let message_kind_s =
-    match message_kind with `Internal -> "internal" | `External -> "external"
+    match message_kind with `Internal -> "intern" | `External -> "extern"
   in
   let entrypoint_s = Option.value ~default:"default" entrypoint in
+  let outbox_parameters_ty_s =
+    Option.value ~default:"no_parameters_ty" outbox_parameters_ty
+  in
   test_full_scenario
+    ?supports
     ?regression
     ?boot_sector
     ~parameters_ty:"bytes"
@@ -3494,17 +3501,19 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
     ~commitment_period
     ~challenge_window
     {
-      tags = ["outbox"; message_kind_s; entrypoint_s];
+      tags = ["outbox"; message_kind_s; entrypoint_s; outbox_parameters_ty_s];
       variant =
         Some
           (Format.sprintf
-             "entrypoint: %%%s, earliness: %d, %s"
+             "%s, entrypoint: %%%s, eager: %d, %s, %s"
+             init_storage
              entrypoint_s
              earliness
-             message_kind_s);
-      description = "trigger exec output";
+             message_kind_s
+             outbox_parameters_ty_s);
+      description = "output exec";
     }
-  @@ fun _protocol rollup_node sc_client sc_rollup _node client ->
+  @@ fun protocol rollup_node sc_client sc_rollup _node client ->
   let* () = Sc_rollup_node.run rollup_node [] in
   let src = Constant.bootstrap1.public_key_hash in
   let src2 = Constant.bootstrap2.public_key_hash in
@@ -3513,8 +3522,8 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
       Printf.sprintf
         {|
           {
-            parameter (or (int %%default) (int %%aux));
-            storage (int :s);
+            parameter (or (%s %%default) (%s %%aux));
+            storage (%s :s);
             code
               {
                 # Check that SENDER is the rollup address
@@ -3534,6 +3543,9 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
               }
           }
         |}
+        storage_ty
+        storage_ty
+        storage_ty
         sc_rollup
         src2
     in
@@ -3544,7 +3556,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
         ~burn_cap:(Tez.of_int 100)
         ~src
         ~prg
-        ~init:"0"
+        ~init:init_storage
         client
     in
     let* () = Client.bake_for_and_wait client in
@@ -3625,7 +3637,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
     in
     repeat blocks_to_wait @@ fun () -> Client.bake_for client
   in
-  let trigger_outbox_message_execution address =
+  let trigger_outbox_message_execution ?expected_l1_error address =
     let outbox_level = 5 in
     let destination = address in
     let parameters = "37" in
@@ -3645,17 +3657,34 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
               [ { "outbox_level": %d, "message_index": "%d",
                   "message":
                   { "transactions":
-                    [ { "parameters": { "int": "%s" },
-                    "destination": "%s"%s } ] } } ] |}
+                      [ { "parameters": { "int": "%s" }%s,
+                          "destination": "%s"%s } ]%s
+                     } } ] |}
                  outbox_level
                  message_index
                  parameters
+                 (match outbox_parameters_ty with
+                 | None -> ""
+                 | Some outbox_parameters_ty ->
+                     Format.asprintf
+                       {| , "parameters_ty" : { "prim": "%s"} |}
+                       outbox_parameters_ty)
                  address
                  (match entrypoint with
                  | None -> ""
                  | Some entrypoint ->
                      Format.asprintf {| , "entrypoint" : "%s" |} entrypoint)
+                 (match protocol with
+                 | Protocol.Mumbai -> ""
+                 | _ ->
+                     Printf.sprintf
+                       {|, "kind": "%s"|}
+                       (Option.fold
+                          ~none:"untyped"
+                          ~some:(fun _ -> "typed")
+                          outbox_parameters_ty))
           in
+          Log.info "Expected is %s" (JSON.encode expected) ;
           assert (JSON.encode expected = JSON.encode outbox) ;
           Sc_rollup_client.outbox_proof_single
             sc_client
@@ -3665,6 +3694,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
             ~destination
             ?entrypoint
             ~parameters
+            ?parameters_ty:outbox_parameters_ty
       | Some _ ->
           assert (JSON.encode outbox = "[]") ;
           return None
@@ -3674,18 +3704,32 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
     | Some _, Some _ -> assert false
     | None, None -> failwith "Unexpected error during proof generation"
     | None, Some _ -> unit
-    | Some {commitment_hash; proof}, None ->
-        let*! () =
-          Client.Sc_rollup.execute_outbox_message
-            ~hooks
-            ~burn_cap:(Tez.of_int 10)
-            ~rollup:sc_rollup
-            ~src:src2
-            ~commitment_hash
-            ~proof
-            client
-        in
-        Client.bake_for_and_wait client
+    | Some {commitment_hash; proof}, None -> (
+        match expected_l1_error with
+        | None ->
+            let*! () =
+              Client.Sc_rollup.execute_outbox_message
+                ~hooks
+                ~burn_cap:(Tez.of_int 10)
+                ~rollup:sc_rollup
+                ~src:src2
+                ~commitment_hash
+                ~proof
+                client
+            in
+            Client.bake_for_and_wait client
+        | Some msg ->
+            let*? process =
+              Client.Sc_rollup.execute_outbox_message
+                ~hooks
+                ~burn_cap:(Tez.of_int 10)
+                ~rollup:sc_rollup
+                ~src:src2
+                ~commitment_hash
+                ~proof
+                client
+            in
+            Process.check_error ~msg process)
   in
   let* target_contract_address = originate_target_contract () in
   let* source_contract_address = originate_source_contract () in
@@ -3695,7 +3739,9 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
       target_contract_address
   in
   let* () = Client.bake_for_and_wait client in
-  let* () = trigger_outbox_message_execution target_contract_address in
+  let* () =
+    trigger_outbox_message_execution ?expected_l1_error target_contract_address
+  in
   match expected_error with
   | None ->
       let* () =
@@ -3704,8 +3750,9 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
       unit
   | Some _ -> unit
 
-let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
-    ~message_kind =
+let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
+    ~earliness ?entrypoint ?(init_storage = "0") ?(storage_ty = "int")
+    ?(outbox_parameters = "37") ?outbox_parameters_ty ~kind ~message_kind =
   let wrap payload =
     match message_kind with
     | `Internal -> `Internal payload
@@ -3717,41 +3764,115 @@ let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
         let input_message _client contract_address =
           let payload =
             Printf.sprintf
-              "37 %s%s"
+              "%s %s%s"
+              outbox_parameters
               contract_address
               (match entrypoint with Some e -> "%" ^ e | None -> "")
           in
           let payload = hex_encode payload in
           return @@ wrap payload
         in
-        (None, input_message, "37")
+        (None, input_message, outbox_parameters)
     | "wasm_2_0_0" ->
         let bootsector = read_kernel "echo" in
         let input_message client contract_address =
           let transaction =
             Sc_rollup_client.
-              {destination = contract_address; entrypoint; parameters = "37"}
+              {
+                destination = contract_address;
+                entrypoint;
+                parameters = outbox_parameters;
+                parameters_ty = outbox_parameters_ty;
+              }
           in
           let* answer = Sc_rollup_client.encode_batch client [transaction] in
           match answer with
           | None -> failwith "Encoding of batch should not fail."
           | Some answer -> return (wrap answer)
         in
-        (Some bootsector, input_message, "37")
+        ( Some bootsector,
+          input_message,
+          if Option.is_none expected_l1_error then outbox_parameters
+          else init_storage )
     | _ ->
         (* There is no other PVM in the protocol. *)
         assert false
   in
   test_outbox_message_generic
+    ?supports
     ?regression
     ?expected_error
+    ?expected_l1_error
     ~earliness
     ?entrypoint
+    ?outbox_parameters_ty
     ?boot_sector
+    ~init_storage
+    ~storage_ty
     ~input_message
     ~expected_storage
     ~message_kind
     ~kind
+
+let test_outbox_message protocols ~kind =
+  let test (expected_error, earliness, entrypoint, message_kind) =
+    test_outbox_message
+      ~regression:true
+      ?expected_error
+      ~earliness
+      ?entrypoint
+      ~message_kind
+      protocols
+      ~kind ;
+    (* arith does not support, yet, the typed outbox messages *)
+    if kind <> "arith" then
+      test_outbox_message
+        ~supports:(Protocol.From_protocol 17)
+        ~regression:true
+        ?expected_error
+        ~earliness
+        ?entrypoint
+        ~message_kind
+        ~outbox_parameters_ty:"int"
+        protocols
+        ~kind
+  in
+  List.iter
+    test
+    [
+      (None, 0, None, `Internal);
+      (None, 0, Some "aux", `Internal);
+      (Some (Base.rex ".*Invalid claim about outbox"), 5, None, `Internal);
+      (Some (Base.rex ".*Invalid claim about outbox"), 5, Some "aux", `Internal);
+      (None, 0, None, `External);
+      (None, 0, Some "aux", `External);
+      (Some (Base.rex ".*Invalid claim about outbox"), 5, None, `External);
+      (Some (Base.rex ".*Invalid claim about outbox"), 5, Some "aux", `External);
+    ] ;
+  if kind <> "arith" then (
+    (* wrong type for the parameters *)
+    test_outbox_message
+      ~expected_l1_error:
+        (Base.rex "A data expression was invalid for its expected type.")
+      ~supports:(Protocol.From_protocol 17)
+      ~earliness:0
+      ~regression:true
+      ~message_kind:`Internal
+      ~outbox_parameters_ty:"string"
+      protocols
+      ~kind ;
+    test_outbox_message
+      ~expected_l1_error:
+        (Base.rex ".*or a parameter was supplied of the wrong type")
+      ~supports:(Protocol.From_protocol 17)
+      ~earliness:0
+      ~regression:true
+      ~message_kind:`Internal
+      ~init_storage:{|"word"|}
+      ~storage_ty:"string"
+      ~outbox_parameters_ty:"int"
+      protocols
+      ~kind)
 
 let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind) =
@@ -4211,58 +4332,7 @@ let register ~kind ~protocols =
   test_late_rollup_node protocols ~kind ;
   test_late_rollup_node_2 protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
-  test_outbox_message
-    ~regression:true
-    ~earliness:0
-    ~message_kind:`Internal
-    ~kind
-    protocols ;
-  test_outbox_message
-    ~regression:true
-    ~earliness:0
-    ~entrypoint:"aux"
-    ~message_kind:`Internal
-    protocols
-    ~kind ;
-  test_outbox_message
-    ~expected_error:(Base.rex ".*Invalid claim about outbox")
-    ~earliness:5
-    ~message_kind:`Internal
-    protocols
-    ~kind ;
-  test_outbox_message
-    ~expected_error:(Base.rex ".*Invalid claim about outbox")
-    ~earliness:5
-    ~entrypoint:"aux"
-    ~message_kind:`Internal
-    protocols
-    ~kind ;
-  test_outbox_message
-    ~regression:true
-    ~earliness:0
-    ~message_kind:`External
-    protocols
-    ~kind ;
-  test_outbox_message
-    ~regression:true
-    ~earliness:0
-    ~entrypoint:"aux"
-    ~message_kind:`External
-    protocols
-    ~kind ;
-  test_outbox_message
-    ~expected_error:(Base.rex ".*Invalid claim about outbox")
-    ~earliness:5
-    ~message_kind:`External
-    protocols
-    ~kind ;
-  test_outbox_message
-    ~expected_error:(Base.rex ".*Invalid claim about outbox")
-    ~earliness:5
-    ~entrypoint:"aux"
-    ~message_kind:`External
-    protocols
-    ~kind ;
+  test_outbox_message protocols ~kind ;
   test_messages_processed_by_commitment ~kind protocols
 
 let register ~protocols =

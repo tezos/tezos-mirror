@@ -101,9 +101,16 @@ module Internal_for_tests : sig
       transactions [ts]. *)
   val make_atomic_batch : transaction list -> outbox_message
 
-  (** [serialize_output_message msg] encodes the outbox message [msg] in binary
-      format. *)
-  val serialize_outbox_message :
+  (** [serialize_output_message_untyped msg] encodes the outbox message
+      [msg] in binary format using the untyped outbox message
+      representation. *)
+  val serialize_outbox_message_untyped :
+    outbox_message -> Sc_rollup.Outbox.Message.serialized tzresult
+
+  (** [serialize_output_message_typed msg] encodes the outbox
+      message [msg] in binary format using the typed outbox message
+      representation. *)
+  val serialize_outbox_message_typed :
     outbox_message -> Sc_rollup.Outbox.Message.serialized tzresult
 
   (** [deserialize_inbox_message bs] decodes an inbox message from the given data
