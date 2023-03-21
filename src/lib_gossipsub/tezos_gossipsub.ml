@@ -274,6 +274,8 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let retain_duration state = state.limits.retain_duration
 
+    let fanout_ttl state = state.limits.fanout_ttl
+
     let heartbeat_interval state = state.limits.heartbeat_interval
 
     let backoff_cleanup_ticks state = state.limits.backoff_cleanup_ticks
@@ -1208,6 +1210,22 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       return (to_graft, to_prune, noPX_peers)
 
+    let expire_fanout =
+      let open Monad.Syntax in
+      let*! fanout in
+      let*! fanout_ttl in
+      let current = Time.now () in
+      let fanout =
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5184
+           Optimize by having a min and a max last published time to avoid
+           traversing the map when not needed? *)
+        Topic.Map.filter
+          (fun _topic {last_published_time; peers = _} ->
+            Time.(add last_published_time fanout_ttl >= current))
+          fanout
+      in
+      set_fanout fanout
+
     let handle =
       let open Monad.Syntax in
       let*! heartbeat_ticks in
@@ -1226,8 +1244,8 @@ module Make (C : AUTOMATON_CONFIG) :
          [degree_optimal]. *)
       let* to_graft, to_prune, noPX_peers = maintain_mesh in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4988
-         Expire fanout for topics we haven't published to in a while *)
+      (* Expire fanout for topics we haven't published to in a while *)
+      let* () = expire_fanout in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5066
          Maintain our fanout for topics we are publishing to, but we have not

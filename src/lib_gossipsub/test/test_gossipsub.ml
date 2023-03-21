@@ -101,6 +101,7 @@ let default_limits =
     graft_flood_backoff = -50;
     prune_backoff = 60;
     retain_duration = 10;
+    fanout_ttl = 60;
     heartbeat_interval = 1;
     backoff_cleanup_ticks = 15;
     degree_low = 5;
