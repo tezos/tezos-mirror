@@ -2668,16 +2668,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
       let cache_nonce =
         Cache.cache_nonce_from_block_header shell_header block_data_contents
       in
-      let locked_round_evidence =
-        Option.map
-          (fun (preendorsement_round, preendorsement_count) ->
-            Block_header.{preendorsement_round; preendorsement_count})
-          (Consensus.locked_round_evidence ctxt)
-      in
       let locked_round =
-        match locked_round_evidence with
-        | None -> None
-        | Some {preendorsement_round; _} -> Some preendorsement_round
+        Option.map fst (Consensus.locked_round_evidence ctxt)
       in
       let level = (Level.current ctxt).level in
       let*? fitness =

@@ -186,35 +186,15 @@ let hash {shell; protocol_data} =
         Data_encoding.Binary.to_bytes_exn protocol_data_encoding protocol_data;
     }
 
-type locked_round_evidence = {
-  preendorsement_round : Round_repr.t;
-  preendorsement_count : int;
-}
-
 type error +=
   | (* Permanent *)
       Invalid_block_signature of
       Block_hash.t * Signature.Public_key_hash.t
   | (* Permanent *) Invalid_stamp
   | (* Permanent *)
-      Invalid_payload_hash of {
-      expected : Block_payload_hash.t;
-      provided : Block_payload_hash.t;
-    }
-  | (* Permanent *)
-      Locked_round_after_block_round of {
-      locked_round : Round_repr.t;
-      round : Round_repr.t;
-    }
-  | (* Permanent *)
       Invalid_payload_round of {
       payload_round : Round_repr.t;
       round : Round_repr.t;
-    }
-  | (* Permanent *)
-      Insufficient_locked_round_evidence of {
-      voting_power : int;
-      consensus_threshold : int;
     }
   | (* Permanent *) Invalid_commitment of {expected : bool}
   | (* Permanent *) Wrong_timestamp of Time.t * Time.t
@@ -251,52 +231,6 @@ let () =
     (fun () -> Invalid_stamp) ;
   register_error_kind
     `Permanent
-    ~id:"block_header.invalid_payload_hash"
-    ~title:"Invalid payload hash"
-    ~description:"Invalid payload hash."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Invalid payload hash (expected: %a, provided: %a)."
-        Block_payload_hash.pp_short
-        expected
-        Block_payload_hash.pp_short
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_payload_hash.encoding)
-        (req "provided" Block_payload_hash.encoding))
-    (function
-      | Invalid_payload_hash {expected; provided} -> Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) -> Invalid_payload_hash {expected; provided}) ;
-  () ;
-  register_error_kind
-    `Permanent
-    ~id:"block_header.locked_round_after_block_round"
-    ~title:"Locked round after block round"
-    ~description:"Locked round after block round."
-    ~pp:(fun ppf (locked_round, round) ->
-      Format.fprintf
-        ppf
-        "Locked round (%a) is after the block round (%a)."
-        Round_repr.pp
-        locked_round
-        Round_repr.pp
-        round)
-    Data_encoding.(
-      obj2
-        (req "locked_round" Round_repr.encoding)
-        (req "round" Round_repr.encoding))
-    (function
-      | Locked_round_after_block_round {locked_round; round} ->
-          Some (locked_round, round)
-      | _ -> None)
-    (fun (locked_round, round) ->
-      Locked_round_after_block_round {locked_round; round}) ;
-  () ;
-  register_error_kind
-    `Permanent
     ~id:"block_header.invalid_payload_round"
     ~title:"Invalid payload round"
     ~description:"The given payload round is invalid."
@@ -317,27 +251,6 @@ let () =
           Some (payload_round, round)
       | _ -> None)
     (fun (payload_round, round) -> Invalid_payload_round {payload_round; round}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block_header.insufficient_locked_round_evidence"
-    ~title:"Insufficient locked round evidence"
-    ~description:"Insufficient locked round evidence."
-    ~pp:(fun ppf (voting_power, consensus_threshold) ->
-      Format.fprintf
-        ppf
-        "The provided locked round evidence is not sufficient: provided %d \
-         voting power but was expecting at least %d."
-        voting_power
-        consensus_threshold)
-    Data_encoding.(
-      obj2 (req "voting_power" int31) (req "consensus_threshold" int31))
-    (function
-      | Insufficient_locked_round_evidence {voting_power; consensus_threshold}
-        ->
-          Some (voting_power, consensus_threshold)
-      | _ -> None)
-    (fun (voting_power, consensus_threshold) ->
-      Insufficient_locked_round_evidence {voting_power; consensus_threshold}) ;
   register_error_kind
     `Permanent
     ~id:"block_header.invalid_commitment"
@@ -461,46 +374,3 @@ let begin_validate_block_header ~(block_header : t) ~(chain_id : Chain_id.t)
   error_unless
     Compare.Bool.(has_commitment = expected_commitment)
     (Invalid_commitment {expected = expected_commitment})
-
-type checkable_payload_hash =
-  | No_check
-  | Expected_payload_hash of Block_payload_hash.t
-
-let finalize_validate_block_header ~(block_header_contents : contents)
-    ~(round : Round_repr.t)
-    ~(* We have to check the round because in the construction case it was
-        deduced from the time *)
-    (fitness_locked_round : Round_repr.t option)
-    ~(checkable_payload_hash : checkable_payload_hash)
-    ~(locked_round_evidence : locked_round_evidence option)
-    ~(consensus_threshold : int) =
-  let {
-    payload_hash = actual_payload_hash;
-    seed_nonce_hash = _;
-    proof_of_work_nonce = _;
-    _;
-  } =
-    block_header_contents
-  in
-  (match checkable_payload_hash with
-  | No_check -> Result.return_unit
-  | Expected_payload_hash bph ->
-      error_unless
-        (Block_payload_hash.equal actual_payload_hash bph)
-        (Invalid_payload_hash {expected = bph; provided = actual_payload_hash}))
-  >>? fun () ->
-  (match locked_round_evidence with
-  | None -> ok None
-  | Some {preendorsement_count; preendorsement_round} ->
-      error_when
-        Round_repr.(preendorsement_round >= round)
-        (Locked_round_after_block_round
-           {locked_round = preendorsement_round; round})
-      >>? fun () ->
-      error_when
-        Compare.Int.(preendorsement_count < consensus_threshold)
-        (Insufficient_locked_round_evidence
-           {voting_power = preendorsement_count; consensus_threshold})
-      >>? fun () -> ok (Some preendorsement_round))
-  >>? fun locked_round ->
-  Fitness_repr.check_locked_round ~fitness_locked_round ~locked_round

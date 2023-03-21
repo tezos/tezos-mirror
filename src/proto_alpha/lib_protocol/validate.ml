@@ -297,8 +297,6 @@ type block_info = {
   round : Round.t;
   locked_round : Round.t option;
   predecessor_hash : Block_hash.t;
-  block_producer : Consensus_key.pk;
-  payload_producer : Consensus_key.pk;
   header_contents : Block_header.contents;
 }
 
@@ -307,8 +305,6 @@ type block_info = {
 type construction_info = {
   round : Round.t;
   predecessor_hash : Block_hash.t;
-  block_producer : Consensus_key.pk;
-  payload_producer : Consensus_key.pk;
   header_contents : Block_header.contents;
 }
 
@@ -2346,7 +2342,8 @@ let begin_any_application ctxt chain_id ~predecessor_level
   let* () =
     Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
   in
-  let* ctxt, _slot, payload_producer =
+  let* ctxt, _slot, _payload_producer =
+    (* We just make sure that this call will not fail in apply.ml *)
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2358,8 +2355,6 @@ let begin_any_application ctxt chain_id ~predecessor_level
       round;
       locked_round = Fitness.locked_round fitness;
       predecessor_hash;
-      block_producer;
-      payload_producer;
       header_contents = block_header.protocol_data.contents;
     }
   in
@@ -2419,7 +2414,8 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
   let* () =
     Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
   in
-  let* ctxt, _slot, payload_producer =
+  let* ctxt, _slot, _payload_producer =
+    (* We just make sure that this call will not fail in apply.ml *)
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2428,14 +2424,7 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
   let validation_state =
     init_validation_state
       ctxt
-      (Construction
-         {
-           round;
-           predecessor_hash;
-           block_producer;
-           payload_producer;
-           header_contents;
-         })
+      (Construction {round; predecessor_hash; header_contents})
       chain_id
       ~predecessor_level_and_round:
         (Some (predecessor_level.Level.level, predecessor_round))
@@ -2858,112 +2847,122 @@ let validate_operation ?(check_signature = true)
             operation
       | Single (Failing_noop _) -> tzfail Validate_errors.Failing_noop_error)
 
-let are_endorsements_required vi =
-  let open Lwt_result_syntax in
-  let+ first_level = First_level_of_protocol.get vi.ctxt in
-  (* [Comment from Legacy_apply] NB: the first level is the level
-     of the migration block. There are no endorsements for this
-     block. Therefore the block at the next level cannot contain
-     endorsements. *)
-  let level_position_in_protocol =
-    Raw_level.diff vi.current_level.level first_level
-  in
-  Compare.Int32.(level_position_in_protocol > 1l)
+(** Block finalization *)
+
+open Validate_errors.Block
 
 let check_endorsement_power vi bs =
-  let required = Constants.consensus_threshold vi.ctxt in
-  let provided = bs.endorsement_power in
-  error_unless
-    Compare.Int.(provided >= required)
-    (Validate_errors.Block.Not_enough_endorsements {required; provided})
-
-let finalize_validate_block_header vi vs checkable_payload_hash
-    (block_header_contents : Block_header.contents) round ~fitness_locked_round
-    =
-  let locked_round_evidence =
-    Option.map
-      (fun (preendorsement_round, preendorsement_count) ->
-        Block_header.{preendorsement_round; preendorsement_count})
-      vs.locked_round_evidence
+  let open Lwt_result_syntax in
+  let* are_endorsements_required =
+    (* The migration block (whose level is [first_level_of_protocol])
+       is always considered final, and is not endorsed. Therefore, the
+       block at the next level does not need to contain endorsements.
+       (Note that the migration block itself is validated by the
+       previous protocol, so the returned value for it does not matter.) *)
+    let* first_level_of_protocol = First_level_of_protocol.get vi.ctxt in
+    let level_position_in_protocol =
+      Raw_level.diff vi.current_level.level first_level_of_protocol
+    in
+    return Compare.Int32.(level_position_in_protocol > 1l)
   in
-  Block_header.finalize_validate_block_header
-    ~block_header_contents
-    ~round
-    ~fitness_locked_round
-    ~checkable_payload_hash
-    ~locked_round_evidence
-    ~consensus_threshold:(Constants.consensus_threshold vi.ctxt)
+  if are_endorsements_required then
+    let required = Constants.consensus_threshold vi.ctxt in
+    let provided = bs.endorsement_power in
+    fail_unless
+      Compare.Int.(provided >= required)
+      (Not_enough_endorsements {required; provided})
+  else return_unit
 
-let compute_payload_hash block_state
-    (block_header_contents : Block_header.contents) ~predecessor_hash =
-  Block_payload.hash
-    ~predecessor_hash
-    ~payload_round:block_header_contents.payload_round
-    (List.rev block_state.recorded_operations_rev)
+(** Check that the locked round in the fitness and the locked round
+    observed in the preendorsements are the same.
+
+    This check is not called in construction mode because there is
+    no provided fitness (meaning that we do not know whether the block
+    should contain any preendorsements).
+
+    When the observed locked round is [Some _], we actually already
+    know that it is identical to the fitness locked round, otherwise
+    {!Consensus.check_preexisting_block_preendorsement} would have
+    rejected the preendorsements. But this check is needed to reject
+    blocks where the fitness locked round has a value yet there are no
+    preendorsements (ie. the observed locked round is [None]). *)
+let check_fitness_locked_round bs fitness_locked_round =
+  let observed_locked_round = Option.map fst bs.locked_round_evidence in
+  error_unless
+    (Option.equal Round.equal observed_locked_round fitness_locked_round)
+    Fitness.Wrong_fitness
+
+(** When there are preendorsements, check that they point to a round
+    before the block's round, and that their total power is high enough.
+
+    Note that this function does not check whether the block actually
+    contains preendorments when they are mandatory. This is checked by
+    {!check_fitness_locked_round} instead. *)
+let check_preendorsement_round_and_power vi vs round =
+  let open Result_syntax in
+  match vs.locked_round_evidence with
+  | None -> ok_unit
+  | Some (preendorsement_round, preendorsement_count) ->
+      let* () =
+        (* Actually, this check should never fail, because we have
+           already called {!Consensus.check_round_before_block} for
+           all preendorsements in a block. Nevertheless, it does not
+           cost much to check again here. *)
+        error_when
+          Round.(preendorsement_round >= round)
+          (Locked_round_after_block_round
+             {locked_round = preendorsement_round; round})
+      in
+      let consensus_threshold = Constants.consensus_threshold vi.ctxt in
+      error_when
+        Compare.Int.(preendorsement_count < consensus_threshold)
+        (Insufficient_locked_round_evidence
+           {voting_power = preendorsement_count; consensus_threshold})
+
+let check_payload_hash block_state ~predecessor_hash
+    (block_header_contents : Block_header.contents) =
+  let expected =
+    Block_payload.hash
+      ~predecessor_hash
+      ~payload_round:block_header_contents.payload_round
+      (List.rev block_state.recorded_operations_rev)
+  in
+  let provided = block_header_contents.payload_hash in
+  error_unless
+    (Block_payload_hash.equal expected provided)
+    (Invalid_payload_hash {expected; provided})
 
 let finalize_block {info; block_state; _} =
   let open Lwt_result_syntax in
   match info.mode with
-  | Application {round; locked_round; predecessor_hash; header_contents; _} ->
-      let* are_endorsements_required = are_endorsements_required info in
+  | Application {round; locked_round; predecessor_hash; header_contents} ->
+      let* () = check_endorsement_power info block_state in
+      let*? () = check_fitness_locked_round block_state locked_round in
+      let*? () = check_preendorsement_round_and_power info block_state round in
       let*? () =
-        if are_endorsements_required then
-          check_endorsement_power info block_state
-        else ok_unit
-      in
-      let block_payload_hash =
-        compute_payload_hash block_state header_contents ~predecessor_hash
-      in
-      let*? () =
-        finalize_validate_block_header
-          info
-          block_state
-          (Block_header.Expected_payload_hash block_payload_hash)
-          header_contents
-          round
-          ~fitness_locked_round:locked_round
+        check_payload_hash block_state ~predecessor_hash header_contents
       in
       return_unit
-  | Partial_validation _ ->
-      let* are_endorsements_required = are_endorsements_required info in
-      let*? () =
-        if are_endorsements_required then
-          check_endorsement_power info block_state
-        else ok_unit
-      in
+  | Partial_validation {round; locked_round; _} ->
+      let* () = check_endorsement_power info block_state in
+      let*? () = check_fitness_locked_round block_state locked_round in
+      let*? () = check_preendorsement_round_and_power info block_state round in
       return_unit
-  | Construction {round; predecessor_hash; header_contents; _} ->
-      let block_payload_hash =
-        compute_payload_hash block_state header_contents ~predecessor_hash
-      in
-      let locked_round_evidence = block_state.locked_round_evidence in
-      let checkable_payload_hash =
-        match locked_round_evidence with
-        | Some _ -> Block_header.Expected_payload_hash block_payload_hash
+  | Construction {round; predecessor_hash; header_contents} ->
+      let* () = check_endorsement_power info block_state in
+      let*? () = check_preendorsement_round_and_power info block_state round in
+      let*? () =
+        match block_state.locked_round_evidence with
+        | Some _ ->
+            check_payload_hash block_state ~predecessor_hash header_contents
         | None ->
-            (* In full construction, when there is no locked round
-               evidence (and thus no preendorsements), the baker cannot
-               know the payload hash before selecting the operations. We
-               may dismiss checking the initially given
-               payload_hash. However, to be valid, the baker must patch
-               the resulting block header with the actual payload
-               hash. *)
-            Block_header.No_check
-      in
-      let* are_endorsements_required = are_endorsements_required info in
-      let*? () =
-        if are_endorsements_required then
-          check_endorsement_power info block_state
-        else ok_unit
-      in
-      let*? () =
-        finalize_validate_block_header
-          info
-          block_state
-          checkable_payload_hash
-          header_contents
-          round
-          ~fitness_locked_round:(Option.map fst locked_round_evidence)
+            (* In construction mode, when there is no locked round
+               evidence (ie. no preendorsements), the baker cannot know
+               the payload hash before selecting the operations.
+               Therefore, we do not check the initially given payload
+               hash. The baker will have to patch the resulting block
+               header with the actual payload hash afterwards. *)
+            ok_unit
       in
       return_unit
   | Mempool ->
