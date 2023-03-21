@@ -144,6 +144,7 @@ Minor Changes
   blocks. To avoid mempools getting spammed with operations with
   various slots, double (pre)endorsement denunciations can now punish
   multiple operations from the same delegate with distinct slots.
+  Finally, this change makes mempool initialization faster.
   (MR :gl:`!7927`)
 
 Internal
@@ -158,6 +159,8 @@ Internal
   Otherwise it is referred to as ``or_``. (MR :gl:`!7546`)
 
 - Michelson: normalize all lambdas into optimized mode during elaboration. (MR :gl:`!7829`)
+
+- Michelson: stack types variables renamed to uppercase. (MR :gl:`!7953`)
 
 - Michelson: ``IConst`` constructor renamed into ``IPush``. (MR :gl:`!7954`)
 
