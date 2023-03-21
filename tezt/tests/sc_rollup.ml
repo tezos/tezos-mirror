@@ -149,11 +149,7 @@ let get_sc_rollup_constants client =
 let commit_too_recent =
   "Attempted to cement a commitment before its refutation deadline"
 
-let parent_not_lcc = "Parent is not the last cemented commitment"
-
 let disputed_commit = "Attempted to cement a disputed commitment"
-
-let commit_doesnt_exit = "Commitment src\\w+\\sdoes not exist"
 
 let register_test ?(regression = false) ~__FILE__ ~tags ~title f =
   let tags = "sc_rollup" :: tags in
@@ -3010,7 +3006,7 @@ let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 client =
 let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
   test_forking_scenario ~variant:"publish, and cement on wrong commitment"
   @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
-  let c1, c2, c31, c32, c311, c321 = commits in
+  let c1, c2, c31, c32, c311, _c321 = commits in
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
   let cement = cement_commitments client sc_rollup in
@@ -3028,15 +3024,10 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
          (modulo cementation ordering & disputes resolution) *)
       repeat challenge_window (fun () -> Client.bake_for_and_wait client)
   in
-  (* We cannot cement any of the commitments before cementing c1 *)
-  let* () = cement [c2; c31; c32; c311; c321] ~fail:parent_not_lcc in
-  (* But, we can cement c1 and then c2, in this order *)
+  (* c1 and c2 will be cemented. *)
   let* () = cement [c1; c2] in
   (* We cannot cement c31 or c32 on top of c2 because they are disputed *)
   let* () = cement [c31; c32] ~fail:disputed_commit in
-  (* Of course, we cannot cement c311 or c321 because their parents are not
-     cemented. *)
-  let* () = cement ~fail:parent_not_lcc [c311; c321] in
 
   (* +++ dispute resolution +++
      Let's resolve the dispute between operator1 and operator2 on the fork
@@ -3071,9 +3062,7 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
       client
   in
   (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
-  let* () = cement [c31; c311] in
-  (* Attempting to cement defeated branch will fail. *)
-  cement ~fail:commit_doesnt_exit [c32; c321]
+  cement [c31; c311]
 
 (** Given a commitment tree constructed by {test_forking_scenario}, this test
     starts a dispute and makes a first valid dissection move.

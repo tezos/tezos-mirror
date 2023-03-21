@@ -72,10 +72,12 @@ val publish_commitment :
   tzresult
   Lwt.t
 
-(** [cement_commitment context rollup commitment] cements the given
-    commitment whose hash is given (and returns the corresponding commitment).
+(** [cement context rollup] tries to cement the next inbox level commitment,
+    that is, the LCC's successor. Returns the cemented commitment hash and
+    its hash.
 
-    For cementing to succeed, the following must hold:
+    For cementing to succeed, we need to have **one** commitment respecting
+    the following properties:
     {ol
       {li The deadline for [commitment] must have passed.}
       {li The predecessor of [commitment] must be the Last Cemented Commitment.}
@@ -83,7 +85,7 @@ val publish_commitment :
       {li All stakers must be indirectly staked on [commitment].}
     }
 
-    If successful, Last Cemented commitment is set to the given [commitment],
+    If successful, Last Cemented commitment is set to the found commitment,
     and deallocate the old cemented commitment accordingly to the number
     of stored cemented commitments.
 
@@ -92,8 +94,11 @@ val publish_commitment :
 val cement_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_commitment_repr.Hash.t ->
-  (Raw_context.t * Sc_rollup_commitment_repr.t) tzresult Lwt.t
+  (Raw_context.t
+  * Sc_rollup_commitment_repr.t
+  * Sc_rollup_commitment_repr.Hash.t)
+  tzresult
+  Lwt.t
 
 (** [find_staker context rollup staker] returns the most recent commitment
     [staker] staked on, or [None] if its last staked commitment is older

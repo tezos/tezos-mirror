@@ -1145,13 +1145,18 @@ let apply_manager_operation :
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas} in
       return (ctxt, result, [])
-  | Sc_rollup_cement {rollup; commitment} ->
-      Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
-      >>=? fun (ctxt, commitment) ->
+  | Sc_rollup_cement {rollup; commitment = _commitment_hash} ->
+      (* The field [commitment] is deprecated. It is not used during the
+         application of [Sc_rollup_cement]. The commitment to cement is
+         computed by the protocol.
+
+         It is deprecated starting N, and can be removed in O. *)
+      Sc_rollup.Stake_storage.cement_commitment ctxt rollup
+      >>=? fun (ctxt, commitment, commitment_hash) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_cement_result
-          {consumed_gas; inbox_level = commitment.inbox_level}
+          {consumed_gas; inbox_level = commitment.inbox_level; commitment_hash}
       in
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
