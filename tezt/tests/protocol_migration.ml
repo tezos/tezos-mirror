@@ -31,16 +31,15 @@
 *)
 
 let connect (client_1, node_1) (client_2, node_2) =
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2 in
-  let* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   Client.Admin.connect_address client_1 ~peer:node_2
 
-let disconnect (client_1, node_1) (client_2, node_2) =
-  let* node_1_id = Node.wait_for_identity node_1
-  and* node_2_id = Node.wait_for_identity node_2 in
+let disconnect (client_1, _node_1) (_client_2, node_2) =
+  let* node_2_id = Node.wait_for_identity node_2 in
   let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id in
-  Client.Admin.kick_peer client_2 ~peer:node_1_id
+  Background.register (Client.Admin.untrust_address client_1 ~peer:node_2) ;
+  unit
 
 let get_proposer ~level client =
   let block = string_of_int level in
