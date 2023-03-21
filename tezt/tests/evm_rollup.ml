@@ -164,9 +164,6 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       ~src:originator_key
       client
   in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node sc_rollup_address
-  in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   (* EVM Kernel installation level. *)
@@ -217,7 +214,6 @@ let test_evm_proxy_server_connection =
   let process = Evm_proxy_server.spawn_run evm_proxy in
   let* () = Process.check ~expect_failure:true process in
   (* Starts the rollup node. *)
-  let* _filename = Sc_rollup_node.config_init sc_rollup_node sc_rollup in
   let* _ = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   (* Starts the EVM proxy server and asks its version. *)
   let* () = Evm_proxy_server.run evm_proxy in

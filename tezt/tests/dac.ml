@@ -222,11 +222,8 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") f tezos_node tezos_client
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:bootstrap1_key
   in
-  let* configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node rollup_address
-  in
   let* () = Client.bake_for_and_wait tezos_client in
-  f rollup_address sc_rollup_node configuration_filename
+  f rollup_address sc_rollup_node
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
@@ -275,7 +272,7 @@ let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
       with_fresh_rollup
         ~protocol
         ~pvm_name
-        (fun sc_rollup_address sc_rollup_node _configuration_filename ->
+        (fun sc_rollup_address sc_rollup_node ->
           with_legacy_dac_node
             node
             ~sc_rollup_node

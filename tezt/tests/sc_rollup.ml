@@ -264,7 +264,6 @@ let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
   in
-  let* _filename = Sc_rollup_node.config_init sc_rollup_node sc_rollup in
   let rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   return (sc_rollup_node, rollup_client, sc_rollup)
 
@@ -463,9 +462,10 @@ let test_rollup_node_configuration ~kind =
   @@ fun _protocol
              rollup_node
              _rollup_client
-             _sc_rollup
+             sc_rollup
              _tezos_node
              _tezos_client ->
+  let* _filename = Sc_rollup_node.config_init rollup_node sc_rollup in
   let config = Sc_rollup_node.Config_file.read rollup_node in
   let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
   unit
@@ -1401,9 +1401,6 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   let sc_rollup_other_client =
     Sc_rollup_client.create ~protocol sc_rollup_other_node
   in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_other_node sc_rollup
-  in
   let* () = Sc_rollup_node.run sc_rollup_other_node sc_rollup [] in
   let* _level = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Other rollup node synchronized." ;
@@ -1621,9 +1618,6 @@ let commitment_stored_robust_to_failures protocol sc_rollup_node
       node
       ~base_dir:(Client.base_dir client')
       ~default_operator:bootstrap2_key
-  in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node' sc_rollup
   in
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
@@ -2011,9 +2005,6 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
       ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node' sc_rollup
-  in
   let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup [] in
 
   let* _ =
@@ -2150,9 +2141,6 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
       ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node' sc_rollup
-  in
   let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup [] in
 
   let* _ =
@@ -2215,9 +2203,6 @@ let _test_reinject_failed_commitment ~protocol ~kind =
       node
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap5.public_key_hash
-  in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup
   in
   Log.info "Run two honest rollup nodes." ;
   let* () = Sc_rollup_node.run sc_rollup_node1 sc_rollup []
@@ -2781,20 +2766,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       loser_keys
       loser_modes
   in
-  let* _configuration_filenames =
-    Lwt_list.map_p (fun (loser_mode, loser_sc_rollup_node) ->
-        Sc_rollup_node.config_init
-          ~loser_mode
-          loser_sc_rollup_node
-          sc_rollup_address)
-    @@ List.combine loser_modes loser_sc_rollup_nodes
-  in
   let* gather_promises = run_honest_node sc_rollup_node
   and* () =
-    Lwt_list.iter_p
-      (fun loser_sc_rollup_node ->
-        Sc_rollup_node.run loser_sc_rollup_node sc_rollup_address [])
-      loser_sc_rollup_nodes
+    Lwt_list.iter_p (fun (loser_mode, loser_sc_rollup_node) ->
+        Sc_rollup_node.run loser_sc_rollup_node ~loser_mode sc_rollup_address [])
+    @@ List.combine loser_modes loser_sc_rollup_nodes
   in
 
   let restart_promise =
@@ -3393,9 +3369,6 @@ let test_late_rollup_node =
       ~default_operator:
         Constant.bootstrap1.alias (* Same as other rollup_node *)
   in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup_address
-  in
   Log.info "Start rollup node from scratch with same operator" ;
   let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
   let* _level =
@@ -3445,9 +3418,6 @@ let test_late_rollup_node_2 =
       node
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap2.alias
-  in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup_address
   in
   Log.info
     "Starting alternative rollup node from scratch with a different operator." ;
