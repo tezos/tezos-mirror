@@ -50,8 +50,6 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let () = ignore generated_code_destination
-
   let tags = ["misc"]
 
   let models = [("*", lwt_model)]

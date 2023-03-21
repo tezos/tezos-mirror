@@ -59,6 +59,8 @@ module Probing_bench = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   (* The encoding is used by `tezos-snoop` to load the config from json
      files. *)
   let config_encoding =

@@ -66,8 +66,6 @@ module Take_fees_benchmark = struct
 
   let generated_code_destination = None
 
-  let () = ignore generated_code_destination
-
   let tags = ["apply"]
 
   type config = unit

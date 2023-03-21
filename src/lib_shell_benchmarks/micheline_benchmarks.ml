@@ -137,8 +137,6 @@ module Micheline_strip_locations : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let () = ignore generated_code_destination
-
   let tags = ["micheline"]
 
   type config = unit

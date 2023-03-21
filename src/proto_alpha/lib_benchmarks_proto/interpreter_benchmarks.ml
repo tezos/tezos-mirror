@@ -276,8 +276,6 @@ let make_benchmark :
 
     let generated_code_destination = None
 
-    let () = ignore generated_code_destination
-
     let benchmark kinstr_and_stack_sampler ctxt step_constants () =
       let stack_instr = kinstr_and_stack_sampler () in
       benchmark_from_kinstr_and_stack
@@ -562,8 +560,6 @@ let make_continuation_benchmark :
 
     let generated_code_destination = None
 
-    let () = ignore generated_code_destination
-
     let benchmark cont_and_stack_sampler ctxt step_constants () =
       let stack_instr = cont_and_stack_sampler () in
       benchmark_from_continuation ?amplification ctxt step_constants stack_instr
@@ -662,8 +658,6 @@ module Registration_section = struct
       let module_filename = __FILE__
 
       let generated_code_destination = None
-
-      let () = ignore generated_code_destination
 
       let tags = [Tags.interpreter]
 
@@ -2737,8 +2731,6 @@ module Registration_section = struct
         let module_filename = __FILE__
 
         let generated_code_destination = None
-
-        let () = ignore generated_code_destination
 
         include Default_config
         include Default_boilerplate

@@ -90,8 +90,6 @@ struct
 
       let generated_code_destination = Info.generated_code_destination
 
-      let () = ignore generated_code_destination
-
       let tags = ["encoding"]
 
       include Shared_constant_time
@@ -122,8 +120,6 @@ struct
       let module_filename = Info.file
 
       let generated_code_destination = Info.generated_code_destination
-
-      let () = ignore generated_code_destination
 
       let tags = ["encoding"]
 
@@ -157,8 +153,6 @@ struct
 
       let generated_code_destination = Info.generated_code_destination
 
-      let () = ignore generated_code_destination
-
       let tags = ["encoding"]
 
       include Shared_linear
@@ -178,8 +172,6 @@ struct
       let module_filename = Info.file
 
       let generated_code_destination = Info.generated_code_destination
-
-      let () = ignore generated_code_destination
 
       let tags = ["encoding"]
 

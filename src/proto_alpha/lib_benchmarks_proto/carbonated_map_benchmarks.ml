@@ -49,8 +49,6 @@ module Config_and_workload = struct
 
   let generated_code_destination = None
 
-  let () = ignore generated_code_destination
-
   let tags = ["carbonated_map"]
 
   let workload_encoding = config_encoding
@@ -170,8 +168,6 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let module_filename = __FILE__
 
     let generated_code_destination = None
-
-    let () = ignore generated_code_destination
 
     let models =
       [
@@ -313,8 +309,6 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let module_filename = __FILE__
 
     let generated_code_destination = None
-
-    let () = ignore generated_code_destination
 
     let models =
       [

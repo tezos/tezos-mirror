@@ -50,6 +50,8 @@ module Blake2b_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let tags = ["example"]
 
   (* We will measure hashing time on random bytes with length
