@@ -23,6 +23,9 @@ use crate::{Error, METADATA_SIZE};
 #[cfg(feature = "alloc")]
 use tezos_smart_rollup_core::smart_rollup_core::ReadInputMessageInfo;
 
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
 #[derive(Copy, Eq, PartialEq, Clone, Debug)]
 /// Errors that may be returned when called [Runtime] methods.
 pub enum RuntimeError {
@@ -32,6 +35,8 @@ pub enum RuntimeError {
     StoreListIndexOutOfBounds,
     /// Errors returned by the host functions
     HostErr(Error),
+    /// Failed parsing
+    DecodingError,
 }
 
 /// Returned by [`Runtime::store_has`] - specifies whether a path has a value or is a prefix.
@@ -184,6 +189,10 @@ pub trait Runtime {
 
     /// The number of reboot left for the kernel.
     fn reboot_left(&self) -> Result<u32, RuntimeError>;
+
+    /// The runtime_version the kernel is using.
+    #[cfg(feature = "alloc")]
+    fn runtime_version(&self) -> Result<String, RuntimeError>;
 }
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -502,6 +511,16 @@ where
 
         let counter = u32::from_le_bytes(bytes);
         Ok(counter)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn runtime_version(&self) -> Result<String, RuntimeError> {
+        const PATH_VERSION: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/wasm_version");
+        let bytes = Runtime::store_read(self, &PATH_VERSION, 0, 9)?;
+        // SAFETY: This storage can only contains valid version string which are utf8 safe.
+        let version = unsafe { alloc::string::String::from_utf8_unchecked(bytes) };
+        Ok(version)
     }
 }
 
