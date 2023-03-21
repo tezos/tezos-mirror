@@ -235,6 +235,16 @@ let no_committee_member_address =
     ~level:Notice
     ()
 
+let cannot_retrieve_keys_from_address =
+  declare_1
+    ~section
+    ~name:"cannot_retrieve_keys_from_address"
+    ~msg:
+      "Cannot retrieve keys from address: {address}, node is not a Committee \
+       Member"
+    ~level:Notice
+    ("address", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -263,3 +273,6 @@ let emit_signature_pushed_to_coordinator signature =
   emit new_signature_pushed_to_coordinator signature
 
 let emit_no_committee_member_address = emit no_committee_member_address
+
+let emit_cannot_retrieve_keys_from_address address =
+  emit cannot_retrieve_keys_from_address address

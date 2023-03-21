@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Mode_not_supported of string | Cannot_retrieve_node_keys of string
+type error += Mode_not_supported of string
 
 let () =
   register_error_kind
@@ -37,20 +37,6 @@ let () =
     Data_encoding.(obj1 (req "mode" string))
     (function Mode_not_supported mode -> Some mode | _ -> None)
     (fun mode -> Mode_not_supported mode)
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dac.node.cannot_retrieve_node_keys"
-    ~title:"Cannot retrieve node keys"
-    ~description:"Cannot retrieve node keys"
-    ~pp:(fun ppf public_key_hash ->
-      Format.fprintf ppf "Cannot retrieve node keys from %s" public_key_hash)
-    Data_encoding.(obj1 (req "public_key_hash" string))
-    (function
-      | Cannot_retrieve_node_keys public_key_hash -> Some public_key_hash
-      | _ -> None)
-    (fun public_key_hash -> Cannot_retrieve_node_keys public_key_hash)
 
 module Handler = struct
   (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
@@ -184,9 +170,9 @@ module Handler = struct
           in
           match (committee_member_keys, committee_member_address) with
           | Some committee_member_keys, _ ->
-              (* If there is a [public_key_hash], it means the node is run as a member,
+              (* If there is a [committee_member_address], it means the node is run as a member,
                    so we must sign the payload and post the signature to the coordinator
-                 If there is no [public_key_hash] provided, it means the node is run as an observer
+                 If there is no [committee_member_address] provided, it means the node is run as an observer
                    then we simply [return ()] *)
               push_payload_signature
                 dac_plugin
@@ -194,12 +180,15 @@ module Handler = struct
                 wallet_cctxt
                 committee_member_keys
                 root_hash
-          | None, Some committee_member_address ->
-              tzfail
-              @@ Cannot_retrieve_node_keys
-                   (Tezos_crypto.Aggregate_signature.Public_key_hash.to_string
-                      committee_member_address)
-          | None, None -> return ())
+          | _, Some committee_member_address ->
+              let*! () =
+                Event.emit_cannot_retrieve_keys_from_address
+                  committee_member_address
+              in
+              return ()
+          | None, None ->
+              let*! () = Event.emit_no_committee_member_address () in
+              return ())
       | Error errs ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
               Improve handling of errors. *)
