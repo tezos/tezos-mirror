@@ -179,6 +179,8 @@ module Make (C : AUTOMATON_CONFIG) :
       {messages = Message_id.Map.add message_id value t.messages}
   end
 
+  type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
+
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
 
       This data-structure should be documented. *)
@@ -189,8 +191,7 @@ module Make (C : AUTOMATON_CONFIG) :
     ihave_per_heartbeat : int Peer.Map.t;
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
-    fanout : Peer.Set.t Topic.Map.t;
-    last_published_time : time Topic.Map.t;
+    fanout : fanout_peers Topic.Map.t;
     seen_messages : Message_id.Set.t;
     memory_cache : Memory_cache.t;
     rng : Random.State.t;
@@ -245,7 +246,6 @@ module Make (C : AUTOMATON_CONFIG) :
       iwant_per_heartbeat = Peer.Map.empty;
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
-      last_published_time = Topic.Map.empty;
       seen_messages = Message_id.Set.empty;
       memory_cache = Memory_cache.create ();
       rng;
@@ -397,11 +397,15 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let find_fanout topic state = Topic.Map.find topic state.fanout
 
-    let set_fanout_topic topic peers state =
+    let set_fanout_topic topic last_published_time peers state =
       if Peer.Set.is_empty peers then (state, ())
       else
         let state =
-          {state with fanout = Topic.Map.add topic peers state.fanout}
+          {
+            state with
+            fanout =
+              Topic.Map.add topic {peers; last_published_time} state.fanout;
+          }
         in
         (state, ())
 
@@ -415,25 +419,6 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let delete_fanout topic state =
       let state = {state with fanout = Topic.Map.remove topic state.fanout} in
-      (state, ())
-
-    let set_last_published_time topic time state =
-      let state =
-        {
-          state with
-          last_published_time =
-            Topic.Map.add topic time state.last_published_time;
-        }
-      in
-      (state, ())
-
-    let delete_last_published_time topic state =
-      let state =
-        {
-          state with
-          last_published_time = Topic.Map.remove topic state.last_published_time;
-        }
-      in
       (state, ())
 
     let put_message_in_cache message_id message state =
@@ -776,11 +761,10 @@ module Make (C : AUTOMATON_CONFIG) :
   module Publish = struct
     let get_peers_for_unsubscribed_topic topic =
       let open Monad.Syntax in
-      let*! fanout_opt = find_fanout topic in
-      let now = Time.now () in
-      let* () = set_last_published_time topic now in
       let*! gossip_publish_threshold in
       let*! degree_optimal in
+      let now = Time.now () in
+      let*! fanout_opt = find_fanout topic in
       match fanout_opt with
       | None ->
           let filter _peer {direct; score; _} =
@@ -790,7 +774,7 @@ module Make (C : AUTOMATON_CONFIG) :
           let* not_direct_peers =
             select_peers topic ~filter ~max:degree_optimal
           in
-          let* () = set_fanout_topic topic not_direct_peers in
+          let* () = set_fanout_topic topic now not_direct_peers in
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5010
 
              We could avoid this call by directly having a map
@@ -798,12 +782,10 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter peer ({direct; _} as connection) =
             filter peer connection || direct
           in
-          let* peers = select_peers topic ~filter ~max:Int.max_int in
-          (* FIXME https://gitlab.com/tezos/tezos/-/issues/4988
-
-             lastpub field *)
-          return peers
-      | Some peers -> return peers
+          select_peers topic ~filter ~max:Int.max_int
+      | Some fanout ->
+          let* () = set_fanout_topic topic now fanout.peers in
+          return fanout.peers
 
     let handle ~sender topic message_id message : [`Publish] output Monad.t =
       let open Monad.Syntax in
@@ -864,7 +846,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let valid_fanout_peers =
         match Topic.Map.find topic fanout with
         | None -> Peer.Set.empty
-        | Some fanout_peers -> Peer.Set.filter is_valid fanout_peers
+        | Some fanout_peers -> Peer.Set.filter is_valid fanout_peers.peers
       in
       let* peers =
         (* We prioritize fanout peers to be in the mesh for this
@@ -881,7 +863,6 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       let* () = set_mesh_topic topic peers in
       let* () = delete_fanout topic in
-      let* () = delete_last_published_time topic in
       Joining_topic peers |> return
 
     let handle topic : [`Join] output Monad.t =
@@ -1293,7 +1274,10 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = set_mesh mesh in
       let*! fanout in
       let fanout =
-        Topic.Map.map (fun peers -> Peer.Set.remove peer peers) fanout
+        Topic.Map.map
+          (fun fanout_peers ->
+            {fanout_peers with peers = Peer.Set.remove peer fanout_peers.peers})
+          fanout
       in
       let* () = set_fanout fanout in
       let*! connections in
