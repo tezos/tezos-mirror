@@ -181,6 +181,9 @@ pub trait Runtime {
 
     /// True if the kernel rebooted too many times.
     fn restart_forced(&self) -> Result<bool, RuntimeError>;
+
+    /// The number of reboot left for the kernel.
+    fn reboot_left(&self) -> Result<u32, RuntimeError>;
 }
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -487,6 +490,18 @@ where
         let restart_forced =
             Runtime::store_has(self, &PATH_TOO_MANY_REBOOT_FLAG)?.is_some();
         Ok(restart_forced)
+    }
+
+    fn reboot_left(&self) -> Result<u32, RuntimeError> {
+        const PATH_REBOOT_COUNTER: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/reboot_counter");
+        const SIZE: usize = core::mem::size_of::<i32>();
+
+        let mut bytes: [u8; SIZE] = [0; SIZE];
+        self.store_read_slice(&PATH_REBOOT_COUNTER, 0, &mut bytes)?;
+
+        let counter = u32::from_le_bytes(bytes);
+        Ok(counter)
     }
 }
 
