@@ -942,7 +942,7 @@ module Make (C : AUTOMATON_CONFIG) :
          backoff time is expired, then remove it *)
       (* We only clear once every [backoff_cleanup_ticks] ticks to avoid
          iterating over the map(s) too much *)
-      if Int64.(rem heartbeat_ticks (of_int backoff_cleanup_ticks)) != 0L then
+      if Int64.(rem heartbeat_ticks (of_int backoff_cleanup_ticks)) <> 0L then
         return ()
       else
         let current = Time.now () in
@@ -964,7 +964,7 @@ module Make (C : AUTOMATON_CONFIG) :
                Check the reasoning *)
             match connection.expire with
             | Some expire
-              when Time.(expire > current)
+              when Time.(expire < current)
                    && Topic.Map.is_empty connection.backoff ->
                 None
             | _ -> Some {connection with backoff})
@@ -1254,7 +1254,6 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! heartbeat_ticks in
       let* () = set_heartbeat_ticks (Int64.succ heartbeat_ticks) in
-
       (* cleaning up *)
       let* () = cleanup in
 
