@@ -18,6 +18,12 @@ It requires protocol environment V9, compared to V8 for Mumbai. (MR :gl:`!7178`)
 Smart Rollups
 -------------
 
+- Add a new kind of outbox messages batches allowing to specify the
+  type of the transaction to execute on the L1. (MR :gl:`!7941`)
+
+- Add a field `"kind"` to the outbox message transaction json
+  encoding. (MR :gl:`!7941`)
+
 - Update gas model for decoding output proofs. (MR :gl:`!7116`)
 
 - Improve readability of ``assert_commitment_not_too_far_ahead``.
