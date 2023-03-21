@@ -52,8 +52,8 @@ let test_raw_scenario time () =
   | Some message_decrypted ->
       assert (message = message_decrypted) ;
       assert (unlocked = same_unlocked) ;
-      assert (verify_time_lock public ~time locked_value unlocked proof_1) ;
-      assert (verify_time_lock public ~time locked_value unlocked proof_2)
+      assert (verify_timelock public ~time locked_value unlocked proof_1) ;
+      assert (verify_timelock public ~time locked_value unlocked proof_2)
 
 let bench () =
   let open Timelock_legacy in

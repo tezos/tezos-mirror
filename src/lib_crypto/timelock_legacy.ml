@@ -29,7 +29,7 @@ type rsa_secret = {p : Z.t; q : Z.t}
 
 type rsa_public = Z.t (* RSA modulus = p * q*)
 
-type time_lock_proof = Z.t
+type timelock_proof = Z.t
 
 type locked_value = Z.t
 
@@ -104,13 +104,13 @@ let prove_with_secret secret ~time locked_value unlocked_value =
    2 ^ time = (((2 ^ time) / l) * l) + (2 ^ time mod l) mod phi
    see https://eprint.iacr.org/2018/712.pdf section 3.2 for this proof
 *)
-let verify_time_lock rsa_public ~time locked_value unlocked_value proof =
+let verify_timelock rsa_public ~time locked_value unlocked_value proof =
   let l = hash_to_prime rsa_public ~time locked_value unlocked_value in
   let r = Z.(powm (of_int 2) (Z.of_int time) l) in
   unlocked_value
   = Z.(powm proof l rsa_public * powm locked_value r rsa_public mod rsa_public)
 
-(* Gives the value that was time_locked from the time_lock, the secret and the
+(* Gives the value that was timelocked from the timelock, the secret and the
    time. Works in logarithmic time in [time] *)
 let unlock_with_secret secret ~(time : int) (locked_value : locked_value) =
   let phi = Z.((secret.p - one) * (secret.q - one)) in
@@ -127,7 +127,7 @@ let locked_value_to_symmetric_key_with_secret secret ~(time : int)
     (locked_value : locked_value) : symmetric_key =
   unlocked_value_to_symmetric_key (unlock_with_secret secret ~time locked_value)
 
-(* Gives the value that was time_locked from the time_lock, the public modulus
+(* Gives the value that was timelocked from the timelock, the public modulus
    and the time. Works in linear time in [time] *)
 let unlock_and_prove_without_secret rsa_public ~time locked_value =
   let rec aux time v =
@@ -139,7 +139,7 @@ let unlock_and_prove_without_secret rsa_public ~time locked_value =
 
 let locked_value_to_symmetric_key_with_proof (rsa_public : rsa_public)
     ~(time : int) locked_value unlocked_value proof =
-  if verify_time_lock rsa_public ~time locked_value unlocked_value proof then
+  if verify_timelock rsa_public ~time locked_value unlocked_value proof then
     Some (unlocked_value_to_symmetric_key unlocked_value)
   else None
 
@@ -157,7 +157,7 @@ let decrypt symmetric_key ciphertext =
     ciphertext.nonce
 
 (* ------------*)
-type chest_key = {unlocked_value : unlocked_value; proof : time_lock_proof}
+type chest_key = {unlocked_value : unlocked_value; proof : timelock_proof}
 
 type chest = {
   locked_value : locked_value;

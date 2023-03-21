@@ -39,16 +39,16 @@ let default_challenge =
 let test_raw_scenario time () =
   let open Timelock in
   (* Creator creating chest. *)
-  let time_lock_precomputed_tuple = precompute_time_lock ~time () in
+  let timelock_precomputed_tuple = precompute_timelock ~time () in
   let locked, proof =
-    proof_of_vdf_tuple rsa2048 ~time time_lock_precomputed_tuple
+    proof_of_vdf_tuple rsa2048 ~time timelock_precomputed_tuple
   in
   (* Not creator opening chest. *)
   assert (verify rsa2048 ~time locked proof) ;
   let proof_2 = unlock_and_prove rsa2048 ~time locked in
   assert (verify rsa2048 ~time locked proof_2) ;
-  let sym_key_1 = time_lock_proof_to_symmetric_key rsa2048 proof in
-  let sym_key_2 = time_lock_proof_to_symmetric_key rsa2048 proof_2 in
+  let sym_key_1 = timelock_proof_to_symmetric_key rsa2048 proof in
+  let sym_key_2 = timelock_proof_to_symmetric_key rsa2048 proof_2 in
   assert (sym_key_1 = sym_key_2) ;
   let message = Bytes.of_string "rzersef" in
   let c = encrypt sym_key_2 message in

@@ -3184,7 +3184,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Precompute time_lock tuple."
+      ~desc:"Precompute timelock tuple."
       (args1 timelock_locked_value_arg)
       (prefixes ["timelock"; "precompute"]
       @@ prefix "for"
@@ -3210,7 +3210,7 @@ let commands_rw () =
               else return locked_option
         in
         let _ =
-          precompute_time_lock
+          precompute_timelock
             ~locked_value
             ~precompute_path:(Some timelock_path)
             ~time
@@ -3222,7 +3222,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Generate time_lock chest."
+      ~desc:"Generate timelock chest."
       no_options
       (prefixes ["timelock"; "create"]
       @@ prefix "for"
@@ -3260,7 +3260,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Open time_lock chest."
+      ~desc:"Open timelock chest."
       no_options
       (prefixes ["timelock"; "open"]
       @@ prefix "for"
@@ -3287,7 +3287,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Verify time_lock chest."
+      ~desc:"Verify timelock chest."
       no_options
       (prefixes ["timelock"; "verify"]
       @@ prefix "for"

@@ -100,7 +100,7 @@ val to_vdf_tuple_unsafe : string -> string -> string -> vdf_tuple
 (** Proof that the opening of a value is the claimed value.
     It is concretely an optional vdf_tuple and a member of the RSA
     group. *)
-type time_lock_proof = {vdf_tuple : vdf_tuple; nonce : Z.t}
+type timelock_proof = {vdf_tuple : vdf_tuple; nonce : Z.t}
 
 (** Default modulus for RSA-based timelock, chosen as 2048 bit RSA modulus
     challenge "RSA-2048". *)
@@ -120,25 +120,25 @@ val gen_locked_value_opt : rsa_public -> locked_value option
 
 (** Hashes a number mod n to a symmetric key for authenticated encryption,
     where the number is unlocked_value**nonce mod rsa_public. *)
-val time_lock_proof_to_symmetric_key :
-  rsa_public -> time_lock_proof -> symmetric_key
+val timelock_proof_to_symmetric_key :
+  rsa_public -> timelock_proof -> symmetric_key
 
 (** Unlock a timelock value and produces a proof certifying that the result is
     indeed what had been locked. *)
-val unlock_and_prove : rsa_public -> time:int -> locked_value -> time_lock_proof
+val unlock_and_prove : rsa_public -> time:int -> locked_value -> timelock_proof
 
 (** Produces a proof certifying that the result is indeed what had been locked. *)
 val prove :
-  rsa_public -> time:int -> locked_value -> unlocked_value -> time_lock_proof
+  rsa_public -> time:int -> locked_value -> unlocked_value -> timelock_proof
 
 (** Verifies that [locked_value] indeed contains [unlocked_value] with
     parameters [rsa_public] and [time:int]. *)
-val verify : rsa_public -> time:int -> locked_value -> time_lock_proof -> bool
+val verify : rsa_public -> time:int -> locked_value -> timelock_proof -> bool
 
 (** Precomputes a [vdf_tuple] given a [time:int] and optionally [locked_value].
     If [precompute_path] is given, it will instead read [vdf_tuple] locally and
     if not found, will write the newly computed [vdf_tuple] there. *)
-val precompute_time_lock :
+val precompute_timelock :
   ?locked_value:locked_value option ->
   ?precompute_path:string option ->
   time:int ->
@@ -148,7 +148,7 @@ val precompute_time_lock :
 (** Randomizes a [vdf_tuple] given a [rsa_public] and a [time:int]
     (to verify the [vdf_tuple] is correct). *)
 val proof_of_vdf_tuple :
-  rsa_public -> time:int -> vdf_tuple -> locked_value * time_lock_proof
+  rsa_public -> time:int -> vdf_tuple -> locked_value * timelock_proof
 
 (** Receives a claim opening with a proof and potentially secret.
     If the proof is valid hashes the opening using
@@ -157,7 +157,7 @@ val locked_value_to_symmetric_key :
   rsa_public ->
   time:int ->
   locked_value ->
-  time_lock_proof ->
+  timelock_proof ->
   symmetric_key option
 
 (** encrypt using authenticated encryption, i.e. ciphertext contains
@@ -174,7 +174,7 @@ val rsa_public_encoding : rsa_public Data_encoding.t
 
 val vdf_tuple_encoding : vdf_tuple Data_encoding.t
 
-val proof_encoding : time_lock_proof Data_encoding.t
+val proof_encoding : timelock_proof Data_encoding.t
 
 (* -------- Exposed to the protocol -------- *)
 
@@ -189,7 +189,7 @@ type chest = {
 val chest_encoding : chest Data_encoding.t
 
 (** Provably opens a chest in a short time. *)
-type chest_key = time_lock_proof
+type chest_key = timelock_proof
 
 val chest_key_encoding : chest_key Data_encoding.t
 

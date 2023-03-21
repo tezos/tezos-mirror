@@ -66,7 +66,7 @@ type rsa_secret
 
 (** Proof that the opening of a value is the claimed value.
     It is concretely a member of the RSA group. *)
-type time_lock_proof
+type timelock_proof
 
 (** Locked value that can be quickly access with a secret or slowly-access with
     a number of sequential operations.
@@ -110,26 +110,26 @@ val unlock_with_secret :
 (** Unlock a value using the RSA secret. Also produces a proof certifying
     that the result is indeed what had been locked. *)
 val unlock_and_prove_with_secret :
-  rsa_secret -> time:int -> locked_value -> unlocked_value * time_lock_proof
+  rsa_secret -> time:int -> locked_value -> unlocked_value * timelock_proof
 
 (** Unlock a value the slow way, without the RSA secret. Also produces a proof certifying
     that the result is indeed what had been locked. *)
 val unlock_and_prove_without_secret :
-  rsa_public -> time:int -> locked_value -> unlocked_value * time_lock_proof
+  rsa_public -> time:int -> locked_value -> unlocked_value * timelock_proof
 
 val prove_without_secret :
-  rsa_public -> time:int -> locked_value -> unlocked_value -> time_lock_proof
+  rsa_public -> time:int -> locked_value -> unlocked_value -> timelock_proof
 
 val prove_with_secret :
-  rsa_secret -> time:int -> locked_value -> unlocked_value -> time_lock_proof
+  rsa_secret -> time:int -> locked_value -> unlocked_value -> timelock_proof
 
 (** Verifies that [locked_value] indeed contains [unlocked_value] with parameters [rsa_public] and [time:Z.t]. *)
-val verify_time_lock :
+val verify_timelock :
   rsa_public ->
   time:int ->
   locked_value ->
   unlocked_value ->
-  time_lock_proof ->
+  timelock_proof ->
   bool
 
 (** Receives a claim opening with a proof.
@@ -140,7 +140,7 @@ val locked_value_to_symmetric_key_with_proof :
   time:int ->
   unlocked_value ->
   locked_value ->
-  time_lock_proof ->
+  timelock_proof ->
   symmetric_key option
 
 (** encrypt using authenticated encryption, i.e. ciphertext contains
@@ -153,7 +153,7 @@ val decrypt : symmetric_key -> ciphertext -> bytes option
 
 val ciphertext_encoding : ciphertext Data_encoding.t
 
-val proof_encoding : time_lock_proof Data_encoding.t
+val proof_encoding : timelock_proof Data_encoding.t
 
 (*------Exposed to the protocol----------*)
 
@@ -168,7 +168,7 @@ type chest = {
 val chest_encoding : chest Data_encoding.t
 
 (** Provably opens a chest in a short time. *)
-type chest_key = {unlocked_value : unlocked_value; proof : time_lock_proof}
+type chest_key = {unlocked_value : unlocked_value; proof : timelock_proof}
 
 val chest_key_encoding : chest_key Data_encoding.t
 

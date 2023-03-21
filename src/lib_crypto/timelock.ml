@@ -141,7 +141,7 @@ let to_vdf_tuple_unsafe x y z =
 (* Timelock proof:
    - a VDF tuple, and a random coin
    - a scalar, either the random coin for the precomputer or 1 *)
-type time_lock_proof = {vdf_tuple : vdf_tuple; nonce : Z.t}
+type timelock_proof = {vdf_tuple : vdf_tuple; nonce : Z.t}
 
 let proof_encoding =
   let open Data_encoding in
@@ -234,13 +234,13 @@ let rec unlock_timelock rsa_public ~time locked_value =
       ~time:Int.(pred time)
       Z.(locked_value * locked_value mod rsa_public)
 
-(* Gives the value that was time_locked from the time_lock, the public modulus
+(* Gives the value that was timelocked from the timelock, the public modulus
    and the time. Works in linear time in [time] *)
 let unlock_and_prove rsa_public ~time locked_value =
   let unlocked_value = unlock_timelock rsa_public ~time locked_value in
   prove rsa_public ~time locked_value unlocked_value
 
-let precompute_time_lock ?(locked_value = None) ?(precompute_path = None) ~time
+let precompute_timelock ?(locked_value = None) ?(precompute_path = None) ~time
     () =
   let locked_value =
     match locked_value with
@@ -281,7 +281,7 @@ let proof_of_vdf_tuple rsa_public ~time vdf_tuple =
   else raise (Invalid_argument "Timelock tuple verification failed.")
 
 (* Creates a symmetric key using hash based key derivation from the time locked value*)
-let time_lock_proof_to_symmetric_key rsa_public proof =
+let timelock_proof_to_symmetric_key rsa_public proof =
   let updated = Z.powm proof.vdf_tuple.unlocked_value proof.nonce rsa_public in
   let kdf_key = "Tezoskdftimelockv1" in
   let to_hash = Z.to_string updated in
@@ -290,7 +290,7 @@ let time_lock_proof_to_symmetric_key rsa_public proof =
 
 let locked_value_to_symmetric_key rsa_public ~time locked_value proof =
   if verify rsa_public ~time locked_value proof then
-    Some (time_lock_proof_to_symmetric_key rsa_public proof)
+    Some (timelock_proof_to_symmetric_key rsa_public proof)
   else None
 
 (* -------- Timelock high level functions (used in Tezos) -------- *)
@@ -316,7 +316,7 @@ let chest_encoding =
           (req "rsa_public" n)
           (req "ciphertext" ciphertext_encoding))
 
-type chest_key = time_lock_proof
+type chest_key = timelock_proof
 
 let chest_key_encoding = proof_encoding
 
@@ -324,10 +324,10 @@ type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
 
 let create_chest_and_chest_key ?(precompute_path = None) ~payload ~time () =
   let locked_value, proof =
-    let vdf_tuple = precompute_time_lock ~time ~precompute_path () in
+    let vdf_tuple = precompute_timelock ~time ~precompute_path () in
     proof_of_vdf_tuple rsa2048 ~time vdf_tuple
   in
-  let sym_key = time_lock_proof_to_symmetric_key rsa2048 proof in
+  let sym_key = timelock_proof_to_symmetric_key rsa2048 proof in
   let ciphertext = encrypt sym_key payload in
   ({locked_value; rsa_public = rsa2048; ciphertext}, proof)
 
@@ -383,6 +383,6 @@ let chest_sampler ~rng_state ~plaintext_size ~time =
   let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
   let locked_value = gen_locked_value_bench_unsafe rsa2048 in
   let proof = unlock_and_prove rsa2048 ~time locked_value in
-  let sym_key = time_lock_proof_to_symmetric_key rsa2048 proof in
+  let sym_key = timelock_proof_to_symmetric_key rsa2048 proof in
   let ciphertext = encrypt_unsafe sym_key plaintext in
   ({locked_value; rsa_public = rsa2048; ciphertext}, proof)
