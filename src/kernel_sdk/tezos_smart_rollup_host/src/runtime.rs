@@ -175,6 +175,9 @@ pub trait Runtime {
 
     /// True if the last kernel run was aborted.
     fn last_run_aborted(&self) -> Result<bool, RuntimeError>;
+
+    /// True if the kernel failed to upgrade.
+    fn upgrade_failed(&self) -> Result<bool, RuntimeError>;
 }
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -465,6 +468,14 @@ where
             RefPath::assert_from_readonly(b"/readonly/kernel/env/stuck");
         let last_run_aborted = Runtime::store_has(self, &PATH_STUCK_FLAG)?.is_some();
         Ok(last_run_aborted)
+    }
+
+    fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
+        const PATH_UPGRADE_ERROR_FLAG: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/upgrade_error");
+        let upgrade_failed =
+            Runtime::store_has(self, &PATH_UPGRADE_ERROR_FLAG)?.is_some();
+        Ok(upgrade_failed)
     }
 }
 
