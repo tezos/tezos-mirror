@@ -178,6 +178,9 @@ pub trait Runtime {
 
     /// True if the kernel failed to upgrade.
     fn upgrade_failed(&self) -> Result<bool, RuntimeError>;
+
+    /// True if the kernel rebooted too many times.
+    fn restart_forced(&self) -> Result<bool, RuntimeError>;
 }
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -476,6 +479,14 @@ where
         let upgrade_failed =
             Runtime::store_has(self, &PATH_UPGRADE_ERROR_FLAG)?.is_some();
         Ok(upgrade_failed)
+    }
+
+    fn restart_forced(&self) -> Result<bool, RuntimeError> {
+        const PATH_TOO_MANY_REBOOT_FLAG: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/too_many_reboot");
+        let restart_forced =
+            Runtime::store_has(self, &PATH_TOO_MANY_REBOOT_FLAG)?.is_some();
+        Ok(restart_forced)
     }
 }
 
