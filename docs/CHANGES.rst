@@ -3,6 +3,20 @@
 Changelog
 '''''''''
 
+Version 16.1
+============
+
+Baker
+-----
+
+- Fixed a bug where the baker could count a (pre)endorsement twice
+  while waiting for a (pre)quorum.
+
+- Fixed an implementation bug where upon observing a pre-quorum on an
+  earlier round, the baker would reach a state where it could not
+  endorse anymore. This could lead to a slow consensus scenario
+  affecting network liveness.
+
 Version 16.0
 ============
 
