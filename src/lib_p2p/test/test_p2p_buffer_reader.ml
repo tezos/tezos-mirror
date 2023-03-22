@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_buffer_reader
+    Invocation:   dune exec src/lib_p2p/test/main.exe
     Subject:      Tests [P2p_buffer_reader]
 *)
 

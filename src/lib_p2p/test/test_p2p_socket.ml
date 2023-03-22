@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_socket_ipv4
+    Invocation:   dune exec src/lib_p2p/test/main.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Sockets and client-server communications.
 *)

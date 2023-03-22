@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_broadcast
+    Invocation:   dune exec src/lib_p2p/test/main.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Testing of the Broadcast
                   Each test launches nodes in separate process, each node
