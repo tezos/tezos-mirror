@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Peer_validator
-    Invocation:   dune exec src/lib_shell/test/test_peer_validator.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe
     Subject:      Unit tests for [Peer_validator]
 *)
 

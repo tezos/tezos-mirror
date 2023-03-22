@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator pending operations)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_pending_operations.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe
     Subject:      Unit tests the Prevalidator pending operations APIs
 *)
 

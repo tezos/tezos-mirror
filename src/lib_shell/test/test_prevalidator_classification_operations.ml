@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe
     Subject:      Unit tests [Prevalidator_classification.Internal_for_tests.handle_live_operations]
                   and [Prevalidator_classification.recyle_operations]
 *)

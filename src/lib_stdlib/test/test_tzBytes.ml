@@ -26,8 +26,7 @@
 (** Testing
     _______
 
-    Invocation: dune build @src/lib_stdlib/test/runtest
-    Single invocation: dune exec src/lib_stdlib/test/test_tzBytes.exe
+    Invocation: dune exec src/lib_stdlib/test/main.exe
     Subject: Bitwise byte operation and Bytes <=> nat/int conversion
 *)
 

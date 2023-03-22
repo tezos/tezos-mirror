@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest
+    Invocation:   dune exec src/lib_stdlib/test-unix/main.exe
     Subject:      On circular buffer
 *)
 
