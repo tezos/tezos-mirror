@@ -346,9 +346,15 @@ module type AUTOMATON = sig
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
   module Internal_for_tests : sig
+    (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of [topic]. *)
+    val get_peers_in_topic_mesh : Topic.t -> state -> Peer.t list
+
     (** [get_subscribed_topics peer state] returns the set of topics
         that are subscribed by [peer] *)
     val get_subscribed_topics : Peer.t -> state -> Topic.t list
+
+    (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
+    val get_fanout_peers : Topic.t -> state -> Peer.t list
 
     type connection = {
       topics : Topic.Set.t;

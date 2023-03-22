@@ -1433,10 +1433,20 @@ module Make (C : AUTOMATON_CONFIG) :
     fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
   module Internal_for_tests = struct
+    let get_peers_in_topic_mesh topic state =
+      match Topic.Map.find topic state.mesh with
+      | None -> []
+      | Some peers -> Peer.Set.elements peers
+
     let get_subscribed_topics peer state =
       match Peer.Map.find peer state.connections with
       | None -> []
       | Some connection -> Topic.Set.elements connection.topics
+
+    let get_fanout_peers topic state =
+      match Topic.Map.find topic state.fanout with
+      | None -> []
+      | Some fanout_peers -> Peer.Set.elements fanout_peers.peers
 
     type nonrec connection = connection = {
       topics : Topic.Set.t;
