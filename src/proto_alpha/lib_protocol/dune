@@ -274,7 +274,6 @@
   Contract_services
   Delegate_services
   Voting_services
-  Tx_rollup_services
   Dal_services
   Alpha_services
   Main))
@@ -561,7 +560,6 @@
   contract_services.ml contract_services.mli
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
-  tx_rollup_services.ml tx_rollup_services.mli
   dal_services.ml dal_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli
@@ -828,7 +826,6 @@
   contract_services.ml contract_services.mli
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
-  tx_rollup_services.ml tx_rollup_services.mli
   dal_services.ml dal_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
@@ -1100,7 +1097,6 @@
   contract_services.ml contract_services.mli
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
-  tx_rollup_services.ml tx_rollup_services.mli
   dal_services.ml dal_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
