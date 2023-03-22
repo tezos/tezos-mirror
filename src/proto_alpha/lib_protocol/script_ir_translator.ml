@@ -639,6 +639,7 @@ let rec parse_ty :
         check_type_annot loc annot >|? fun () -> return ctxt bls12_381_fr_t
     | Prim (loc, T_contract, [utl], annot) ->
         if allow_contract then
+          check_type_annot loc annot >>? fun () ->
           parse_passable_ty
             ctxt
             ~stack_depth:(stack_depth + 1)
@@ -646,10 +647,10 @@ let rec parse_ty :
             utl
             ~ret:Don't_parse_entrypoints
           >>? fun (Ex_ty tl, ctxt) ->
-          check_type_annot loc annot >>? fun () ->
           contract_t loc tl >|? fun ty -> return ctxt ty
         else error (Unexpected_contract loc)
     | Prim (loc, T_pair, utl :: utr, annot) ->
+        check_type_annot loc annot >>? fun () ->
         remove_field_annot utl >>? fun utl ->
         parse_ty
           ctxt
@@ -679,9 +680,9 @@ let rec parse_ty :
           ~ret:Don't_parse_entrypoints
           utr
         >>? fun (Ex_ty tr, ctxt) ->
-        check_type_annot loc annot >>? fun () ->
         pair_t loc tl tr >|? fun (Ty_ex_c ty) -> return ctxt ty
     | Prim (loc, T_or, [utl; utr], annot) -> (
+        check_type_annot loc annot >>? fun () ->
         (match ret with
         | Don't_parse_entrypoints ->
             remove_field_annot utl >>? fun utl ->
@@ -710,7 +711,6 @@ let rec parse_ty :
           ~ret
           utr
         >>? fun (parsed_r, ctxt) ->
-        check_type_annot loc annot >>? fun () ->
         match ret with
         | Don't_parse_entrypoints ->
             let (Ex_ty tl) = parsed_l in
@@ -735,11 +735,11 @@ let rec parse_ty :
             (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt)
         )
     | Prim (loc, T_lambda, [uta; utr], annot) ->
+        check_type_annot loc annot >>? fun () ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
         >>? fun (Ex_ty ta, ctxt) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
         >>? fun (Ex_ty tr, ctxt) ->
-        check_type_annot loc annot >>? fun () ->
         lambda_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_option, [ut], annot) ->
         (if legacy then
@@ -761,6 +761,7 @@ let rec parse_ty :
         >>? fun (Ex_ty t, ctxt) ->
         option_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_list, [ut], annot) ->
+        check_type_annot loc annot >>? fun () ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -772,21 +773,21 @@ let rec parse_ty :
           ~ret:Don't_parse_entrypoints
           ut
         >>? fun (Ex_ty t, ctxt) ->
-        check_type_annot loc annot >>? fun () ->
         list_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_ticket, [ut], annot) ->
         if allow_ticket then
+          check_type_annot loc annot >>? fun () ->
           parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
           >>? fun (Ex_comparable_ty t, ctxt) ->
-          check_type_annot loc annot >>? fun () ->
           ticket_t loc t >|? fun ty -> return ctxt ty
         else error (Unexpected_ticket loc)
     | Prim (loc, T_set, [ut], annot) ->
+        check_type_annot loc annot >>? fun () ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
         >>? fun (Ex_comparable_ty t, ctxt) ->
-        check_type_annot loc annot >>? fun () ->
         set_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_map, [uta; utr], annot) ->
+        check_type_annot loc annot >>? fun () ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt uta
         >>? fun (Ex_comparable_ty ta, ctxt) ->
         parse_ty
@@ -800,7 +801,6 @@ let rec parse_ty :
           ~ret:Don't_parse_entrypoints
           utr
         >>? fun (Ex_ty tr, ctxt) ->
-        check_type_annot loc annot >>? fun () ->
         map_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
         check_type_annot loc annot >>? fun () ->
@@ -948,6 +948,7 @@ and parse_big_map_ty ctxt ~stack_depth ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle >>? fun ctxt ->
   match args with
   | [key_ty; value_ty] ->
+      check_type_annot big_map_loc map_annot >>? fun () ->
       parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt key_ty
       >>? fun (Ex_comparable_ty key_ty, ctxt) ->
       parse_big_map_value_ty
@@ -956,7 +957,6 @@ and parse_big_map_ty ctxt ~stack_depth ~legacy big_map_loc args map_annot =
         ~legacy
         value_ty
       >>? fun (Ex_ty value_ty, ctxt) ->
-      check_type_annot big_map_loc map_annot >>? fun () ->
       big_map_t big_map_loc key_ty value_ty >|? fun big_map_ty ->
       (Ex_ty big_map_ty, ctxt)
   | args -> error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
