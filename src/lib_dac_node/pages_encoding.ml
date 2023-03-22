@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4682
-    Remove `open Environment.Error_monad`
-*)
 type error +=
   | Payload_cannot_be_empty
   | Cannot_serialize_page_payload
