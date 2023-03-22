@@ -531,7 +531,7 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let main () =
-  P2p_test_utils.addr := Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" ;
+  P2p_test_utils.addr := Node.default_ipv6_addr ;
   Lwt_main.run
   @@ Alcotest_lwt.run
        "tezos-p2p"

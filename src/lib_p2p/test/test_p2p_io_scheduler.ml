@@ -251,7 +251,7 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let () =
-  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
+  let addr = Node.default_ipv6_addr in
   let port = Some (Tezt_tezos.Port.fresh ()) in
   let max_download_speed = 1048576 in
   let max_upload_speed = 262144 in

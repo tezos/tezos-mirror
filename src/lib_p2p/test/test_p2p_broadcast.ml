@@ -315,7 +315,7 @@ let wrap addr n f =
       aux n f)
 
 let main () =
-  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
+  let addr = Node.default_ipv6_addr in
   Lwt_main.run
   @@ Alcotest_lwt.run
        "tezos-p2p-broadcast"

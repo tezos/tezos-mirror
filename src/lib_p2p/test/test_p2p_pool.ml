@@ -728,11 +728,9 @@ let init_logs =
 
 let points = ref []
 
-let wrap ?addr ?port ?(clients = 10) n f =
+let wrap ?port ?(clients = 10) n f =
   let gen_points addr = points := Node.gen_points ?port clients addr in
-  let addr =
-    Option.value ~default:(Ipaddr.V6.of_string_exn "::ffff:127.0.0.1") addr
-  in
+  let addr = Node.default_ipv6_addr in
   gen_points addr ;
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
