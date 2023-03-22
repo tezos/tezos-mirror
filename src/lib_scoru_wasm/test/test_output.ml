@@ -39,11 +39,13 @@ open Tezos_scoru_wasm
 let test_output_buffer () =
   let open Lwt_result_syntax in
   let test (level, output_buffer) =
-    match Output_buffer.level_range output_buffer with
+    match Output_buffer.Internal_for_tests.level_range output_buffer with
     | None -> true
     | Some (first_level, max_level) ->
         if level <= max_level && level >= first_level then
-          Output_buffer.is_outbox_available output_buffer level
+          Output_buffer.Internal_for_tests.is_outbox_available
+            output_buffer
+            level
         else true
   in
   let test =
@@ -88,11 +90,12 @@ let test_aux_write_output () =
   let last_outbox_level = output_buffer.Output_buffer.last_level in
   let* last_outbox =
     match last_outbox_level with
-    | Some level -> Output_buffer.get_outbox output_buffer level
+    | Some level ->
+        Output_buffer.Internal_for_tests.get_outbox output_buffer level
     | None -> Stdlib.failwith "No outbox exists"
   in
   let last_message_in_last_outbox =
-    Output_buffer.get_outbox_last_message_index last_outbox
+    Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
   in
   assert (last_outbox_level = Some 0l) ;
   assert (last_message_in_last_outbox = Some Z.zero) ;
@@ -158,11 +161,11 @@ let test_write_host_fun ~version () =
   let last_outbox_level = output.Output_buffer.last_level in
   let* last_outbox =
     match last_outbox_level with
-    | Some level -> Output_buffer.get_outbox output level
+    | Some level -> Output_buffer.Internal_for_tests.get_outbox output level
     | None -> Stdlib.failwith "No outbox exists"
   in
   let last_message_in_last_outbox =
-    Output_buffer.get_outbox_last_message_index last_outbox
+    Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
   in
   assert (last_outbox_level = Some 0l) ;
   assert (last_message_in_last_outbox = Some Z.zero) ;
@@ -187,12 +190,12 @@ let test_write_host_fun ~version () =
   let last_outbox_level = output.Output_buffer.last_level in
   let* last_outbox =
     match last_outbox_level with
-    | Some level -> Output_buffer.get_outbox output level
+    | Some level -> Output_buffer.Internal_for_tests.get_outbox output level
     | None ->
         Stdlib.failwith "The PVM output buffer does not contain any outbox."
   in
   let last_message_in_last_outbox =
-    Output_buffer.get_outbox_last_message_index last_outbox
+    Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
   in
   assert (
     result = Values.[Num (I32 Host_funcs.Error.(code Input_output_too_large))]) ;
@@ -232,7 +235,7 @@ let test_output_limit_gen ~limit ~message_number =
       (List.init ~when_negative_length:[] message_number Z.of_int)
   in
   let* () = List.iter_s push_message messages in
-  let* outbox = Output_buffer.get_outbox buffer 0l in
+  let* outbox = Output_buffer.Internal_for_tests.get_outbox buffer 0l in
   if message_number > limit then
     assert (Output_buffer.Messages.num_elements outbox = message_limit)
   else
@@ -287,12 +290,12 @@ let test_write_output_above_limit ~version () =
     let last_outbox_level = output.Output_buffer.last_level in
     let* last_outbox =
       match last_outbox_level with
-      | Some level -> Output_buffer.get_outbox output level
+      | Some level -> Output_buffer.Internal_for_tests.get_outbox output level
       | None ->
           Stdlib.failwith "The PVM output buffer does not contain any outbox."
     in
     let last_message_in_last_outbox =
-      Output_buffer.get_outbox_last_message_index last_outbox
+      Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
     in
 
     if expected_message_index >= message_limit then (
@@ -315,7 +318,9 @@ let test_push_output_bigger_than_max_size () =
   let output_buffer = Eval.default_output_buffer () in
   let message_size = Host_funcs.Aux.input_output_max_size * 2 in
   assert (output_buffer.Output_buffer.last_level = Some 0l) ;
-  let* outbox_level_0 = Output_buffer.get_outbox output_buffer 0l in
+  let* outbox_level_0 =
+    Output_buffer.Internal_for_tests.get_outbox output_buffer 0l
+  in
   let num_messages_before =
     Output_buffer.Messages.num_elements outbox_level_0
   in
@@ -328,7 +333,9 @@ let test_push_output_bigger_than_max_size () =
   in
   assert (result = Host_funcs.Error.(code Input_output_too_large)) ;
   assert (output_buffer.Output_buffer.last_level = Some 0l) ;
-  let* outbox_level_0 = Output_buffer.get_outbox output_buffer 0l in
+  let* outbox_level_0 =
+    Output_buffer.Internal_for_tests.get_outbox output_buffer 0l
+  in
   assert (
     Z.equal
       num_messages_before

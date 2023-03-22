@@ -31,8 +31,9 @@ let run_fast = Wasm_fast.Internal_for_tests.compute_step_many_with_hooks
 
 let run_slow = Wasm.compute_step_many
 
-let apply_fast ?write_debug ?(images = Preimage_map.empty) ?metadata
-    ?(stop_at_snapshot = false) ?(max_steps = Int64.max_int) counter tree =
+let apply_fast ?write_debug ?(fast_should_run = true)
+    ?(images = Preimage_map.empty) ?metadata ?(stop_at_snapshot = false)
+    ?(max_steps = Int64.max_int) counter tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
   let reveal_builtins =
@@ -66,8 +67,11 @@ let apply_fast ?write_debug ?(images = Preimage_map.empty) ?metadata
   if counter > 0l then
     (* Assert that the FE actual ran. We must consider that before the first
        message is inserted, FE is unlikely to run. *)
-    if !run_counter <= 0l then
-      Stdlib.failwith "Fast Execution was expected to run!" ;
+    if fast_should_run && !run_counter <= 0l then
+      Stdlib.failwith "Fast Execution was expected to run!"
+    else if (not fast_should_run) && !run_counter > 0l then
+      (* If we didn't expect FE to run, and e.g. expected it to fallback to PVM *)
+      Stdlib.failwith "Fast Execution was NOT expected to run!" ;
   (tree, ticks)
 
 let rec apply_slow ?write_debug ?images ?metadata ?(max_steps = Int64.max_int)
@@ -119,7 +123,7 @@ and check_reveal ?write_debug ?(images = Preimage_map.empty) ?metadata
     - [write_debug] is the implementation of the host function to use.
     - [metadata] is used in case of Reveal_metadata step.
     - [images] is a hashmap used in case of reveal steps. *)
-let test_against_both ~version ?write_debug
+let test_against_both ~version ?write_debug ?(fast_should_run = true)
     ?(set_input = Wasm_utils.set_full_input_step) ?images ?metadata ~from_binary
     ~kernel ~messages ?(max_steps = Int64.max_int) () =
   let open Lwt.Syntax in
@@ -172,7 +176,14 @@ let test_against_both ~version ?write_debug
   let* fast_hashes =
     run_with (fun i t ->
         let+ tree, _ =
-          apply_fast ?write_debug ?images ?metadata ~max_steps i t
+          apply_fast
+            ~fast_should_run
+            ?write_debug
+            ?images
+            ?metadata
+            ~max_steps
+            i
+            t
         in
         tree)
   in
@@ -883,6 +894,80 @@ let test_check_nb_ticks ~version () =
 
   return ()
 
+let test_read_input_write_output_failing ~version () =
+  let kernel =
+    {|
+    (module
+      (import
+        "smart_rollup_core"
+        "read_input"
+        (func $read_input (param i32 i32 i32) (result i32))
+      )
+
+      (import
+        "smart_rollup_core"
+        "write_output"
+        (func $write_output (param i32 i32) (result i32))
+      )
+
+      (import
+        "smart_rollup_core"
+        "write_debug"
+        (func $write_debug (param i32 i32))
+      )
+
+
+      (memory 1)
+      (export "memory" (memory 0))
+
+      (data (i32.const 1000) "kernel_run called")
+
+      (func (export "kernel_run")
+        (call $write_debug
+          (i32.const 1000) ;; Memory address
+          (i32.const 17) ;; length of the string to log
+        ) ;; Should print "kernel_run called"
+
+        (call $read_input
+          (i32.const 100) ;; address to write the level (4b) + message counter (8b)
+          (i32.const 112) ;; address to write the read input
+          (i32.const 4) ;; length of the input
+        ) ;; should fill the bytes 100-116 with level, msg counter and the 4 bytes data
+        (drop) ;; we don't care about the result
+
+        (call $read_input
+          (i32.const 100) ;; address to write the level (4b) + message counter (8b)
+          (i32.const 112) ;; address to write the read input
+          (i32.const 4) ;; length of the input
+        ) ;; should fill the bytes 100-116 with level, msg counter and the 4 bytes data
+        (drop) ;; we don't care about the result
+
+        (call $write_output
+          (i32.const 100) ;; source address
+          (i32.const 16) ;; number of bytes
+        )
+        (drop) ;; we don't care about the result of write_output
+
+        (call $write_output
+          (i32.const 100) ;; source address
+          (i32.const 16) ;; number of bytes
+        ) ;; writes the read level, msg counter and the data "abcd"
+        (drop) ;; we don't care about the result of write_output
+
+        (unreachable)
+      )
+    )
+      |}
+  in
+  let messages = ["abc"; "bonjour"; "привет"; "guten Tag"] in
+  test_against_both
+    ~fast_should_run:false
+    ~version
+    ~from_binary:false
+    ~kernel
+    ~messages
+    ()
+
 let tests =
   tztests_with_pvm
     ~versions:[V0; V1]
@@ -900,4 +985,7 @@ let tests =
       ( "compute_step_many pauses at snapshot",
         `Quick,
         test_compute_step_many_pauses_at_snapshot_when_flag_set );
+      ( "compute_step_many recovers correctly after kernel panics",
+        `Quick,
+        test_read_input_write_output_failing );
     ]

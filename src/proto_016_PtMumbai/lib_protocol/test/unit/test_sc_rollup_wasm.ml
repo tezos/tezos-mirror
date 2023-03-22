@@ -266,12 +266,14 @@ let test_output () =
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
   let*! last_outbox =
-    Tezos_webassembly_interpreter.Output_buffer.get_outbox
+    Tezos_webassembly_interpreter.Output_buffer.Internal_for_tests.get_outbox
       output
       last_outbox_level
   in
   let* end_of_level_message_index =
-    match Output_buffer.get_outbox_last_message_index last_outbox with
+    match
+      Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
+    with
     | Some index -> return index
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
