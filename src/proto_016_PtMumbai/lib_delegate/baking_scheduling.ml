@@ -678,7 +678,6 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       latest_proposal = current_proposal;
       is_latest_proposal_applied =
         true (* this proposal is expected to be the current head *);
-      delayed_prequorum = None;
       injected_preendorsements = None;
       locked_round = None;
       endorsable_payload = None;
@@ -691,8 +690,15 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
   (if synchronize then
    create_round_durations constants >>? fun round_durations ->
    Baking_actions.compute_round current_proposal round_durations
-   >>? fun current_round -> ok {current_round; current_phase = Idle}
-  else ok {Baking_state.current_round = Round.zero; current_phase = Idle})
+   >>? fun current_round ->
+   ok {current_round; current_phase = Idle; delayed_prequorum = None}
+  else
+    ok
+      {
+        Baking_state.current_round = Round.zero;
+        current_phase = Idle;
+        delayed_prequorum = None;
+      })
   >>?= fun round_state ->
   let state = {global_state; level_state; round_state} in
   (* Try loading locked round and endorsable round from disk *)
