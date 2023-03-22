@@ -312,13 +312,14 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let new_level = new_proposal.block.shell.level in
     let compute_new_state ~current_round ~delegate_slots
         ~next_level_delegate_slots =
-      let round_state = {current_round; current_phase = Idle} in
+      let round_state =
+        {current_round; current_phase = Idle; delayed_prequorum = None}
+      in
       let level_state =
         {
           current_level = new_level;
           latest_proposal = new_proposal;
           is_latest_proposal_applied = is_proposal_applied;
-          delayed_prequorum = None;
           (* Unlock values *)
           locked_round = None;
           endorsable_payload = None;
@@ -406,10 +407,10 @@ let may_register_early_prequorum state ((candidate, _) as received_prequorum) =
     >>= fun () -> do_nothing state
   else
     Events.(emit pqc_while_waiting_for_application candidate.hash) >>= fun () ->
-    let new_level_state =
-      {state.level_state with delayed_prequorum = Some received_prequorum}
+    let new_round_state =
+      {state.round_state with delayed_prequorum = Some received_prequorum}
     in
-    let new_state = {state with level_state = new_level_state} in
+    let new_state = {state with round_state = new_round_state} in
     do_nothing new_state
 
 (** In the association map [delegate_slots], the function returns an
@@ -772,14 +773,25 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
     {state.level_state with is_latest_proposal_applied = true}
   in
   let new_state = {state with level_state = new_level_state} in
-  match new_state.level_state.delayed_prequorum with
+  match new_state.round_state.delayed_prequorum with
   | None ->
       (* The application arrived before the prequorum: just wait for the prequorum. *)
       let new_state = update_current_phase new_state Awaiting_preendorsements in
       do_nothing new_state
   | Some (candidate, preendorsement_qc) ->
       (* The application arrived after the prequorum: handle the
-         prequorum received earlier. *)
+         prequorum received earlier.
+         Start by resetting the delayed_prequorum *)
+      let new_round_state =
+        {new_state.round_state with delayed_prequorum = None}
+      in
+      let new_state =
+        {
+          state with
+          level_state = new_level_state;
+          round_state = new_round_state;
+        }
+      in
       prequorum_reached_when_awaiting_preendorsements
         new_state
         candidate
