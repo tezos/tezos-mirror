@@ -1306,19 +1306,24 @@ module Generate_config_cmd = struct
 end
 
 module Workload_cmd = struct
-  let options_dump = Tezos_clic.no_options
+  let options_dump =
+    Tezos_clic.args1
+      (Tezos_clic.arg
+         ~doc:"JSON file name to write the content"
+         ~short:'o'
+         ~long:"out-file"
+         ~placeholder:"OUTPUT-FILE"
+         (Tezos_clic.parameter (fun () parsed -> Lwt.return_ok parsed)))
 
-  let handler_dump () workload_data output_path () =
+  let handler_dump output_path workload_data () =
     let packed_measurement = Measure.load ~filename:workload_data in
-    Measure.packed_measurement_save_json packed_measurement output_path ;
+    Measure.packed_measurement_print_json packed_measurement output_path ;
     Lwt.return_ok ()
 
   let params_dump =
     Tezos_clic.(
       prefixes ["workload"; "dump"]
       @@ string ~name:"WORKLOAD-FILE" ~desc:"Workload file name"
-      @@ prefix "to"
-      @@ string ~name:"OUTPUT-FILE" ~desc:"JSON file name to write the content"
       @@ stop)
 
   let group =

@@ -302,7 +302,7 @@ let save :
   in
   Measurement (bench, measurement)
 
-let packed_measurement_save_json measurement_packed output_path =
+let packed_measurement_print_json measurement_packed output_path =
   let (Measurement (bench, measurement)) = measurement_packed in
   let module Bench = (val bench) in
   let encoding_measurement = measurement_encoding Bench.workload_encoding in
@@ -314,11 +314,14 @@ let packed_measurement_save_json measurement_packed output_path =
   in
   let data = Data_encoding.Json.construct encoding (Bench.name, measurement) in
   let json = Data_encoding.Json.to_string data in
-  Out_channel.with_open_text output_path (fun oc ->
-      Printf.fprintf oc "%s\n" json) ;
-  Format.eprintf
-    "Measure.packed_measurement_save_json: saved to %s@."
-    output_path
+  match output_path with
+  | Some output_path ->
+      Out_channel.with_open_text output_path (fun oc ->
+          Printf.fprintf oc "%s\n" json) ;
+      Format.eprintf
+        "Measure.packed_measurement_save_json: saved to %s@."
+        output_path
+  | None -> Printf.printf "%s\n" json
 
 let load : filename:string -> packed_measurement =
  fun ~filename ->
