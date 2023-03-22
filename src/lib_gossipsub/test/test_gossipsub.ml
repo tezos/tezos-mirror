@@ -50,21 +50,22 @@ let default_limits =
 let parameters = {peer_filter = (fun _peer _action -> true)}
 
 (* This is to use a seed with Tezt. *)
-let seed =
-  match
-    Tezt_core.Cli.get
-      ~default:None
-      (fun x ->
-        try int_of_string x |> Option.some |> Option.some
-        with _ -> Option.none)
-      "seed"
-  with
-  | None ->
-      Random.self_init () ;
-      Random.bits ()
-  | Some seed -> seed
-
-let rng = Random.State.make [|seed|]
+let rng =
+  let seed =
+    match
+      Tezt_core.Cli.get
+        ~default:None
+        (fun x ->
+          try int_of_string x |> Option.some |> Option.some
+          with _ -> Option.none)
+        "seed"
+    with
+    | None ->
+        Random.self_init () ;
+        Random.bits ()
+    | Some seed -> seed
+  in
+  Random.State.make [|seed|]
 
 let () =
   Test_unit.register rng default_limits parameters ;

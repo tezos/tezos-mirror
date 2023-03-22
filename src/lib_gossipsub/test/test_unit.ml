@@ -29,32 +29,11 @@ open Test_gossipsub_shared
 open Tezt
 open Tezt_core.Base
 
-(** [init_state ~peer_no ~topics ~direct ~outbound] initiates a gossipsub state,
-joins the topics in [topics], and connects to [peer_no] number of peers which
-will be direct/outbound depending on [direct] and [outbound]. *)
-let init_state rng limits parameters ~(peer_no : int) ~(topics : C.Topic.t list)
-    ~(direct : bool) ~(outbound : bool) : GS.state * C.Peer.t array =
-  let state =
-    List.fold_left
-      (fun state topic ->
-        let state, _output = GS.join {topic} state in
-        state)
-      (GS.make rng limits parameters)
-      topics
-  in
-  let peers =
-    List.init ~when_negative_length:() peer_no (fun i -> i)
-    |> WithExceptions.Result.get_ok ~loc:__LOC__
-  in
-  let state =
-    List.fold_left
-      (fun state peer ->
-        let state, _output = GS.add_peer {direct; outbound; peer} state in
-        state)
-      state
-      peers
-  in
-  (state, Array.of_list peers)
+let assert_output ~__LOC__ actual expected =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
+     Use non-polymorphic compare and print actual/expected output on failure. *)
+  if actual = expected then ()
+  else Test.fail ~__LOC__ "Assert for output failed."
 
 let assert_subscribed_topics ~__LOC__ ~peer ~expected_topics state =
   let actual_topics = GS.Internal_for_tests.get_subscribed_topics peer state in
@@ -64,25 +43,83 @@ let assert_subscribed_topics ~__LOC__ ~peer ~expected_topics state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
+let many_peers limits = (4 * limits.Gossipsub_intf.degree_optimal) + 1
+
+let make_peers ~number =
+  List.init ~when_negative_length:() number (fun i -> i)
+  |> WithExceptions.Result.get_ok ~loc:__LOC__
+
+(** [add_and_subscribe_peers topics peers] adds [peers] to the
+    gossipsub connections and subscribes each peer to [topics]. *)
+let add_and_subscribe_peers (topics : C.Topic.t list) (peers : C.Peer.t list)
+    ~(to_subscribe : C.Peer.t * C.Topic.t -> bool)
+    ?(direct : C.Peer.t -> bool = fun _ -> false)
+    ?(outbound : C.Peer.t -> bool = fun _ -> false) state =
+  let subscribe_peer_to_topics peer topics state =
+    List.fold_left
+      (fun state topic ->
+        if not @@ to_subscribe (peer, topic) then state
+        else
+          let state, output = GS.handle_subscribe {topic; peer} state in
+          assert_output ~__LOC__ output Subscribed ;
+          state)
+      state
+      topics
+  in
+  List.fold_left
+    (fun state peer ->
+      let state, output =
+        GS.add_peer {direct = direct peer; outbound = outbound peer; peer} state
+      in
+      assert_output ~__LOC__ output Peer_added ;
+      subscribe_peer_to_topics peer topics state)
+    state
+    peers
+
+let init_state ~rng ~limits ~parameters ~peers ~topics
+    ?(to_join : C.Topic.t -> bool = fun _ -> true)
+    ?(direct : C.Peer.t -> bool = fun _ -> false)
+    ?(outbound : C.Peer.t -> bool = fun _ -> false)
+    ~(to_subscribe : C.Peer.t * C.Topic.t -> bool) () =
+  let state = GS.make rng limits parameters in
+  (* Join to the given topics. *)
+  let state =
+    List.fold_left
+      (fun state topic ->
+        if to_join topic then
+          let state, _output = GS.join {topic} state in
+          state
+        else state)
+      state
+      topics
+  in
+  (* Add and subscribe the given peers. *)
+  let state =
+    add_and_subscribe_peers topics peers ~to_subscribe ~direct ~outbound state
+  in
+  state
+
 (** Test that grafting an unknown topic is ignored.
 
-Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4367 *)
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4367 *)
 let test_ignore_graft_from_unknown_topic rng limits parameters =
   Tezt_core.Test.register
     ~__FILE__
     ~title:"Gossipsub: Ignore graft from unknown topic"
     ~tags:["gossipsub"; "graft"]
   @@ fun () ->
-  let state, peers =
+  let peers = make_peers ~number:1 in
+  let state =
     init_state
-      rng
-      limits
-      parameters
-      ~peer_no:1
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
       ~topics:[]
-      ~direct:false
-      ~outbound:false
+      ~to_subscribe:(fun _ -> false)
+      ()
   in
+  let peers = Array.of_list peers in
   let _state, output =
     GS.handle_graft {peer = peers.(0); topic = "unknown_topic"} state
   in
@@ -93,12 +130,12 @@ let test_ignore_graft_from_unknown_topic rng limits parameters =
   | _ -> Tezt.Test.fail "Expected output [Unknown_topic]"
 
 (** Test that:
-- Subscribing a known peer to a topic adds the topic to their subscriptions.
-- Subscribing an unknown peer to a topic does nothing.
-- Unsubscribing a peer from a topic removes the topic from their subscriptions.
-- Unsubscribing a non-subscribed topic from a peer has no effect.
+    - Subscribing a known peer to a topic adds the topic to their subscriptions.
+    - Subscribing an unknown peer to a topic does nothing.
+    - Unsubscribing a peer from a topic removes the topic from their subscriptions.
+    - Unsubscribing a non-subscribed topic from a peer has no effect.
 
-Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L852
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L852
 *)
 let test_handle_received_subscriptions rng limits parameters =
   Tezt_core.Test.register
@@ -107,16 +144,18 @@ let test_handle_received_subscriptions rng limits parameters =
     ~tags:["gossipsub"; "subscribe"]
   @@ fun () ->
   let topics = ["topic1"; "topic2"; "topic3"; "topic4"] in
-  let state, peers =
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
     init_state
-      rng
-      limits
-      parameters
-      ~peer_no:20
+      ~peers
+      ~rng
+      ~limits
+      ~parameters
       ~topics
-      ~direct:false
-      ~outbound:false
+      ~to_subscribe:(fun _ -> false)
+      ()
   in
+  let peers = Array.of_list peers in
 
   (* The first peer, second peer, and an unknown peer sends
      3 subscriptions and 1 unsubscription *)
