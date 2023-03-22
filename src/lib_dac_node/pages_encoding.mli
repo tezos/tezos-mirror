@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** DAC pages encoding schemes *)
+(** Library for encoding payloads of arbitrary size in formats that can be
+    decoded by the Sc-rollup kernels. *)
 
 type error +=
   | Payload_cannot_be_empty
@@ -34,44 +35,46 @@ type error +=
   | Cannot_combine_pages_data_of_different_type
   | Hashes_page_repr_expected_single_element
 
-(* Encoding scheme configuration. *)
+(** [CONFIG] is a module for configuration of encoding scheme. *)
 module type CONFIG = sig
+  (** [max_page_size] is max size of the page, that encoding can produce. *)
   val max_page_size : int
 end
 
 type version = int
 
-(* Versioning to configure content and hash serialization. *)
+(** [VERSION] is a module for versioning [Content] and [Hashes] pages of
+    a specific encoding. *)
 module type VERSION = sig
+  (** [content_version] versions [content] pages. *)
   val content_version : version
 
+  (** [hashes_version] versions [hashes] pages. *)
   val hashes_version : version
 end
 
-(** [Dac_codec] is a module for encoding a payload as a whole and returnining
-    the calculated root hash.
-*)
+(** [Dac_codec] is a module for encoding a payload as a whole and returning
+    the calculated root hash. *)
 module type Dac_codec = sig
-  (* Page store type *)
+  (** Page store type. *)
   type page_store
 
-  (** [serialize_payload page_store payload] serializes a [payload] into pages
-      suitable to be read by a PVM's `reveal_preimage` and stores it into
-      [page_store]. The serialization scheme  is some hash-based encoding
-      scheme such that a root hash is produced that represents the payload.
-  *)
+  (** [serialize_payload dac_plugin page_store payload] serializes a
+      [payload] into pages suitable to be read by a PVM's `reveal_preimage`
+      and stores it into [page_store]. The serialization scheme is some
+      hash-based encoding scheme, that produces a root hash representing
+      the preimage. *)
   val serialize_payload :
     Dac_plugin.t ->
     page_store:page_store ->
     bytes ->
     Dac_plugin.hash tzresult Lwt.t
 
-  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload from [hash]
-      using some hash-based encoding scheme. Any payload serialized by
-      [serialize_payload] can de deserialized from its root hash by
+  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload
+      from [hash] using some hash-based encoding scheme. Any payload serialized
+      by [serialize_payload] can de deserialized from its root hash by
       [deserialize_payload], that is, these functions are inverses of each
-      other.
-  *)
+      other. *)
   val deserialize_payload :
     Dac_plugin.t ->
     page_store:page_store ->
@@ -79,41 +82,38 @@ module type Dac_codec = sig
     bytes tzresult Lwt.t
 end
 
-(** [Buffered_dac_codec] partially constructs a Dac external message payload by
+(** [Buffered_dac_codec] icrementally constructs and serializes payload by
     aggregating  messages one message at a time. [add] maintains partially
-    constructed pages in a buffer [t] and persist full pages to [page_store].
-    [finalize] is called to end the aggeragation process and calculate the
-    resulting root hash.
-*)
+    constructed pages in a buffer and persist full pages to [page_store].
+    [finalize] is called to end the aggregation process, by flushing all the
+    remaining data inside the buffer and calculating the resulting root hash. *)
 module type Buffered_dac_codec = sig
-  (* Buffer type *)
+  (** Buffer type. *)
   type t
 
-  (* Page store type *)
+  (** Page store type. *)
   type page_store
 
-  (* Returns an empty buffer *)
+  (** [empty] returns an empty buffer. *)
   val empty : unit -> t
 
-  (** [add dac_plugin page_store buffer message] adds a [message] to [buffer]. The
-      [buffer] is serialized to [page_store] when it is full. Serialization
-      logic is dependent on the encoding scheme.
-  *)
+  (** [add dac_plugin page_store buffer message] adds a [message] to [buffer].
+      The [buffer] is serialized to [page_store] when it is full. Serialization
+      logic is dependent on the encoding scheme. *)
   val add :
     Dac_plugin.t -> page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
 
-  (** [finalize dac_plugin page_store buffer] serializes the [buffer] to [page_store] and
-      returns a root hash that represents the final payload. The serialization
-      logic is dependent on the encoding scheme. [buffer] is emptied after
-      this call.
-  *)
+  (** [finalize dac_plugin page_store buffer] serializes the [buffer] to
+      [page_store] and returns a root hash that represents the final payload.
+      The serialization logic is dependent on the encoding scheme. [buffer] is
+      emptied after this call. *)
   val finalize :
     Dac_plugin.t -> page_store:page_store -> t -> Dac_plugin.hash tzresult Lwt.t
 
-  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload from [hash]
-      using some hash-based encoding scheme. Any payload serialized by [add] +
-      [finalize] can be deserialized by this function.
-  *)
+  (** [deserialize_payload dac_plugin page_store hash] deserializes a payload
+      from [hash]  using some hash-based encoding scheme.
+      Any payload serialized by [add] + [finalize] can be deserialized
+      by this function. *)
   val deserialize_payload :
     Dac_plugin.t ->
     page_store:page_store ->
@@ -151,15 +151,13 @@ end
 
     Merkle tree encodings of DAC pages are versioned, to allow for multiple
     hashing schemes to be used.
- *)
+*)
 module Merkle_tree : sig
   module V0 : sig
     module Filesystem : Dac_codec with type page_store = Page_store.Filesystem.t
 
     module Remote : Dac_codec with type page_store = Page_store.Remote.t
   end
-
-  (**/**)
 
   module Internal_for_tests : sig
     module Make_buffered (S : Page_store.S) (V : VERSION) (C : CONFIG) :
@@ -170,9 +168,8 @@ module Merkle_tree : sig
   end
 end
 
-(** Encoding of DAC payload as a Hash Chain/Merkle List. The encoding implementation
-    is specific to the Arith PVM.
- *)
+(** Encoding of DAC payload as a Hash Chain/Merkle List. The encoding
+    implementation is specific to the Arith PVM. *)
 module Hash_chain : sig
   module V0 : sig
     val serialize_payload :
