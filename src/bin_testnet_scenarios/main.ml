@@ -28,5 +28,6 @@ let () =
   let testnet = Testnet.get_testnet_config path in
 
   Sc_rollup.register ~testnet ;
+  Evm_rollup.register ~testnet ;
 
   Test.run ()
