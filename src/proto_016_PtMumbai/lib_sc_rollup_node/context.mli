@@ -159,3 +159,12 @@ module PVMState : sig
       information must be committed using {!commit}. *)
   val set : 'a t -> value -> 'a t Lwt.t
 end
+
+(** Static information about the rollup. *)
+module Rollup : sig
+  val set_address :
+    _ index -> Protocol.Alpha_context.Sc_rollup.Address.t -> unit tzresult Lwt.t
+
+  val get_address :
+    _ index -> Protocol.Alpha_context.Sc_rollup.Address.t option tzresult Lwt.t
+end
