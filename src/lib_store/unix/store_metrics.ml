@@ -30,41 +30,63 @@ type metrics = {
   alternate_heads_count : Prometheus.Gauge.t;
   last_written_block_size : Prometheus.Gauge.t;
   last_store_merge_time : Prometheus.Gauge.t;
-  invalid_blocks : Prometheus.Gauge.t;
 }
 
 let namespace = Tezos_version.Node_version.namespace
 
+type collectors = {mutable invalid_blocks : unit -> float Lwt.t}
+
+let collectors = {invalid_blocks = (fun () -> Lwt.return 0.)}
+
+let set_invalid_blocks_collector fn = collectors.invalid_blocks <- fn
+
 let metrics =
-  let subsystem = Some "store" in
+  let open Lwt_syntax in
+  let subsystem = "store" in
   let checkpoint_level =
     let help = "Current checkpoint level" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "checkpoint_level"
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "checkpoint_level"
   in
   let savepoint_level =
     let help = "Current savepoint level" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "savepoint_level"
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "savepoint_level"
   in
   let caboose_level =
     let help = "Current caboose level" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "caboose_level"
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "caboose_level"
   in
   let alternate_heads_count =
     let help = "Current number of alternated heads known" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "alternate_heads_count"
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "alternate_heads_count"
   in
   let last_written_block_size =
     let help = "Size, in bytes, of the last block written in store" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "last_written_block_size"
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "last_written_block_size"
   in
   let last_store_merge_time =
     let help = "Time, in seconds, for the completion of the last store merge" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "last_merge_time"
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "last_merge_time"
   in
-  let invalid_blocks =
-    let help = "Number of blocks known to be invalid stored on disk" in
-    Prometheus.Gauge.v ~help ~namespace ?subsystem "invalid_blocks"
+  let invalid_blocks_info =
+    Prometheus.MetricInfo.
+      {
+        name =
+          Prometheus.MetricName.v
+            (String.concat "_" [namespace; subsystem; "invalid_blocks"]);
+        metric_type = Gauge;
+        help = "Number of blocks known to be invalid stored on disk";
+        label_names = [];
+      }
   in
+  let invalid_blocks_collect () =
+    let* collect = collectors.invalid_blocks () in
+    return
+    @@ Prometheus.LabelSetMap.singleton
+         []
+         [Prometheus.Sample_set.sample collect]
+  in
+  Prometheus.CollectorRegistry.(
+    register_lwt default invalid_blocks_info invalid_blocks_collect) ;
   {
     checkpoint_level;
     savepoint_level;
@@ -72,5 +94,4 @@ let metrics =
     alternate_heads_count;
     last_written_block_size;
     last_store_merge_time;
-    invalid_blocks;
   }
