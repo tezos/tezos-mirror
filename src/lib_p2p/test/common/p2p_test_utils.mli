@@ -70,8 +70,6 @@ val connect_all :
     function waits until the connections are effectively closed. *)
 val close_active_conns : ('a, 'b, 'c) Tezos_p2p.P2p_pool.t -> unit Lwt.t
 
-val addr : Ipaddr.V6.t ref
-
 val canceler : Lwt_canceler.t
 
 val proof_of_work_target : Tezos_crypto.Crypto_box.pow_target
@@ -81,6 +79,7 @@ val id1 : P2p_identity.t Lwt.t
 val id2 : P2p_identity.t Lwt.t
 
 val run_nodes :
+  addr:P2p_addr.t ->
   ?port:int ->
   ((unit, unit) Process.Channel.t ->
   P2p_io_scheduler.t ->

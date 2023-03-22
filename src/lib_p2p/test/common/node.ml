@@ -294,6 +294,8 @@ let select_nth_point n points =
   in
   loop n [] points
 
+let default_ipv6_addr = Ipaddr.V6.localhost
+
 let gen_points npoints ?port addr =
   match port with
   | Some port ->

@@ -39,9 +39,6 @@ end)
 
 let p2p_peer_id_typ = Check.comparable P2p_peer.Id.pp P2p_peer.Id.compare
 
-let set_addr_to_ipv4_localhost () =
-  addr := Ipaddr.V6.of_string_exn "::ffff:127.0.0.1"
-
 (** [connect ?target_id ?proof_of_work_target sched addr port] connect
     and performs [P2p_socket.authenticate] with the given
     [proof_of_work_target] (also checking that the remote point is the
@@ -100,7 +97,7 @@ let nack_test () =
     sync ch
   in
 
-  let* _ = run_nodes client server in
+  let* _ = run_nodes ~addr:Node.default_ipv6_addr client server in
   unit
 
 let () =
@@ -111,5 +108,4 @@ let () =
      successful using ipv6 on your machine, this will
      not work on the CI as ipv6 network interface is
      disabled on CI's executors. *)
-  set_addr_to_ipv4_localhost () ;
   nack_test ()

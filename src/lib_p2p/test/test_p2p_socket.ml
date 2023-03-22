@@ -212,7 +212,7 @@ module Pow_check = struct
     let* conn = connect sched addr port id in
     tzassert (is_connection_closed conn) __POS__
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** Spawns a client and a server. After the client getting connected to
@@ -251,7 +251,7 @@ module Low_level = struct
         let* () = P2p_io_scheduler.close fd in
         return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** Spawns a client and a server. A client trying to connect to a
@@ -282,7 +282,7 @@ module Nacked = struct
     let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
     sync ch
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** Spawns a client and a server. A client tries to connect to a
@@ -320,7 +320,7 @@ module Simple_message = struct
     let*! _stat = P2p_socket.close conn in
     return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** Spawns a client and a server. A client tries to connect to a
@@ -362,7 +362,7 @@ module Chunked_message = struct
     let*! _stat = P2p_socket.close conn in
     return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** Two messages of size 131072 bytes are randomly generated. After
@@ -404,7 +404,7 @@ module Oversized_message = struct
     let*! _stat = P2p_socket.close conn in
     return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** After then successful connection of a client to a server, the client
@@ -433,7 +433,7 @@ module Close_on_read = struct
     let*! _stat = P2p_socket.close conn in
     return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** After the successful connection of a client to a server, the client
@@ -465,7 +465,7 @@ module Close_on_write = struct
     let*! _stat = P2p_socket.close conn in
     return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 (** A dummy message is generated into [garbled_msg]. After the
@@ -509,7 +509,7 @@ module Garbled_data = struct
     let*! _stat = P2p_socket.close conn in
     return_unit
 
-  let run _dir = run_nodes client server
+  let run addr _dir = run_nodes ~addr client server
 end
 
 let init_logs =
@@ -521,17 +521,17 @@ let init_logs =
   lazy (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
 
 let wrap n f =
+  let addr = Node.default_ipv6_addr in
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let* () = Lazy.force init_logs in
-      let* r = f () in
+      let* r = f addr () in
       match r with
       | Ok () -> Lwt.return_unit
       | Error error ->
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let main () =
-  P2p_test_utils.addr := Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" ;
   Lwt_main.run
   @@ Alcotest_lwt.run
        "tezos-p2p"
