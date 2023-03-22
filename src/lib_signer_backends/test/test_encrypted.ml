@@ -10,7 +10,7 @@
 (** Testing
     -------
     Component:    Remote-signature Backends
-    Invocation:   dune build @src/lib_signer_backends/runtest
+    Invocation:   dune exec src/lib_signer_backends/test/main.exe
     Subject:      On secret keys and URIs.
 *)
 

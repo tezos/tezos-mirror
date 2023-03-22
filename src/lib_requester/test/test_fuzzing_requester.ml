@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune build @src/lib_requester/runtest
+    Invocation:   dune exec src/lib_requester/test/main.exe
     Subject:      Relations between functions of [Requester]'s API
 *)
 

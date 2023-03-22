@@ -1,7 +1,7 @@
 (** Testing
     -------
     Component:    Remote-signature Backends
-    Invocation:   dune build @src/lib_signer_backends/runtest
+    Invocation:   dune exec src/lib_signer_backends/unix/test/main.exe
     Subject:      On pseudo-unique names for Ledger Nano S devices.
 *)
 

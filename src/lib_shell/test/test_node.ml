@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Shell (Node)
-    Invocation:   dune exec src/lib_shell/test/test_shell.exe \
-                  -- test '^test node$'
+    Invocation:   dune exec src/lib_shell/test/main.exe
     Dependencies: src/lib_shell/test/shell_test_helpers.ml
     Subject:      Unit tests for node. Currently only tests that
                   events are emitted.

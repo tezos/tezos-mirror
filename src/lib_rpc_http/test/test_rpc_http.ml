@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    RPC-HTTP
-    Invocation:   dune build @src/lib_rpc_http/runtest
+    Invocation:   dune exec src/lib_rpc_http/test/main.exe
     Subject:      Basic unit tests for HTTP server running RPC services.
 
                   These tests concern themselves mainly with ACL feature
