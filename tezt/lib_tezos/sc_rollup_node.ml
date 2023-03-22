@@ -146,12 +146,13 @@ let node_args ?loser_mode sc_node rollup_address =
         in
         ["--dal-node"; endpoint] )
 
-let spawn_config_init sc_node ?loser_mode rollup_address =
+let spawn_config_init sc_node ?(force = false) ?loser_mode rollup_address =
   let mode, args = node_args ?loser_mode sc_node rollup_address in
   spawn_command sc_node @@ ["init"; mode; "config"] @ args
+  @ if force then ["--force"] else []
 
-let config_init sc_node ?loser_mode rollup_address =
-  let process = spawn_config_init sc_node ?loser_mode rollup_address in
+let config_init sc_node ?force ?loser_mode rollup_address =
+  let process = spawn_config_init sc_node ?force ?loser_mode rollup_address in
   let* output = Process.check_and_read_stdout process in
   match
     output =~* rex "Smart rollup node configuration written in ([^\n]*)"

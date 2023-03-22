@@ -135,12 +135,23 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** Send SIGKILL and wait for the process to terminate. *)
 val kill : t -> unit Lwt.t
 
-(** Run [octez-sc-rollup-node-alpha config init ?loser_mode rollup_address].
-    Returns the name of the resulting configuration file. *)
-val config_init : t -> ?loser_mode:string -> string -> string Lwt.t
+(** Initialize the rollup node configuration file with
+    [octez-sc-rollup-node-alpha config init].  Returns the name of the resulting
+    configuration file. *)
+val config_init :
+  t -> ?force:bool -> ?loser_mode:string -> string -> string Lwt.t
+
+(** Initialize the rollup node configuration file with
+    [octez-sc-rollup-node-alpha config init] and return the corresponding
+    process. *)
+val spawn_config_init :
+  t -> ?force:bool -> ?loser_mode:string -> string -> Process.t
 
 module Config_file : sig
   (** Sc node configuration files. *)
+
+  (** Returns the configuration file name for a rollup node. *)
+  val filename : t -> string
 
   (** Read the configuration file ([config.json]) of an sc node. *)
   val read : t -> JSON.t
