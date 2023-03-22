@@ -2166,16 +2166,13 @@ let ty_traverse =
     | Or_t (ty1, ty2, _, _) -> (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
         (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
-    | Option_t (ty1, _, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
-    | List_t (ty1, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
+    | Option_t (ty1, _, _) -> (aux [@ocaml.tailcall]) f accu ty1 continue
+    | List_t (ty1, _) -> (aux [@ocaml.tailcall]) f accu ty1 continue
     | Set_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty continue
-    | Map_t (cty, ty1, _) ->
-        (aux [@ocaml.tailcall]) f accu cty (fun accu ->
-            (next [@ocaml.tailcall]) f accu ty1 continue)
+    | Map_t (cty, ty1, _) -> (next2 [@ocaml.tailcall]) f accu cty ty1 continue
     | Big_map_t (cty, ty1, _) ->
-        (aux [@ocaml.tailcall]) f accu cty (fun accu ->
-            (next [@ocaml.tailcall]) f accu ty1 continue)
-    | Contract_t (ty1, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
+        (next2 [@ocaml.tailcall]) f accu cty ty1 continue
+    | Contract_t (ty1, _) -> (aux [@ocaml.tailcall]) f accu ty1 continue
   and next2 :
       type a ac b bc ret accu.
       accu ty_traverse ->
@@ -2186,14 +2183,7 @@ let ty_traverse =
       ret =
    fun f accu ty1 ty2 continue ->
     (aux [@ocaml.tailcall]) f accu ty1 (fun accu ->
-        (aux [@ocaml.tailcall]) f accu ty2 (fun accu ->
-            (continue [@ocaml.tailcall]) accu))
-  and next :
-      type a ac ret accu.
-      accu ty_traverse -> accu -> (a, ac) ty -> (accu -> ret) -> ret =
-   fun f accu ty1 continue ->
-    (aux [@ocaml.tailcall]) f accu ty1 (fun accu ->
-        (continue [@ocaml.tailcall]) accu)
+        (aux [@ocaml.tailcall]) f accu ty2 continue)
   in
   fun ty init f -> aux f init ty (fun accu -> accu)
 
