@@ -60,7 +60,7 @@ module Benchmark : sig
     val workload_to_vector : workload -> Sparse_vec.String.t
 
     (** Cost model *)
-    val model : workload Model.t
+    val model : name:Namespace.t -> workload Model.t
 
     (** Generated code file location, automatically prefix by
         "src/proto_alpha/lib_protocol/"
@@ -86,4 +86,22 @@ module Registration : sig
   (** Registers a benchmark with a model, model names are uniformely generated
   *)
   val register : Benchmark.t -> unit
+end
+
+module Model : sig
+  open Model
+
+  val make :
+    name:Namespace.t ->
+    conv:('a -> 'b) ->
+    model:(Namespace.t -> 'b model) ->
+    'a t
+
+  val affine :
+    ?intercept:Free_variable.t ->
+    ?coeff:Free_variable.t ->
+    Namespace.t ->
+    (int * unit) model
+
+  val logn : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
 end

@@ -67,9 +67,7 @@ module Next : Benchmark.S = struct
   let workload_to_vector len =
     Sparse_vec.String.of_list [("len", float_of_int @@ len)]
 
-  let model =
-    let conv x = (x, ()) in
-    Model.make ~conv ~model:(Model.logn ~name ~coeff:(fv "len_coeff"))
+  let model = Model.make ~conv:(fun x -> (x, ())) ~model:Model.logn
 
   let create_skip_list_of_len len =
     let rec go n cell =
@@ -146,11 +144,7 @@ module Hash_cell : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "cost_hash_skip_list_cell")
-           ~coeff:(fv "cost_hash_skip_list_cell_coef"))
+      ~model:Model.affine
 
   let create_benchmark ~rng_state conf =
     (* Since the model we want to infer is logarithmic in
