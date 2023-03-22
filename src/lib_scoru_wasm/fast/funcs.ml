@@ -38,7 +38,7 @@ type host_state = {
   mutable durable : Durable.t;
 }
 
-let make ~reveal_builtins ~write_debug state =
+let make ~version ~reveal_builtins ~write_debug state =
   let open Wasmer in
   let open Lwt.Syntax in
   let with_mem f =
@@ -244,8 +244,7 @@ let make ~reveal_builtins ~write_debug state =
           ~payload:(Bytes.of_string payload))
   in
 
-  List.map
-    (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
+  let base =
     [
       ("read_input", read_input);
       ("write_output", write_output);
@@ -262,3 +261,8 @@ let make ~reveal_builtins ~write_debug state =
       ("reveal_preimage", reveal_preimage);
       ("reveal_metadata", reveal_metadata);
     ]
+  in
+  let extra = match version with Wasm_pvm_state.V0 | V1 -> [] in
+  List.map
+    (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
+    (base @ extra)

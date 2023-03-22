@@ -37,8 +37,6 @@ module type Internal_for_tests = sig
     max_steps:int64 ->
     state ->
     (state * int64) Lwt.t
-
-  val get_wasm_version : state -> version Lwt.t
 end
 
 module type Generic = sig
@@ -87,6 +85,10 @@ module type Generic = sig
   (** [get_info pvm_state] provides a typed view of the current machine state.
       Should not raise. *)
   val get_info : state -> info Lwt.t
+
+  (** [get_wasm_version pvm_state] returns the current version at
+      which the WASM PVM operates. *)
+  val get_wasm_version : state -> version Lwt.t
 
   module Internal_for_tests : Internal_for_tests with type state := state
 end

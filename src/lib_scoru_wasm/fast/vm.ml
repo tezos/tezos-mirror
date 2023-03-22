@@ -42,9 +42,11 @@ let compute_until_snapshot ~max_steps ?write_debug pvm_state =
 
 let compute_fast ~reveal_builtins ~write_debug pvm_state =
   let open Lwt.Syntax in
+  let* version = Wasm_vm.get_wasm_version pvm_state in
   (* Execute! *)
   let* durable =
     Exec.compute
+      ~version
       ~reveal_builtins
       ~write_debug
       pvm_state.durable
@@ -161,10 +163,10 @@ let rec compute_step_many accum_ticks ?reveal_builtins
 
 let compute_step_many = compute_step_many 0L
 
+let get_wasm_version = Wasm_vm.get_wasm_version
+
 module Internal_for_tests = struct
   let compute_step_many_with_hooks = compute_step_many
-
-  let get_wasm_version = Wasm_vm.Internal_for_tests.get_wasm_version
 end
 
 let compute_step_many = compute_step_many ?after_fast_exec:None

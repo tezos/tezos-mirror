@@ -28,6 +28,7 @@ open Tezos_webassembly_interpreter
 
 (** [compute durable buffers] applies one call to [kernel_run]. *)
 val compute :
+  version:Wasm_pvm_state.version ->
   reveal_builtins:Builtins.reveals ->
   write_debug:Builtins.write_debug ->
   Durable.t ->
