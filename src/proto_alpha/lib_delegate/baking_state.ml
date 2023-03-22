@@ -288,8 +288,6 @@ type level_state = {
   current_level : int32;
   latest_proposal : proposal;
   is_latest_proposal_applied : bool;
-  delayed_prequorum :
-    (Operation_worker.candidate * Kind.preendorsement operation list) option;
   (* Last proposal received where we injected an endorsement (thus we
      have seen 2f+1 preendorsements) *)
   locked_round : locked_round option;
@@ -339,7 +337,12 @@ let phase_encoding =
         (fun () -> Awaiting_endorsements);
     ]
 
-type round_state = {current_round : Round.t; current_phase : phase}
+type round_state = {
+  current_round : Round.t;
+  current_phase : phase;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+}
 
 type state = {
   global_state : global_state;
@@ -821,7 +824,6 @@ let pp_level_state fmt
       current_level;
       latest_proposal;
       is_latest_proposal_applied;
-      delayed_prequorum;
       locked_round;
       endorsable_payload;
       elected_block;
@@ -831,13 +833,12 @@ let pp_level_state fmt
     } =
   Format.fprintf
     fmt
-    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b, \
-     delayed prequorum:%b):@ %a@]@ locked round: %a@ endorsable payload: %a@ \
-     elected block: %a@ @[<v 2>own delegate slots:@ %a@]@ @[<v 2>next level \
-     own delegate slots:@ %a@]@ next level proposed round: %a@]"
+    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
+     %a@]@ locked round: %a@ endorsable payload: %a@ elected block: %a@ @[<v \
+     2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
+     next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied
-    (Option.is_some delayed_prequorum)
     pp_proposal
     latest_proposal
     (pp_option pp_locked_round)
@@ -859,14 +860,15 @@ let pp_phase fmt = function
   | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_endorsements -> Format.fprintf fmt "awaiting endorsements"
 
-let pp_round_state fmt {current_round; current_phase} =
+let pp_round_state fmt {current_round; current_phase; delayed_prequorum} =
   Format.fprintf
     fmt
-    "@[<v 2>Round state:@ round: %a@ phase: %a@]"
+    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed prequorum: %b@]"
     Round.pp
     current_round
     pp_phase
     current_phase
+    (Option.is_some delayed_prequorum)
 
 let pp fmt {global_state; level_state; round_state} =
   Format.fprintf

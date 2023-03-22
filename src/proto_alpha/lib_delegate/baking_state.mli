@@ -130,8 +130,6 @@ type level_state = {
   current_level : int32;
   latest_proposal : proposal;
   is_latest_proposal_applied : bool;
-  delayed_prequorum :
-    (Operation_worker.candidate * Kind.preendorsement operation list) option;
   locked_round : locked_round option;
   endorsable_payload : endorsable_payload option;
   elected_block : elected_block option;
@@ -148,7 +146,12 @@ type phase =
 
 val phase_encoding : phase Data_encoding.t
 
-type round_state = {current_round : Round.t; current_phase : phase}
+type round_state = {
+  current_round : Round.t;
+  current_phase : phase;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+}
 
 type state = {
   global_state : global_state;
