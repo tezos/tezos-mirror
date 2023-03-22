@@ -42,8 +42,8 @@ let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
       | Ok () -> Lwt.return_unit
       | Error err ->
           let* () = Tezos_base_unix.Internal_event_unix.close () in
-          Format.printf "@\n%a@." pp_print_trace err ;
-          Lwt.fail Alcotest.Test_error)
+          let msg = Format.asprintf "@\n%a@." pp_print_trace err in
+          Lwt.fail (Alcotest.fail msg))
 
 let tztest_qcheck ?count ~name generator f =
   let name, speed, run =
