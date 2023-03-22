@@ -26,20 +26,20 @@
 (** This module provides benchmarks for skip list operations for basis = 4. *)
 
 open Protocol
-open Registration_helpers
+open Benchmarks_proto
 
 module Skip_list = Skip_list_repr.Make (struct
   (** The benchmarks must be run again if [basis] is changed. *)
   let basis = 4
 end)
 
-let ns = Namespace.make Registration_helpers.ns "skip_list"
+let ns = Namespace.make Registration.ns "skip_list"
 
 let fv s = Free_variable.of_namespace (ns s)
 
 (** Benchmark for the [Skip_list_repr.next] function. It is used for estimating
     the parameters for [Skip_list_cost_model.model_next]. *)
-module Next : Benchmark_simple.S = struct
+module Next : Benchmark.S = struct
   let generated_code_destination = Some "skip_list"
 
   include Skip_list
@@ -99,7 +99,7 @@ end
    function. It is used for estimating the parameters for
    [Skip_list_cost_model.model_hash_cell]. The model estimates hashing
    a skip_list cell content and all its back pointers. *)
-module Hash_cell : Benchmark_simple.S = struct
+module Hash_cell : Benchmark.S = struct
   let generated_code_destination = Some "skip_list"
 
   let name = ns "hash_cell"
@@ -182,6 +182,6 @@ module Hash_cell : Benchmark_simple.S = struct
     Generator.Plain {workload; closure}
 end
 
-let () = Registration_helpers.register_simple (module Next)
+let () = Registration.register (module Next)
 
-let () = Registration_helpers.register_simple (module Hash_cell)
+let () = Registration.register (module Hash_cell)

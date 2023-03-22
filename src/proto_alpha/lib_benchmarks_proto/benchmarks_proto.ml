@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,12 +23,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ns = Namespace.root
+module Benchmark_base = Benchmark
 
-let register ((module Bench) : Benchmark.t) =
-  let module B : Benchmark.S = struct
-    include Bench
+module Benchmark = struct
+  module type S = sig
+    val name : Namespace.t
 
-    let tags = Tags.common :: tags
-  end in
-  Registration.register (module B)
+    val info : string
+
+    val module_location : string
+
+    val tags : string list
+
+    type config
+
+    val default_config : config
+
+    val config_encoding : config Data_encoding.t
+
+    type workload
+
+    val workload_encoding : workload Data_encoding.t
+
+    val workload_to_vector : workload -> Sparse_vec.String.t
+
+    val model : workload Model.t
+
+    val generated_code_destination : string option
+
+    val create_benchmark :
+      rng_state:Random.State.t -> config -> workload Generator.benchmark
+  end
+
+  type t = (module S)
+end
+
+module Registration = struct
+  let ns = Namespace.root
+
+  let register ((module Bench) : Benchmark.t) =
+    let module B : Benchmark_base.S = struct
+      include Bench
+
+      let generated_code_destination =
+        Option.map
+          (fun destination ->
+            Filename.concat
+              "src/proto_alpha/lib_protocol"
+              (destination ^ "_costs_generated.ml"))
+          Bench.generated_code_destination
+
+      (* The value will be used later in lib_benchmark/registration.ml for
+         codegen file destination. *)
+      let () = ignore generated_code_destination
+
+      let models = [(Namespace.(cons name "model" |> to_string), Bench.model)]
+
+      let create_benchmarks ~rng_state ~bench_num config =
+        List.repeat bench_num (fun () ->
+            Bench.create_benchmark ~rng_state config)
+    end in
+    Registration_helpers.register (module B)
+end
