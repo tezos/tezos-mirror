@@ -171,8 +171,10 @@ val check_mode : t -> t tzresult
     for a game state it already played before. *)
 val refutation_player_buffer_levels : int
 
-(** [save configuration] overwrites [configuration] file from [data_dir]. *)
-val save : data_dir:string -> t -> unit tzresult Lwt.t
+(** [save ~force ~data_dir configuration] writes the [configuration] file in
+    [data_dir]. If [force] is [true], existing configurations are
+    overwritten. *)
+val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t
