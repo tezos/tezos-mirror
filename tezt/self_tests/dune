@@ -1,17 +1,33 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
- (public_name tezt-self-tests)
- (package tezt-self-tests)
+(library
+ (name tezt_self_tests_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezt
   tezt-tezos)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezt
   -open Tezt.Base
-  -open Tezt_tezos))
+  -open Tezt_tezos)
+ (modules test_michelson_script test_daemon))
 
-(cram (package tezt-self-tests) (deps tezt.sh main.exe))
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  tezt_self_tests_tezt_lib
+  tezt)
+ (modules main))
+
+(rule (alias runtezt) (package tezt-tezos) (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

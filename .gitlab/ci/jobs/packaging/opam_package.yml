@@ -1564,8 +1564,6 @@ opam:tezt-performance-regression:
   variables:
     package: tezt-performance-regression
 
-# Ignoring unreleased package tezt-self-tests.
-
 opam:tezt-tezos:
   extends:
     - .opam_template

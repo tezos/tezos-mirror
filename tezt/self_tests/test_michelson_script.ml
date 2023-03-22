@@ -327,8 +327,10 @@ let test_version_range3 () =
 
      And test that [find_all prev_proto] returns an ok.
   *)
-  let* () = touch_p (prefix // "foo" // script0 "bar") in
-  let* () = touch_p (prefix // "foo" // script2 "bar" prev_prev_proto Alpha) in
+  let out_of_range = "foo" // script0 "bar" in
+  let in_range = "foo" // script2 "bar" prev_prev_proto Alpha in
+  let* () = touch_p (prefix // out_of_range) in
+  let* () = touch_p (prefix // in_range) in
   let () =
     match Michelson_script.find_all_res ~prefix prev_proto with
     | Error (__LOC__, msg) ->
@@ -337,10 +339,10 @@ let test_version_range3 () =
         let paths = ts |> List.map (Michelson_script.path ~no_prefix:true) in
         Check.( = )
           paths
-          ["foo/bar_014_016.tz"]
+          ["foo" // script2 "bar" prev_prev_proto Alpha]
           Check.(list string)
           ~__LOC__
-          ~error_msg:"Expected []"
+          ~error_msg:"Got %R, expected %L"
   in
 
   unit
@@ -455,7 +457,7 @@ let test_version_range6 () =
           []
           Check.(list string)
           ~__LOC__
-          ~error_msg:"Expected []"
+          ~error_msg:"Expected %R, got %L"
   in
   unit
 
@@ -498,7 +500,7 @@ let test_version_range7 () =
   in
   unit
 
-let register () =
+let () =
   test_all () ;
   test_find () ;
   test_version_range1 () ;

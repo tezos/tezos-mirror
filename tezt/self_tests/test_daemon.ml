@@ -139,7 +139,7 @@ module Nth_event = struct
     unit
 end
 
-let register () =
+let () =
   N_events.should_evaluate_in_the_list_of_given_events () ;
   N_events.calls_should_be_independent () ;
   N_events.should_fail_if_n_inf_to_zero () ;
