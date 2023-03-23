@@ -307,7 +307,9 @@ let gen_points npoints ?port addr =
         if i <= 0 then ports
         else
           try
-            let main_socket = Unix.(socket PF_INET6 SOCK_STREAM 0) in
+            let main_socket =
+              Unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0)
+            in
             try
               Unix.setsockopt main_socket Unix.SO_REUSEPORT true ;
               Unix.setsockopt main_socket Unix.SO_REUSEADDR true ;

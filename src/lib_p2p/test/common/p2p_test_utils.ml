@@ -137,7 +137,7 @@ let glob_port = ref None
 let listen ?port addr =
   let open Lwt_syntax in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
+  let main_socket = Lwt_unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
   (* If [port] is [0], a fresh port is used. *)
   let port_or_gen = Option.value port ~default:0 in
