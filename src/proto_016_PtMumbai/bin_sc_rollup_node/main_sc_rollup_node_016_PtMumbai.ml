@@ -220,6 +220,19 @@ let injector_retention_period_arg =
              Configuration.max_injector_retention_period ;
          p)
 
+let log_kernel_debug_arg =
+  Tezos_clic.switch
+    ~long:"log-kernel-debug"
+    ~doc:"Log the kernel debug output to kernel.log in the data directory"
+    ()
+
+let log_kernel_debug_file_arg =
+  Tezos_clic.arg
+    ~long:"log-kernel-debug-file"
+    ~placeholder:"file"
+    ~doc:""
+    Client_proto_args.string_parameter
+
 let group =
   {
     Tezos_clic.name = "sc_rollup.node";
@@ -245,7 +258,7 @@ let make_operators sc_rollup_node_operators =
 
 let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
     ~reconnection_delay ~dal_node_endpoint ~injector_retention_period ~mode
-    ~sc_rollup_address ~sc_rollup_node_operators =
+    ~sc_rollup_address ~sc_rollup_node_operators ~log_kernel_debug =
   let open Configuration in
   let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
   let config =
@@ -267,6 +280,7 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
           ~default:Configuration.default_injector_retention_period
           injector_retention_period;
       l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
+      log_kernel_debug;
     }
   in
   check_mode config
@@ -315,7 +329,7 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
 let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
     ~loser_mode ~reconnection_delay ~dal_node_endpoint
     ~injector_retention_period ~mode ~sc_rollup_address
-    ~sc_rollup_node_operators =
+    ~sc_rollup_node_operators ~log_kernel_debug =
   let open Lwt_result_syntax in
   let config_file = Configuration.config_filename ~data_dir in
   let*! exists_config = Lwt_unix.file_exists config_file in
@@ -370,6 +384,7 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~mode
         ~sc_rollup_address
         ~sc_rollup_node_operators
+        ~log_kernel_debug
     in
     return config
 
@@ -379,7 +394,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args9
+    (args10
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -388,7 +403,8 @@ let config_init_command =
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
-       injector_retention_period_arg)
+       injector_retention_period_arg
+       log_kernel_debug_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -402,7 +418,8 @@ let config_init_command =
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
-           injector_retention_period )
+           injector_retention_period,
+           log_kernel_debug )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -419,6 +436,7 @@ let config_init_command =
           ~mode
           ~sc_rollup_address
           ~sc_rollup_node_operators
+          ~log_kernel_debug
       in
       let* () = Configuration.save ~force ~data_dir config in
       let*! () =
@@ -434,7 +452,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args10
+    (args12
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -444,7 +462,9 @@ let legacy_run_command =
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
-       injector_retention_period_arg)
+       injector_retention_period_arg
+       log_kernel_debug_arg
+       log_kernel_debug_file_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
            mode,
@@ -455,7 +475,9 @@ let legacy_run_command =
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
-           injector_retention_period )
+           injector_retention_period,
+           log_kernel_debug,
+           log_kernel_debug_file )
          cctxt ->
       let* configuration =
         create_or_read_config
@@ -470,8 +492,9 @@ let legacy_run_command =
           ~mode
           ~sc_rollup_address
           ~sc_rollup_node_operators:[]
+          ~log_kernel_debug
       in
-      Daemon.run ~data_dir configuration cctxt)
+      Daemon.run ~data_dir ?log_kernel_debug_file configuration cctxt)
 
 let run_command =
   let open Tezos_clic in
@@ -481,7 +504,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args8
+    (args10
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -489,7 +512,9 @@ let run_command =
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
-       injector_retention_period_arg)
+       injector_retention_period_arg
+       log_kernel_debug_arg
+       log_kernel_debug_file_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -501,7 +526,9 @@ let run_command =
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
-           injector_retention_period )
+           injector_retention_period,
+           log_kernel_debug,
+           log_kernel_debug_file )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -519,8 +546,9 @@ let run_command =
           ~mode:(Some mode)
           ~sc_rollup_address:(Some sc_rollup_address)
           ~sc_rollup_node_operators
+          ~log_kernel_debug
       in
-      Daemon.run ~data_dir configuration cctxt)
+      Daemon.run ~data_dir ?log_kernel_debug_file configuration cctxt)
 
 (** Command to dump the rollup node metrics. *)
 let dump_metrics =

@@ -64,6 +64,7 @@ type t = {
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;
+  log_kernel_debug : bool;
 }
 
 let default_data_dir =
@@ -492,6 +493,7 @@ let encoding : t Data_encoding.t =
            batcher;
            injector_retention_period;
            l2_blocks_cache_size;
+           log_kernel_debug;
          } ->
       ( ( sc_rollup_address,
           sc_rollup_node_operators,
@@ -505,7 +507,8 @@ let encoding : t Data_encoding.t =
         ( dal_node_endpoint,
           batcher,
           injector_retention_period,
-          l2_blocks_cache_size ) ))
+          l2_blocks_cache_size,
+          log_kernel_debug ) ))
     (fun ( ( sc_rollup_address,
              sc_rollup_node_operators,
              rpc_addr,
@@ -518,7 +521,8 @@ let encoding : t Data_encoding.t =
            ( dal_node_endpoint,
              batcher,
              injector_retention_period,
-             l2_blocks_cache_size ) ) ->
+             l2_blocks_cache_size,
+             log_kernel_debug ) ) ->
       if injector_retention_period > max_injector_retention_period then
         Format.ksprintf
           Stdlib.failwith
@@ -538,6 +542,7 @@ let encoding : t Data_encoding.t =
         batcher;
         injector_retention_period;
         l2_blocks_cache_size;
+        log_kernel_debug;
       })
     (merge_objs
        (obj9
@@ -577,14 +582,15 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj4
+       (obj5
           (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
           (dft "batcher" batcher_encoding default_batcher)
           (dft
              "injector_retention_period"
              uint16
              default_injector_retention_period)
-          (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)))
+          (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
+          (dft "log-kernel-debug" Data_encoding.bool false)))
 
 let check_mode config =
   let open Result_syntax in

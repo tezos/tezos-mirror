@@ -173,7 +173,7 @@ module Make (PVM : Pvm.S) = struct
               let*! state, executed_ticks =
                 PVM.eval_many
                   ~reveal_builtins
-                  ~write_debug:(Printer Event.kernel_debug)
+                  ~write_debug:(Printer node_ctxt.kernel_debug_logger)
                   ~max_steps
                   state
               in
