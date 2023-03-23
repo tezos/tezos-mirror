@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,7 +25,11 @@
 (*****************************************************************************)
 
 module Parameters = struct
-  type legacy_mode_settings = {threshold : int; committee_members : string list}
+  type legacy_mode_settings = {
+    threshold : int;
+    committee_members : string list;
+    committee_member_address_opt : string option;
+  }
 
   type coordinator_mode_settings = {
     threshold : int;
@@ -124,21 +129,24 @@ let spawn_config_init dac_node =
   in
   let mode_command =
     match dac_node.persistent_state.mode with
-    | Legacy legacy_params ->
+    | Legacy legacy_params -> (
         [
           "configure";
           "as";
           "legacy";
           "with";
-          "threshold";
-          Int.to_string legacy_params.threshold;
-          "and";
           "data";
           "availability";
           "committee";
           "members";
         ]
         @ legacy_params.committee_members
+        @ ["and"; "threshold"; Int.to_string legacy_params.threshold]
+        @
+        match legacy_params.committee_member_address_opt with
+        | None -> []
+        | Some committee_member_address ->
+            ["--committee-member-address"; committee_member_address])
     | Coordinator coordinator_params ->
         [
           "configure";
@@ -275,8 +283,15 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
 
 let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
-    ~committee_members ~node ~client () =
-  let mode = Legacy {threshold; committee_members} in
+    ~committee_members ?committee_member_address ~node ~client () =
+  let mode =
+    Legacy
+      {
+        threshold;
+        committee_members;
+        committee_member_address_opt = committee_member_address;
+      }
+  in
   create
     ~path
     ?name

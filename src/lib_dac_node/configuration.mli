@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -69,6 +70,9 @@ module Legacy : sig
      as a coordinator for the DAC, if any is specified in the legacy node
      condiguration. *)
   val dac_cctxt_config : t -> host_and_port option
+
+  val committee_member_address_opt :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash option
 end
 
 (** Mode specific fragment of a configuration. *)
@@ -116,6 +120,7 @@ val make_legacy :
   ?coordinator_host_and_port:host_and_port ->
   int ->
   Tezos_crypto.Aggregate_signature.public_key_hash trace ->
+  Tezos_crypto.Aggregate_signature.public_key_hash option ->
   mode
 
 (** [filename config] gets the path to config file *)

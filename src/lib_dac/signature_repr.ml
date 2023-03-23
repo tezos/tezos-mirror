@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,10 +35,10 @@ type t = {
 let encoding ((module P) : Dac_plugin.t) =
   Data_encoding.(
     conv
-      (fun {root_hash; signer_pkh; signature} ->
+      (fun {root_hash; signature; signer_pkh} ->
         (root_hash, signature, signer_pkh))
       (fun (root_hash, signature, signer_pkh) ->
-        {root_hash; signer_pkh; signature})
+        {root_hash; signature; signer_pkh})
       (obj3
          (req "root_hash" P.encoding)
          (req "signature" Tezos_crypto.Aggregate_signature.encoding)

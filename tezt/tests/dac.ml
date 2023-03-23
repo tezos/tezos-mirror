@@ -163,7 +163,8 @@ let with_layer1 ?additional_bootstrap_accounts ?commitment_period
   f node client bootstrap1_key
 
 let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~threshold ~committee_members tezos_client f =
+    ?(wait_ready = true) ~threshold ?committee_member_address ~committee_members
+    tezos_client f =
   let range i = List.init i Fun.id in
   let reveal_data_dir =
     Option.map
@@ -190,6 +191,7 @@ let with_legacy_dac_node tezos_node ?sc_rollup_node ?(pvm_name = "arith")
       ~client:tezos_client
       ?reveal_data_dir
       ~threshold
+      ?committee_member_address
       ~committee_members:
         (List.map
            (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
@@ -263,7 +265,7 @@ let scenario_with_layer1_and_legacy_dac_nodes
 
 let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
     ?(pvm_name = "arith") ?commitment_period ?challenge_window ~threshold
-    ~committee_members variant scenario =
+    ?committee_member_address ~committee_members variant scenario =
   let description = "Testing DAC rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -282,6 +284,7 @@ let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
             ~pvm_name
             ~threshold
             ~committee_members
+            ?committee_member_address
             client
           @@ fun dac_node committee_members ->
           scenario
@@ -307,6 +310,12 @@ let wait_for_root_hash_pushed_to_data_streamer dac_node root_hash =
     dac_node
     "root_hash_pushed_to_the_data_streamer.v0"
     (fun json -> if JSON.(json |> as_string) = root_hash then Some () else None)
+
+let wait_for_signature_pushed_to_coordinator dac_node signature =
+  Dac_node.wait_for
+    dac_node
+    "new_signature_pushed_to_coordinator.v0"
+    (fun json -> if JSON.(json |> as_string) = signature then Some () else None)
 
 let wait_for_received_root_hash_processed dac_node root_hash =
   Dac_node.wait_for
@@ -723,8 +732,8 @@ module Legacy = struct
     in
     return @@ check_valid_root_hash expected_rh actual_rh
 
-  let test_streaming_of_root_hashes _protocol node client coordinator threshold
-      committee_members =
+  let test_streaming_of_root_hashes_as_observer _protocol node client
+      coordinator threshold committee_members =
     (* 1. Create two new dac nodes; [observer_1] and [observer_2].
        2. Initialize their default configuration.
        3. Update their configuration so that their dac node client context
@@ -797,6 +806,9 @@ module Legacy = struct
     let observer_2_is_subscribed =
       wait_for_handle_new_subscription_to_hash_streamer coordinator
     in
+    let push_signature =
+      wait_for_signature_pushed_to_coordinator observer_1 ""
+    in
     let* () = Dac_node.run observer_2 in
     let* () = observer_2_is_subscribed in
     (* [coordinator] serializes [payload_2]. We expect it would push
@@ -818,7 +830,64 @@ module Legacy = struct
        We assert this, by making sure that the promise of [observer_2] about
        waiting for the emitted event with payload [expected_rh_1] is still not
        resolved after the promise [observer_2_promise_2] has been resolved. *)
-    assert (Lwt.is_sleeping observer_2_promise_1) ;
+    assert (
+      Lwt.is_sleeping observer_2_promise_1 && Lwt.is_sleeping push_signature) ;
+    unit
+
+  let test_streaming_of_root_hashes_as_member _protocol node client coordinator
+      threshold dac_members =
+    (* This test doesn't have any meaning if run without any committee member. *)
+    assert (List.length dac_members > 0) ;
+    let member_key : Account.aggregate_key = List.nth dac_members 0 in
+    let dac_member_pkh = member_key.aggregate_public_key_hash in
+
+    let member =
+      Dac_node.create_legacy
+        ~threshold
+        ~committee_members:[]
+        ~node
+        ~client
+        ?committee_member_address:(Some dac_member_pkh)
+        ()
+    in
+    let* _ = Dac_node.init_config member in
+    let () = set_coordinator member coordinator in
+    let payload = "test_1" in
+    let expected_rh =
+      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+    in
+    let push_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
+    in
+    let member_promise = wait_for_received_root_hash member expected_rh in
+
+    (* Start running [member]. From now on we expect [member] to
+       monitor streamed root hashes produced by [coordinator]. [coordinator]
+       produces and pushes them as a side effect of serializing dac payload. *)
+    let member_is_subscribed =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator
+    in
+    let expected_signature = bls_sign_hex_hash member_key (`Hex expected_rh) in
+    let* () = Dac_node.run member in
+    let* () = member_is_subscribed in
+    (* [coordinator] serializes [payload_1]. We expect it would push
+       [expected_rh_1] to all attached subscribers, i.e. to [member]. *)
+    let* () =
+      coordinator_serializes_payload coordinator ~payload ~expected_rh
+    in
+    (* Assert [coordinator] emitted event that [expected_rh_1] was pushed
+       to the data_streamer. *)
+    let* () = push_promise in
+    (* Assert [member] emitted event of received [expected_rh_1]. *)
+    let* () = member_promise in
+
+    (* If the signature inside the emitted event is equal to the [expected_signature]
+       test is OK *)
+    let* () =
+      wait_for_signature_pushed_to_coordinator
+        member
+        (Tezos_crypto.Aggregate_signature.to_b58check expected_signature)
+    in
     unit
 
   (** [check_downloaded_page coordinator observer page_hash] checks that the
@@ -1180,7 +1249,14 @@ let register ~protocols =
     ~committee_members:0
     ~tags:["dac"; "dac_node"]
     "dac_streaming_of_root_hashes_in_legacy_mode"
-    Legacy.test_streaming_of_root_hashes
+    Legacy.test_streaming_of_root_hashes_as_observer
+    protocols ;
+  scenario_with_layer1_and_legacy_dac_nodes
+    ~threshold:0
+    ~committee_members:1
+    ~tags:["dac"; "dac_node"]
+    "dac_push_signature_in_legacy_mode_as_member"
+    Legacy.test_streaming_of_root_hashes_as_member
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~threshold:0

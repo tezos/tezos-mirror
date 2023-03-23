@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,6 +42,7 @@ val create_legacy :
   ?reveal_data_dir:string ->
   threshold:int ->
   committee_members:string list ->
+  ?committee_member_address:string ->
   node:Node.t ->
   client:Client.t ->
   unit ->

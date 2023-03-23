@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,19 +31,26 @@ type error +=
   | Cannot_create_reveal_data_dir of string
 
 module Keys : sig
-  (** [get_keys ~addresses ~threshold cctxt] returns the aliases and keys associated with the
-      aggregate signature addresses in the tezos wallet of [cctxt]. *)
+  type t = private {
+    public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
+    public_key_opt : Tezos_crypto.Aggregate_signature.public_key option;
+    aggregate_sk_uri : Client_keys.aggregate_sk_uri;
+  }
+
+  (** Retrieve [Keys.t] from the provided [#Client_context.wallet] 
+      and [Tezos_crypto.Aggregate_signature.public_key_hash] *)
+  val get_wallet_info :
+    #Client_context.wallet ->
+    Tezos_crypto.Aggregate_signature.public_key_hash ->
+    t option tzresult Lwt.t
+
+  (** [get_keys ~addresses ~threshold cctxt config] returns the aliases and keys associated with the
+      aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)
   val get_keys :
     addresses:Tezos_crypto.Aggregate_signature.public_key_hash trace ->
     threshold:int ->
     #Client_context.wallet ->
-    (Tezos_crypto.Aggregate_signature.public_key_hash
-    * Tezos_crypto.Aggregate_signature.public_key option
-    * Client_keys.aggregate_sk_uri)
-    option
-    list
-    tzresult
-    Lwt.t
+    t option list tzresult Lwt.t
 
   (** [get_public_key cctxt pkh] returns the public key associated with the given [pkh] if it can 
       be found in [cctxt].
