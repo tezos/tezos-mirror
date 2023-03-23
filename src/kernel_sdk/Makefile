@@ -28,7 +28,7 @@ check:
 build: check installer.wasm
 	@cargo build -p tezos_smart_rollup_installer \
 		--release \
-	        $(NATIVE_OPT)
+                $(NATIVE_OPT)
 
 installer.wasm:
 	@cargo build -p installer_kernel \

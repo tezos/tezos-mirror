@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 #![deny(missing_docs)]
-#![deny(rustdoc::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 //! Hook to capture kernel panics, and write them to the debug log.
 //!

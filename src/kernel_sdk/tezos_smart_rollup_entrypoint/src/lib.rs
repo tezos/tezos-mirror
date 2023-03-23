@@ -13,7 +13,7 @@
 //! called a number of times per non-empty level.  The kernel must take care not to perform
 //! arbitrarily long computations, to avoid breaching the computation limit.
 #![deny(missing_docs)]
-#![deny(rustdoc::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "dlmalloc")]
