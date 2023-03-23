@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
 module Simple = struct
   include Internal_event.Simple
 
@@ -114,17 +111,6 @@ module Simple = struct
       ~level:Debug
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
-
-  let wrong_initial_pvm_state_hash =
-    declare_2
-      ~section
-      ~name:"sc_rollup_daemon_incorrect_initial_pvm_state_hash"
-      ~msg:
-        "The initial state hash produced by the PVM {actual} is not consistent\n\
-        \     with the expected hash {expected}"
-      ~level:Notice
-      ("actual", Sc_rollup.State_hash.encoding)
-      ("expected", Sc_rollup.State_hash.encoding)
 end
 
 let head_processing hash level ~finalized =
@@ -172,6 +158,3 @@ let included_operation (type kind) ~finalized
             | Skipped _ -> (`Skipped, None)
           in
           Simple.(emit included_failed_operation) (operation, status, errors))
-
-let wrong_initial_pvm_state_hash actual_hash expected_hash =
-  Simple.(emit wrong_initial_pvm_state_hash (actual_hash, expected_hash))

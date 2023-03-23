@@ -448,18 +448,14 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! l2_initial_state_hash = PVM.state_hash s in
-    if
-      not
-        Sc_rollup.State_hash.(
-          l1_reference_initial_state_hash = l2_initial_state_hash)
-    then
-      let*! () =
-        Daemon_event.wrong_initial_pvm_state_hash
-          l2_initial_state_hash
-          l1_reference_initial_state_hash
-      in
-      Lwt_exit.exit_and_raise 1
-    else return_unit
+    fail_unless
+      Sc_rollup.State_hash.(
+        l1_reference_initial_state_hash = l2_initial_state_hash)
+      (Sc_rollup_node_errors.Wrong_initial_pvm_state
+         {
+           initial_state_hash = l2_initial_state_hash;
+           expected_state_hash = l1_reference_initial_state_hash;
+         })
 
   let run node_ctxt configuration =
     let open Lwt_result_syntax in
