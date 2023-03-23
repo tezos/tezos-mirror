@@ -73,7 +73,6 @@
   src_lib_protocol_environment_test_shell_context_tezt_lib
   src_lib_protocol_environment_test_tezt_lib
   src_lib_p2p_tezt_tezt_lib
-  src_lib_p2p_test_tezt_lib
   src_lib_mockup_test_tezt_lib
   src_lib_lwt_result_stdlib_test_tezt_lib
   src_lib_lazy_containers_test_tezt_lib

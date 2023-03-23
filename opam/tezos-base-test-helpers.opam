@@ -14,7 +14,8 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-event-logging-test-helpers"
   "tezos-test-helpers"
-  "octez-alcotezt"
+  "alcotest" { >= "1.5.0" }
+  "alcotest-lwt" { >= "1.5.0" }
   "qcheck-alcotest" { >= "0.20" }
 ]
 build: [

@@ -11,7 +11,7 @@
   tezos-error-monad
   tezos-event-logging
   tezos-test-helpers
-  octez-alcotezt)
+  alcotest)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
@@ -19,5 +19,4 @@
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_event_logging
-  -open Tezos_test_helpers
-  -open Octez_alcotezt))
+  -open Tezos_test_helpers))
