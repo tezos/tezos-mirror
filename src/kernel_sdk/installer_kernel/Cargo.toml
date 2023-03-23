@@ -23,14 +23,14 @@ features = ["portable"]
 [dependencies.tezos_smart_rollup_core]
 path = "../tezos_smart_rollup_core"
 
-[dependencies.host]
-git = "https://gitlab.com/tezos/kernel"
+[dependencies.tezos_smart_rollup_host]
+path = "../tezos_smart_rollup_host"
 default-features = false
 
-[dependencies.tezos_rollup_encoding]
-git = "https://gitlab.com/tezos/kernel"
+[dependencies.tezos_smart_rollup_encoding]
+path = "../tezos_smart_rollup_encoding"
 default-features = false
 
-[dependencies.kernel]
-git = "https://gitlab.com/tezos/kernel"
+[dependencies.tezos_smart_rollup_entrypoint]
+path = "../tezos_smart_rollup_entrypoint"
 default-features = false
