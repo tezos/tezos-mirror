@@ -120,6 +120,10 @@ pub trait Runtime {
         buffer: &mut [u8],
     ) -> Result<usize, RuntimeError>;
 
+    /// Read an entire value from the given path in storage.
+    #[cfg(feature = "alloc")]
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError>;
+
     /// Write the bytes given by `src` to storage at `path`, starting `at_offset`.
     fn store_write<T: Path>(
         &mut self,
@@ -338,6 +342,50 @@ where
             Ok(i) => Ok(i),
             Err(e) => Err(RuntimeError::HostErr(e)),
         }
+    }
+
+    #[cfg(feature = "alloc")]
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
+        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+
+        let length = Runtime::store_value_size(self, path)?;
+        let mut buffer: Vec<u8> = Vec::with_capacity(length);
+
+        // SAFETY: the algorithm goes as follows:
+        //
+        // A vector of capacity [length] has been previously allocated, of the exact
+        // size of the value in the storage. Only `MAX_FILE_CHUNK_SIZE` bytes
+        // can be read at once, as such the values must be read as chunks.
+        while buffer.len() < length {
+            let offset = buffer.len();
+            let max_length = usize::min(MAX_FILE_CHUNK_SIZE, length - offset);
+            // At each loop, `store_read` takes a slice starting at the next
+            // offset in the value, which is the current length of the buffer.
+            // The slicing is always valid since it starts at the buffer's
+            // length, and always below the vector capacity by construction of
+            // the looping condition.
+            let slice = &mut buffer[offset..];
+            unsafe {
+                // SAFETY: `store_read` expects a pointer to write the value,
+                // which is given by the slicing in the buffer.
+                let chunk_size = self.store_read(
+                    path.as_ptr(),
+                    path.size(),
+                    offset,
+                    slice.as_mut_ptr(),
+                    max_length,
+                );
+                let chunk_size =
+                    Error::wrap(chunk_size).map_err(RuntimeError::HostErr)?;
+                // SAFETY: at the end of the loop, the buffer's length is
+                // incremented with the size of the value read, since
+                // `store_read` won't update it (as it only deals with
+                // pointers). This makes the slicing at the next loop valid,
+                // since it starts from the buffer length, and is less than the capacity.
+                buffer.set_len(offset + chunk_size)
+            };
+        }
+        Ok(buffer)
     }
 
     fn store_write<T: Path>(
@@ -575,7 +623,8 @@ mod tests {
     use std::slice::{from_raw_parts, from_raw_parts_mut};
     use test_helpers::*;
     use tezos_smart_rollup_core::{
-        smart_rollup_core::MockSmartRollupCore, MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE,
+        smart_rollup_core::MockSmartRollupCore, MAX_FILE_CHUNK_SIZE,
+        MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE,
     };
 
     const READ_SIZE: usize = 80;
@@ -788,6 +837,66 @@ mod tests {
 
         // Assert
         assert_eq!(Err(RuntimeError::PathNotFound), result);
+    }
+
+    #[test]
+    fn store_read_all_above_max_file_chunk_size() {
+        // Arrange
+
+        // The value read is formed of 3 chunks, two of the max chunk value and
+        // the last one being less than the max size.
+        const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
+        const VALUE_FIRST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'a'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_SECOND_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'b'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_LAST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE / 2] =
+            [b'c'; MAX_FILE_CHUNK_SIZE / 2];
+        const VALUE_SIZE: usize =
+            VALUE_FIRST_CHUNK.len() + VALUE_SECOND_CHUNK.len() + VALUE_LAST_CHUNK.len();
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        // Check that the path is the one given to `store_read_all` and the
+        // offset is always a multiple of `MAX_FILE_CHUNK_SIZE`.
+        mock.expect_store_read()
+            .withf(|path_ptr, path_size, offset, _, max_bytes| {
+                let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                let last_offset = MAX_FILE_CHUNK_SIZE * 2;
+                let expected_max_bytes = if offset == &last_offset {
+                    VALUE_LAST_CHUNK.len()
+                } else {
+                    MAX_FILE_CHUNK_SIZE
+                };
+
+                (offset % MAX_FILE_CHUNK_SIZE) == 0
+                    && &expected_max_bytes == max_bytes
+                    && PATH.as_bytes() == slice
+            })
+            // Returns the expected chunks, as we know the offsets are consistent.
+            .returning(|_, _, offset, buf_ptr, _| {
+                let chunk = if offset == 0 {
+                    VALUE_FIRST_CHUNK.to_vec()
+                } else if offset == MAX_FILE_CHUNK_SIZE {
+                    VALUE_SECOND_CHUNK.to_vec()
+                } else {
+                    VALUE_LAST_CHUNK.to_vec()
+                };
+                let buffer = unsafe { from_raw_parts_mut(buf_ptr, chunk.len()) };
+                buffer.copy_from_slice(&chunk);
+                (chunk.len()).try_into().unwrap()
+            });
+
+        mock.expect_store_value_size()
+            .return_const(i32::try_from(VALUE_SIZE).unwrap());
+
+        // Act
+        let result = Runtime::store_read_all(&mock, &PATH);
+
+        // Assert
+        let mut expected: Vec<u8> = Vec::new();
+        expected.extend_from_slice(&VALUE_FIRST_CHUNK);
+        expected.extend_from_slice(&VALUE_SECOND_CHUNK);
+        expected.extend_from_slice(&VALUE_LAST_CHUNK);
+
+        assert_eq!(Ok(expected), result);
     }
 
     #[test]
