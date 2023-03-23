@@ -195,6 +195,7 @@ let wait ~value_encoding ~flags pid result_ch =
       | exn -> fail_with_exn exn)
 
 type ('a, 'b, 'c) t = {
+  after_termination : unit -> unit Lwt.t;
   termination : 'c tzresult Lwt.t;
   channel : ('b, 'a) Channel.t;
   prefix : string;
@@ -255,15 +256,25 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
                 f chans)
               child_exit
           in
+          let* () = Lwt_io.close child_out in
+          let* () = Lwt_io.close child_in in
+          let* () = Lwt_io.close child_exit in
           exit i
       | pid ->
           Lwt_canceler.on_cancel canceler (fun () -> terminate pid) ;
           let termination = wait ~value_encoding ~flags pid main_result in
+          let after_termination () =
+            let* () = Lwt_io.close main_out in
+            let* () = Lwt_io.close main_in in
+            let* () = Lwt_io.close main_result in
+            Lwt.return_unit
+          in
           let* () = Lwt_io.close child_in in
           let* () = Lwt_io.close child_out in
           let* () = Lwt_io.close child_exit in
           return_ok
             {
+              after_termination;
               termination;
               channel =
                 Channel.make
@@ -482,4 +493,5 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
 let wait_all pl =
   let open Lwt_result_syntax in
   let* _ = wait_all_results pl in
+  let*! () = List.iter_s (fun p -> p.after_termination ()) pl in
   return_unit
