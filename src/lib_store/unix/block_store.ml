@@ -1739,11 +1739,31 @@ let v_3_0_upgrade chain_dir ~cleanups ~finalizers =
               (fun (block_b, _len) ->
                 let block_hash = Block_repr_unix.raw_get_block_hash block_b in
                 let block_context = Block_repr_unix.raw_get_context block_b in
-                let {
-                  Floating_block_index.Legacy.Legacy_block_info.offset;
-                  predecessors;
-                } =
-                  Floating_block_index.Legacy.find legacy_index block_hash
+                let* {
+                       Floating_block_index.Legacy.Legacy_block_info.offset;
+                       predecessors;
+                     } =
+                  try
+                    return
+                    @@ Floating_block_index.Legacy.find legacy_index block_hash
+                  with
+                  | Not_found ->
+                      let block_level =
+                        Block_repr_unix.raw_get_block_level block_b
+                      in
+                      let floating_kind =
+                        (function
+                          | Naming.RO -> "RO"
+                          | RW -> "RW"
+                          | RO_TMP -> "RO_TMP"
+                          | RW_TMP -> "RW_TMP"
+                          | Restore _ -> "Restored")
+                          kind
+                      in
+                      tzfail
+                        (V_3_0_upgrade_missing_floating_block
+                           {block_hash; block_level; floating_kind})
+                  | e -> raise e
                 in
                 let resulting_context_hash = block_context in
                 let new_value =
