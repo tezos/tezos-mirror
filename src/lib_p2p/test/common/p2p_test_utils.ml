@@ -183,9 +183,18 @@ let run_nodes ~addr ?port client server =
   let* server_node =
     Process.detach ~prefix:"server: " (fun channel ->
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-        let* () = server channel sched main_socket in
-        let*! () = P2p_io_scheduler.shutdown sched in
-        return_unit)
+        Lwt.finalize
+          (fun () ->
+            let* () = server channel sched main_socket in
+            let*! () = P2p_io_scheduler.shutdown sched in
+            return_unit)
+          (fun () ->
+            let*! r = Lwt_utils_unix.safe_close main_socket in
+            match r with
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+                Lwt.return_unit
+            | Ok () -> Lwt.return_unit))
   in
   let* client_node =
     Process.detach ~prefix:"client: " (fun channel ->
@@ -204,7 +213,9 @@ let run_nodes ~addr ?port client server =
   in
   let nodes = [server_node; client_node] in
   Lwt.ignore_result (sync_nodes nodes) ;
-  Process.wait_all nodes
+  let* () = Process.wait_all nodes in
+  let*! _ = Lwt_utils_unix.safe_close main_socket in
+  return_unit
 
 let raw_accept sched main_socket =
   let open Lwt_syntax in
