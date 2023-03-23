@@ -93,3 +93,66 @@ end
 
 module C = Automaton_config
 module GS = Tezos_gossipsub.Make (C)
+
+let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
+  let {
+    max_recv_ihave_per_heartbeat;
+    max_sent_iwant_per_heartbeat;
+    degree_optimal;
+    gossip_publish_threshold;
+    accept_px_threshold;
+    unsubscribe_backoff;
+    graft_flood_backoff;
+    prune_backoff;
+    retain_duration;
+    fanout_ttl;
+    heartbeat_interval;
+    backoff_cleanup_ticks;
+    degree_low;
+    degree_high;
+    degree_score;
+    degree_out;
+  } =
+    l
+  in
+  let open Format in
+  fprintf
+    fmtr
+    "@[<v 2>{ max_recv_ihave_per_heartbeat = %d;@;\
+     max_sent_iwant_per_heartbeat = %d;@;\
+     degree_optimal = %d;@;\
+     gossip_publish_threshold = %f;@;\
+     accept_px_threshold = %f;@;\
+     unsubscribe_backoff = %a;@;\
+     graft_flood_backoff = %a;@;\
+     prune_backoff = %a;@;\
+     retain_duration = %a;@;\
+     fanout_ttl = %a;@;\
+     heartbeat_interval = %a;@;\
+     backoff_cleanup_ticks = %d;@;\
+     degree_low = %d;@;\
+     degree_high = %d;@;\
+     degree_score = %d;@;\
+     degree_out = %d }@]"
+    max_recv_ihave_per_heartbeat
+    max_sent_iwant_per_heartbeat
+    degree_optimal
+    gossip_publish_threshold
+    accept_px_threshold
+    GS.Span.pp
+    unsubscribe_backoff
+    GS.Span.pp
+    graft_flood_backoff
+    GS.Span.pp
+    prune_backoff
+    GS.Span.pp
+    retain_duration
+    GS.Span.pp
+    fanout_ttl
+    GS.Span.pp
+    heartbeat_interval
+    backoff_cleanup_ticks
+    degree_low
+    degree_high
+    degree_score
+    degree_out
