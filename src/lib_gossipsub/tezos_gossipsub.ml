@@ -260,6 +260,7 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_score >= 0) ;
     assert (l.degree_low < l.degree_optimal) ;
     assert (l.degree_high > l.degree_optimal) ;
+    assert (l.backoff_cleanup_ticks > 0) ;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
        This requirement is not imposed in the spec/Go implementation. Relax this
        requirement or delete the todo. *)
@@ -964,7 +965,7 @@ module Make (C : AUTOMATON_CONFIG) :
                Check the reasoning *)
             match connection.expire with
             | Some expire
-              when Time.(expire < current)
+              when Time.(expire <= current)
                    && Topic.Map.is_empty connection.backoff ->
                 None
             | _ -> Some {connection with backoff})
