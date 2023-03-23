@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune exec src/lib_p2p/test/main.exe
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler_ipv4
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      On I/O scheduling of client-server connections.
 *)
@@ -124,10 +124,10 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
       ()
   in
   Moving_average.on_update (P2p_io_scheduler.ma_state sched) (fun () ->
-      debug "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       if display_client_stat then
         P2p_io_scheduler.iter_connection sched (fun conn ->
-            debug
+            log_notice
               " client(%d) %a"
               (P2p_io_scheduler.id conn)
               P2p_stat.pp
@@ -139,7 +139,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   let* r = List.iter_ep P2p_io_scheduler.close conns in
   match r with
   | Ok () ->
-      debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       return_ok ()
   | Error _ -> Lwt.fail Alcotest.Test_error
 
@@ -188,7 +188,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   | Error err -> Lwt.fail (Error err)
   | Ok () ->
       let stat = P2p_io_scheduler.stat conn in
-      let* () = lwt_debug "Client OK %a" P2p_stat.pp stat in
+      let* () = lwt_log_notice "Client OK %a" P2p_stat.pp stat in
       return_ok ()
 
 (** Listens to address [addr] on port [port] to open a socket [main_socket].
@@ -251,7 +251,7 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let () =
-  let addr = Node.default_ipv6_addr in
+  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
   let port = Some (Tezt_tezos.Port.fresh ()) in
   let max_download_speed = 1048576 in
   let max_upload_speed = 262144 in

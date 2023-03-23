@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune exec src/lib_p2p/test/main.exe
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_banned_peers
     Subject:      On banning peers and usage of Access Control Lists (ACL)
                   using sets and POSIX timestamps.
 *)
