@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:  Layer-2 indexed store
-   Invocation: dune exec src/lib_layer2_store/test/test_indexed_store.exe -- -v
+   Invocation: dune exec src/lib_layer2_store/test/main.exe
    Subject:    Test the indexed store
 *)
 
