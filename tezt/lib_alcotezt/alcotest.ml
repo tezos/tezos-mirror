@@ -43,7 +43,7 @@ let run library_name tests =
      Test.register
        ~__FILE__:library_name
        ~title:(library_name ^ ": " ^ test_name)
-       ~tags:["alcotest"]
+       ~tags:["alcotezt"]
      @@ fun () ->
      (test_cases
      |> List.iter @@ fun (test_case_name, speed_level, body) ->
