@@ -96,6 +96,11 @@ type ('peer, 'message_id, 'span) limits = {
   prune_backoff : 'span;  (** The duration added when we prune a peer. *)
   retain_duration : 'span;
       (** The duration added to remove metadata about a disconnected peer. *)
+  fanout_ttl : 'span;
+      (** [fanout_ttl] controls how long we keep track of a fanout topic. If
+          it's been [fanout_ttl] since we've published to a topic that we're not
+          subscribed to, then we don't track that topic anymore, that is, we
+          delete it from the fanout map. *)
   heartbeat_interval : 'span;
       (** [heartbeat_interval] controls the time between heartbeats. *)
   backoff_cleanup_ticks : int;
