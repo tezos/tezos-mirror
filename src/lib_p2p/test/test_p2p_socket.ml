@@ -170,16 +170,17 @@ module Crypto_test = struct
 
   let channel_key = Tezos_crypto.Crypto_box.precompute sk pk
 
-  let in_fd, out_fd = Unix.pipe ()
-
   let data = {channel_key; local_nonce = zero_nonce; remote_nonce = zero_nonce}
 
   let wrap () =
     Alcotest_lwt.test_case "ACK" `Quick (fun _ () ->
         let open Lwt_syntax in
         let msg = Bytes.of_string "test" in
+        let in_fd, out_fd = Lwt_unix.pipe ~cloexec:true () in
         let* _ = write_chunk out_fd data msg in
         let* r = read_chunk in_fd data in
+        let* () = Lwt_unix.close in_fd in
+        let* () = Lwt_unix.close out_fd in
         match r with
         | Ok res when Bytes.equal msg res -> Lwt.return_unit
         | Ok res ->
