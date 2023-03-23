@@ -57,12 +57,6 @@ Client
 Baker
 -----
 
-- Fixed a bug where the baker could count an (pre)endorsement twice
-  while waiting for a (pre)quorum.
-
-- Fixed a bug where receiving an early prequorum would made the baker
-  reach a state where it could not endorse anymore.
-
 Accuser
 -------
 

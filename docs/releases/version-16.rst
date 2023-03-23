@@ -1,4 +1,4 @@
-Version 16.0
+Version 16.1
 ============
 
 Version 16.0 contains a new version (V8) of the protocol environment,
@@ -39,6 +39,7 @@ This release includes the following baker improvements:
 - Baker injects preendorsements twice: once the block is considered as valid by the node and once it is fully applied by the node.
   This is a safety measure in case the early preendorsement is dropped by the mempool.
 
+Version 16.1 fixes an implementation bug in the baker binary that would made bakers pre-endorse block proposals without subsequently endorsing them, preventing the optimal functioning of the baking process and potentially deteriorating network liveness.
 
 Update Instructions
 -------------------
@@ -46,7 +47,7 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v16.0
+  git checkout v16.1
   make clean
   rm -rf _opam  # if updating from v15 or older
   make build-deps
@@ -56,7 +57,7 @@ To update from sources::
 Note that, as the minimal required OCaml version is now 4.14.1, you may have to remove the ``_opam/`` directory when updating from Octez v15.1 or older released versions.
 See more details :ref:`here <update_from_sources>`.
 
-If you are using Docker instead, use the ``v16.0`` Docker images of Octez.
+If you are using Docker instead, use the ``v16.1`` Docker images of Octez.
 
 If you are installing Octez using Opam, note that the minimal required
 OCaml version is now 4.14.1. This means that you might need to create a
@@ -66,6 +67,7 @@ new switch with ``opam switch create 4.14.1`` before you run ``opam install tezo
 Changelog
 ---------
 
+- `Version 16.1 <../CHANGES.html#version-16-1>`_
 - `Version 16.0 <../CHANGES.html#version-16-0>`_
 - `Version 16.0~rc3 <../CHANGES.html#version-16-0-rc3>`_
 - `Version 16.0~rc2 <../CHANGES.html#version-16-0-rc2>`_
