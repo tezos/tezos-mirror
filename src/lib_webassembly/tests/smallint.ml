@@ -1,3 +1,10 @@
+(* Testing
+   -------
+   Component:    WebAssembly
+   Invocation:   dune exec src/lib_webassembly/tests/main.exe
+   Subject:      Test small ints
+*)
+
 (* Simple, non-exhaustive tests for small ints (i8, i16). *)
 
 let s32max = 0x7fffffffl

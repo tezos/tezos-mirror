@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Lazy containers
+   Invocation:   dune exec src/lib_lazy_containers/test/main.exe
+   Subject:      Test chunked byte vector
+*)
+
 open QCheck_alcotest
 open QCheck2
 
