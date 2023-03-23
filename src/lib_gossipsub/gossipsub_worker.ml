@@ -83,7 +83,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         gossip_state
     | New_connection {peer; direct; outbound} ->
         let gossip_state, output =
-          GS.add_peer ~direct ~outbound peer gossip_state
+          GS.add_peer {direct; outbound; peer} gossip_state
         in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5160
 
@@ -91,7 +91,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         ignore output ;
         gossip_state
     | Disconnection {peer} ->
-        let gossip_state, output = GS.remove_peer peer gossip_state in
+        let gossip_state, output = GS.remove_peer {peer} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
 
            Handle disconnection's output *)
@@ -99,7 +99,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         gossip_state
     | Publish_message {message; message_id; topic} ->
         let gossip_state, output =
-          GS.publish ~sender:None topic message_id message gossip_state
+          GS.publish {sender = None; topic; message_id; message} gossip_state
         in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5162
 
