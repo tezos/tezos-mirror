@@ -216,6 +216,12 @@ Baker
   preendorse as soon as the node considers a block as valid instead of
   waiting for the node to fully apply it. (MR :gl:`!7516`)
 
+- Fixed a bug where the baker could count an (pre)endorsement twice
+  while waiting for a (pre)quorum.
+
+- Fixed a bug where receiving an early prequorum would made the baker
+  reach a state where it could not endorse anymore.
+
 Accuser
 -------
 

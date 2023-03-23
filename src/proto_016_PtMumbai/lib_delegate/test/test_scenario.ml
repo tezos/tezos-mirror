@@ -113,6 +113,60 @@ let test_preendorse_on_valid () =
   let config = {default_config with timeout = 10} in
   run ~config [(1, (module Hooks))]
 
+let test_reset_delayed_pqc () =
+  let module Hooks : Hooks = struct
+    include Default_hooks
+
+    let should_wait = ref true
+
+    let trigger = ref false
+
+    let on_new_operation x =
+      (if !should_wait then Lwt_unix.sleep 0.5 else Lwt_unix.sleep 0.2)
+      >>= fun () ->
+      if !trigger then (
+        trigger := false ;
+        Lwt.return_none)
+      else Lwt.return_some x
+
+    let on_new_head ~block_hash ~(block_header : Block_header.t) =
+      let block_round =
+        match
+          Protocol.Alpha_context.Fitness.round_from_raw
+            block_header.shell.fitness
+        with
+        | Error _ -> assert false
+        | Ok x -> x
+      in
+      if
+        block_header.Block_header.shell.level = 1l
+        && Protocol.Alpha_context.Round.(block_round = zero)
+      then (
+        Lwt_unix.sleep 1. >>= fun () ->
+        should_wait := false ;
+        trigger := true ;
+        Lwt.return_some (block_hash, block_header))
+      else Lwt.return_some (block_hash, block_header)
+
+    let stop_on_event = function
+      | Baking_state.New_valid_proposal {block; _} ->
+          let is_high_round =
+            let open Protocol.Alpha_context.Round in
+            match of_int 5 with
+            | Ok high_round -> block.round = high_round
+            | _ -> assert false
+          in
+          (block.shell.level = 1l && is_high_round) || block.shell.level > 1l
+      | _ -> false
+
+    let check_chain_on_success ~chain =
+      let head = Stdlib.List.hd chain in
+      if head.rpc_context.block_header.level = 1l then failwith "baker is stuck"
+      else return_unit
+  end in
+  let config = {default_config with round0 = 2L; round1 = 3L; timeout = 50} in
+  run ~config [(1, (module Hooks))]
+
 (*
 
 Scenario T1
@@ -1530,6 +1584,7 @@ let tests =
   [
     tztest "reaches level 5" `Quick test_level_5;
     tztest "cannot progress without new head" `Quick test_preendorse_on_valid;
+    tztest "reset delayed pqc" `Quick test_reset_delayed_pqc;
     tztest "scenario t1" `Quick test_scenario_t1;
     tztest "scenario t2" `Quick test_scenario_t2;
     tztest "scenario t3" `Quick test_scenario_t3;

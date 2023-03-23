@@ -203,7 +203,13 @@ struct
   module Compare = Compare
   module Either = Either
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
-  module List = Tezos_error_monad.TzLwtreslib.List
+
+  module List = struct
+    include Tezos_error_monad.TzLwtreslib.List
+
+    let fold_right_es f l x = fold_left_es (fun acc x -> f x acc) x (rev l)
+  end
+
   module Array = Tezos_protocol_environment_structs.V8.Array
   module Char = Char
   module Bytes = Tezos_base.TzPervasives.Bytes
