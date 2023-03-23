@@ -344,6 +344,41 @@ module type AUTOMATON = sig
 
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
+  module Introspection : sig
+    type connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      backoff : Time.t Topic.Map.t;
+      score : Score.t;
+      expire : Time.t option;
+    }
+
+    type connections := connection Peer.Map.t
+
+    type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
+
+    module Memory_cache : sig
+      type value = {message : message; access : int Peer.Map.t}
+
+      type t = {messages : value Message_id.Map.t}
+    end
+
+    type view = {
+      limits : limits;
+      parameters : parameters;
+      connections : connections;
+      ihave_per_heartbeat : int Peer.Map.t;
+      iwant_per_heartbeat : int Peer.Map.t;
+      mesh : Peer.Set.t Topic.Map.t;
+      fanout : fanout_peers Topic.Map.t;
+      seen_messages : Message_id.Set.t;
+      memory_cache : Memory_cache.t;
+      rng : Random.State.t;
+      heartbeat_ticks : int64;
+    }
+  end
+
   module Internal_for_tests : sig
     (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of [topic]. *)
     val get_peers_in_topic_mesh : Topic.t -> state -> Peer.t list

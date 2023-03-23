@@ -1431,6 +1431,45 @@ module Make (C : AUTOMATON_CONFIG) :
     let open Format in
     fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
+  module Introspection = struct
+    (* This module reexport datatypes so that it can be used for
+       introspection. While at the moment, this module reexport purely
+       the datatype, we can decide that for abstraction purpose, we do
+       not export all those fields in the future. This may have a
+       small overhead cost, but for introspection it should be
+       irrelevant. *)
+
+    type nonrec connection = connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      backoff : time Topic.Map.t;
+      score : Score.t;
+      expire : time option;
+    }
+
+    type nonrec fanout_peers = fanout_peers = {
+      peers : Peer.Set.t;
+      last_published_time : time;
+    }
+
+    module Memory_cache = Memory_cache
+
+    type view = state = {
+      limits : limits;
+      parameters : parameters;
+      connections : connections;
+      ihave_per_heartbeat : int Peer.Map.t;
+      iwant_per_heartbeat : int Peer.Map.t;
+      mesh : Peer.Set.t Topic.Map.t;
+      fanout : fanout_peers Topic.Map.t;
+      seen_messages : Message_id.Set.t;
+      memory_cache : Memory_cache.t;
+      rng : Random.State.t;
+      heartbeat_ticks : int64;
+    }
+  end
+
   module Internal_for_tests = struct
     let get_peers_in_topic_mesh topic state =
       match Topic.Map.find topic state.mesh with
