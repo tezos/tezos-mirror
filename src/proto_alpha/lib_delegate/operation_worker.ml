@@ -159,16 +159,33 @@ type event =
   | Prequorum_reached of candidate * Kind.preendorsement operation list
   | Quorum_reached of candidate * Kind.endorsement operation list
 
+let compare_consensus_contents (op1 : consensus_content)
+    (op2 : consensus_content) =
+  Compare.or_else (Raw_level.compare op1.level op2.level) @@ fun () ->
+  Compare.or_else (Round.compare op1.round op2.round) @@ fun () ->
+  Compare.or_else (Slot.compare op1.slot op2.slot) @@ fun () ->
+  Block_payload_hash.compare op1.block_payload_hash op2.block_payload_hash
+
 module Preendorsement_set = Set.Make (struct
   type t = Kind.preendorsement operation
 
-  let compare = compare
+  let compare
+      ({protocol_data = {contents = Single (Preendorsement op1); _}; shell = _} :
+        t)
+      ({protocol_data = {contents = Single (Preendorsement op2); _}; shell = _} :
+        t) =
+    compare_consensus_contents op1 op2
 end)
 
 module Endorsement_set = Set.Make (struct
   type t = Kind.endorsement operation
 
-  let compare = compare
+  let compare
+      ({protocol_data = {contents = Single (Endorsement op1); _}; shell = _} :
+        t)
+      ({protocol_data = {contents = Single (Endorsement op2); _}; shell = _} :
+        t) =
+    compare_consensus_contents op1 op2
 end)
 
 type pqc_watched = {
