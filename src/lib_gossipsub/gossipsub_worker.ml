@@ -52,7 +52,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | New_connection of P2P.Connections_handler.connection
     | Disconnection of {peer : GS.Peer.t}
     | Received_message of {peer : GS.Peer.t; message : p2p_message}
-    | Publish_message of {
+    | Inject_message of {
         message : GS.Message.t;
         message_id : GS.Message_id.t;
         topic : GS.Topic.t;
@@ -97,13 +97,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle disconnection's output *)
         ignore output ;
         gossip_state
-    | Publish_message {message; message_id; topic} ->
+    | Inject_message {message; message_id; topic} ->
         let gossip_state, output =
           GS.publish {sender = None; topic; message_id; message} gossip_state
         in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5162
 
-           Handle Publish_message's output *)
+           Handle Inject_message's output *)
         ignore output ;
         gossip_state
     | Received_message m ->
@@ -118,8 +118,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** A set of functions that push different kinds of events in the worker's
       state. *)
-  let publish t message_id message topic =
-    push (Publish_message {message; message_id; topic}) t
+  let inject t message_id message topic =
+    push (Inject_message {message; message_id; topic}) t
 
   let new_connection t conn = push (New_connection conn) t
 

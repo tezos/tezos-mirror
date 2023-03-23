@@ -303,7 +303,7 @@ module type AUTOMATON = sig
 
   (** [publish { sender; topic; message_id; message }] allows to route a
       message on the gossip network. If [sender=None], the message
-      comes from the application layer and we are the sender. *)
+      comes from the application layer and the local node is the sender. *)
   val publish : publish -> [`Publish] monad
 
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
@@ -449,7 +449,7 @@ module type WORKER = sig
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
   val shutdown : t -> unit
 
-  (** [publish state msg_id msg topic] is used to publish a message [msg] with
+  (** [inject state msg_id msg topic] is used to inject a message [msg] with
       ID [msg_id] and that belongs to [topic] to the network. *)
-  val publish : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
+  val inject : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
 end
