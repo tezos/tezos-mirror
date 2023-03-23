@@ -116,6 +116,15 @@ let int32 : int32 testable =
     let pp fmt i = Format.pp_print_string fmt (Int32.to_string i)
   end)
 
+let unit : unit testable =
+  (module struct
+    type t = unit
+
+    let equal () () = true
+
+    let pp fmt () = Format.fprintf fmt "()"
+  end)
+
 let int : int testable =
   (module struct
     type t = int
