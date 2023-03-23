@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe
+   Subject:      Test basic properties of lwt list
+*)
+
 open Support.Lib.Monad
 
 let assert_eq_s pa pb =

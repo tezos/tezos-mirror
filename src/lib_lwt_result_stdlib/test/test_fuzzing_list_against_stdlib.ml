@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe
+   Subject:      Test fuzzing list against stdlib
+*)
+
 open Test_fuzzing_lib
 
 let init =

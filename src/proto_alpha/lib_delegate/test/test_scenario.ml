@@ -1,3 +1,10 @@
+(* Testing
+   -------
+   Component:    Protocol, delegate
+   Invocation:   dune exec src/proto_alpha/lib_delegate/test/main.exe
+   Subject:      Test different scenario for delegate
+*)
+
 open Mockup_simulator
 
 let bootstrap1 = Signature.Public_key.hash bootstrap1

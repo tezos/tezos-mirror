@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe
+   Subject:      Test basic properties of sequence
+*)
+
 let ( >>== ) p v = Lwt_main.run (Lwt.map (( = ) v) p)
 
 let vanilla () =

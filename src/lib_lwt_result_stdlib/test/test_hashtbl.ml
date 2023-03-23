@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe
+   Subject:      Test hashtable
+*)
+
 (* This test suite relies heavily on Lwt. It also deals with error a lot, but it
    checks most errors directly. So we don't need the syntactic support to
    alleviate the error handling. *)

@@ -1,3 +1,10 @@
+(* Testing
+   -------
+   Component:    Protocol, delegate
+   Invocation:   dune exec src/proto_015_PtLimaPt/lib_delegate/test/main.exe
+   Subject:      Test different scenario for delegate
+*)
+
 open Mockup_simulator
 
 let bootstrap1 = Tezos_crypto.Signature.V0.Public_key.hash bootstrap1

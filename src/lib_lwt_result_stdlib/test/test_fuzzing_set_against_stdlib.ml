@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe
+   Subject:      Test fuzzing set against stdlib
+*)
+
 open Test_fuzzing_lib
 
 (* The testing framework [Test_fuzzing_lib] uses [char] as the type of values
