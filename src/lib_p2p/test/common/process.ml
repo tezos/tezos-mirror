@@ -35,9 +35,13 @@ let log_f ~level format =
     Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter format
   else Format.kasprintf (fun msg -> Lwt_log.log ~section ~level msg) format
 
-let lwt_log_notice fmt = log_f ~level:Lwt_log.Notice fmt
+(* not used at the moment *)
+let _lwt_log_notice fmt = log_f ~level:Lwt_log.Notice fmt
 
-let lwt_log_info fmt = log_f ~level:Lwt_log.Info fmt
+(* not used at the moment *)
+let _lwt_log_info fmt = log_f ~level:Lwt_log.Info fmt
+
+let lwt_log_debug fmt = log_f ~level:Lwt_log.Debug fmt
 
 let lwt_log_error fmt = log_f ~level:Lwt_log.Error fmt
 
@@ -241,7 +245,7 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
                 ~close_mode:`Keep
                 ~channel:Lwt_io.stderr
                 () ;
-            let* () = lwt_log_notice "PID: %d" (Unix.getpid ()) in
+            let* () = lwt_log_debug "PID: %d" (Unix.getpid ()) in
             handle_result
               ~value_encoding
               ~flags
@@ -442,7 +446,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
   let* o = loop terminations in
   match o with
   | None -> (
-      let* () = lwt_log_info "All done!" in
+      let* () = lwt_log_debug "All done!" in
       let* terminated = all terminations in
       match List.partition_result terminated with
       | _, _ :: _ -> assert false

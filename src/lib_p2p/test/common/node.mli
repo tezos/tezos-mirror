@@ -56,6 +56,8 @@ type t = {
 (** [sync node] join [node] to a synchronization barrier. *)
 val sync : t -> unit tzresult Lwt.t
 
+val default_ipv6_addr : P2p_addr.t
+
 (** [gen_points npoints ~port addr] generated [npoints] points. If
     [port] is not specified, it loops and generates points randomly
     until it finds [npoints] that are not currently used.

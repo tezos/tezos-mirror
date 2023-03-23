@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_peerset
+    Invocation:   dune exec src/lib_p2p/test/main.exe
     Subject:      On banning peers and usage of Access Control Lists (ACL)
                   using FIFO caches filled with peers' ids.
 *)

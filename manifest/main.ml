@@ -1019,7 +1019,7 @@ let octez_event_logging_test_helpers =
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_event_logging |> open_;
         octez_test_helpers |> open_;
-        alcotest;
+        alcotezt;
       ]
     ~js_compatible:true
     ~linkall:true
@@ -1253,12 +1253,12 @@ let octez_base_test_helpers =
         octez_stdlib_unix;
         octez_event_logging_test_helpers;
         octez_test_helpers |> open_;
-        alcotest;
-        alcotest_lwt;
+        alcotezt;
         qcheck_alcotest;
       ]
     ~linkall:true
     ~bisect_ppx:No
+    ~release_status:Released
 
 let lazy_containers =
   public_lib
@@ -1651,7 +1651,7 @@ let _octez_p2p_tezt =
       ]
 
 let _octez_p2p_tests =
-  tests
+  tezt
     [
       "test_p2p_socket";
       "test_p2p_pool";
@@ -1682,74 +1682,9 @@ let _octez_p2p_tests =
         octez_p2p_test_common |> open_;
         octez_p2p_services |> open_;
         tezt_tezos;
-        alcotest_lwt;
+        alcotezt;
         astring;
       ]
-    ~linkall:true
-    ~alias:""
-    ~dune:
-      Dune.(
-        (* At the termination of the tests, or if an unexpected
-           error occurs, detached processes are terminated through a
-           SIGKILL.
-           See https://github.com/aantron/bisect_ppx/blob/master/doc/advanced.md#SIGTERM
-           See https://gitlab.com/tezos/tezos/-/issues/1946 *)
-        let run_exe prog args =
-          setenv "BISECT_SIGTERM" "yes" @@ run_exe prog args
-        in
-        [
-          alias_rule
-            "runtest_p2p_pool"
-            ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_pool" []);
-          alias_rule
-            "runtest_p2p_broadcast"
-            ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_broadcast" []);
-          alias_rule
-            "runtest_p2p_io_scheduler"
-            ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_io_scheduler" []);
-          alias_rule
-            "runtest_p2p_socket"
-            ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_socket" []);
-          alias_rule
-            "runtest_p2p_node"
-            ~locks:"/ports/49152-65535"
-            ~action:(run_exe "test_p2p_node" []);
-          alias_rule
-            "runtest_p2p_peerset"
-            ~action:(run_exe "test_p2p_peerset" []);
-          alias_rule
-            "runtest_p2p_buffer_reader"
-            ~action:(run_exe "test_p2p_buffer_reader" []);
-          alias_rule
-            "runtest_p2p_banned_peers"
-            ~action:(run_exe "test_p2p_banned_peers" []);
-          alias_rule
-            "runtest_p2p_connect_handler"
-            ~action:(run_exe "test_p2p_connect_handler" []);
-          alias_rule
-            "runtest_p2p_maintenance"
-            ~action:(run_exe "test_p2p_maintenance" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-p2p"
-            ~alias_deps:
-              [
-                "runtest_p2p_socket";
-                "runtest_p2p_pool";
-                "runtest_p2p_broadcast";
-                "runtest_p2p_io_scheduler";
-                "runtest_p2p_peerset";
-                "runtest_p2p_buffer_reader";
-                "runtest_p2p_banned_peers";
-                "runtest_p2p_node";
-                "runtest_p2p_connect_handler";
-                "runtest_p2p_maintenance";
-              ];
-        ])
 
 let octez_gossipsub =
   public_lib

@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    lib_p2p (test lib)
-   Invocation:   dune exec src/lib_p2p/test/test_p2p_node.exe
+   Invocation:   dune exec src/lib_p2p/test/main.exe
    Subject:      Check p2p test framework.
 *)
 module Event = struct
@@ -104,7 +104,7 @@ let main () =
     in
     Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
   in
-  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
+  let addr = Node.default_ipv6_addr in
   Lwt_main.run
   @@ Alcotest_lwt.run
        "tezos-p2p"
