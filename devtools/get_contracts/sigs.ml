@@ -167,6 +167,10 @@ module type PROTOCOL = sig
       'a Lwt.t
   end
 
+  module Global_constants : sig
+    val expand : context -> Script.expr -> (context * Script.expr) Lwt.t
+  end
+
   val code_storage_type : Translator.toplevel -> Script.node
 
   val is_unpack : Script.prim -> bool

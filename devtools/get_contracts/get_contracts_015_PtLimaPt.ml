@@ -298,6 +298,13 @@ module Proto = struct
     | _ -> false
 
   let code_storage_type ({storage_type; _} : Translator.toplevel) = storage_type
+
+  module Global_constants = struct
+    let expand ctxt (expr : Script.expr) =
+      let open Lwt_syntax in
+      let+ res = Global_constants_storage.expand ctxt expr in
+      match res with Error _ -> (ctxt, expr) | Ok x -> x
+  end
 end
 
 let () = Known_protocols.register (module Proto)
