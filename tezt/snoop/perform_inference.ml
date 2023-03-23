@@ -75,7 +75,10 @@ let main () =
   in
   Lwt_list.iter_s
     (fun model_name ->
-      cleanup model_name ;
+      let saved_model_name =
+        String.split_on_char '/' model_name |> String.concat "__"
+      in
+      cleanup saved_model_name ;
       (* Python bindings tend to crash, hence the need to retry and resume inference midway,
          multiple times. When python bindings are removed, this needs to be removed as well
          See https://gitlab.com/tezos/tezos/-/issues/1523
@@ -85,9 +88,9 @@ let main () =
             ~model_name
             ~workload_data:Files.(working_dir // benchmark_results_dir)
             ~regression_method:Snoop.(Lasso {positive = true})
-            ~dump_csv:Files.(inference_root // solution_csv model_name)
-            ~solution:Files.(inference_root // solution_bin model_name)
-            ~report:Files.(inference_root // report_tex model_name)
-            ~graph:Files.(inference_root // dep_graph model_name)
+            ~dump_csv:Files.(inference_root // solution_csv saved_model_name)
+            ~solution:Files.(inference_root // solution_bin saved_model_name)
+            ~report:Files.(inference_root // report_tex saved_model_name)
+            ~graph:Files.(inference_root // dep_graph saved_model_name)
             snoop))
     models
