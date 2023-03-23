@@ -215,9 +215,9 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
   protect
     ~canceler
     (fun () ->
-      let main_in, child_out = Lwt_io.pipe () in
-      let child_in, main_out = Lwt_io.pipe () in
-      let main_result, child_exit = Lwt_io.pipe () in
+      let main_in, child_out = Lwt_io.pipe ~cloexec:true () in
+      let child_in, main_out = Lwt_io.pipe ~cloexec:true () in
+      let main_result, child_exit = Lwt_io.pipe ~cloexec:true () in
       match Lwt_unix.fork () with
       | 0 ->
           Lwt_log.default :=
