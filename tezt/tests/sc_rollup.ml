@@ -240,6 +240,13 @@ let setup_rollup ~protocol ~kind ?(mode = Sc_rollup_node.Operator) ?boot_sector
   let rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   return (sc_rollup_node, rollup_client, sc_rollup)
 
+let format_title_scenario kind {variant; tags = _; description} =
+  Printf.sprintf
+    "%s - %s%s"
+    kind
+    description
+    (match variant with Some variant -> " (" ^ variant ^ ")" | None -> "")
+
 let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
     ?challenge_window ?timeout ?(src = Constant.bootstrap1.alias)
     {variant; tags; description} scenario =
@@ -248,14 +255,7 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
     ?regression
     ~__FILE__
     ~tags
-    ~title:
-      (Printf.sprintf
-         "%s - %s%s"
-         kind
-         description
-         (match variant with
-         | Some variant -> " (" ^ variant ^ ")"
-         | None -> ""))
+    ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =
     setup_l1 ?commitment_period ?challenge_window ?timeout protocol
@@ -272,14 +272,7 @@ let test_full_scenario ?supports ?regression ~kind ?mode ?boot_sector
     ?regression
     ~__FILE__
     ~tags
-    ~title:
-      (Printf.sprintf
-         "%s - %s%s"
-         kind
-         description
-         (match variant with
-         | Some variant -> " (" ^ variant ^ ")"
-         | None -> ""))
+    ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =
     setup_l1 ?commitment_period ?challenge_window ?timeout protocol
