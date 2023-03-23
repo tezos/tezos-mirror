@@ -1296,3 +1296,40 @@ let () =
     Data_encoding.(obj1 (req "kind" corruption_kind_encoding))
     (function Corrupted_store k -> Some k | _ -> None)
     (fun k -> Corrupted_store k)
+
+(* Storage upgrade errors *)
+type error +=
+  | V_3_0_upgrade_missing_floating_block of {
+      block_hash : Block_hash.t;
+      block_level : Int32.t;
+      floating_kind : string;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"block_store.v_3_0_upgrade_missing_floating_block"
+    ~title:"V.3.0 upgrade missing floating block"
+    ~description:"Failed to upgrade the floating store"
+    ~pp:(fun ppf (block_hash, block_level, floating_kind) ->
+      Format.fprintf
+        ppf
+        "Failed to upgrade block %a (level %ld) for %s floating store: block \
+         not found in the index."
+        Block_hash.pp
+        block_hash
+        block_level
+        floating_kind)
+    Data_encoding.(
+      obj3
+        (req "block_hash" Block_hash.encoding)
+        (req "block_level" int32)
+        (req "floating_kind" string))
+    (function
+      | V_3_0_upgrade_missing_floating_block
+          {block_hash; block_level; floating_kind} ->
+          Some (block_hash, block_level, floating_kind)
+      | _ -> None)
+    (fun (block_hash, block_level, floating_kind) ->
+      V_3_0_upgrade_missing_floating_block
+        {block_hash; block_level; floating_kind})
