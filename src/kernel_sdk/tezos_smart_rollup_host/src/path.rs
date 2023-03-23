@@ -93,6 +93,10 @@ pub enum PathError {
     InvalidEmptyStep,
     /// Steps must be a sequence of bytes such that every byte is in `[A-Za-z0-9.]`
     InvalidByteInStep,
+    /// The given path starts with `/readonly` which is
+    /// prohibited. Use the specific function to read from that part
+    /// of the storage.
+    ReadOnly,
 }
 
 /// Representation of a [`Path`] which borrows its underlying byte-sequence.
@@ -135,7 +139,19 @@ impl<'a> RefPath<'a> {
     /// let path = RefPath::assert_from("!&(*(".as_bytes());
     /// ```
     pub const fn assert_from(path: &[u8]) -> RefPath {
-        assert_is_valid_path(path);
+        assert_ok(validate_path(path));
+
+        RefPath {
+            inner: unsafe { core::str::from_utf8_unchecked(path) },
+        }
+    }
+
+    /// similar to [`assert_from`] but does not verify that the path
+    /// is writable, i.e. not prefixed with `/readonly`. This function
+    /// is to be used only internally to create [`RefPath`] for the
+    /// `readonly` part of the storage. See `runtime.rs` for example.
+    pub(crate) const fn assert_from_readonly(path: &[u8]) -> RefPath {
+        assert_ok(validate_path_internal(path));
 
         RefPath {
             inner: unsafe { core::str::from_utf8_unchecked(path) },
@@ -153,8 +169,8 @@ const fn is_allowed_step_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'_' || byte == b'-'
 }
 
-const fn assert_is_valid_path(path: &[u8]) {
-    match validate_path(path) {
+const fn assert_ok(res: Result<(), PathError>) {
+    match res {
         Err(PathError::PathEmpty) => panic!("Path must contain at least one empty step"),
         Err(PathError::PathTooLong) => panic!("Path contained too many bytes"),
         Err(PathError::InvalidStart) => panic!("Path must begin with a path separator"),
@@ -165,11 +181,21 @@ const fn assert_is_valid_path(path: &[u8]) {
             one of the following symbols \"b'.'\" , \"b'_'\" , \"b'-'\""
             )
         }
+        Err(PathError::ReadOnly) => {
+            panic!(
+                "Path must not start by /readonly, this is a reserved
+                part of the storage. Uses the appropriate function to
+                look values in this storage."
+            )
+        }
         Ok(()) => (),
     }
 }
 
-const fn validate_path(path: &[u8]) -> Result<(), PathError> {
+/// check that the given path is well-formed. it Does not check that
+/// the path is writable, see [`validate_path`] to be sure the path is
+/// writable.
+const fn validate_path_internal(path: &[u8]) -> Result<(), PathError> {
     match path {
         [] => Err(PathError::PathEmpty),
         [PATH_SEPARATOR] | [.., PATH_SEPARATOR] => Err(PathError::InvalidEmptyStep),
@@ -194,6 +220,19 @@ const fn validate_path(path: &[u8]) -> Result<(), PathError> {
             Ok(())
         }
         _ => Err(PathError::InvalidStart),
+    }
+}
+
+const fn validate_path(path: &[u8]) -> Result<(), PathError> {
+    match validate_path_internal(path) {
+        Ok(()) => match path {
+            [PATH_SEPARATOR, b'r', b'e', b'a', b'd', b'o', b'n', b'l', b'y']
+            | [PATH_SEPARATOR, b'r', b'e', b'a', b'd', b'o', b'n', b'l', b'y', PATH_SEPARATOR, ..] => {
+                Err(PathError::ReadOnly)
+            }
+            _ => Ok(()),
+        },
+        Err(e) => Err(e),
     }
 }
 
@@ -386,6 +425,21 @@ mod tests {
 
         let result: Result<RefPath, _> = path.as_slice().try_into();
         assert_eq!(Err(PathError::PathTooLong), result);
+    }
+
+    #[test]
+    fn store_path_readonly() {
+        let path = "/readonly/this/path/is/read/only";
+        let result: Result<RefPath, PathError> = path.as_bytes().try_into();
+        assert_eq!(Err(PathError::ReadOnly), result);
+
+        let path = "/readonly";
+        let result: Result<RefPath, PathError> = path.as_bytes().try_into();
+        assert_eq!(Err(PathError::ReadOnly), result);
+
+        let path = "/readonly.is/a/correct_path";
+        let result: Result<RefPath, PathError> = path.as_bytes().try_into();
+        assert!(result.is_ok());
     }
 
     #[test]

@@ -23,6 +23,9 @@ use crate::{Error, METADATA_SIZE};
 #[cfg(feature = "alloc")]
 use tezos_smart_rollup_core::smart_rollup_core::ReadInputMessageInfo;
 
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
 #[derive(Copy, Eq, PartialEq, Clone, Debug)]
 /// Errors that may be returned when called [Runtime] methods.
 pub enum RuntimeError {
@@ -32,6 +35,8 @@ pub enum RuntimeError {
     StoreListIndexOutOfBounds,
     /// Errors returned by the host functions
     HostErr(Error),
+    /// Failed parsing
+    DecodingError,
 }
 
 /// Returned by [`Runtime::store_has`] - specifies whether a path has a value or is a prefix.
@@ -172,6 +177,22 @@ pub trait Runtime {
 
     /// Returns [RollupMetadata]
     fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError>;
+
+    /// True if the last kernel run was aborted.
+    fn last_run_aborted(&self) -> Result<bool, RuntimeError>;
+
+    /// True if the kernel failed to upgrade.
+    fn upgrade_failed(&self) -> Result<bool, RuntimeError>;
+
+    /// True if the kernel rebooted too many times.
+    fn restart_forced(&self) -> Result<bool, RuntimeError>;
+
+    /// The number of reboot left for the kernel.
+    fn reboot_left(&self) -> Result<u32, RuntimeError>;
+
+    /// The runtime_version the kernel is using.
+    #[cfg(feature = "alloc")]
+    fn runtime_version(&self) -> Result<String, RuntimeError>;
 }
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -455,6 +476,51 @@ where
 
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.store_write(&REBOOT_PATH, &[0_u8], 0)
+    }
+
+    fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
+        const PATH_STUCK_FLAG: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/stuck");
+        let last_run_aborted = Runtime::store_has(self, &PATH_STUCK_FLAG)?.is_some();
+        Ok(last_run_aborted)
+    }
+
+    fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
+        const PATH_UPGRADE_ERROR_FLAG: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/upgrade_error");
+        let upgrade_failed =
+            Runtime::store_has(self, &PATH_UPGRADE_ERROR_FLAG)?.is_some();
+        Ok(upgrade_failed)
+    }
+
+    fn restart_forced(&self) -> Result<bool, RuntimeError> {
+        const PATH_TOO_MANY_REBOOT_FLAG: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/too_many_reboot");
+        let restart_forced =
+            Runtime::store_has(self, &PATH_TOO_MANY_REBOOT_FLAG)?.is_some();
+        Ok(restart_forced)
+    }
+
+    fn reboot_left(&self) -> Result<u32, RuntimeError> {
+        const PATH_REBOOT_COUNTER: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/kernel/env/reboot_counter");
+        const SIZE: usize = core::mem::size_of::<i32>();
+
+        let mut bytes: [u8; SIZE] = [0; SIZE];
+        self.store_read_slice(&PATH_REBOOT_COUNTER, 0, &mut bytes)?;
+
+        let counter = u32::from_le_bytes(bytes);
+        Ok(counter)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn runtime_version(&self) -> Result<String, RuntimeError> {
+        const PATH_VERSION: RefPath =
+            RefPath::assert_from_readonly(b"/readonly/wasm_version");
+        let bytes = Runtime::store_read(self, &PATH_VERSION, 0, 9)?;
+        // SAFETY: This storage can only contains valid version string which are utf8 safe.
+        let version = unsafe { alloc::string::String::from_utf8_unchecked(bytes) };
+        Ok(version)
     }
 }
 
