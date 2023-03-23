@@ -236,7 +236,7 @@ let test_join_adds_peers_to_mesh rng limits parameters =
   (* re-join - there should be peers associated with the topic *)
   let state, to_graft =
     match GS.join {topic} state with
-    | state, Joining_topic to_graft -> (state, C.Peer.Set.elements to_graft)
+    | state, Joining_topic {to_graft} -> (state, C.Peer.Set.elements to_graft)
     | _, _ -> Test.fail ~__LOC__ "Expected Join to succeed"
   in
   (* should have added [degree_optimal] nodes to the mesh *)
@@ -313,7 +313,7 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
   (* Join to topic0 *)
   let state, to_graft =
     match GS.join {topic = "topic0"} state with
-    | state, Joining_topic to_graft -> (state, C.Peer.Set.elements to_graft)
+    | state, Joining_topic {to_graft} -> (state, C.Peer.Set.elements to_graft)
     | _, _ -> Test.fail ~__LOC__ "Expected Join to succeed"
   in
   let peers_in_topic =
