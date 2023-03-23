@@ -1298,7 +1298,13 @@ let () =
     (fun k -> Corrupted_store k)
 
 (* Store upgrade errors *)
-type error += Cannot_find_chain_dir of string
+type error +=
+  | Cannot_find_chain_dir of string
+  | V_3_0_upgrade_missing_floating_block of {
+      block_hash : Block_hash.t;
+      block_level : Int32.t;
+      floating_kind : string;
+    }
 
 let () =
   Error_monad.register_error_kind
@@ -1315,4 +1321,31 @@ let () =
         path)
     Data_encoding.(obj1 (req "path" string))
     (function Cannot_find_chain_dir p -> Some p | _ -> None)
-    (fun p -> Cannot_find_chain_dir p)
+    (fun p -> Cannot_find_chain_dir p) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_store.v_3_0_upgrade_missing_floating_block"
+    ~title:"V.3.0 upgrade missing floating block"
+    ~description:"Failed to upgrade the floating store"
+    ~pp:(fun ppf (block_hash, block_level, floating_kind) ->
+      Format.fprintf
+        ppf
+        "Failed to upgrade block %a (level %ld) for %s floating store: block \
+         not found in the index."
+        Block_hash.pp
+        block_hash
+        block_level
+        floating_kind)
+    Data_encoding.(
+      obj3
+        (req "block_hash" Block_hash.encoding)
+        (req "block_level" int32)
+        (req "floating_kind" string))
+    (function
+      | V_3_0_upgrade_missing_floating_block
+          {block_hash; block_level; floating_kind} ->
+          Some (block_hash, block_level, floating_kind)
+      | _ -> None)
+    (fun (block_hash, block_level, floating_kind) ->
+      V_3_0_upgrade_missing_floating_block
+        {block_hash; block_level; floating_kind})
