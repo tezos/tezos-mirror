@@ -302,8 +302,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
 
 let directory_parameter =
   Tezos_clic.parameter (fun _ p ->
-      if not (Sys.file_exists p && Sys.is_directory p) then
-        failwith "Directory doesn't exist: '%s'" p
+      Lwt_utils_unix.dir_exists p >>= fun exists ->
+      if not exists then failwith "Directory doesn't exist: '%s'" p
       else return p)
 
 let per_block_vote_file_arg =
