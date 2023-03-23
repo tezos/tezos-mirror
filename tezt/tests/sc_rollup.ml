@@ -2842,7 +2842,7 @@ let test_accuser protocols =
 
 (** Helper to check that the operation whose hash is given is successfully
     included (applied) in the current head block. *)
-let check_op_included =
+let check_op_included ~__LOC__ =
   let get_op_status op =
     JSON.(op |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
   in
@@ -2878,10 +2878,10 @@ let check_op_included =
 (** Helper function that allows to inject the given operation in a node, bake a
     block, and check that the operation is successfully applied in the baked
     block. *)
-let bake_operation_via_rpc client op =
+let bake_operation_via_rpc ~__LOC__ client op =
   let* (`OpHash oph) = Operation.Manager.inject [op] client in
   let* () = Client.bake_for_and_wait client in
-  check_op_included ~oph client
+  check_op_included ~__LOC__ ~oph client
 
 (** This helper function constructs the following commitment tree by baking and
     publishing commitments (but without cementing them):
@@ -3035,7 +3035,7 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
     let refutation =
       M.Start {player_commitment_hash = c32; opponent_commitment_hash = c31}
     in
-    bake_operation_via_rpc client
+    bake_operation_via_rpc ~__LOC__ client
     @@ M.make ~source:operator2
     @@ M.sc_rollup_refute
          ~sc_rollup
@@ -3088,7 +3088,7 @@ let test_valid_dispute_dissection =
     let refutation =
       M.Start {player_commitment_hash = c32; opponent_commitment_hash = c31}
     in
-    bake_operation_via_rpc client
+    bake_operation_via_rpc ~__LOC__ client
     @@ M.make ~source
     @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
   in
@@ -3112,7 +3112,7 @@ let test_valid_dispute_dissection =
   in
 
   let* () =
-    bake_operation_via_rpc client
+    bake_operation_via_rpc ~__LOC__ client
     @@ M.make ~source
     @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
   in
@@ -3158,7 +3158,7 @@ let test_timeout =
     let refutation =
       M.Start {player_commitment_hash = c32; opponent_commitment_hash = c31}
     in
-    bake_operation_via_rpc client
+    bake_operation_via_rpc ~__LOC__ client
     @@ M.make ~source:operator2
     @@ M.sc_rollup_refute
          ~sc_rollup
@@ -3409,7 +3409,7 @@ let test_refutation_reward_and_punishment ~kind =
           opponent_commitment_hash = operator2_commitment;
         }
     in
-    bake_operation_via_rpc client
+    bake_operation_via_rpc ~__LOC__ client
     @@ M.make ~source:operator1
     @@ M.sc_rollup_refute
          ~sc_rollup
