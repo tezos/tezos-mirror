@@ -212,11 +212,12 @@ do
         fi
 
         $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$CURRENT_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$current"_"$b" 2> tmp
-        # The parameters with "score" in their name indicate how well the models
-        # fits the benchmarks. We care about their values but not much about
-        # their variations so we ignore them when looking for regressions. They
-        # are however part of the all_*.csv tables computed above.
-        grep -v score tmp > tmp2
+        # The parameters with "score" or "T-value" in their name indicate how
+        # well the models fits the benchmarks. We care about their values but
+        # not much about their variations so we ignore them when looking for
+        # regressions. They are however part of the all_*.csv tables computed
+        # above.
+        grep -v "score\|T-value" tmp > tmp2
         if [ -s tmp2 ]
         then
             {
