@@ -478,8 +478,16 @@ module Test_remove_peer = struct
       Int64.(rem v.heartbeat_ticks (of_int v.limits.backoff_cleanup_ticks)) = 0L
     in
     Peer.Map.iter
-      (fun peer {GS.Introspection.backoff; expire; _} ->
+      (fun peer {GS.Introspection.expire; _} ->
         let open Format in
+        let backoff =
+          v.GS.Introspection.backoff |> GS.Topic.Map.to_seq
+          |> Seq.filter_map (fun (topic, peers) ->
+                 match GS.Peer.Map.find peer peers with
+                 | None -> None
+                 | Some backoff -> Some (topic, backoff))
+          |> GS.Topic.Map.of_seq
+        in
         fprintf
           fmtr
           "peer %a, expire=%a, backoff=[%a], cleanup=%b"

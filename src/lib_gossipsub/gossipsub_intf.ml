@@ -493,7 +493,6 @@ module type AUTOMATON = sig
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
-      backoff : Time.t Topic.Map.t;
       score : Score.t;
       expire : Time.t option;
     }
@@ -529,6 +528,7 @@ module type AUTOMATON = sig
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
+      backoff : Time.t Peer.Map.t Topic.Map.t;
       seen_messages : Message_id.Set.t;
       message_cache : Message_cache.t;
       rng : Random.State.t;

@@ -168,8 +168,6 @@ module Make (C : AUTOMATON_CONFIG) :
         (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
     outbound : bool;
         (** An outbound connection is a connection we initiated. *)
-    backoff : time Topic.Map.t;
-        (** The backoff times associated to this peer for each topic *)
     score : Score.t;  (** The score associated to this peer. *)
     expire : time option;
         (** The expiring time after having being disconnected from this peer. *)
@@ -203,8 +201,9 @@ module Make (C : AUTOMATON_CONFIG) :
             above some given threshold. The local peer routes full-messages to
             these peers. In contrast to the mesh, the fanout map contains topics
             the local peer has not joined. *)
+    backoff : time Peer.Map.t Topic.Map.t;
+        (** The backoff times associated to a topic and a peer. *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5302
-
        Introduce TTL to [seen_messages]. *)
     seen_messages : Message_id.Set.t;
     message_cache : Message_cache.t;
@@ -265,6 +264,7 @@ module Make (C : AUTOMATON_CONFIG) :
       iwant_per_heartbeat = Peer.Map.empty;
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
+      backoff = Topic.Map.empty;
       seen_messages = Message_id.Set.empty;
       message_cache =
         Message_cache.create
@@ -325,6 +325,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let mesh state = state.mesh
 
     let fanout state = state.fanout
+
+    let backoff state = state.backoff
 
     let connections state = state.connections
 
@@ -482,35 +484,41 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       (state, ())
 
-    let update_backoff peer topic expire connections =
-      Peer.Map.update
-        peer
-        (function
-          | None -> None
-          | Some connection ->
-              let backoff =
-                Topic.Map.update
-                  topic
-                  (function
-                    | None -> Some expire
-                    | Some old_backoff ->
-                        if Time.(old_backoff < expire) then Some expire
-                        else Some old_backoff)
-                  connection.backoff
-              in
-              Some {connection with backoff})
-        connections
+    let get_backoff topic peer backoff =
+      Option.bind (Topic.Map.find topic backoff) (fun per_peer_backoff ->
+          Peer.Map.find peer per_peer_backoff)
 
-    let add_connections_backoff time topic peer connections =
+    let exists_backoff topic peer backoff =
+      get_backoff topic peer backoff |> Option.is_some
+
+    let set_backoff backoff state =
+      let state = {state with backoff} in
+      (state, ())
+
+    let add_backoff_for_peer delay topic peer backoffs =
       let now = Time.now () in
-      let expire = Time.add now time in
-      update_backoff peer topic expire connections
+      let backoff_expire = Time.add now delay in
+      Topic.Map.update
+        topic
+        (function
+          | None -> Some (Peer.Map.singleton peer backoff_expire)
+          | Some peer_backoff ->
+              Peer.Map.update
+                peer
+                (function
+                  | None -> Some backoff_expire
+                  | Some old_backoff ->
+                      if Time.(old_backoff < backoff_expire) then
+                        Some backoff_expire
+                      else Some old_backoff)
+                peer_backoff
+              |> Option.some)
+        backoffs
 
-    let add_backoff time topic peer =
+    let set_backoff_for_peer delay topic peer =
       let open Monad.Syntax in
-      let*! connections in
-      let connections = add_connections_backoff time topic peer connections in
-      set_connections connections
+      let*! backoff in
+      add_backoff_for_peer delay topic peer backoff |> set_backoff
 
     let add_connections_score peer score =
       Peer.Map.update
@@ -680,7 +688,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! prune_backoff in
       if Score.(score >= zero) then unit
       else
-        let* () = add_backoff prune_backoff topic peer in
+        let* () = set_backoff_for_peer prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
 
     let check_mesh_size mesh connection =
@@ -694,23 +702,24 @@ module Make (C : AUTOMATON_CONFIG) :
         ((not connection.outbound) && Peer.Set.cardinal mesh >= degree_high)
         Mesh_full
 
-    let check_backoff peer topic {backoff; score; _} =
+    let check_backoff peer topic score =
       let open Monad.Syntax in
-      let*! prune_backoff in
-      match Topic.Map.find topic backoff with
+      let*! backoff in
+      match get_backoff topic peer backoff with
       | None -> unit
-      | Some backoff ->
+      | Some backoff_expire ->
           let current = Time.now () in
-          if Time.(current >= backoff) then unit
+          if Time.(current >= backoff_expire) then unit
           else
             let score = Score.penalty score 1 in
             let*! graft_flood_backoff in
             let score =
-              if Time.(current < add backoff graft_flood_backoff) then
+              if Time.(current < add backoff_expire graft_flood_backoff) then
                 Score.penalty score 1
               else score
             in
-            let* () = add_backoff prune_backoff topic peer in
+            let*! prune_backoff in
+            let* () = set_backoff_for_peer prune_backoff topic peer in
             let* () = add_score peer score in
             fail Peer_backed_off
 
@@ -724,7 +733,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? mesh = check_topic_known topic in
       let*? () = check_not_in_mesh mesh peer in
       let*? connection = check_not_direct peer in
-      let*? () = check_backoff peer topic connection in
+      let*? () = check_backoff peer topic connection.score in
       let*? () = check_score peer topic connection in
       let*? () = check_mesh_size mesh connection in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
@@ -754,7 +763,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? mesh = check_topic_known topic in
       let mesh = Peer.Set.remove peer mesh in
       let* () = set_mesh_topic topic mesh in
-      let* () = add_backoff backoff topic peer in
+      let* () = set_backoff_for_peer backoff topic peer in
       let px = Peer.Set.of_seq px in
       if Peer.Set.is_empty px then No_PX |> return
       else
@@ -883,6 +892,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! degree_optimal in
       let*! connections in
+      let*! backoff in
       let is_valid peer =
         match Peer.Map.find peer connections with
         | None ->
@@ -891,8 +901,9 @@ module Make (C : AUTOMATON_CONFIG) :
                Not supposed to happen. But maybe it is better to
                return a value for defensive programming. *)
             false
-        | Some {backoff; score; _} ->
-            not (Topic.Map.mem topic backoff || Score.(score < zero))
+        | Some {score; _} ->
+            let backed_off = exists_backoff topic peer backoff in
+            not (backed_off || Score.(score < zero))
       in
       let*! fanout in
       let valid_fanout_peers =
@@ -910,10 +921,10 @@ module Make (C : AUTOMATON_CONFIG) :
         else
           let max = max 0 (degree_optimal - valid_fanout_peers_len) in
           let* more_peers =
-            let filter peer {backoff; score; direct; _} =
+            let filter peer {score; direct; _} =
+              let backed_off = exists_backoff topic peer backoff in
               not
-                (direct
-                || Topic.Map.mem topic backoff
+                (direct || backed_off
                 || Score.(score < zero)
                 || Peer.Set.mem peer valid_fanout_peers)
             in
@@ -946,15 +957,15 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle_mesh topic mesh : [`Leave] output Monad.t =
       let open Monad.Syntax in
       let*! unsubscribe_backoff in
-      let*! connections in
-      let connections =
+      let*! backoff in
+      let* () =
         Peer.Set.fold
-          (fun peer connections ->
-            add_connections_backoff unsubscribe_backoff topic peer connections)
+          (fun peer backoff ->
+            add_backoff_for_peer unsubscribe_backoff topic peer backoff)
           mesh
-          connections
+          backoff
+        |> set_backoff
       in
-      let* () = set_connections connections in
       Leaving_topic {to_prune = mesh} |> return
 
     let handle topic : [`Leave] output Monad.t =
@@ -987,28 +998,35 @@ module Make (C : AUTOMATON_CONFIG) :
              https://github.com/libp2p/go-libp2p-pubsub/issues/368 *)
           Time.sub current (Time.mul_span heartbeat_interval 2)
         in
-        let*! connections in
-        Peer.Map.filter_map
-          (fun _peer connection ->
-            let backoff =
-              Topic.Map.filter
-                (fun _topic expire -> Time.(expire > current_with_slack))
-                connection.backoff
+        let*! backoff in
+        Topic.Map.filter_map
+          (fun _topic peer_backoff ->
+            let peer_backoff =
+              Peer.Map.filter
+                (fun _peer expire -> Time.(expire > current_with_slack))
+                peer_backoff
             in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5095
-               Check the reasoning *)
-            match connection.expire with
-            | Some expire
-              when Time.(expire <= current) && Topic.Map.is_empty backoff ->
-                None
-            | _ -> Some {connection with backoff})
-          connections
-        |> set_connections
+            if Peer.Map.is_empty peer_backoff then None else Some peer_backoff)
+          backoff
+        |> set_backoff
+
+    let clear_expired =
+      let open Monad.Syntax in
+      let*! connections in
+      let current = Time.now () in
+      Peer.Map.filter
+        (fun _peer {expire; _} ->
+          match expire with None -> true | Some t -> Time.(t > current))
+        connections
+      |> set_connections
 
     let cleanup =
       let open Monad.Syntax in
       (* Clean up expired backoffs *)
       let* () = clear_backoff in
+
+      (* Clean up expired connections *)
+      let* () = clear_expired in
 
       (* Clean up IHave and IWant counters *)
       let* () = reset_ihave_per_heartbeat in
@@ -1087,6 +1105,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let maintain_mesh =
       let open Monad.Syntax in
       let*! connections in
+      let*! backoff in
       let*! rng in
       let*! prune_backoff in
       let*! degree_optimal in
@@ -1228,10 +1247,8 @@ module Make (C : AUTOMATON_CONFIG) :
                off, and peers with negative score. *)
             let filter peer connection =
               let in_mesh = Peer.Set.mem peer peers in
-              let backedoff =
-                Option.is_some (Topic.Map.find_opt topic connection.backoff)
-              in
-              (not in_mesh) && (not backedoff) && (not connection.direct)
+              let backed_off = exists_backoff topic peer backoff in
+              (not in_mesh) && (not backed_off) && (not connection.direct)
               && Score.(connection.score >= zero)
             in
             select_connections_peers connections rng topic ~filter ~max
@@ -1264,10 +1281,8 @@ module Make (C : AUTOMATON_CONFIG) :
                  off, and peers with negative score *)
               let filter peer connection =
                 let in_mesh = Peer.Set.mem peer peers in
-                let backedoff =
-                  Option.is_some (Topic.Map.find_opt topic connection.backoff)
-                in
-                (not in_mesh) && (not backedoff) && (not connection.direct)
+                let backed_off = exists_backoff topic peer backoff in
+                (not in_mesh) && (not backed_off) && (not connection.direct)
                 && Score.(connection.score >= zero)
                 && has_outbound_connection peer
               in
@@ -1293,15 +1308,15 @@ module Make (C : AUTOMATON_CONFIG) :
       (* Update backoff for pruned peers. *)
       let* () =
         Peer.Map.fold
-          (fun peer topicset connections ->
+          (fun peer topicset backoff ->
             Topic.Set.fold
-              (fun topic connections ->
-                add_connections_backoff prune_backoff topic peer connections)
+              (fun topic backoff ->
+                add_backoff_for_peer prune_backoff topic peer backoff)
               topicset
-              connections)
+              backoff)
           to_prune
-          connections
-        |> set_connections
+          backoff
+        |> set_backoff
       in
       (* Update mesh for grafted and pruned peers *)
       let* () = update_mesh mesh ~to_graft ~to_prune in
@@ -1466,7 +1481,6 @@ module Make (C : AUTOMATON_CONFIG) :
             {
               direct;
               score = Score.zero;
-              backoff = Topic.Map.empty;
               topics = Topic.Set.empty;
               outbound;
               expire = None;
@@ -1696,7 +1710,6 @@ module Make (C : AUTOMATON_CONFIG) :
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
-      backoff : time Topic.Map.t;
       score : Score.t;
       expire : time option;
     }
@@ -1716,6 +1729,7 @@ module Make (C : AUTOMATON_CONFIG) :
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
+      backoff : time Peer.Map.t Topic.Map.t;
       seen_messages : Message_id.Set.t;
       message_cache : Message_cache.t;
       rng : Random.State.t;
