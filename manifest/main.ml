@@ -5479,6 +5479,7 @@ module Protocol = Protocol
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
             octez_dac_lib |> open_;
+            octez_dac_client_lib |> open_;
             client |> if_some |> open_;
             embedded |> open_;
             main |> open_;
