@@ -738,12 +738,7 @@ let rec parse_ty :
         >>? fun (Ex_ty tr, ctxt) ->
         lambda_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_option, [ut], annot) ->
-        (if legacy then
-         (* legacy semantics with (broken) field annotations *)
-         remove_field_annot ut >>? fun ut ->
-         check_composed_type_annot loc annot >>? fun () -> ok ut
-        else check_type_annot loc annot >>? fun () -> ok ut)
-        >>? fun ut ->
+        check_type_annot loc annot >>? fun () ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
