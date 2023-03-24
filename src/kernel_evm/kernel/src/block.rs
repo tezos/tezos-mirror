@@ -275,27 +275,38 @@ fn apply_transactions<Host: Runtime + RawRollupCore>(
     )
 }
 
-pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) {
+pub fn produce<Host: Runtime + RawRollupCore>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     for proposal in queue.proposals {
         let current_level = storage::read_current_block_number(host);
         let next_level = match current_level {
-            Ok(current_level) => current_level + 1,
-            Err(_) => panic!("Error, cannot produce a new block from a non existing block number."),
-        };
+            Ok(current_level) => Ok(current_level + 1),
+            Err(_) => {
+                debug_msg!(host; "Error, cannot produce a new block from a non existing block number.");
+                Err(Error::Generic)
+            }
+        }?;
 
         let transaction_hashes = proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
 
         match validate(host, proposal.transactions) {
             Ok(transactions) => {
                 let valid_block = L2Block::new(next_level, transaction_hashes);
-                storage::store_current_block(host, &valid_block).unwrap_or_else(|_| {
-                    panic!("Error while storing the current block: stopping the daemon.")
-                });
-                let receipts = apply_transactions(host, &valid_block, &transactions)
-                    .unwrap_or_else(|_| panic!("Error while applying the transactions."));
-                storage::store_transaction_receipts(host, &receipts).unwrap()
+                storage::store_current_block(host, &valid_block).map_err(|_| {
+                    debug_msg!(host; "Error while storing the current block.");
+                    Error::Generic
+                })?;
+                let receipts =
+                    apply_transactions(host, &valid_block, &transactions).map_err(|_| {
+                        debug_msg!(host; "Error while applying the transactions.");
+                        Error::Generic
+                    })?;
+                storage::store_transaction_receipts(host, &receipts).map_err(|_| {
+                    debug_msg!(host; "Error while storing the transactions receipts.");
+                    Error::Generic
+                })?;
             }
             Err(e) => debug_msg!(host; "Blueprint is invalid: {:?}\n", e),
         }
     }
+    Ok(())
 }
