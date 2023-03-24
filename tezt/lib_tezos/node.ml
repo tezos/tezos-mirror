@@ -804,7 +804,13 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     arguments
     ~on_terminate
 
-let run ?on_terminate ?event_level ?event_sections_levels node arguments =
+let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
+    arguments =
+  let () =
+    match patch_config with
+    | None -> ()
+    | Some patch -> Config_file.update node patch
+  in
   let arguments = runlike_command_arguments node "run" arguments in
   do_runlike_command
     ?on_terminate
@@ -852,18 +858,15 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
-  let () =
-    match patch_config with
-    | None -> ()
-    | Some patch -> Config_file.update node patch
-  in
   let* () =
     match snapshot with
     | Some (file, reconstruct) -> snapshot_import ~reconstruct node file
     | None -> unit
   in
   let argument = if single_process then [Singleprocess] else [] in
-  let* () = run ?event_level ?event_sections_levels node argument in
+  let* () =
+    run ?patch_config ?event_level ?event_sections_levels node argument
+  in
   let* () = wait_for_ready node in
   return node
 

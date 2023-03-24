@@ -393,6 +393,7 @@ val spawn_reconstruct : t -> Process.t
     for a more precise semantic.
  *)
 val run :
+  ?patch_config:(JSON.t -> JSON.t) ->
   ?on_terminate:(Unix.process_status -> unit) ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
