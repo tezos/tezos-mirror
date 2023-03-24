@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Storage API
+//! Storage API for transactional account updates.
 
 use crate::layer::Layer;
 use crate::StorageError;

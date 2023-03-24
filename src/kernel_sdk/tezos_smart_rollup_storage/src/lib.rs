@@ -5,7 +5,7 @@
 //! Transactions storage
 //!
 //! This crate supports dealing with accounts and transactions for updating
-//! said accounts storage. All accounts are stored in durable storage.
+//! said accounts' storage. All accounts are stored in durable storage.
 //!
 //! To use this crate, provide a definition of an account. The account structure
 //! should follow these guidelines:
@@ -14,6 +14,9 @@
 //! - it has getters and setters that operate directly on durable storage, each
 //!   getter and setter should take a [Runtime] as argument to do so (`mut` in
 //!   case of setters).
+//!
+//! **NB** an account must only look in durable storage prefixed by its
+//! `OwnedPath`.
 //!
 //! To use this crate, create account struct and storage object like so:
 //!
@@ -112,13 +115,6 @@ pub enum StorageError {
     /// a '/' character (it should).
     #[error("Path error")]
     PathError(host::path::PathError),
-    /// Some value (tx counter) was kept in a malformed format in
-    /// durable storage.
-    #[error("Malformed 32 or 64 bit integer in storage")]
-    MalformedValue,
-    /// A 32 bit transaction counter overflowed.
-    #[error("Transaction counter overflow")]
-    TxCounterOverflow,
     /// Some error was encountered while using the durable storage. This may
     /// happen when doing some transaction operation.
     #[error("Runtrime error")]

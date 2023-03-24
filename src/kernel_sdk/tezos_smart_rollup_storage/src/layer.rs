@@ -5,16 +5,13 @@
 //! Transaction layers
 //!
 //! Account storage is kept in layers - one on top of another. The bottom layer
-//! holds the "original" values for each account. It is the current world state.
-//! Each layer above that layer holds the current state of a transaction.
+//! holds the "original" values for each account.
 //!
-//! Since Ethereum can have many (1024 at most) transactions nested at a time,
-//! we support this model here. In cases with a single transaction can happen
-//! at most, we'll have just two layers: the "world state" layer and the current
-//! transaction layer.
+//! Each time a transaction is created with `begin_transaction`, a new layer
+//! is added to the top of the layer stack. `rollback` will delete the top layer,
+//! and `commit` moves the top layer back into the previous one (overwriting it).
 //!
-//! This file is used solely by the `storage` module and should _not_ be used
-//! anywhere else.
+//! This allows transactions to be arbitrarily nested.
 
 use crate::StorageError;
 use core::marker::PhantomData;
@@ -39,8 +36,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// creating a Layer for path "/accounts" will assume "/accounts/alph" will
     /// contain all data for account with id "alpha".
     ///
-    /// This function is used solely for creating the bottom layer of the storage -
-    /// the layer that stores the "world state" of all accounts.
+    /// This function is used solely for creating the bottom layer of the storage.
     pub(crate) fn with_path(name: &impl Path) -> Self {
         Self {
             path: OwnedPath::from(name),
