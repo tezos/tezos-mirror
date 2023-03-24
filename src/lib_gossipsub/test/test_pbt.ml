@@ -59,6 +59,292 @@ module Basic_fragments = struct
   let heartbeat : t = of_list [Heartbeat]
 end
 
+module Test_message_cache = struct
+  module L = GS.Introspection.Message_cache
+
+  module R = struct
+    module M = Map.Make (Int)
+
+    type t = {
+      mutable ticks : int;
+      cache : C.Message.t C.Message_id.Map.t C.Topic.Map.t M.t;
+      history_slots : int;
+      gossip_slots : int;
+    }
+
+    let create ~history_slots ~gossip_slots =
+      assert (gossip_slots > 0) ;
+      assert (gossip_slots <= history_slots) ;
+      {ticks = 0; cache = M.empty; history_slots; gossip_slots}
+
+    let add_message message_id message topic t =
+      {
+        t with
+        cache =
+          M.update
+            t.ticks
+            (function
+              | None ->
+                  C.Topic.Map.singleton
+                    topic
+                    (C.Message_id.Map.singleton message_id message)
+                  |> Option.some
+              | Some map ->
+                  C.Topic.Map.update
+                    topic
+                    (function
+                      | None ->
+                          C.Message_id.Map.singleton message_id message
+                          |> Option.some
+                      | Some topic_map ->
+                          C.Message_id.Map.add message_id message topic_map
+                          |> Option.some)
+                    map
+                  |> Option.some)
+            t.cache;
+      }
+
+    let get_message_for_peer _peer message_id t =
+      let found = ref None in
+      for x = max 0 (t.ticks - t.history_slots + 1) to t.ticks do
+        match M.find x t.cache with
+        | None -> ()
+        | Some topic_map ->
+            C.Topic.Map.iter
+              (fun _topic map ->
+                match C.Message_id.Map.find message_id map with
+                | None -> ()
+                | Some message -> found := Some message)
+              topic_map
+      done ;
+      let r = !found in
+      Option.map (fun message -> (t, message)) r
+
+    let get_message_ids_to_gossip topic t =
+      let found = ref C.Message_id.Set.empty in
+      for x = max 0 (t.ticks - t.gossip_slots + 1) to t.ticks do
+        match M.find x t.cache with
+        | None -> ()
+        | Some topic_map -> (
+            match C.Topic.Map.find topic topic_map with
+            | None -> ()
+            | Some message_map ->
+                let set =
+                  message_map |> C.Message_id.Map.to_seq |> Seq.map fst
+                  |> C.Message_id.Set.of_seq
+                in
+                found := C.Message_id.Set.union !found set)
+      done ;
+      !found
+
+    let shift t =
+      t.ticks <- t.ticks + 1 ;
+      t
+  end
+
+  (* If those numbers are too large, we will miss scenarios with collisions. *)
+  let history_slots = QCheck2.Gen.int_range (-1) 10
+
+  let gossip_slots = history_slots
+
+  let message_id = QCheck2.Gen.int_range 0 10
+
+  (* The data-structure assumes that the id identifies uniquely the
+     message. To ease the readibility of the test we consider a
+     messsage constant. *)
+  let message = QCheck2.Gen.return "m"
+
+  let peer = QCheck2.Gen.return 0
+
+  let topic =
+    let open QCheck2.Gen in
+    let* chars =
+      QCheck2.Gen.list_size
+        (QCheck2.Gen.int_range 1 2)
+        (QCheck2.Gen.char_range 'a' 'c')
+    in
+    return (String.of_seq (List.to_seq chars))
+
+  type action =
+    | Add_message of {message_id : int; message : string; topic : string}
+    | Get_message_for_peer of {peer : int; message_id : int}
+    | Get_message_ids_to_gossip of {topic : string}
+    | Shift
+
+  let pp_action fmt = function
+    | Add_message {message_id; message = _; topic} ->
+        Format.fprintf fmt "ADD_MESSAGE {id:%d;topic:%s}" message_id topic
+    | Get_message_for_peer {peer = _; message_id} ->
+        Format.fprintf fmt "GET_MESSAGE {id:%d}" message_id
+    | Get_message_ids_to_gossip {topic} ->
+        Format.fprintf fmt "GET_FOR_TOPIC {topic:%s}" topic
+    | Shift -> Format.fprintf fmt "SHIFT"
+
+  let add_message =
+    let open QCheck2.Gen in
+    let* message_id in
+    let* message in
+    let* topic in
+    return (Add_message {message_id; message; topic})
+
+  let get_message_for_peer =
+    let open QCheck2.Gen in
+    let* message_id in
+    let* peer in
+    return (Get_message_for_peer {peer; message_id})
+
+  let get_message_ids_to_gossip =
+    let open QCheck2.Gen in
+    let* topic in
+    return (Get_message_ids_to_gossip {topic})
+
+  let action =
+    QCheck2.Gen.oneof
+      [
+        add_message;
+        get_message_for_peer;
+        get_message_ids_to_gossip;
+        QCheck2.Gen.return Shift;
+      ]
+
+  let actions = QCheck2.Gen.(list_size (int_range 1 30) action)
+
+  let rec run (left, right) actions =
+    let remaining_steps = List.length actions in
+    match actions with
+    | [] -> None
+    | Add_message {message_id; message; topic} :: actions ->
+        let left = L.add_message message_id message topic left in
+        let right = R.add_message message_id message topic right in
+        run (left, right) actions
+    | Get_message_for_peer {peer; message_id} :: actions -> (
+        let left_result = L.get_message_for_peer peer message_id left in
+        let right_result = R.get_message_for_peer peer message_id right in
+        match (left_result, right_result) with
+        | None, None -> run (left, right) actions
+        | Some (left, _left_message, _left_counter), Some (right, _right_message)
+          ->
+            (* By definition of the message generator, messages are equal. *)
+            run (left, right) actions
+        | None, Some _ ->
+            let message = Format.asprintf "Expected: A message. Got: None" in
+            Some (remaining_steps, message)
+        | Some _, None ->
+            let message =
+              Format.asprintf "Expected: No message. Got: A message"
+            in
+            Some (remaining_steps, message))
+    | Get_message_ids_to_gossip {topic} :: actions ->
+        let left_result = L.get_message_ids_to_gossip topic left in
+        let right_result = R.get_message_ids_to_gossip topic right in
+        let left_set = C.Message_id.Set.of_list left_result in
+        if C.Message_id.Set.equal left_set right_result then
+          run (left, right) actions
+        else
+          let pp_set fmt s =
+            if C.Message_id.Set.is_empty s then Format.fprintf fmt "empty set"
+            else
+              s |> C.Message_id.Set.to_seq |> List.of_seq
+              |> Format.fprintf
+                   fmt
+                   "%a"
+                   (Format.pp_print_list
+                      ~pp_sep:(fun fmt () -> Format.fprintf fmt " ")
+                      Format.pp_print_int)
+          in
+          let message =
+            Format.asprintf
+              "Expected: %a@.Got: %a@."
+              pp_set
+              right_result
+              pp_set
+              left_set
+          in
+          Some (remaining_steps, message)
+    | Shift :: actions ->
+        let left = L.shift left in
+        let right = R.shift right in
+        run (left, right) actions
+
+  let pp fmt trace =
+    Format.fprintf
+      fmt
+      "%a@."
+      (Format.pp_print_list ~pp_sep:Format.pp_print_newline pp_action)
+      trace
+
+  let test rng =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: check correction of message cache data structure"
+      ~tags:["gossipsub"; "message_cache"]
+    @@ fun () ->
+    let scenario =
+      let open QCheck2.Gen in
+      let* history_slots in
+      let* gossip_slots in
+      let* actions in
+      let left =
+        try L.create ~history_slots ~gossip_slots |> Either.left
+        with exn -> Either.right exn
+      in
+      let right =
+        try R.create ~history_slots ~gossip_slots |> Either.left
+        with exn -> Either.right exn
+      in
+      match (left, right) with
+      | Right _, Right _ -> return None
+      | Left left, Left right -> (
+          match run (left, right) actions with
+          | None -> return None
+          | Some (remaining_steps, explanation) ->
+              let n = List.length actions - remaining_steps + 1 in
+              let actions = List.take_n n actions in
+              return @@ Some (history_slots, gossip_slots, explanation, actions)
+          )
+      | Right exn, Left _ ->
+          let explanation =
+            Format.asprintf
+              "Initialisation failed unexpectedly: %s"
+              (Printexc.to_string exn)
+          in
+          return @@ Some (history_slots, gossip_slots, explanation, [])
+      | Left _, Right exn ->
+          let explanation =
+            Format.asprintf
+              "Initialisation succeeded while it should not. Expected to fail \
+               with: %s"
+              (Printexc.to_string exn)
+          in
+          return @@ Some (history_slots, gossip_slots, explanation, [])
+    in
+    let test =
+      QCheck2.Test.make ~count:500_000 ~name:"Gossipsub: message cache" scenario
+      @@ function
+      | None -> true
+      | Some (history_slots, gossip_slots, explanation, trace) ->
+          Tezt.Test.fail
+            ~__LOC__
+            "@[<v 2>Soundness check failed.@;\
+             Limits:@;\
+             history_slots: %d@;\
+             gossip_slots: %d@;\
+             @;\
+             Dumping trace:@;\
+             @[<v>%a@]@;\
+             @;\
+             Explanation:@;\
+             %s@]"
+            history_slots
+            gossip_slots
+            pp
+            trace
+            explanation
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 (** Test that removing a peer really removes it from the state *)
 module Test_remove_peer = struct
   open Gossipsub_pbt_generators
@@ -172,4 +458,6 @@ module Test_remove_peer = struct
     unit
 end
 
-let register rng limits parameters = Test_remove_peer.test rng limits parameters
+let register rng limits parameters =
+  Test_remove_peer.test rng limits parameters ;
+  Test_message_cache.test rng
