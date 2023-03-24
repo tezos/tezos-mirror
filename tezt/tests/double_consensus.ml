@@ -162,6 +162,74 @@ let double_preendorsement_wrong_slot =
     ~tags:["double"; "preendorsement"; "accuser"; "slot"; "node"]
   @@ fun protocol -> double_consensus_wrong_slot preendorse_utils protocol
 
+let double_consensus_wrong_block_payload_hash
+    (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
+  let* (client, accuser), (branch, level, round, slots, _block_payload_hash) =
+    double_endorsement_init consensus_for consensus_name protocol ()
+  in
+  let* header =
+    RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
+  in
+  let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
+  Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
+  let op =
+    mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
+  in
+  let waiter = consensus_waiter accuser in
+  let* _ =
+    Operation.Consensus.inject
+      ~force:true
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter in
+  Log.info
+    "Inject another invalid %s and wait for already_denounced event"
+    consensus_name ;
+  let* header =
+    RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~3" ()
+  in
+  let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
+  let op =
+    mk_consensus ~slot:(List.nth slots 2) ~level ~round ~block_payload_hash
+  in
+  let* oph = get_double_consensus_denounciation_hash consensus_name client in
+  let waiter_already_denounced =
+    double_consensus_already_denounced_waiter accuser oph
+  in
+  let* _ =
+    Operation.Consensus.inject
+      ~force:true
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter_already_denounced in
+  unit
+
+let double_endorsement_wrong_block_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double endorsement using wrong block_payload_hash"
+    ~supports:Protocol.(From_protocol (number Nairobi))
+    ~tags:["double"; "endorsement"; "accuser"; "block_payload_hash"; "node"]
+  @@ fun protocol ->
+  double_consensus_wrong_block_payload_hash endorse_utils protocol
+
+let double_preendorsement_wrong_block_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double preendorsement using wrong block_payload_hash"
+    ~supports:Protocol.(From_protocol (number Nairobi))
+    ~tags:["double"; "preendorsement"; "accuser"; "block_payload_hash"; "node"]
+  @@ fun protocol ->
+  double_consensus_wrong_block_payload_hash preendorse_utils protocol
+
 let register ~protocols =
   double_endorsement_wrong_slot protocols ;
-  double_preendorsement_wrong_slot protocols
+  double_preendorsement_wrong_slot protocols ;
+  double_endorsement_wrong_block_payload_hash protocols ;
+  double_preendorsement_wrong_block_payload_hash protocols
