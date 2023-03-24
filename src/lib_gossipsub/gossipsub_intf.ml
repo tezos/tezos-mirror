@@ -317,10 +317,10 @@ module type AUTOMATON = sig
       unsubscribe to a [topic]. *)
   val handle_unsubscribe : unsubscribe -> [`Unsubscribe] monad
 
-  (** [join { topic }] join/subscribe to a new topic. *)
+  (** [join { topic }] handles a join/subscribe to a new topic. *)
   val join : join -> [`Join] monad
 
-  (** [leave { topic }] leave/unscribe a topic. *)
+  (** [leave { topic }] handles a leave/unsubscribe from a topic. *)
   val leave : leave -> [`Leave] monad
 
   val pp_add_peer : Format.formatter -> add_peer -> unit
