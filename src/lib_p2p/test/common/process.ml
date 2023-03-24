@@ -221,6 +221,7 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
       let main_result, child_exit = Lwt_io.pipe ~cloexec:true () in
       match Lwt_unix.fork () with
       | 0 ->
+          (* I am the child process. *)
           Lwt_log.default :=
             Lwt_log.channel
               ~template
@@ -256,16 +257,17 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
                 f chans)
               child_exit
           in
-          let* () = Lwt_io.close child_out in
           let* () = Lwt_io.close child_in in
+          let* () = Lwt_io.close child_out in
           let* () = Lwt_io.close child_exit in
           exit i
       | pid ->
+          (* I am the main process. *)
           Lwt_canceler.on_cancel canceler (fun () -> terminate pid) ;
           let termination = wait ~value_encoding ~flags pid main_result in
           let after_termination () =
-            let* () = Lwt_io.close main_out in
             let* () = Lwt_io.close main_in in
+            let* () = Lwt_io.close main_out in
             let* () = Lwt_io.close main_result in
             Lwt.return_unit
           in
