@@ -124,7 +124,6 @@ module Make (C : AUTOMATON_CONFIG) :
     | Message_topic_not_tracked : [`IHave] output
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
     | On_iwant_messages_to_route : {
-        peer : Peer.t;
         routed_message_ids :
           [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
       }
@@ -635,7 +634,7 @@ module Make (C : AUTOMATON_CONFIG) :
           message_ids
       in
       let* () = set_memory_cache memory_cache in
-      On_iwant_messages_to_route {peer; routed_message_ids} |> return
+      On_iwant_messages_to_route {routed_message_ids} |> return
   end
 
   let handle_iwant : iwant -> [`IWant] output Monad.t =
