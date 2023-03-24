@@ -242,7 +242,7 @@ module type AUTOMATON = sig
     | PX : Peer.Set.t -> [`Prune] output
     | Publish_message : Peer.Set.t -> [`Publish] output
     | Already_subscribed : [`Join] output
-    | Joining_topic : Peer.Set.t -> [`Join] output
+    | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_subscribed : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
     | Heartbeat : {

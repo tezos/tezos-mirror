@@ -143,7 +143,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | PX : Peer.Set.t -> [`Prune] output
     | Publish_message : Peer.Set.t -> [`Publish] output
     | Already_subscribed : [`Join] output
-    | Joining_topic : Peer.Set.t -> [`Join] output
+    | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_subscribed : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
     | Heartbeat : {
@@ -892,7 +892,7 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       let* () = set_mesh_topic topic peers in
       let* () = delete_fanout topic in
-      Joining_topic peers |> return
+      Joining_topic {to_graft = peers} |> return
 
     let handle topic : [`Join] output Monad.t =
       let open Monad.Syntax in
