@@ -872,14 +872,15 @@ module Internal_for_tests = struct
       (fun _ -> assert false)
       Data_encoding.unit
 
-  let mock conn =
+  let mock ?(reader = Lwt_pipe.Maybe_bounded.create ())
+      ?(writer = Lwt_pipe.Maybe_bounded.create ()) conn =
     let reader =
       Reader.
         {
           canceler = Lwt_canceler.create ();
           conn;
           encoding = make_crashing_encoding ();
-          messages = Lwt_pipe.Maybe_bounded.create ();
+          messages = reader;
           worker = Lwt.return_unit;
         }
     in
@@ -889,7 +890,7 @@ module Internal_for_tests = struct
           canceler = Lwt_canceler.create ();
           conn;
           encoding = make_crashing_encoding ();
-          messages = Lwt_pipe.Maybe_bounded.create ();
+          messages = writer;
           worker = Lwt.return_unit;
           binary_chunks_size = 0;
         }

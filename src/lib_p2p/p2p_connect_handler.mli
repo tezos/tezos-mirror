@@ -81,6 +81,11 @@ type config = {
       (** The TCP port on which the peer can be reached. *)
   advertised_port : P2p_addr.port option;
       (** The TCP port advertised to other peers, the default is listening_port. *)
+  disable_peer_discovery : bool;
+      (** If [True], point discovery is disabled. The connections will neither
+          send nor answer to Bootstrap and Advertise messages. It will send
+          Nack messages with empty list of points and not register points
+          received by Nack messages. *)
 }
 
 (** [create ?p2p_version config pool message_config socket_meta_config

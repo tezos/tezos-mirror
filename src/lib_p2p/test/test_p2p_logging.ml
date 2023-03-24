@@ -208,6 +208,7 @@ module P2p_net = struct
         proof_of_work_target = P2p_test_utils.proof_of_work_target;
         trust_discovered_peers = false;
         reconnection_config = Point_reconnection_config.default;
+        disable_peer_discovery = false;
       }
 
   let p2p_conf =

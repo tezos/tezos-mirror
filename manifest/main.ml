@@ -1633,7 +1633,7 @@ let octez_p2p_test_common =
 
 let _octez_p2p_tezt =
   tezt
-    ["test_p2p_socket"]
+    ["test_p2p_socket"; "test_p2p_conn"]
     ~path:"src/lib_p2p/tezt"
     ~opam:"tezos-p2p"
     ~deps:

@@ -39,6 +39,7 @@ type config = {
   proof_of_work_target : Tezos_crypto.Crypto_box.pow_target;
   trust_discovered_peers : bool;
   reconnection_config : Point_reconnection_config.t;
+  disable_peer_discovery : bool;
 }
 
 let create_scheduler limits =
@@ -90,6 +91,7 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
       incoming_message_queue_size = limits.incoming_message_queue_size;
       outgoing_message_queue_size = limits.outgoing_message_queue_size;
       binary_chunks_size = limits.binary_chunks_size;
+      disable_peer_discovery = config.disable_peer_discovery;
     }
   in
   P2p_connect_handler.create

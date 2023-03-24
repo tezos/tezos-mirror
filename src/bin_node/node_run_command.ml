@@ -296,6 +296,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
             proof_of_work_target =
               Tezos_crypto.Crypto_box.make_pow_target config.p2p.expected_pow;
             trust_discovered_peers = sandbox <> None;
+            disable_peer_discovery = config.p2p.disable_peer_discovery;
           }
         in
         return_some (p2p_config, config.p2p.limits)
