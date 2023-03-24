@@ -1277,8 +1277,10 @@ module Make (C : AUTOMATON_CONFIG) :
          Maintain our fanout for topics we are publishing to, but we have not
          joined. *)
 
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4982
-         Advance the message history window *)
+      (* Advance the message history sliding window. *)
+      let*! message_cache in
+      let* () = Message_cache.shift message_cache |> set_message_cache in
+
       Heartbeat {to_graft; to_prune; noPX_peers} |> return
   end
 
