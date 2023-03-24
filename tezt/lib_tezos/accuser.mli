@@ -83,7 +83,7 @@ val kill : t -> unit Lwt.t
 
     The resulting promise is fulfilled as soon as the accuser has been spawned.
     It continues running in the background. *)
-val run : t -> unit Lwt.t
+val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
 
 (** {2 Events} *)
 
@@ -137,6 +137,9 @@ val log_events : t -> unit
     from [name]. It will be created as a named pipe so that accuser
     events can be received.
 
+    [event_level] specifies the verbosity of the file descriptor sink.
+    The default value is [`Info].
+
     [base_dir] corresponds to the (useless) "--base-dir" argument of
     the octez-accuser command.
 
@@ -151,6 +154,7 @@ val init :
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
+  ?event_level:Daemon.Level.default_level ->
   ?base_dir:string ->
   ?runner:Runner.t ->
   Node.t ->

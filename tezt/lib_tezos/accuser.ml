@@ -76,7 +76,7 @@ let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   on_stdout accuser (handle_raw_stdout accuser) ;
   accuser
 
-let run accuser =
+let run ?event_level accuser =
   (match accuser.status with
   | Not_running -> ()
   | Running _ -> Test.fail "accuser %s is already running" accuser.name) ;
@@ -98,7 +98,7 @@ let run accuser =
     trigger_ready accuser None ;
     unit
   in
-  run accuser {ready = false} arguments ~on_terminate ?runner
+  run ?event_level accuser {ready = false} arguments ~on_terminate ?runner
 
 let check_event ?where accuser name promise =
   let* result = promise in
@@ -117,12 +117,13 @@ let wait_for_ready accuser =
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
+let init ~protocol ?name ?color ?event_pipe ?event_level ?base_dir ?runner node
+    =
   let* () = Node.wait_for_ready node in
   let accuser =
     create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node
   in
-  let* () = run accuser in
+  let* () = run ?event_level accuser in
   let* () = wait_for_ready accuser in
   return accuser
 
