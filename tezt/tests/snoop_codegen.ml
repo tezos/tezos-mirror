@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Snoop
+   Invocation:   dune exec tezt/tests/main.exe -- --file snoop_codegen.ml
+   Subject:      Tests for snoop codegen.
+*)
+
 let generate_code_using_solution_test () =
   Test.register ~title:"snoop codegen" ~tags:["snoop"; "codegen"] ~__FILE__
   @@ fun () ->
@@ -45,3 +52,25 @@ let generate_code_using_solution_test () =
   else Lwt.return_unit
 
 let register_protocol_independent () = generate_code_using_solution_test ()
+
+let perform_check_definitions snoop proto =
+  let files =
+    List.map
+      (fun fn ->
+        project_root
+        // Printf.sprintf "src/%s/lib_protocol/%s" (Protocol.directory proto) fn)
+      ["michelson_v1_gas_costs.ml"; "michelson_v1_gas_costs_generated.ml"]
+  in
+  Snoop.check_definitions ~files snoop
+
+let check_definitions_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"check of the cost function definitions"
+    ~tags:["snoop"; "codegen"]
+  @@ fun protocol ->
+  Log.info "Checking the cost function definitions" ;
+  let snoop = Snoop.create () in
+  perform_check_definitions snoop protocol
+
+let register ~protocols = check_definitions_test protocols

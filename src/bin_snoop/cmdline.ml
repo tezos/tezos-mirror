@@ -106,6 +106,7 @@ type command =
       codegen_options : codegen_options;
       exclusions : String.Set.t;
     }
+  | Codegen_check_definitions of {files : string list}
   | Solution_print of string list
   | No_command
 

@@ -71,3 +71,9 @@ val make_toplevel_module : code list -> module_
 val pp_code : Format.formatter -> code -> unit
 
 val pp_module : Format.formatter -> module_ -> unit
+
+module Parser : sig
+  (** [get_cost_functions fn] extracts the cost function names of
+      OCaml source file [fn]. *)
+  val get_cost_functions : string -> (string list, exn) result
+end

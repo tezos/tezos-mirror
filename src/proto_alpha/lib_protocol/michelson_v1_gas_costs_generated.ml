@@ -32,10 +32,6 @@ module S_syntax = S.Syntax
 (* This file is planned to be automatically generated. *)
 (* If you want to update the following functions, update the gas model instead. *)
 
-(* model N_IAbs_int *)
-(* Allocates [size] bytes. *)
-let cost_N_IAbs_int size = S.safe_int (20 + (size lsr 1))
-
 (* model N_IAdd_bls12_381_fr *)
 (* when benchmarking, compile bls12-381 without ADX *)
 let cost_N_IAdd_bls12_381_fr = S.safe_int 30
@@ -48,30 +44,8 @@ let cost_N_IAdd_bls12_381_g1 = S.safe_int 900
 (* when benchmarking, compile bls12-381 without ADX *)
 let cost_N_IAdd_bls12_381_g2 = S.safe_int 2_470
 
-(* Allocates [max size1 size2] *)
-let cost_linear_op_int size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 35 + (v0 lsr 1)
-
-(* model N_IAdd_int *)
-(* Approximating 0.078154 x term *)
-let cost_N_IAdd_int = cost_linear_op_int
-
-(* model N_IAdd_nat *)
-(* Approximating 0.077807 x term *)
-let cost_N_IAdd_nat = cost_linear_op_int
-
-(* model N_IAdd_seconds_to_timestamp *)
-(* Approximating 0.078056 x term *)
-let cost_N_IAdd_seconds_to_timestamp = cost_linear_op_int
-
 (* model N_IAdd_tez *)
 let cost_N_IAdd_tez = S.safe_int 20
-
-(* model N_IAdd_timestamp_to_seconds *)
-(* Approximating 0.077771 x term *)
-let cost_N_IAdd_timestamp_to_seconds = cost_linear_op_int
 
 (* model N_IAddress *)
 let cost_N_IAddress = S.safe_int 10
@@ -81,28 +55,6 @@ let cost_N_IAmount = S.safe_int 10
 
 (* model N_IAnd *)
 let cost_N_IAnd = S.safe_int 10
-
-(* model N_IAnd_int_nat *)
-(* Allocates [min size1 size2] *)
-let cost_N_IAnd_int_nat size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int (Compare.Int.min size1 size2) in
-  S.safe_int 35 + (v0 lsr 1)
-
-(* model N_IAnd_nat *)
-(* Allocates [min size1 size2] *)
-let cost_N_IAnd_nat size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int (Compare.Int.min size1 size2) in
-  S.safe_int 35 + (v0 lsr 1)
-
-(* model N_IAnd_bytes *)
-(* Allocates [min size1 size2] *)
-(* fun size1 -> fun size2 -> (34.8914840649 + (0.398826813115 * (min size1 size2))) *)
-let cost_N_IAnd_bytes size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int (Compare.Int.min size1 size2) in
-  S.safe_int 35 + (v0 lsr 1)
 
 (* model N_IBalance *)
 let cost_N_IBalance = S.safe_int 10
@@ -211,20 +163,6 @@ let cost_N_ICompare size1 size2 =
   let v0 = S.safe_int (Compare.Int.min size1 size2) in
   S.safe_int 35 + ((v0 lsr 6) + (v0 lsr 7))
 
-(* model N_IConcat_bytes_pair *)
-(* Allocates [size1 + size2] *)
-let cost_N_IConcat_bytes_pair size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int size1 + S.safe_int size2 in
-  S.safe_int 45 + (v0 lsr 1)
-
-(* model N_IConcat_string_pair *)
-(* Allocates [size1 + size2] *)
-let cost_N_IConcat_string_pair size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int size1 + S.safe_int size2 in
-  S.safe_int 45 + (v0 lsr 1)
-
 (* model N_ICons_list *)
 let cost_N_ICons_list = S.safe_int 10
 
@@ -240,16 +178,6 @@ let cost_N_ICons_some = S.safe_int 10
 (* model N_IPush *)
 let cost_N_IPush = S.safe_int 10
 
-(* model N_IContract *)
-let cost_N_IContract = S.safe_int 30
-
-(* model N_ICreate_contract *)
-let cost_N_ICreate_contract = S.safe_int 60
-
-(* model N_IDiff_timestamps *)
-(* Approximating 0.077922 x term *)
-let cost_N_IDiff_timestamps = cost_linear_op_int
-
 (* model N_IDig *)
 (* Approximating 6.750442 x term *)
 let cost_N_IDig size =
@@ -257,28 +185,11 @@ let cost_N_IDig size =
   let v0 = S.safe_int size in
   S.safe_int 30 + ((S.safe_int 6 * v0) + (v0 lsr 1) + (v0 lsr 2))
 
-(* model N_IDip *)
-let cost_N_IDip = S.safe_int 10
-
-(* model N_IDipN *)
-(* Approximating 4.05787663635 x term *)
-let cost_N_IDipN size =
-  let open S_syntax in
-  let v0 = S.safe_int size in
-  S.safe_int 15 + (S.safe_int 4 * v0)
-
 (* model N_IView *)
 let cost_N_IView = S.safe_int 1460
 
 (* model N_IDrop *)
 let cost_N_IDrop = S.safe_int 10
-
-(* model N_IDropN *)
-(* Approximating 2.713108 x term *)
-let cost_N_IDropN size =
-  let open S_syntax in
-  let v0 = S.safe_int size in
-  S.safe_int 30 + (S.safe_int 2 * v0) + (v0 lsr 1) + (v0 lsr 3)
 
 (* model N_IDug *)
 (* Approximating 6.718396 x term *)
@@ -297,29 +208,8 @@ let cost_N_IDupN size =
   let v0 = S.safe_int size in
   S.safe_int 20 + v0 + (v0 lsr 2)
 
-let cost_div_int size1 size2 =
-  (* Allocates at most [size1] bytes *)
-  let q = size1 - size2 in
-  let open S_syntax in
-  let v1 = S.safe_int size1 in
-  if Compare.Int.(q < 0) then S.safe_int 105 + (v1 lsr 1)
-  else
-    let v0 = S.safe_int q * S.safe_int size2 in
-    S.safe_int 105 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13) + (v1 lsr 1)
-
-(* model N_IEdiv_int *)
-(* Approximating 0.001591 x term *)
-let cost_N_IEdiv_int = cost_div_int
-
-(* model N_IEdiv_nat *)
-(* Approximating 0.001605 x term *)
-let cost_N_IEdiv_nat = cost_div_int
-
 (* model N_IEdiv_tez *)
 let cost_N_IEdiv_tez = S.safe_int 80
-
-(* model N_IEmpty_big_map *)
-let cost_N_IEmpty_big_map = S.safe_int 300
 
 (* model N_IEmpty_map *)
 let cost_N_IEmpty_map = S.safe_int 300
@@ -329,9 +219,6 @@ let cost_N_IEmpty_set = S.safe_int 300
 
 (* model N_IEq *)
 let cost_N_IEq = S.safe_int 10
-
-(* model N_IExec *)
-let cost_N_IExec = S.safe_int 10
 
 (* model N_IFailwith *)
 (* let cost_N_IFailwith = S.safe_int 105 *)
@@ -347,21 +234,6 @@ let cost_N_IHalt = S.safe_int 15
 
 (* model N_IHash_key *)
 let cost_N_IHash_key = S.safe_int 605
-
-(* model N_IIf *)
-let cost_N_IIf = S.safe_int 10
-
-(* model N_IIf_cons *)
-let cost_N_IIf_cons = S.safe_int 10
-
-(* model N_IIf_left *)
-let cost_N_IIf_left = S.safe_int 10
-
-(* model N_IIf_none *)
-let cost_N_IIf_none = S.safe_int 10
-
-(* model N_IOpt_map *)
-let cost_N_IOpt_map = S.safe_int 10
 
 (* model N_IImplicit_account *)
 let cost_N_IImplicit_account = S.safe_int 10
@@ -395,54 +267,11 @@ let cost_N_ILeft = S.safe_int 10
 (* model N_ILevel *)
 let cost_N_ILevel = S.safe_int 10
 
-(* model N_IList_iter *)
-let cost_N_IList_iter = S.safe_int 20
-
 (* model N_IList_map *)
 let cost_N_IList_map = S.safe_int 20
 
 (* model N_IList_size *)
 let cost_N_IList_size = S.safe_int 10
-
-(* model N_ILoop *)
-let cost_N_ILoop = S.safe_int 10
-
-(* model N_ILoop_left *)
-let cost_N_ILoop_left = S.safe_int 10
-
-(* model N_ILsl_nat *)
-(* Allocates at most [size + 256] bytes *)
-let cost_N_ILsl_nat size =
-  let open S_syntax in
-  let v0 = S.safe_int size in
-  S.safe_int 128 + (v0 lsr 1)
-
-(* model N_ILsr_nat *)
-(* Allocates at most [size] bytes*)
-let cost_N_ILsr_nat size =
-  let open S_syntax in
-  let v0 = S.safe_int size in
-  S.safe_int 45 + (v0 lsr 1)
-
-(* model N_ILsl_bytes *)
-(* Allocates [size + shift / 8] bytes *)
-(* fun size1 -> fun size2 -> ((63.0681507316 + (0.667539714647 * size1)) + (0. * size2)) *)
-let cost_N_ILsl_bytes size shift =
-  let open S_syntax in
-  let v1 = S.safe_int size in
-  let v0 = S.safe_int shift in
-  S.safe_int 65 + (v1 lsr 1) + (v1 lsr 2) + (v0 lsr 4)
-
-(* model N_ILsr_bytes *)
-(* Allocates [max 0 (size - shift / 8)] bytes *)
-(* fun size1 -> fun size2 -> let q = (size1 - (size2 * 0.125)) in (53.9248173983 + (0.658785032381 * (if (0 < q) then q else 0))) *)
-let cost_N_ILsr_bytes size shift =
-  let q = size - (shift lsr 3) in
-  let open S.Syntax in
-  if Compare.Int.(q < 0) then S.safe_int 55
-  else
-    let v0 = S.safe_int q in
-    S.safe_int 55 + (v0 lsr 1) + (v0 lsr 2)
 
 (* model N_ILt *)
 let cost_N_ILt = S.safe_int 10
@@ -499,6 +328,15 @@ let cost_N_IMap_update size1 size2 =
   let size2 = S.safe_int size2 in
   let v0 = size1 * log2 size2 in
   S.safe_int 55 + (v0 lsr 4) + (v0 lsr 5)
+
+(* model N_IMul_nattez *)
+let cost_N_IMul_nattez = S.safe_int 50
+
+(* model N_IMul_teznat *)
+let cost_N_IMul_teznat = S.safe_int 50
+
+(* model N_IEdiv_teznat *)
+let cost_N_IEdiv_teznat = S.safe_int 70
 
 (* model N_IMul_bls12_381_fr *)
 (* when benchmarking, compile bls12-381 without ADX *)
@@ -600,18 +438,6 @@ let cost_N_IOpen_chest time chest =
 (* model N_IOr *)
 let cost_N_IOr = S.safe_int 10
 
-(* model N_IOr_nat *)
-(* Approximating 0.075758 x term *)
-let cost_N_IOr_nat = cost_linear_op_int
-
-(* model N_IOr_bytes *)
-(* Allocates [max size1 size2] bytes *)
-(* fun size1 -> fun size2 -> (32.5381507316 + (0.232425212131 * (max size1 size2))) *)
-let cost_N_IOr_bytes size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 35 + (v0 lsr 1)
-
 (* model N_IPairing_check_bls12_381 *)
 (* when benchmarking, compile bls12-381 without ADX *)
 let cost_N_IPairing_check_bls12_381 size =
@@ -622,9 +448,6 @@ let cost_N_IRead_ticket = S.safe_int 10
 
 (* model N_IRight *)
 let cost_N_IRight = S.safe_int 10
-
-(* model N_ISapling_empty_state *)
-let cost_N_ISapling_empty_state = S.safe_int 300
 
 (* model N_ISelf_address *)
 let cost_N_ISelf_address = S.safe_int 10
@@ -666,44 +489,17 @@ let cost_N_ISha512 size =
   let v0 = S.safe_int size in
   S.safe_int 680 + (S.safe_int 3 * v0)
 
-(* model N_ISlice_bytes *)
-(* Allocates [size] bytes *)
-let cost_N_ISlice_bytes size =
-  let open S_syntax in
-  S.safe_int 25 + (S.safe_int size lsr 1)
-
-(* model N_ISlice_string *)
-(* Allocates [size] bytes *)
-let cost_N_ISlice_string size =
-  let open S_syntax in
-  S.safe_int 25 + (S.safe_int size lsr 1)
-
 (* model N_ISource *)
 let cost_N_ISource = S.safe_int 10
 
-(* model N_ISplit_ticket *)
-(* Allocates [max size1 size2] *)
-let cost_N_ISplit_ticket size1 size2 =
-  let open S_syntax in
-  let v1 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 40 + (v1 lsr 1)
-
 (* model N_IString_size *)
 let cost_N_IString_size = S.safe_int 15
-
-(* model N_ISub_int *)
-(* Approximating 0.077849 x term *)
-let cost_N_ISub_int = cost_linear_op_int
 
 (* model N_ISub_tez *)
 let cost_N_ISub_tez = S.safe_int 15
 
 (* model N_ISub_tez_legacy *)
 let cost_N_ISub_tez_legacy = S.safe_int 20
-
-(* model N_ISub_timestamp_seconds *)
-(* Approximating 0.077794 x term *)
-let cost_N_ISub_timestamp_seconds = cost_linear_op_int
 
 (* model N_ISwap *)
 let cost_N_ISwap = S.safe_int 10
@@ -713,9 +509,6 @@ let cost_N_ITicket = S.safe_int 10
 
 (* model N_ITotal_voting_power *)
 let cost_N_ITotal_voting_power = S.safe_int 450
-
-(* model N_ITransfer_tokens *)
-let cost_N_ITransfer_tokens = S.safe_int 60
 
 (* model N_IUncomb *)
 (* Approximating 3.944710 x term *)
@@ -732,24 +525,6 @@ let cost_N_IVoting_power = S.safe_int 640
 
 (* model N_IXor *)
 let cost_N_IXor = S.safe_int 15
-
-(* model N_IXor_nat *)
-(* Approximating 0.075601 x term *)
-let cost_N_IXor_nat = cost_linear_op_int
-
-(* model N_IXor_bytes *)
-(* Allocates [max size1 size2] bytes *)
-(* fun size1 -> fun size2 -> (38.5110342369 + (0.397946895815 * (max size1 size2))) *)
-let cost_N_IXor_bytes size1 size2 =
-  let open S_syntax in
-  let v0 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 40 + (v0 lsr 1)
-
-(* model N_KCons *)
-let cost_N_KCons = S.safe_int 10
-
-(* model N_KList_exit_body *)
-let cost_N_KList_exit_body = S.safe_int 10
 
 (* model N_KLoop_in *)
 let cost_N_KLoop_in = S.safe_int 10
@@ -981,11 +756,3 @@ let cost_TIMESTAMP_READABLE_DECODING bytes =
 
 (* model TIMESTAMP_READABLE_ENCODING *)
 let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 820
-
-(* model CHECK_PRINTABLE *)
-let cost_CHECK_PRINTABLE size =
-  let open S_syntax in
-  S.safe_int 14 + (S.safe_int 10 * S.safe_int size)
-
-(* model IEmit *)
-let cost_N_IEmit = S.safe_int 30

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022, 2023 DaiLambda, Incs. <contact@dailambad.jp>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -441,3 +442,58 @@ let%expect_test "module_generation" =
 
     (* comment *)
     let func_name x = let open S.Syntax in let x = S.safe_int x in x |}]
+
+(* Module to get the name of cost functions manually/automatically defined
+   in a source file *)
+module Parser = struct
+  let with_ic fn f =
+    let ic = open_in fn in
+    Fun.protect (fun () -> f ic) ~finally:(fun () -> close_in ic)
+
+  let parse ic =
+    let lexbuf = Lexing.from_channel ic in
+    Lexer.init () ;
+    Parser.implementation Lexer.token lexbuf
+
+  let get_pattern_vars pattern =
+    let open Parsetree in
+    let vars = ref [] in
+    let super = Ast_iterator.default_iterator in
+    let pat self p =
+      (match p.ppat_desc with
+      | Ppat_var {txt; _} | Ppat_alias (_, {txt; _}) -> vars := txt :: !vars
+      | _ -> ()) ;
+      super.pat self p
+    in
+    let self = {super with pat} in
+    self.pat self pattern ;
+    !vars
+
+  let scrape_defined_vars str =
+    let open Parsetree in
+    let defs = ref [] in
+    let super = Ast_iterator.default_iterator in
+    let value_binding _self vb =
+      defs := get_pattern_vars vb.Parsetree.pvb_pat @ !defs ;
+      (* Skip traversals to ignore the internal defs *)
+      ()
+    in
+    let structure_item self si =
+      match si.pstr_desc with
+      | Pstr_value _ | Pstr_module _ -> super.structure_item self si
+      | _ -> ()
+    in
+    let self = {super with value_binding; structure_item} in
+    self.structure self str ;
+    !defs
+
+  let is_cost_function n =
+    let prefix = "cost_" in
+    TzString.has_prefix ~prefix n
+
+  let get_cost_functions fn =
+    try
+      with_ic fn @@ fun ic ->
+      Ok (List.filter is_cost_function @@ scrape_defined_vars @@ parse ic)
+    with exn -> Error exn
+end
