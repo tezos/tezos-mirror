@@ -130,24 +130,23 @@ module Crypto_test = struct
     TzEndian.set_int16 payload 0 encrypted_length ;
     Bytes.blit tag 0 payload header_length tag_length ;
     Bytes.blit cmsg 0 payload extrabytes msg_length ;
-    let* i = return (Unix.write fd payload 0 payload_length) in
+    let*! i = Lwt_unix.write fd payload 0 payload_length in
     tzassert (payload_length = i) __POS__
 
   let read_chunk fd cryptobox_data =
     let open Lwt_result_syntax in
     let header_buf = Bytes.create header_length in
-    let* i = return (Unix.read fd header_buf 0 header_length) in
+    let*! i = Lwt_unix.read fd header_buf 0 header_length in
     let* () = tzassert (header_length = i) __POS__ in
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
     assert (encrypted_length >= tag_length) ;
     let msg_length = encrypted_length - tag_length in
     let tag = Bytes.make tag_length '\x00' in
-    let* i = return (Unix.read fd tag 0 tag_length) in
+    let*! i = Lwt_unix.read fd tag 0 tag_length in
     let* () = tzassert (tag_length = i) __POS__ in
     let msg = Bytes.make msg_length '\x00' in
-    let* i =
-      if msg_length > 0 then return (Unix.read fd msg 0 msg_length)
-      else return 0
+    let*! i =
+      if msg_length > 0 then Lwt_unix.read fd msg 0 msg_length else Lwt.return 0
     in
     let* () = tzassert (msg_length = i) __POS__ in
     let remote_nonce = cryptobox_data.remote_nonce in
@@ -170,16 +169,17 @@ module Crypto_test = struct
 
   let channel_key = Tezos_crypto.Crypto_box.precompute sk pk
 
-  let in_fd, out_fd = Unix.pipe ()
-
   let data = {channel_key; local_nonce = zero_nonce; remote_nonce = zero_nonce}
 
   let wrap () =
     Alcotest_lwt.test_case "ACK" `Quick (fun _ () ->
         let open Lwt_syntax in
         let msg = Bytes.of_string "test" in
+        let in_fd, out_fd = Lwt_unix.pipe ~cloexec:true () in
         let* _ = write_chunk out_fd data msg in
         let* r = read_chunk in_fd data in
+        let* () = Lwt_unix.close in_fd in
+        let* () = Lwt_unix.close out_fd in
         match r with
         | Ok res when Bytes.equal msg res -> Lwt.return_unit
         | Ok res ->
