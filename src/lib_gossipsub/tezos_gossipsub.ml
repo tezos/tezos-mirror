@@ -847,12 +847,6 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> unit
       | Some _ -> Already_subscribed |> fail
 
-    let get_more_peers topic ~max =
-      let filter _peer {backoff; score; direct; _} =
-        not (direct || Topic.Map.mem topic backoff || Score.(score < zero))
-      in
-      select_peers topic ~filter ~max
-
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
       let*! degree_optimal in
@@ -884,7 +878,16 @@ module Make (C : AUTOMATON_CONFIG) :
           let max =
             max 0 (degree_optimal - Peer.Set.cardinal valid_fanout_peers)
           in
-          let* more_peers = get_more_peers topic ~max in
+          let* more_peers =
+            let filter peer {backoff; score; direct; _} =
+              not
+                (direct
+                || Topic.Map.mem topic backoff
+                || Score.(score < zero)
+                || Peer.Set.mem peer valid_fanout_peers)
+            in
+            select_peers topic ~filter ~max
+          in
           return (Peer.Set.union more_peers valid_fanout_peers)
       in
       let* () = set_mesh_topic topic peers in
@@ -1430,10 +1433,20 @@ module Make (C : AUTOMATON_CONFIG) :
     fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
   module Internal_for_tests = struct
+    let get_peers_in_topic_mesh topic state =
+      match Topic.Map.find topic state.mesh with
+      | None -> []
+      | Some peers -> Peer.Set.elements peers
+
     let get_subscribed_topics peer state =
       match Peer.Map.find peer state.connections with
       | None -> []
       | Some connection -> Topic.Set.elements connection.topics
+
+    let get_fanout_peers topic state =
+      match Topic.Map.find topic state.fanout with
+      | None -> []
+      | Some fanout_peers -> Peer.Set.elements fanout_peers.peers
 
     type nonrec connection = connection = {
       topics : Topic.Set.t;
