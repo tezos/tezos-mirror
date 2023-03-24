@@ -459,19 +459,6 @@ module Scripts = struct
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "simulate_operation")
 
-    let simulate_tx_rollup_operation =
-      RPC_service.post_service
-        ~description:"Simulate a tx rollup operation"
-        ~query:RPC_query.empty
-        ~input:
-          (obj4
-             (opt "blocks_before_activation" int32)
-             (req "operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding)
-             (dft "latency" int16 default_operation_inclusion_latency))
-        ~output:Apply_results.operation_data_and_metadata_encoding
-        RPC_path.(path / "simulate_tx_rollup_operation")
-
     let entrypoint_type =
       RPC_service.post_service
         ~description:"Return the type of the given entrypoint"
@@ -2640,39 +2627,6 @@ module Dal = struct
     register_shards ()
 end
 
-module Tx_rollup = struct
-  open Data_encoding
-
-  module S = struct
-    let path : RPC_context.t RPC_path.context =
-      RPC_path.(open_root / "context" / "tx_rollup")
-
-    let has_bond =
-      RPC_service.get_service
-        ~description:
-          "Returns true if the public key hash already deposited a bond  for \
-           the given rollup"
-        ~query:RPC_query.empty
-        ~output:bool
-        RPC_path.(
-          path /: Tx_rollup.rpc_arg / "has_bond"
-          /: Signature.Public_key_hash.rpc_arg)
-  end
-
-  let register_has_bond () =
-    Registration.register2
-      ~chunked:false
-      S.has_bond
-      (fun ctxt rollup operator () () ->
-        Tx_rollup_commitment.has_bond ctxt rollup operator
-        >>=? fun (_ctxt, has_bond) -> return has_bond)
-
-  let register () = register_has_bond ()
-
-  let has_bond ctxt block rollup operator =
-    RPC_context.make_call2 S.has_bond ctxt block rollup operator () ()
-end
-
 module Forge = struct
   module S = struct
     open Data_encoding
@@ -2712,99 +2666,6 @@ module Forge = struct
                  LB_pass))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
-
-    module Tx_rollup = struct
-      open Data_encoding
-
-      let path = RPC_path.(path / "tx_rollup")
-
-      module Inbox = struct
-        let path = RPC_path.(path / "inbox")
-
-        let message_hash =
-          RPC_service.post_service
-            ~description:"Compute the hash of a message"
-            ~query:RPC_query.empty
-            ~input:(obj1 (req "message" Tx_rollup_message.encoding))
-            ~output:(obj1 (req "hash" Tx_rollup_message_hash.encoding))
-            RPC_path.(path / "message_hash")
-
-        let merkle_tree_hash =
-          RPC_service.post_service
-            ~description:"Compute the merkle tree hash of an inbox"
-            ~query:RPC_query.empty
-            ~input:
-              (obj1
-                 (req "message_hashes" (list Tx_rollup_message_hash.encoding)))
-            ~output:(obj1 (req "hash" Tx_rollup_inbox.Merkle.root_encoding))
-            RPC_path.(path / "merkle_tree_hash")
-
-        let merkle_tree_path =
-          RPC_service.post_service
-            ~description:"Compute a path of an inbox message in a merkle tree"
-            ~query:RPC_query.empty
-            ~input:
-              (obj2
-                 (req "message_hashes" (list Tx_rollup_message_hash.encoding))
-                 (req "position" int16))
-            ~output:(obj1 (req "path" Tx_rollup_inbox.Merkle.path_encoding))
-            RPC_path.(path / "merkle_tree_path")
-      end
-
-      module Commitment = struct
-        let path = RPC_path.(path / "commitment")
-
-        let merkle_tree_hash =
-          RPC_service.post_service
-            ~description:"Compute the merkle tree hash of a commitment"
-            ~query:RPC_query.empty
-            ~input:
-              (obj1
-                 (req
-                    "message_result_hashes"
-                    (list Tx_rollup_message_result_hash.encoding)))
-            ~output:
-              (obj1 (req "hash" Tx_rollup_commitment.Merkle_hash.encoding))
-            RPC_path.(path / "merkle_tree_hash")
-
-        let merkle_tree_path =
-          RPC_service.post_service
-            ~description:
-              "Compute a path of a message result hash in the commitment \
-               merkle tree"
-            ~query:RPC_query.empty
-            ~input:
-              (obj2
-                 (req
-                    "message_result_hashes"
-                    (list Tx_rollup_message_result_hash.encoding))
-                 (req "position" int16))
-            ~output:
-              (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
-            RPC_path.(path / "merkle_tree_path")
-
-        let message_result_hash =
-          RPC_service.post_service
-            ~description:"Compute the message result hash"
-            ~query:RPC_query.empty
-            ~input:Tx_rollup_message_result.encoding
-            ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
-            RPC_path.(path / "message_result_hash")
-      end
-
-      module Withdraw = struct
-        let path = RPC_path.(path / "withdraw")
-
-        let withdraw_list_hash =
-          RPC_service.post_service
-            ~description:"Compute the hash of a withdraw list"
-            ~query:RPC_query.empty
-            ~input:
-              (obj1 (req "withdraw_list" (list Tx_rollup_withdraw.encoding)))
-            ~output:(obj1 (req "hash" Tx_rollup_withdraw_list_hash.encoding))
-            RPC_path.(path / "withdraw_list_hash")
-      end
-    end
   end
 
   let register () =
@@ -2836,46 +2697,7 @@ module Forge = struct
                seed_nonce_hash;
                proof_of_work_nonce;
                liquidity_baking_toggle_vote;
-             })) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Inbox.message_hash
-      (fun () message ->
-        return (Tx_rollup_message_hash.hash_uncarbonated message)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Inbox.merkle_tree_hash
-      (fun () message_hashes ->
-        return (Tx_rollup_inbox.Merkle.merklize_list message_hashes)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Inbox.merkle_tree_path
-      (fun () (message_hashes, position) ->
-        Lwt.return (Tx_rollup_inbox.Merkle.compute_path message_hashes position)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Commitment.merkle_tree_hash
-      (fun () message_result_hashes ->
-        let open Tx_rollup_commitment.Merkle in
-        let tree = List.fold_left snoc nil message_result_hashes in
-        return (root tree)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Commitment.merkle_tree_path
-      (fun () (message_result_hashes, position) ->
-        let open Tx_rollup_commitment.Merkle in
-        let tree = List.fold_left snoc nil message_result_hashes in
-        Lwt.return (compute_path tree position)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Commitment.message_result_hash
-      (fun () message_result ->
-        return (Tx_rollup_message_result_hash.hash_uncarbonated message_result)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Withdraw.withdraw_list_hash
-      (fun () withdrawals ->
-        return (Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals))
+             }))
 
   module Manager = struct
     let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
@@ -3688,7 +3510,6 @@ let register () =
   Validators.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
-  Tx_rollup.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
       if q.offset < 0l then tzfail Negative_level_offset
       else
