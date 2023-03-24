@@ -181,7 +181,7 @@ module Make (C : AUTOMATON_CONFIG) :
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4982
 
      This module is incomplete. *)
-  module Memory_cache = struct
+  module Message_cache = struct
     type value = {message : message; access : int Peer.Map.t}
 
     type t = {messages : value Message_id.Map.t}
@@ -225,7 +225,7 @@ module Make (C : AUTOMATON_CONFIG) :
     mesh : Peer.Set.t Topic.Map.t;
     fanout : fanout_peers Topic.Map.t;
     seen_messages : Message_id.Set.t;
-    memory_cache : Memory_cache.t;
+    message_cache : Message_cache.t;
     rng : Random.State.t;
     heartbeat_ticks : int64;
   }
@@ -280,7 +280,7 @@ module Make (C : AUTOMATON_CONFIG) :
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
       seen_messages = Message_id.Set.empty;
-      memory_cache = Memory_cache.create ();
+      message_cache = Message_cache.create ();
       rng;
       heartbeat_ticks = 0L;
     }
@@ -337,7 +337,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let peer_filter state = state.parameters.peer_filter
 
-    let memory_cache state = state.memory_cache
+    let message_cache state = state.message_cache
 
     let rng state = state.rng
 
@@ -395,7 +395,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let {mesh; _} = state in
       match Topic.Map.find topic mesh with None -> false | Some _ -> true
 
-    let set_memory_cache memory_cache state = ({state with memory_cache}, ())
+    let set_message_cache message_cache state = ({state with message_cache}, ())
 
     let get_connections_score connections ~default peer =
       match Peer.Map.find peer connections with
@@ -466,8 +466,8 @@ module Make (C : AUTOMATON_CONFIG) :
       let state =
         {
           state with
-          memory_cache =
-            Memory_cache.add_message message_id message state.memory_cache;
+          message_cache =
+            Message_cache.add_message message_id message state.message_cache;
         }
       in
       (state, ())
@@ -611,31 +611,34 @@ module Make (C : AUTOMATON_CONFIG) :
          Score check is missing.
       *)
       let routed_message_ids = Message_id.Map.empty in
-      let*! memory_cache in
+      let*! message_cache in
       let*! peer_filter in
-      let memory_cache, routed_message_ids =
+      let message_cache, routed_message_ids =
         (* FIXME https://gitlab.com/tezos/tezos/-/issues/5011
 
            A check should ensure that the number of accesses do not
            exceed some pre-defined limit. *)
         List.fold_left
-          (fun (memory_cache, messages) message_id ->
-            let memory_cache, info =
+          (fun (message_cache, messages) message_id ->
+            let message_cache, info =
               match
-                Memory_cache.record_message_access peer message_id memory_cache
+                Message_cache.record_message_access
+                  peer
+                  message_id
+                  message_cache
               with
-              | None -> (memory_cache, `Not_found)
-              | Some (memory_cache, message) ->
-                  ( memory_cache,
+              | None -> (message_cache, `Not_found)
+              | Some (message_cache, message) ->
+                  ( message_cache,
                     if peer_filter peer (`IWant message_id) then
                       `Message message
                     else `Ignored )
             in
-            (memory_cache, Message_id.Map.add message_id info messages))
-          (memory_cache, routed_message_ids)
+            (message_cache, Message_id.Map.add message_id info messages))
+          (message_cache, routed_message_ids)
           message_ids
       in
-      let* () = set_memory_cache memory_cache in
+      let* () = set_message_cache message_cache in
       On_iwant_messages_to_route {routed_message_ids} |> return
   end
 
@@ -1474,12 +1477,12 @@ module Make (C : AUTOMATON_CONFIG) :
       last_published_time : time;
     }
 
-    module Memory_cache = struct
-      include Memory_cache
+    module Message_cache = struct
+      include Message_cache
 
       let get_value message_id state =
-        Message_id.Map.find_opt message_id state.memory_cache.messages
-        |> Option.map (fun Memory_cache.{message; access} -> {message; access})
+        Message_id.Map.find_opt message_id state.message_cache.messages
+        |> Option.map (fun Message_cache.{message; access} -> {message; access})
     end
 
     type view = state = {
@@ -1491,7 +1494,7 @@ module Make (C : AUTOMATON_CONFIG) :
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
       seen_messages : Message_id.Set.t;
-      memory_cache : Memory_cache.t;
+      message_cache : Message_cache.t;
       rng : Random.State.t;
       heartbeat_ticks : int64;
     }

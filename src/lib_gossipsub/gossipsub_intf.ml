@@ -424,12 +424,12 @@ module type AUTOMATON = sig
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
-    module Memory_cache : sig
+    module Message_cache : sig
       type value = {message : message; access : int Peer.Map.t}
 
       type t = {messages : value Message_id.Map.t}
 
-      (** [get_memory_cache_value message_id state] returns the
+      (** [get_message_cache_value message_id state] returns the
           cached value for [message_id]. *)
       val get_value : Message_id.t -> state -> value option
     end
@@ -443,7 +443,7 @@ module type AUTOMATON = sig
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
       seen_messages : Message_id.Set.t;
-      memory_cache : Memory_cache.t;
+      message_cache : Message_cache.t;
       rng : Random.State.t;
       heartbeat_ticks : int64;
     }

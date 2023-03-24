@@ -55,10 +55,10 @@ let assert_fanout_size ~__LOC__ ~topic ~expected_size state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
-let assert_in_memory_cache ~__LOC__ message_id ~expected_message state =
-  match GS.Introspection.Memory_cache.get_value message_id state with
+let assert_in_message_cache ~__LOC__ message_id ~expected_message state =
+  match GS.Introspection.Message_cache.get_value message_id state with
   | None ->
-      Test.fail "Expected entry in memory cache for message id %d" message_id
+      Test.fail "Expected entry in message cache for message id %d" message_id
   | Some {message; access = _} ->
       Check.(
         (message = expected_message)
@@ -397,7 +397,7 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
 
 (** Tests that publishing to a subscribed topic:
     - Returns peers to publish to.
-    - Inserts message into memory cache.
+    - Inserts message into message cache.
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L629
 *)
@@ -432,8 +432,8 @@ let test_publish_without_flood_publishing rng limits parameters =
       int
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
-  (* [message_id] should be added to the memory cache. *)
-  assert_in_memory_cache
+  (* [message_id] should be added to the message cache. *)
+  assert_in_message_cache
     ~__LOC__
     message_id
     ~expected_message:publish_data
@@ -442,7 +442,7 @@ let test_publish_without_flood_publishing rng limits parameters =
 (** Tests that publishing to an unsubscribed topic:
     - Populate fanout peers.
     - Return peers to publish to.
-    - Inserts message into the memory cache.
+    - Inserts message into the message cache.
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L715
 *)
@@ -481,8 +481,8 @@ let test_fanout rng limits parameters =
       int
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
-  (* [message_id] should be added to the memory cache. *)
-  assert_in_memory_cache
+  (* [message_id] should be added to the message cache. *)
+  assert_in_message_cache
     ~__LOC__
     message_id
     ~expected_message:publish_data
