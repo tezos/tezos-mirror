@@ -53,10 +53,10 @@ let regression_test ~__FILE__ ?(tags = []) title f =
   let tags = "dac" :: tags in
   Protocol.register_regression_test ~__FILE__ ~title ~tags f
 
-let assert_lwt_failure ?__LOC__ msg unit_lwt =
+let assert_lwt_failure ?__LOC__ msg lwt_under_inspection =
   let* passed =
     Lwt.catch
-      (fun () -> Lwt.map (fun () -> false) unit_lwt)
+      (fun () -> Lwt.map (fun _a -> false) lwt_under_inspection)
       (fun _exn -> return true)
   in
   if passed then unit else Test.fail ?__LOC__ msg
@@ -1186,6 +1186,57 @@ let test_get_certificate _protocol _tezos_node _tz_client coordinator _threshold
   assert_verify_aggregate_signature [member] hex_root_hash certificate ;
   unit
 
+(* 1. Observer should fetch missing page from Coordinator when GET /missing_page/{hash}
+      is called.
+   2. As a side effect, Observer should save fetched page into its page store before
+      returning it in the response. This can be observer by checking the result of
+      retrieving preimage before and after the GET /missing_page/{hash} call.*)
+let test_observer_get_missing_page _protocol node client coordinator threshold
+    dac_members =
+  let root_hash =
+    "00649d431e829f4adc68edecb8d8d8071154b57086cc124b465f6f6600a4bc91c7"
+  in
+  let root_hash_stream_promise =
+    wait_for_root_hash_pushed_to_data_streamer coordinator root_hash
+  in
+  let* hex_root_hash =
+    init_hex_root_hash ~payload:"test payload abc 123" coordinator
+  in
+  assert (root_hash = Hex.show hex_root_hash) ;
+  let* () = root_hash_stream_promise in
+  let observer =
+    Dac_node.create_legacy
+      ~threshold
+      ~committee_members:
+        (List.map
+           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
+           dac_members)
+      ~node
+      ~client
+      ()
+  in
+  let* _ = Dac_node.init_config observer in
+  let () = Legacy.set_coordinator observer coordinator in
+  let* () = Dac_node.run observer in
+  let* () =
+    assert_lwt_failure
+      ~__LOC__
+      "Expected retrieve_preimage"
+      (RPC.call observer (Dac_rpc.get_preimage (Hex.show hex_root_hash)))
+  in
+  let* missing_page =
+    RPC.call observer (Dac_rpc.get_missing_page ~hex_root_hash)
+  in
+  let* coordinator_page =
+    RPC.call coordinator (Dac_rpc.get_preimage (Hex.show hex_root_hash))
+  in
+  check_preimage coordinator_page missing_page ;
+  let* observer_preimage =
+    RPC.call observer (Dac_rpc.get_preimage (Hex.show hex_root_hash))
+  in
+  check_preimage coordinator_page observer_preimage ;
+  unit
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   test_dac_node_startup protocols ;
@@ -1267,4 +1318,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "dac_store_member_signature"
     Signature_manager.Coordinator.test_handle_store_signature
+    protocols ;
+  scenario_with_layer1_and_legacy_dac_nodes
+    ~threshold:0
+    ~committee_members:1
+    ~tags:["dac"; "dac_node"]
+    "dac_observer_get_missing_page"
+    test_observer_get_missing_page
     protocols

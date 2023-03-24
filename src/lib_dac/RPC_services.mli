@@ -49,6 +49,19 @@ val get_certificate :
     Certificate_repr.t option )
   Tezos_rpc.Service.service
 
+(**  GET dac/missing_page/[page_hash] Observer fetches the missing page 
+  from a Coordinator node. The missing page is then saved to a 
+  page store before returning the page as a response. *)
+val get_missing_page :
+  Dac_plugin.t ->
+  ( [`GET],
+    'a,
+    'a * Dac_plugin.hash,
+    unit,
+    unit,
+    Bytes.t )
+  Tezos_rpc.Service.service
+
 module Coordinator : sig
   (** POST dac/preimage sends a [payload] to the DAC
     [Coordinator]. It returns a hex encoded root page hash, 

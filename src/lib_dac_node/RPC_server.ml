@@ -154,6 +154,17 @@ let handle_get_certificate ctx root_hash =
       Certificate_repr.{aggregate_signature; witnesses; root_hash})
     value_opt
 
+let handle_get_missing_page cctxt page_store dac_plugin root_hash =
+  let open Lwt_result_syntax in
+  let remote_store = Page_store.Remote.(init {cctxt; page_store}) in
+  let* preimage =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5142
+        Retrieve missing page from dac committee via "flooding". *)
+    Page_store.Remote.load dac_plugin remote_store root_hash
+  in
+  let*! () = Event.(emit (fetched_missing_page dac_plugin) root_hash) in
+  return preimage
+
 let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer
     directory =
   directory
@@ -216,6 +227,19 @@ let register_get_certificate ctx dac_plugin =
     (RPC_services.get_certificate dac_plugin)
     (fun root_hash () () -> handle_get_certificate ctx root_hash)
 
+let register_get_missing_page ctx dac_plugin =
+  match (Node_context.get_config ctx).mode with
+  | Legacy _ | Observer _ ->
+      add_service
+        Tezos_rpc.Directory.register1
+        (RPC_services.get_missing_page dac_plugin)
+        (fun root_hash () () ->
+          let open Lwt_result_syntax in
+          let page_store = Node_context.get_page_store ctx in
+          let*? cctxt = Node_context.get_coordinator_client ctx in
+          handle_get_missing_page cctxt page_store dac_plugin root_hash)
+  | Coordinator _ | Committee_member _ -> Fun.id
+
 let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
     hash_streamer =
   let page_store = Node_context.get_page_store node_context in
@@ -235,6 +259,7 @@ let register dac_plugin node_context cctxt dac_public_keys_opt dac_sk_uris
      "/preimage" endpoint should be moved out of the [start_legacy]. *)
   |> register_coordinator_post_preimage dac_plugin hash_streamer page_store
   |> register_get_certificate node_context dac_plugin
+  |> register_get_missing_page node_context dac_plugin
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4750
    Move this to RPC_server.Legacy once all operating modes are supported. *)
