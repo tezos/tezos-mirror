@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_tree_encoding)
+(library
+ (name src_lib_tree_encoding_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-tree-encoding
   tezos-base.unix
@@ -12,14 +14,31 @@
   tezos-test-helpers
   tezos-webassembly-interpreter
   qcheck-alcotest
-  alcotest-lwt)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_tree_encoding test_proofs test_encoding))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_tree_encoding_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
- (alias runtest)
+ (alias runtezt)
  (package tezos-tree-encoding-test)
- (action (run %{dep:./test_tree_encoding.exe})))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
