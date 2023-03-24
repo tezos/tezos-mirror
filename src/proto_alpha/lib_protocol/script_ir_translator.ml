@@ -1762,9 +1762,8 @@ let parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
             Script_string.of_string v >|? fun s -> (s, ctxt) )
   | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
 
-let parse_toplevel :
-    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy:_ toplevel ->
+let parse_toplevel : context -> Script.expr -> (toplevel * context) tzresult =
+ fun ctxt toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
   match root toplevel with
@@ -4000,7 +3999,7 @@ and parse_instr :
          contracts but then we throw away the typed version, except for the
          storage type which is kept for efficiency in the ticket scanner. *)
       let canonical_code = Micheline.strip_locations code in
-      parse_toplevel ctxt ~legacy canonical_code
+      parse_toplevel ctxt canonical_code
       >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
@@ -4641,8 +4640,7 @@ and parse_contract :
                       code
                     >>? fun (code, ctxt) ->
                     (* can only fail because of gas *)
-                    parse_toplevel ctxt ~legacy:true code
-                    >>? fun ({arg_type; _}, ctxt) ->
+                    parse_toplevel ctxt code >>? fun ({arg_type; _}, ctxt) ->
                     parse_parameter_ty_and_entrypoints
                       ctxt
                       ~stack_depth:(stack_depth + 1)
@@ -4768,7 +4766,7 @@ let parse_code :
   >>?= fun (code, ctxt) ->
   let legacy = elab_conf.legacy in
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  parse_toplevel ctxt ~legacy code
+  parse_toplevel ctxt code
   >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
   let arg_type_loc = location arg_type in
   record_trace
@@ -4878,7 +4876,7 @@ let typecheck_code :
  fun ~unparse_code_rec ~legacy ~show_types ctxt code ->
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  parse_toplevel ctxt ~legacy code >>?= fun (toplevel, ctxt) ->
+  parse_toplevel ctxt code >>?= fun (toplevel, ctxt) ->
   let {arg_type; storage_type; code_field; views} = toplevel in
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
@@ -5513,9 +5511,9 @@ let unparse_code ctxt mode code =
 let parse_contract_data context loc arg_ty contract ~entrypoint =
   parse_contract_data ~stack_depth:0 context loc arg_ty contract ~entrypoint
 
-let parse_toplevel ctxt ~legacy toplevel =
+let parse_toplevel ctxt toplevel =
   Global_constants_storage.expand ctxt toplevel >>=? fun (ctxt, toplevel) ->
-  Lwt.return @@ parse_toplevel ctxt ~legacy toplevel
+  Lwt.return @@ parse_toplevel ctxt toplevel
 
 let parse_comparable_ty = parse_comparable_ty ~stack_depth:0
 

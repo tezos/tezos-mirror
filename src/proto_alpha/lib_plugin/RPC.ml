@@ -1067,7 +1067,7 @@ module Scripts = struct
       let ctxt = Gas.set_unlimited ctxt in
       let legacy = false in
       let open Script_ir_translator in
-      parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
+      parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
       Lwt.return
         ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
         >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _) ->
@@ -1083,9 +1083,8 @@ module Scripts = struct
     in
     let script_view_type ctxt contract expr view =
       let ctxt = Gas.set_unlimited ctxt in
-      let legacy = false in
       let open Script_ir_translator in
-      parse_toplevel ctxt ~legacy expr >>=? fun ({views; _}, _) ->
+      parse_toplevel ctxt expr >>=? fun ({views; _}, _) ->
       Lwt.return
         ( Script_string.of_string view >>? fun view_name ->
           match Script_map.get view_name views with
@@ -1607,7 +1606,7 @@ module Scripts = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
+        parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
         Lwt.return
           ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
           >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
