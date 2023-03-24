@@ -82,6 +82,14 @@ module Denunciator = struct
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
+  let double_consensus_already_denounced =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"double_consensus_already_denounced"
+      ~msg:"double consensus operation already denounced in {hash}"
+      ("hash", Operation_hash.encoding)
+
   let inconsistent_endorsement =
     declare_1
       ~section
