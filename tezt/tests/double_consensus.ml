@@ -228,8 +228,68 @@ let double_preendorsement_wrong_block_payload_hash =
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash preendorse_utils protocol
 
+let double_consensus_wrong_branch
+    (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
+  let* (client, accuser), (_branch, level, round, slots, block_payload_hash) =
+    double_endorsement_init consensus_for consensus_name protocol ()
+  in
+  let* branch = Operation.Manager.get_branch ~offset:4 client in
+  Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
+  let op =
+    mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
+  in
+  let waiter = consensus_waiter accuser in
+  let* _ =
+    Operation.Consensus.inject
+      ~force:true
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter in
+  Log.info
+    "Inject another invalid %s and wait for already_denounced event"
+    consensus_name ;
+  let* branch = Operation.Manager.get_branch ~offset:5 client in
+  let op =
+    mk_consensus ~slot:(List.nth slots 2) ~level ~round ~block_payload_hash
+  in
+  let* oph = get_double_consensus_denounciation_hash consensus_name client in
+  let waiter_already_denounced =
+    double_consensus_already_denounced_waiter accuser oph
+  in
+  let* _ =
+    Operation.Consensus.inject
+      ~force:true
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter_already_denounced in
+  unit
+
+let double_endorsement_wrong_branch =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double endorsement using wrong branch"
+    ~supports:Protocol.(From_protocol (number Nairobi))
+    ~tags:["double"; "endorsement"; "accuser"; "branch"; "node"]
+  @@ fun protocol -> double_consensus_wrong_branch endorse_utils protocol
+
+let double_preendorsement_wrong_branch =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double preendorsement using wrong branch"
+    ~supports:Protocol.(From_protocol (number Nairobi))
+    ~tags:["double"; "preendorsement"; "accuser"; "branch"; "node"]
+  @@ fun protocol -> double_consensus_wrong_branch preendorse_utils protocol
+
 let register ~protocols =
   double_endorsement_wrong_slot protocols ;
   double_preendorsement_wrong_slot protocols ;
   double_endorsement_wrong_block_payload_hash protocols ;
-  double_preendorsement_wrong_block_payload_hash protocols
+  double_preendorsement_wrong_block_payload_hash protocols ;
+  double_endorsement_wrong_branch protocols ;
+  double_preendorsement_wrong_branch protocols
