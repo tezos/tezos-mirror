@@ -1764,7 +1764,7 @@ let parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
 
 let parse_toplevel :
     context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy toplevel ->
+ fun ctxt ~legacy:_ toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
   match root toplevel with
@@ -1829,30 +1829,10 @@ let parse_toplevel :
           Some (s, sloc, sannot),
           Some (c, cloc, cannot),
           views ) ->
-          let p_pannot =
-            (* root name can be attached to either the parameter
-               primitive or the toplevel constructor (legacy only).
-
-               In the latter case we move it to the parameter type.
-            *)
-            Script_ir_annot.has_field_annot p >>? function
-            | true -> ok (p, pannot)
-            | false -> (
-                match pannot with
-                | [single] when legacy -> (
-                    is_field_annot ploc single >|? fun is_field_annot ->
-                    match (is_field_annot, p) with
-                    | true, Prim (loc, prim, args, annots) ->
-                        (Prim (loc, prim, args, single :: annots), [])
-                    | _ -> (p, []))
-                | _ -> ok (p, pannot))
-          in
-          (* only one field annot is allowed to set the root entrypoint name *)
-          p_pannot >>? fun (arg_type, pannot) ->
           Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
+          ({code_field = c; arg_type = p; views; storage_type = s}, ctxt))
 
 (* Normalize lambdas during parsing *)
 
