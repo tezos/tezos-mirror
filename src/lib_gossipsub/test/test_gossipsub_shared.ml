@@ -112,6 +112,8 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     degree_high;
     degree_score;
     degree_out;
+    history_length;
+    history_gossip_length;
   } =
     l
   in
@@ -133,7 +135,9 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      degree_low = %d;@;\
      degree_high = %d;@;\
      degree_score = %d;@;\
-     degree_out = %d }@]"
+     degree_out = %d;@;\
+     history_length = %d;@;\
+     history_gossip_length = %d }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
     degree_optimal
@@ -156,3 +160,5 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     degree_high
     degree_score
     degree_out
+    history_length
+    history_gossip_length

@@ -55,17 +55,24 @@ let assert_fanout_size ~__LOC__ ~topic ~expected_size state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
-let assert_in_message_cache ~__LOC__ message_id ~expected_message state =
-  match GS.Introspection.Message_cache.get_value message_id state with
+(* Note: a new message cache state is returned when inspecting it, but this
+   function does not return this updated state! *)
+let assert_in_message_cache ~__LOC__ message_id ~peer ~expected_message state =
+  let view = GS.Introspection.view state in
+  match
+    GS.Introspection.Message_cache.get_message_for_peer
+      peer
+      message_id
+      view.message_cache
+  with
   | None ->
       Test.fail "Expected entry in message cache for message id %d" message_id
-  | Some {message; access = _} ->
+  | Some (_message_cache_state, message, _access) ->
       Check.(
         (message = expected_message)
           string
           ~error_msg:"Expected %R, got %L"
-          ~__LOC__) ;
-      unit
+          ~__LOC__)
 
 let assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included state =
   let view = GS.Introspection.view state in
@@ -436,8 +443,10 @@ let test_publish_without_flood_publishing rng limits parameters =
   assert_in_message_cache
     ~__LOC__
     message_id
+    ~peer:(Stdlib.List.hd peers)
     ~expected_message:publish_data
-    state
+    state ;
+  unit
 
 (** Tests that publishing to an unsubscribed topic:
     - Populate fanout peers.
@@ -485,8 +494,10 @@ let test_fanout rng limits parameters =
   assert_in_message_cache
     ~__LOC__
     message_id
+    ~peer:(Stdlib.List.hd peers)
     ~expected_message:publish_data
-    state
+    state ;
+  unit
 
 (** Tests that a peer is added to our mesh on graft when we are both
     joined/subscribed to the same topic.

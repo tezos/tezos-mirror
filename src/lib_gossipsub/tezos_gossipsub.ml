@@ -178,40 +178,10 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type connections = connection Peer.Map.t
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4982
-
-     This module is incomplete. *)
-  module Message_cache = struct
-    type value = {message : message; access : int Peer.Map.t}
-
-    type t = {messages : value Message_id.Map.t}
-
-    let create () = {messages = Message_id.Map.empty}
-
-    let record_message_access peer message_id t =
-      match Message_id.Map.find message_id t.messages with
-      | None -> None
-      | Some {message; access} ->
-          let access =
-            Peer.Map.update
-              peer
-              (function None -> Some 1 | Some x -> Some (x + 1))
-              access
-          in
-          let t =
-            {
-              messages =
-                Message_id.Map.add message_id {message; access} t.messages;
-            }
-          in
-          Some (t, message)
-
-    let add_message message_id message t =
-      let value = {message; access = Peer.Map.empty} in
-      {messages = Message_id.Map.add message_id value t.messages}
-  end
-
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
+
+  module Message_cache =
+    Message_cache.Make (Peer) (Topic) (Message_id) (Message)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
 
@@ -266,7 +236,9 @@ module Make (C : AUTOMATON_CONFIG) :
        requirement or delete the todo. *)
     assert (l.degree_score + l.degree_out <= l.degree_optimal) ;
     assert (l.degree_out < l.degree_low) ;
-    assert (l.degree_out <= l.degree_optimal / 2)
+    assert (l.degree_out <= l.degree_optimal / 2) ;
+    assert (l.history_gossip_length > 0) ;
+    assert (l.history_gossip_length <= l.history_length)
 
   let make : Random.State.t -> limits -> parameters -> state =
    fun rng limits parameters ->
@@ -280,7 +252,10 @@ module Make (C : AUTOMATON_CONFIG) :
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
       seen_messages = Message_id.Set.empty;
-      message_cache = Message_cache.create ();
+      message_cache =
+        Message_cache.create
+          ~history_slots:limits.history_length
+          ~gossip_slots:limits.history_gossip_length;
       rng;
       heartbeat_ticks = 0L;
     }
@@ -462,12 +437,16 @@ module Make (C : AUTOMATON_CONFIG) :
       let state = {state with fanout = Topic.Map.remove topic state.fanout} in
       (state, ())
 
-    let put_message_in_cache message_id message state =
+    let put_message_in_cache message_id message topic state =
       let state =
         {
           state with
           message_cache =
-            Message_cache.add_message message_id message state.message_cache;
+            Message_cache.add_message
+              message_id
+              message
+              topic
+              state.message_cache;
         }
       in
       (state, ())
@@ -622,13 +601,10 @@ module Make (C : AUTOMATON_CONFIG) :
           (fun (message_cache, messages) message_id ->
             let message_cache, info =
               match
-                Message_cache.record_message_access
-                  peer
-                  message_id
-                  message_cache
+                Message_cache.get_message_for_peer peer message_id message_cache
               with
               | None -> (message_cache, `Not_found)
-              | Some (message_cache, message) ->
+              | Some (message_cache, message, _access_counter) ->
                   ( message_cache,
                     if peer_filter peer (`IWant message_id) then
                       `Message message
@@ -841,7 +817,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let handle ~sender topic message_id message : [`Publish] output Monad.t =
       let open Monad.Syntax in
-      let* () = put_message_in_cache message_id message in
+      let* () = put_message_in_cache message_id message topic in
       let*! mesh_opt = find_mesh topic in
       let* peers =
         match mesh_opt with
@@ -1477,13 +1453,7 @@ module Make (C : AUTOMATON_CONFIG) :
       last_published_time : time;
     }
 
-    module Message_cache = struct
-      include Message_cache
-
-      let get_value message_id state =
-        Message_id.Map.find_opt message_id state.message_cache.messages
-        |> Option.map (fun Message_cache.{message; access} -> {message; access})
-    end
+    module Message_cache = Message_cache
 
     type view = state = {
       limits : limits;
