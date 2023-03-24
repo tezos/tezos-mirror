@@ -42,7 +42,7 @@ To learn more about Tezos, its implementation, and its ecosystem, see :doc:`intr
 
     <summary><a>Newcomer to Tezos? Come and participate! (See more) </a> </summary><div style="max-width:1000px; margin-top:1em; margin-left:2em">
 
-Start participating to Tezos by following the `Introduction` section in the documentation menu.
+Start participating to Tezos by following the ``Introduction`` section in the documentation menu.
 
 These tutorials explain:
 
@@ -131,19 +131,19 @@ For Tezos developers, this website mostly provides reference and API documentati
 
     <details>
 
-    <summary><a>Are you a core developer? Here are the nuts and bolts! (See more)</a></summary><div style="max-width:1000px; margin-top:1em; margin-left:2em">
+    <summary><a>Are you a platform developer? Here are the nuts and bolts! (See more)</a></summary><div style="max-width:1000px; margin-top:1em; margin-left:2em">
 
-The main focus of this technical documentation website is on resources for core developers, that is, contributors to the Tezos platform, and in particular to its Octez implementation.
+The main focus of this technical documentation website is on resources for platform developers, that is, those contributing to the Tezos platform, including contributors to its Octez implementation (Octez developers) and contributors to the Tezos protocol (protocol developers).
 
-Core developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Core Developer`` section, including:
+Platform developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Platform Developer`` section, including:
 
 - a tutorial on the various forms of contributing (:doc:`developer/contributing`), and guidelines such as :doc:`developer/guidelines`
 - programming tutorials covering various libraries and frameworks specific to the Octez OCaml implementation, such as using :doc:`developer/gadt`, using :doc:`developer/error_monad`, using :doc:`developer/clic`, :doc:`developer/event_logging_framework`, etc.
 - howtos for specific maintenance tasks such as :doc:`developer/michelson_instructions`, :doc:`developer/protocol_environment_upgrade`, or :doc:`developer/howto-freeze-protocols`
 - a whole subsection on the :doc:`various testing frameworks <developer/testing_index>` for Octez, explaining how to use them and how to add different kinds of tests
-- presentations of various tools for core developers, such as support for :doc:`developer/profiling` and :doc:`developer/snoop`.
+- presentations of various tools for platform developers, such as support for :doc:`developer/profiling` and :doc:`developer/snoop`.
 
-Core developers are also provided reference materials for internal APIs of Octez, such as:
+Platform developers are also provided reference materials for internal APIs of Octez, such as:
 
 - The :doc:`API of OCaml libraries and modules <api/api-inline>` reference
 - The :doc:`shell/p2p_api` reference
@@ -223,15 +223,18 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Developer doc
+   :caption: Tezos developer doc
    :hidden:
 
    developer/rpc
    developer/michelson_anti_patterns
+   developer/openmetrics
+   api/errors
+   api/openapi
 
 .. toctree::
    :maxdepth: 2
-   :caption: Core Developer doc
+   :caption: Platform developer doc
    :hidden:
 
    developer/contributing_index
@@ -242,7 +245,7 @@ Core developers are also provided reference materials for internal APIs of Octez
    developer/tools
    developer/encodings
    developer/merkle-proof-encoding-formats
-   developer/openmetrics
+   api/api-inline
 
 .. toctree::
    :maxdepth: 2
@@ -263,12 +266,3 @@ Core developers are also provided reference materials for internal APIs of Octez
    releases/releases
    releases/version-16
    releases/history
-
-.. toctree::
-   :maxdepth: 2
-   :caption: APIs
-   :hidden:
-
-   api/api-inline
-   api/openapi
-   api/errors

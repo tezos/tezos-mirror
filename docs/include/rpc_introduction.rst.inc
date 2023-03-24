@@ -1,9 +1,5 @@
-This page describes the RPCs specific to a particular version of the Tezos protocol (specified below).
-
-.. note::
-
-    They are all served under the prefix ``/chains/<chain_id>/blocks/<block_id>/``.
-    To make the RPC reference more readable, this prefix is not repeated every time below, but instead shortened as ``../``.
+This page describes the RPCs specific to the particular version of the Tezos protocol specified above.
+(The protocol-independent RPCs are described :doc:`in this other page <../shell/rpc>`.)
 
 .. warning::
 
@@ -11,9 +7,6 @@ This page describes the RPCs specific to a particular version of the Tezos proto
     specification <../api/openapi>` may be used to retrieve the
     complete list of protocol RPCs and their associated schemas
     (search the ``.json`` files that are linked from that page).
-
-RPCs - Index
-************
 
 Note that the RPCs served under a given prefix can also be listed using the client, e.g.::
 
@@ -24,7 +17,7 @@ retrieve all JSON and binary schemas, e.g.::
 
     octez-client rpc get /describe/chains/main/blocks/head/context/constants
 
-Shell
-=====
+.. note::
 
-The protocol-independent RPCs are described :doc:`in this other page <../shell/rpc>`.
+    The protocol-specific RPCs are all served under the prefix ``/chains/<chain_id>/blocks/<block_id>/``.
+    To make the RPC reference more readable, this prefix is not repeated every time below, but instead shortened as ``../``.
