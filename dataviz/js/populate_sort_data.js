@@ -64,6 +64,14 @@ function get_info_block(dict_data, msec = false) {
     });
     return [t_delay_block, t_baker, max_round]
 }
+
+function get_operation_reception_time(operation) {
+    if ("received_in_mempools" in operation && Array.isArray(operation["received_in_mempools"]) && operation["received_in_mempools"].length > 0) {
+	return Math.min(...operation["received_in_mempools"].map(v => new Date(v["reception_time"])));
+    }
+    else return null;
+}
+
 function delegate_delays_distribution_of_operations(dict_data, delegate, msec = false) {
     let t_valid = []
     let complete_delays = delays_distribution_of_operations(dict_data, msec)
@@ -84,12 +92,13 @@ function delegate_delays_distribution_of_operations(dict_data, delegate, msec = 
                     baker_ops["operations"].forEach((operation) => {
                         let round_cib = 0;
                         if ("round" in operation) round_cib = operation["round"];
-                        if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
+			reception_time = get_operation_reception_time(operation);
+                        if ((round_cib in t_baker) && reception_time != null) {
                             let delay
                             if (msec == false) {
-                                delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                                delay = new Date(reception_time - t_baker[round_cib]).getSeconds();
                             } else {
-                                delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
+                                delay = reception_time - t_baker[round_cib];
                             }
 
                             if (("kind" in operation) && (va in delays_preendorsement) && (round_cib in delays_preendorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
@@ -137,12 +146,13 @@ function delays_distribution_of_operations(dict_data, msec = false) {
                 baker_ops["operations"].forEach((operation) => {
                     let round_cib = 0;
                     if ("round" in operation) round_cib = operation["round"];
-                    if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
+		    reception_time = get_operation_reception_time(operation);
+                    if ((round_cib in t_baker) && reception_time != null) {
                         let delay
                         if (msec == false) {
-                            delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                            delay = new Date(reception_time - t_baker[round_cib]).getSeconds();
                         } else {
-                            delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
+                            delay = reception_time - t_baker[round_cib];
                         }
                         if (("kind" in operation)) {
                             t_op_pre_valid_i[round_cib].push(delay);
@@ -181,12 +191,13 @@ function delays_distribution_of_operations_w_delegate(dict_data, msec = false) {
                 baker_ops["operations"].forEach((operation) => {
                     let round_cib = 0;
                     if ("round" in operation) round_cib = operation["round"];
-                    if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
+		    reception_time = get_operation_reception_time(operation);
+                    if ((round_cib in t_baker) && reception_time != null) {
                         let delay
                         if (msec == false) {
-                            delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                            delay = new Date(reception_time - t_baker[round_cib]).getSeconds();
                         } else {
-                            delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
+                            delay = reception_time - t_baker[round_cib];
                         }
                         if (("kind" in operation)) {
                             t_op_pre_valid_i[round_cib][baker_ops["delegate"]] = delay;
@@ -212,64 +223,6 @@ function get_endorsing_power(dict_data) {
         });
     });
     return endorsing_power
-}
-
-
-function delays_distribution_of_operations_multi_nodes(dict_data, msec = false) { // return [{ height:{'nodeA':t_op_valide_i, 'nodeB':t_op_valide_i}}, t_op_pre_valide: { height:{'nodeA':t_op_pre_valide_i, 'nodeB':t_op_pre_valide_i}}]
-    //Get nodes name  
-
-    let nodes_used = []; // we store keys, used on server, to differentitate them
-    let t_op_valid = {};
-    let t_op_pre_valid = {};
-    Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valid_i = {};
-        let t_op_pre_valid_i = {};
-        let t_baker = {};
-
-        Object.entries(nodes_used).forEach((node_) => {
-
-            t_op_valid_i[node_] = {};
-            t_op_pre_valid_i[node_] = {};
-            if ("blocks" in v) {
-                v["blocks"].forEach((element) => {
-                    let round = 0;
-                    if ("round" in element) round = element["round"];
-                    if ("timestamp" in element) nodes_t_op[node_]["t_baker"][round] = new Date(element["timestamp"][node_]);
-                    nodes_t_op[node_]["t_op_valid_i"][round] = [];
-                    nodes_t_op[node_]["t_op_pre_valid_i"][round] = []
-
-                })
-            }
-        });
-        Object.entries(v["endorsements"]).forEach(([_k, baker_ops]) => {
-            if ("operations" in baker_ops)
-                baker_ops["operations"].forEach((operation) => {
-                    Object.entries(nodes_used).forEach((node_) => {
-                        let round_cib = 0;
-                        if ("round" in operation) round_cib = operation["round"];
-                        if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"][node_] != null) && (node_ in operation["reception_time"])) {
-                            let delay
-                            if (msec == false) {
-                                delay = new Date(new Date(operation["reception_time"][node_]) - t_baker[node_][round_cib]).getSeconds();
-                            } else {
-                                delay = (new Date(new Date(operation["reception_time"][node_]) - t_baker[node_][round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"][node_]) - t_baker[round_cib][node_]).getMilliseconds();
-                            }
-                            if (("kind" in operation)) {
-                                t_op_pre_valid_i[node_][round_cib].push(delay);
-                            }
-                            else {
-                                t_op_valid_i[node_][round_cib].push(delay);
-                            }
-                        }
-                    })
-                })
-        })
-        t_op_pre_valid[va] = t_op_pre_valid_i;
-        t_op_valid[va] = t_op_valid_i;
-    })
-    return nodes_t_op
-
-
 }
 
 function classify_operations(dict_data, delegate = "") {
@@ -306,7 +259,8 @@ function classify_operations(dict_data, delegate = "") {
                                 }
                             }
 			    //If the Operation is valid, the reception time does not exist or is null, but the operation is still included in the chain => preendo/endo ESCROW
-			    if ((!("errors" in operation)) && ((!("reception_time" in operation)) || (operation["reception_time"] == null))) {
+			    reception_time = get_operation_reception_time(operation);
+			    if (reception_time == null) {
                                 if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
                                     if (delegate == "") { // To look at operation of a specific delegate
                                         operations_logs[round_cib]["preendorsements"]["sequestered"].push(baker_ops["delegate"]);
@@ -323,7 +277,7 @@ function classify_operations(dict_data, delegate = "") {
                                 }
                             }
                             //If the OP is valid, reception time has a value, but the operation is not included in the block => endo forgotten
-                            if ((!("kind" in operation)) && (!("errors" in operation)) && (!("included_in_blocks" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
+                            if ((!("kind" in operation)) && (!("included_in_blocks" in operation)) && reception_time != null && (!("kind" in operation))) {
                                 if (delegate == "") { // To look at operation of a specific delegate 
                                     operations_logs[round_cib]["endorsements"]["lost"].push(baker_ops["delegate"]);
                                 } else if (baker_ops["delegate"] == delegate) {

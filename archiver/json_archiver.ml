@@ -126,9 +126,9 @@ let extract_anomalies path level infos =
           List.fold_left
             (fun acc
                  Data.Delegate_operations.
-                   {kind; round; reception_time; errors; block_inclusion} ->
-              match errors with
-              | Some (_ :: _) ->
+                   {kind; round; mempool_inclusion; block_inclusion} ->
+              match (kind, mempool_inclusion, block_inclusion) with
+              | Endorsement, [], [] ->
                   Data.Anomaly.
                     {
                       level;
@@ -136,43 +136,46 @@ let extract_anomalies path level infos =
                       kind;
                       delegate;
                       delegate_alias;
-                      problem = Data.Anomaly.Incorrect;
+                      problem = Data.Anomaly.Missed;
                     }
                   :: acc
-              | None | Some [] -> (
-                  match (kind, reception_time, block_inclusion) with
-                  | Endorsement, None, [] ->
-                      {
-                        level;
-                        round;
-                        kind;
-                        delegate;
-                        delegate_alias;
-                        problem = Data.Anomaly.Missed;
-                      }
+              | Endorsement, Data.Delegate_operations.{errors; _} :: _, [] -> (
+                  match errors with
+                  | Some (_ :: _) ->
+                      Data.Anomaly.
+                        {
+                          level;
+                          round;
+                          kind;
+                          delegate;
+                          delegate_alias;
+                          problem = Incorrect;
+                        }
                       :: acc
-                  | Endorsement, Some _, [] ->
-                      {
-                        level;
-                        round;
-                        kind;
-                        delegate;
-                        delegate_alias;
-                        problem = Data.Anomaly.Forgotten;
-                      }
-                      :: acc
-                  | Endorsement, None, _ :: _ ->
-                      {
-                        level;
-                        round;
-                        kind;
-                        delegate;
-                        delegate_alias;
-                        problem = Data.Anomaly.Sequestered;
-                      }
-                      :: acc
-                  | Endorsement, Some _, _ :: _ -> acc
-                  | Preendorsement, _, _ -> acc))
+                  | None | Some [] ->
+                      Data.Anomaly.
+                        {
+                          level;
+                          round;
+                          kind;
+                          delegate;
+                          delegate_alias;
+                          problem = Forgotten;
+                        }
+                      :: acc)
+              | Endorsement, [], _ :: _ ->
+                  Data.Anomaly.
+                    {
+                      level;
+                      round;
+                      kind;
+                      delegate;
+                      delegate_alias;
+                      problem = Sequestered;
+                    }
+                  :: acc
+              | Endorsement, _ :: _, _ :: _ -> acc
+              | Preendorsement, _, _ -> acc)
             acc
             operations)
         []
@@ -199,15 +202,14 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
       operations
   with
   | ( Data.Delegate_operations.
-        {kind; round = _; errors; reception_time; block_inclusion}
+        {kind; round = _; mempool_inclusion; block_inclusion}
       :: _,
       operations' ) ->
       Data.Delegate_operations.
         {
           kind;
           round = ops_round;
-          errors;
-          reception_time;
+          mempool_inclusion;
           block_inclusion = block_hash :: block_inclusion;
         }
       :: operations'
@@ -215,8 +217,7 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
       {
         kind = ops_kind;
         round = ops_round;
-        errors = None;
-        reception_time = None;
+        mempool_inclusion = [];
         block_inclusion = [block_hash];
       }
       :: operations
@@ -274,8 +275,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
                   {
                     kind = op.op.kind;
                     round = op.op.round;
-                    errors = None;
-                    reception_time = None;
+                    mempool_inclusion = [];
                     block_inclusion = [block_hash];
                   };
                 ];
@@ -382,15 +382,15 @@ let merge_operations =
             Option.equal Int32.equal r round && kind = k)
           acc
       with
-      | ( Data.Delegate_operations.{block_inclusion; reception_time = None; _}
+      | ( Data.Delegate_operations.{block_inclusion; mempool_inclusion = []; _}
           :: _,
           acc' ) ->
           Data.Delegate_operations.
             {
               kind;
               round;
-              errors;
-              reception_time = Some reception_time;
+              mempool_inclusion =
+                [{source = "archiver"; reception_time; errors}];
               block_inclusion;
             }
           :: acc'
@@ -399,8 +399,7 @@ let merge_operations =
           {
             kind;
             round;
-            errors;
-            reception_time = Some reception_time;
+            mempool_inclusion = [{source = "archiver"; reception_time; errors}];
             block_inclusion = [];
           }
           :: acc)
@@ -462,8 +461,14 @@ let dump_received cctxt path ?unaccurate level received_ops =
                                {
                                  kind;
                                  round;
-                                 errors;
-                                 reception_time = Some reception_time;
+                                 mempool_inclusion =
+                                   [
+                                     {
+                                       source = "archiver";
+                                       reception_time;
+                                       errors;
+                                     };
+                                   ];
                                  block_inclusion = [];
                                })
                              ops;

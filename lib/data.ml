@@ -24,21 +24,41 @@
 (*****************************************************************************)
 
 module Delegate_operations = struct
+  type reception = {
+    source : string;
+    reception_time : Time.System.t;
+    errors : error list option;
+  }
+
+  let reception_encoding =
+    let open Data_encoding in
+    conv
+      (fun {source; reception_time; errors} -> (source, reception_time, errors))
+      (fun (source, reception_time, errors) -> {source; reception_time; errors})
+      (obj3
+         (req "source" string)
+         (req "reception_time" Time.System.encoding)
+         (dft "errors" Tezos_rpc.Error.opt_encoding None))
+
   type operation = {
     kind : Consensus_ops.operation_kind;
     round : Int32.t option;
-    reception_time : Time.System.t option;
-    errors : error list option;
+    mempool_inclusion : reception list;
     block_inclusion : Block_hash.t list;
   }
 
-  let operation_encoding =
+  let legacy_operation_encoding =
     let open Data_encoding in
     conv
-      (fun {kind; round; reception_time; errors; block_inclusion} ->
-        (kind, round, reception_time, errors, block_inclusion))
+      (fun _ -> assert false)
       (fun (kind, round, reception_time, errors, block_inclusion) ->
-        {kind; round; reception_time; errors; block_inclusion})
+        let mempool_inclusion =
+          match reception_time with
+          | None -> []
+          | Some reception_time ->
+              [{source = "archiver"; reception_time; errors}]
+        in
+        {kind; round; mempool_inclusion; block_inclusion})
       (obj5
          (dft
             "kind"
@@ -48,6 +68,43 @@ module Delegate_operations = struct
          (req "reception_time" (option Time.System.encoding))
          (dft "errors" Tezos_rpc.Error.opt_encoding None)
          (dft "included_in_blocks" (list Block_hash.encoding) []))
+
+  let operation_encoding =
+    let open Data_encoding in
+    conv
+      (fun {kind; round; mempool_inclusion; block_inclusion} ->
+        (kind, round, mempool_inclusion, block_inclusion))
+      (fun (kind, round, mempool_inclusion, block_inclusion) ->
+        {kind; round; mempool_inclusion; block_inclusion})
+      (obj4
+         (dft
+            "kind"
+            Consensus_ops.operation_kind_encoding
+            Consensus_ops.Endorsement)
+         (opt "round" int32)
+         (dft "received_in_mempools" (list reception_encoding) [])
+         (dft "included_in_blocks" (list Block_hash.encoding) []))
+
+  let operation_encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (union
+           [
+             case
+               ~title:"current"
+               Json_only
+               operation_encoding
+               Option.some
+               (fun x -> x);
+             case
+               ~title:"legacy"
+               Json_only
+               legacy_operation_encoding
+               (fun _ -> None)
+               (fun x -> x);
+           ])
+      ~binary:operation_encoding
 
   type t = {
     delegate : Tezos_crypto.Signature.public_key_hash;
@@ -65,6 +122,12 @@ module Delegate_operations = struct
         | None, [] ->
             {delegate; delegate_alias; endorsing_power = 0; operations = []}
         | _, _ ->
+            let mempool_inclusion =
+              match reception_time with
+              | None -> []
+              | Some reception_time ->
+                  [{source = "archiver"; reception_time; errors}]
+            in
             {
               delegate;
               delegate_alias;
@@ -73,8 +136,7 @@ module Delegate_operations = struct
                 [
                   {
                     kind = Endorsement;
-                    reception_time;
-                    errors;
+                    mempool_inclusion;
                     round = None;
                     block_inclusion;
                   };

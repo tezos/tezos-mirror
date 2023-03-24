@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_base
-open Teztale_lib
-
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
 let parse_block_row
@@ -61,7 +58,10 @@ let select_blocks db_pool level =
     db_pool
 
 module Op_key = struct
-  type t = {kind : Consensus_ops.operation_kind; round : Int32.t option}
+  type t = {
+    kind : Teztale_lib.Consensus_ops.operation_kind;
+    round : Int32.t option;
+  }
 
   let compare op1 op2 =
     let c = Option.compare Int32.compare op1.round op2.round in
@@ -75,14 +75,9 @@ end
 
 module Pkh_ops = Map.Make (Op_key)
 
-type received = {
-  reception_time : Time.System.t;
-  errors : TzPervasives.error list option;
-}
-
 type op_info = {
   included : Tezos_crypto.Hashed.Block_hash.t list;
-  received : received list;
+  received : Teztale_lib.Data.Delegate_operations.reception list;
 }
 
 (* NB: It can happen that there is an EQC at round r, but a block at
@@ -103,6 +98,10 @@ let _max_round (module Db : Caqti_lwt.CONNECTION) level =
   in
   let* m2 = Db.find r_ops level in
   return (max (Some m1) m2)
+
+let kind_of_bool = function
+  | false -> Teztale_lib.Consensus_ops.Preendorsement
+  | true -> Teztale_lib.Consensus_ops.Endorsement
 
 let select_ops db_pool level =
   (* We make 3 queries:
@@ -139,12 +138,12 @@ let select_ops db_pool level =
       ->* Caqti_type.(
             tup2
               (tup4 Sql_requests.Type.public_key_hash (option string) int ptime)
-              (tup3 Sql_requests.Type.errors bool (option int32))))
+              (tup4 Sql_requests.Type.errors string bool (option int32))))
       "SELECT d.address, d.alias, e.endorsing_power, r.timestamp, r.errors, \
-       o.endorsement, o.round FROM operations o, endorsing_rights e, \
-       operations_reception r, delegates d ON r.operation = o.id AND \
+       n.name, o.endorsement, o.round FROM operations o, endorsing_rights e, \
+       operations_reception r, delegates d , nodes n ON r.operation = o.id AND \
        o.endorser = d.id AND e.delegate = d.id WHERE o.level = ? AND e.level = \
-       ?"
+       ? AND n.id = r.source"
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
   let cb_missing (delegate, alias, power) info =
@@ -152,11 +151,7 @@ let select_ops db_pool level =
   in
   let cb_included ((delegate, alias, power), (endorsement, round, block_hash))
       info =
-    let kind =
-      match endorsement with
-      | false -> Consensus_ops.Preendorsement
-      | true -> Consensus_ops.Endorsement
-    in
+    let kind = kind_of_bool endorsement in
     match Ops.find_opt delegate info with
     | Some (alias, power, ops) ->
         let op_key = Op_key.{kind; round} in
@@ -175,14 +170,12 @@ let select_ops db_pool level =
         Ops.add delegate (alias, power, ops) info
   in
   let cb_received
-      ((delegate, alias, power, reception_time), (errors, endorsement, round))
-      info =
-    let kind =
-      match endorsement with
-      | false -> Consensus_ops.Preendorsement
-      | true -> Consensus_ops.Endorsement
+      ( (delegate, alias, power, reception_time),
+        (errors, source, endorsement, round) ) info =
+    let kind = kind_of_bool endorsement in
+    let received_info =
+      Teztale_lib.Data.Delegate_operations.{source; reception_time; errors}
     in
-    let received_info = {reception_time; errors} in
     match Ops.find_opt delegate info with
     | Some (alias, power, ops) ->
         let op_key = Op_key.{kind; round} in
@@ -221,31 +214,18 @@ let translate_ops info =
   let translate pkh_ops =
     List.map
       (fun (Op_key.{kind; round}, op_info) ->
-        let reception_time, errors =
-          if op_info.received = [] then (None, None)
-          else
-            let ordered =
-              List.sort
-                (fun op1 op2 ->
-                  Ptime.compare op1.reception_time op2.reception_time)
-                op_info.received
-            in
-            let r = Stdlib.List.hd ordered in
-            (Some r.reception_time, r.errors)
-        in
-        Data.Delegate_operations.
+        Teztale_lib.Data.Delegate_operations.
           {
             kind;
             round;
-            reception_time;
-            errors;
+            mempool_inclusion = op_info.received;
             block_inclusion = op_info.included;
           })
       (Pkh_ops.bindings pkh_ops)
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
     (fun pkh (alias, power, pkh_ops) acc ->
-      Data.Delegate_operations.
+      Teztale_lib.Data.Delegate_operations.
         {
           delegate = pkh;
           delegate_alias = alias;
@@ -262,20 +242,20 @@ let translate_ops info =
      "per block anomaly" rather than a "per delegate anomaly". *)
 let anomalies level ops =
   let extract_anomalies delegate delegate_alias pkh_ops =
+    let open Teztale_lib.Data.Anomaly in
     Pkh_ops.fold
       (fun Op_key.{kind; round} {received; included} acc ->
         let problem =
           match (received, included) with
-          | [], [] -> Some Data.Anomaly.Missed
-          | [], _ -> Some Data.Anomaly.Sequestered
-          | _, [] -> Some Data.Anomaly.Forgotten
+          | [], [] -> Some Missed
+          | [], _ -> Some Sequestered
+          | _, [] -> Some Forgotten
           | _ -> None
         in
         match problem with
         | None -> acc
         | Some problem ->
-            Data.Anomaly.{level; kind; round; delegate; delegate_alias; problem}
-            :: acc)
+            {level; kind; round; delegate; delegate_alias; problem} :: acc)
       pkh_ops
       []
   in
