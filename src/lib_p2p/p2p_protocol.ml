@@ -153,6 +153,10 @@ module Default_answerer = struct
     | None -> Lwt.return_unit (* ignore *)
     | Some (_time, proposed_peer_id) -> (
         (* Ignore the swap if the new point is already connected *)
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5211
+           Should we accept the swap if we are not yet connected
+           to the node, but already in the process of connecting to
+           it? This can raise race conditions. *)
         match P2p_pool.Connection.find_by_point pool new_point with
         | None ->
             swap config pool source_peer_id ~connect proposed_peer_id new_point

@@ -213,6 +213,16 @@ let create_connection t p2p_conn id_point point_info peer_info
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   let* () =
+    (* DISCLAIMER: A similar check is also performed in [P2p_worker] before
+       running the maintenance. Thus, it is important that both conditionals
+       be identical to maintain the maintainance triggering consitency.
+       If this comparison needs to be updated for some reason (for example
+       from a strict to a non strict one), please, consider updating also
+       the [P2p_worker]. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5291
+       Improve invariant stability using a better encapsulation. *)
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5294
+       Stop triggering the maintainance while performing a connection swap. *)
     if t.config.max_connections < P2p_pool.active_connections t.pool then (
       P2p_trigger.broadcast_too_many_connections t.triggers ;
       Events.(emit trigger_maintenance_too_many_connections)
