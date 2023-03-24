@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_rollup_encoding::dac::PreimageHash;
+use tezos_smart_rollup_encoding::dac::PreimageHash;
 use wasm_gen::write_custom_section;
 
 const INSTALLER_KERNEL: &[u8] = include_bytes!("../../installer.wasm");

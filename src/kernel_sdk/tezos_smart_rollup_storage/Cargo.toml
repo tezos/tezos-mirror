@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_smart_rollup_storage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0"
+
+[dependencies.tezos_smart_rollup_core]
+path = "../tezos_smart_rollup_core"
+default-features = false
+
+[dependencies.tezos_smart_rollup_host]
+path = "../tezos_smart_rollup_host"
+default-features = false
+
+[dependencies.tezos_smart_rollup_debug]
+path = "../tezos_smart_rollup_debug"
+
+[dependencies.tezos_smart_rollup_encoding]
+path = "../tezos_smart_rollup_encoding"
+
+[dev-dependencies.tezos_smart_rollup_core]
+path = "../tezos_smart_rollup_core"
+features = ["testing"]
+
+[dev-dependencies.tezos_smart_rollup_mock]
+path = "../tezos_smart_rollup_mock"
+
+[features]
+default = []

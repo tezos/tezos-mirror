@@ -8,7 +8,7 @@
 //! example, be written to a log file, or to `stdout` etc.
 #![cfg_attr(target_arch = "wasm32", no_std)]
 #![deny(missing_docs)]
-#![deny(rustdoc::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 /// Write a formatted message to host debug log. Formats follow [`core::fmt`].
 ///

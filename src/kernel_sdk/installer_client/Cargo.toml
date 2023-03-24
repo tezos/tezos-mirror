@@ -21,8 +21,8 @@ path = "src/main.rs"
 version = "0.3.10"
 features = ["portable"]
 
-[dependencies.tezos_rollup_encoding]
-git = "https://gitlab.com/tezos/kernel"
+[dependencies.tezos_smart_rollup_encoding]
+path = "../tezos_smart_rollup_encoding"
 
 [dependencies.clap]
 version = "4.1"

@@ -16,7 +16,7 @@
 //! [smart_rollup_core]: tezos_smart_rollup_core::smart_rollup_core
 #![cfg_attr(not(feature = "testing"), no_std)]
 #![deny(missing_docs)]
-#![deny(rustdoc::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

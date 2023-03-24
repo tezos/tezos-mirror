@@ -18,14 +18,13 @@
 #![forbid(unsafe_code)]
 
 use core::panic::PanicInfo;
-use host::path::RefPath;
-use host::rollup_core::RawRollupCore;
-use host::rollup_core::MAX_FILE_CHUNK_SIZE;
-use host::runtime::Runtime;
-use host::PREIMAGE_HASH_SIZE;
-use tezos_rollup_encoding::dac::reveal_loop;
-use tezos_rollup_encoding::dac::V0SliceContentPage;
-use tezos_rollup_encoding::dac::MAX_PAGE_SIZE;
+use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_encoding::dac::reveal_loop;
+use tezos_smart_rollup_encoding::dac::V0SliceContentPage;
+use tezos_smart_rollup_encoding::dac::MAX_PAGE_SIZE;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 // Path of currently running kernel.
 const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
@@ -37,10 +36,10 @@ const PREPARE_KERNEL_PATH: RefPath = RefPath::assert_from(b"/installer/kernel/bo
 const MAX_DAC_LEVELS: usize = 4;
 
 #[cfg(all(feature = "entrypoint", target_arch = "wasm32"))]
-kernel::kernel_entry!(installer);
+tezos_smart_rollup_entrypoint::kernel_entry!(installer);
 
 /// Installer.
-pub fn installer<Host: RawRollupCore>(host: &mut Host) {
+pub fn installer<Host: Runtime>(host: &mut Host) {
     if let Some(preimage_hash) = read_reveal_hash(host) {
         if let Err(e) = install_kernel(host, &preimage_hash) {
             Runtime::write_debug(host, e)
@@ -77,7 +76,7 @@ fn read_reveal_hash(host: &mut impl Runtime) -> Option<[u8; PREIMAGE_HASH_SIZE]>
     Some(preimage_hash)
 }
 
-fn install_kernel<Host: RawRollupCore>(
+fn install_kernel<Host: Runtime>(
     host: &mut Host,
     root_hash: &[u8; PREIMAGE_HASH_SIZE],
 ) -> Result<(), &'static str> {
@@ -100,7 +99,7 @@ fn install_kernel<Host: RawRollupCore>(
     Ok(())
 }
 
-fn write_kernel_page<Host: RawRollupCore>(
+fn write_kernel_page<Host: Runtime>(
 ) -> impl FnMut(&mut Host, V0SliceContentPage) -> Result<(), &'static str> {
     let mut kernel_size = 0;
     move |host, page| {
@@ -111,7 +110,7 @@ fn write_kernel_page<Host: RawRollupCore>(
 }
 
 /// Appends the content of the page path given.
-fn append_content<Host: RawRollupCore>(
+fn append_content<Host: Runtime>(
     host: &mut Host,
     kernel_size: usize,
     content: V0SliceContentPage,
