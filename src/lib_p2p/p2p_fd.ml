@@ -89,10 +89,7 @@ let string_of_sockaddr addr =
 let id t = t.id
 
 let socket proto kind arg =
-  create
-    (let fd = Lwt_unix.socket proto kind arg in
-     Lwt_unix.set_close_on_exec fd ;
-     fd)
+  create (Lwt_unix.socket ~cloexec:true proto kind arg)
 
 let close t =
   let open Lwt_result_syntax in
