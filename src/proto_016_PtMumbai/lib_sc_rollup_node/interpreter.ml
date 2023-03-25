@@ -38,6 +38,7 @@ module type S = sig
   val process_head :
     Node_context.rw ->
     'a Context.t ->
+    predecessor:Layer1.head ->
     Layer1.head ->
     Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
     ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
@@ -162,16 +163,15 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     return (ctxt, num_messages, num_ticks, initial_tick)
 
-  (** [process_head node_ctxt head] runs the PVM for the given head. *)
-  let process_head (node_ctxt : _ Node_context.t) ctxt head inbox_messages =
+  (** [process_head node_ctxt ctxt ~predecessor head] runs the PVM for the given
+      head. *)
+  let process_head (node_ctxt : _ Node_context.t) ctxt ~predecessor head
+      inbox_messages =
     let open Lwt_result_syntax in
     let first_inbox_level =
       Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
     in
     if head.Layer1.level >= first_inbox_level then
-      let* predecessor =
-        Layer1.get_predecessor node_ctxt.Node_context.l1_ctxt head
-      in
       transition_pvm node_ctxt ctxt predecessor head inbox_messages
     else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
     then

@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -193,6 +194,28 @@ val hash_of_level_opt : _ t -> int32 -> Block_hash.t option tzresult Lwt.t
 (** [level_of_hash node_ctxt hash] returns the level for Tezos block hash [hash]
     if it is known by the Tezos Layer 1 node. *)
 val level_of_hash : _ t -> Block_hash.t -> int32 tzresult Lwt.t
+
+(** [get_predecessor_opt state head] returns the predecessor of block [head],
+    when [head] is not the genesis block. *)
+val get_predecessor_opt :
+  _ t -> Layer1.head -> Layer1.head option tzresult Lwt.t
+
+(** [get_predecessor state head] returns the predecessor block of [head]. *)
+val get_predecessor : _ t -> Layer1.head -> Layer1.head tzresult Lwt.t
+
+(** [nth_predecessor n head] return [block, history] where [block] is the nth
+    predecessor of [head] and [history] is the list of blocks between [block]
+    (excluded) and [head] (included) on the chain. *)
+val nth_predecessor :
+  _ t -> int -> Layer1.head -> (Layer1.head * Layer1.head list) tzresult Lwt.t
+
+(** [get_tezos_reorg_for_new_head node_ctxt old_head new_head] returns the L1
+    reorganization between [old_head] and [new_head]. *)
+val get_tezos_reorg_for_new_head :
+  _ t ->
+  [`Head of Layer1.head | `Level of int32] ->
+  Layer1.head ->
+  Layer1.head Reorg.t tzresult Lwt.t
 
 (** [block_with_tick store ~max_level tick] returns [Some b] where [b] is the
     last layer 2 block which contains the [tick] before [max_level]. If no such

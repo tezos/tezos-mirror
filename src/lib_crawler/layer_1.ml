@@ -229,18 +229,19 @@ let get_predecessor state ((hash, _) as head) =
   | None -> tzfail (Cannot_find_predecessor hash)
   | Some pred -> return pred
 
-let nth_predecessor l1_state n block =
+let nth_predecessor ~get_predecessor n block =
   let open Lwt_result_syntax in
   assert (n >= 0) ;
   let rec aux acc n block =
     if n = 0 then return (block, acc)
     else
-      let* pred = get_predecessor l1_state block in
+      let* pred = get_predecessor block in
       (aux [@tailcall]) (block :: acc) (n - 1) pred
   in
   aux [] n block
 
-let get_tezos_reorg_for_new_head l1_state old_head new_head =
+let get_tezos_reorg_for_new_head l1_state
+    ?(get_old_predecessor = get_predecessor l1_state) old_head new_head =
   let open Lwt_result_syntax in
   (* old_head and new_head must have the same level when calling aux *)
   let rec aux reorg old_head new_head =
@@ -248,7 +249,7 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
     let new_head_hash, _ = new_head in
     if Block_hash.(old_head_hash = new_head_hash) then return reorg
     else
-      let* old_head_pred = get_predecessor l1_state old_head in
+      let* old_head_pred = get_old_predecessor old_head in
       let* new_head_pred = get_predecessor l1_state new_head in
       let reorg =
         Reorg.
@@ -268,17 +269,25 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
     if old_head_level = new_head_level then
       return (old_head, new_head, Reorg.no_reorg)
     else if old_head_level < new_head_level then
-      let+ new_head, new_chain = nth_predecessor l1_state distance new_head in
+      let+ new_head, new_chain =
+        nth_predecessor
+          ~get_predecessor:(get_predecessor l1_state)
+          distance
+          new_head
+      in
       (old_head, new_head, {Reorg.no_reorg with new_chain})
     else
-      let+ old_head, old_chain = nth_predecessor l1_state distance old_head in
+      let+ old_head, old_chain =
+        nth_predecessor ~get_predecessor:get_old_predecessor distance old_head
+      in
       (old_head, new_head, {Reorg.no_reorg with old_chain})
   in
   assert (snd old_head = snd new_head) ;
   aux reorg old_head new_head
 
 (** Returns the reorganization of L1 blocks (if any) for [new_head]. *)
-let get_tezos_reorg_for_new_head l1_state old_head new_head =
+let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
+    =
   let open Lwt_result_syntax in
   match old_head with
   | `Level l ->
@@ -288,9 +297,14 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
       else
         let* _block_at_l, new_chain =
           nth_predecessor
-            l1_state
+            ~get_predecessor:(get_predecessor l1_state)
             (Int32.sub new_head_level l |> Int32.to_int)
             new_head
         in
         return Reorg.{old_chain = []; new_chain}
-  | `Head old_head -> get_tezos_reorg_for_new_head l1_state old_head new_head
+  | `Head old_head ->
+      get_tezos_reorg_for_new_head
+        l1_state
+        ?get_old_predecessor
+        old_head
+        new_head

@@ -78,39 +78,8 @@ let blocks_cache : blocks_cache = Blocks_cache.create 32
 
 include Octez_crawler.Layer_1
 
-let head_of_block_level (hash, level) = {hash; level}
-
-let block_level_of_head {hash; level} = (hash, level)
-
 let iter_heads l1_ctxt f =
   iter_heads l1_ctxt @@ fun (hash, {shell = {level; _}; _}) -> f {hash; level}
-
-let get_predecessor_opt state head =
-  let open Lwt_result_syntax in
-  let+ res = get_predecessor_opt state (block_level_of_head head) in
-  Option.map head_of_block_level res
-
-let get_predecessor state head =
-  let open Lwt_result_syntax in
-  let+ res = get_predecessor state (block_level_of_head head) in
-  head_of_block_level res
-
-let nth_predecessor l1_state n block =
-  let open Lwt_result_syntax in
-  let+ res, preds = nth_predecessor l1_state n (block_level_of_head block) in
-  (head_of_block_level res, List.map head_of_block_level preds)
-
-let get_tezos_reorg_for_new_head l1_ctxt old_head new_head =
-  let open Lwt_result_syntax in
-  let old_head =
-    match old_head with
-    | `Level l -> `Level l
-    | `Head h -> `Head (block_level_of_head h)
-  in
-  let+ reorg =
-    get_tezos_reorg_for_new_head l1_ctxt old_head (block_level_of_head new_head)
-  in
-  Reorg.map head_of_block_level reorg
 
 (**
 

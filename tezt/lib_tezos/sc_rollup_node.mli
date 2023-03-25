@@ -170,3 +170,7 @@ val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
     returned. [where], if present, should describe the constraint that [filter]
     applies. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Stops the rollup node and restart it, connected to another Tezos Layer 1
+    node. *)
+val change_node_and_restart : t -> Node.t -> unit Lwt.t

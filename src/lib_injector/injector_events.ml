@@ -129,6 +129,13 @@ module Make
           ~level:Debug
           ("head", Block_hash.encoding)
 
+      let cannot_compute_reorg =
+        declare_1
+          ~name:"cannot_compute_reorg"
+          ~msg:"Cannot compute reorg for new block {head}"
+          ~level:Warning
+          ("head", Block_hash.encoding)
+
       let injecting_pending =
         declare_1
           ~name:"injecting_pending"

@@ -34,16 +34,18 @@ module type S = sig
   module Free_pvm :
     Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
 
-  (** [process_head node_ctxt head (inbox, messages)] interprets the [messages]
-      associated with a [head]. This requires the [inbox] to be updated
-      beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where
-      [ctxt] is the updated layer 2 context (with the new PVM state),
+  (** [process_head node_ctxt ~predecessor head (inbox, messages)] interprets
+      the [messages] associated with a [head] (where [predecessor] is the
+      predecessor of [head] in the L1 chain). This requires the [inbox] to be
+      updated beforehand. It returns [(ctxt, num_messages, num_ticks, tick)]
+      where [ctxt] is the updated layer 2 context (with the new PVM state),
       [num_messages] is the number of [messages], [num_ticks] is the number of
       ticks taken by the PVM for the evaluation and [tick] is the tick reached
       by the PVM after the evaluation. *)
   val process_head :
     Node_context.rw ->
     'a Context.t ->
+    predecessor:Layer1.head ->
     Layer1.head ->
     Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
     ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t

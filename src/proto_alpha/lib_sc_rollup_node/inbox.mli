@@ -36,11 +36,13 @@
 open Protocol.Alpha_context
 open Sc_rollup
 
-(** [process_head node_ctxt head operations] changes the state of the inbox to
-    react to [head]. In particular, this process filters the provided
+(** [process_head node_ctxt ~predecessor head operations] changes the state of
+    the inbox to react to [head] (where [predecessor] is the predecessor of
+    [head] in the L1 chain). In particular, this process filters the provided
     [operations] of the [head] block. *)
 val process_head :
   Node_context.rw ->
+  predecessor:Layer1.head ->
   Layer1.head ->
   (Sc_rollup.Inbox.Hash.t
   * Sc_rollup.Inbox.t

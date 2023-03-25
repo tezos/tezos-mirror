@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -329,6 +330,72 @@ let find_l2_block_by_level node_ctxt level =
   match block_hash with
   | None -> return_none
   | Some block_hash -> find_l2_block node_ctxt block_hash
+
+let head_of_block_level (hash, level) = {Layer1.hash; level}
+
+let block_level_of_head Layer1.{hash; level} = (hash, level)
+
+let get_l2_block_predecessor node_ctxt hash =
+  let open Lwt_result_syntax in
+  let+ header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
+  Option.map
+    (fun {Sc_rollup_block.predecessor; level; _} ->
+      (predecessor, Int32.pred (Raw_level.to_int32 level)))
+    header
+
+let get_predecessor_opt node_ctxt (hash, level) =
+  let open Lwt_result_syntax in
+  let* pred = get_l2_block_predecessor node_ctxt hash in
+  match pred with
+  | Some p -> return_some p
+  | None ->
+      (* [head] is not already known in the L2 chain *)
+      Layer1.get_predecessor_opt node_ctxt.l1_ctxt (hash, level)
+
+let get_predecessor node_ctxt (hash, level) =
+  let open Lwt_result_syntax in
+  let* pred = get_l2_block_predecessor node_ctxt hash in
+  match pred with
+  | Some p -> return p
+  | None ->
+      (* [head] is not already known in the L2 chain *)
+      Layer1.get_predecessor node_ctxt.l1_ctxt (hash, level)
+
+let nth_predecessor node_ctxt n block =
+  let open Lwt_result_syntax in
+  let+ res, preds =
+    Layer1.nth_predecessor
+      ~get_predecessor:(get_predecessor node_ctxt)
+      n
+      (block_level_of_head block)
+  in
+  (head_of_block_level res, List.map head_of_block_level preds)
+
+let get_tezos_reorg_for_new_head node_ctxt old_head new_head =
+  let open Lwt_result_syntax in
+  let old_head =
+    match old_head with
+    | `Level l -> `Level l
+    | `Head h -> `Head (block_level_of_head h)
+  in
+  let+ reorg =
+    Layer1.get_tezos_reorg_for_new_head
+      node_ctxt.l1_ctxt
+      ~get_old_predecessor:(get_predecessor node_ctxt)
+      old_head
+      (block_level_of_head new_head)
+  in
+  Reorg.map head_of_block_level reorg
+
+let get_predecessor_opt node_ctxt head =
+  let open Lwt_result_syntax in
+  let+ res = get_predecessor_opt node_ctxt (block_level_of_head head) in
+  Option.map head_of_block_level res
+
+let get_predecessor node_ctxt head =
+  let open Lwt_result_syntax in
+  let+ res = get_predecessor node_ctxt (block_level_of_head head) in
+  head_of_block_level res
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4128
    Unit test the function tick_search. *)

@@ -296,7 +296,7 @@ module Make (PVM : Pvm.S) = struct
     in
     unless (already_finalized || before_origination node_ctxt block)
     @@ fun () ->
-    let* predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt block in
+    let* predecessor = Node_context.get_predecessor_opt node_ctxt block in
     let* () =
       Option.iter_es (processed_finalized_block node_ctxt) predecessor
     in
@@ -305,69 +305,85 @@ module Make (PVM : Pvm.S) = struct
     let* () = Node_context.mark_finalized_head node_ctxt hash in
     return_unit
 
-  let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
-      =
+  let rec process_head (node_ctxt : _ Node_context.t)
+      Layer1.({hash; level} as head) =
     let open Lwt_result_syntax in
+    let* already_processed = Node_context.is_processed node_ctxt hash in
+    unless (already_processed || before_origination node_ctxt head) @@ fun () ->
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
-    let* () = Node_context.save_level node_ctxt head in
-    let* inbox_hash, inbox, inbox_witness, messages, ctxt =
-      Inbox.process_head node_ctxt head
-    in
-    let* () =
-      when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
-      Dal_slots_tracker.process_head node_ctxt head
-    in
-    let* () = process_l1_block_operations ~finalized:false node_ctxt head in
-    (* Avoid storing and publishing commitments if the head is not final. *)
-    (* Avoid triggering the pvm execution if this has been done before for
-       this head. *)
-    let* ctxt, _num_messages, num_ticks, initial_tick =
-      Components.Interpreter.process_head node_ctxt ctxt head (inbox, messages)
-    in
-    let*! context_hash = Context.commit ctxt in
-    let* {Layer1.hash = predecessor; _} =
-      Layer1.get_predecessor node_ctxt.l1_ctxt head
-    in
-    let* commitment_hash =
-      Components.Commitment.process_head node_ctxt ~predecessor head ctxt
-    in
-    let level = Raw_level.of_int32_exn level in
-    let* previous_commitment_hash =
-      if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
-        (* Previous commitment for rollup genesis is itself. *)
-        return node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash
-      else
-        let+ pred = Node_context.get_l2_block node_ctxt predecessor in
-        Sc_rollup_block.most_recent_commitment pred.header
-    in
-    let header =
-      Sc_rollup_block.
-        {
-          block_hash = hash;
-          level;
-          predecessor;
-          commitment_hash;
-          previous_commitment_hash;
-          context = context_hash;
-          inbox_witness;
-          inbox_hash;
-        }
-    in
-    let l2_block =
-      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
-    in
-    let* finalized_block, _ =
-      Layer1.nth_predecessor
-        node_ctxt.l1_ctxt
-        node_ctxt.block_finality_time
-        head
-    in
-    let* () = processed_finalized_block node_ctxt finalized_block in
-    let* () = Node_context.save_l2_head node_ctxt l2_block in
-    let*! () =
-      Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
-    in
-    return_unit
+    let* predecessor = Node_context.get_predecessor_opt node_ctxt head in
+    match predecessor with
+    | None ->
+        (* Predecessor not available on the L1, which means the block does not
+           exist in the chain. *)
+        return_unit
+    | Some predecessor ->
+        let* () = process_head node_ctxt predecessor in
+        let* () = Node_context.save_level node_ctxt head in
+        let* inbox_hash, inbox, inbox_witness, messages, ctxt =
+          Inbox.process_head node_ctxt ~predecessor head
+        in
+        let* () =
+          when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
+          Dal_slots_tracker.process_head node_ctxt head
+        in
+        let* () = process_l1_block_operations ~finalized:false node_ctxt head in
+        (* Avoid storing and publishing commitments if the head is not final. *)
+        (* Avoid triggering the pvm execution if this has been done before for
+           this head. *)
+        let* ctxt, _num_messages, num_ticks, initial_tick =
+          Components.Interpreter.process_head
+            node_ctxt
+            ctxt
+            ~predecessor
+            head
+            (inbox, messages)
+        in
+        let*! context_hash = Context.commit ctxt in
+        let* commitment_hash =
+          Components.Commitment.process_head
+            node_ctxt
+            ~predecessor:predecessor.hash
+            head
+            ctxt
+        in
+        let level = Raw_level.of_int32_exn level in
+        let* previous_commitment_hash =
+          if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+            (* Previous commitment for rollup genesis is itself. *)
+            return node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash
+          else
+            let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
+            Sc_rollup_block.most_recent_commitment pred.header
+        in
+        let header =
+          Sc_rollup_block.
+            {
+              block_hash = hash;
+              level;
+              predecessor = predecessor.hash;
+              commitment_hash;
+              previous_commitment_hash;
+              context = context_hash;
+              inbox_witness;
+              inbox_hash;
+            }
+        in
+        let l2_block =
+          Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+        in
+        let* finalized_block, _ =
+          Node_context.nth_predecessor
+            node_ctxt
+            node_ctxt.block_finality_time
+            head
+        in
+        let* () = processed_finalized_block node_ctxt finalized_block in
+        let* () = Node_context.save_l2_head node_ctxt l2_block in
+        let*! () =
+          Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
+        in
+        return_unit
 
   (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
      also processes any missing blocks that were not processed. Every time a
@@ -393,8 +409,25 @@ module Make (PVM : Pvm.S) = struct
           in
           `Level (Int32.pred origination_level)
     in
-    let* reorg =
-      Layer1.get_tezos_reorg_for_new_head node_ctxt.l1_ctxt old_head head
+    let*! reorg =
+      Node_context.get_tezos_reorg_for_new_head node_ctxt old_head head
+    in
+    let*? reorg =
+      match reorg with
+      | Error trace
+        when TzTrace.fold
+               (fun yes error ->
+                 yes
+                 ||
+                 match error with
+                 | Octez_crawler.Layer_1.Cannot_find_predecessor _ -> true
+                 | _ -> false)
+               false
+               trace ->
+          (* The reorganization could not be computed entirely because of missing
+             info on the Layer 1. We fallback to a recursive process_head. *)
+          Ok {Reorg.no_reorg with new_chain = [head]}
+      | _ -> reorg
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
        Rollback state information on reorganization, i.e. for

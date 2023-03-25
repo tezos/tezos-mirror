@@ -922,7 +922,7 @@ struct
   let on_new_tezos_head state ((head_hash, head_level) as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
-    let* reorg =
+    let*! reorg =
       match state.last_seen_head with
       | None -> return {Reorg.no_reorg with new_chain = [head]}
       | Some last_head ->
@@ -930,6 +930,25 @@ struct
             state.l1_ctxt
             (`Head last_head)
             head
+    in
+    let* reorg =
+      match reorg with
+      | Error trace
+        when TzTrace.fold
+               (fun yes error ->
+                 yes
+                 ||
+                 match error with
+                 | Layer_1.Cannot_find_predecessor _ -> true
+                 | _ -> false)
+               false
+               trace ->
+          (* The reorganization could not be computed entirely because of
+             missing info on the Layer 1. We may miss on some backtracking but
+             it is better than to fail. *)
+          let*! () = Event.(emit1 cannot_compute_reorg) state head_hash in
+          return {Reorg.no_reorg with new_chain = [head]}
+      | _ -> Lwt.return reorg
     in
     let* () =
       List.iter_es
