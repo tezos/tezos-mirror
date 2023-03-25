@@ -877,7 +877,7 @@ let test_submit_from_originated_source =
   in
   let msg =
     match protocol with
-    | Lima | Mumbai | Alpha -> rex "Erroneous command line argument"
+    | Lima | Mumbai | Nairobi | Alpha -> rex "Erroneous command line argument"
   in
   let* () = Process.check_error ~exit_code:1 ~msg process in
   unit

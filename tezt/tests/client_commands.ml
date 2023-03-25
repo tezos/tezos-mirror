@@ -51,7 +51,8 @@ module Helpers = struct
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
 
   let supported_signature_schemes = function
-    | Protocol.Alpha | Mumbai -> ["ed25519"; "secp256k1"; "p256"; "bls"]
+    | Protocol.Alpha | Nairobi | Mumbai ->
+        ["ed25519"; "secp256k1"; "p256"; "bls"]
     | Lima -> ["ed25519"; "secp256k1"; "p256"]
 
   let airdrop_and_reveal client accounts =
@@ -473,7 +474,7 @@ module Transfer = struct
     let* () =
       match protocol with
       | Lima -> unit
-      | Mumbai | Alpha ->
+      | Mumbai | Nairobi | Alpha ->
           let* () = Client.import_secret_key client Constant.tz4_account in
           airdrop_and_reveal client [Constant.tz4_account]
     in
@@ -486,7 +487,7 @@ module Transfer = struct
     let msg =
       match protocol with
       | Lima -> rex "Invalid contract notation \"tz4.*\""
-      | Mumbai | Alpha ->
+      | Mumbai | Nairobi | Alpha ->
           rex
             "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
     in

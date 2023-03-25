@@ -77,7 +77,9 @@ let test_originate_first_explosion client protocol () =
   in
   let* () = Client.typecheck_script ~script:first_explosion client in
   let gas_limit =
-    match protocol with Protocol.Alpha -> 645 | Lima | Mumbai -> 1479
+    match protocol with
+    | Protocol.Nairobi | Alpha -> 645
+    | Lima | Mumbai -> 1479
   in
   let process =
     Client.spawn_originate_contract

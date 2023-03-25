@@ -612,7 +612,8 @@ let test_fail_inject_signed_arbitrary_operation =
      let arbitrary =
        match protocol with
        | Protocol.Lima -> message
-       | Protocol.Mumbai | Protocol.Alpha -> Hex.(of_string message |> show)
+       | Protocol.Mumbai | Protocol.Nairobi | Protocol.Alpha ->
+           Hex.(of_string message |> show)
      in
      let (op_json : JSON.u) =
        `O
