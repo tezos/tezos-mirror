@@ -259,20 +259,17 @@ module Nullifiers = struct
   let mem ctx id nf = Storage.Sapling.Nullifiers_hashed.mem (ctx, id) nf
 
   (* Allows for duplicates as they are already checked by verify_update before
-     updating the state.
-     Not tail-recursive so we put a hard limit on the size of the
-     list of nullifiers. *)
+     updating the state. *)
   let add ctx id nfs =
-    assert (Compare.Int.(List.compare_length_with nfs 1000 <= 0)) ;
     size ctx id >>=? fun nf_start_pos ->
-    List.fold_right_es
-      (fun nf (ctx, pos, acc_size) ->
+    List.fold_left_es
+      (fun (ctx, pos, acc_size) nf ->
         Storage.Sapling.Nullifiers_hashed.init (ctx, id) nf
         >>=? fun (ctx, size) ->
         Storage.Sapling.Nullifiers_ordered.init (ctx, id) pos nf >|=? fun ctx ->
         (ctx, Int64.succ pos, Z.add acc_size (Z.of_int size)))
-      nfs
       (ctx, nf_start_pos, Z.zero)
+      (List.rev nfs)
     >>=? fun (ctx, nf_end_pos, size) ->
     Storage.Sapling.Nullifiers_size.update (ctx, id) nf_end_pos >|=? fun ctx ->
     (ctx, size)
@@ -405,12 +402,12 @@ let apply_diff ctx id diff =
     (ctx, id)
     (Int64.add cm_start_pos (Int64.of_int nb_commitments))
   >>=? fun ctx ->
-  List.fold_right_es
-    (fun (_cm, cp) (ctx, pos, acc_size) ->
+  List.fold_left_es
+    (fun (ctx, pos, acc_size) (_cm, cp) ->
       Ciphertexts.add ctx id cp pos >|=? fun (ctx, size) ->
       (ctx, Int64.succ pos, Z.add acc_size (Z.of_int size)))
-    diff.commitments_and_ciphertexts
     (ctx, cm_start_pos, Z.of_int size)
+    (List.rev diff.commitments_and_ciphertexts)
   >>=? fun (ctx, _ct_end_pos, size) ->
   Nullifiers.add ctx id diff.nullifiers >>=? fun (ctx, size_nf) ->
   let size = Z.add size size_nf in
