@@ -1,0 +1,51 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_alpha_lib_protocol_test_regression_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezt-tezos
+  tezos-protocol-017-PtNairob
+  tezos-client-alpha
+  tezos-protocol-plugin-alpha
+  tezos-alpha-test-helpers
+  tezos-micheline)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezt_tezos
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_client_alpha
+  -open Tezos_protocol_plugin_alpha
+  -open Tezos_alpha_test_helpers
+  -open Tezos_micheline)
+ (modules test_logging))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_alpha_lib_protocol_test_regression_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtezt)
+ (package tezos-protocol-017-PtNairob-tests)
+ (deps
+  (glob_files contracts/*.tz)
+  (glob_files expected/test_logging.ml/*.out))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

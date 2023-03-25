@@ -1,0 +1,1112 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_environment_alpha)
+ (public_name tezos-protocol-017-PtNairob.environment)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (modules Tezos_protocol_environment_alpha))
+
+(rule
+ (targets tezos_protocol_environment_alpha.ml)
+ (action
+  (write-file
+   %{targets}
+   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V9.Make(Name)()\n")))
+
+(library
+ (name tezos_raw_protocol_017_PtNairob)
+ (public_name tezos-protocol-017-PtNairob.raw)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-017-PtNairob.environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -nostdlib
+  -nopervasives
+  -open Tezos_protocol_environment_alpha
+  -open Tezos_protocol_environment_alpha.Pervasives
+  -open Tezos_protocol_environment_alpha.Error_monad)
+ (modules
+  Misc
+  Non_empty_string
+  Path_encoding
+  Storage_description
+  State_hash
+  Nonce_hash
+  Script_expr_hash
+  Origination_nonce
+  Contract_hash
+  Blinded_public_key_hash
+  Block_payload_hash
+  Tx_rollup_prefixes
+  Sc_rollup_reveal_hash
+  Merkle_list
+  Bitset
+  Bounded_history_repr
+  Skip_list_repr
+  Context_binary_proof
+  Michelson_v1_primitives
+  Slot_repr
+  Tez_repr
+  Period_repr
+  Time_repr
+  Ratio_repr
+  Round_repr
+  Block_payload_repr
+  Fixed_point_repr
+  Saturation_repr
+  Gas_limit_repr
+  Constants_parametric_repr
+  Constants_parametric_previous_repr
+  Constants_repr
+  Raw_level_repr
+  Fitness_repr
+  Cycle_repr
+  Level_repr
+  Script_repr
+  Cache_memory_helpers
+  Seed_repr
+  Sampler
+  Voting_period_repr
+  Ticket_hash_repr
+  Manager_counter_repr
+  Contract_repr
+  Indexable
+  Entrypoint_repr
+  Dal_slot_index_repr
+  Dal_slot_repr
+  Dal_attestation_repr
+  Sc_rollup_repr
+  Sc_rollup_metadata_repr
+  Sc_rollup_tick_repr
+  Sc_rollup_inbox_message_repr
+  Sc_rollup_inbox_merkelized_payload_hashes_repr
+  Sc_rollup_outbox_message_repr
+  Sc_rollup_dissection_chunk_repr
+  Sc_rollup_PVM_sig
+  Sc_rollup_arith
+  Sc_rollup_wasm
+  Sc_rollups
+  Sc_rollup_data_version_sig
+  Sc_rollup_inbox_repr
+  Sc_rollup_staker_index_repr
+  Sc_rollup_commitment_repr
+  Sc_rollup_proof_repr
+  Skip_list_costs
+  Sc_rollup_costs
+  Sc_rollup_game_repr
+  Tx_rollup_level_repr
+  Tx_rollup_l2_proof
+  Tx_rollup_l2_address
+  Tx_rollup_l2_qty
+  Tx_rollup_l2_context_hash
+  Tx_rollup_repr
+  Tx_rollup_withdraw_repr
+  Tx_rollup_withdraw_list_hash_repr
+  Tx_rollup_reveal_repr
+  Tx_rollup_message_repr
+  Tx_rollup_message_hash_repr
+  Tx_rollup_inbox_repr
+  Tx_rollup_message_result_repr
+  Tx_rollup_message_result_hash_repr
+  Tx_rollup_commitment_repr
+  Tx_rollup_errors_repr
+  Tx_rollup_state_repr
+  Dal_errors_repr
+  Dal_operations_repr
+  Zk_rollup_scalar
+  Zk_rollup_repr
+  Zk_rollup_state_repr
+  Zk_rollup_account_repr
+  Zk_rollup_ticket_repr
+  Zk_rollup_operation_repr
+  Zk_rollup_update_repr
+  Zk_rollup_circuit_public_inputs_repr
+  Bond_id_repr
+  Vote_repr
+  Liquidity_baking_repr
+  Block_header_repr
+  Destination_repr
+  Script_int
+  Ticket_amount
+  Operation_repr
+  Manager_repr
+  Commitment_repr
+  Parameters_repr
+  Sapling_repr
+  Lazy_storage_kind
+  Receipt_repr
+  Migration_repr
+  Carbonated_map_costs
+  Carbonated_map
+  Raw_context_intf
+  Raw_context
+  Storage_costs
+  Storage_sigs
+  Storage_functors
+  Storage
+  Ticket_hash_builder
+  Constants_storage
+  Tx_rollup_gas
+  Tx_rollup_hash_builder
+  Level_storage
+  Nonce_storage
+  Seed_storage
+  Contract_manager_storage
+  Delegate_activation_storage
+  Frozen_deposits_storage
+  Sapling_storage
+  Lazy_storage_diff
+  Commitment_storage
+  Voting_period_storage
+  Cache_repr
+  Zk_rollup_storage
+  Contract_delegate_storage
+  Stake_storage
+  Contract_storage
+  Token
+  Fees_storage
+  Delegate_consensus_key
+  Delegate_storage
+  Delegate_sampler
+  Delegate_missed_endorsements_storage
+  Delegate_slashed_deposits_storage
+  Delegate_cycles
+  Bootstrap_storage
+  Vote_storage
+  Ticket_storage
+  Liquidity_baking_storage
+  Liquidity_baking_cpmm
+  Liquidity_baking_lqt
+  Liquidity_baking_migration
+  Sc_rollup_errors
+  Sc_rollup_inbox_storage
+  Legacy_script_patches
+  Init_storage
+  Sapling_validator
+  Global_constants_costs
+  Global_constants_storage
+  Tx_rollup_state_storage
+  Tx_rollup_reveal_storage
+  Tx_rollup_inbox_storage
+  Tx_rollup_commitment_storage
+  Tx_rollup_storage
+  Sc_rollup_staker_index_storage
+  Sc_rollup_commitment_storage
+  Sc_rollup_outbox_storage
+  Sc_rollup_stake_storage
+  Sc_rollup_storage
+  Dal_slot_storage
+  Sc_rollup_refutation_storage
+  Zk_rollup_errors
+  Destination_storage
+  Alpha_context
+  Script_string
+  Script_timestamp
+  Script_bytes
+  Tx_rollup_l2_storage_sig
+  Tx_rollup_l2_context_sig
+  Tx_rollup_l2_context
+  Tx_rollup_l2_batch
+  Tx_rollup_l2_apply
+  Tx_rollup_l2_verifier
+  Local_gas_counter
+  Script_tc_errors
+  Gas_monad
+  Script_ir_annot
+  Dependent_bool
+  Script_list
+  Script_typed_ir
+  Script_comparable
+  Gas_comparable_input_size
+  Script_set
+  Script_map
+  Gas_input_size
+  Script_typed_ir_size
+  Script_typed_ir_size_costs
+  Michelson_v1_gas_costs_generated
+  Michelson_v1_gas_costs
+  Michelson_v1_gas
+  Operation_costs
+  Script_tc_context
+  Ticket_token
+  Ticket_receipt
+  Apply_operation_result
+  Apply_internal_results
+  Apply_results
+  Script_ir_translator_config
+  Script_ir_unparser
+  Script_ir_translator
+  Script_big_map
+  Script_cache
+  Script_tc_errors_registration
+  Ticket_token_unparser
+  Ticket_costs
+  Ticket_scanner
+  Ticket_balance_key
+  Ticket_lazy_storage_diff
+  Tx_rollup_parameters
+  Zk_rollup_parameters
+  Ticket_token_map
+  Ticket_operations_diff
+  Ticket_accounting
+  Ticket_transfer
+  Script_interpreter_defs
+  Script_interpreter
+  Sc_rollup_management_protocol
+  Sc_rollup_operations
+  Dal_apply
+  Zk_rollup_apply
+  Baking
+  Validate_errors
+  Amendment
+  Validate
+  Mempool_validation
+  Apply
+  Services_registration
+  Constants_services
+  Sapling_services
+  Contract_services
+  Delegate_services
+  Voting_services
+  Tx_rollup_services
+  Dal_services
+  Alpha_services
+  Main))
+
+(library
+ (name tezos_protocol_017_PtNairob)
+ (public_name tezos-protocol-017-PtNairob)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-017-PtNairob.raw)
+ (flags
+  (:standard)
+  -nopervasives)
+ (modules Protocol Tezos_protocol_017_PtNairob))
+
+(install
+ (package tezos-protocol-017-PtNairob)
+ (section lib)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
+(rule
+ (targets protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"\nlet name = Tezos_protocol_environment_alpha.Name.name\ninclude Tezos_raw_protocol_017_PtNairob\ninclude Tezos_raw_protocol_alpha.Main\n")))
+
+(rule
+ (targets tezos_protocol_017_PtNairob.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_alpha\nmodule Protocol = Protocol\n")))
+
+(rule
+ (alias runtest_compile_protocol)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  origination_nonce.ml origination_nonce.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  tx_rollup_prefixes.ml tx_rollup_prefixes.mli
+  sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
+  merkle_list.ml merkle_list.mli
+  bitset.ml bitset.mli
+  bounded_history_repr.ml bounded_history_repr.mli
+  skip_list_repr.ml skip_list_repr.mli
+  context_binary_proof.ml context_binary_proof.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  ratio_repr.ml ratio_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_parametric_repr.ml constants_parametric_repr.mli
+  constants_parametric_previous_repr.ml
+  constants_parametric_previous_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  manager_counter_repr.ml manager_counter_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
+  dal_slot_index_repr.ml dal_slot_index_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_attestation_repr.ml dal_attestation_repr.mli
+  sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_inbox_merkelized_payload_hashes_repr.ml
+  sc_rollup_inbox_merkelized_payload_hashes_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
+  sc_rollup_dissection_chunk_repr.ml sc_rollup_dissection_chunk_repr.mli
+  sc_rollup_PVM_sig.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
+  sc_rollups.ml sc_rollups.mli
+  sc_rollup_data_version_sig.ml
+  sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
+  sc_rollup_staker_index_repr.ml sc_rollup_staker_index_repr.mli
+  sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
+  skip_list_costs.ml skip_list_costs.mli
+  sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_game_repr.ml sc_rollup_game_repr.mli
+  tx_rollup_level_repr.ml tx_rollup_level_repr.mli
+  tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
+  tx_rollup_l2_address.ml tx_rollup_l2_address.mli
+  tx_rollup_l2_qty.ml tx_rollup_l2_qty.mli
+  tx_rollup_l2_context_hash.ml tx_rollup_l2_context_hash.mli
+  tx_rollup_repr.ml tx_rollup_repr.mli
+  tx_rollup_withdraw_repr.ml tx_rollup_withdraw_repr.mli
+  tx_rollup_withdraw_list_hash_repr.ml tx_rollup_withdraw_list_hash_repr.mli
+  tx_rollup_reveal_repr.ml tx_rollup_reveal_repr.mli
+  tx_rollup_message_repr.ml tx_rollup_message_repr.mli
+  tx_rollup_message_hash_repr.ml tx_rollup_message_hash_repr.mli
+  tx_rollup_inbox_repr.ml tx_rollup_inbox_repr.mli
+  tx_rollup_message_result_repr.ml tx_rollup_message_result_repr.mli
+  tx_rollup_message_result_hash_repr.ml
+  tx_rollup_message_result_hash_repr.mli
+  tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
+  tx_rollup_errors_repr.ml
+  tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_errors_repr.ml
+  dal_operations_repr.ml dal_operations_repr.mli
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
+  zk_rollup_update_repr.ml zk_rollup_update_repr.mli
+  zk_rollup_circuit_public_inputs_repr.ml
+  zk_rollup_circuit_public_inputs_repr.mli
+  bond_id_repr.ml bond_id_repr.mli
+  vote_repr.ml vote_repr.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  carbonated_map_costs.ml carbonated_map_costs.mli
+  carbonated_map.ml carbonated_map.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  ticket_hash_builder.ml ticket_hash_builder.mli
+  constants_storage.ml constants_storage.mli
+  tx_rollup_gas.ml tx_rollup_gas.mli
+  tx_rollup_hash_builder.ml
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  commitment_storage.ml commitment_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_storage.ml contract_storage.mli
+  token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
+  delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  vote_storage.ml vote_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_storage.ml liquidity_baking_storage.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  sc_rollup_errors.ml
+  sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
+  legacy_script_patches.ml
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  tx_rollup_state_storage.ml tx_rollup_state_storage.mli
+  tx_rollup_reveal_storage.ml tx_rollup_reveal_storage.mli
+  tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
+  tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
+  tx_rollup_storage.ml tx_rollup_storage.mli
+  sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
+  sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
+  sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
+  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
+  zk_rollup_errors.ml
+  destination_storage.ml destination_storage.mli
+  alpha_context.ml alpha_context.mli
+  script_string.ml script_string.mli
+  script_timestamp.ml script_timestamp.mli
+  script_bytes.ml script_bytes.mli
+  tx_rollup_l2_storage_sig.ml
+  tx_rollup_l2_context_sig.ml
+  tx_rollup_l2_context.ml
+  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
+  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
+  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
+  local_gas_counter.ml local_gas_counter.mli
+  script_tc_errors.ml
+  gas_monad.ml gas_monad.mli
+  script_ir_annot.ml script_ir_annot.mli
+  dependent_bool.ml dependent_bool.mli
+  script_list.ml script_list.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_comparable.ml script_comparable.mli
+  gas_comparable_input_size.ml gas_comparable_input_size.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  gas_input_size.ml gas_input_size.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas_costs_generated.ml
+  michelson_v1_gas_costs.ml
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  operation_costs.ml operation_costs.mli
+  script_tc_context.ml script_tc_context.mli
+  ticket_token.ml ticket_token.mli
+  ticket_receipt.ml ticket_receipt.mli
+  apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
+  apply_results.ml apply_results.mli
+  script_ir_translator_config.ml
+  script_ir_unparser.ml script_ir_unparser.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_token_unparser.ml ticket_token_unparser.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
+  tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
+  ticket_token_map.ml ticket_token_map.mli
+  ticket_operations_diff.ml ticket_operations_diff.mli
+  ticket_accounting.ml ticket_accounting.mli
+  ticket_transfer.ml ticket_transfer.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
+  sc_rollup_operations.ml sc_rollup_operations.mli
+  dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
+  baking.ml baking.mli
+  validate_errors.ml validate_errors.mli
+  amendment.ml amendment.mli
+  validate.ml validate.mli
+  mempool_validation.ml mempool_validation.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  tx_rollup_services.ml tx_rollup_services.mli
+  dal_services.ml dal_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli
+  (:src_dir TEZOS_PROTOCOL))
+ (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
+
+(library
+ (name tezos_protocol_017_PtNairob_functor)
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs)
+ (flags
+  (:standard)
+  -nopervasives)
+ (modules Functor))
+
+(rule
+ (targets functor.ml)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  origination_nonce.ml origination_nonce.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  tx_rollup_prefixes.ml tx_rollup_prefixes.mli
+  sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
+  merkle_list.ml merkle_list.mli
+  bitset.ml bitset.mli
+  bounded_history_repr.ml bounded_history_repr.mli
+  skip_list_repr.ml skip_list_repr.mli
+  context_binary_proof.ml context_binary_proof.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  ratio_repr.ml ratio_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_parametric_repr.ml constants_parametric_repr.mli
+  constants_parametric_previous_repr.ml
+  constants_parametric_previous_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  manager_counter_repr.ml manager_counter_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
+  dal_slot_index_repr.ml dal_slot_index_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_attestation_repr.ml dal_attestation_repr.mli
+  sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_inbox_merkelized_payload_hashes_repr.ml
+  sc_rollup_inbox_merkelized_payload_hashes_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
+  sc_rollup_dissection_chunk_repr.ml sc_rollup_dissection_chunk_repr.mli
+  sc_rollup_PVM_sig.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
+  sc_rollups.ml sc_rollups.mli
+  sc_rollup_data_version_sig.ml
+  sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
+  sc_rollup_staker_index_repr.ml sc_rollup_staker_index_repr.mli
+  sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
+  skip_list_costs.ml skip_list_costs.mli
+  sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_game_repr.ml sc_rollup_game_repr.mli
+  tx_rollup_level_repr.ml tx_rollup_level_repr.mli
+  tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
+  tx_rollup_l2_address.ml tx_rollup_l2_address.mli
+  tx_rollup_l2_qty.ml tx_rollup_l2_qty.mli
+  tx_rollup_l2_context_hash.ml tx_rollup_l2_context_hash.mli
+  tx_rollup_repr.ml tx_rollup_repr.mli
+  tx_rollup_withdraw_repr.ml tx_rollup_withdraw_repr.mli
+  tx_rollup_withdraw_list_hash_repr.ml tx_rollup_withdraw_list_hash_repr.mli
+  tx_rollup_reveal_repr.ml tx_rollup_reveal_repr.mli
+  tx_rollup_message_repr.ml tx_rollup_message_repr.mli
+  tx_rollup_message_hash_repr.ml tx_rollup_message_hash_repr.mli
+  tx_rollup_inbox_repr.ml tx_rollup_inbox_repr.mli
+  tx_rollup_message_result_repr.ml tx_rollup_message_result_repr.mli
+  tx_rollup_message_result_hash_repr.ml
+  tx_rollup_message_result_hash_repr.mli
+  tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
+  tx_rollup_errors_repr.ml
+  tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_errors_repr.ml
+  dal_operations_repr.ml dal_operations_repr.mli
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
+  zk_rollup_update_repr.ml zk_rollup_update_repr.mli
+  zk_rollup_circuit_public_inputs_repr.ml
+  zk_rollup_circuit_public_inputs_repr.mli
+  bond_id_repr.ml bond_id_repr.mli
+  vote_repr.ml vote_repr.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  carbonated_map_costs.ml carbonated_map_costs.mli
+  carbonated_map.ml carbonated_map.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  ticket_hash_builder.ml ticket_hash_builder.mli
+  constants_storage.ml constants_storage.mli
+  tx_rollup_gas.ml tx_rollup_gas.mli
+  tx_rollup_hash_builder.ml
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  commitment_storage.ml commitment_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_storage.ml contract_storage.mli
+  token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
+  delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  vote_storage.ml vote_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_storage.ml liquidity_baking_storage.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  sc_rollup_errors.ml
+  sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
+  legacy_script_patches.ml
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  tx_rollup_state_storage.ml tx_rollup_state_storage.mli
+  tx_rollup_reveal_storage.ml tx_rollup_reveal_storage.mli
+  tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
+  tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
+  tx_rollup_storage.ml tx_rollup_storage.mli
+  sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
+  sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
+  sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
+  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
+  zk_rollup_errors.ml
+  destination_storage.ml destination_storage.mli
+  alpha_context.ml alpha_context.mli
+  script_string.ml script_string.mli
+  script_timestamp.ml script_timestamp.mli
+  script_bytes.ml script_bytes.mli
+  tx_rollup_l2_storage_sig.ml
+  tx_rollup_l2_context_sig.ml
+  tx_rollup_l2_context.ml
+  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
+  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
+  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
+  local_gas_counter.ml local_gas_counter.mli
+  script_tc_errors.ml
+  gas_monad.ml gas_monad.mli
+  script_ir_annot.ml script_ir_annot.mli
+  dependent_bool.ml dependent_bool.mli
+  script_list.ml script_list.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_comparable.ml script_comparable.mli
+  gas_comparable_input_size.ml gas_comparable_input_size.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  gas_input_size.ml gas_input_size.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas_costs_generated.ml
+  michelson_v1_gas_costs.ml
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  operation_costs.ml operation_costs.mli
+  script_tc_context.ml script_tc_context.mli
+  ticket_token.ml ticket_token.mli
+  ticket_receipt.ml ticket_receipt.mli
+  apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
+  apply_results.ml apply_results.mli
+  script_ir_translator_config.ml
+  script_ir_unparser.ml script_ir_unparser.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_token_unparser.ml ticket_token_unparser.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
+  tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
+  ticket_token_map.ml ticket_token_map.mli
+  ticket_operations_diff.ml ticket_operations_diff.mli
+  ticket_accounting.ml ticket_accounting.mli
+  ticket_transfer.ml ticket_transfer.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
+  sc_rollup_operations.ml sc_rollup_operations.mli
+  dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
+  baking.ml baking.mli
+  validate_errors.ml validate_errors.mli
+  amendment.ml amendment.mli
+  validate.ml validate.mli
+  mempool_validation.ml mempool_validation.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  tx_rollup_services.ml tx_rollup_services.mli
+  dal_services.ml dal_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
+
+(library
+ (name tezos_embedded_protocol_017_PtNairob)
+ (public_name tezos-embedded-protocol-017-PtNairob)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-017-PtNairob
+  tezos-protocol-updater
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (modules Registerer))
+
+(rule
+ (targets registerer.ml)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  origination_nonce.ml origination_nonce.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  tx_rollup_prefixes.ml tx_rollup_prefixes.mli
+  sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
+  merkle_list.ml merkle_list.mli
+  bitset.ml bitset.mli
+  bounded_history_repr.ml bounded_history_repr.mli
+  skip_list_repr.ml skip_list_repr.mli
+  context_binary_proof.ml context_binary_proof.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  ratio_repr.ml ratio_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_parametric_repr.ml constants_parametric_repr.mli
+  constants_parametric_previous_repr.ml
+  constants_parametric_previous_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  manager_counter_repr.ml manager_counter_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
+  dal_slot_index_repr.ml dal_slot_index_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_attestation_repr.ml dal_attestation_repr.mli
+  sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_inbox_merkelized_payload_hashes_repr.ml
+  sc_rollup_inbox_merkelized_payload_hashes_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
+  sc_rollup_dissection_chunk_repr.ml sc_rollup_dissection_chunk_repr.mli
+  sc_rollup_PVM_sig.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
+  sc_rollups.ml sc_rollups.mli
+  sc_rollup_data_version_sig.ml
+  sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
+  sc_rollup_staker_index_repr.ml sc_rollup_staker_index_repr.mli
+  sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
+  skip_list_costs.ml skip_list_costs.mli
+  sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_game_repr.ml sc_rollup_game_repr.mli
+  tx_rollup_level_repr.ml tx_rollup_level_repr.mli
+  tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
+  tx_rollup_l2_address.ml tx_rollup_l2_address.mli
+  tx_rollup_l2_qty.ml tx_rollup_l2_qty.mli
+  tx_rollup_l2_context_hash.ml tx_rollup_l2_context_hash.mli
+  tx_rollup_repr.ml tx_rollup_repr.mli
+  tx_rollup_withdraw_repr.ml tx_rollup_withdraw_repr.mli
+  tx_rollup_withdraw_list_hash_repr.ml tx_rollup_withdraw_list_hash_repr.mli
+  tx_rollup_reveal_repr.ml tx_rollup_reveal_repr.mli
+  tx_rollup_message_repr.ml tx_rollup_message_repr.mli
+  tx_rollup_message_hash_repr.ml tx_rollup_message_hash_repr.mli
+  tx_rollup_inbox_repr.ml tx_rollup_inbox_repr.mli
+  tx_rollup_message_result_repr.ml tx_rollup_message_result_repr.mli
+  tx_rollup_message_result_hash_repr.ml
+  tx_rollup_message_result_hash_repr.mli
+  tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
+  tx_rollup_errors_repr.ml
+  tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_errors_repr.ml
+  dal_operations_repr.ml dal_operations_repr.mli
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
+  zk_rollup_update_repr.ml zk_rollup_update_repr.mli
+  zk_rollup_circuit_public_inputs_repr.ml
+  zk_rollup_circuit_public_inputs_repr.mli
+  bond_id_repr.ml bond_id_repr.mli
+  vote_repr.ml vote_repr.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  carbonated_map_costs.ml carbonated_map_costs.mli
+  carbonated_map.ml carbonated_map.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  ticket_hash_builder.ml ticket_hash_builder.mli
+  constants_storage.ml constants_storage.mli
+  tx_rollup_gas.ml tx_rollup_gas.mli
+  tx_rollup_hash_builder.ml
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  commitment_storage.ml commitment_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_storage.ml contract_storage.mli
+  token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
+  delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  vote_storage.ml vote_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_storage.ml liquidity_baking_storage.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  sc_rollup_errors.ml
+  sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
+  legacy_script_patches.ml
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  tx_rollup_state_storage.ml tx_rollup_state_storage.mli
+  tx_rollup_reveal_storage.ml tx_rollup_reveal_storage.mli
+  tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
+  tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
+  tx_rollup_storage.ml tx_rollup_storage.mli
+  sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
+  sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
+  sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
+  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
+  zk_rollup_errors.ml
+  destination_storage.ml destination_storage.mli
+  alpha_context.ml alpha_context.mli
+  script_string.ml script_string.mli
+  script_timestamp.ml script_timestamp.mli
+  script_bytes.ml script_bytes.mli
+  tx_rollup_l2_storage_sig.ml
+  tx_rollup_l2_context_sig.ml
+  tx_rollup_l2_context.ml
+  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
+  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
+  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
+  local_gas_counter.ml local_gas_counter.mli
+  script_tc_errors.ml
+  gas_monad.ml gas_monad.mli
+  script_ir_annot.ml script_ir_annot.mli
+  dependent_bool.ml dependent_bool.mli
+  script_list.ml script_list.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_comparable.ml script_comparable.mli
+  gas_comparable_input_size.ml gas_comparable_input_size.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  gas_input_size.ml gas_input_size.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas_costs_generated.ml
+  michelson_v1_gas_costs.ml
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  operation_costs.ml operation_costs.mli
+  script_tc_context.ml script_tc_context.mli
+  ticket_token.ml ticket_token.mli
+  ticket_receipt.ml ticket_receipt.mli
+  apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
+  apply_results.ml apply_results.mli
+  script_ir_translator_config.ml
+  script_ir_unparser.ml script_ir_unparser.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_token_unparser.ml ticket_token_unparser.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
+  tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
+  ticket_token_map.ml ticket_token_map.mli
+  ticket_operations_diff.ml ticket_operations_diff.mli
+  ticket_accounting.ml ticket_accounting.mli
+  ticket_transfer.ml ticket_transfer.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
+  sc_rollup_operations.ml sc_rollup_operations.mli
+  dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
+  baking.ml baking.mli
+  validate_errors.ml validate_errors.mli
+  amendment.ml amendment.mli
+  validate.ml validate.mli
+  mempool_validation.ml mempool_validation.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  tx_rollup_services.ml tx_rollup_services.mli
+  dal_services.ml dal_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} alpha)))))

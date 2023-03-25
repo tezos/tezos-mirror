@@ -1,0 +1,69 @@
+
+trace
+  - DUP (interp) @ location: 7
+    [ (Pair "abcd" "efgh") ]
+  - DUP (entry) @ location: 7
+    [ (Pair "abcd" "efgh") ]
+    - log/DIP (exit) @ location: 7
+      [ (Pair "abcd" "efgh")
+        (Pair "abcd" "efgh") ]
+  - DIP (entry) @ location: 8
+    [ (Pair "abcd" "efgh")
+      (Pair "abcd" "efgh") ]
+    - log/CDR (exit) @ location: 8
+      [ (Pair "abcd" "efgh") ]
+  - CDR (entry) @ location: 10
+    [ (Pair "abcd" "efgh") ]
+    - log/NIL (exit) @ location: 10
+      [ "efgh" ]
+  - NIL (entry) @ location: 11
+    [ "efgh" ]
+    - log/SWAP (exit) @ location: 11
+      [ {}
+        "efgh" ]
+  - SWAP (entry) @ location: 13
+    [ {}
+      "efgh" ]
+    - log/CONS (exit) @ location: 13
+      [ "efgh"
+        {} ]
+  - CONS (entry) @ location: 14
+    [ "efgh"
+      {} ]
+    - log/[halt] (exit) @ location: 14
+      [ { "efgh" } ]
+  - [halt] (entry) @ location: 9
+    [ { "efgh" } ]
+    - control: KUndip
+    - control: KCons
+    - log/CAR (exit) @ location: 8
+      [ (Pair "abcd" "efgh")
+        { "efgh" } ]
+  - CAR (entry) @ location: 15
+    [ (Pair "abcd" "efgh")
+      { "efgh" } ]
+    - log/CONS (exit) @ location: 15
+      [ "abcd"
+        { "efgh" } ]
+  - CONS (entry) @ location: 16
+    [ "abcd"
+      { "efgh" } ]
+    - log/CONCAT (exit) @ location: 16
+      [ { "abcd" ; "efgh" } ]
+  - CONCAT (entry) @ location: 17
+    [ { "abcd" ; "efgh" } ]
+    - log/NIL (exit) @ location: 17
+      [ "abcdefgh" ]
+  - NIL (entry) @ location: 18
+    [ "abcdefgh" ]
+    - log/PAIR (exit) @ location: 18
+      [ {}
+        "abcdefgh" ]
+  - PAIR (entry) @ location: 20
+    [ {}
+      "abcdefgh" ]
+    - log/[halt] (exit) @ location: 20
+      [ (Pair {} "abcdefgh") ]
+  - [halt] (entry) @ location: 6
+    [ (Pair {} "abcdefgh") ]
+    - control: KNil

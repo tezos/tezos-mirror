@@ -1,0 +1,54 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_alpha_parameters)
+ (public_name tezos-protocol-alpha.parameters)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-environment
+  tezos-protocol-alpha)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha)
+ (modules (:standard \ gen)))
+
+(executable
+ (name gen)
+ (libraries
+  tezos-base
+  tezos-protocol-alpha.parameters
+  tezos-protocol-alpha)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_alpha)
+ (modules gen))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(install
+ (package tezos-protocol-alpha)
+ (section lib)
+ (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
