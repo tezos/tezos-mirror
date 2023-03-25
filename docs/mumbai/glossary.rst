@@ -164,6 +164,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
+.. _glossary_minimal_stake:
 .. _glossary_minimal_stake_mumbai:
 
 _`Minimal stake`

@@ -52,20 +52,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Lima RPCs
----------
-
-The OpenAPI specification for RPCs which are specific to the Lima (``PtLimaPt``)
-protocol can be found at:
-
-- `lima-openapi.json (version 15.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/lima-openapi.json>`_
-
-The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Lima protocol can be found at:
-
-- `lima-mempool-openapi.json (version 15.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/lima-mempool-openapi.json>`_
-
-
 Mumbai RPCs
 -----------
 
@@ -75,7 +61,7 @@ protocol can be found at:
 - `mumbai-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Lima protocol can be found at:
+and specific to the Mumbai protocol can be found at:
 
 - `mumbai-mempool-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-mempool-openapi.json>`_
 

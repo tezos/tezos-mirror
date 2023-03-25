@@ -27,10 +27,10 @@ usage:
 where <test-name> can be:
 * install-bin-bionic
 * install-bin-focal
-* install-bin-fedora35
+* install-bin-fedora36
 * install-bin-rc-bionic
 * install-bin-rc-focal
-* install-bin-rc-fedora35
+* install-bin-rc-fedora36
 * install-opam-scratch
 * install-opam-bionic
 * install-opam-focal
@@ -57,8 +57,8 @@ for test_case in "$@"; do
         "install-bin-focal" )
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_FOCAL /Scripts/install-bin-ubuntu.sh
             ;;
-        "install-bin-fedora35" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:35 /Scripts/install-bin-fedora.sh
+        "install-bin-fedora36" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:36 /Scripts/install-bin-fedora.sh
             ;;
         "install-bin-rc-bionic" )
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_BIONIC /Scripts/install-bin-ubuntu.sh rc
@@ -66,8 +66,8 @@ for test_case in "$@"; do
         "install-bin-rc-focal" )
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_FOCAL /Scripts/install-bin-ubuntu.sh rc
             ;;
-        "install-bin-rc-fedora35" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:35 /Scripts/install-bin-fedora.sh rc
+        "install-bin-rc-fedora36" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:36 /Scripts/install-bin-fedora.sh rc
             ;;
         "install-opam-scratch" )
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged $UBUNTU_BIONIC /Scripts/install-opam-scratch.sh
