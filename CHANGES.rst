@@ -66,6 +66,9 @@ Baker
 Accuser
 -------
 
+- Fixed a bug that made the accuser start without waiting for its
+  corresponding protocol.
+
 Signer
 ------
 
