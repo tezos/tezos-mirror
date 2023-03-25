@@ -521,7 +521,8 @@ let init_with_constants_gen tup constants =
   let n = tup_n tup in
   let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
   let parameters =
-    Tezos_protocol_017_PtNairob_parameters.Default_parameters.parameters_of_constants
+    Tezos_protocol_017_PtNairob_parameters.Default_parameters
+    .parameters_of_constants
       ~bootstrap_accounts
       constants
   in
