@@ -223,7 +223,6 @@ module type AUTOMATON = sig
     | Message_topic_not_tracked : [`IHave] output
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
     | On_iwant_messages_to_route : {
-        peer : Peer.t;
         routed_message_ids :
           [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
       }
