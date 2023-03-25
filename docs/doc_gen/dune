@@ -10,6 +10,7 @@
             ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-embedded-protocol-genesis
             tezos-embedded-protocol-016-PtMumbai
+            tezos-embedded-protocol-017-PtNairob
             tezos-embedded-protocol-alpha
             data-encoding
             re)
