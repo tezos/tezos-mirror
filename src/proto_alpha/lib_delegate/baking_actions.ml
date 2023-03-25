@@ -425,12 +425,12 @@ let inject_preendorsements state ~preendorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     preendorsements
   >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_preendorsement (delegate, err))
@@ -438,8 +438,8 @@ let inject_preendorsements state ~preendorsements =
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit preendorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
 
 let sign_endorsements state endorsements =
@@ -505,7 +505,7 @@ let sign_endorsements state endorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     endorsements
 
 let sign_dal_attestations state attestations =
@@ -554,7 +554,7 @@ let inject_endorsements state ~endorsements =
   sign_endorsements state endorsements >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_endorsement (delegate, err))
@@ -562,8 +562,8 @@ let inject_endorsements state ~endorsements =
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit endorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
 
 let inject_dal_attestations state attestations =

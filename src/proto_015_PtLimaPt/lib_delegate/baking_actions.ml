@@ -401,13 +401,13 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     preendorsements
   >>=? fun signed_operations ->
   state_recorder ~new_state:updated_state >>=? fun () ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       let encoded_op =
         Data_encoding.Binary.to_bytes_exn Operation.encoding operation
       in
@@ -421,8 +421,8 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
             ~chain:(`Hash chain_id)
             encoded_op
           >>=? fun oph ->
-          Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit preendorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
   >>=? fun () -> return updated_state
 
@@ -488,7 +488,7 @@ let sign_endorsements state endorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     endorsements
 
 let inject_endorsements ~state_recorder state ~endorsements ~updated_state =
@@ -498,7 +498,7 @@ let inject_endorsements ~state_recorder state ~endorsements ~updated_state =
   state_recorder ~new_state:updated_state >>=? fun () ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, signed_operation) ->
+    (fun (delegate, signed_operation, level, round) ->
       let encoded_op =
         Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
       in
@@ -507,8 +507,8 @@ let inject_endorsements ~state_recorder state ~endorsements ~updated_state =
         ~chain:(`Hash chain_id)
         encoded_op
       >>=? fun oph ->
-      Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
-      return_unit)
+      Events.(emit endorsement_injected (oph, delegate, level, round))
+      >>= fun () -> return_unit)
     signed_operations
   >>=? fun () -> return updated_state
 

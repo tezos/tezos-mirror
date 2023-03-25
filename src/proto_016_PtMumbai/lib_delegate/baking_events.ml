@@ -625,26 +625,38 @@ module Actions = struct
       ("round", Round.encoding)
 
   let preendorsement_injected =
-    declare_2
+    declare_4
       ~section
       ~name:"preendorsement_injected"
       ~level:Notice
-      ~msg:"injected preendorsement {ophash} for {delegate}"
+      ~msg:
+        "injected preendorsement {ophash} for {delegate} for level {level}, \
+         round {round}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp3:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp4:Round.pp
+      ("round", Round.encoding)
 
   let endorsement_injected =
-    declare_2
+    declare_4
       ~section
       ~name:"endorsement_injected"
       ~level:Notice
-      ~msg:"injected endorsement {ophash} for {delegate}"
+      ~msg:
+        "injected endorsement {ophash} for {delegate} for level {level}, round \
+         {round}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp3:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp4:Round.pp
+      ("round", Round.encoding)
 
   let synchronizing_round =
     declare_1

@@ -96,7 +96,9 @@ val inject_preendorsements :
 val sign_endorsements :
   state ->
   (consensus_key_and_delegate * consensus_content) list ->
-  (consensus_key_and_delegate * packed_operation) list tzresult Lwt.t
+  (consensus_key_and_delegate * packed_operation * int32 * Round.t) list
+  tzresult
+  Lwt.t
 
 val inject_endorsements :
   state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
