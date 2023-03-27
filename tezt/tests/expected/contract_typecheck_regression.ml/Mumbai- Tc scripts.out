@@ -1,5 +1,6 @@
 
-./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/attic/accounts.tz michelson_test_scripts/attic/add1.tz michelson_test_scripts/attic/add1_list.tz michelson_test_scripts/attic/after_strategy.tz michelson_test_scripts/attic/always.tz michelson_test_scripts/attic/append.tz michelson_test_scripts/attic/at_least.tz michelson_test_scripts/attic/auction.tz michelson_test_scripts/attic/bad_lockup.tz michelson_test_scripts/attic/big_map_union.tz michelson_test_scripts/attic/cadr_annotation.tz michelson_test_scripts/attic/concat.tz michelson_test_scripts/attic/conditionals.tz michelson_test_scripts/attic/cons_twice.tz michelson_test_scripts/attic/cps_fact.tz michelson_test_scripts/attic/create_add1_lists.tz michelson_test_scripts/attic/data_publisher.tz michelson_test_scripts/attic/dispatch.tz michelson_test_scripts/attic/empty.tz michelson_test_scripts/attic/fail_amount.tz michelson_test_scripts/attic/faucet.tz michelson_test_scripts/attic/forward.tz michelson_test_scripts/attic/id.tz michelson_test_scripts/attic/infinite_loop.tz michelson_test_scripts/attic/insertion_sort.tz michelson_test_scripts/attic/int_publisher.tz michelson_test_scripts/attic/king_of_tez.tz michelson_test_scripts/attic/list_of_transactions.tz michelson_test_scripts/attic/queue.tz michelson_test_scripts/attic/reduce_map.tz michelson_test_scripts/attic/reentrancy.tz michelson_test_scripts/attic/reservoir.tz michelson_test_scripts/attic/scrutable_reservoir.tz michelson_test_scripts/attic/spawn_identities.tz michelson_test_scripts/entrypoints/big_map_entrypoints.tz michelson_test_scripts/entrypoints/delegatable_target.tz michelson_test_scripts/entrypoints/manager.tz michelson_test_scripts/entrypoints/no_default_target.tz michelson_test_scripts/entrypoints/no_entrypoint_target.tz michelson_test_scripts/entrypoints/rooted_target.tz michelson_test_scripts/entrypoints/simple_entrypoints.tz michelson_test_scripts/macros/assert.tz michelson_test_scripts/macros/assert_cmpeq.tz michelson_test_scripts/macros/assert_cmpge.tz michelson_test_scripts/macros/assert_cmpgt.tz michelson_test_scripts/macros/assert_cmple.tz michelson_test_scripts/macros/assert_cmplt.tz michelson_test_scripts/macros/assert_cmpneq.tz michelson_test_scripts/macros/assert_eq.tz michelson_test_scripts/macros/assert_ge.tz michelson_test_scripts/macros/assert_gt.tz michelson_test_scripts/macros/assert_le.tz michelson_test_scripts/macros/assert_lt.tz michelson_test_scripts/macros/assert_neq.tz michelson_test_scripts/macros/big_map_get_add.tz michelson_test_scripts/macros/big_map_mem.tz michelson_test_scripts/macros/build_list.tz michelson_test_scripts/macros/carn_and_cdrn.tz michelson_test_scripts/macros/compare.tz michelson_test_scripts/macros/compare_bytes.tz michelson_test_scripts/macros/fail.tz michelson_test_scripts/macros/guestbook.tz michelson_test_scripts/macros/macro_annotations.tz michelson_test_scripts/macros/map_caddaadr.tz michelson_test_scripts/macros/max_in_list.tz michelson_test_scripts/macros/min.tz michelson_test_scripts/macros/pair_macro.tz michelson_test_scripts/macros/set_caddaadr.tz michelson_test_scripts/macros/take_my_money.tz michelson_test_scripts/macros/unpair_macro.tz michelson_test_scripts/mini_scenarios/999_constant.tz michelson_test_scripts/mini_scenarios/add_clear_tickets_015.tz michelson_test_scripts/mini_scenarios/always_fails.tz michelson_test_scripts/mini_scenarios/authentication.tz michelson_test_scripts/mini_scenarios/big_map_all.tz michelson_test_scripts/mini_scenarios/big_map_entrypoints.tz michelson_test_scripts/mini_scenarios/big_map_magic.tz michelson_test_scripts/mini_scenarios/big_map_read.tz michelson_test_scripts/mini_scenarios/big_map_store.tz michelson_test_scripts/mini_scenarios/big_map_write.tz michelson_test_scripts/mini_scenarios/cache_consistency.tz michelson_test_scripts/mini_scenarios/check_signature.tz michelson_test_scripts/mini_scenarios/constant_entrypoints.tz michelson_test_scripts/mini_scenarios/constant_unit.tz michelson_test_scripts/mini_scenarios/create_contract.tz michelson_test_scripts/mini_scenarios/create_contract_simple.tz michelson_test_scripts/mini_scenarios/default_account.tz michelson_test_scripts/mini_scenarios/emit_events.tz michelson_test_scripts/mini_scenarios/execution_order_appender.tz michelson_test_scripts/mini_scenarios/execution_order_caller.tz michelson_test_scripts/mini_scenarios/execution_order_storer.tz michelson_test_scripts/mini_scenarios/fa12_reference.tz michelson_test_scripts/mini_scenarios/fail_on_false.tz michelson_test_scripts/mini_scenarios/generic_multisig.tz michelson_test_scripts/mini_scenarios/groth16.tz michelson_test_scripts/mini_scenarios/hardlimit.tz michelson_test_scripts/mini_scenarios/large_error.tz michelson_test_scripts/mini_scenarios/large_flat_contract.tz michelson_test_scripts/mini_scenarios/large_str_id.tz michelson_test_scripts/mini_scenarios/legacy_multisig.tz michelson_test_scripts/mini_scenarios/lockup.tz michelson_test_scripts/mini_scenarios/loop.tz michelson_test_scripts/mini_scenarios/lqt_fa12.mligo.tz michelson_test_scripts/mini_scenarios/multiple_en2.tz michelson_test_scripts/mini_scenarios/multiple_entrypoints_counter.tz michelson_test_scripts/mini_scenarios/multisig_dest_entrypoint.tz michelson_test_scripts/mini_scenarios/multisig_dest_entrypoint_arg.tz michelson_test_scripts/mini_scenarios/nat_id.tz michelson_test_scripts/mini_scenarios/noop_bytes.tz michelson_test_scripts/mini_scenarios/originate_contract.tz michelson_test_scripts/mini_scenarios/parameterized_multisig.tz michelson_test_scripts/mini_scenarios/parsable_contract.tz michelson_test_scripts/mini_scenarios/receive_tickets_in_big_map.tz michelson_test_scripts/mini_scenarios/replay.tz michelson_test_scripts/mini_scenarios/reveal_signed_preimage.tz michelson_test_scripts/mini_scenarios/sc_rollup_forward.tz michelson_test_scripts/mini_scenarios/sc_rollup_mint_and_forward.tz michelson_test_scripts/mini_scenarios/self_address_receiver.tz michelson_test_scripts/mini_scenarios/self_address_sender.tz michelson_test_scripts/mini_scenarios/send_ticket_list_016.tz michelson_test_scripts/mini_scenarios/send_ticket_list_multiple_016.tz michelson_test_scripts/mini_scenarios/send_tickets_from_storage_016.tz michelson_test_scripts/mini_scenarios/send_tickets_in_big_map_015.tz michelson_test_scripts/mini_scenarios/smart_rollup_mint_and_deposit_ticket_016.tz michelson_test_scripts/mini_scenarios/smart_rollup_receive_tickets_016.tz michelson_test_scripts/mini_scenarios/str_id.tz michelson_test_scripts/mini_scenarios/ticket_builder_fungible.tz michelson_test_scripts/mini_scenarios/ticket_builder_non_fungible.tz michelson_test_scripts/mini_scenarios/ticket_wallet_fungible.tz michelson_test_scripts/mini_scenarios/ticket_wallet_non_fungible.tz michelson_test_scripts/mini_scenarios/tickets_015.tz michelson_test_scripts/mini_scenarios/tickets_bag_016.tz michelson_test_scripts/mini_scenarios/tickets_bag_implicit_016.tz michelson_test_scripts/mini_scenarios/tickets_blackhole_016.tz michelson_test_scripts/mini_scenarios/tickets_create_and_send_015.tz michelson_test_scripts/mini_scenarios/tickets_list_blackhole_016.tz michelson_test_scripts/mini_scenarios/tickets_receive_and_store.tz michelson_test_scripts/mini_scenarios/tickets_send_016.tz michelson_test_scripts/mini_scenarios/tickets_send_with_tez_016.tz michelson_test_scripts/mini_scenarios/tickets_store_fst_and_rely_snd.tz michelson_test_scripts/mini_scenarios/tzip4_view.tz michelson_test_scripts/mini_scenarios/very_small.tz michelson_test_scripts/mini_scenarios/view_check_caller.tz michelson_test_scripts/mini_scenarios/view_registers_callers.tz michelson_test_scripts/mini_scenarios/viewable.tz michelson_test_scripts/mini_scenarios/vote_for_delegate.tz michelson_test_scripts/mini_scenarios/weather_insurance.tz michelson_test_scripts/mini_scenarios/xcat.tz michelson_test_scripts/mini_scenarios/xcat_dapp.tz michelson_test_scripts/non_regression/262_bug.tz michelson_test_scripts/non_regression/843_bug.tz michelson_test_scripts/non_regression/bad_annot_contract.tz michelson_test_scripts/non_regression/pairk_annot.tz michelson_test_scripts/opcodes/abs.tz michelson_test_scripts/opcodes/add.tz michelson_test_scripts/opcodes/add_bls12_381_fr.tz michelson_test_scripts/opcodes/add_bls12_381_g1.tz michelson_test_scripts/opcodes/add_bls12_381_g2.tz michelson_test_scripts/opcodes/add_delta_timestamp.tz michelson_test_scripts/opcodes/add_timestamp_delta.tz michelson_test_scripts/opcodes/address.tz michelson_test_scripts/opcodes/amount_after_fib_view.tz michelson_test_scripts/opcodes/amount_after_nonexistent_view.tz michelson_test_scripts/opcodes/amount_after_view.tz michelson_test_scripts/opcodes/and.tz michelson_test_scripts/opcodes/and_binary.tz michelson_test_scripts/opcodes/and_bytes_016.tz michelson_test_scripts/opcodes/and_logical_1.tz michelson_test_scripts/opcodes/balance.tz michelson_test_scripts/opcodes/balance_after_fib_view.tz michelson_test_scripts/opcodes/balance_after_nonexistent_view.tz michelson_test_scripts/opcodes/balance_after_view.tz michelson_test_scripts/opcodes/big_map_mem_nat.tz michelson_test_scripts/opcodes/big_map_mem_string.tz michelson_test_scripts/opcodes/big_map_to_self.tz michelson_test_scripts/opcodes/bls12_381_fr_push_bytes_not_padded.tz michelson_test_scripts/opcodes/bls12_381_fr_push_nat.tz michelson_test_scripts/opcodes/bls12_381_fr_to_int.tz michelson_test_scripts/opcodes/bls12_381_fr_to_mutez.tz michelson_test_scripts/opcodes/bls12_381_fr_z_int.tz michelson_test_scripts/opcodes/bls12_381_fr_z_nat.tz michelson_test_scripts/opcodes/bls12_381_z_fr_int.tz michelson_test_scripts/opcodes/bls12_381_z_fr_nat.tz michelson_test_scripts/opcodes/bytes.tz michelson_test_scripts/opcodes/bytes_of_int_016.tz michelson_test_scripts/opcodes/bytes_of_nat_016.tz michelson_test_scripts/opcodes/car.tz michelson_test_scripts/opcodes/cdr.tz michelson_test_scripts/opcodes/chain_id.tz michelson_test_scripts/opcodes/chain_id_store.tz michelson_test_scripts/opcodes/check_signature.tz michelson_test_scripts/opcodes/comb.tz michelson_test_scripts/opcodes/comb-get.tz michelson_test_scripts/opcodes/comb-literals.tz michelson_test_scripts/opcodes/comb-set.tz michelson_test_scripts/opcodes/comb-set-2.tz michelson_test_scripts/opcodes/compare.tz michelson_test_scripts/opcodes/compare_big_type.tz michelson_test_scripts/opcodes/compare_big_type2.tz michelson_test_scripts/opcodes/comparisons.tz michelson_test_scripts/opcodes/concat_hello.tz michelson_test_scripts/opcodes/concat_hello_bytes.tz michelson_test_scripts/opcodes/concat_list.tz michelson_test_scripts/opcodes/cons.tz michelson_test_scripts/opcodes/contains_all.tz michelson_test_scripts/opcodes/contract.tz michelson_test_scripts/opcodes/create_contract.tz michelson_test_scripts/opcodes/create_contract_rootname.tz michelson_test_scripts/opcodes/create_contract_rootname_alt.tz michelson_test_scripts/opcodes/create_contract_with_view.tz michelson_test_scripts/opcodes/diff_timestamps.tz michelson_test_scripts/opcodes/dig_eq.tz michelson_test_scripts/opcodes/dign.tz michelson_test_scripts/opcodes/dip.tz michelson_test_scripts/opcodes/dipn.tz michelson_test_scripts/opcodes/dropn.tz michelson_test_scripts/opcodes/dugn.tz michelson_test_scripts/opcodes/dup-n.tz michelson_test_scripts/opcodes/ediv.tz michelson_test_scripts/opcodes/ediv_mutez.tz michelson_test_scripts/opcodes/emit.tz michelson_test_scripts/opcodes/empty_map.tz michelson_test_scripts/opcodes/exec_concat.tz michelson_test_scripts/opcodes/fact.tz michelson_test_scripts/opcodes/first.tz michelson_test_scripts/opcodes/get_and_update_big_map.tz michelson_test_scripts/opcodes/get_and_update_map.tz michelson_test_scripts/opcodes/get_big_map_value.tz michelson_test_scripts/opcodes/get_map_value.tz michelson_test_scripts/opcodes/hash_consistency_checker.tz michelson_test_scripts/opcodes/hash_key.tz michelson_test_scripts/opcodes/hash_string.tz michelson_test_scripts/opcodes/if.tz michelson_test_scripts/opcodes/if_some.tz michelson_test_scripts/opcodes/int.tz michelson_test_scripts/opcodes/iter_fail.tz michelson_test_scripts/opcodes/keccak.tz michelson_test_scripts/opcodes/left_right.tz michelson_test_scripts/opcodes/level.tz michelson_test_scripts/opcodes/list_concat.tz michelson_test_scripts/opcodes/list_concat_bytes.tz michelson_test_scripts/opcodes/list_id.tz michelson_test_scripts/opcodes/list_id_map.tz michelson_test_scripts/opcodes/list_iter.tz michelson_test_scripts/opcodes/list_map_block.tz michelson_test_scripts/opcodes/list_size.tz michelson_test_scripts/opcodes/loop_failwith.tz michelson_test_scripts/opcodes/loop_left.tz michelson_test_scripts/opcodes/loop_left_failwith.tz michelson_test_scripts/opcodes/lsl_bytes_016.tz michelson_test_scripts/opcodes/lsr_bytes_016.tz michelson_test_scripts/opcodes/map_car.tz michelson_test_scripts/opcodes/map_id.tz michelson_test_scripts/opcodes/map_iter.tz michelson_test_scripts/opcodes/map_map.tz michelson_test_scripts/opcodes/map_map_sideeffect.tz michelson_test_scripts/opcodes/map_mem_nat.tz michelson_test_scripts/opcodes/map_mem_string.tz michelson_test_scripts/opcodes/map_size.tz michelson_test_scripts/opcodes/merge_comparable_pairs.tz michelson_test_scripts/opcodes/mul.tz michelson_test_scripts/opcodes/mul_bls12_381_fr.tz michelson_test_scripts/opcodes/mul_bls12_381_g1.tz michelson_test_scripts/opcodes/mul_bls12_381_g2.tz michelson_test_scripts/opcodes/mul_overflow.tz michelson_test_scripts/opcodes/munch.tz michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz michelson_test_scripts/opcodes/neg.tz michelson_test_scripts/opcodes/neg_bls12_381_fr.tz michelson_test_scripts/opcodes/neg_bls12_381_g1.tz michelson_test_scripts/opcodes/neg_bls12_381_g2.tz michelson_test_scripts/opcodes/none.tz michelson_test_scripts/opcodes/noop.tz michelson_test_scripts/opcodes/not.tz michelson_test_scripts/opcodes/not_binary.tz michelson_test_scripts/opcodes/not_bytes_016.tz michelson_test_scripts/opcodes/or.tz michelson_test_scripts/opcodes/or_binary.tz michelson_test_scripts/opcodes/or_bytes_016.tz michelson_test_scripts/opcodes/originate_big_map.tz michelson_test_scripts/opcodes/packunpack.tz michelson_test_scripts/opcodes/packunpack_rev.tz michelson_test_scripts/opcodes/packunpack_rev_cty.tz michelson_test_scripts/opcodes/pair_id.tz michelson_test_scripts/opcodes/pairing_check.tz michelson_test_scripts/opcodes/pexec.tz michelson_test_scripts/opcodes/pexec_2.tz michelson_test_scripts/opcodes/proxy.tz michelson_test_scripts/opcodes/ret_int.tz michelson_test_scripts/opcodes/reverse.tz michelson_test_scripts/opcodes/reverse_loop.tz michelson_test_scripts/opcodes/sapling_empty_state.tz michelson_test_scripts/opcodes/self.tz michelson_test_scripts/opcodes/self_address.tz michelson_test_scripts/opcodes/self_address_after_fib_view.tz michelson_test_scripts/opcodes/self_address_after_nonexistent_view.tz michelson_test_scripts/opcodes/self_address_after_view.tz michelson_test_scripts/opcodes/self_after_fib_view.tz michelson_test_scripts/opcodes/self_after_nonexistent_view.tz michelson_test_scripts/opcodes/self_after_view.tz michelson_test_scripts/opcodes/self_with_default_entrypoint.tz michelson_test_scripts/opcodes/self_with_entrypoint.tz michelson_test_scripts/opcodes/sender.tz michelson_test_scripts/opcodes/sender_after_fib_view.tz michelson_test_scripts/opcodes/sender_after_nonexistent_view.tz michelson_test_scripts/opcodes/sender_after_view.tz michelson_test_scripts/opcodes/set_car.tz michelson_test_scripts/opcodes/set_cdr.tz michelson_test_scripts/opcodes/set_delegate.tz michelson_test_scripts/opcodes/set_id.tz michelson_test_scripts/opcodes/set_iter.tz michelson_test_scripts/opcodes/set_member.tz michelson_test_scripts/opcodes/set_size.tz michelson_test_scripts/opcodes/sets.tz michelson_test_scripts/opcodes/sha3.tz michelson_test_scripts/opcodes/shifts.tz michelson_test_scripts/opcodes/slice.tz michelson_test_scripts/opcodes/slice_bytes.tz michelson_test_scripts/opcodes/slices.tz michelson_test_scripts/opcodes/source.tz michelson_test_scripts/opcodes/split_bytes.tz michelson_test_scripts/opcodes/split_string.tz michelson_test_scripts/opcodes/store_bls12_381_fr.tz michelson_test_scripts/opcodes/store_bls12_381_g1.tz michelson_test_scripts/opcodes/store_bls12_381_g2.tz michelson_test_scripts/opcodes/store_input.tz michelson_test_scripts/opcodes/store_now.tz michelson_test_scripts/opcodes/str_id.tz michelson_test_scripts/opcodes/sub_timestamp_delta.tz michelson_test_scripts/opcodes/subset.tz michelson_test_scripts/opcodes/tez_add_sub.tz michelson_test_scripts/opcodes/ticket_bad.tz michelson_test_scripts/opcodes/ticket_big_store.tz michelson_test_scripts/opcodes/ticket_join.tz michelson_test_scripts/opcodes/ticket_read.tz michelson_test_scripts/opcodes/ticket_split.tz michelson_test_scripts/opcodes/ticket_store.tz michelson_test_scripts/opcodes/ticket_store-2.tz michelson_test_scripts/opcodes/ticketer.tz michelson_test_scripts/opcodes/ticketer-2.tz michelson_test_scripts/opcodes/transfer_amount.tz michelson_test_scripts/opcodes/transfer_tokens.tz michelson_test_scripts/opcodes/uncomb.tz michelson_test_scripts/opcodes/unpair.tz michelson_test_scripts/opcodes/unpair_field_annotation_mismatch.tz michelson_test_scripts/opcodes/update_big_map.tz michelson_test_scripts/opcodes/utxo_read.tz michelson_test_scripts/opcodes/utxor.tz michelson_test_scripts/opcodes/view_fib.tz michelson_test_scripts/opcodes/view_mutual_recursion.tz michelson_test_scripts/opcodes/view_op_add.tz michelson_test_scripts/opcodes/view_op_constant.tz michelson_test_scripts/opcodes/view_op_id.tz michelson_test_scripts/opcodes/view_op_nonexistent_addr.tz michelson_test_scripts/opcodes/view_op_nonexistent_func.tz michelson_test_scripts/opcodes/view_op_test_step_contants.tz michelson_test_scripts/opcodes/view_op_toplevel_inconsistent_input_type.tz michelson_test_scripts/opcodes/view_op_toplevel_inconsistent_output_type.tz michelson_test_scripts/opcodes/view_rec.tz michelson_test_scripts/opcodes/view_toplevel_lib.tz michelson_test_scripts/opcodes/voting_power.tz michelson_test_scripts/opcodes/xor.tz michelson_test_scripts/opcodes/xor_bytes_016.tz --details
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/attic/accounts.tz michelson_test_scripts/attic/add1.tz michelson_test_scripts/attic/add1_list.tz michelson_test_scripts/attic/after_strategy.tz michelson_test_scripts/attic/always.tz michelson_test_scripts/attic/append.tz michelson_test_scripts/attic/at_least.tz michelson_test_scripts/attic/auction.tz michelson_test_scripts/attic/bad_lockup.tz michelson_test_scripts/attic/big_map_union.tz michelson_test_scripts/attic/cadr_annotation.tz michelson_test_scripts/attic/concat.tz michelson_test_scripts/attic/conditionals.tz michelson_test_scripts/attic/cons_twice.tz michelson_test_scripts/attic/cps_fact.tz michelson_test_scripts/attic/create_add1_lists.tz michelson_test_scripts/attic/data_publisher.tz michelson_test_scripts/attic/dispatch.tz michelson_test_scripts/attic/empty.tz michelson_test_scripts/attic/fail_amount.tz michelson_test_scripts/attic/faucet.tz michelson_test_scripts/attic/forward.tz michelson_test_scripts/attic/id.tz michelson_test_scripts/attic/infinite_loop.tz michelson_test_scripts/attic/insertion_sort.tz michelson_test_scripts/attic/int_publisher.tz michelson_test_scripts/attic/king_of_tez.tz michelson_test_scripts/attic/list_of_transactions.tz michelson_test_scripts/attic/queue.tz michelson_test_scripts/attic/reduce_map.tz michelson_test_scripts/attic/reentrancy.tz michelson_test_scripts/attic/reservoir.tz michelson_test_scripts/attic/scrutable_reservoir.tz michelson_test_scripts/attic/spawn_identities.tz michelson_test_scripts/entrypoints/big_map_entrypoints.tz michelson_test_scripts/entrypoints/delegatable_target.tz michelson_test_scripts/entrypoints/manager.tz michelson_test_scripts/entrypoints/no_default_target.tz michelson_test_scripts/entrypoints/no_entrypoint_target.tz michelson_test_scripts/entrypoints/rooted_target.tz michelson_test_scripts/entrypoints/simple_entrypoints.tz michelson_test_scripts/macros/assert.tz michelson_test_scripts/macros/assert_cmpeq.tz michelson_test_scripts/macros/assert_cmpge.tz michelson_test_scripts/macros/assert_cmpgt.tz michelson_test_scripts/macros/assert_cmple.tz michelson_test_scripts/macros/assert_cmplt.tz michelson_test_scripts/macros/assert_cmpneq.tz michelson_test_scripts/macros/assert_eq.tz michelson_test_scripts/macros/assert_ge.tz michelson_test_scripts/macros/assert_gt.tz michelson_test_scripts/macros/assert_le.tz michelson_test_scripts/macros/assert_lt.tz michelson_test_scripts/macros/assert_neq.tz michelson_test_scripts/macros/big_map_get_add.tz michelson_test_scripts/macros/big_map_mem.tz michelson_test_scripts/macros/build_list.tz michelson_test_scripts/macros/carn_and_cdrn.tz michelson_test_scripts/macros/compare.tz michelson_test_scripts/macros/compare_bytes.tz michelson_test_scripts/macros/fail.tz michelson_test_scripts/macros/guestbook.tz michelson_test_scripts/macros/macro_annotations.tz michelson_test_scripts/macros/map_caddaadr.tz michelson_test_scripts/macros/max_in_list.tz michelson_test_scripts/macros/min.tz michelson_test_scripts/macros/pair_macro.tz michelson_test_scripts/macros/set_caddaadr.tz michelson_test_scripts/macros/take_my_money.tz michelson_test_scripts/macros/unpair_macro.tz michelson_test_scripts/mini_scenarios/999_constant.tz michelson_test_scripts/mini_scenarios/add_clear_tickets_015.tz michelson_test_scripts/mini_scenarios/always_fails.tz michelson_test_scripts/mini_scenarios/authentication.tz michelson_test_scripts/mini_scenarios/big_map_all.tz michelson_test_scripts/mini_scenarios/big_map_entrypoints.tz michelson_test_scripts/mini_scenarios/big_map_magic.tz michelson_test_scripts/mini_scenarios/big_map_read.tz michelson_test_scripts/mini_scenarios/big_map_store.tz michelson_test_scripts/mini_scenarios/big_map_write.tz michelson_test_scripts/mini_scenarios/cache_consistency.tz michelson_test_scripts/mini_scenarios/check_signature.tz michelson_test_scripts/mini_scenarios/constant_entrypoints.tz michelson_test_scripts/mini_scenarios/constant_unit.tz michelson_test_scripts/mini_scenarios/create_contract.tz michelson_test_scripts/mini_scenarios/create_contract_simple.tz michelson_test_scripts/mini_scenarios/default_account.tz michelson_test_scripts/mini_scenarios/emit_events.tz michelson_test_scripts/mini_scenarios/execution_order_appender.tz michelson_test_scripts/mini_scenarios/execution_order_caller.tz michelson_test_scripts/mini_scenarios/execution_order_storer.tz michelson_test_scripts/mini_scenarios/fa12_reference.tz michelson_test_scripts/mini_scenarios/fail_on_false.tz michelson_test_scripts/mini_scenarios/generic_multisig.tz michelson_test_scripts/mini_scenarios/groth16.tz michelson_test_scripts/mini_scenarios/hardlimit.tz michelson_test_scripts/mini_scenarios/large_error.tz michelson_test_scripts/mini_scenarios/large_flat_contract.tz michelson_test_scripts/mini_scenarios/large_str_id.tz michelson_test_scripts/mini_scenarios/legacy_multisig.tz michelson_test_scripts/mini_scenarios/lockup.tz michelson_test_scripts/mini_scenarios/loop.tz michelson_test_scripts/mini_scenarios/lqt_fa12.mligo.tz michelson_test_scripts/mini_scenarios/multiple_en2.tz michelson_test_scripts/mini_scenarios/multiple_entrypoints_counter.tz michelson_test_scripts/mini_scenarios/multisig_dest_entrypoint.tz michelson_test_scripts/mini_scenarios/multisig_dest_entrypoint_arg.tz michelson_test_scripts/mini_scenarios/nat_id.tz michelson_test_scripts/mini_scenarios/noop_bytes.tz michelson_test_scripts/mini_scenarios/originate_contract.tz michelson_test_scripts/mini_scenarios/parameterized_multisig.tz michelson_test_scripts/mini_scenarios/parsable_contract.tz michelson_test_scripts/mini_scenarios/receive_tickets_in_big_map.tz michelson_test_scripts/mini_scenarios/replay.tz michelson_test_scripts/mini_scenarios/reveal_signed_preimage.tz michelson_test_scripts/mini_scenarios/sc_rollup_forward.tz michelson_test_scripts/mini_scenarios/sc_rollup_mint_and_forward.tz michelson_test_scripts/mini_scenarios/self_address_receiver.tz michelson_test_scripts/mini_scenarios/self_address_sender.tz michelson_test_scripts/mini_scenarios/send_ticket_list_016.tz michelson_test_scripts/mini_scenarios/send_ticket_list_multiple_016.tz michelson_test_scripts/mini_scenarios/send_tickets_from_storage_016.tz michelson_test_scripts/mini_scenarios/send_tickets_in_big_map_015.tz michelson_test_scripts/mini_scenarios/smart_rollup_mint_and_deposit_ticket_016.tz michelson_test_scripts/mini_scenarios/smart_rollup_receive_tickets_016.tz michelson_test_scripts/mini_scenarios/str_id.tz michelson_test_scripts/mini_scenarios/ticket_builder_fungible.tz michelson_test_scripts/mini_scenarios/ticket_builder_non_fungible.tz michelson_test_scripts/mini_scenarios/ticket_wallet_fungible.tz michelson_test_scripts/mini_scenarios/ticket_wallet_non_fungible.tz michelson_test_scripts/mini_scenarios/tickets_015.tz michelson_test_scripts/mini_scenarios/tickets_bag_016.tz michelson_test_scripts/mini_scenarios/tickets_bag_implicit_016.tz michelson_test_scripts/mini_scenarios/tickets_blackhole_016.tz michelson_test_scripts/mini_scenarios/tickets_create_and_send_015.tz michelson_test_scripts/mini_scenarios/tickets_list_blackhole_016.tz michelson_test_scripts/mini_scenarios/tickets_receive_and_store.tz michelson_test_scripts/mini_scenarios/tickets_send_016.tz michelson_test_scripts/mini_scenarios/tickets_send_with_tez_016.tz michelson_test_scripts/mini_scenarios/tickets_store_fst_and_rely_snd.tz michelson_test_scripts/mini_scenarios/tzip4_view.tz michelson_test_scripts/mini_scenarios/very_small.tz michelson_test_scripts/mini_scenarios/view_check_caller.tz michelson_test_scripts/mini_scenarios/view_registers_callers.tz michelson_test_scripts/mini_scenarios/viewable.tz michelson_test_scripts/mini_scenarios/vote_for_delegate.tz michelson_test_scripts/mini_scenarios/weather_insurance.tz michelson_test_scripts/mini_scenarios/xcat.tz michelson_test_scripts/mini_scenarios/xcat_dapp.tz michelson_test_scripts/non_regression/262_bug.tz michelson_test_scripts/non_regression/843_bug.tz michelson_test_scripts/non_regression/bad_annot_contract.tz michelson_test_scripts/non_regression/pairk_annot.tz michelson_test_scripts/opcodes/abs.tz michelson_test_scripts/opcodes/add.tz michelson_test_scripts/opcodes/add_bls12_381_fr.tz michelson_test_scripts/opcodes/add_bls12_381_g1.tz michelson_test_scripts/opcodes/add_bls12_381_g2.tz michelson_test_scripts/opcodes/add_delta_timestamp.tz michelson_test_scripts/opcodes/add_timestamp_delta.tz michelson_test_scripts/opcodes/address.tz michelson_test_scripts/opcodes/amount_after_fib_view.tz michelson_test_scripts/opcodes/amount_after_nonexistent_view.tz michelson_test_scripts/opcodes/amount_after_view.tz michelson_test_scripts/opcodes/and.tz michelson_test_scripts/opcodes/and_binary.tz michelson_test_scripts/opcodes/and_bytes_016.tz michelson_test_scripts/opcodes/and_logical_1.tz michelson_test_scripts/opcodes/balance.tz michelson_test_scripts/opcodes/balance_after_fib_view.tz michelson_test_scripts/opcodes/balance_after_nonexistent_view.tz michelson_test_scripts/opcodes/balance_after_view.tz michelson_test_scripts/opcodes/big_map_mem_nat.tz michelson_test_scripts/opcodes/big_map_mem_string.tz michelson_test_scripts/opcodes/big_map_to_self.tz michelson_test_scripts/opcodes/bls12_381_fr_push_bytes_not_padded.tz michelson_test_scripts/opcodes/bls12_381_fr_push_nat.tz michelson_test_scripts/opcodes/bls12_381_fr_to_int.tz michelson_test_scripts/opcodes/bls12_381_fr_to_mutez.tz michelson_test_scripts/opcodes/bls12_381_fr_z_int.tz michelson_test_scripts/opcodes/bls12_381_fr_z_nat.tz michelson_test_scripts/opcodes/bls12_381_z_fr_int.tz michelson_test_scripts/opcodes/bls12_381_z_fr_nat.tz michelson_test_scripts/opcodes/bytes.tz michelson_test_scripts/opcodes/bytes_of_int_016.tz michelson_test_scripts/opcodes/bytes_of_nat_016.tz michelson_test_scripts/opcodes/car.tz michelson_test_scripts/opcodes/cdr.tz michelson_test_scripts/opcodes/chain_id.tz michelson_test_scripts/opcodes/chain_id_store.tz michelson_test_scripts/opcodes/check_signature.tz michelson_test_scripts/opcodes/comb.tz michelson_test_scripts/opcodes/comb-get.tz michelson_test_scripts/opcodes/comb-literals.tz michelson_test_scripts/opcodes/comb-set.tz michelson_test_scripts/opcodes/comb-set-2.tz michelson_test_scripts/opcodes/compare.tz michelson_test_scripts/opcodes/compare_big_type.tz michelson_test_scripts/opcodes/compare_big_type2.tz michelson_test_scripts/opcodes/comparisons.tz michelson_test_scripts/opcodes/concat_hello.tz michelson_test_scripts/opcodes/concat_hello_bytes.tz michelson_test_scripts/opcodes/concat_list.tz michelson_test_scripts/opcodes/cons.tz michelson_test_scripts/opcodes/contains_all.tz michelson_test_scripts/opcodes/contract.tz michelson_test_scripts/opcodes/create_contract.tz michelson_test_scripts/opcodes/create_contract_rootname.tz michelson_test_scripts/opcodes/create_contract_rootname_alt.tz michelson_test_scripts/opcodes/create_contract_with_view.tz michelson_test_scripts/opcodes/diff_timestamps.tz michelson_test_scripts/opcodes/dig_eq.tz michelson_test_scripts/opcodes/dign.tz michelson_test_scripts/opcodes/dip.tz michelson_test_scripts/opcodes/dipn.tz michelson_test_scripts/opcodes/dropn.tz michelson_test_scripts/opcodes/dugn.tz michelson_test_scripts/opcodes/dup-n.tz michelson_test_scripts/opcodes/ediv.tz michelson_test_scripts/opcodes/ediv_mutez.tz michelson_test_scripts/opcodes/emit.tz michelson_test_scripts/opcodes/empty_map.tz michelson_test_scripts/opcodes/exec_concat.tz michelson_test_scripts/opcodes/fact.tz michelson_test_scripts/opcodes/first.tz michelson_test_scripts/opcodes/get_and_update_big_map.tz michelson_test_scripts/opcodes/get_and_update_map.tz michelson_test_scripts/opcodes/get_big_map_value.tz michelson_test_scripts/opcodes/get_map_value.tz michelson_test_scripts/opcodes/hash_consistency_checker.tz michelson_test_scripts/opcodes/hash_key.tz michelson_test_scripts/opcodes/hash_string.tz michelson_test_scripts/opcodes/if.tz michelson_test_scripts/opcodes/if_some.tz michelson_test_scripts/opcodes/int.tz michelson_test_scripts/opcodes/iter_fail.tz michelson_test_scripts/opcodes/keccak.tz michelson_test_scripts/opcodes/left_right.tz michelson_test_scripts/opcodes/level.tz michelson_test_scripts/opcodes/list_concat.tz michelson_test_scripts/opcodes/list_concat_bytes.tz michelson_test_scripts/opcodes/list_id.tz michelson_test_scripts/opcodes/list_id_map.tz michelson_test_scripts/opcodes/list_iter.tz michelson_test_scripts/opcodes/list_map_block.tz michelson_test_scripts/opcodes/list_size.tz michelson_test_scripts/opcodes/loop_failwith.tz michelson_test_scripts/opcodes/loop_left.tz michelson_test_scripts/opcodes/loop_left_failwith.tz michelson_test_scripts/opcodes/lsl_bytes_016.tz michelson_test_scripts/opcodes/lsr_bytes_016.tz michelson_test_scripts/opcodes/map_car.tz michelson_test_scripts/opcodes/map_id.tz michelson_test_scripts/opcodes/map_iter.tz michelson_test_scripts/opcodes/map_map.tz michelson_test_scripts/opcodes/map_map_sideeffect.tz michelson_test_scripts/opcodes/map_mem_nat.tz michelson_test_scripts/opcodes/map_mem_string.tz michelson_test_scripts/opcodes/map_size.tz michelson_test_scripts/opcodes/merge_comparable_pairs.tz michelson_test_scripts/opcodes/mul.tz michelson_test_scripts/opcodes/mul_bls12_381_fr.tz michelson_test_scripts/opcodes/mul_bls12_381_g1.tz michelson_test_scripts/opcodes/mul_bls12_381_g2.tz michelson_test_scripts/opcodes/mul_overflow.tz michelson_test_scripts/opcodes/munch.tz michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz michelson_test_scripts/opcodes/neg.tz michelson_test_scripts/opcodes/neg_bls12_381_fr.tz michelson_test_scripts/opcodes/neg_bls12_381_g1.tz michelson_test_scripts/opcodes/neg_bls12_381_g2.tz michelson_test_scripts/opcodes/none.tz michelson_test_scripts/opcodes/noop.tz michelson_test_scripts/opcodes/not.tz michelson_test_scripts/opcodes/not_binary.tz michelson_test_scripts/opcodes/not_bytes_016.tz michelson_test_scripts/opcodes/or.tz michelson_test_scripts/opcodes/or_binary.tz michelson_test_scripts/opcodes/or_bytes_016.tz michelson_test_scripts/opcodes/originate_big_map.tz michelson_test_scripts/opcodes/packunpack.tz michelson_test_scripts/opcodes/packunpack_rev.tz michelson_test_scripts/opcodes/packunpack_rev_cty.tz michelson_test_scripts/opcodes/pair_id.tz michelson_test_scripts/opcodes/pairing_check.tz michelson_test_scripts/opcodes/pexec.tz michelson_test_scripts/opcodes/pexec_2.tz michelson_test_scripts/opcodes/proxy.tz michelson_test_scripts/opcodes/ret_int.tz michelson_test_scripts/opcodes/reverse.tz michelson_test_scripts/opcodes/reverse_loop.tz michelson_test_scripts/opcodes/sapling_empty_state.tz michelson_test_scripts/opcodes/self.tz michelson_test_scripts/opcodes/self_address.tz michelson_test_scripts/opcodes/self_address_after_fib_view.tz michelson_test_scripts/opcodes/self_address_after_nonexistent_view.tz michelson_test_scripts/opcodes/self_address_after_view.tz michelson_test_scripts/opcodes/self_after_fib_view.tz michelson_test_scripts/opcodes/self_after_nonexistent_view.tz michelson_test_scripts/opcodes/self_after_view.tz michelson_test_scripts/opcodes/self_with_default_entrypoint.tz michelson_test_scripts/opcodes/self_with_entrypoint.tz michelson_test_scripts/opcodes/sender.tz michelson_test_scripts/opcodes/sender_after_fib_view.tz michelson_test_scripts/opcodes/sender_after_nonexistent_view.tz michelson_test_scripts/opcodes/sender_after_view.tz michelson_test_scripts/opcodes/set_car.tz michelson_test_scripts/opcodes/set_cdr.tz michelson_test_scripts/opcodes/set_delegate.tz michelson_test_scripts/opcodes/set_id.tz michelson_test_scripts/opcodes/set_iter.tz michelson_test_scripts/opcodes/set_member.tz michelson_test_scripts/opcodes/set_size.tz michelson_test_scripts/opcodes/sets.tz michelson_test_scripts/opcodes/sha3.tz michelson_test_scripts/opcodes/shifts.tz michelson_test_scripts/opcodes/slice.tz michelson_test_scripts/opcodes/slice_bytes.tz michelson_test_scripts/opcodes/slices.tz michelson_test_scripts/opcodes/source.tz michelson_test_scripts/opcodes/split_bytes.tz michelson_test_scripts/opcodes/split_string.tz michelson_test_scripts/opcodes/store_bls12_381_fr.tz michelson_test_scripts/opcodes/store_bls12_381_g1.tz michelson_test_scripts/opcodes/store_bls12_381_g2.tz michelson_test_scripts/opcodes/store_input.tz michelson_test_scripts/opcodes/store_now.tz michelson_test_scripts/opcodes/str_id.tz michelson_test_scripts/opcodes/sub_timestamp_delta.tz michelson_test_scripts/opcodes/subset.tz michelson_test_scripts/opcodes/tez_add_sub.tz michelson_test_scripts/opcodes/ticket_bad.tz michelson_test_scripts/opcodes/ticket_big_store.tz michelson_test_scripts/opcodes/ticket_join.tz michelson_test_scripts/opcodes/ticket_read.tz michelson_test_scripts/opcodes/ticket_split.tz michelson_test_scripts/opcodes/ticket_store.tz michelson_test_scripts/opcodes/ticket_store-2.tz michelson_test_scripts/opcodes/ticketer.tz michelson_test_scripts/opcodes/ticketer-2.tz michelson_test_scripts/opcodes/transfer_amount.tz michelson_test_scripts/opcodes/transfer_tokens.tz michelson_test_scripts/opcodes/uncomb.tz michelson_test_scripts/opcodes/unpair.tz michelson_test_scripts/opcodes/unpair_field_annotation_mismatch.tz michelson_test_scripts/opcodes/update_big_map.tz michelson_test_scripts/opcodes/utxo_read.tz michelson_test_scripts/opcodes/utxor.tz michelson_test_scripts/opcodes/view_fib.tz michelson_test_scripts/opcodes/view_mutual_recursion.tz michelson_test_scripts/opcodes/view_op_add.tz michelson_test_scripts/opcodes/view_op_constant.tz michelson_test_scripts/opcodes/view_op_id.tz michelson_test_scripts/opcodes/view_op_nonexistent_addr.tz michelson_test_scripts/opcodes/view_op_nonexistent_func.tz michelson_test_scripts/opcodes/view_op_test_step_contants.tz michelson_test_scripts/opcodes/view_op_toplevel_inconsistent_input_type.tz michelson_test_scripts/opcodes/view_op_toplevel_inconsistent_output_type.tz michelson_test_scripts/opcodes/view_rec.tz michelson_test_scripts/opcodes/view_toplevel_lib.tz michelson_test_scripts/opcodes/voting_power.tz michelson_test_scripts/opcodes/xor.tz michelson_test_scripts/opcodes/xor_bytes_016.tz --details --display-names
+michelson_test_scripts/attic/accounts.tz
 Well typed
 Gas remaining: 1039932.585 units remaining
 { parameter
@@ -213,6 +214,7 @@ Gas remaining: 1039932.585 units remaining
                       /* [ list operation : map key_hash mutez ] */ ;
                       PAIR
                       /* [ pair (list operation) (map key_hash mutez) ] */ } } } } }
+michelson_test_scripts/attic/add1.tz
 Well typed
 Gas remaining: 1039996.774 units remaining
 { parameter int ;
@@ -227,6 +229,7 @@ Gas remaining: 1039996.774 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/attic/add1_list.tz
 Well typed
 Gas remaining: 1039995.973 units remaining
 { parameter (list int) ;
@@ -239,6 +242,7 @@ Gas remaining: 1039995.973 units remaining
          /* [ list operation : list int ] */ ;
          PAIR
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/attic/after_strategy.tz
 Well typed
 Gas remaining: 1039991.203 units remaining
 { parameter nat ;
@@ -262,6 +266,7 @@ Gas remaining: 1039991.203 units remaining
          /* [ list operation : pair (pair nat bool) timestamp ] */ ;
          PAIR
          /* [ pair (list operation) (pair nat bool) timestamp ] */ } }
+michelson_test_scripts/attic/always.tz
 Well typed
 Gas remaining: 1039995.941 units remaining
 { parameter nat ;
@@ -278,6 +283,7 @@ Gas remaining: 1039995.941 units remaining
          /* [ list operation : pair nat bool ] */ ;
          PAIR
          /* [ pair (list operation) nat bool ] */ } }
+michelson_test_scripts/attic/append.tz
 Well typed
 Gas remaining: 1039993.459 units remaining
 { parameter (pair (list int) (list int)) ;
@@ -298,6 +304,7 @@ Gas remaining: 1039993.459 units remaining
          /* [ list operation : list int ] */ ;
          PAIR
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/attic/at_least.tz
 Well typed
 Gas remaining: 1039993.870 units remaining
 { parameter unit ;
@@ -314,6 +321,7 @@ Gas remaining: 1039993.870 units remaining
               /* [ list operation : mutez ] */ ;
               PAIR
               /* [ pair (list operation) mutez ] */ } } }
+michelson_test_scripts/attic/auction.tz
 Well typed
 Gas remaining: 1039974.418 units remaining
 { parameter key_hash ;
@@ -378,6 +386,7 @@ Gas remaining: 1039974.418 units remaining
          /* [ list operation : pair timestamp mutez key_hash ] */ ;
          PAIR
          /* [ pair (list operation) timestamp mutez key_hash ] */ } }
+michelson_test_scripts/attic/bad_lockup.tz
 Well typed
 Gas remaining: 1039974.993 units remaining
 { parameter unit ;
@@ -435,6 +444,7 @@ Gas remaining: 1039974.993 units remaining
          /* [ list operation : pair timestamp address address ] */ ;
          PAIR
          /* [ pair (list operation) timestamp address address ] */ } }
+michelson_test_scripts/attic/big_map_union.tz
 Well typed
 Gas remaining: 1039987.459 units remaining
 { parameter (list (pair string int)) ;
@@ -467,6 +477,7 @@ Gas remaining: 1039987.459 units remaining
          /* [ list operation : pair (big_map string int) unit ] */ ;
          PAIR
          /* [ pair (list operation) (big_map string int) unit ] */ } }
+michelson_test_scripts/attic/cadr_annotation.tz
 Well typed
 Gas remaining: 1039995.385 units remaining
 { parameter (pair (pair %p1 unit (string %no_name)) bool) ;
@@ -482,6 +493,7 @@ Gas remaining: 1039995.385 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/attic/concat.tz
 Well typed
 Gas remaining: 1039993.578 units remaining
 { parameter string ;
@@ -507,6 +519,7 @@ Gas remaining: 1039993.578 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/attic/conditionals.tz
 Well typed
 Gas remaining: 1039990.576 units remaining
 { parameter (or string (option int)) ;
@@ -525,6 +538,7 @@ Gas remaining: 1039990.576 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/attic/cons_twice.tz
 Well typed
 Gas remaining: 1039993.758 units remaining
 { parameter nat ;
@@ -545,6 +559,7 @@ Gas remaining: 1039993.758 units remaining
          /* [ list operation : list nat ] */ ;
          PAIR
          /* [ pair (list operation) (list nat) ] */ } }
+michelson_test_scripts/attic/cps_fact.tz
 Well typed
 Gas remaining: 1039976.109 units remaining
 { storage nat ;
@@ -609,6 +624,7 @@ Gas remaining: 1039976.109 units remaining
                  /* [ list operation : nat ] */ ;
                  PAIR
                  /* [ pair (list operation) nat ] */ } } } }
+michelson_test_scripts/attic/create_add1_lists.tz
 Well typed
 Gas remaining: 1039989.990 units remaining
 { parameter unit ;
@@ -636,6 +652,7 @@ Gas remaining: 1039989.990 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/attic/data_publisher.tz
 Well typed
 Gas remaining: 1039975.804 units remaining
 { parameter (pair signature (pair string nat)) ;
@@ -707,6 +724,7 @@ Gas remaining: 1039975.804 units remaining
               PAIR
               /* [ pair (list operation) (pair key nat) string ] */ }
             { FAIL } } }
+michelson_test_scripts/attic/dispatch.tz
 Well typed
 Gas remaining: 1039983.006 units remaining
 { parameter (or string (pair string (lambda unit string))) ;
@@ -760,6 +778,7 @@ Gas remaining: 1039983.006 units remaining
          /* [ list operation : pair string (map string (lambda unit string)) ] */ ;
          PAIR
          /* [ pair (list operation) string (map string (lambda unit string)) ] */ } }
+michelson_test_scripts/attic/empty.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter unit ;
@@ -770,6 +789,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/attic/fail_amount.tz
 Well typed
 Gas remaining: 1039993.067 units remaining
 { parameter unit ;
@@ -788,6 +808,7 @@ Gas remaining: 1039993.067 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/attic/faucet.tz
 Well typed
 Gas remaining: 1039988.070 units remaining
 { parameter key_hash ;
@@ -821,6 +842,7 @@ Gas remaining: 1039988.070 units remaining
          /* [ list operation : timestamp ] */ ;
          PAIR
          /* [ pair (list operation) timestamp ] */ } }
+michelson_test_scripts/attic/forward.tz
 Well typed
 Gas remaining: 1039670.292 units remaining
 { parameter (or string nat) ;
@@ -2594,6 +2616,7 @@ Gas remaining: 1039670.292 units remaining
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ } } } } } } } }
+michelson_test_scripts/attic/id.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter string ;
@@ -2604,6 +2627,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/attic/infinite_loop.tz
 Well typed
 Gas remaining: 1039995.465 units remaining
 { parameter unit ;
@@ -2620,6 +2644,7 @@ Gas remaining: 1039995.465 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/attic/insertion_sort.tz
 Well typed
 Gas remaining: 1039976.745 units remaining
 { parameter (list int) ;
@@ -2681,6 +2706,7 @@ Gas remaining: 1039976.745 units remaining
          /* [ list operation : list int ] */ ;
          PAIR
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/attic/int_publisher.tz
 Well typed
 Gas remaining: 1039970.043 units remaining
 { parameter (option (pair signature int)) ;
@@ -2766,6 +2792,7 @@ Gas remaining: 1039970.043 units remaining
          /* [ list operation : pair key int ] */ ;
          PAIR
          /* [ pair (list operation) key int ] */ } }
+michelson_test_scripts/attic/king_of_tez.tz
 Well typed
 Gas remaining: 1039974.327 units remaining
 { parameter key_hash ;
@@ -2834,6 +2861,7 @@ Gas remaining: 1039974.327 units remaining
                    /* [ list operation : pair timestamp mutez key_hash ] */ } } ;
          PAIR
          /* [ pair (list operation) timestamp mutez key_hash ] */ } }
+michelson_test_scripts/attic/list_of_transactions.tz
 Well typed
 Gas remaining: 1039985.482 units remaining
 { parameter unit ;
@@ -2874,6 +2902,7 @@ Gas remaining: 1039985.482 units remaining
          /* [ list operation : list address ] */ ;
          PAIR
          /* [ pair (list operation) (list address) ] */ } }
+michelson_test_scripts/attic/queue.tz
 Well typed
 Gas remaining: 1039958.584 units remaining
 { parameter (option string) ;
@@ -2978,6 +3007,7 @@ Gas remaining: 1039958.584 units remaining
          /* [ list operation : pair (option string) (pair nat nat) (map nat string) ] */ ;
          PAIR
          /* [ pair (list operation) (option string) (pair nat nat) (map nat string) ] */ } }
+michelson_test_scripts/attic/reduce_map.tz
 Well typed
 Gas remaining: 1039978.486 units remaining
 { parameter (pair (lambda int int) (list int)) ;
@@ -3032,6 +3062,7 @@ Gas remaining: 1039978.486 units remaining
          /* [ list operation : list int ] */ ;
          PAIR
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/attic/reentrancy.tz
 Well typed
 Gas remaining: 1039983.352 units remaining
 { parameter unit ;
@@ -3073,6 +3104,7 @@ Gas remaining: 1039983.352 units remaining
          /* [ list operation : pair address address ] */ ;
          PAIR
          /* [ pair (list operation) address address ] */ } }
+michelson_test_scripts/attic/reservoir.tz
 Well typed
 Gas remaining: 1039969.237 units remaining
 { parameter unit ;
@@ -3149,6 +3181,7 @@ Gas remaining: 1039969.237 units remaining
               /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
               PAIR
               /* [ pair (list operation) (pair timestamp mutez) address address ] */ } } }
+michelson_test_scripts/attic/scrutable_reservoir.tz
 Well typed
 Gas remaining: 1039889.171 units remaining
 { parameter unit ;
@@ -3394,6 +3427,7 @@ Gas remaining: 1039889.171 units remaining
                       : pair string timestamp (pair mutez mutez) address address address ] */ ;
                    PAIR
                    /* [ pair (list operation) string timestamp (pair mutez mutez) address address address ] */ } } } }
+michelson_test_scripts/attic/spawn_identities.tz
 Well typed
 Gas remaining: 1039976.440 units remaining
 { parameter nat ;
@@ -3453,6 +3487,7 @@ Gas remaining: 1039976.440 units remaining
          /* [ list operation : list address ] */ ;
          PAIR
          /* [ pair (list operation) (list address) ] */ } }
+michelson_test_scripts/entrypoints/big_map_entrypoints.tz
 Well typed
 Gas remaining: 1039953.156 units remaining
 { storage (pair (big_map string nat) (big_map string nat)) ;
@@ -3571,6 +3606,7 @@ Gas remaining: 1039953.156 units remaining
              /* [ list operation : pair (big_map string nat) (big_map string nat) ] */ ;
              PAIR
              /* [ pair (list operation) (big_map string nat) (big_map string nat) ] */ } } }
+michelson_test_scripts/entrypoints/delegatable_target.tz
 Well typed
 Gas remaining: 1039960.927 units remaining
 { parameter
@@ -3688,6 +3724,7 @@ Gas remaining: 1039960.927 units remaining
              /* [ list operation : pair key_hash string nat ] */ ;
              PAIR
              /* [ pair (list operation) key_hash string nat ] */ } } }
+michelson_test_scripts/entrypoints/manager.tz
 Well typed
 Gas remaining: 1039984.397 units remaining
 { parameter (or (lambda %do unit (list operation)) (unit %default)) ;
@@ -3721,6 +3758,7 @@ Gas remaining: 1039984.397 units remaining
              /* [ list operation : key_hash ] */ ;
              PAIR
              /* [ pair (list operation) key_hash ] */ } } }
+michelson_test_scripts/entrypoints/no_default_target.tz
 Well typed
 Gas remaining: 1039990.140 units remaining
 { storage (pair string nat) ;
@@ -3748,6 +3786,7 @@ Gas remaining: 1039990.140 units remaining
              /* [ list operation : pair string nat ] */ ;
              PAIR
              /* [ pair (list operation) string nat ] */ } } }
+michelson_test_scripts/entrypoints/no_entrypoint_target.tz
 Well typed
 Gas remaining: 1039990.140 units remaining
 { storage (pair string nat) ;
@@ -3775,6 +3814,7 @@ Gas remaining: 1039990.140 units remaining
              /* [ list operation : pair string nat ] */ ;
              PAIR
              /* [ pair (list operation) string nat ] */ } } }
+michelson_test_scripts/entrypoints/rooted_target.tz
 Well typed
 Gas remaining: 1039990.140 units remaining
 { storage (pair string nat) ;
@@ -3802,6 +3842,7 @@ Gas remaining: 1039990.140 units remaining
              /* [ list operation : pair string nat ] */ ;
              PAIR
              /* [ pair (list operation) string nat ] */ } } }
+michelson_test_scripts/entrypoints/simple_entrypoints.tz
 Well typed
 Gas remaining: 1039997.574 units remaining
 { parameter (or (unit %A) (or (string %B) (nat %C))) ;
@@ -3812,6 +3853,7 @@ Gas remaining: 1039997.574 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert.tz
 Well typed
 Gas remaining: 1039995.213 units remaining
 { parameter bool ;
@@ -3825,6 +3867,7 @@ Gas remaining: 1039995.213 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_cmpeq.tz
 Well typed
 Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
@@ -3844,6 +3887,7 @@ Gas remaining: 1039991.596 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_cmpge.tz
 Well typed
 Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
@@ -3863,6 +3907,7 @@ Gas remaining: 1039991.596 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_cmpgt.tz
 Well typed
 Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
@@ -3882,6 +3927,7 @@ Gas remaining: 1039991.596 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_cmple.tz
 Well typed
 Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
@@ -3901,6 +3947,7 @@ Gas remaining: 1039991.596 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_cmplt.tz
 Well typed
 Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
@@ -3920,6 +3967,7 @@ Gas remaining: 1039991.596 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_cmpneq.tz
 Well typed
 Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
@@ -3939,6 +3987,7 @@ Gas remaining: 1039991.596 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_eq.tz
 Well typed
 Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
@@ -3960,6 +4009,7 @@ Gas remaining: 1039991.843 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_ge.tz
 Well typed
 Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
@@ -3981,6 +4031,7 @@ Gas remaining: 1039991.843 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_gt.tz
 Well typed
 Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
@@ -4002,6 +4053,7 @@ Gas remaining: 1039991.843 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_le.tz
 Well typed
 Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
@@ -4023,6 +4075,7 @@ Gas remaining: 1039991.843 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_lt.tz
 Well typed
 Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
@@ -4044,6 +4097,7 @@ Gas remaining: 1039991.843 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/assert_neq.tz
 Well typed
 Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
@@ -4065,6 +4119,7 @@ Gas remaining: 1039991.843 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/big_map_get_add.tz
 Well typed
 Gas remaining: 1039971.186 units remaining
 { parameter (pair (pair %set_pair int (option int)) (pair %check_pair int (option int))) ;
@@ -4118,6 +4173,7 @@ Gas remaining: 1039971.186 units remaining
          /* [ list operation : pair (big_map int int) unit ] */ ;
          PAIR
          /* [ pair (list operation) (big_map int int) unit ] */ } }
+michelson_test_scripts/macros/big_map_mem.tz
 Well typed
 Gas remaining: 1039984.191 units remaining
 { parameter (pair int bool) ;
@@ -4147,6 +4203,7 @@ Gas remaining: 1039984.191 units remaining
          /* [ list operation : pair (big_map int unit) unit ] */ ;
          PAIR
          /* [ pair (list operation) (big_map int unit) unit ] */ } }
+michelson_test_scripts/macros/build_list.tz
 Well typed
 Gas remaining: 1039985.111 units remaining
 { parameter nat ;
@@ -4190,6 +4247,7 @@ Gas remaining: 1039985.111 units remaining
          /* [ list operation : list nat ] */ ;
          PAIR
          /* [ pair (list operation) (list nat) ] */ } }
+michelson_test_scripts/macros/carn_and_cdrn.tz
 Well typed
 Gas remaining: 1039965.224 units remaining
 { parameter (pair nat nat nat unit) ;
@@ -4235,6 +4293,7 @@ Gas remaining: 1039965.224 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/compare.tz
 Well typed
 Gas remaining: 1039971.322 units remaining
 { parameter (pair mutez mutez) ;
@@ -4325,6 +4384,7 @@ Gas remaining: 1039971.322 units remaining
          /* [ list operation : list bool ] */ ;
          PAIR
          /* [ pair (list operation) (list bool) ] */ } }
+michelson_test_scripts/macros/compare_bytes.tz
 Well typed
 Gas remaining: 1039971.322 units remaining
 { parameter (pair bytes bytes) ;
@@ -4415,9 +4475,11 @@ Gas remaining: 1039971.322 units remaining
          /* [ list operation : list bool ] */ ;
          PAIR
          /* [ pair (list operation) (list bool) ] */ } }
+michelson_test_scripts/macros/fail.tz
 Well typed
 Gas remaining: 1039998.449 units remaining
 { parameter unit ; storage unit ; code { FAIL } }
+michelson_test_scripts/macros/guestbook.tz
 Well typed
 Gas remaining: 1039988.143 units remaining
 { parameter string ;
@@ -4449,6 +4511,7 @@ Gas remaining: 1039988.143 units remaining
          /* [ list operation : map address (option string) ] */ ;
          PAIR
          /* [ pair (list operation) (map address (option string)) ] */ } }
+michelson_test_scripts/macros/macro_annotations.tz
 Well typed
 Gas remaining: 1039993.362 units remaining
 { parameter unit ;
@@ -4471,6 +4534,7 @@ Gas remaining: 1039993.362 units remaining
          /* [ list operation : pair unit unit ] */ ;
          PAIR
          /* [ pair (list operation) unit unit ] */ } }
+michelson_test_scripts/macros/map_caddaadr.tz
 Well typed
 Gas remaining: 1039966.766 units remaining
 { parameter unit ;
@@ -4487,6 +4551,7 @@ Gas remaining: 1039966.766 units remaining
          /* [ pair unit (pair nat nat (pair (pair nat mutez) nat) nat) nat
             : list operation ] */ ;
          SET_CAR } }
+michelson_test_scripts/macros/max_in_list.tz
 Well typed
 Gas remaining: 1039987.861 units remaining
 { parameter (list int) ;
@@ -4514,6 +4579,7 @@ Gas remaining: 1039987.861 units remaining
          /* [ list operation : option int ] */ ;
          PAIR
          /* [ pair (list operation) (option int) ] */ } }
+michelson_test_scripts/macros/min.tz
 Well typed
 Gas remaining: 1039991.951 units remaining
 { parameter (pair int int) ;
@@ -4534,6 +4600,7 @@ Gas remaining: 1039991.951 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/macros/pair_macro.tz
 Well typed
 Gas remaining: 1039988.858 units remaining
 { parameter unit ;
@@ -4558,6 +4625,7 @@ Gas remaining: 1039988.858 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/set_caddaadr.tz
 Well typed
 Gas remaining: 1039970.670 units remaining
 { parameter mutez ;
@@ -4576,6 +4644,7 @@ Gas remaining: 1039970.670 units remaining
          /* [ list operation : pair (pair nat nat (pair (pair nat mutez) nat) nat) nat ] */ ;
          PAIR
          /* [ pair (list operation) (pair nat nat (pair (pair nat mutez) nat) nat) nat ] */ } }
+michelson_test_scripts/macros/take_my_money.tz
 Well typed
 Gas remaining: 1039993.750 units remaining
 { parameter key_hash ;
@@ -4600,6 +4669,7 @@ Gas remaining: 1039993.750 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/macros/unpair_macro.tz
 Well typed
 Gas remaining: 1039977.130 units remaining
 { parameter (unit :param_unit) ;
@@ -4630,6 +4700,7 @@ Gas remaining: 1039977.130 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/999_constant.tz
 Well typed
 Gas remaining: 1039563.004 units remaining
 { parameter unit ;
@@ -4643,6 +4714,7 @@ Gas remaining: 1039563.004 units remaining
          /* [ int ] */ ;
          NIL operation /* [ pair (list operation) int ] */ ;
          PAIR } }
+michelson_test_scripts/mini_scenarios/add_clear_tickets_015.tz
 Well typed
 Gas remaining: 1039988.509 units remaining
 { parameter (or (pair %add nat string) (unit %clear)) ;
@@ -4675,9 +4747,11 @@ Gas remaining: 1039988.509 units remaining
              /* [ list operation : list (ticket string) ] */ ;
              PAIR
              /* [ pair (list operation) (list (ticket string)) ] */ } } }
+michelson_test_scripts/mini_scenarios/always_fails.tz
 Well typed
 Gas remaining: 1039999.431 units remaining
 { parameter string ; storage unit ; code FAILWITH /* [] */ }
+michelson_test_scripts/mini_scenarios/authentication.tz
 Well typed
 Gas remaining: 1039979.836 units remaining
 { parameter (pair (lambda unit (list operation)) signature) ;
@@ -4720,6 +4794,7 @@ Gas remaining: 1039979.836 units remaining
          DIP { PUSH nat 1 /* [ nat : nat : key ] */ ; ADD /* [ nat : key ] */ }
          /* [ list operation : nat : key ] */ ;
          PAPAIR } }
+michelson_test_scripts/mini_scenarios/big_map_all.tz
 Well typed
 Gas remaining: 1039996.181 units remaining
 { parameter (pair string (option nat)) ;
@@ -4734,6 +4809,7 @@ Gas remaining: 1039996.181 units remaining
          /* [ list operation : big_map string nat ] */ ;
          PAIR
          /* [ pair (list operation) (big_map string nat) ] */ } }
+michelson_test_scripts/mini_scenarios/big_map_entrypoints.tz
 Well typed
 Gas remaining: 1039953.156 units remaining
 { storage (pair (big_map string nat) (big_map string nat)) ;
@@ -4852,6 +4928,7 @@ Gas remaining: 1039953.156 units remaining
              /* [ list operation : pair (big_map string nat) (big_map string nat) ] */ ;
              PAIR
              /* [ pair (list operation) (big_map string nat) (big_map string nat) ] */ } } }
+michelson_test_scripts/mini_scenarios/big_map_magic.tz
 Well typed
 Gas remaining: 1039954.710 units remaining
 { storage (or (pair (big_map string string) (big_map string string)) unit) ;
@@ -4953,6 +5030,7 @@ Gas remaining: 1039954.710 units remaining
             : or (pair (big_map string string) (big_map string string)) unit ] */ ;
          PAIR
          /* [ pair (list operation) (or (pair (big_map string string) (big_map string string)) unit) ] */ } }
+michelson_test_scripts/mini_scenarios/big_map_read.tz
 Well typed
 Gas remaining: 1039994.234 units remaining
 { storage nat ;
@@ -4968,6 +5046,7 @@ Gas remaining: 1039994.234 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/mini_scenarios/big_map_store.tz
 Well typed
 Gas remaining: 1039996.856 units remaining
 { storage (big_map nat nat) ;
@@ -4980,6 +5059,7 @@ Gas remaining: 1039996.856 units remaining
          /* [ list operation : big_map nat nat ] */ ;
          PAIR
          /* [ pair (list operation) (big_map nat nat) ] */ } }
+michelson_test_scripts/mini_scenarios/big_map_write.tz
 Well typed
 Gas remaining: 1039994.982 units remaining
 { storage unit ;
@@ -4998,6 +5078,7 @@ Gas remaining: 1039994.982 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/cache_consistency.tz
 Well typed
 Gas remaining: 1039994.914 units remaining
 { parameter (or (unit %renew) (unit %keep)) ;
@@ -5011,6 +5092,7 @@ Gas remaining: 1039994.914 units remaining
          /* [ list operation : big_map nat string ] */ ;
          PAIR
          /* [ pair (list operation) (big_map nat string) ] */ } }
+michelson_test_scripts/mini_scenarios/check_signature.tz
 Well typed
 Gas remaining: 1039986.408 units remaining
 { parameter (pair key signature bytes) ;
@@ -5054,6 +5136,7 @@ Gas remaining: 1039986.408 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/constant_entrypoints.tz
 Well typed
 Gas remaining: 1039546.605 units remaining
 { parameter
@@ -5110,6 +5193,7 @@ Gas remaining: 1039546.605 units remaining
              /* [ list operation : key_hash ] */ ;
              NIL operation /* [ pair (list operation) key_hash ] */ ;
              PAIR } } }
+michelson_test_scripts/mini_scenarios/constant_unit.tz
 Well typed
 Gas remaining: 1039124.469 units remaining
 { parameter (constant "exprvKFFbc7SnPjkPZgyhaHewQhmrouNjNae3DpsQ8KuADn9i2WuJ8") ;
@@ -5124,6 +5208,7 @@ Gas remaining: 1039124.469 units remaining
          NIL operation ;
          PAIR }
   /* [] */ }
+michelson_test_scripts/mini_scenarios/create_contract.tz
 Well typed
 Gas remaining: 1039973.277 units remaining
 { parameter (option address) ;
@@ -5196,6 +5281,7 @@ Gas remaining: 1039973.277 units remaining
              /* [ list operation : unit ] */ ;
              PAIR
              /* [ pair (list operation) unit ] */ } } }
+michelson_test_scripts/mini_scenarios/create_contract_simple.tz
 Well typed
 Gas remaining: 1039991.809 units remaining
 { parameter unit ;
@@ -5221,6 +5307,7 @@ Gas remaining: 1039991.809 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/default_account.tz
 Well typed
 Gas remaining: 1039993.750 units remaining
 { parameter key_hash ;
@@ -5245,6 +5332,7 @@ Gas remaining: 1039993.750 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/emit_events.tz
 Well typed
 Gas remaining: 1039991.110 units remaining
 { parameter unit ;
@@ -5277,6 +5365,7 @@ Gas remaining: 1039991.110 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/execution_order_appender.tz
 Well typed
 Gas remaining: 1039990.644 units remaining
 { parameter unit ;
@@ -5304,6 +5393,7 @@ Gas remaining: 1039990.644 units remaining
          /* [ list operation : pair address string ] */ ;
          PAIR
          /* [ pair (list operation) address string ] */ } }
+michelson_test_scripts/mini_scenarios/execution_order_caller.tz
 Well typed
 Gas remaining: 1039992.571 units remaining
 { parameter unit ;
@@ -5324,6 +5414,7 @@ Gas remaining: 1039992.571 units remaining
          /* [ list operation : list address ] */ ;
          PAIR
          /* [ pair (list operation) (list address) ] */ } }
+michelson_test_scripts/mini_scenarios/execution_order_storer.tz
 Well typed
 Gas remaining: 1039996.980 units remaining
 { parameter string ;
@@ -5338,6 +5429,7 @@ Gas remaining: 1039996.980 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/mini_scenarios/fa12_reference.tz
 Well typed
 Gas remaining: 1039349.178 units remaining
 { parameter
@@ -8043,6 +8135,7 @@ Gas remaining: 1039349.178 units remaining
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          PAIR
                          /* [ pair (list operation) (big_map address (pair nat (map address nat))) address bool nat ] */ } } } } } }
+michelson_test_scripts/mini_scenarios/fail_on_false.tz
 Well typed
 Gas remaining: 1039995.659 units remaining
 { parameter bool ;
@@ -8054,6 +8147,7 @@ Gas remaining: 1039995.659 units remaining
               PAIR
               /* [ pair (list operation) unit ] */ }
             { DROP /* [] */ ; PUSH string "bang" /* [ string ] */ ; FAILWITH /* [] */ } } }
+michelson_test_scripts/mini_scenarios/generic_multisig.tz
 Well typed
 Gas remaining: 1039939.911 units remaining
 { parameter
@@ -8297,6 +8391,7 @@ Gas remaining: 1039939.911 units remaining
                  /* [ list operation : pair nat nat (list key) ] */ } ;
              PAIR
              /* [ pair (list operation) nat nat (list key) ] */ } } }
+michelson_test_scripts/mini_scenarios/groth16.tz
 Well typed
 Gas remaining: 1039536.287 units remaining
 { storage unit ;
@@ -8489,6 +8584,7 @@ Gas remaining: 1039536.287 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/hardlimit.tz
 Well typed
 Gas remaining: 1039992.503 units remaining
 { parameter unit ;
@@ -8505,6 +8601,7 @@ Gas remaining: 1039992.503 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/mini_scenarios/large_error.tz
 Well typed
 Gas remaining: 1039991.492 units remaining
 { parameter int ;
@@ -8538,6 +8635,7 @@ Gas remaining: 1039991.492 units remaining
          /* [ string ] */ ;
          FAILWITH
          /* [] */ } }
+michelson_test_scripts/mini_scenarios/large_flat_contract.tz
 Well typed
 Gas remaining: 1035259.369 units remaining
 { parameter unit ;
@@ -12170,6 +12268,7 @@ Gas remaining: 1035259.369 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/large_str_id.tz
 Well typed
 Gas remaining: 1032066.594 units remaining
 { parameter (or int unit) ;
@@ -31782,6 +31881,7 @@ Gas remaining: 1032066.594 units remaining
          /* [ pair (list operation) string string : pair (list operation) string string ] */ ;
          DROP
          /* [ pair (list operation) string string ] */ } }
+michelson_test_scripts/mini_scenarios/legacy_multisig.tz
 Well typed
 Gas remaining: 1039943.391 units remaining
 { parameter
@@ -32034,6 +32134,7 @@ Gas remaining: 1039943.391 units remaining
                  /* [ list operation : pair nat nat (list key) ] */ } } ;
          PAIR
          /* [ pair (list operation) nat nat (list key) ] */ } }
+michelson_test_scripts/mini_scenarios/lockup.tz
 Well typed
 Gas remaining: 1039983.115 units remaining
 { parameter unit ;
@@ -32074,6 +32175,7 @@ Gas remaining: 1039983.115 units remaining
          /* [ list operation : pair timestamp mutez address ] */ ;
          PAIR
          /* [ pair (list operation) timestamp mutez address ] */ } }
+michelson_test_scripts/mini_scenarios/loop.tz
 Well typed
 Gas remaining: 1039992.614 units remaining
 { parameter int ;
@@ -32103,6 +32205,7 @@ Gas remaining: 1039992.614 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/lqt_fa12.mligo.tz
 Well typed
 Gas remaining: 1039738.642 units remaining
 { parameter
@@ -33486,6 +33589,7 @@ Gas remaining: 1039738.642 units remaining
                          (big_map (pair address address) nat)
                          address
                          nat ] */ } } } }
+michelson_test_scripts/mini_scenarios/multiple_en2.tz
 Well typed
 Gas remaining: 1039928.052 units remaining
 { parameter unit ;
@@ -33649,6 +33753,7 @@ Gas remaining: 1039928.052 units remaining
                 /* [ list operation : option address ] */ ;
                 PAIR
                 /* [ pair (list operation) (option address) ] */ } } } }
+michelson_test_scripts/mini_scenarios/multiple_entrypoints_counter.tz
 Well typed
 Gas remaining: 1039930.762 units remaining
 { parameter unit ;
@@ -33795,6 +33900,7 @@ Gas remaining: 1039930.762 units remaining
              PAIR
              /* [ pair (list operation) (option address) ] */ }
          /* [ mutez : pair (or (or nat nat) unit) int ] */ } }
+michelson_test_scripts/mini_scenarios/multisig_dest_entrypoint.tz
 Well typed
 Gas remaining: 1039997.740 units remaining
 { parameter (or (unit %a) (string %b)) ;
@@ -33805,6 +33911,7 @@ Gas remaining: 1039997.740 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/multisig_dest_entrypoint_arg.tz
 Well typed
 Gas remaining: 1039997.740 units remaining
 { parameter (or (int %a) (string %b)) ;
@@ -33815,6 +33922,7 @@ Gas remaining: 1039997.740 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/nat_id.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter nat ;
@@ -33825,6 +33933,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/mini_scenarios/noop_bytes.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter bytes ;
@@ -33835,6 +33944,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/originate_contract.tz
 Well typed
 Gas remaining: 1039991.040 units remaining
 { parameter unit ;
@@ -33861,6 +33971,7 @@ Gas remaining: 1039991.040 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/parameterized_multisig.tz
 Well typed
 Gas remaining: 1039940.583 units remaining
 { storage (pair bool (pair (map nat (pair bool bool)) (pair key key))) ;
@@ -34025,6 +34136,7 @@ Gas remaining: 1039940.583 units remaining
          /* [ list operation : pair bool (map nat (pair bool bool)) key key ] */ ;
          PAIR
          /* [ pair (list operation) bool (map nat (pair bool bool)) key key ] */ } }
+michelson_test_scripts/mini_scenarios/parsable_contract.tz
 Well typed
 Gas remaining: 1039980.441 units remaining
 { parameter int ;
@@ -34086,6 +34198,7 @@ Gas remaining: 1039980.441 units remaining
          /* [ list operation : map int address ] */ ;
          PAIR
          /* [ pair (list operation) (map int address) ] */ } }
+michelson_test_scripts/mini_scenarios/receive_tickets_in_big_map.tz
 Well typed
 Gas remaining: 1039997.029 units remaining
 { parameter (big_map int (ticket string)) ;
@@ -34096,6 +34209,7 @@ Gas remaining: 1039997.029 units remaining
          /* [ list operation : big_map int (ticket string) ] */ ;
          PAIR
          /* [ pair (list operation) (big_map int (ticket string)) ] */ } }
+michelson_test_scripts/mini_scenarios/replay.tz
 Well typed
 Gas remaining: 1039990.860 units remaining
 { parameter unit ;
@@ -34123,6 +34237,7 @@ Gas remaining: 1039990.860 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/reveal_signed_preimage.tz
 Well typed
 Gas remaining: 1039978.896 units remaining
 { parameter (pair bytes signature) ;
@@ -34184,6 +34299,7 @@ Gas remaining: 1039978.896 units remaining
          /* [ list operation : pair bytes key ] */ ;
          PAIR
          /* [ pair (list operation) bytes key ] */ } }
+michelson_test_scripts/mini_scenarios/sc_rollup_forward.tz
 Well typed
 Gas remaining: 1039994.394 units remaining
 { parameter (pair bytes (contract bytes)) ;
@@ -34202,6 +34318,7 @@ Gas remaining: 1039994.394 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/sc_rollup_mint_and_forward.tz
 Well typed
 Gas remaining: 1039990.860 units remaining
 { parameter (pair (pair bytes nat) (contract (ticket bytes))) ;
@@ -34229,6 +34346,7 @@ Gas remaining: 1039990.860 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/self_address_receiver.tz
 Well typed
 Gas remaining: 1039992.799 units remaining
 { parameter (lambda unit address) ;
@@ -34246,6 +34364,7 @@ Gas remaining: 1039992.799 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/self_address_sender.tz
 Well typed
 Gas remaining: 1039993.319 units remaining
 { parameter (contract (lambda unit address)) ;
@@ -34267,6 +34386,7 @@ Gas remaining: 1039993.319 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/send_ticket_list_016.tz
 Well typed
 Gas remaining: 1039986.152 units remaining
 { parameter address ;
@@ -34307,6 +34427,7 @@ Gas remaining: 1039986.152 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/send_ticket_list_multiple_016.tz
 Well typed
 Gas remaining: 1039981.403 units remaining
 { parameter address ;
@@ -34360,6 +34481,7 @@ Gas remaining: 1039981.403 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/send_tickets_from_storage_016.tz
 Well typed
 Gas remaining: 1039981.083 units remaining
 { parameter (or (unit %mint) (contract %send (list (ticket string)))) ;
@@ -34407,6 +34529,7 @@ Gas remaining: 1039981.083 units remaining
              /* [ list operation : list (ticket string) ] */ ;
              PAIR
              /* [ pair (list operation) (list (ticket string)) ] */ } } }
+michelson_test_scripts/mini_scenarios/send_tickets_in_big_map_015.tz
 Well typed
 Gas remaining: 1039967.113 units remaining
 { parameter address ;
@@ -34538,6 +34661,7 @@ Gas remaining: 1039967.113 units remaining
              /* [ list operation : unit ] */ ;
              PAIR
              /* [ pair (list operation) unit ] */ } } }
+michelson_test_scripts/mini_scenarios/smart_rollup_mint_and_deposit_ticket_016.tz
 Well typed
 Gas remaining: 1039982.120 units remaining
 { parameter
@@ -34606,6 +34730,7 @@ Gas remaining: 1039982.120 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/smart_rollup_receive_tickets_016.tz
 Well typed
 Gas remaining: 1039993.563 units remaining
 { parameter (or (unit %burn_all_tickets) (ticket %receive_tickets string)) ;
@@ -34627,6 +34752,7 @@ Gas remaining: 1039993.563 units remaining
              /* [ list operation : list (ticket string) ] */ ;
              PAIR
              /* [ pair (list operation) (list (ticket string)) ] */ } } }
+michelson_test_scripts/mini_scenarios/str_id.tz
 Well typed
 Gas remaining: 1039997.300 units remaining
 { parameter string ;
@@ -34639,6 +34765,7 @@ Gas remaining: 1039997.300 units remaining
          /* [ list operation : option string ] */ ;
          PAIR
          /* [ pair (list operation) (option string) ] */ } }
+michelson_test_scripts/mini_scenarios/ticket_builder_fungible.tz
 Well typed
 Gas remaining: 1039974.006 units remaining
 { parameter
@@ -34695,6 +34822,7 @@ Gas remaining: 1039974.006 units remaining
              /* [ list operation : address ] */ } ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/mini_scenarios/ticket_builder_non_fungible.tz
 Well typed
 Gas remaining: 1039971.519 units remaining
 { parameter (or (ticket %burn nat) (contract %mint_destination (ticket nat))) ;
@@ -34749,6 +34877,7 @@ Gas remaining: 1039971.519 units remaining
              /* [ list operation : address : nat ] */ } ;
          PAIR 3
          /* [ pair (list operation) address nat ] */ } }
+michelson_test_scripts/mini_scenarios/ticket_wallet_fungible.tz
 Well typed
 Gas remaining: 1039937.454 units remaining
 { parameter
@@ -34941,6 +35070,7 @@ Gas remaining: 1039937.454 units remaining
              /* [ list operation : pair address (big_map address (ticket unit)) ] */ } ;
          PAIR
          /* [ pair (list operation) address (big_map address (ticket unit)) ] */ } }
+michelson_test_scripts/mini_scenarios/ticket_wallet_non_fungible.tz
 Well typed
 Gas remaining: 1039959.702 units remaining
 { parameter
@@ -35055,6 +35185,7 @@ Gas remaining: 1039959.702 units remaining
              /* [ list operation : pair address (big_map (pair address nat) (ticket nat)) ] */ } ;
          PAIR
          /* [ pair (list operation) address (big_map (pair address nat) (ticket nat)) ] */ } }
+michelson_test_scripts/mini_scenarios/tickets_015.tz
 Well typed
 Gas remaining: 1039992.919 units remaining
 { parameter unit ;
@@ -35074,6 +35205,7 @@ Gas remaining: 1039992.919 units remaining
          /* [ list operation : list (ticket string) ] */ ;
          PAIR
          /* [ pair (list operation) (list (ticket string)) ] */ } }
+michelson_test_scripts/mini_scenarios/tickets_bag_016.tz
 Well typed
 Gas remaining: 1039985.966 units remaining
 { parameter (or (ticket %save string) (address %send)) ;
@@ -35112,6 +35244,7 @@ Gas remaining: 1039985.966 units remaining
                  PAIR
                  /* [ pair (list operation) (list (ticket string)) ] */ }
                { PUSH string "no ticket to send" /* [ string : address ] */ ; FAILWITH /* [] */ } } } }
+michelson_test_scripts/mini_scenarios/tickets_bag_implicit_016.tz
 Well typed
 Gas remaining: 1039985.966 units remaining
 { parameter (or (ticket %save string) (address %send)) ;
@@ -35150,6 +35283,7 @@ Gas remaining: 1039985.966 units remaining
                  PAIR
                  /* [ pair (list operation) (list (ticket string)) ] */ }
                { PUSH string "no ticket to send" /* [ string : address ] */ ; FAILWITH /* [] */ } } } }
+michelson_test_scripts/mini_scenarios/tickets_blackhole_016.tz
 Well typed
 Gas remaining: 1039997.823 units remaining
 { parameter (ticket %ticket string) ;
@@ -35160,6 +35294,7 @@ Gas remaining: 1039997.823 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/tickets_create_and_send_015.tz
 Well typed
 Gas remaining: 1039960.905 units remaining
 { parameter (pair address address) ;
@@ -35284,6 +35419,7 @@ Gas remaining: 1039960.905 units remaining
          /* [ list operation : list (ticket string) ] */ ;
          PAIR
          /* [ pair (list operation) (list (ticket string)) ] */ } }
+michelson_test_scripts/mini_scenarios/tickets_list_blackhole_016.tz
 Well typed
 Gas remaining: 1039997.740 units remaining
 { parameter (list (ticket string)) ;
@@ -35294,6 +35430,7 @@ Gas remaining: 1039997.740 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/tickets_receive_and_store.tz
 Well typed
 Gas remaining: 1039997.074 units remaining
 { parameter (ticket string) ;
@@ -35306,6 +35443,7 @@ Gas remaining: 1039997.074 units remaining
          /* [ list operation : option (ticket string) ] */ ;
          PAIR
          /* [ pair (list operation) (option (ticket string)) ] */ } }
+michelson_test_scripts/mini_scenarios/tickets_send_016.tz
 Well typed
 Gas remaining: 1039987.411 units remaining
 { parameter (pair address nat) ;
@@ -35339,6 +35477,7 @@ Gas remaining: 1039987.411 units remaining
              /* [ list operation : unit ] */ ;
              PAIR
              /* [ pair (list operation) unit ] */ } } }
+michelson_test_scripts/mini_scenarios/tickets_send_with_tez_016.tz
 Well typed
 Gas remaining: 1039987.976 units remaining
 { parameter address ;
@@ -35370,6 +35509,7 @@ Gas remaining: 1039987.976 units remaining
              /* [ list operation : unit ] */ ;
              PAIR
              /* [ pair (list operation) unit ] */ } } }
+michelson_test_scripts/mini_scenarios/tickets_store_fst_and_rely_snd.tz
 Well typed
 Gas remaining: 1039988.632 units remaining
 { parameter (pair (pair (ticket string) (ticket string)) address) ;
@@ -35410,6 +35550,7 @@ Gas remaining: 1039988.632 units remaining
          /* [ list operation : option (ticket string) ] */ ;
          PAIR
          /* [ pair (list operation) (option (ticket string)) ] */ } }
+michelson_test_scripts/mini_scenarios/tzip4_view.tz
 Well typed
 Gas remaining: 1039986.099 units remaining
 { parameter
@@ -35463,6 +35604,7 @@ Gas remaining: 1039986.099 units remaining
              /* [ list operation : unit ] */ ;
              PAIR
              /* [ pair (list operation) unit ] */ } } }
+michelson_test_scripts/mini_scenarios/very_small.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -35475,6 +35617,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/view_check_caller.tz
 Well typed
 Gas remaining: 1039982.378 units remaining
 { parameter address ;
@@ -35510,6 +35653,7 @@ Gas remaining: 1039982.378 units remaining
          /* [ list operation : option address ] */ ;
          PAIR
          /* [ pair (list operation) (option address) ] */ } }
+michelson_test_scripts/mini_scenarios/view_registers_callers.tz
 Well typed
 Gas remaining: 1039990.957 units remaining
 { parameter unit ;
@@ -35533,6 +35677,7 @@ Gas remaining: 1039990.957 units remaining
          IF_CONS
            { DIP { DROP /* [] */ } /* [ address ] */ ; SOME /* [ option address ] */ }
            { NONE address /* [ option address ] */ } } }
+michelson_test_scripts/mini_scenarios/viewable.tz
 Well typed
 Gas remaining: 1039959.449 units remaining
 { parameter nat ;
@@ -35650,6 +35795,7 @@ Gas remaining: 1039959.449 units remaining
          /* [ int : int ] */ ;
          ADD
          /* [ int ] */ } }
+michelson_test_scripts/mini_scenarios/vote_for_delegate.tz
 Well typed
 Gas remaining: 1039945.231 units remaining
 { parameter (option key_hash) ;
@@ -35762,6 +35908,7 @@ Gas remaining: 1039945.231 units remaining
                     : pair (pair address (option key_hash)) address (option key_hash) ] */ } } ;
          PAIR
          /* [ pair (list operation) (pair address (option key_hash)) address (option key_hash) ] */ } }
+michelson_test_scripts/mini_scenarios/weather_insurance.tz
 Well typed
 Gas remaining: 1039963.680 units remaining
 { parameter (pair (signature %signed_weather_data) (nat :rain %actual_level)) ;
@@ -35847,6 +35994,7 @@ Gas remaining: 1039963.680 units remaining
          /* [ list operation : pair (pair address address) nat key ] */ ;
          PAIR
          /* [ pair (list operation) (pair address address) nat key ] */ } }
+michelson_test_scripts/mini_scenarios/xcat.tz
 Well typed
 Gas remaining: 1039967.305 units remaining
 { parameter bytes ;
@@ -35928,6 +36076,7 @@ Gas remaining: 1039967.305 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/mini_scenarios/xcat_dapp.tz
 Well typed
 Gas remaining: 1039922.932 units remaining
 { parameter
@@ -36234,6 +36383,7 @@ Gas remaining: 1039922.932 units remaining
              /* [ pair (list operation)
                      (big_map bytes (pair (pair address address) mutez timestamp))
                      unit ] */ } } }
+michelson_test_scripts/non_regression/262_bug.tz
 Well typed
 Gas remaining: 1039995.909 units remaining
 { parameter unit ;
@@ -36250,6 +36400,7 @@ Gas remaining: 1039995.909 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/non_regression/843_bug.tz
 Well typed
 Gas remaining: 1039993.549 units remaining
 { parameter never ;
@@ -36262,6 +36413,7 @@ Gas remaining: 1039993.549 units remaining
          /* [ never ] */ ;
          NEVER
          /* [] */ } }
+michelson_test_scripts/non_regression/bad_annot_contract.tz
 Well typed
 Gas remaining: 1039996.681 units remaining
 { parameter bytes ;
@@ -36274,6 +36426,7 @@ Gas remaining: 1039996.681 units remaining
          /* [ list operation : option (lambda unit unit) ] */ ;
          PAIR
          /* [ pair (list operation) (option (lambda unit unit)) ] */ } }
+michelson_test_scripts/non_regression/pairk_annot.tz
 Well typed
 Gas remaining: 1039993.678 units remaining
 { parameter unit ;
@@ -36300,6 +36453,7 @@ Gas remaining: 1039993.678 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/abs.tz
 Well typed
 Gas remaining: 1039992.714 units remaining
 { parameter nat ;
@@ -36321,6 +36475,7 @@ Gas remaining: 1039992.714 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/add.tz
 Well typed
 Gas remaining: 1039947.571 units remaining
 { parameter unit ;
@@ -36403,6 +36558,7 @@ Gas remaining: 1039947.571 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/add_bls12_381_fr.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_fr bls12_381_fr) ;
@@ -36419,6 +36575,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_fr) ] */ } }
+michelson_test_scripts/opcodes/add_bls12_381_g1.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_g1 bls12_381_g1) ;
@@ -36435,6 +36592,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option bls12_381_g1 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g1) ] */ } }
+michelson_test_scripts/opcodes/add_bls12_381_g2.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_g2 bls12_381_g2) ;
@@ -36451,6 +36609,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option bls12_381_g2 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g2) ] */ } }
+michelson_test_scripts/opcodes/add_delta_timestamp.tz
 Well typed
 Gas remaining: 1039994.398 units remaining
 { parameter (pair int timestamp) ;
@@ -36471,6 +36630,7 @@ Gas remaining: 1039994.398 units remaining
          /* [ list operation : option timestamp ] */ ;
          PAIR
          /* [ pair (list operation) (option timestamp) ] */ } }
+michelson_test_scripts/opcodes/add_timestamp_delta.tz
 Well typed
 Gas remaining: 1039994.398 units remaining
 { parameter (pair timestamp int) ;
@@ -36491,6 +36651,7 @@ Gas remaining: 1039994.398 units remaining
          /* [ list operation : option timestamp ] */ ;
          PAIR
          /* [ pair (list operation) (option timestamp) ] */ } }
+michelson_test_scripts/opcodes/address.tz
 Well typed
 Gas remaining: 1039996.754 units remaining
 { parameter (contract unit) ;
@@ -36505,6 +36666,7 @@ Gas remaining: 1039996.754 units remaining
          /* [ list operation : option address ] */ ;
          PAIR
          /* [ pair (list operation) (option address) ] */ } }
+michelson_test_scripts/opcodes/amount_after_fib_view.tz
 Well typed
 Gas remaining: 1039986.567 units remaining
 { parameter address ;
@@ -36541,6 +36703,7 @@ Gas remaining: 1039986.567 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/amount_after_nonexistent_view.tz
 Well typed
 Gas remaining: 1039986.775 units remaining
 { parameter address ;
@@ -36575,6 +36738,7 @@ Gas remaining: 1039986.775 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/amount_after_view.tz
 Well typed
 Gas remaining: 1039986.392 units remaining
 { parameter address ;
@@ -36611,6 +36775,7 @@ Gas remaining: 1039986.392 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/and.tz
 Well typed
 Gas remaining: 1039995.193 units remaining
 { parameter (pair :param (bool %first) (bool %second)) ;
@@ -36631,6 +36796,7 @@ Gas remaining: 1039995.193 units remaining
          /* [ list operation : option bool ] */ ;
          PAIR %a %b
          /* [ pair (list operation) (option bool) ] */ } }
+michelson_test_scripts/opcodes/and_binary.tz
 Well typed
 Gas remaining: 1039972.796 units remaining
 { parameter unit ;
@@ -36679,6 +36845,7 @@ Gas remaining: 1039972.796 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/and_bytes_016.tz
 Well typed
 Gas remaining: 1039978.916 units remaining
 { parameter unit ;
@@ -36718,6 +36885,7 @@ Gas remaining: 1039978.916 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/and_logical_1.tz
 Well typed
 Gas remaining: 1039996.814 units remaining
 { parameter (pair bool bool) ;
@@ -36732,6 +36900,7 @@ Gas remaining: 1039996.814 units remaining
          /* [ list operation : bool ] */ ;
          PAIR
          /* [ pair (list operation) bool ] */ } }
+michelson_test_scripts/opcodes/balance.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -36744,6 +36913,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/balance_after_fib_view.tz
 Well typed
 Gas remaining: 1039986.567 units remaining
 { parameter address ;
@@ -36780,6 +36950,7 @@ Gas remaining: 1039986.567 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/balance_after_nonexistent_view.tz
 Well typed
 Gas remaining: 1039986.775 units remaining
 { parameter address ;
@@ -36814,6 +36985,7 @@ Gas remaining: 1039986.775 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/balance_after_view.tz
 Well typed
 Gas remaining: 1039986.392 units remaining
 { parameter address ;
@@ -36850,6 +37022,7 @@ Gas remaining: 1039986.392 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/big_map_mem_nat.tz
 Well typed
 Gas remaining: 1039993.494 units remaining
 { parameter nat ;
@@ -36870,6 +37043,7 @@ Gas remaining: 1039993.494 units remaining
          /* [ list operation : pair (big_map nat nat) (option bool) ] */ ;
          PAIR
          /* [ pair (list operation) (big_map nat nat) (option bool) ] */ } }
+michelson_test_scripts/opcodes/big_map_mem_string.tz
 Well typed
 Gas remaining: 1039993.494 units remaining
 { parameter string ;
@@ -36893,6 +37067,7 @@ Gas remaining: 1039993.494 units remaining
          /* [ list operation : pair (big_map string nat) (option bool) ] */ ;
          PAIR
          /* [ pair (list operation) (big_map string nat) (option bool) ] */ } }
+michelson_test_scripts/opcodes/big_map_to_self.tz
 Well typed
 Gas remaining: 1039987.387 units remaining
 { parameter (or (pair %have_fun (big_map string nat) unit) (unit %default)) ;
@@ -36947,6 +37122,7 @@ Gas remaining: 1039987.387 units remaining
              /* [ list operation : big_map string nat ] */ } ;
          PAIR
          /* [ pair (list operation) (big_map string nat) ] */ } }
+michelson_test_scripts/opcodes/bls12_381_fr_push_bytes_not_padded.tz
 Well typed
 Gas remaining: 1039996.436 units remaining
 { parameter unit ;
@@ -36961,6 +37137,7 @@ Gas remaining: 1039996.436 units remaining
          /* [ list operation : option bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_fr) ] */ } }
+michelson_test_scripts/opcodes/bls12_381_fr_push_nat.tz
 Well typed
 Gas remaining: 1039996.436 units remaining
 { parameter unit ;
@@ -36975,6 +37152,7 @@ Gas remaining: 1039996.436 units remaining
          /* [ list operation : option bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_fr) ] */ } }
+michelson_test_scripts/opcodes/bls12_381_fr_to_int.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter bls12_381_fr ;
@@ -36987,6 +37165,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/opcodes/bls12_381_fr_to_mutez.tz
 Well typed
 Gas remaining: 1039993.594 units remaining
 { parameter bls12_381_fr ;
@@ -37006,6 +37185,7 @@ Gas remaining: 1039993.594 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/bls12_381_fr_z_int.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter int ;
@@ -37018,6 +37198,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) bls12_381_fr ] */ } }
+michelson_test_scripts/opcodes/bls12_381_fr_z_nat.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter nat ;
@@ -37030,6 +37211,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) bls12_381_fr ] */ } }
+michelson_test_scripts/opcodes/bls12_381_z_fr_int.tz
 Well typed
 Gas remaining: 1039996.980 units remaining
 { parameter int ;
@@ -37044,6 +37226,7 @@ Gas remaining: 1039996.980 units remaining
          /* [ list operation : bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) bls12_381_fr ] */ } }
+michelson_test_scripts/opcodes/bls12_381_z_fr_nat.tz
 Well typed
 Gas remaining: 1039996.980 units remaining
 { parameter nat ;
@@ -37058,6 +37241,7 @@ Gas remaining: 1039996.980 units remaining
          /* [ list operation : bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) bls12_381_fr ] */ } }
+michelson_test_scripts/opcodes/bytes.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter bytes ;
@@ -37068,6 +37252,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/bytes_of_int_016.tz
 Well typed
 Gas remaining: 1039908.105 units remaining
 { parameter unit ;
@@ -37192,6 +37377,7 @@ Gas remaining: 1039908.105 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/bytes_of_nat_016.tz
 Well typed
 Gas remaining: 1039958.808 units remaining
 { parameter unit ;
@@ -37253,6 +37439,7 @@ Gas remaining: 1039958.808 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/car.tz
 Well typed
 Gas remaining: 1039997.277 units remaining
 { parameter (pair (nat :l) (nat :r)) ;
@@ -37265,6 +37452,7 @@ Gas remaining: 1039997.277 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/cdr.tz
 Well typed
 Gas remaining: 1039997.277 units remaining
 { parameter (pair (nat :l) (nat :r)) ;
@@ -37277,6 +37465,7 @@ Gas remaining: 1039997.277 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/chain_id.tz
 Well typed
 Gas remaining: 1039996.980 units remaining
 { parameter unit ;
@@ -37291,6 +37480,7 @@ Gas remaining: 1039996.980 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/chain_id_store.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter unit ;
@@ -37305,6 +37495,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option chain_id ] */ ;
          PAIR
          /* [ pair (list operation) (option chain_id) ] */ } }
+michelson_test_scripts/opcodes/check_signature.tz
 Well typed
 Gas remaining: 1039988.984 units remaining
 { parameter key ;
@@ -37337,6 +37528,7 @@ Gas remaining: 1039988.984 units remaining
          /* [ list operation : pair signature string ] */ ;
          PAIR
          /* [ pair (list operation) signature string ] */ } }
+michelson_test_scripts/opcodes/comb.tz
 Well typed
 Gas remaining: 1039995.014 units remaining
 { parameter unit ;
@@ -37353,6 +37545,7 @@ Gas remaining: 1039995.014 units remaining
          /* [ list operation : nat : nat : nat ] */ ;
          PAIR 4
          /* [ pair (list operation) nat nat nat ] */ } }
+michelson_test_scripts/opcodes/comb-get.tz
 Well typed
 Gas remaining: 1039966.252 units remaining
 { parameter (pair nat nat nat unit) ;
@@ -37402,6 +37595,7 @@ Gas remaining: 1039966.252 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/comb-literals.tz
 Well typed
 Gas remaining: 1039993.270 units remaining
 { parameter unit ;
@@ -37417,6 +37611,7 @@ Gas remaining: 1039993.270 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/comb-set.tz
 Well typed
 Gas remaining: 1039991.623 units remaining
 { parameter unit ;
@@ -37443,6 +37638,7 @@ Gas remaining: 1039991.623 units remaining
          /* [ list operation : pair nat nat nat unit ] */ ;
          PAIR
          /* [ pair (list operation) nat nat nat unit ] */ } }
+michelson_test_scripts/opcodes/comb-set-2.tz
 Well typed
 Gas remaining: 1039991.581 units remaining
 { parameter (pair nat nat nat unit) ;
@@ -37467,6 +37663,7 @@ Gas remaining: 1039991.581 units remaining
          /* [ list operation : option (pair int nat string bytes) ] */ ;
          PAIR
          /* [ pair (list operation) (option (pair int nat string bytes)) ] */ } }
+michelson_test_scripts/opcodes/compare.tz
 Well typed
 Gas remaining: 1039840.163 units remaining
 { parameter unit ;
@@ -37682,6 +37879,7 @@ Gas remaining: 1039840.163 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/compare_big_type.tz
 Well typed
 Gas remaining: 1039129.907 units remaining
 { parameter unit ;
@@ -41417,6 +41615,7 @@ Gas remaining: 1039129.907 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/compare_big_type2.tz
 Well typed
 Gas remaining: 1038995.158 units remaining
 { parameter unit ;
@@ -45717,6 +45916,7 @@ Gas remaining: 1038995.158 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/comparisons.tz
 Well typed
 Gas remaining: 1039977.212 units remaining
 { parameter (list int) ;
@@ -45780,6 +45980,7 @@ Gas remaining: 1039977.212 units remaining
          /* [ list operation : list (list bool) ] */ ;
          PAIR
          /* [ pair (list operation) (list (list bool)) ] */ } }
+michelson_test_scripts/opcodes/concat_hello.tz
 Well typed
 Gas remaining: 1039995.899 units remaining
 { parameter (list string) ;
@@ -45792,6 +45993,7 @@ Gas remaining: 1039995.899 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/concat_hello_bytes.tz
 Well typed
 Gas remaining: 1039995.973 units remaining
 { parameter (list bytes) ;
@@ -45804,6 +46006,7 @@ Gas remaining: 1039995.973 units remaining
          /* [ list operation : list bytes ] */ ;
          PAIR
          /* [ pair (list operation) (list bytes) ] */ } }
+michelson_test_scripts/opcodes/concat_list.tz
 Well typed
 Gas remaining: 1039992.537 units remaining
 { parameter (list string) ;
@@ -45832,6 +46035,7 @@ Gas remaining: 1039992.537 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/opcodes/cons.tz
 Well typed
 Gas remaining: 1039997.240 units remaining
 { parameter int ;
@@ -45844,6 +46048,7 @@ Gas remaining: 1039997.240 units remaining
          /* [ list operation : list int ] */ ;
          PAIR
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/opcodes/contains_all.tz
 Well typed
 Gas remaining: 1039974.767 units remaining
 { parameter (pair (list string) (list string)) ;
@@ -45917,6 +46122,7 @@ Gas remaining: 1039974.767 units remaining
          /* [ list operation : option bool ] */ ;
          PAIR
          /* [ pair (list operation) (option bool) ] */ } }
+michelson_test_scripts/opcodes/contract.tz
 Well typed
 Gas remaining: 1039994.190 units remaining
 { parameter address ;
@@ -45934,6 +46140,7 @@ Gas remaining: 1039994.190 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/create_contract.tz
 Well typed
 Gas remaining: 1039991.584 units remaining
 { parameter unit ;
@@ -45959,6 +46166,7 @@ Gas remaining: 1039991.584 units remaining
          /* [ list operation : option address ] */ ;
          PAIR
          /* [ pair (list operation) (option address) ] */ } }
+michelson_test_scripts/opcodes/create_contract_rootname.tz
 Well typed
 Gas remaining: 1039991.584 units remaining
 { parameter unit ;
@@ -45986,6 +46194,7 @@ Gas remaining: 1039991.584 units remaining
          /* [ list operation : option address ] */ ;
          PAIR
          /* [ pair (list operation) (option address) ] */ } }
+michelson_test_scripts/opcodes/create_contract_rootname_alt.tz
 Well typed
 Gas remaining: 1039991.584 units remaining
 { parameter unit ;
@@ -46013,6 +46222,7 @@ Gas remaining: 1039991.584 units remaining
          /* [ list operation : option address ] */ ;
          PAIR
          /* [ pair (list operation) (option address) ] */ } }
+michelson_test_scripts/opcodes/create_contract_with_view.tz
 Well typed
 Gas remaining: 1039990.516 units remaining
 { parameter unit ;
@@ -46041,6 +46251,7 @@ Gas remaining: 1039990.516 units remaining
          /* [ list operation : option address ] */ ;
          PAIR
          /* [ pair (list operation) (option address) ] */ } }
+michelson_test_scripts/opcodes/diff_timestamps.tz
 Well typed
 Gas remaining: 1039995.013 units remaining
 { parameter (pair timestamp timestamp) ;
@@ -46059,6 +46270,7 @@ Gas remaining: 1039995.013 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/opcodes/dig_eq.tz
 Well typed
 Gas remaining: 1039909.247 units remaining
 { parameter
@@ -46214,6 +46426,7 @@ Gas remaining: 1039909.247 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/dign.tz
 Well typed
 Gas remaining: 1039992.220 units remaining
 { parameter (pair (pair (pair (pair nat nat) nat) nat) nat) ;
@@ -46236,6 +46449,7 @@ Gas remaining: 1039992.220 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/dip.tz
 Well typed
 Gas remaining: 1039994.918 units remaining
 { parameter (pair nat nat) ;
@@ -46254,6 +46468,7 @@ Gas remaining: 1039994.918 units remaining
          /* [ list operation : pair nat nat ] */ ;
          PAIR
          /* [ pair (list operation) nat nat ] */ } }
+michelson_test_scripts/opcodes/dipn.tz
 Well typed
 Gas remaining: 1039991.330 units remaining
 { parameter (pair (pair (pair (pair nat nat) nat) nat) nat) ;
@@ -46284,6 +46499,7 @@ Gas remaining: 1039991.330 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/dropn.tz
 Well typed
 Gas remaining: 1039994.587 units remaining
 { parameter (pair (pair (pair (pair nat nat) nat) nat) nat) ;
@@ -46304,6 +46520,7 @@ Gas remaining: 1039994.587 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/dugn.tz
 Well typed
 Gas remaining: 1039992.716 units remaining
 { parameter (pair (pair (pair (pair nat nat) nat) nat) nat) ;
@@ -46332,6 +46549,7 @@ Gas remaining: 1039992.716 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/dup-n.tz
 Well typed
 Gas remaining: 1039968.032 units remaining
 { parameter unit ;
@@ -46381,6 +46599,7 @@ Gas remaining: 1039968.032 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/ediv.tz
 Well typed
 Gas remaining: 1039981.718 units remaining
 { parameter (pair int int) ;
@@ -46446,6 +46665,7 @@ Gas remaining: 1039981.718 units remaining
                  (option (pair int nat))
                  (option (pair int nat))
                  (option (pair nat nat)) ] */ } }
+michelson_test_scripts/opcodes/ediv_mutez.tz
 Well typed
 Gas remaining: 1039990.621 units remaining
 { parameter (pair mutez (or mutez nat)) ;
@@ -46474,6 +46694,7 @@ Gas remaining: 1039990.621 units remaining
          /* [ list operation : or (option (pair nat mutez)) (option (pair mutez mutez)) ] */ ;
          PAIR
          /* [ pair (list operation) (or (option (pair nat mutez)) (option (pair mutez mutez))) ] */ } }
+michelson_test_scripts/opcodes/emit.tz
 Well typed
 Gas remaining: 1039991.050 units remaining
 { parameter unit ;
@@ -46506,6 +46727,7 @@ Gas remaining: 1039991.050 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/empty_map.tz
 Well typed
 Gas remaining: 1039994.366 units remaining
 { storage (map string string) ;
@@ -46526,6 +46748,7 @@ Gas remaining: 1039994.366 units remaining
          /* [ list operation : map string string ] */ ;
          PAIR
          /* [ pair (list operation) (map string string) ] */ } }
+michelson_test_scripts/opcodes/exec_concat.tz
 Well typed
 Gas remaining: 1039992.377 units remaining
 { parameter string ;
@@ -46558,6 +46781,7 @@ Gas remaining: 1039992.377 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/opcodes/fact.tz
 Well typed
 Gas remaining: 1039989.390 units remaining
 { parameter nat ;
@@ -46594,6 +46818,7 @@ Gas remaining: 1039989.390 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/first.tz
 Well typed
 Gas remaining: 1039995.098 units remaining
 { parameter (list nat) ;
@@ -46605,6 +46830,7 @@ Gas remaining: 1039995.098 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/get_and_update_big_map.tz
 Well typed
 Gas remaining: 1039994.790 units remaining
 { parameter string ;
@@ -46618,6 +46844,7 @@ Gas remaining: 1039994.790 units remaining
          /* [ list operation : pair (option nat) (big_map string nat) ] */ ;
          PAIR
          /* [ pair (list operation) (option nat) (big_map string nat) ] */ } }
+michelson_test_scripts/opcodes/get_and_update_map.tz
 Well typed
 Gas remaining: 1039994.850 units remaining
 { parameter string ;
@@ -46631,6 +46858,7 @@ Gas remaining: 1039994.850 units remaining
          /* [ list operation : pair (option nat) (map string nat) ] */ ;
          PAIR
          /* [ pair (list operation) (option nat) (map string nat) ] */ } }
+michelson_test_scripts/opcodes/get_big_map_value.tz
 Well typed
 Gas remaining: 1039992.079 units remaining
 { parameter string ;
@@ -46652,6 +46880,7 @@ Gas remaining: 1039992.079 units remaining
          /* [ list operation : pair (big_map string string) (option string) ] */ ;
          PAIR
          /* [ pair (list operation) (big_map string string) (option string) ] */ } }
+michelson_test_scripts/opcodes/get_map_value.tz
 Well typed
 Gas remaining: 1039992.607 units remaining
 { parameter string ;
@@ -46671,6 +46900,7 @@ Gas remaining: 1039992.607 units remaining
          /* [ list operation : pair (option string) (map string string) ] */ ;
          PAIR
          /* [ pair (list operation) (option string) (map string string) ] */ } }
+michelson_test_scripts/opcodes/hash_consistency_checker.tz
 Well typed
 Gas remaining: 1039996.569 units remaining
 { parameter (pair mutez (pair timestamp int)) ;
@@ -46685,6 +46915,7 @@ Gas remaining: 1039996.569 units remaining
          /* [ list operation : bytes ] */ ;
          PAIR
          /* [ pair (list operation) bytes ] */ } }
+michelson_test_scripts/opcodes/hash_key.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter key ;
@@ -46699,6 +46930,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option key_hash ] */ ;
          PAIR
          /* [ pair (list operation) (option key_hash) ] */ } }
+michelson_test_scripts/opcodes/hash_string.tz
 Well typed
 Gas remaining: 1039996.980 units remaining
 { parameter string ;
@@ -46713,6 +46945,7 @@ Gas remaining: 1039996.980 units remaining
          /* [ list operation : bytes ] */ ;
          PAIR
          /* [ pair (list operation) bytes ] */ } }
+michelson_test_scripts/opcodes/if.tz
 Well typed
 Gas remaining: 1039995.290 units remaining
 { parameter bool ;
@@ -46726,6 +46959,7 @@ Gas remaining: 1039995.290 units remaining
          /* [ list operation : option bool ] */ ;
          PAIR
          /* [ pair (list operation) (option bool) ] */ } }
+michelson_test_scripts/opcodes/if_some.tz
 Well typed
 Gas remaining: 1039996.019 units remaining
 { parameter (option string) ;
@@ -46737,6 +46971,7 @@ Gas remaining: 1039996.019 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/opcodes/int.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter nat ;
@@ -46751,6 +46986,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option int ] */ ;
          PAIR
          /* [ pair (list operation) (option int) ] */ } }
+michelson_test_scripts/opcodes/iter_fail.tz
 Well typed
 Gas remaining: 1039996.874 units remaining
 { parameter (set nat) ;
@@ -46763,6 +46999,7 @@ Gas remaining: 1039996.874 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/keccak.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { storage (option bytes) ;
@@ -46777,6 +47014,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option bytes ] */ ;
          PAIR
          /* [ pair (list operation) (option bytes) ] */ } }
+michelson_test_scripts/opcodes/left_right.tz
 Well typed
 Gas remaining: 1039995.570 units remaining
 { parameter (or bool string) ;
@@ -46790,6 +47028,7 @@ Gas remaining: 1039995.570 units remaining
          /* [ list operation : or string bool ] */ ;
          PAIR
          /* [ pair (list operation) (or string bool) ] */ } }
+michelson_test_scripts/opcodes/level.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -46802,6 +47041,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/list_concat.tz
 Well typed
 Gas remaining: 1039996.374 units remaining
 { parameter (list string) ;
@@ -46818,6 +47058,7 @@ Gas remaining: 1039996.374 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/opcodes/list_concat_bytes.tz
 Well typed
 Gas remaining: 1039996.374 units remaining
 { parameter (list bytes) ;
@@ -46834,6 +47075,7 @@ Gas remaining: 1039996.374 units remaining
          /* [ list operation : bytes ] */ ;
          PAIR
          /* [ pair (list operation) bytes ] */ } }
+michelson_test_scripts/opcodes/list_id.tz
 Well typed
 Gas remaining: 1039997.680 units remaining
 { parameter (list string) ;
@@ -46844,6 +47086,7 @@ Gas remaining: 1039997.680 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/list_id_map.tz
 Well typed
 Gas remaining: 1039996.974 units remaining
 { parameter (list string) ;
@@ -46856,6 +47099,7 @@ Gas remaining: 1039996.974 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/list_iter.tz
 Well typed
 Gas remaining: 1039995.593 units remaining
 { parameter (list int) ;
@@ -46872,6 +47116,7 @@ Gas remaining: 1039995.593 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/opcodes/list_map_block.tz
 Well typed
 Gas remaining: 1039991.624 units remaining
 { parameter (list int) ;
@@ -46895,6 +47140,7 @@ Gas remaining: 1039991.624 units remaining
          /* [ pair (list operation) (list int) : int ] */ ;
          DIP { DROP /* [] */ }
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/opcodes/list_size.tz
 Well typed
 Gas remaining: 1039997.360 units remaining
 { parameter (list int) ;
@@ -46907,6 +47153,7 @@ Gas remaining: 1039997.360 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/loop_failwith.tz
 Well typed
 Gas remaining: 1039996.957 units remaining
 { parameter bool ;
@@ -46919,6 +47166,7 @@ Gas remaining: 1039996.957 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/loop_left.tz
 Well typed
 Gas remaining: 1039987.396 units remaining
 { parameter (list string) ;
@@ -46957,6 +47205,7 @@ Gas remaining: 1039987.396 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/loop_left_failwith.tz
 Well typed
 Gas remaining: 1039996.716 units remaining
 { parameter (or string nat) ;
@@ -46969,6 +47218,7 @@ Gas remaining: 1039996.716 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/lsl_bytes_016.tz
 Well typed
 Gas remaining: 1039972.796 units remaining
 { parameter unit ;
@@ -47017,6 +47267,7 @@ Gas remaining: 1039972.796 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/lsr_bytes_016.tz
 Well typed
 Gas remaining: 1039959.946 units remaining
 { parameter unit ;
@@ -47083,6 +47334,7 @@ Gas remaining: 1039959.946 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/map_car.tz
 Well typed
 Gas remaining: 1039991.063 units remaining
 { parameter bool ;
@@ -47100,6 +47352,7 @@ Gas remaining: 1039991.063 units remaining
          /* [ list operation : pair bool nat ] */ ;
          PAIR
          /* [ pair (list operation) bool nat ] */ } }
+michelson_test_scripts/opcodes/map_id.tz
 Well typed
 Gas remaining: 1039997.454 units remaining
 { parameter (map nat nat) ;
@@ -47110,6 +47363,7 @@ Gas remaining: 1039997.454 units remaining
          /* [ list operation : map nat nat ] */ ;
          PAIR
          /* [ pair (list operation) (map nat nat) ] */ } }
+michelson_test_scripts/opcodes/map_iter.tz
 Well typed
 Gas remaining: 1039986.949 units remaining
 { parameter (map (int :k) (int :e)) ;
@@ -47146,6 +47400,7 @@ Gas remaining: 1039986.949 units remaining
          /* [ list operation : pair int int ] */ ;
          PAIR
          /* [ pair (list operation) int int ] */ } }
+michelson_test_scripts/opcodes/map_map.tz
 Well typed
 Gas remaining: 1039993.574 units remaining
 { parameter nat ;
@@ -47167,6 +47422,7 @@ Gas remaining: 1039993.574 units remaining
          /* [ list operation : map string nat ] */ ;
          PAIR
          /* [ pair (list operation) (map string nat) ] */ } }
+michelson_test_scripts/opcodes/map_map_sideeffect.tz
 Well typed
 Gas remaining: 1039988.534 units remaining
 { parameter nat ;
@@ -47200,6 +47456,7 @@ Gas remaining: 1039988.534 units remaining
          /* [ list operation : pair (map string nat) nat ] */ ;
          PAIR
          /* [ pair (list operation) (map string nat) nat ] */ } }
+michelson_test_scripts/opcodes/map_mem_nat.tz
 Well typed
 Gas remaining: 1039993.554 units remaining
 { parameter nat ;
@@ -47220,6 +47477,7 @@ Gas remaining: 1039993.554 units remaining
          /* [ list operation : pair (map nat nat) (option bool) ] */ ;
          PAIR
          /* [ pair (list operation) (map nat nat) (option bool) ] */ } }
+michelson_test_scripts/opcodes/map_mem_string.tz
 Well typed
 Gas remaining: 1039993.554 units remaining
 { parameter string ;
@@ -47240,6 +47498,7 @@ Gas remaining: 1039993.554 units remaining
          /* [ list operation : pair (map string nat) (option bool) ] */ ;
          PAIR
          /* [ pair (list operation) (map string nat) (option bool) ] */ } }
+michelson_test_scripts/opcodes/map_size.tz
 Well typed
 Gas remaining: 1039997.277 units remaining
 { parameter (map string nat) ;
@@ -47252,6 +47511,7 @@ Gas remaining: 1039997.277 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/merge_comparable_pairs.tz
 Well typed
 Gas remaining: 1039992.173 units remaining
 { parameter (set (pair (nat %n) (pair %p (string %s) (int %i)))) ;
@@ -47277,6 +47537,7 @@ Gas remaining: 1039992.173 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/mul.tz
 Well typed
 Gas remaining: 1039961.621 units remaining
 { parameter unit ;
@@ -47357,6 +47618,7 @@ Gas remaining: 1039961.621 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/mul_bls12_381_fr.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_fr bls12_381_fr) ;
@@ -47373,6 +47635,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_fr) ] */ } }
+michelson_test_scripts/opcodes/mul_bls12_381_g1.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_g1 bls12_381_fr) ;
@@ -47389,6 +47652,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option bls12_381_g1 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g1) ] */ } }
+michelson_test_scripts/opcodes/mul_bls12_381_g2.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair bls12_381_g2 bls12_381_fr) ;
@@ -47405,6 +47669,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option bls12_381_g2 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g2) ] */ } }
+michelson_test_scripts/opcodes/mul_overflow.tz
 Well typed
 Gas remaining: 1039992.344 units remaining
 { parameter (or unit unit) ;
@@ -47432,6 +47697,7 @@ Gas remaining: 1039992.344 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/munch.tz
 Well typed
 Gas remaining: 1039997.065 units remaining
 { parameter
@@ -47443,6 +47709,7 @@ Gas remaining: 1039997.065 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz
 Well typed
 Gas remaining: 1039992.323 units remaining
 { parameter mutez ;
@@ -47466,6 +47733,7 @@ Gas remaining: 1039992.323 units remaining
          /* [ list operation : bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) bls12_381_fr ] */ } }
+michelson_test_scripts/opcodes/neg.tz
 Well typed
 Gas remaining: 1039996.161 units remaining
 { parameter (or int nat) ;
@@ -47477,6 +47745,7 @@ Gas remaining: 1039996.161 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/opcodes/neg_bls12_381_fr.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter bls12_381_fr ;
@@ -47491,6 +47760,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_fr) ] */ } }
+michelson_test_scripts/opcodes/neg_bls12_381_g1.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter bls12_381_g1 ;
@@ -47505,6 +47775,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option bls12_381_g1 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g1) ] */ } }
+michelson_test_scripts/opcodes/neg_bls12_381_g2.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter bls12_381_g2 ;
@@ -47519,6 +47790,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option bls12_381_g2 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g2) ] */ } }
+michelson_test_scripts/opcodes/none.tz
 Well typed
 Gas remaining: 1039997.217 units remaining
 { parameter unit ;
@@ -47531,6 +47803,7 @@ Gas remaining: 1039997.217 units remaining
          /* [ list operation : option nat ] */ ;
          PAIR
          /* [ pair (list operation) (option nat) ] */ } }
+michelson_test_scripts/opcodes/noop.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter unit ;
@@ -47541,6 +47814,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/not.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { parameter bool ;
@@ -47555,6 +47829,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option bool ] */ ;
          PAIR
          /* [ pair (list operation) (option bool) ] */ } }
+michelson_test_scripts/opcodes/not_binary.tz
 Well typed
 Gas remaining: 1039995.545 units remaining
 { parameter (or int nat) ;
@@ -47568,6 +47843,7 @@ Gas remaining: 1039995.545 units remaining
          /* [ list operation : option int ] */ ;
          PAIR
          /* [ pair (list operation) (option int) ] */ } }
+michelson_test_scripts/opcodes/not_bytes_016.tz
 Well typed
 Gas remaining: 1039981.341 units remaining
 { parameter unit ;
@@ -47601,6 +47877,7 @@ Gas remaining: 1039981.341 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/or.tz
 Well typed
 Gas remaining: 1039994.425 units remaining
 { parameter (pair bool bool) ;
@@ -47623,6 +47900,7 @@ Gas remaining: 1039994.425 units remaining
          /* [ list operation : option bool ] */ ;
          PAIR
          /* [ pair (list operation) (option bool) ] */ } }
+michelson_test_scripts/opcodes/or_binary.tz
 Well typed
 Gas remaining: 1039996.129 units remaining
 { parameter (pair nat nat) ;
@@ -47639,6 +47917,7 @@ Gas remaining: 1039996.129 units remaining
          /* [ list operation : option nat ] */ ;
          PAIR
          /* [ pair (list operation) (option nat) ] */ } }
+michelson_test_scripts/opcodes/or_bytes_016.tz
 Well typed
 Gas remaining: 1039978.916 units remaining
 { parameter unit ;
@@ -47678,6 +47957,7 @@ Gas remaining: 1039978.916 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/originate_big_map.tz
 Well typed
 Gas remaining: 1039997.334 units remaining
 { parameter (big_map int int) ;
@@ -47688,6 +47968,7 @@ Gas remaining: 1039997.334 units remaining
          /* [ list operation : big_map int int ] */ ;
          PAIR
          /* [ pair (list operation) (big_map int int) ] */ } }
+michelson_test_scripts/opcodes/packunpack.tz
 Well typed
 Gas remaining: 1039987.310 units remaining
 { parameter (pair (pair (pair string (list int)) (set nat)) bytes) ;
@@ -47713,6 +47994,7 @@ Gas remaining: 1039987.310 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/packunpack_rev.tz
 Well typed
 Gas remaining: 1039888.774 units remaining
 { parameter (pair int nat string bytes mutez bool key_hash timestamp address) ;
@@ -47873,6 +48155,7 @@ Gas remaining: 1039888.774 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/packunpack_rev_cty.tz
 Well typed
 Gas remaining: 1039875.178 units remaining
 { parameter
@@ -48482,6 +48765,7 @@ Gas remaining: 1039875.178 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/pair_id.tz
 Well typed
 Gas remaining: 1039996.769 units remaining
 { parameter (pair bool bool) ;
@@ -48494,6 +48778,7 @@ Gas remaining: 1039996.769 units remaining
          /* [ list operation : option (pair bool bool) ] */ ;
          PAIR
          /* [ pair (list operation) (option (pair bool bool)) ] */ } }
+michelson_test_scripts/opcodes/pairing_check.tz
 Well typed
 Gas remaining: 1039996.509 units remaining
 { parameter (list (pair bls12_381_g1 bls12_381_g2)) ;
@@ -48508,6 +48793,7 @@ Gas remaining: 1039996.509 units remaining
          /* [ list operation : option bool ] */ ;
          PAIR
          /* [ pair (list operation) (option bool) ] */ } }
+michelson_test_scripts/opcodes/pexec.tz
 Well typed
 Gas remaining: 1039993.994 units remaining
 { parameter nat ;
@@ -48529,6 +48815,7 @@ Gas remaining: 1039993.994 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/pexec_2.tz
 Well typed
 Gas remaining: 1039988.161 units remaining
 { parameter int ;
@@ -48568,6 +48855,7 @@ Gas remaining: 1039988.161 units remaining
          /* [ list operation : list int ] */ ;
          PAIR
          /* [ pair (list operation) (list int) ] */ } }
+michelson_test_scripts/opcodes/proxy.tz
 Well typed
 Gas remaining: 1039995.281 units remaining
 { parameter (contract unit) ;
@@ -48586,6 +48874,7 @@ Gas remaining: 1039995.281 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/ret_int.tz
 Well typed
 Gas remaining: 1039996.556 units remaining
 { parameter unit ;
@@ -48600,6 +48889,7 @@ Gas remaining: 1039996.556 units remaining
          /* [ list operation : option nat ] */ ;
          PAIR
          /* [ pair (list operation) (option nat) ] */ } }
+michelson_test_scripts/opcodes/reverse.tz
 Well typed
 Gas remaining: 1039995.453 units remaining
 { parameter (list string) ;
@@ -48616,6 +48906,7 @@ Gas remaining: 1039995.453 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/reverse_loop.tz
 Well typed
 Gas remaining: 1039990.243 units remaining
 { parameter (list string) ;
@@ -48646,6 +48937,7 @@ Gas remaining: 1039990.243 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/sapling_empty_state.tz
 Well typed
 Gas remaining: 1039997.397 units remaining
 { parameter unit ;
@@ -48658,6 +48950,7 @@ Gas remaining: 1039997.397 units remaining
          /* [ list operation : sapling_state 8 ] */ ;
          PAIR
          /* [ pair (list operation) (sapling_state 8) ] */ } }
+michelson_test_scripts/opcodes/self.tz
 Well typed
 Gas remaining: 1039996.945 units remaining
 { parameter unit ;
@@ -48672,6 +48965,7 @@ Gas remaining: 1039996.945 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_address.tz
 Well typed
 Gas remaining: 1039990.189 units remaining
 { parameter unit ;
@@ -48698,6 +48992,7 @@ Gas remaining: 1039990.189 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/self_address_after_fib_view.tz
 Well typed
 Gas remaining: 1039986.567 units remaining
 { parameter address ;
@@ -48734,6 +49029,7 @@ Gas remaining: 1039986.567 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_address_after_nonexistent_view.tz
 Well typed
 Gas remaining: 1039987.050 units remaining
 { parameter address ;
@@ -48768,6 +49064,7 @@ Gas remaining: 1039987.050 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_address_after_view.tz
 Well typed
 Gas remaining: 1039986.392 units remaining
 { parameter address ;
@@ -48804,6 +49101,7 @@ Gas remaining: 1039986.392 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_after_fib_view.tz
 Well typed
 Gas remaining: 1039986.060 units remaining
 { parameter address ;
@@ -48842,6 +49140,7 @@ Gas remaining: 1039986.060 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_after_nonexistent_view.tz
 Well typed
 Gas remaining: 1039986.452 units remaining
 { parameter address ;
@@ -48878,6 +49177,7 @@ Gas remaining: 1039986.452 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_after_view.tz
 Well typed
 Gas remaining: 1039985.886 units remaining
 { parameter address ;
@@ -48916,6 +49216,7 @@ Gas remaining: 1039985.886 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/self_with_default_entrypoint.tz
 Well typed
 Gas remaining: 1039988.800 units remaining
 { parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %default) (string %C))) ;
@@ -48945,6 +49246,7 @@ Gas remaining: 1039988.800 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/self_with_entrypoint.tz
 Well typed
 Gas remaining: 1039970.861 units remaining
 { parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ;
@@ -49011,6 +49313,7 @@ Gas remaining: 1039970.861 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/sender.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -49023,6 +49326,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/sender_after_fib_view.tz
 Well typed
 Gas remaining: 1039986.567 units remaining
 { parameter address ;
@@ -49059,6 +49363,7 @@ Gas remaining: 1039986.567 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/sender_after_nonexistent_view.tz
 Well typed
 Gas remaining: 1039987.050 units remaining
 { parameter address ;
@@ -49093,6 +49398,7 @@ Gas remaining: 1039987.050 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/sender_after_view.tz
 Well typed
 Gas remaining: 1039986.392 units remaining
 { parameter address ;
@@ -49129,6 +49435,7 @@ Gas remaining: 1039986.392 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/set_car.tz
 Well typed
 Gas remaining: 1039992.274 units remaining
 { parameter string ;
@@ -49144,6 +49451,7 @@ Gas remaining: 1039992.274 units remaining
          /* [ list operation : pair string nat ] */ ;
          PAIR
          /* [ pair (list operation) string nat ] */ } }
+michelson_test_scripts/opcodes/set_cdr.tz
 Well typed
 Gas remaining: 1039992.742 units remaining
 { parameter nat ;
@@ -49159,6 +49467,7 @@ Gas remaining: 1039992.742 units remaining
          /* [ list operation : pair string nat ] */ ;
          PAIR
          /* [ pair (list operation) string nat ] */ } }
+michelson_test_scripts/opcodes/set_delegate.tz
 Well typed
 Gas remaining: 1039996.276 units remaining
 { parameter (option key_hash) ;
@@ -49173,6 +49482,7 @@ Gas remaining: 1039996.276 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/set_id.tz
 Well typed
 Gas remaining: 1039997.680 units remaining
 { parameter (set string) ;
@@ -49183,6 +49493,7 @@ Gas remaining: 1039997.680 units remaining
          /* [ list operation : set string ] */ ;
          PAIR
          /* [ pair (list operation) (set string) ] */ } }
+michelson_test_scripts/opcodes/set_iter.tz
 Well typed
 Gas remaining: 1039995.593 units remaining
 { parameter (set int) ;
@@ -49199,6 +49510,7 @@ Gas remaining: 1039995.593 units remaining
          /* [ list operation : int ] */ ;
          PAIR
          /* [ pair (list operation) int ] */ } }
+michelson_test_scripts/opcodes/set_member.tz
 Well typed
 Gas remaining: 1039989.840 units remaining
 { parameter string ;
@@ -49229,6 +49541,7 @@ Gas remaining: 1039989.840 units remaining
          /* [ list operation : pair (set string) (option bool) ] */ ;
          PAIR
          /* [ pair (list operation) (set string) (option bool) ] */ } }
+michelson_test_scripts/opcodes/set_size.tz
 Well typed
 Gas remaining: 1039997.360 units remaining
 { parameter (set int) ;
@@ -49241,6 +49554,7 @@ Gas remaining: 1039997.360 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/sets.tz
 Well typed
 Gas remaining: 1039952.034 units remaining
 { parameter unit ;
@@ -49307,6 +49621,7 @@ Gas remaining: 1039952.034 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/sha3.tz
 Well typed
 Gas remaining: 1039996.837 units remaining
 { storage (option bytes) ;
@@ -49321,6 +49636,7 @@ Gas remaining: 1039996.837 units remaining
          /* [ list operation : option bytes ] */ ;
          PAIR
          /* [ pair (list operation) (option bytes) ] */ } }
+michelson_test_scripts/opcodes/shifts.tz
 Well typed
 Gas remaining: 1039994.259 units remaining
 { parameter (or (pair nat nat) (pair nat nat)) ;
@@ -49336,6 +49652,7 @@ Gas remaining: 1039994.259 units remaining
          /* [ list operation : option nat ] */ ;
          PAIR
          /* [ pair (list operation) (option nat) ] */ } }
+michelson_test_scripts/opcodes/slice.tz
 Well typed
 Gas remaining: 1039993.747 units remaining
 { parameter (pair nat nat) ;
@@ -49356,6 +49673,7 @@ Gas remaining: 1039993.747 units remaining
          /* [ list operation : option string ] */ ;
          PAIR
          /* [ pair (list operation) (option string) ] */ } }
+michelson_test_scripts/opcodes/slice_bytes.tz
 Well typed
 Gas remaining: 1039993.747 units remaining
 { parameter (pair nat nat) ;
@@ -49376,6 +49694,7 @@ Gas remaining: 1039993.747 units remaining
          /* [ list operation : option bytes ] */ ;
          PAIR
          /* [ pair (list operation) (option bytes) ] */ } }
+michelson_test_scripts/opcodes/slices.tz
 Well typed
 Gas remaining: 1039937.057 units remaining
 { parameter (pair bytes signature) ;
@@ -49490,6 +49809,7 @@ Gas remaining: 1039937.057 units remaining
          /* [ list operation : key ] */ ;
          PAIR
          /* [ pair (list operation) key ] */ } }
+michelson_test_scripts/opcodes/source.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -49502,6 +49822,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/split_bytes.tz
 Well typed
 Gas remaining: 1039973.337 units remaining
 { parameter bytes ;
@@ -49571,6 +49892,7 @@ Gas remaining: 1039973.337 units remaining
          /* [ list operation : list bytes ] */ ;
          PAIR
          /* [ pair (list operation) (list bytes) ] */ } }
+michelson_test_scripts/opcodes/split_string.tz
 Well typed
 Gas remaining: 1039973.337 units remaining
 { parameter string ;
@@ -49640,6 +49962,7 @@ Gas remaining: 1039973.337 units remaining
          /* [ list operation : list string ] */ ;
          PAIR
          /* [ pair (list operation) (list string) ] */ } }
+michelson_test_scripts/opcodes/store_bls12_381_fr.tz
 Well typed
 Gas remaining: 1039997.300 units remaining
 { parameter bls12_381_fr ;
@@ -49652,6 +49975,7 @@ Gas remaining: 1039997.300 units remaining
          /* [ list operation : option bls12_381_fr ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_fr) ] */ } }
+michelson_test_scripts/opcodes/store_bls12_381_g1.tz
 Well typed
 Gas remaining: 1039997.300 units remaining
 { parameter bls12_381_g1 ;
@@ -49664,6 +49988,7 @@ Gas remaining: 1039997.300 units remaining
          /* [ list operation : option bls12_381_g1 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g1) ] */ } }
+michelson_test_scripts/opcodes/store_bls12_381_g2.tz
 Well typed
 Gas remaining: 1039997.300 units remaining
 { parameter bls12_381_g2 ;
@@ -49676,6 +50001,7 @@ Gas remaining: 1039997.300 units remaining
          /* [ list operation : option bls12_381_g2 ] */ ;
          PAIR
          /* [ pair (list operation) (option bls12_381_g2) ] */ } }
+michelson_test_scripts/opcodes/store_input.tz
 Well typed
 Gas remaining: 1039997.907 units remaining
 { parameter string ;
@@ -49686,6 +50012,7 @@ Gas remaining: 1039997.907 units remaining
          /* [ list operation : string ] */ ;
          PAIR
          /* [ pair (list operation) string ] */ } }
+michelson_test_scripts/opcodes/store_now.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -49698,6 +50025,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : timestamp ] */ ;
          PAIR
          /* [ pair (list operation) timestamp ] */ } }
+michelson_test_scripts/opcodes/str_id.tz
 Well typed
 Gas remaining: 1039997.300 units remaining
 { parameter string ;
@@ -49710,6 +50038,7 @@ Gas remaining: 1039997.300 units remaining
          /* [ list operation : option string ] */ ;
          PAIR
          /* [ pair (list operation) (option string) ] */ } }
+michelson_test_scripts/opcodes/sub_timestamp_delta.tz
 Well typed
 Gas remaining: 1039995.013 units remaining
 { parameter (pair timestamp int) ;
@@ -49728,6 +50057,7 @@ Gas remaining: 1039995.013 units remaining
          /* [ list operation : timestamp ] */ ;
          PAIR
          /* [ pair (list operation) timestamp ] */ } }
+michelson_test_scripts/opcodes/subset.tz
 Well typed
 Gas remaining: 1039986.401 units remaining
 { parameter (pair (set string) (set string)) ;
@@ -49771,6 +50101,7 @@ Gas remaining: 1039986.401 units remaining
          /* [ list operation : bool ] */ ;
          PAIR
          /* [ pair (list operation) bool ] */ } }
+michelson_test_scripts/opcodes/tez_add_sub.tz
 Well typed
 Gas remaining: 1039987.345 units remaining
 { parameter (pair mutez mutez) ;
@@ -49805,6 +50136,7 @@ Gas remaining: 1039987.345 units remaining
          /* [ list operation : option (pair mutez mutez) ] */ ;
          PAIR
          /* [ pair (list operation) (option (pair mutez mutez)) ] */ } }
+michelson_test_scripts/opcodes/ticket_bad.tz
 Well typed
 Gas remaining: 1039997.763 units remaining
 { parameter unit ;
@@ -49815,6 +50147,7 @@ Gas remaining: 1039997.763 units remaining
          /* [ list operation : ticket nat ] */ ;
          PAIR
          /* [ pair (list operation) (ticket nat) ] */ } }
+michelson_test_scripts/opcodes/ticket_big_store.tz
 Well typed
 Gas remaining: 1039991.976 units remaining
 { parameter nat ;
@@ -49838,6 +50171,7 @@ Gas remaining: 1039991.976 units remaining
          /* [ list operation : big_map unit (ticket nat) ] */ ;
          PAIR
          /* [ pair (list operation) (big_map unit (ticket nat)) ] */ } }
+michelson_test_scripts/opcodes/ticket_join.tz
 Well typed
 Gas remaining: 1039992.503 units remaining
 { parameter (ticket nat) ;
@@ -49859,6 +50193,7 @@ Gas remaining: 1039992.503 units remaining
          /* [ list operation : option (ticket nat) ] */ ;
          PAIR
          /* [ pair (list operation) (option (ticket nat)) ] */ } }
+michelson_test_scripts/opcodes/ticket_read.tz
 Well typed
 Gas remaining: 1039985.350 units remaining
 { parameter (ticket nat) ;
@@ -49881,6 +50216,7 @@ Gas remaining: 1039985.350 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/ticket_split.tz
 Well typed
 Gas remaining: 1039979.558 units remaining
 { parameter (ticket nat) ;
@@ -49918,6 +50254,7 @@ Gas remaining: 1039979.558 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/ticket_store.tz
 Well typed
 Gas remaining: 1039997.074 units remaining
 { parameter (ticket nat) ;
@@ -49930,6 +50267,7 @@ Gas remaining: 1039997.074 units remaining
          /* [ list operation : option (ticket nat) ] */ ;
          PAIR
          /* [ pair (list operation) (option (ticket nat)) ] */ } }
+michelson_test_scripts/opcodes/ticket_store-2.tz
 Well typed
 Gas remaining: 1039997.454 units remaining
 { parameter (option (ticket nat)) ;
@@ -49940,6 +50278,7 @@ Gas remaining: 1039997.454 units remaining
          /* [ list operation : option (ticket nat) ] */ ;
          PAIR
          /* [ pair (list operation) (option (ticket nat)) ] */ } }
+michelson_test_scripts/opcodes/ticketer.tz
 Well typed
 Gas remaining: 1039986.744 units remaining
 { parameter address ;
@@ -49973,6 +50312,7 @@ Gas remaining: 1039986.744 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/ticketer-2.tz
 Well typed
 Gas remaining: 1039986.226 units remaining
 { parameter (pair (pair address nat) nat) ;
@@ -50006,6 +50346,7 @@ Gas remaining: 1039986.226 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/transfer_amount.tz
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;
@@ -50018,6 +50359,7 @@ Gas remaining: 1039997.443 units remaining
          /* [ list operation : mutez ] */ ;
          PAIR
          /* [ pair (list operation) mutez ] */ } }
+michelson_test_scripts/opcodes/transfer_tokens.tz
 Well typed
 Gas remaining: 1039994.130 units remaining
 { parameter (contract unit) ;
@@ -50040,6 +50382,7 @@ Gas remaining: 1039994.130 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/uncomb.tz
 Well typed
 Gas remaining: 1039993.181 units remaining
 { parameter (pair nat nat nat) ;
@@ -50066,6 +50409,7 @@ Gas remaining: 1039993.181 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/unpair.tz
 Well typed
 Gas remaining: 1039904.519 units remaining
 { parameter (unit :param_unit) ;
@@ -50386,6 +50730,7 @@ Gas remaining: 1039904.519 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/unpair_field_annotation_mismatch.tz
 Well typed
 Gas remaining: 1039993.685 units remaining
 { parameter (unit :param_unit) ;
@@ -50412,6 +50757,7 @@ Gas remaining: 1039993.685 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/update_big_map.tz
 Well typed
 Gas remaining: 1039993.471 units remaining
 { storage (pair (big_map string string) unit) ;
@@ -50428,6 +50774,7 @@ Gas remaining: 1039993.471 units remaining
          /* [ list operation : pair (big_map string string) unit ] */ ;
          PAIR
          /* [ pair (list operation) (big_map string string) unit ] */ } }
+michelson_test_scripts/opcodes/utxo_read.tz
 Well typed
 Gas remaining: 1039985.390 units remaining
 { parameter (pair (ticket nat) nat) ;
@@ -50452,6 +50799,7 @@ Gas remaining: 1039985.390 units remaining
          /* [ list operation : address ] */ ;
          PAIR
          /* [ pair (list operation) address ] */ } }
+michelson_test_scripts/opcodes/utxor.tz
 Well typed
 Gas remaining: 1039966.804 units remaining
 { parameter (pair address address) ;
@@ -50543,6 +50891,7 @@ Gas remaining: 1039966.804 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/view_fib.tz
 Well typed
 Gas remaining: 1039994.630 units remaining
 { parameter (pair nat address) ;
@@ -50559,6 +50908,7 @@ Gas remaining: 1039994.630 units remaining
              PAIR
              /* [ pair (list operation) nat ] */ }
            { FAIL } } }
+michelson_test_scripts/opcodes/view_mutual_recursion.tz
 Well typed
 Gas remaining: 1039993.335 units remaining
 { parameter (pair nat address) ;
@@ -50579,6 +50929,7 @@ Gas remaining: 1039993.335 units remaining
              PAIR
              /* [ pair (list operation) nat ] */ }
            { FAIL } } }
+michelson_test_scripts/opcodes/view_op_add.tz
 Well typed
 Gas remaining: 1039994.410 units remaining
 { parameter (pair nat address) ;
@@ -50594,6 +50945,7 @@ Gas remaining: 1039994.410 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/view_op_constant.tz
 Well typed
 Gas remaining: 1039994.390 units remaining
 { parameter (pair nat address) ;
@@ -50609,6 +50961,7 @@ Gas remaining: 1039994.390 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/view_op_id.tz
 Well typed
 Gas remaining: 1039993.949 units remaining
 { parameter (pair nat address) ;
@@ -50624,6 +50977,7 @@ Gas remaining: 1039993.949 units remaining
          /* [ list operation : pair nat nat ] */ ;
          PAIR
          /* [ pair (list operation) nat nat ] */ } }
+michelson_test_scripts/opcodes/view_op_nonexistent_addr.tz
 Well typed
 Gas remaining: 1039989.259 units remaining
 { parameter (pair nat address) ;
@@ -50643,6 +50997,7 @@ Gas remaining: 1039989.259 units remaining
          /* [ list operation : bool ] */ ;
          PAIR
          /* [ pair (list operation) bool ] */ } }
+michelson_test_scripts/opcodes/view_op_nonexistent_func.tz
 Well typed
 Gas remaining: 1039993.859 units remaining
 { parameter (pair nat address) ;
@@ -50660,6 +51015,7 @@ Gas remaining: 1039993.859 units remaining
          /* [ list operation : bool ] */ ;
          PAIR
          /* [ pair (list operation) bool ] */ } }
+michelson_test_scripts/opcodes/view_op_test_step_contants.tz
 Well typed
 Gas remaining: 1039994.470 units remaining
 { parameter address ;
@@ -50676,6 +51032,7 @@ Gas remaining: 1039994.470 units remaining
             : option (pair (pair mutez mutez) (pair address address) address) ] */ ;
          PAIR
          /* [ pair (list operation) (option (pair (pair mutez mutez) (pair address address) address)) ] */ } }
+michelson_test_scripts/opcodes/view_op_toplevel_inconsistent_input_type.tz
 Well typed
 Gas remaining: 1039993.919 units remaining
 { parameter (pair int address) ;
@@ -50691,6 +51048,7 @@ Gas remaining: 1039993.919 units remaining
          /* [ list operation : nat ] */ ;
          PAIR
          /* [ pair (list operation) nat ] */ } }
+michelson_test_scripts/opcodes/view_op_toplevel_inconsistent_output_type.tz
 Well typed
 Gas remaining: 1039993.919 units remaining
 { parameter (pair nat address) ;
@@ -50708,6 +51066,7 @@ Gas remaining: 1039993.919 units remaining
          /* [ list operation : bool ] */ ;
          PAIR
          /* [ pair (list operation) bool ] */ } }
+michelson_test_scripts/opcodes/view_rec.tz
 Well typed
 Gas remaining: 1039988.440 units remaining
 { parameter unit ;
@@ -50739,6 +51098,7 @@ Gas remaining: 1039988.440 units remaining
          /* [ list operation : unit ] */ ;
          PAIR
          /* [ pair (list operation) unit ] */ } }
+michelson_test_scripts/opcodes/view_toplevel_lib.tz
 Well typed
 Gas remaining: 1039947.179 units remaining
 { parameter nat ;
@@ -50880,6 +51240,7 @@ Gas remaining: 1039947.179 units remaining
                        /* [ option nat : nat ] */ ;
                        IF_SOME { ADD /* [ nat ] */ } { FAIL } }
                      { FAIL } } } } }
+michelson_test_scripts/opcodes/voting_power.tz
 Well typed
 Gas remaining: 1039995.193 units remaining
 { parameter key ;
@@ -50898,6 +51259,7 @@ Gas remaining: 1039995.193 units remaining
          /* [ list operation : pair nat nat ] */ ;
          PAIR
          /* [ pair (list operation) nat nat ] */ } }
+michelson_test_scripts/opcodes/xor.tz
 Well typed
 Gas remaining: 1039992.584 units remaining
 { parameter (or (pair bool bool) (pair nat nat)) ;
@@ -50913,6 +51275,7 @@ Gas remaining: 1039992.584 units remaining
          /* [ list operation : option (or bool nat) ] */ ;
          PAIR
          /* [ pair (list operation) (option (or bool nat)) ] */ } }
+michelson_test_scripts/opcodes/xor_bytes_016.tz
 Well typed
 Gas remaining: 1039978.916 units remaining
 { parameter unit ;
