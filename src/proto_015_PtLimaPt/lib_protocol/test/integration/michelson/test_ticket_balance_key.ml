@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component: Protocol (Ticket_balance_key)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^ticket balance key"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/main.exe
     Subject: Ticket balance key hashing
 *)
 

@@ -30,8 +30,7 @@ open Lwt_result_syntax
 (** Testing
     -------
     Component:  Protocol (event logging)
-    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson && \
-                dune exec ./main.exe -- test '^event logging$'
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:  This module tests that the event logs can be written to the receipt
               in correct order and expected format.
 *)
