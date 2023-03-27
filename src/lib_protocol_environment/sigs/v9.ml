@@ -6504,6 +6504,11 @@ end
 
     {3 Special considerations}
 
+    Because they traverse the list from right-to-left, the {!fold_right2}
+    function and all its variants fail with [when_different_lengths] before any
+    of the processing starts. Whilst this is still within the fail-early
+    behaviour, it may be surprising enough that it requires mentioning here.
+
     Because they may return early, {!for_all2} and {!exists2} and all their
     variants may return [Ok _] even though the arguments have different lengths.
 *)
@@ -7395,6 +7400,13 @@ val fold_left_i_es :
   'a ->
   'b list ->
   ('a, 'trace) result Lwt.t
+
+(** This function is not tail-recursive *)
+val fold_right_es :
+  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  'b ->
+  ('b, 'trace) result Lwt.t
 
 (** {3 Double-traversal variants}
 
