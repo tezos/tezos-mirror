@@ -360,27 +360,47 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck one or several scripts."
-      (args5
+      (args6
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
          run_gas_limit_arg
-         legacy_switch)
-      (prefixes ["typecheck"; "script"] @@ seq_of_param Program.source_param)
-      (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
-           scripts
+         legacy_switch
+         display_names_flag)
+      (prefixes ["typecheck"; "script"]
+      @@ seq_of_param
+      @@ file_or_literal_with_origin_param ())
+      (fun ( show_types,
+             emacs_mode,
+             no_print_source,
+             original_gas,
+             legacy,
+             display_names )
+           expr_strings
            cctxt ->
         let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
-        match scripts with
+        match expr_strings with
         | [] ->
             let*! () =
               cctxt#warning "No scripts were specified on the command line"
             in
             return_unit
         | _ :: _ ->
-            List.iter_es
-              (fun program ->
+            List.iteri_es
+              (fun i content_with_origin ->
+                let expr_string =
+                  Client_proto_args.content_of_file_or_text content_with_origin
+                in
+                let program = Michelson_v1_parser.parse_toplevel expr_string in
+                let name =
+                  if display_names then
+                    Some
+                      (match content_with_origin with
+                      | Client_proto_args.File {path; _} -> path
+                      | Text _ -> "Literal script " ^ string_of_int (i + 1))
+                  else None
+                in
                 handle_parsing_error "types" cctxt setup program
                 @@ fun program ->
                 let* original_gas =
@@ -400,10 +420,11 @@ let commands () =
                   ~emacs:emacs_mode
                   ~show_types
                   ~print_source_on_error:(not no_print_source)
+                  ~name
                   program
                   res
                   cctxt)
-              scripts);
+              expr_strings);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
@@ -939,6 +960,7 @@ let commands () =
                       ~emacs:false
                       ~show_types:true
                       ~print_source_on_error:true
+                      ~name:None
                       program
                       res
                       cctxt
