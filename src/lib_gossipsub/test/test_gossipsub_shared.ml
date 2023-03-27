@@ -44,7 +44,7 @@ module Automaton_config :
      and type Peer.t = int
      and type Topic.t = string
      and type Message_id.t = int
-     and type Message.t = int = struct
+     and type Message.t = string = struct
   module Span = struct
     type t = int
 
@@ -88,7 +88,7 @@ module Automaton_config :
   module Peer = Int_iterable
   module Topic = String_iterable
   module Message_id = Int_iterable
-  module Message = Int_iterable
+  module Message = String_iterable
 end
 
 module C = Automaton_config

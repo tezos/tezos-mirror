@@ -294,7 +294,7 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
      We did not join the topic so the peers should be added to the fanout map.*)
   let state, _ =
     GS.publish
-      {sender = None; topic = "topic0"; message_id = 0; message = 0}
+      {sender = None; topic = "topic0"; message_id = 0; message = "message"}
       state
   in
   (* Check that all [init_peers] have been added to the fanout.  *)
