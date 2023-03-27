@@ -120,12 +120,12 @@ let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
-let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
+let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999))
     ?(src = Constant.bootstrap1.alias) ~kind ?(parameters_ty = "string")
     ?(boot_sector = default_boot_sector_of ~kind) client =
   let* sc_rollup =
     Client.Sc_rollup.(
-      originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
+      originate ?hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
   in
   let* () = Client.bake_for_and_wait client in
   return sc_rollup

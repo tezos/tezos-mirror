@@ -212,16 +212,24 @@ let wait_for_timeout_detected sc_node =
   let other = JSON.(json |-> "other" |> as_string) in
   Some other
 
+(** Wait for the rollup node to compute a dissection *)
+let wait_for_computed_dissection sc_node =
+  Sc_rollup_node.wait_for sc_node "sc_rollup_node_computed_dissection.v0"
+  @@ fun json ->
+  let opponent = JSON.(json |-> "opponent" |> as_string) in
+  Some (opponent, json)
+
 (* Configuration of a rollup node
    ------------------------------
 
    A rollup node has a configuration file that must be initialized.
 *)
-let setup_rollup ~protocol ~kind ?(mode = Sc_rollup_node.Operator) ?boot_sector
-    ?(parameters_ty = "string") ?(operator = Constant.bootstrap1.alias)
-    tezos_node tezos_client =
+let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
+    ?boot_sector ?(parameters_ty = "string")
+    ?(operator = Constant.bootstrap1.alias) tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup
+      ?hooks
       ~kind
       ?boot_sector
       ~parameters_ty
@@ -247,7 +255,7 @@ let format_title_scenario kind {variant; tags = _; description} =
     description
     (match variant with Some variant -> " (" ^ variant ^ ")" | None -> "")
 
-let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
+let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
     ?challenge_window ?timeout ?(src = Constant.bootstrap1.alias)
     {variant; tags; description} scenario =
   let tags = kind :: tags in
@@ -260,10 +268,12 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
   let* tezos_node, tezos_client =
     setup_l1 ?commitment_period ?challenge_window ?timeout protocol
   in
-  let* sc_rollup = originate_sc_rollup ~kind ?boot_sector ~src tezos_client in
+  let* sc_rollup =
+    originate_sc_rollup ?hooks ~kind ?boot_sector ~src tezos_client
+  in
   scenario sc_rollup tezos_node tezos_client
 
-let test_full_scenario ?supports ?regression ~kind ?mode ?boot_sector
+let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
@@ -282,6 +292,7 @@ let test_full_scenario ?supports ?regression ~kind ?mode ?boot_sector
       ~protocol
       ~parameters_ty
       ~kind
+      ?hooks
       ?mode
       ?boot_sector
       tezos_node
@@ -374,6 +385,7 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
 let test_origination ~kind =
   test_l1_scenario
     ~regression:true
+    ~hooks
     {
       variant = None;
       tags = ["origination"];
@@ -531,11 +543,11 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
    the Tezos node. Then we can observe that the messages are included in the
    inbox.
 *)
-let send_message_client ?(src = Constant.bootstrap2.alias) client msg =
-  let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
+let send_message_client ?hooks ?(src = Constant.bootstrap2.alias) client msg =
+  let* () = Client.Sc_rollup.send_message ?hooks ~src ~msg client in
   Client.bake_for_and_wait client
 
-let send_messages_client ?src ?batch_size n client =
+let send_messages_client ?hooks ?src ?batch_size n client =
   let messages =
     List.map
       (fun i ->
@@ -546,7 +558,9 @@ let send_messages_client ?src ?batch_size n client =
         "text:" ^ Ezjsonm.to_string json)
       (range 1 n)
   in
-  Lwt_list.iter_s (fun msg -> send_message_client ?src client msg) messages
+  Lwt_list.iter_s
+    (fun msg -> send_message_client ?hooks ?src client msg)
+    messages
 
 let send_message_batcher_aux ?hooks client sc_node sc_client msgs =
   let batched =
@@ -606,10 +620,10 @@ let to_hex_messages_arg msgs =
   let json = Ezjsonm.list Ezjsonm.string msgs in
   "hex:" ^ Ezjsonm.to_string ~minify:true json
 
-let send_text_messages ?(format = `Raw) ?src client msgs =
+let send_text_messages ?(format = `Raw) ?hooks ?src client msgs =
   match format with
-  | `Raw -> send_message ?src client (to_text_messages_arg msgs)
-  | `Hex -> send_message ?src client (to_hex_messages_arg msgs)
+  | `Raw -> send_message ?hooks ?src client (to_text_messages_arg msgs)
+  | `Hex -> send_message ?hooks ?src client (to_hex_messages_arg msgs)
 
 let parse_inbox json =
   let go () =
@@ -997,6 +1011,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     ~internal ~kind =
   test_full_scenario
     ?regression
+    ~hooks
     {
       variant = Some (if internal then "internal" else "external");
       tags = ["pvm"];
@@ -1051,7 +1066,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       match forwarder with
       | None ->
           (* External message *)
-          send_message client (sf "[%S]" message)
+          send_message ~hooks client (sf "[%S]" message)
       | Some forwarder ->
           (* Internal message through forwarder *)
           let message = hex_encode message in
@@ -2278,6 +2293,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   *)
   test_l1_scenario
     ~regression:true
+    ~hooks
     ~boot_sector:boot_sector1
     ~kind
     {
@@ -2288,6 +2304,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   @@ fun sc_rollup1 _tezos_node tezos_client ->
   let* sc_rollup2 =
     originate_sc_rollup
+      ~hooks
       ~kind
       ~boot_sector:boot_sector2
       ~src:Constant.bootstrap2.alias
@@ -2578,6 +2595,19 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
    -------------------------
 *)
 
+let remove_state_from_dissection dissection =
+  JSON.update
+    "dissection"
+    (fun d ->
+      let d =
+        JSON.as_list d
+        |> List.map (fun s ->
+               JSON.filter_object s (fun key _ -> not (key = "state"))
+               |> JSON.unannotate)
+      in
+      JSON.annotate ~origin:"trimmed_dissection" (`A d))
+    dissection
+
 (*
 
    To check the refutation game logic, we evaluate a scenario with one
@@ -2599,6 +2629,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       stop_loser_at,
       reset_honest_on ) =
   test_full_scenario
+    ~regression:true
+    ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
     ~mode
@@ -2611,16 +2643,21 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     }
   @@ fun protocol sc_rollup_node sc_client1 sc_rollup_address node client ->
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  let bootstrap2_key = Constant.bootstrap2.public_key_hash in
+  let loser_keys =
+    List.mapi
+      (fun i _ -> Account.Bootstrap.keys.(i + 1).public_key_hash)
+      loser_modes
+  in
 
   let game_started = ref false in
   let conflict_detected = ref false in
   let detected_conflicts = ref [] in
   let published_commitments = ref [] in
   let detected_timeouts = Hashtbl.create 5 in
+  let dissections = Hashtbl.create 17 in
 
-  let rec run_honest_node sc_rollup_node =
-    let _ =
+  let run_honest_node sc_rollup_node =
+    let gather_conflicts_promise =
       let rec gather_conflicts () =
         let* conflict = wait_for_conflict_detected sc_rollup_node in
         conflict_detected := true ;
@@ -2629,7 +2666,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_conflicts ()
     in
-    let _ =
+    let gather_commitments_promise =
       let rec gather_commitments () =
         let* c = wait_for_publish_commitment sc_rollup_node in
         published_commitments := c :: !published_commitments ;
@@ -2637,7 +2674,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_commitments ()
     in
-    let _ =
+    let gather_timeouts_promise =
       let rec gather_timeouts () =
         let* other = wait_for_timeout_detected sc_rollup_node in
         Hashtbl.replace
@@ -2649,36 +2686,51 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_timeouts ()
     in
-    let _ =
-      (* Reset node when detecting certain events *)
-      Lwt_list.iter_p
-        (fun (event, delay) ->
-          let* () =
-            Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
-          in
-          let current_level = Node.get_level node in
-          let* _ =
-            Sc_rollup_node.wait_for_level
-              ~timeout:3.0
-              sc_rollup_node
-              (current_level + delay)
-          in
-          let* () = Sc_rollup_node.terminate sc_rollup_node in
-          run_honest_node sc_rollup_node)
-        reset_honest_on
+    let gather_dissections_promise =
+      let rec gather_dissections () =
+        let* opponent, dissection =
+          wait_for_computed_dissection sc_rollup_node
+        in
+        let dissection =
+          match kind with
+          | "arith" -> dissection
+          | _ (* wasm *) ->
+              (* Remove state hashes from WASM dissections as they depend on
+                 timestamps *)
+              remove_state_from_dissection dissection
+        in
+        (* Use buckets of table to store multiple dissections for same
+           opponent. *)
+        Hashtbl.add dissections opponent dissection ;
+        gather_dissections ()
+      in
+      gather_dissections ()
     in
-    Sc_rollup_node.run sc_rollup_node []
+    let* () =
+      Sc_rollup_node.run
+        ~event_sections_levels:[("sc_rollup_node.refutation_game", `Debug)]
+        sc_rollup_node
+        []
+    in
+    return
+      [
+        gather_conflicts_promise;
+        gather_commitments_promise;
+        gather_timeouts_promise;
+        gather_dissections_promise;
+      ]
   in
 
   let loser_sc_rollup_nodes =
-    List.map
-      (fun _ ->
+    List.map2
+      (fun default_operator _ ->
         Sc_rollup_node.create
           ~protocol
           Operator
           node
           ~base_dir:(Client.base_dir client)
-          ~default_operator:bootstrap2_key)
+          ~default_operator)
+      loser_keys
       loser_modes
   in
   let* _configuration_filenames =
@@ -2689,11 +2741,31 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
           sc_rollup_address)
     @@ List.combine loser_modes loser_sc_rollup_nodes
   in
-  let* () = run_honest_node sc_rollup_node
+  let* gather_promises = run_honest_node sc_rollup_node
   and* () =
     Lwt_list.iter_p
       (fun loser_sc_rollup_node -> Sc_rollup_node.run loser_sc_rollup_node [])
       loser_sc_rollup_nodes
+  in
+
+  let restart_promise =
+    (* Reset node when detecting certain events *)
+    Lwt_list.iter_p
+      (fun (event, delay) ->
+        let* () =
+          Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
+        in
+        let current_level = Node.get_level node in
+        let* _ =
+          Sc_rollup_node.wait_for_level
+            ~timeout:3.0
+            sc_rollup_node
+            (current_level + delay)
+        in
+        let* () = Sc_rollup_node.terminate sc_rollup_node in
+        let* _ = run_honest_node sc_rollup_node in
+        unit)
+      reset_honest_on
   in
 
   let stop_losers level =
@@ -2768,27 +2840,40 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
             level)
       !published_commitments) ;
 
+  let* {stake_amount; _} = get_sc_rollup_constants client in
   let* honest_deposit_json =
     RPC.Client.call client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap1_key ()
   in
-  let* loser_deposit_json =
-    RPC.Client.call client
-    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap2_key ()
+  let* loser_deposits_json =
+    Lwt_list.map_p
+      (fun id ->
+        RPC.Client.call client
+        @@ RPC.get_chain_block_context_contract_frozen_bonds ~id ())
+      loser_keys
   in
-  let* {stake_amount; _} = get_sc_rollup_constants client in
 
   Check.(
     (honest_deposit_json = stake_amount)
       Tez.typ
       ~error_msg:"expecting deposit for honest participant = %R, got %L") ;
-  Check.(
-    (loser_deposit_json = Tez.zero)
-      Tez.typ
-      ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
+  List.iter
+    (fun loser_deposit_json ->
+      Check.(
+        (loser_deposit_json = Tez.zero)
+          Tez.typ
+          ~error_msg:"expecting loss for dishonest participant = %R, got %L"))
+    loser_deposits_json ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
-  let*! _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
+  let*! _value = Sc_rollup_client.state_hash sc_client1 in
+  List.iter Lwt.cancel (restart_promise :: gather_promises) ;
+  (* Capture dissections *)
+  Hashtbl.to_seq_values dissections
+  |> List.of_seq |> List.rev
+  |> List.iter (fun dissection ->
+         Regression.capture "\n" ;
+         Regression.capture @@ JSON.encode dissection) ;
   unit
 
 let rec swap i l =
@@ -3377,6 +3462,7 @@ let test_refutation_reward_and_punishment ~kind =
     ~timeout:timeout_period
     ~commitment_period
     ~regression:true
+    ~hooks
     {
       tags = ["refutation"; "reward"; "punishment"];
       variant = None;
@@ -3542,6 +3628,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
   test_full_scenario
     ?supports
     ?regression
+    ~hooks
     ?boot_sector
     ~parameters_ty:"bytes"
     ~kind
@@ -3667,7 +3754,8 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     let* payload = input_message sc_client target_address in
     let* () =
       match payload with
-      | `External payload -> send_text_messages ~format:`Hex client [payload]
+      | `External payload ->
+          send_text_messages ~hooks ~format:`Hex client [payload]
       | `Internal payload ->
           let payload = "0x" ^ payload in
           Client.transfer
@@ -3925,6 +4013,7 @@ let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind) =
   test_full_scenario
     ~regression:true
+    ~hooks
     ~kind
     ~boot_sector
     {
@@ -4187,6 +4276,7 @@ let test_messages_processed_by_commitment ~kind =
 let test_recover_bond_of_stakers =
   test_l1_scenario
     ~regression:true
+    ~hooks
     ~boot_sector:""
     ~kind:"arith"
     ~challenge_window:10

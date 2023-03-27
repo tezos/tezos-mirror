@@ -105,9 +105,16 @@ val base_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run node arguments ] launches the given smart contract rollup node
-    with the given arguments . *)
-val run : t -> string list -> unit Lwt.t
+(** [run ?event_level ?event_sections_levels node arguments ] launches the given
+    smart contract rollup node with the given arguments. [event_level] and
+    [event_sections_levels] allow to select which events we want the node to
+    emit (see {!Daemon}). *)
+val run :
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  t ->
+  string list ->
+  unit Lwt.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)

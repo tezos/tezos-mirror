@@ -57,6 +57,7 @@ module Simple = struct
 
   let conflict_detected =
     declare_5
+      ~section
       ~name:"sc_rollup_node_conflict_detected"
       ~msg:
         "A conflict has been found with our commitment {our_commitment_hash} \
@@ -71,6 +72,7 @@ module Simple = struct
 
   let potential_conflict_detected =
     declare_4
+      ~section
       ~name:"sc_rollup_node_potential_conflict_detected"
       ~msg:
         "A potential conflict has been found with our commitment \
@@ -89,6 +91,29 @@ module Simple = struct
         "The rollup node has detected that opponent {other} can be timed out."
       ~level:Notice
       ("other", Sc_rollup.Staker.encoding)
+
+  let dissection_chunk_encoding =
+    let open Data_encoding in
+    let open Sc_rollup.Dissection_chunk in
+    conv
+      (fun {state_hash; tick} -> (state_hash, tick))
+      (fun (state_hash, tick) -> {state_hash; tick})
+      (obj2
+         (opt "state" Sc_rollup.State_hash.encoding)
+         (req "tick" Sc_rollup.Tick.encoding))
+
+  let computed_dissection =
+    declare_4
+      ~section
+      ~name:"sc_rollup_node_computed_dissection"
+      ~msg:
+        "Computed dissection against {opponent} between ticks {start_tick} and \
+         {end_tick}: {dissection}."
+      ~level:Debug
+      ("opponent", Signature.Public_key_hash.encoding)
+      ("start_tick", Sc_rollup.Tick.encoding)
+      ("end_tick", Sc_rollup.Tick.encoding)
+      ("dissection", Data_encoding.list dissection_chunk_encoding)
 end
 
 let timeout address = Simple.(emit timeout address)
@@ -122,3 +147,6 @@ let potential_conflict_detected ~our_commitment_hash ~their_commitment_hash
       (our_commitment_hash, level, other, their_commitment_hash))
 
 let timeout_detected other = Simple.(emit timeout_detected other)
+
+let computed_dissection ~opponent ~start_tick ~end_tick dissection =
+  Simple.(emit computed_dissection (opponent, start_tick, end_tick, dissection))
