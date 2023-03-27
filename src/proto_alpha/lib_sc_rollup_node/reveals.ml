@@ -87,17 +87,25 @@ let file_contents filename =
   Lwt.catch
     (fun () ->
       let*! contents = Lwt_utils_unix.read_file filename in
-      return contents)
-    (fun _ -> tzfail @@ Could_not_open_preimage_file filename)
+      return_some contents)
+    (fun _ -> return_none)
 
 let path data_dir pvm_name hash =
   let hash = Protocol.Sc_rollup_reveal_hash.to_hex hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
-let get ~data_dir ~pvm_kind ~hash =
+let get ?dac_client ~data_dir ~pvm_kind hash =
   let open Lwt_result_syntax in
-  let filename = path data_dir (Sc_rollup.Kind.to_string pvm_kind) hash in
-  let* contents = file_contents filename in
+  let* contents =
+    let filename = path data_dir (Sc_rollup.Kind.to_string pvm_kind) hash in
+    let* file_contents = file_contents filename in
+    match file_contents with
+    | Some contents -> return contents
+    | None -> (
+        match dac_client with
+        | None -> tzfail (Could_not_open_preimage_file filename)
+        | Some dac_client -> Dac_observer_client.fetch_preimage dac_client hash)
+  in
   let*? () =
     let contents_hash =
       Reveal_hash.hash_string ~scheme:Reveal_hash.Blake2B [contents]

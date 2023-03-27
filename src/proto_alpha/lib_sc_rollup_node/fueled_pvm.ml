@@ -100,7 +100,7 @@ module Make (PVM : Pvm.S) = struct
 
     type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
 
-    let get_reveal ~data_dir reveal_map hash =
+    let get_reveal ?dac_client ~data_dir reveal_map hash =
       let found_in_map =
         match reveal_map with
         | None -> None
@@ -108,7 +108,7 @@ module Make (PVM : Pvm.S) = struct
       in
       match found_in_map with
       | Some data -> return data
-      | None -> Reveals.get ~data_dir ~pvm_kind:PVM.kind ~hash
+      | None -> Reveals.get ?dac_client ~data_dir ~pvm_kind:PVM.kind hash
 
     type eval_completion =
       | Aborted of {state : PVM.state; fuel : fuel; current_tick : int64}
@@ -149,7 +149,11 @@ module Make (PVM : Pvm.S) = struct
                     hash
                 in
                 let*! data =
-                  get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
+                  get_reveal
+                    ?dac_client:node_ctxt.dac_client
+                    ~data_dir:node_ctxt.data_dir
+                    reveal_map
+                    hash
                 in
                 match data with
                 | Error error ->

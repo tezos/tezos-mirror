@@ -22,6 +22,7 @@
   tezos-workers
   tezos-dal-node-services
   tezos_dal_node_lib
+  tezos-dac-alpha
   tezos-shell-services
   tezos-smart-rollup-alpha
   tezos-smart-rollup-layer2-alpha
@@ -55,6 +56,7 @@
   -open Tezos_protocol_alpha_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
+  -open Tezos_dac_alpha
   -open Tezos_shell_services
   -open Tezos_smart_rollup_alpha
   -open Tezos_smart_rollup_layer2_alpha

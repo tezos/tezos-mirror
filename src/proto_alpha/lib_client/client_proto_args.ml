@@ -142,6 +142,10 @@ let int_parameter =
   Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
       try return (int_of_string p) with _ -> cctxt#error "Cannot read int")
 
+let z_parameter =
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
+      try return (Z.of_string p) with _ -> cctxt#error "Cannot read integer")
+
 let uri_parameter = Tezos_clic.parameter (fun _ x -> return (Uri.of_string x))
 
 let bytes_of_prefixed_string (cctxt : #Client_context.full) s =

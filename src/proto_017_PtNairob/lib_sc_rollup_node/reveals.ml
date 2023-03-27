@@ -97,6 +97,8 @@ let path data_dir pvm_name hash =
 let get ~data_dir ~pvm_kind ~hash =
   let open Lwt_result_syntax in
   let filename = path data_dir (Sc_rollup.Kind.to_string pvm_kind) hash in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5296
+     Use DAC observer client when [filename] doesn't exist. *)
   let* contents = file_contents filename in
   let*? () =
     let contents_hash =

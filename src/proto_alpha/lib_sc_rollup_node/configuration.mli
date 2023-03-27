@@ -81,6 +81,8 @@ type t = {
     Dal nodes for different slot indexes.
   *)
   dal_node_endpoint : Uri.t option;
+  dac_observer_endpoint : Uri.t option;
+  dac_timeout : Z.t option;
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;

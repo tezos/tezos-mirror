@@ -5900,6 +5900,99 @@ module Protocol = Protocol
         ~inline_tests:ppx_expect
         ~linkall:true
     in
+    let dal =
+      only_if (active && N.(number >= 016)) @@ fun () ->
+      public_lib
+        (sf "tezos-dal-%s" name_dash)
+        ~path:(path // "lib_dal")
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library for the Data availability \
+           Layer"
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_protocol_compiler_registerer |> open_;
+            octez_stdlib_unix |> open_;
+            octez_dal_node_lib |> open_;
+            client |> if_some |> open_;
+            plugin |> if_some |> open_;
+            embedded |> open_;
+            layer2_utils |> if_some |> open_;
+            main |> open_;
+          ]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
+    let _dal_tests =
+      only_if (active && N.(number >= 016)) @@ fun () ->
+      tezt
+        ["test_dal_slot_frame_encoding"; "test_helpers"]
+        ~path:(path // "lib_dal/test")
+        ~opam:(sf "tezos-dal-%s" name_dash)
+        ~with_macos_security_framework:true
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            dal |> if_some |> open_;
+            main |> open_;
+            octez_base_test_helpers |> open_;
+            test_helpers |> if_some |> open_;
+            alcotezt;
+          ]
+    in
+    let dac =
+      (* [~link_all:true] is necessary to ensure that the dac plugin
+         registration happens when running the dal node. Removing this
+         option would cause DAL related tezts to fail because the DAC
+         plugin cannot be resolved. *)
+      only_if (active && N.(number >= 017)) @@ fun () ->
+      public_lib
+        (sf "tezos-dac-%s" name_dash)
+        ~path:(path // "lib_dac_plugin")
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library for the Data availability \
+           Committee"
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_protocol_compiler_registerer |> open_;
+            octez_stdlib_unix |> open_;
+            octez_dac_lib |> open_;
+            octez_dac_client_lib |> open_;
+            client |> if_some |> open_;
+            embedded |> open_;
+            main |> open_;
+          ]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
+    let _dac_tests =
+      only_if (active && N.(number >= 017)) @@ fun () ->
+      tezt
+        [
+          "test_dac_pages_encoding";
+          "test_dac_plugin_registration";
+          "test_helpers";
+        ]
+        ~path:(path // "lib_dac_plugin/test")
+        ~with_macos_security_framework:true
+        ~opam:(sf "tezos-dac-%s" name_dash)
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            dac |> if_some |> open_;
+            main |> open_;
+            octez_base_test_helpers |> open_;
+            test_helpers |> if_some |> open_;
+            octez_dac_lib |> open_;
+            octez_dac_node_lib |> open_;
+            alcotezt;
+          ]
+    in
     let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
       public_lib
@@ -5941,6 +6034,10 @@ module Protocol = Protocol
             octez_workers |> open_;
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
+            dac |> if_some
+            |> if_ N.(number >= 018)
+            (* [dac] is needed for the DAC observer client which is not available in Nairobi and earlier. *)
+            |> open_;
             octez_shell_services |> open_;
             octez_sc_rollup |> if_some |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
@@ -6142,99 +6239,6 @@ module Protocol = Protocol
             octez_client_base |> open_;
             octez_client_base_unix |> open_;
             tx_rollup |> if_some |> open_;
-          ]
-    in
-    let dal =
-      only_if (active && N.(number >= 016)) @@ fun () ->
-      public_lib
-        (sf "tezos-dal-%s" name_dash)
-        ~path:(path // "lib_dal")
-        ~synopsis:
-          "Tezos/Protocol: protocol specific library for the Data availability \
-           Layer"
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_protocol_compiler_registerer |> open_;
-            octez_stdlib_unix |> open_;
-            octez_dal_node_lib |> open_;
-            client |> if_some |> open_;
-            plugin |> if_some |> open_;
-            embedded |> open_;
-            layer2_utils |> if_some |> open_;
-            main |> open_;
-          ]
-        ~inline_tests:ppx_expect
-        ~linkall:true
-    in
-    let _dal_tests =
-      only_if (active && N.(number >= 016)) @@ fun () ->
-      tezt
-        ["test_dal_slot_frame_encoding"; "test_helpers"]
-        ~path:(path // "lib_dal/test")
-        ~opam:(sf "tezos-dal-%s" name_dash)
-        ~with_macos_security_framework:true
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            dal |> if_some |> open_;
-            main |> open_;
-            octez_base_test_helpers |> open_;
-            test_helpers |> if_some |> open_;
-            alcotezt;
-          ]
-    in
-    let dac =
-      (* [~link_all:true] is necessary to ensure that the dac plugin
-         registration happens when running the dal node. Removing this
-         option would cause DAL related tezts to fail because the DAC
-         plugin cannot be resolved. *)
-      only_if (active && N.(number >= 017)) @@ fun () ->
-      public_lib
-        (sf "tezos-dac-%s" name_dash)
-        ~path:(path // "lib_dac_plugin")
-        ~synopsis:
-          "Tezos/Protocol: protocol specific library for the Data availability \
-           Committee"
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_protocol_compiler_registerer |> open_;
-            octez_stdlib_unix |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_client_lib |> open_;
-            client |> if_some |> open_;
-            embedded |> open_;
-            main |> open_;
-          ]
-        ~inline_tests:ppx_expect
-        ~linkall:true
-    in
-    let _dac_tests =
-      only_if (active && N.(number >= 017)) @@ fun () ->
-      tezt
-        [
-          "test_dac_pages_encoding";
-          "test_dac_plugin_registration";
-          "test_helpers";
-        ]
-        ~path:(path // "lib_dac_plugin/test")
-        ~with_macos_security_framework:true
-        ~opam:(sf "tezos-dac-%s" name_dash)
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            dac |> if_some |> open_;
-            main |> open_;
-            octez_base_test_helpers |> open_;
-            test_helpers |> if_some |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_node_lib |> open_;
-            alcotezt;
           ]
     in
     let benchmark_type_inference =
