@@ -31,6 +31,8 @@ Node
 Client
 ------
 
+- The ``typecheck script`` command can now be used to typecheck several scripts.
+
 Baker
 -----
 

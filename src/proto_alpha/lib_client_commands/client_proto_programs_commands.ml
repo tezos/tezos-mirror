@@ -359,38 +359,51 @@ let commands () =
         return_unit);
     command
       ~group
-      ~desc:"Ask the node to typecheck a script."
+      ~desc:"Ask the node to typecheck one or several scripts."
       (args5
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
          run_gas_limit_arg
          legacy_switch)
-      (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
+      (prefixes ["typecheck"; "script"] @@ seq_of_param Program.source_param)
       (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
-           program
+           scripts
            cctxt ->
         let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
-        handle_parsing_error "types" cctxt setup program @@ fun program ->
-        let* original_gas = resolve_max_gas cctxt cctxt#block original_gas in
-        let*! res =
-          typecheck_program
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~gas:original_gas
-            ~legacy
-            ~show_types
-            program
-        in
-        print_typecheck_result
-          ~emacs:emacs_mode
-          ~show_types
-          ~print_source_on_error:(not no_print_source)
-          program
-          res
-          cctxt);
+        match scripts with
+        | [] ->
+            let*! () =
+              cctxt#warning "No scripts were specified on the command line"
+            in
+            return_unit
+        | _ :: _ ->
+            List.iter_es
+              (fun program ->
+                handle_parsing_error "types" cctxt setup program
+                @@ fun program ->
+                let* original_gas =
+                  resolve_max_gas cctxt cctxt#block original_gas
+                in
+                let*! res =
+                  typecheck_program
+                    cctxt
+                    ~chain:cctxt#chain
+                    ~block:cctxt#block
+                    ~gas:original_gas
+                    ~legacy
+                    ~show_types
+                    program
+                in
+                print_typecheck_result
+                  ~emacs:emacs_mode
+                  ~show_types
+                  ~print_source_on_error:(not no_print_source)
+                  program
+                  res
+                  cctxt)
+              scripts);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
