@@ -3535,7 +3535,7 @@ let tests =
       test_offline_staker_does_not_prevent_cementation;
     Tztest.tztest "win refutation game by forfeit" `Quick test_winner_by_forfeit;
     Tztest.tztest
-      "win refutation game by forfeit"
+      "win refutation game by forfeit with draw"
       `Quick
       test_winner_by_forfeit_with_draw;
     Tztest.tztest

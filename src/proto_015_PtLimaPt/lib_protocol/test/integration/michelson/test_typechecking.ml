@@ -978,7 +978,7 @@ let tests =
       `Quick
       test_parse_contract_data_for_rollup_with_entrypoints;
     Tztest.tztest
-      "test parse contract data for rollup with entrypoint"
+      "test parse contract data for rollup with invalid type"
       `Quick
       test_parse_contract_data_for_rollup_with_invalid_type;
     Tztest.tztest

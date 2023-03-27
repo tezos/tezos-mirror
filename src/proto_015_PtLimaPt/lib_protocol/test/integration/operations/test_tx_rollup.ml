@@ -5641,8 +5641,7 @@ module Withdraw = struct
         `Quick
         test_multiple_withdrawals_multiple_batches;
       Tztest.tztest
-        "Test multiple withdrawals from the same batch and from different \
-         batches"
+        "Test deposit, followed by withdrawal, followed by deposit"
         `Quick
         test_forge_deposit_withdraw_deposit;
     ]

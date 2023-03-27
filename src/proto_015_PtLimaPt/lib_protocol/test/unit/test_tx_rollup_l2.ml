@@ -289,10 +289,11 @@ module Test_index (Index : S) = struct
   let tests =
     wrap_tztest_tests
       [
-        ("test set and get", test_set_and_get);
-        ("test associate fresh index", test_associate_fresh_index);
-        ("test associate same value twice", test_associate_value_twice);
-        ("test the limit of indexes", test_reach_too_many_l2);
+        (Index.name ^ ", test set and get", test_set_and_get);
+        (Index.name ^ ", test associate fresh index", test_associate_fresh_index);
+        ( Index.name ^ ", test associate same value twice",
+          test_associate_value_twice );
+        (Index.name ^ ", test the limit of indexes", test_reach_too_many_l2);
       ]
 end
 

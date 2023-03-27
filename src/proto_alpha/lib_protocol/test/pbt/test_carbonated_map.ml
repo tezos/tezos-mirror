@@ -162,7 +162,7 @@ let test_update_replace =
 (** Test merging when ignoring new overlapping keys. *)
 let test_merge_overlaps_left =
   let open Result_syntax in
-  unit_test "Merge overlap keep existing" @@ fun () ->
+  unit_test "Merge overlaps left" @@ fun () ->
   let ctxt = unsafe_new_context () in
   let* map, ctxt =
     CM.of_list

@@ -208,16 +208,16 @@ let tests =
     tztest "Binary Destination_repr to Contract_repr (null address)" `Quick
     @@ test_encode_destination_decode_contract null_address;
     tztest
-      "Binary Contract_repr to Destination_repr (liquidity baking dex)"
+      "Binary Destination_repr to Contract_repr (liquidity baking dex)"
       `Quick
     @@ test_encode_destination_decode_contract liquidity_baking_dex;
     tztest
-      "Json encoding compatibility Contract_repr to Destination_repr with \
+      "Json encoding compatibility Contract_repr to Destination_repr with  \
        dummy contracts"
       `Quick
     @@ test_encoding_json_compat;
     tztest
-      "Binary encoding compatibility Contract_repr to Destination_repr with \
+      "Binary encoding compatibility Contract_repr to Destination_repr with  \
        dummy contracts"
       `Quick
     @@ test_encoding_json_compat;

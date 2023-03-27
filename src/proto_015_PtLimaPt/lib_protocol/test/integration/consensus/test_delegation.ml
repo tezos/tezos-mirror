@@ -354,12 +354,12 @@ let tests_bootstrap_contracts =
       `Quick
       (bootstrap_delegate_cannot_be_removed ~fee:max_tez);
     Tztest.tztest
-      "contracts not registered as delegate can remove their delegation (small \
+      "contracts not registered as delegate can change their delegation (small \
        fee)"
       `Quick
       (delegate_can_be_changed_from_unregistered_contract ~fee:Tez.one_mutez);
     Tztest.tztest
-      "contracts not registered as delegate can remove their delegation (max \
+      "contracts not registered as delegate can change their delegation (max \
        fee)"
       `Quick
       (delegate_can_be_changed_from_unregistered_contract ~fee:max_tez);

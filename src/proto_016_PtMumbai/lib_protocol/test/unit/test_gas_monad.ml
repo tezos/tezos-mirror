@@ -202,10 +202,13 @@ let tests =
       `Quick
       test_gas_exhaustion_before_error;
     Tztest.tztest
-      "Test successful result"
+      "Test successful result with remaining gas"
       `Quick
       test_successful_with_remaining_gas;
-    Tztest.tztest "Test successful result" `Quick test_successful_with_spare_gas;
+    Tztest.tztest
+      "Test successful result with spare gas"
+      `Quick
+      test_successful_with_spare_gas;
     Tztest.tztest "Test inner error" `Quick test_inner_error;
     Tztest.tztest "Test unlimited" `Quick test_unlimited;
     Tztest.tztest "Test syntax module" `Quick test_syntax_module;
