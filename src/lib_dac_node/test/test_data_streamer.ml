@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Lib_dac_node Data_streamer
-    Invocation: dune exec src/lib_dac_node/test/main.exe \
-                  -- test "^\[Unit\] Data_streamer.ml$"   
+    Invocation: dune exec src/lib_dac_node/test/main.exe   
     Subject:    Tests for the data streamer component.
 *)
 
