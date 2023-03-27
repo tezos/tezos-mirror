@@ -92,7 +92,7 @@ module Simple = struct
 
   let rec connect ~timeout connect_handler pool point =
     let open Lwt_syntax in
-    let* () = lwt_log_info "Connect to %a" P2p_point.Id.pp point in
+    let* () = lwt_debug "Connect to %a" P2p_point.Id.pp point in
     let* r = P2p_connect_handler.connect connect_handler point ~timeout in
     match r with
     | Error (Tezos_p2p_services.P2p_errors.Connected :: _) -> (
@@ -107,7 +107,7 @@ module Simple = struct
           | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as head_err)
         :: _) ->
         let* () =
-          lwt_log_info
+          lwt_debug
             "Connection to %a failed (%a)@."
             P2p_point.Id.pp
             point
@@ -219,7 +219,7 @@ module Simple = struct
         node.pool
         node.points
     in
-    let*! () = lwt_log_info "Bootstrap OK@." in
+    let*! () = lwt_debug "Bootstrap OK@." in
     let* () = Node.sync node in
     let rec loop n acc gacc msg =
       if n <= 0 then return (acc, gacc)
@@ -233,10 +233,10 @@ module Simple = struct
             let end_time = Ptime_clock.now () in
             let span = Ptime.diff end_time start_time in
             let*! () =
-              lwt_log_info "Broadcast message in %a.@." Ptime.Span.pp span
+              lwt_debug "Broadcast message in %a.@." Ptime.Span.pp span
             in
             let* () = Node.sync node in
-            let*! () = lwt_log_info "Wait others.@." in
+            let*! () = lwt_debug "Wait others.@." in
             let* () = Node.sync node in
             let end_global_time = Ptime_clock.now () in
             let gspan = Ptime.diff end_global_time start_global_time in
@@ -249,7 +249,7 @@ module Simple = struct
     let* times, gtimes = loop repeat [] [] msgs in
     let print_stat times name =
       let ftimes = List.map Ptime.Span.to_float_s times in
-      lwt_log_notice
+      lwt_debug
         "%s; %f; %f; %f; %f; %f"
         name
         (List.fold_left Float.max Float.min_float ftimes)
@@ -259,8 +259,8 @@ module Simple = struct
         (stddev ftimes)
     in
     let*! () = close_all node.pool in
-    let*! () = lwt_log_info "All connections successfully closed.@." in
-    let*! () = lwt_log_notice "type; max; min; avg; median; std_dev" in
+    let*! () = lwt_debug "All connections successfully closed.@." in
+    let*! () = lwt_debug "type; max; min; avg; median; std_dev" in
     let*! () = print_stat times "broadcasting" in
     let*! () = print_stat gtimes "global" in
 
@@ -268,7 +268,7 @@ module Simple = struct
 
   let node msgs (node : Node.t) =
     let open Lwt_result_syntax in
-    let*! () = lwt_log_info "Bootstrap OK@." in
+    let*! () = lwt_debug "Bootstrap OK@." in
     let* () = Node.sync node in
     let rec loop n msg =
       if n <= 0 then return_unit
@@ -276,10 +276,10 @@ module Simple = struct
         match msg with
         | [] -> return_unit
         | ref_msg :: next ->
-            let*! () = lwt_log_info "Wait broadcaster.@." in
+            let*! () = lwt_debug "Wait broadcaster.@." in
             let* () = Node.sync node in
             let* _msgs = read_all node.pool ref_msg in
-            let*! () = lwt_log_info "Read message.@." in
+            let*! () = lwt_debug "Read message.@." in
             let* () = Node.sync node in
             loop (n - 1) (if no_check then next @ [ref_msg] else next)
     in
@@ -288,7 +288,7 @@ module Simple = struct
   let run points =
     (* Messages are precomputed for every iteration and shared between
        processes to allow checking their content *)
-    log_notice "Running broadcast test on %d points.@." (List.length points) ;
+    debug "Running broadcast test on %d points.@." (List.length points) ;
     let msgs = message () in
     Node.detach_nodes
       (fun i -> if i = 0 then broadcaster msgs else node msgs)
@@ -315,7 +315,7 @@ let wrap addr n f =
       aux n f)
 
 let main () =
-  let addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1" in
+  let addr = Node.default_ipv6_addr in
   Lwt_main.run
   @@ Alcotest_lwt.run
        "tezos-p2p-broadcast"

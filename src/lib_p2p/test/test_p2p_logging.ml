@@ -1,7 +1,7 @@
 module type TEST = sig
   val name : string
 
-  val run : unit -> unit tzresult Lwt.t
+  val run : addr:P2p_addr.t -> unit -> unit tzresult Lwt.t
 end
 
 let canceler = Lwt_canceler.create () (* unused *)
@@ -67,7 +67,7 @@ module Authentication = struct
       close_event ;
     return_unit
 
-  let run _dir = run_nodes client server
+  let run ~addr () = run_nodes ~addr client server
 end
 
 module Nack = struct
@@ -104,7 +104,7 @@ module Nack = struct
     let*! _conn = P2p_socket.accept ~canceler auth_fd Data_encoding.bytes in
     sync ch
 
-  let run _ = run_nodes client server
+  let run ~addr () = run_nodes ~addr client server
 end
 
 module Read_and_write = struct
@@ -187,7 +187,7 @@ module Read_and_write = struct
       message_event ;
     return_unit
 
-  let run _dir = run_nodes client server
+  let run ~addr () = run_nodes ~addr client server
 end
 
 module P2p_net = struct
@@ -285,7 +285,7 @@ module P2p_net = struct
         section = Some (Some (Internal_event.Section.make_sanitized ["p2p"]));
       }
 
-  let run () =
+  let run ~addr:_ () =
     let open Lwt_result_syntax in
     let*! identity = P2p_test_utils.id1 in
     let* net =
@@ -327,11 +327,12 @@ end
 let lwt_log_sink = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
 
 let testcase (module T : TEST) =
+  let addr = Node.default_ipv6_addr in
   Alcotest_lwt.test_case T.name `Quick (fun _switch () ->
       let open Lwt_syntax in
       let* () = Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink () in
       Tztest.with_empty_mock_sink (fun () ->
-          let* r = T.run () in
+          let* r = T.run ~addr () in
           match r with
           | Ok () -> return_unit
           | Error error ->
@@ -340,7 +341,6 @@ let testcase (module T : TEST) =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-p2p"
        [
          ( "p2p-logging",

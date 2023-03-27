@@ -117,8 +117,6 @@ let id1 = P2p_identity.generate proof_of_work_target
 
 let id2 = P2p_identity.generate proof_of_work_target
 
-let addr = ref Ipaddr.V6.localhost
-
 let version =
   {
     Network_version.chain_name =
@@ -168,7 +166,9 @@ let sync_nodes nodes =
   | Ok () | Error (Exn End_of_file :: _) -> return_unit
   | Error _ as err -> Lwt.return err
 
-let run_nodes ?port client server =
+(* addr here is localhost as we run different nodes
+   on the same addr but different ports *)
+let run_nodes ~addr ?port client server =
   let open Lwt_result_syntax in
   let p =
     match port with
@@ -179,7 +179,7 @@ let run_nodes ?port client server =
         glob_port := Some (p + 1) ;
         Some p
   in
-  let*! main_socket, p = listen ?port:p !addr in
+  let*! main_socket, p = listen ?port:p addr in
   let* server_node =
     Process.detach ~prefix:"server: " (fun channel ->
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
@@ -198,7 +198,7 @@ let run_nodes ?port client server =
           | Ok () -> Lwt.return_unit
         in
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-        let* () = client channel sched !addr p in
+        let* () = client channel sched addr p in
         let*! () = P2p_io_scheduler.shutdown sched in
         return_unit)
   in
