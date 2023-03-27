@@ -70,7 +70,7 @@ let test_typecheck_contract protocol script =
             return client
       in
       Client.typecheck_script
-        ~script:(Michelson_script.path script)
+        ~scripts:[Michelson_script.path script]
         ~protocol_hash:(Protocol.hash protocol)
         ~hooks
         ~no_base_dir_warnings:true

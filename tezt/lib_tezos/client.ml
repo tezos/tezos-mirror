@@ -1995,27 +1995,27 @@ let normalize_type ?hooks ~typ client =
 let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
   spawn_typecheck_data ~data ~typ ?gas ~legacy client |> Process.check
 
-let spawn_typecheck_script ?hooks ?protocol_hash ~script ?no_base_dir_warnings
+let spawn_typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
     ?(legacy = false) client =
   let gas_cmd =
     Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
   in
   spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
-  @@ ["typecheck"; "script"; script]
+  @@ ["typecheck"; "script"] @ scripts
   @ Option.value ~default:[] gas_cmd
   @ (if details then ["--details"] else [])
   @ (if emacs then ["--emacs"] else [])
   @ (if no_print_source then ["--no-print-source"] else [])
   @ if legacy then ["--legacy"] else []
 
-let typecheck_script ?hooks ?protocol_hash ~script ?no_base_dir_warnings
+let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
     ?(legacy = false) client =
   spawn_typecheck_script
     ?hooks
     ?protocol_hash
-    ~script
+    ~scripts
     ?no_base_dir_warnings
     ~details
     ~emacs

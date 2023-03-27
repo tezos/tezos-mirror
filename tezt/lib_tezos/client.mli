@@ -1536,7 +1536,7 @@ val spawn_typecheck_data :
 val typecheck_script :
   ?hooks:Process.hooks ->
   ?protocol_hash:string ->
-  script:string ->
+  scripts:string list ->
   ?no_base_dir_warnings:bool ->
   ?details:bool ->
   ?emacs:bool ->
@@ -1550,7 +1550,7 @@ val typecheck_script :
 val spawn_typecheck_script :
   ?hooks:Process.hooks ->
   ?protocol_hash:string ->
-  script:string ->
+  scripts:string list ->
   ?no_base_dir_warnings:bool ->
   ?details:bool ->
   ?emacs:bool ->

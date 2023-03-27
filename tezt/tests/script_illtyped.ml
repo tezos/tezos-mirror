@@ -54,7 +54,7 @@ let test_deprecated_typecheck script ~legacy =
       "ill-typed script"
     else "Use of deprecated instruction"
   in
-  Client.spawn_typecheck_script ~script:script_path ~legacy client
+  Client.spawn_typecheck_script ~scripts:[script_path] ~legacy client
   |> Process.check_error ~msg:(rex expected_error)
 
 let test_ill_typecheck script error_pattern =
@@ -67,7 +67,7 @@ let test_ill_typecheck script error_pattern =
   let script_path =
     Michelson_script.(find ["ill_typed"; script] protocol |> path)
   in
-  Client.spawn_typecheck_script ~script:script_path client
+  Client.spawn_typecheck_script ~scripts:[script_path] client
   |> Process.check_error ~msg:error_pattern
 
 let test_legacy_typecheck protocols =
@@ -90,12 +90,12 @@ let test_legacy_typecheck protocols =
          in
          let* () =
            Client.spawn_typecheck_script
-             ~script:script_path
+             ~scripts:[script_path]
              ~legacy:false
              client
            |> Process.check_error ~msg:(rex "Use of deprecated instruction")
          in
-         Client.typecheck_script ~script:script_path ~legacy:true client )
+         Client.typecheck_script ~scripts:[script_path] ~legacy:true client )
        protocols
 
 let register ~protocols =
