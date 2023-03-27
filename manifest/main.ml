@@ -6064,11 +6064,7 @@ let _yes_wallet_test =
         zarith;
         zarith_stubs_js;
         data_encoding |> open_;
-        alcotest;
-        alcotest_lwt;
         lwt_unix;
-        qcheck_alcotest;
-        octez_test_helpers |> open_;
         ptime;
       ]
     ~bisect_ppx:No
