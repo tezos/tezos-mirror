@@ -512,22 +512,22 @@ let test_handle_graft_for_joined_topic rng limits parameters =
       ()
   in
   let peers = Array.of_list peers in
-  (* Prune peer with backof 0 to be sure that the peer is not in mesh. *)
-  let state, _ = GS.handle_prune
-      {peer = peers.(7); topic; px = Seq.empty; backoff = 0}
-      state
+  (* Prune peer with backoff 0 to be sure that the peer is not in mesh. *)
+  let peer = peers.(7) in
+  let state, _ =
+    GS.handle_prune {peer; topic; px = Seq.empty; backoff = 0} state
   in
-  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:false ;
+  assert_mesh_inclusion ~__LOC__ ~peer ~topic state ~is_included:false ;
   (* Graft peer. *)
-  let state, _ = GS.handle_graft {peer = peers.(7); topic} state in
+  let state, _ = GS.handle_graft {peer; topic} state in
   (* Check that the grafted peer is in mesh. *)
-  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:true ;
+  assert_mesh_inclusion ~__LOC__ ~peer ~topic state ~is_included:true ;
   unit
 
 (** Tests that a peer is not added to our mesh on graft when
     we have not joined the topic.
 
-    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1250
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1263
 *)
 let test_handle_graft_for_not_joined_topic rng limits parameters =
   Tezt_core.Test.register
@@ -588,16 +588,113 @@ let test_handle_prune_peer_in_mesh rng limits parameters =
       ()
   in
   let peers = Array.of_list peers in
+  let peer = peers.(7) in
   (* First graft to be sure that the peer is in the mesh. *)
-  let state, _ = GS.handle_graft {peer = peers.(7); topic} state in
-  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:true ;
+  let state, _ = GS.handle_graft {peer; topic} state in
+  assert_mesh_inclusion ~__LOC__ ~peer ~topic state ~is_included:true ;
   (* Next prune the peer and check if the peer is removed from the mesh. *)
   let state, _ =
     GS.handle_prune
-      {peer = peers.(7); topic; px = Seq.empty; backoff = limits.prune_backoff}
+      {peer; topic; px = Seq.empty; backoff = limits.prune_backoff}
       state
   in
-  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:false ;
+  assert_mesh_inclusion ~__LOC__ ~peer ~topic state ~is_included:false ;
+  unit
+
+(** Test mesh addition in maintainance heartbeat.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1745
+*)
+let test_mesh_addition rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test mesh addition in maintainance"
+    ~tags:["gossipsub"; "heartbeat"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(limits.degree_optimal + 2) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
+  let peers_in_mesh =
+    GS.Introspection.(get_peers_in_topic_mesh topic (view state))
+  in
+  (* Remove two peers from mesh via prune. *)
+  let state =
+    List.take_n 2 peers_in_mesh
+    |> List.fold_left
+         (fun state peer ->
+           let state, _ =
+             GS.handle_prune
+               {peer; topic; px = Seq.empty; backoff = limits.prune_backoff}
+               state
+           in
+           state)
+         state
+  in
+  assert_mesh_size
+    ~__LOC__
+    ~topic
+    ~expected_size:(limits.degree_optimal - 2)
+    state ;
+  (* Heartbeat. *)
+  let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
+  (* There should be two grafting requests to fill the mesh. *)
+  let grafts = C.Peer.Map.bindings to_graft in
+  Check.((List.length grafts = 2) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
+  unit
+
+(** Test mesh subtraction in maintainance heartbeat.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1780
+*)
+let test_mesh_subtraction rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test mesh subtraction in maintainance"
+    ~tags:["gossipsub"; "heartbeat"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peer_number = limits.degree_high + 10 in
+  let peers = make_peers ~number:peer_number in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ~outbound:(fun _ -> true)
+      ()
+  in
+  (* Graft all the peers. This works because the connections are outbound. *)
+  let state =
+    List.fold_left
+      (fun state peer ->
+        let state, _ = GS.handle_graft {peer; topic} state in
+        state)
+      state
+      peers
+  in
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:peer_number state ;
+  (* Heartbeat. *)
+  let _state, Heartbeat {to_prune; _} = GS.heartbeat state in
+  (* There should be enough prune requests to bring back the mesh size to [degree_optimal]. *)
+  let prunes = C.Peer.Map.bindings to_prune in
+  Check.(
+    (List.length prunes = peer_number - limits.degree_optimal)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
   unit
 
 let register rng limits parameters =
@@ -608,5 +705,7 @@ let register rng limits parameters =
   test_publish_without_flood_publishing rng limits parameters ;
   test_fanout rng limits parameters ;
   test_handle_graft_for_joined_topic rng limits parameters ;
-  test_handle_prune_peer_in_mesh rng limits parameters ;
   test_handle_graft_for_not_joined_topic rng limits parameters ;
+  test_handle_prune_peer_in_mesh rng limits parameters ;
+  test_mesh_addition rng limits parameters ;
+  test_mesh_subtraction rng limits parameters
