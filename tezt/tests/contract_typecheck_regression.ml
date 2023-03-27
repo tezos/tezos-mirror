@@ -39,13 +39,13 @@ let hooks =
     ()
 
 let test_typecheck_contract protocol scripts =
-  List.iter
-    (fun script ->
-      Protocol.register_regression_test
-        ~__FILE__
-        ~title:(sf "Tc %s" (Michelson_script.name_s script))
-        ~tags:["client"; "michelson"; "typechecking"]
-        (fun _protocol ->
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:(sf "Tc scripts")
+    ~tags:["client"; "michelson"; "typechecking"]
+    (fun _protocol ->
+      Lwt_list.iter_s
+        (fun script ->
           (* Register constants for scripts that require it *)
           let constants =
             match Michelson_script.name script with
@@ -78,8 +78,8 @@ let test_typecheck_contract protocol scripts =
             ~no_base_dir_warnings:true
             ~details:true
             client)
-        [protocol])
-    scripts
+        scripts)
+    [protocol]
 
 let test_typecheck protocols =
   List.iter
