@@ -44,41 +44,28 @@ let test_typecheck_contract protocol scripts =
     ~title:(sf "Tc scripts")
     ~tags:["client"; "michelson"; "typechecking"]
     (fun _protocol ->
-      Lwt_list.iter_s
-        (fun script ->
-          (* Register constants for scripts that require it *)
-          let constants =
-            match Michelson_script.name script with
-            | ["mini_scenarios"; "999_constant"] -> ["999"]
-            | ["mini_scenarios"; "constant_unit"] -> ["Unit"; "unit"]
-            | ["mini_scenarios"; "constant_entrypoints"] -> ["unit"]
-            | _ -> []
-          in
-          let* client =
-            match constants with
-            | [] -> return (Client.create_with_mode Mockup)
-            | constants ->
-                let* client = Client.init_mockup ~protocol () in
-                let* (_exprs : string list) =
-                  Lwt_list.map_s
-                    (fun value ->
-                      Client.register_global_constant
-                        ~src:Constant.bootstrap1.alias
-                        ~value
-                        ~burn_cap:Tez.one
-                        client)
-                    constants
-                in
-                return client
-          in
-          Client.typecheck_script
-            ~scripts:[Michelson_script.path script]
-            ~protocol_hash:(Protocol.hash protocol)
-            ~hooks
-            ~no_base_dir_warnings:true
-            ~details:true
-            client)
-        scripts)
+      let* client = Client.init_mockup ~protocol () in
+      (* Register constants because some scripts require them. *)
+      let* () =
+        Lwt_list.iter_s
+          (fun value ->
+            let* (_expr : string) =
+              Client.register_global_constant
+                ~src:Constant.bootstrap1.alias
+                ~value
+                ~burn_cap:Tez.one
+                client
+            in
+            unit)
+          ["999"; "Unit"; "unit"]
+      in
+      Client.typecheck_script
+        ~scripts:(List.map Michelson_script.path scripts)
+        ~protocol_hash:(Protocol.hash protocol)
+        ~hooks
+        ~no_base_dir_warnings:true
+        ~details:true
+        client)
     [protocol]
 
 let test_typecheck protocols =
