@@ -2074,10 +2074,10 @@ module Chain = struct
             let testchains_dir = Naming.testchains_dir chain_dir in
             let testchain_dir = Naming.chain_dir testchains_dir testchain_id in
             let testchain_dir_path = Naming.dir_path testchains_dir in
-            if
-              Sys.file_exists testchain_dir_path
-              && Sys.is_directory testchain_dir_path
-            then
+            let*! valid_testchain_dir_path =
+              Lwt_utils_unix.dir_exists testchain_dir_path
+            in
+            if valid_testchain_dir_path then
               let* o =
                 locked_load_testchain
                   chain_store
@@ -2544,10 +2544,11 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in
+  let*! valid_chain_dir_path = Lwt_utils_unix.dir_exists chain_dir_path in
   (* FIXME should be checked with the store's consistency check
      (along with load_chain_state checks) *)
   let* store =
-    if Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path then
+    if valid_chain_dir_path then
       load_store
         ?history_mode
         ?block_cache_limit
@@ -2598,8 +2599,9 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in
-  if not (Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path)
-  then (* Nothing to do, the store is not set *)
+  let*! valid_chain_dir_path = Lwt_utils_unix.dir_exists chain_dir_path in
+  if not valid_chain_dir_path then
+    (* Nothing to do, the store is not set *)
     return_unit
   else
     let*! context_index = Context.init ~readonly:false context_dir in
