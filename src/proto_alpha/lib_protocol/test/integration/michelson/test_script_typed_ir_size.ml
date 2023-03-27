@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (script typed IR size)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^script typed ir size$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
     Subject:    Script_typed_ir computes good approximation of values' sizes
 *)
 

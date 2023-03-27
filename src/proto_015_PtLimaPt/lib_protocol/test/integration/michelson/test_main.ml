@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
+    Invocation:   dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/main.exe
     Subject:      Integration > Michelson
 *)
 

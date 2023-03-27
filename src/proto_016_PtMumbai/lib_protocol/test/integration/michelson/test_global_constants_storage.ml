@@ -29,9 +29,7 @@ open Transfers
 (** Testing
     -------
     Component:  Protocol (global table of constants)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^global table of constants$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:  This module tests that the global table of constants
               can be written to and read from across blocks.
 *)

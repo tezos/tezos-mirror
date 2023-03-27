@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (cache)
-    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson && \
-                dune exec ./main.exe -- test "^script cache$"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/main.exe
     Subject:    These unit tests check basic behavior of script cache
 *)
 

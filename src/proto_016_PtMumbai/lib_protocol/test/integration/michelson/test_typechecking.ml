@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson && \
-                  dune exec ./main.exe -- test "^typechecking$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:      Type-checking
 *)
 
