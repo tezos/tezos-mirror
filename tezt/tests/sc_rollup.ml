@@ -209,7 +209,7 @@ let wait_for_conflict_detected sc_node =
 let wait_for_timeout_detected sc_node =
   Sc_rollup_node.wait_for sc_node "sc_rollup_node_timeout_detected.v0"
   @@ fun json ->
-  let other = JSON.(json |-> "other" |> as_string) in
+  let other = JSON.(json |> as_string) in
   Some other
 
 (** Wait for the rollup node to compute a dissection *)
