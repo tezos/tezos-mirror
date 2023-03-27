@@ -166,6 +166,7 @@ val print_typecheck_result :
   emacs:bool ->
   show_types:bool ->
   print_source_on_error:bool ->
+  name:string option ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult ->
   #Client_context.printer ->
