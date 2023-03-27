@@ -26,3 +26,6 @@ depends: [
   "js_of_ocaml-compiler" { with-test }
   "conf-npm" { with-test }
 ]
+conflicts: [
+  "data-encoding" {!= version}
+]
