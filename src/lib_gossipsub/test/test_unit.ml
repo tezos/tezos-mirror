@@ -46,6 +46,27 @@ let assert_subscribed_topics ~__LOC__ ~peer ~expected_topics state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
+let assert_fanout_size ~__LOC__ ~topic ~expected_size state =
+  let view = GS.Introspection.view state in
+  let fanout_peers = GS.Introspection.get_fanout_peers topic view in
+  Check.(
+    (List.length fanout_peers = expected_size)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__)
+
+let assert_in_memory_cache ~__LOC__ message_id ~expected_message state =
+  match GS.Introspection.Memory_cache.get_value message_id state with
+  | None ->
+      Test.fail "Expected entry in memory cache for message id %d" message_id
+  | Some {message; access = _} ->
+      Check.(
+        (message = expected_message)
+          string
+          ~error_msg:"Expected %R, got %L"
+          ~__LOC__) ;
+      unit
+
 let many_peers limits = (4 * limits.degree_optimal) + 1
 
 let make_peers ~number =
@@ -356,8 +377,53 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
     (List.length fanout_peers = 0) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
   unit
 
+(** Tests that publishing to a subscribed topic:
+    - Returns peers to publish to.
+    - Inserts message into memory cache.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L629
+*)
+let test_publish_without_flood_publishing rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test publish without flood publishing"
+    ~tags:["gossipsub"; "publish"]
+  @@ fun () ->
+  let topic = "test_publish" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> false)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let publish_data = "some_data" in
+  let message_id = 0 in
+  (* Publish to a joined topic. *)
+  let state, Publish_message peers_to_publish =
+    GS.publish {sender = None; topic; message_id; message = publish_data} state
+  in
+  (* Should return [degree_optimal] peers to publish to. *)
+  Check.(
+    (C.Peer.Set.cardinal peers_to_publish = limits.degree_optimal)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  (* [message_id] should be added to the memory cache. *)
+  assert_in_memory_cache
+    ~__LOC__
+    message_id
+    ~expected_message:publish_data
+    state
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
   test_join_adds_peers_to_mesh rng limits parameters ;
-  test_join_adds_fanout_to_mesh rng limits parameters
+  test_join_adds_fanout_to_mesh rng limits parameters ;
+  test_publish_without_flood_publishing rng limits parameters ;
