@@ -67,6 +67,24 @@ let assert_in_memory_cache ~__LOC__ message_id ~expected_message state =
           ~__LOC__) ;
       unit
 
+let assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included state =
+  let view = GS.Introspection.view state in
+  let topic_mesh = GS.Introspection.get_peers_in_topic_mesh topic view in
+  Check.(
+    (List.mem ~equal:Int.equal peer topic_mesh = is_included)
+      bool
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__)
+
+let assert_mesh_size ~__LOC__ ~topic ~expected_size state =
+  let view = GS.Introspection.view state in
+  let topic_mesh = GS.Introspection.get_peers_in_topic_mesh topic view in
+  Check.(
+    (List.length topic_mesh = expected_size)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__)
+
 let many_peers limits = (4 * limits.degree_optimal) + 1
 
 let make_peers ~number =
@@ -470,10 +488,125 @@ let test_fanout rng limits parameters =
     ~expected_message:publish_data
     state
 
+(** Tests that a peer is added to our mesh on graft when we are both
+    joined/subscribed to the same topic.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1250
+*)
+let test_handle_graft_for_joined_topic rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test handle graft for subscribed topic"
+    ~tags:["gossipsub"; "graft"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  (* Prune peer with backof 0 to be sure that the peer is not in mesh. *)
+  let state, _ = GS.handle_prune
+      {peer = peers.(7); topic; px = Seq.empty; backoff = 0}
+      state
+  in
+  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:false ;
+  (* Graft peer. *)
+  let state, _ = GS.handle_graft {peer = peers.(7); topic} state in
+  (* Check that the grafted peer is in mesh. *)
+  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:true ;
+  unit
+
+(** Tests that a peer is not added to our mesh on graft when
+    we have not joined the topic.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1250
+*)
+let test_handle_graft_for_not_joined_topic rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test handle graft for not joined topic"
+    ~tags:["gossipsub"; "graft"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peer_number = many_peers limits in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Add new peer and graft it with an unknown topic. *)
+  let new_peer = peer_number + 1 in
+  let state =
+    add_and_subscribe_peers
+      [topic]
+      [new_peer]
+      ~to_subscribe:(fun _ -> true)
+      state
+  in
+  let state, output =
+    GS.handle_graft {peer = new_peer; topic = "not joined topic"} state
+  in
+  (* Check that the graft did not take effect. *)
+  assert_mesh_inclusion ~__LOC__ ~peer:new_peer ~topic state ~is_included:false ;
+  assert_output ~__LOC__ output Unknown_topic ;
+  unit
+
+(** Tests that prune removes peer from our mesh.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1323
+*)
+let test_handle_prune_peer_in_mesh rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test prune removes peer from mesh"
+    ~tags:["gossipsub"; "prune"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  (* First graft to be sure that the peer is in the mesh. *)
+  let state, _ = GS.handle_graft {peer = peers.(7); topic} state in
+  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:true ;
+  (* Next prune the peer and check if the peer is removed from the mesh. *)
+  let state, _ =
+    GS.handle_prune
+      {peer = peers.(7); topic; px = Seq.empty; backoff = limits.prune_backoff}
+      state
+  in
+  assert_mesh_inclusion ~__LOC__ ~peer:peers.(7) ~topic state ~is_included:false ;
+  unit
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
   test_join_adds_peers_to_mesh rng limits parameters ;
   test_join_adds_fanout_to_mesh rng limits parameters ;
   test_publish_without_flood_publishing rng limits parameters ;
-  test_fanout rng limits parameters
+  test_fanout rng limits parameters ;
+  test_handle_graft_for_joined_topic rng limits parameters ;
+  test_handle_prune_peer_in_mesh rng limits parameters ;
+  test_handle_graft_for_not_joined_topic rng limits parameters ;
