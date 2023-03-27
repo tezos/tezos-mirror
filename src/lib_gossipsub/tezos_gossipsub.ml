@@ -811,7 +811,7 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter peer ({direct; _} as connection) =
             filter peer connection || direct
           in
-          select_peers topic ~filter ~max:Int.max_int
+          select_peers topic ~filter ~max:degree_optimal
       | Some fanout ->
           let* () = set_fanout_topic topic now fanout.peers in
           return fanout.peers
