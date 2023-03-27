@@ -237,6 +237,13 @@ impl HostState {
             .and_then(|n| n.inner.keys().nth(index as usize))
             .ok_or(Error::StoreInvalidSubkeyIndex)
             .cloned()
+            .map(|n| {
+                if n == store::VALUE_NAME {
+                    String::new()
+                } else {
+                    n
+                }
+            })
     }
 
     pub(crate) fn handle_store_move(
@@ -496,6 +503,13 @@ mod tests {
 
         // Assert
         assert_eq!(10, result, "Expected 10 subkeys of prefix");
+
+        // Value is included in the count
+        state
+            .handle_store_write(prefix.as_bytes(), 0, &[1, 2, 3])
+            .unwrap();
+        let with_value = state.handle_store_list_size(prefix.as_bytes()).unwrap();
+        assert_eq!(11, with_value, "Expected 10 subkeys of prefix, plus value");
     }
 
     #[test]
@@ -535,6 +549,25 @@ mod tests {
         // Assert
         let expected = (0..10).map(|i| i.to_string()).collect::<Vec<_>>();
         assert_eq!(results, expected, "Expected stable store_list_get");
+    }
+
+    #[test]
+    fn store_list_get_value() {
+        // Arrange
+        let mut state = HostState::default();
+        let prefix = "/hello".as_bytes();
+
+        state.handle_store_write(prefix, 0, &[]).unwrap();
+
+        // Act
+        let result = state.handle_store_list_get(prefix, 0).unwrap();
+
+        // Assert
+        assert_eq!(
+            result,
+            "".to_string(),
+            "Value should return empty string as subkey"
+        );
     }
 
     #[test]
