@@ -362,6 +362,10 @@ module type AUTOMATON = sig
       type value = {message : message; access : int Peer.Map.t}
 
       type t = {messages : value Message_id.Map.t}
+
+      (** [get_memory_cache_value message_id state] returns the
+          cached value for [message_id]. *)
+      val get_value : Message_id.t -> state -> value option
     end
 
     type view = {

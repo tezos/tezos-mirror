@@ -811,7 +811,7 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter peer ({direct; _} as connection) =
             filter peer connection || direct
           in
-          select_peers topic ~filter ~max:Int.max_int
+          select_peers topic ~filter ~max:degree_optimal
       | Some fanout ->
           let* () = set_fanout_topic topic now fanout.peers in
           return fanout.peers
@@ -1453,7 +1453,13 @@ module Make (C : AUTOMATON_CONFIG) :
       last_published_time : time;
     }
 
-    module Memory_cache = Memory_cache
+    module Memory_cache = struct
+      include Memory_cache
+
+      let get_value message_id state =
+        Message_id.Map.find_opt message_id state.memory_cache.messages
+        |> Option.map (fun Memory_cache.{message; access} -> {message; access})
+    end
 
     type view = state = {
       limits : limits;
