@@ -1453,7 +1453,13 @@ module Make (C : AUTOMATON_CONFIG) :
       last_published_time : time;
     }
 
-    module Memory_cache = Memory_cache
+    module Memory_cache = struct
+      include Memory_cache
+
+      let get_value message_id state =
+        Message_id.Map.find_opt message_id state.memory_cache.messages
+        |> Option.map (fun Memory_cache.{message; access} -> {message; access})
+    end
 
     type view = state = {
       limits : limits;
