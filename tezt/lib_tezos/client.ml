@@ -1997,7 +1997,7 @@ let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
 
 let spawn_typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
-    ?(legacy = false) client =
+    ?(legacy = false) ?(display_names = false) client =
   let gas_cmd =
     Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
   in
@@ -2007,11 +2007,12 @@ let spawn_typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
   @ (if details then ["--details"] else [])
   @ (if emacs then ["--emacs"] else [])
   @ (if no_print_source then ["--no-print-source"] else [])
-  @ if legacy then ["--legacy"] else []
+  @ (if legacy then ["--legacy"] else [])
+  @ if display_names then ["--display-names"] else []
 
 let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
-    ?(legacy = false) client =
+    ?(legacy = false) ?display_names client =
   spawn_typecheck_script
     ?hooks
     ?protocol_hash
@@ -2022,6 +2023,7 @@ let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ~no_print_source
     ?gas
     ~legacy
+    ?display_names
     client
   |> Process.check
 

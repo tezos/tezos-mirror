@@ -1543,6 +1543,7 @@ val typecheck_script :
   ?no_print_source:bool ->
   ?gas:int ->
   ?legacy:bool ->
+  ?display_names:bool ->
   t ->
   unit Lwt.t
 
@@ -1557,6 +1558,7 @@ val spawn_typecheck_script :
   ?no_print_source:bool ->
   ?gas:int ->
   ?legacy:bool ->
+  ?display_names:bool ->
   t ->
   Process.t
 
