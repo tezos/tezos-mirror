@@ -76,6 +76,7 @@ odoc-lite: docexes
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms \
 	  --include="src/proto_016*" \
+	  --include="src/proto_017*" \
 	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
 	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
