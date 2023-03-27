@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,31 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Module that implements Dac related functionalities. *)
+module Aggregate_signature = Tezos_crypto.Aggregate_signature
 
-type error +=
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
+let get_keys cctxt pkh =
+  let open Lwt_result_syntax in
+  let open Tezos_client_base.Client_keys in
+  let* alias = Aggregate_alias.Public_key_hash.rev_find cctxt pkh in
+  match alias with
+  | None -> return (pkh, None, None)
+  | Some alias -> (
+      let* keys_opt = alias_aggregate_keys cctxt alias in
+      match keys_opt with
+      | None ->
+          let*! () = Event.(emit committee_member_not_in_wallet pkh) in
+          return (pkh, None, None)
+      | Some (pkh, pk_opt, sk_uri_opt) -> return (pkh, pk_opt, sk_uri_opt))
 
-module Storage : sig
-  (** [ensure_reveal_data_dir_exists reveal_data_dir] checks that the
-      path at [reveal_data_dir] exists and is a directory. If
-      the path does not exist, it is created as a directory.
-      Parent directories are recursively created when they do not
-      exist.
+let get_public_key cctxt address =
+  let open Lwt_result_syntax in
+  let+ _, pk_opt, _ = get_keys cctxt address in
+  pk_opt
 
-      This function may fail with
-      {ul
-        {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
-          path exists and is not a directory,
+let can_verify (_, pk_opt, _) = Option.is_some pk_opt
 
-        {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
-            creation of the directory fails.}}
-      }
-  *)
-  val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t
-end
-
-val resolve_plugin :
-  Tezos_shell_services.Chain_services.Blocks.protocols ->
-  (module Dac_plugin.T) option Lwt.t
+let can_sign (_, _, sk_uri_opt) = Option.is_some sk_uri_opt

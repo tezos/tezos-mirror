@@ -323,7 +323,7 @@ module Coordinator = struct
         (check_is_dac_member dac_committee signer_pkh)
         (Public_key_is_non_dac_member signer_pkh)
     in
-    let* pub_key_opt = Dac_manager.Keys.get_public_key cctxt signer_pkh in
+    let* pub_key_opt = Wallet_cctxt_helpers.get_public_key cctxt signer_pkh in
     let* pub_key =
       Option.fold_f
         ~none:(fun () ->
