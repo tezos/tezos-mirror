@@ -355,6 +355,8 @@ module Dune = struct
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
 
+  let progn l = [S "progn"; G (of_list l)]
+
   let chdir_workspace_root followup =
     [G [S "chdir"; S "%{workspace_root}"]; followup]
 
