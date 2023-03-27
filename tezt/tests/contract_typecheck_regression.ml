@@ -65,6 +65,7 @@ let test_typecheck_contract protocol scripts =
         ~hooks
         ~no_base_dir_warnings:true
         ~details:true
+        ~display_names:true
         client)
     [protocol]
 
