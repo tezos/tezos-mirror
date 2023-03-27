@@ -85,6 +85,10 @@ let init_state ~rng ~limits ~parameters ~peers ~topics
     ?(outbound : C.Peer.t -> bool = fun _ -> false)
     ~(to_subscribe : C.Peer.t * C.Topic.t -> bool) () =
   let state = GS.make rng limits parameters in
+  (* Add and subscribe the given peers. *)
+  let state =
+    add_and_subscribe_peers topics peers ~to_subscribe ~direct ~outbound state
+  in
   (* Join to the given topics. *)
   let state =
     List.fold_left
@@ -95,10 +99,6 @@ let init_state ~rng ~limits ~parameters ~peers ~topics
         else state)
       state
       topics
-  in
-  (* Add and subscribe the given peers. *)
-  let state =
-    add_and_subscribe_peers topics peers ~to_subscribe ~direct ~outbound state
   in
   state
 
