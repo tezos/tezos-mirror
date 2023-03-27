@@ -13,9 +13,12 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::{Address, BlockHash, L2Level, OwnedHash, Quantity, BLOCK_HASH_SIZE};
+use tezos_ethereum::eth_gen::{
+    Address, BlockHash, L2Level, OwnedHash, Quantity, BLOCK_HASH_SIZE,
+};
 use tezos_ethereum::transaction::{
-    RawTransaction, TransactionHash, TransactionReceipt, TransactionStatus, TransactionType,
+    RawTransaction, TransactionHash, TransactionReceipt, TransactionStatus,
+    TransactionType,
 };
 
 use tezos_ethereum::wei::Wei;
@@ -226,8 +229,8 @@ fn apply_transaction<Host: Runtime>(
 
     let (dst_path, dst_address) = get_tx_receiver(tx)?;
     if status == TransactionStatus::Success {
-        let dst_balance =
-            storage::read_account_balance(host, &dst_path).unwrap_or_else(|_| Wei::zero());
+        let dst_balance = storage::read_account_balance(host, &dst_path)
+            .unwrap_or_else(|_| Wei::zero());
         update_account(host, &dst_path, dst_balance + value, None)?;
     };
     Ok(make_receipt(block, transaction, status, index, dst_address))
@@ -287,7 +290,8 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
             }
         }?;
 
-        let transaction_hashes = proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
+        let transaction_hashes =
+            proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
 
         match validate(host, proposal.transactions) {
             Ok(transactions) => {
@@ -296,8 +300,8 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                     debug_msg!(host, "Error while storing the current block.");
                     Error::Generic
                 })?;
-                let receipts =
-                    apply_transactions(host, &valid_block, &transactions).map_err(|_| {
+                let receipts = apply_transactions(host, &valid_block, &transactions)
+                    .map_err(|_| {
                         debug_msg!(host, "Error while applying the transactions.");
                         Error::Generic
                     })?;
