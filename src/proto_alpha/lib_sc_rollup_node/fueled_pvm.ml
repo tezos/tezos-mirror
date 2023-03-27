@@ -90,11 +90,14 @@ module Make (PVM : Pvm.S) = struct
       | Some data -> return data
       | None -> Reveals.get ~data_dir ~pvm_kind:PVM.kind ~hash
 
-    let continue_with_fuel consumption initial_fuel state f =
-      let open Delayed_write_monad.Lwt_result_syntax in
-      match F.consume consumption initial_fuel with
-      | None -> return (state, initial_fuel, 0L)
-      | Some fuel_left -> f fuel_left state
+    type eval_completion =
+      | Aborted of {state : PVM.state; fuel : fuel; current_tick : int64}
+      | Completed of {
+          state : PVM.state;
+          fuel : fuel;
+          current_tick : int64;
+          failing_ticks : int64 list;
+        }
 
     exception Error_wrapper of tztrace
 
@@ -192,57 +195,63 @@ module Make (PVM : Pvm.S) = struct
               return (state, executed_ticks, failing_ticks')
         | _ -> normal_eval state
       in
+      let abort state fuel current_tick =
+        return (Aborted {state; fuel; current_tick})
+      in
+      let complete state fuel current_tick failing_ticks =
+        return (Completed {state; fuel; current_tick; failing_ticks})
+      in
       let rec go (fuel : fuel) current_tick failing_ticks state =
         let*! input_request = PVM.is_input_state state in
-        if F.is_empty fuel then return (state, fuel, current_tick, failing_ticks)
-        else
-          match input_request with
-          | No_input_required -> (
-              let>* next_state, executed_ticks, failing_ticks =
-                eval_tick fuel failing_ticks state
-              in
-              let fuel_executed = F.of_ticks executed_ticks in
-              match F.consume fuel_executed fuel with
-              | None -> return (state, fuel, current_tick, failing_ticks)
-              | Some fuel ->
-                  go
-                    fuel
-                    (Int64.add current_tick executed_ticks)
-                    failing_ticks
-                    next_state)
-          | Needs_reveal (Reveal_raw_data hash) -> (
-              let* data =
-                get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
-              in
-              let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
-              match F.consume F.one_tick_consumption fuel with
-              | None -> return (state, fuel, current_tick, failing_ticks)
-              | Some fuel ->
-                  go fuel (Int64.succ current_tick) failing_ticks next_state)
-          | Needs_reveal Reveal_metadata -> (
-              let*! next_state =
-                PVM.set_input (Reveal (Metadata metadata)) state
-              in
-              match F.consume F.one_tick_consumption fuel with
-              | None -> return (state, fuel, current_tick, failing_ticks)
-              | Some fuel ->
-                  go fuel (Int64.succ current_tick) failing_ticks next_state)
-          | Needs_reveal (Request_dal_page page_id) -> (
-              let* content_opt =
-                Dal_pages_request.page_content
-                  ~dal_attestation_lag
-                  node_ctxt
-                  page_id
-              in
-              let*! next_state =
-                PVM.set_input (Reveal (Dal_page content_opt)) state
-              in
-              match F.consume F.one_tick_consumption fuel with
-              | None -> return (state, fuel, current_tick, failing_ticks)
-              | Some fuel ->
-                  go fuel (Int64.succ current_tick) failing_ticks next_state)
-          | Initial | First_after _ ->
-              return (state, fuel, current_tick, failing_ticks)
+        match input_request with
+        | No_input_required when F.is_empty fuel ->
+            abort state fuel current_tick
+        | No_input_required -> (
+            let>* next_state, executed_ticks, failing_ticks =
+              eval_tick fuel failing_ticks state
+            in
+            let fuel_executed = F.of_ticks executed_ticks in
+            match F.consume fuel_executed fuel with
+            | None -> abort state fuel current_tick
+            | Some fuel ->
+                go
+                  fuel
+                  (Int64.add current_tick executed_ticks)
+                  failing_ticks
+                  next_state)
+        | Needs_reveal (Reveal_raw_data hash) -> (
+            let* data =
+              get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
+            in
+            let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
+            match F.consume F.one_tick_consumption fuel with
+            | None -> abort state fuel current_tick
+            | Some fuel ->
+                go fuel (Int64.succ current_tick) failing_ticks next_state)
+        | Needs_reveal Reveal_metadata -> (
+            let*! next_state =
+              PVM.set_input (Reveal (Metadata metadata)) state
+            in
+            match F.consume F.one_tick_consumption fuel with
+            | None -> abort state fuel current_tick
+            | Some fuel ->
+                go fuel (Int64.succ current_tick) failing_ticks next_state)
+        | Needs_reveal (Request_dal_page page_id) -> (
+            let* content_opt =
+              Dal_pages_request.page_content
+                ~dal_attestation_lag
+                node_ctxt
+                page_id
+            in
+            let*! next_state =
+              PVM.set_input (Reveal (Dal_page content_opt)) state
+            in
+            match F.consume F.one_tick_consumption fuel with
+            | None -> abort state fuel current_tick
+            | Some fuel ->
+                go fuel (Int64.succ current_tick) failing_ticks next_state)
+        | Initial | First_after _ ->
+            complete state fuel current_tick failing_ticks
       in
       go fuel start_tick failing_ticks state
 
@@ -254,6 +263,10 @@ module Make (PVM : Pvm.S) = struct
       in
       {input with Sc_rollup.payload}
 
+    type feed_input_completion =
+      | Feed_input_aborted of {state : PVM.state; fuel : fuel}
+      | Feed_input_completed of {state : PVM.state; fuel : fuel}
+
     (** [feed_input node_ctxt reveal_map level message_index ~fuel
         ~failing_ticks state input] feeds [input] (that has a given
         [message_index] in inbox of [level]) to the PVM in order to advance
@@ -264,7 +277,7 @@ module Make (PVM : Pvm.S) = struct
         state input =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
-      let>* state, fuel, tick, failing_ticks =
+      let>* res =
         eval_until_input
           node_ctxt
           reveal_map
@@ -275,35 +288,45 @@ module Make (PVM : Pvm.S) = struct
           failing_ticks
           state
       in
-      continue_with_fuel F.one_tick_consumption fuel state @@ fun fuel state ->
-      let>* input, failing_ticks =
-        match failing_ticks with
-        | xtick :: failing_ticks' ->
-            if xtick = tick then
-              let*! () =
-                Interpreter_event.intended_failure
-                  ~level
-                  ~message_index
-                  ~message_tick:tick
-                  ~internal:false
+      match res with
+      | Aborted {state; fuel; _} -> return (Feed_input_aborted {state; fuel})
+      | Completed {state; fuel; current_tick = tick; failing_ticks} -> (
+          let open Delayed_write_monad.Lwt_result_syntax in
+          match F.consume F.one_tick_consumption fuel with
+          | None -> return (Feed_input_aborted {state; fuel})
+          | Some fuel -> (
+              let>* input, failing_ticks =
+                match failing_ticks with
+                | xtick :: failing_ticks' ->
+                    if xtick = tick then
+                      let*! () =
+                        Interpreter_event.intended_failure
+                          ~level
+                          ~message_index
+                          ~message_tick:tick
+                          ~internal:false
+                      in
+                      return (mutate input, failing_ticks')
+                    else return (input, failing_ticks)
+                | [] -> return (input, failing_ticks)
               in
-              return (mutate input, failing_ticks')
-            else return (input, failing_ticks)
-        | [] -> return (input, failing_ticks)
-      in
-      let*! state = PVM.set_input (Inbox_message input) state in
-      let>* state, fuel, tick, _failing_ticks =
-        eval_until_input
-          node_ctxt
-          reveal_map
-          level
-          message_index
-          ~fuel
-          tick
-          failing_ticks
-          state
-      in
-      return (state, fuel, tick)
+              let*! state = PVM.set_input (Inbox_message input) state in
+              let>* res =
+                eval_until_input
+                  node_ctxt
+                  reveal_map
+                  level
+                  message_index
+                  ~fuel
+                  tick
+                  failing_ticks
+                  state
+              in
+              match res with
+              | Aborted {state; fuel; _} ->
+                  return (Feed_input_aborted {state; fuel})
+              | Completed {state; fuel; _} ->
+                  return (Feed_input_completed {state; fuel})))
 
     let eval_messages ~reveal_map ~fuel node_ctxt ~message_counter_offset state
         inbox_level messages =
@@ -311,35 +334,43 @@ module Make (PVM : Pvm.S) = struct
       let open Delayed_write_monad.Lwt_result_syntax in
       let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
       (* Iterate the PVM state with all the messages. *)
-      list_fold_left_i_es
-        (fun message_counter (state, fuel) message ->
-          let*? payload =
-            Sc_rollup.Inbox_message.(
-              message |> serialize |> Environment.wrap_tzresult)
-          in
-          let message_index = message_counter_offset + message_counter in
-          let message_counter = Z.of_int message_index in
-          let input = Sc_rollup.{inbox_level; message_counter; payload} in
-          let failing_ticks =
-            Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
-              ~level
-              ~message_index
-          in
-          let>* state, fuel, _executed_ticks =
-            feed_input
-              node_ctxt
-              reveal_map
-              level
-              message_index
-              ~fuel
-              ~failing_ticks
-              state
-              input
-          in
-          return (state, fuel))
-        (state, fuel)
-        messages
+      let rec feed_messages (state, fuel) message_index = function
+        | [] ->
+            (* Fed all messages *)
+            return (state, fuel)
+        | _messages when F.is_empty fuel ->
+            (* Consumed all fuel *)
+            return (state, fuel)
+        | message :: messages -> (
+            let*? payload =
+              Sc_rollup.Inbox_message.(
+                message |> serialize |> Environment.wrap_tzresult)
+            in
+            let message_counter = Z.of_int message_index in
+            let input = Sc_rollup.{inbox_level; message_counter; payload} in
+            let failing_ticks =
+              Loser_mode.is_failure
+                node_ctxt.Node_context.loser_mode
+                ~level
+                ~message_index
+            in
+            let>* res =
+              feed_input
+                node_ctxt
+                reveal_map
+                level
+                message_index
+                ~fuel
+                ~failing_ticks
+                state
+                input
+            in
+            match res with
+            | Feed_input_completed {state; fuel} ->
+                feed_messages (state, fuel) (message_index + 1) messages
+            | Feed_input_aborted {state; fuel} -> return (state, fuel))
+      in
+      (feed_messages [@tailcall]) (state, fuel) message_counter_offset messages
 
     let eval_block_inbox ~fuel node_ctxt (inbox, messages) (state : PVM.state) :
         (PVM.state * int * Raw_level.t * fuel) Node_context.delayed_write
