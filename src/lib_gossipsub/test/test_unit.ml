@@ -37,7 +37,9 @@ let assert_output ~__LOC__ actual expected =
   else Test.fail ~__LOC__ "Assert for output failed."
 
 let assert_subscribed_topics ~__LOC__ ~peer ~expected_topics state =
-  let actual_topics = GS.Internal_for_tests.get_subscribed_topics peer state in
+  let actual_topics =
+    GS.Introspection.(get_subscribed_topics peer (view state))
+  in
   Check.(
     (actual_topics = expected_topics)
       (list string)
@@ -241,7 +243,7 @@ let test_join_adds_peers_to_mesh rng limits parameters =
   in
   (* should have added [degree_optimal] nodes to the mesh *)
   let peers_in_topic =
-    GS.Internal_for_tests.get_peers_in_topic_mesh "topic0" state
+    GS.Introspection.(get_peers_in_topic_mesh "topic0" (view state))
   in
   Check.(
     (List.length peers_in_topic = limits.degree_optimal)
@@ -296,7 +298,9 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
       state
   in
   (* Check that all [init_peers] have been added to the fanout.  *)
-  let fanout_peers = GS.Internal_for_tests.get_fanout_peers "topic0" state in
+  let fanout_peers =
+    GS.Introspection.(get_fanout_peers "topic0" (view state))
+  in
   Check.(
     (List.length fanout_peers = limits.degree_optimal / 2)
       int
@@ -317,7 +321,7 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
     | _, _ -> Test.fail ~__LOC__ "Expected Join to succeed"
   in
   let peers_in_topic =
-    GS.Internal_for_tests.get_peers_in_topic_mesh "topic0" state
+    GS.Introspection.(get_peers_in_topic_mesh "topic0" (view state))
   in
   (* All [degree_optimal / 2] fanout peers should have been added to the mesh,
      along with [degree_optimal / 2] more from the pool. *)
@@ -345,7 +349,9 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
   (* Check that the fanout map has been cleared.  *)
-  let fanout_peers = GS.Internal_for_tests.get_fanout_peers "topic0" state in
+  let fanout_peers =
+    GS.Introspection.(get_fanout_peers "topic0" (view state))
+  in
   Check.(
     (List.length fanout_peers = 0) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
   unit

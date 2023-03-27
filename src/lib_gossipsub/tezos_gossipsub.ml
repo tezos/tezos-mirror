@@ -1468,9 +1468,9 @@ module Make (C : AUTOMATON_CONFIG) :
       rng : Random.State.t;
       heartbeat_ticks : int64;
     }
-  end
 
-  module Internal_for_tests = struct
+    let view state = state
+
     let get_peers_in_topic_mesh topic state =
       match Topic.Map.find topic state.mesh with
       | None -> []
@@ -1485,15 +1485,6 @@ module Make (C : AUTOMATON_CONFIG) :
       match Topic.Map.find topic state.fanout with
       | None -> []
       | Some fanout_peers -> Peer.Set.elements fanout_peers.peers
-
-    type nonrec connection = connection = {
-      topics : Topic.Set.t;
-      direct : bool;
-      outbound : bool;
-      backoff : Time.t Topic.Map.t;
-      score : Score.t;
-      expire : Time.t option;
-    }
 
     let connections state = state.connections
 

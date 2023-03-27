@@ -377,35 +377,22 @@ module type AUTOMATON = sig
       rng : Random.State.t;
       heartbeat_ticks : int64;
     }
-  end
 
-  module Internal_for_tests : sig
+    val view : state -> view
+
     (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of [topic]. *)
-    val get_peers_in_topic_mesh : Topic.t -> state -> Peer.t list
+    val get_peers_in_topic_mesh : Topic.t -> view -> Peer.t list
 
     (** [get_subscribed_topics peer state] returns the set of topics
         that are subscribed by [peer] *)
-    val get_subscribed_topics : Peer.t -> state -> Topic.t list
+    val get_subscribed_topics : Peer.t -> view -> Topic.t list
 
     (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
-    val get_fanout_peers : Topic.t -> state -> Peer.t list
+    val get_fanout_peers : Topic.t -> view -> Peer.t list
 
-    type connection = {
-      topics : Topic.Set.t;
-      direct : bool;
-          (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
-      outbound : bool;
-          (** An outbound connection is a connection we initiated. *)
-      backoff : Time.t Topic.Map.t;
-          (** The backoff times associated to this peer for each topic *)
-      score : Score.t;  (** The score associated to this peer. *)
-      expire : Time.t option;
-          (** The expiring time after having being disconnected from this peer. *)
-    }
+    val connections : view -> connection Peer.Map.t
 
-    val connections : state -> connection Peer.Map.t
-
-    val limits : state -> limits
+    val limits : view -> limits
   end
 end
 
