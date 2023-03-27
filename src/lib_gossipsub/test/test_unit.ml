@@ -421,9 +421,59 @@ let test_publish_without_flood_publishing rng limits parameters =
     ~expected_message:publish_data
     state
 
+(** Tests that publishing to an unsubscribed topic:
+    - Populate fanout peers.
+    - Return peers to publish to.
+    - Inserts message into the memory cache.
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L715
+*)
+let test_fanout rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test fanout"
+    ~tags:["gossipsub"; "publish"; "fanout"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> false)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Leave the topic. *)
+  let state, _ = GS.leave {topic} state in
+  (* Publish to the topic we left. *)
+  let publish_data = "some data" in
+  let message_id = 0 in
+  let state, Publish_message peers_to_publish =
+    GS.publish {sender = None; topic; message_id; message = publish_data} state
+  in
+  (* Fanout should contain [degree_optimal] peers. *)
+  assert_fanout_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
+  (* Should return [degree_optimal] peers to publish to. *)
+  Check.(
+    (C.Peer.Set.cardinal peers_to_publish = limits.degree_optimal)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  (* [message_id] should be added to the memory cache. *)
+  assert_in_memory_cache
+    ~__LOC__
+    message_id
+    ~expected_message:publish_data
+    state
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
   test_join_adds_peers_to_mesh rng limits parameters ;
   test_join_adds_fanout_to_mesh rng limits parameters ;
   test_publish_without_flood_publishing rng limits parameters ;
+  test_fanout rng limits parameters
