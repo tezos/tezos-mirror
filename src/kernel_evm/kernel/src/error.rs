@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
-use std::str::Utf8Error;
+use core::str::Utf8Error;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
@@ -10,29 +10,35 @@ pub enum TransferError {
     InvalidSignature,
     InvalidNonce,
     NotEnoughBalance,
+    InvalidAddressFormat(Utf8Error),
+}
+
+#[derive(Debug)]
+pub enum StorageError {
+    Path(PathError),
+    Runtime(RuntimeError),
+    InvalidLoadValue { expected: usize, actual: usize },
 }
 
 #[derive(Debug)]
 pub enum Error {
-    Path(PathError),
-    Runtime(RuntimeError),
     Transfer(TransferError),
-    Generic,
+    Storage(StorageError),
 }
 
 impl From<PathError> for Error {
     fn from(e: PathError) -> Self {
-        Self::Path(e)
+        Self::Storage(StorageError::Path(e))
     }
 }
 impl From<RuntimeError> for Error {
     fn from(e: RuntimeError) -> Self {
-        Self::Runtime(e)
+        Self::Storage(StorageError::Runtime(e))
     }
 }
 
-impl From<Utf8Error> for Error {
-    fn from(_: Utf8Error) -> Self {
-        Self::Generic
+impl From<TransferError> for Error {
+    fn from(e: TransferError) -> Self {
+        Self::Transfer(e)
     }
 }

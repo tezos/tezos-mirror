@@ -15,6 +15,7 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_ethereum::transaction::TransactionStatus;
 use tezos_ethereum::transaction::TransactionType;
+use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
 use tezos_ethereum::wei::{self, Wei};
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::OwnedPath;
@@ -22,7 +23,7 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 struct MintAccount {
     mint_address: &'static str,
-    genesis_tx_hash: &'static str,
+    genesis_tx_hash: TransactionHash,
     eth_amount: u64,
 }
 
@@ -35,20 +36,17 @@ const MINT_ACCOUNTS_NUMBER: usize = 3;
 const MINT_ACCOUNTS: [MintAccount; MINT_ACCOUNTS_NUMBER] = [
     MintAccount {
         mint_address: "6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
-        genesis_tx_hash:
-            "47454e4553495341444452455353000000000000000000000000000000000001",
+        genesis_tx_hash: [0; TRANSACTION_HASH_SIZE],
         eth_amount: 9999,
     },
     MintAccount {
         mint_address: "b53dc01974176e5dff2298c5a94343c2585e3c54",
-        genesis_tx_hash:
-            "47454e4553495341444452455353000000000000000000000000000000000002",
+        genesis_tx_hash: [1; TRANSACTION_HASH_SIZE],
         eth_amount: 9999,
     },
     MintAccount {
         mint_address: "9b49c988b5817be31dfb00f7a5a4671772dcce2b",
-        genesis_tx_hash:
-            "47454e4553495341444452455353000000000000000000000000000000000003",
+        genesis_tx_hash: [2; TRANSACTION_HASH_SIZE],
         eth_amount: 9999,
     },
 ];
@@ -58,13 +56,7 @@ fn store_genesis_mint_account<Host: Runtime>(
     account: &Account,
     path: &OwnedPath,
 ) -> Result<(), Error> {
-    match storage::store_account(host, account, path) {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            debug_msg!(host, "Error, cannot initialize genesis' mint account.");
-            Err(Error::Generic)
-        }
-    }
+    storage::store_account(host, account, path)
 }
 
 fn forge_genesis_mint_account<Host: Runtime>(
@@ -73,14 +65,8 @@ fn forge_genesis_mint_account<Host: Runtime>(
     balance: Wei,
 ) -> Result<(), Error> {
     let account = Account::with_assets(balance);
-
-    match storage::account_path(&mint_address.as_bytes().to_vec()) {
-        Ok(path) => store_genesis_mint_account(host, &account, &path),
-        Err(_) => {
-            debug_msg!(host, "Error, cannot forge genesis' mint account path.");
-            Err(Error::Generic)
-        }
-    }
+    let path = storage::account_path(&mint_address.as_bytes().to_vec())?;
+    store_genesis_mint_account(host, &account, &path)
 }
 
 fn collect_mint_transactions<T, E>(
@@ -106,14 +92,7 @@ fn bootstrap_genesis_accounts<Host: Runtime>(
              eth_amount,
          }| {
             forge_genesis_mint_account(host, mint_address, wei::from_eth(eth_amount))?;
-
-            match hex::decode(genesis_tx_hash) {
-                Ok(raw_tx_hash) => raw_tx_hash.try_into().map_err(|_| Error::Generic),
-                Err(_) => {
-                    debug_msg!(host, "Error while decoding raw transaction hash.");
-                    Err(Error::Generic)
-                }
-            }
+            Ok(genesis_tx_hash)
         },
     );
 
@@ -136,7 +115,9 @@ fn store_genesis_receipts<Host: Runtime>(
 
     for (i, hash) in genesis_block.transactions.iter().enumerate() {
         let mint_account = &MINT_ACCOUNTS[i];
-        let index = u32::try_from(i).map_err(|_| Error::Generic)?;
+        // There are very few genesis transactions, the conversion from usize to u32 is safe
+        // and truncate won't lead to a loss of data
+        let index = i as u32;
 
         let receipt = TransactionReceipt {
             hash: *hash,
@@ -166,13 +147,11 @@ pub fn init_block<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 
     // Produce and store genesis' block
     let genesis_block = L2Block::new(GENESIS_LEVEL, transaction_hashes);
-    storage::store_current_block(host, &genesis_block).map_err(|_| {
-        debug_msg!(host, "Error while storing the genesis block.");
-        Error::Generic
-    })?;
-    debug_msg!(host, "Genesis block was initialized.\n");
+    storage::store_current_block(host, &genesis_block)?;
+    store_genesis_receipts(host, genesis_block)?;
 
-    store_genesis_receipts(host, genesis_block)
+    debug_msg!(host, "Genesis block was initialized.\n");
+    Ok(())
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 use std::str::from_utf8;
 
 use crate::block::L2Block;
-use crate::error::Error;
+use crate::error::{Error, StorageError};
 use tezos_ethereum::account::*;
 use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level};
 use tezos_ethereum::transaction::{
@@ -50,15 +50,29 @@ const HASH_MAX_SIZE: usize = 32;
 // TRANSACTION_HASH_SIZE * 128 = 4096.
 const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
 
+fn store_read_slice<Host: Runtime, T: Path>(
+    host: &mut Host,
+    path: &T,
+    buffer: &mut [u8],
+    expected_size: usize,
+) -> Result<(), Error> {
+    let size = Runtime::store_read_slice(host, path, 0, buffer)?;
+    if size == expected_size {
+        Ok(())
+    } else {
+        Err(Error::Storage(StorageError::InvalidLoadValue {
+            expected: expected_size,
+            actual: size,
+        }))
+    }
+}
+
 pub fn read_smart_rollup_address<Host: Runtime>(
     host: &mut Host,
 ) -> Result<[u8; 20], Error> {
     let mut buffer = [0u8; 20];
-
-    match host.store_read_slice(&SMART_ROLLUP_ADDRESS, 0, &mut buffer) {
-        Ok(20) => Ok(buffer),
-        _ => Err(Error::Generic),
-    }
+    store_read_slice(host, &SMART_ROLLUP_ADDRESS, &mut buffer, 20)?;
+    Ok(buffer)
 }
 
 pub fn store_smart_rollup_address<Host: Runtime>(
@@ -89,7 +103,8 @@ fn write_u256(
 }
 
 fn address_path(address: Hash) -> Result<OwnedPath, Error> {
-    let address: &str = from_utf8(address)?;
+    let address: &str =
+        from_utf8(address).map_err(crate::error::TransferError::InvalidAddressFormat)?;
     let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
@@ -128,11 +143,8 @@ pub fn read_account_nonce<Host: Runtime>(
 ) -> Result<u64, Error> {
     let path = concat(account_path, &EVM_ACCOUNT_NONCE)?;
     let mut buffer = [0_u8; 8];
-
-    match host.store_read_slice(&path, 0, &mut buffer) {
-        Ok(8) => Ok(u64::from_le_bytes(buffer)),
-        _ => Err(Error::Generic),
-    }
+    store_read_slice(host, &path, &mut buffer, 8)?;
+    Ok(u64::from_le_bytes(buffer))
 }
 
 pub fn read_account_balance<Host: Runtime>(
@@ -209,11 +221,8 @@ pub fn store_account<Host: Runtime>(
 pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_NUMBER)?;
     let mut buffer = [0_u8; 8];
-
-    match host.store_read_slice(&path, 0, &mut buffer) {
-        Ok(8) => Ok(u64::from_le_bytes(buffer)),
-        _ => Err(Error::Generic),
-    }
+    store_read_slice(host, &path, &mut buffer, 8)?;
+    Ok(u64::from_le_bytes(buffer))
 }
 
 fn read_nth_block_transactions<Host: Runtime>(
