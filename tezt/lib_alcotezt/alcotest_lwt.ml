@@ -50,18 +50,15 @@ type 'a test = string * 'a test_case list
 let run ~__FILE__ library_name tests =
   (tests
   |> List.iter @@ fun (test_name, test_cases) ->
-     Test.register
-       ~__FILE__
-       ~title:(library_name ^ ": " ^ test_name)
-       ~tags:["alcotezt"]
-     @@ fun () ->
      test_cases
-     |> Lwt_list.iter_s @@ fun (test_case_name, speed_level, body) ->
-        match speed_level with
-        | `Slow when Cli.get_bool ~default:false "quick" ->
-            Log.info "Skipped test: %s" test_case_name ;
-            unit
-        | `Slow | `Quick ->
-            Log.info "Test: %s" test_case_name ;
-            body ()) ;
+     |> List.iter @@ fun (test_case_name, speed_level, body) ->
+        let tags =
+          "alcotezt"
+          :: (match speed_level with `Quick -> ["quick"] | `Slow -> [])
+        in
+        Test.register
+          ~__FILE__
+          ~title:(library_name ^ ": " ^ test_name ^ " (" ^ test_case_name ^ ")")
+          ~tags
+        @@ fun () -> body ()) ;
   unit
