@@ -1097,11 +1097,11 @@ let octez_polynomial =
     ~deps:[bls12_381; bisect_ppx; zarith]
 
 let _octez_polynomial_tests =
-  tests
-    ["test_with_finite_field"; "test_utils"]
+  tezt
+    ["test_with_finite_field"; "test_utils"; "polynomial_pbt"]
     ~path:"src/lib_polynomial/test"
     ~opam:"octez-polynomial"
-    ~deps:[bls12_381; octez_mec; alcotest; octez_polynomial]
+    ~deps:[bls12_381; octez_mec; alcotezt; octez_polynomial]
 
 let octez_bls12_381_polynomial =
   public_lib
@@ -1180,6 +1180,62 @@ let _octez_srs_extraction_main =
         bls12_381;
         octez_bls12_381_polynomial |> open_;
       ]
+
+let _octez_srs_extraction_tests =
+  tests
+    ["main"]
+    ~path:"src/lib_srs_extraction/test"
+    ~opam:"octez-srs-extraction"
+    ~deps:[octez_srs_extraction |> open_; alcotest]
+    ~dep_files:["phase1radix2m5"]
+    ~dune:
+      Dune.(
+        let extract curve srs_file =
+          let generated_srs_file = srs_file ^ ".generated" in
+          [
+            S "rule";
+            [S "alias"; S "runtest"];
+            [S "package"; S "octez-srs-extraction"];
+            [S "deps"; S srs_file; S "phase1radix2m5"];
+            [
+              S "action";
+              [
+                S "progn";
+                [
+                  S "run";
+                  S "%{exe:../srs_extraction_main.exe}";
+                  S "extract";
+                  S "zcash";
+                  S curve;
+                  S "phase1radix2m5";
+                  S "-o";
+                  S generated_srs_file;
+                ];
+                [S "diff"; S generated_srs_file; S srs_file];
+              ];
+            ];
+          ]
+        in
+        [
+          extract "g1" "srs_zcash_g1_5";
+          extract "g2" "srs_zcash_g2_5";
+          alias_rule
+            "runtest"
+            ~package:"octez-srs-extraction"
+            ~deps:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
+            ~action:
+              (run
+                 "../srs_extraction_main.exe"
+                 ["check"; "srs_zcash_g1_5"; "srs_zcash_g2_5"]);
+          alias_rule
+            "runtest"
+            ~package:"octez-srs-extraction"
+            ~deps:["srs_filecoin_g1_6"; "srs_filecoin_g2_6"]
+            ~action:
+              (run
+                 "../srs_extraction_main.exe"
+                 ["check"; "srs_filecoin_g1_6"; "srs_filecoin_g2_6"]);
+        ])
 
 let octez_plompiler =
   public_lib
@@ -1596,62 +1652,6 @@ let _octez_epoxy_tx_tests =
                         ]);
                  ]);
         ]
-
-let _octez_srs_extraction_tests =
-  tests
-    ["main"]
-    ~path:"src/lib_srs_extraction/test"
-    ~opam:"octez-srs-extraction"
-    ~deps:[octez_srs_extraction |> open_; alcotest]
-    ~dep_files:["phase1radix2m5"]
-    ~dune:
-      Dune.(
-        let extract curve srs_file =
-          let generated_srs_file = srs_file ^ ".generated" in
-          [
-            S "rule";
-            [S "alias"; S "runtest"];
-            [S "package"; S "octez-srs-extraction"];
-            [S "deps"; S srs_file; S "phase1radix2m5"];
-            [
-              S "action";
-              [
-                S "progn";
-                [
-                  S "run";
-                  S "%{exe:../srs_extraction_main.exe}";
-                  S "extract";
-                  S "zcash";
-                  S curve;
-                  S "phase1radix2m5";
-                  S "-o";
-                  S generated_srs_file;
-                ];
-                [S "diff"; S generated_srs_file; S srs_file];
-              ];
-            ];
-          ]
-        in
-        [
-          extract "g1" "srs_zcash_g1_5";
-          extract "g2" "srs_zcash_g2_5";
-          alias_rule
-            "runtest"
-            ~package:"octez-srs-extraction"
-            ~deps:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
-            ~action:
-              (run
-                 "../srs_extraction_main.exe"
-                 ["check"; "srs_zcash_g1_5"; "srs_zcash_g2_5"]);
-          alias_rule
-            "runtest"
-            ~package:"octez-srs-extraction"
-            ~deps:["srs_filecoin_g1_6"; "srs_filecoin_g2_6"]
-            ~action:
-              (run
-                 "../srs_extraction_main.exe"
-                 ["check"; "srs_filecoin_g1_6"; "srs_filecoin_g2_6"]);
-        ])
 
 let octez_crypto_dal =
   public_lib

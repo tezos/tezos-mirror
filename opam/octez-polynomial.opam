@@ -13,12 +13,14 @@ depends: [
   "bls12-381" { >= "6.1.0" & < "6.2.0" }
   "bisect_ppx" { >= "2.7.0" }
   "zarith" { >= "1.12" & < "1.13" }
+  "tezt" { with-test & >= "3.0.0" }
   "octez-mec" {with-test}
-  "alcotest" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Polynomials over finite fields"
