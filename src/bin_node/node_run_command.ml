@@ -509,7 +509,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let open Lwt_result_syntax in
   (* Main loop *)
   let lwt_log_sink_unix, internal_events =
-    Log_config.make_internal_events_with_defaults
+    Tezos_base_unix.Internal_event_unix.make_internal_events_with_defaults
       ~internal_events:(config.internal_events, config.data_dir)
       ?verbosity
       ~log_cfg:config.log

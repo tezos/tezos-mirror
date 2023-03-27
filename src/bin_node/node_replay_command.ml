@@ -480,7 +480,7 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
   @@ fun () ->
   (* Main loop *)
   let*! () =
-    Log_config.init_internal_events_with_defaults
+    Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults
       ?verbosity
       ~log_cfg:config.log
       ()

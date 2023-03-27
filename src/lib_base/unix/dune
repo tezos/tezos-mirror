@@ -13,11 +13,14 @@
   tezos-stdlib
   tezos-stdlib-unix
   data-encoding
-  uri)
+  uri
+  tezos-event-logging)
  (flags
   (:standard)
   -open Tezos_error_monad
   -open Tezos_base
+  -open Tezos_base.TzPervasives
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
-  -open Data_encoding))
+  -open Data_encoding
+  -open Tezos_event_logging))

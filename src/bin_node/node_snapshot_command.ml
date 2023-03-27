@@ -123,7 +123,10 @@ module Term = struct
       progress_display_mode =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Log_config.init_internal_events_with_defaults () in
+      let*! () =
+        Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults
+          ()
+      in
       let* data_dir, node_config =
         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
       in
@@ -160,7 +163,10 @@ module Term = struct
       block disable_check reconstruct sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Log_config.init_internal_events_with_defaults () in
+      let*! () =
+        Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults
+          ()
+      in
       let* data_dir, node_config =
         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
       in
@@ -272,7 +278,10 @@ module Term = struct
   let get_info snapshot_path format_json =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Log_config.init_internal_events_with_defaults () in
+      let*! () =
+        Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults
+          ()
+      in
       let* snapshot_path = check_snapshot_path snapshot_path in
       let* snapshot_header = Snapshots.read_snapshot_header ~snapshot_path in
       if format_json then

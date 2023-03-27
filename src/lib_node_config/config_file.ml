@@ -410,7 +410,7 @@ let default_config =
     data_dir = default_data_dir;
     p2p = default_p2p;
     rpc = default_rpc;
-    log = Log_config.lwt_log_sink_default_cfg;
+    log = Internal_event_unix.lwt_log_sink_default_cfg;
     internal_events = Internal_event_config.empty;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
@@ -713,7 +713,7 @@ let encoding =
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
           Lwt_log_sink_unix.cfg_encoding
-          Log_config.lwt_log_sink_default_cfg)
+          Internal_event_unix.lwt_log_sink_default_cfg)
        (dft
           "internal-events"
           ~description:"Configuration of the structured logging framework"

@@ -63,3 +63,24 @@ val init :
 
 (** Call [close] on all the sinks. *)
 val close : unit -> unit Lwt.t
+
+(** Default value for the lwt_log sink *)
+val lwt_log_sink_default_cfg : Lwt_log_sink_unix.cfg
+
+(** Creates internal event configuration using default node values depending on
+    parameters *)
+val make_internal_events_with_defaults :
+  ?internal_events:Internal_event_config.t * string ->
+  ?verbosity:Internal_event.level ->
+  ?log_cfg:Lwt_log_sink_unix.cfg ->
+  unit ->
+  Lwt_log_sink_unix.cfg * Internal_event_config.t
+
+(** Inits internal event configuration using default node values depending on
+    parameters *)
+val init_internal_events_with_defaults :
+  ?internal_events:Internal_event_config.t * string ->
+  ?verbosity:Internal_event.level ->
+  ?log_cfg:Lwt_log_sink_unix.cfg ->
+  unit ->
+  unit Lwt.t
