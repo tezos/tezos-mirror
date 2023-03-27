@@ -16,13 +16,15 @@ depends: [
   "tezos-crypto"
   "tezos-error-monad"
   "tezos-micheline"
+  "tezt" { with-test & >= "3.0.0" }
   "tezos-protocol-alpha" {with-test}
   "tezos-client-alpha" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: library for rewriting Micheline expressions"
