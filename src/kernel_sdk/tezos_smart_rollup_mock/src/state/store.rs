@@ -21,6 +21,8 @@ pub(crate) struct Node {
     pub(crate) inner: HashMap<String, Box<Self>>,
 }
 
+pub(crate) const VALUE_NAME: &str = "@";
+
 impl Node {
     fn print(&self, prefix: &str, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(v) = &self.value {
@@ -135,11 +137,13 @@ impl Store {
     pub fn set_value(&mut self, path: &str, value: Vec<u8>) {
         if let Some(mut node) = self.node_from_path_mut(path) {
             node.value = Some(value);
+            node.inner.insert(VALUE_NAME.to_string(), Box::default());
         } else {
-            let node = Node {
+            let mut node = Node {
                 inner: HashMap::default(),
                 value: Some(value),
             };
+            node.inner.insert(VALUE_NAME.to_string(), Box::default());
             self.node_insert(path, node);
         }
     }
