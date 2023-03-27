@@ -344,33 +344,55 @@ module type AUTOMATON = sig
 
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
-  module Internal_for_tests : sig
-    (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of [topic]. *)
-    val get_peers_in_topic_mesh : Topic.t -> state -> Peer.t list
-
-    (** [get_subscribed_topics peer state] returns the set of topics
-        that are subscribed by [peer] *)
-    val get_subscribed_topics : Peer.t -> state -> Topic.t list
-
-    (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
-    val get_fanout_peers : Topic.t -> state -> Peer.t list
-
+  module Introspection : sig
     type connection = {
       topics : Topic.Set.t;
       direct : bool;
-          (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
       outbound : bool;
-          (** An outbound connection is a connection we initiated. *)
       backoff : Time.t Topic.Map.t;
-          (** The backoff times associated to this peer for each topic *)
-      score : Score.t;  (** The score associated to this peer. *)
+      score : Score.t;
       expire : Time.t option;
-          (** The expiring time after having being disconnected from this peer. *)
     }
 
-    val connections : state -> connection Peer.Map.t
+    type connections := connection Peer.Map.t
 
-    val limits : state -> limits
+    type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
+
+    module Memory_cache : sig
+      type value = {message : message; access : int Peer.Map.t}
+
+      type t = {messages : value Message_id.Map.t}
+    end
+
+    type view = {
+      limits : limits;
+      parameters : parameters;
+      connections : connections;
+      ihave_per_heartbeat : int Peer.Map.t;
+      iwant_per_heartbeat : int Peer.Map.t;
+      mesh : Peer.Set.t Topic.Map.t;
+      fanout : fanout_peers Topic.Map.t;
+      seen_messages : Message_id.Set.t;
+      memory_cache : Memory_cache.t;
+      rng : Random.State.t;
+      heartbeat_ticks : int64;
+    }
+
+    val view : state -> view
+
+    (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of [topic]. *)
+    val get_peers_in_topic_mesh : Topic.t -> view -> Peer.t list
+
+    (** [get_subscribed_topics peer state] returns the set of topics
+        that are subscribed by [peer] *)
+    val get_subscribed_topics : Peer.t -> view -> Topic.t list
+
+    (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
+    val get_fanout_peers : Topic.t -> view -> Peer.t list
+
+    val connections : view -> connection Peer.Map.t
+
+    val limits : view -> limits
   end
 end
 

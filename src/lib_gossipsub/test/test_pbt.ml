@@ -69,7 +69,7 @@ module Test_remove_peer = struct
     (* This predicate checks that [peer_id] does not appear in the [connections]
        field of the final state. *)
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/5190 *)
-    let conns = GS.Internal_for_tests.connections final_state in
+    let conns = GS.Introspection.(connections (view final_state)) in
     let fail =
       List.find_opt (fun peer -> GS.Peer.Map.mem peer conns) all_peers
     in
@@ -164,7 +164,7 @@ module Test_remove_peer = struct
                  @[<v>%a@]@]"
                 peer
                 pp_limits
-                (GS.Internal_for_tests.limits final_state)
+                GS.Introspection.(limits (view final_state))
                 (pp_trace ())
                 trace)
     in
