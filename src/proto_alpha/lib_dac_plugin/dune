@@ -10,6 +10,7 @@
   octez-protocol-compiler.registerer
   tezos-stdlib-unix
   tezos-dac-lib
+  tezos-dac-client-lib
   tezos-client-alpha
   tezos-embedded-protocol-alpha
   tezos-protocol-alpha)
@@ -23,6 +24,7 @@
   -open Tezos_protocol_registerer
   -open Tezos_stdlib_unix
   -open Tezos_dac_lib
+  -open Tezos_dac_client_lib
   -open Tezos_client_alpha
   -open Tezos_embedded_protocol_alpha
   -open Tezos_protocol_alpha))
