@@ -208,26 +208,31 @@ module System = struct
               ())
 
   let of_protocol_to_protocol_roundtrip_or_outside_rfc3339 =
-    of_protocol_to_protocol_roundtrip_or_outside_rfc3339_with_gen
-      Gen.(oneof [Protocol.gen; Protocol.rfc3339_compatible_t_gen])
-
-  let of_protocol_to_protocol_roundtrip_or_outside_rfc3339_int_sizes_trap =
-    let interesting_values =
-      Int64.
-        [
-          max_int;
-          div max_int 2L;
-          min_int;
-          0xf0_00_00_00_00L;
-          0xf0_00_00_00_02L;
-          0xf0_00_00_00_10L;
-          0xff_ff_f0_00_00_00_10L;
-          logor 2932890L 0xff_00_00_00_00_00L;
-          logor 18L 0xff_00_00_00_00_00L;
-        ]
+    let gen_interesting_values =
+      let interesting_values =
+        Int64.
+          [
+            max_int;
+            div max_int 2L;
+            min_int;
+            0xf0_00_00_00_00L;
+            0xf0_00_00_00_02L;
+            0xf0_00_00_00_10L;
+            0xff_ff_f0_00_00_00_10L;
+            logor 2932890L 0xff_00_00_00_00_00L;
+            logor 18L 0xff_00_00_00_00_00L;
+          ]
+      in
+      Gen.(oneofl (List.map Protocol.of_seconds interesting_values))
     in
     of_protocol_to_protocol_roundtrip_or_outside_rfc3339_with_gen
-      Gen.(oneofl (List.map Protocol.of_seconds interesting_values))
+      Gen.(
+        oneof
+          [
+            Protocol.gen;
+            Protocol.rfc3339_compatible_t_gen;
+            gen_interesting_values;
+          ])
 
   let rfc_encoding_binary_roundtrip =
     Test.make
@@ -277,7 +282,6 @@ module System = struct
     [
       to_protocol_of_protocol_roundtrip;
       of_protocol_to_protocol_roundtrip_or_outside_rfc3339;
-      of_protocol_to_protocol_roundtrip_or_outside_rfc3339_int_sizes_trap;
       rfc_encoding_binary_roundtrip;
       rfc_encoding_json_roundtrip;
       encoding_binary_roundtrip;
