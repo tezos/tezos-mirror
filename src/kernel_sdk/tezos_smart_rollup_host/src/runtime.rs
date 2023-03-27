@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -559,7 +559,7 @@ fn store_get_subkey_unchecked(
     let mut buffer = Vec::with_capacity(max_size);
 
     unsafe {
-        let bytes_written = host.store_list_get(
+        let bytes_written = host.store_get_nth_key(
             path.as_ptr(),
             path.size(),
             index,
@@ -941,7 +941,7 @@ mod tests {
             })
             .return_const(subkey_count);
 
-        mock.expect_store_list_get()
+        mock.expect_store_get_nth_key()
             .withf(move |path_ptr, path_size, index, _, max_bytes| {
                 let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
 
