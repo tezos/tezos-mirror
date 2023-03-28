@@ -11,15 +11,19 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-protocol-alpha"
-  "tezos-client-alpha"
+  "tezos-protocol-016-PtMumbai"
+  "tezos-client-016-PtMumbai"
   "tezos-test-helpers"
   "qcheck-alcotest" { >= "0.20" }
   "qcheck-core"
   "logs"
+  "tezos-smart-rollup-layer2-016-PtMumbai"
+  "octez-smart-rollup-node-PtMumbai"
+  "octez-alcotezt"
+  "tezos-protocol-alpha"
+  "tezos-client-alpha"
   "tezos-smart-rollup-layer2-alpha"
   "octez-smart-rollup-node-alpha"
-  "octez-alcotezt"
   "tezt" { with-test & >= "3.0.0" }
 ]
 build: [

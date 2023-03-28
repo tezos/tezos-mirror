@@ -1,0 +1,30 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_node_PtMumbai_test_helpers)
+ (package tezos-sc-rollup-node-test)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-016-PtMumbai
+  tezos-protocol-016-PtMumbai.parameters
+  tezos-client-016-PtMumbai
+  tezos-test-helpers
+  qcheck-alcotest
+  qcheck-core
+  logs.lwt
+  tezos-smart-rollup-layer2-016-PtMumbai
+  octez_smart_rollup_node_PtMumbai
+  octez-alcotezt)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai_parameters
+  -open Tezos_client_016_PtMumbai
+  -open Tezos_test_helpers
+  -open Tezos_smart_rollup_layer2_016_PtMumbai
+  -open Octez_smart_rollup_node_PtMumbai
+  -open Octez_alcotezt))
