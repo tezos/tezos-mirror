@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Zk_rollup)
-    Invocation: cd src/proto_alpha/lib_protocol/test/unit && \
-                dune exec ./main.exe -- test "^\[Unit\] zk rollup storage$"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/unit/main.exe
     Subject:    On ZK Rollup storage
 *)
 

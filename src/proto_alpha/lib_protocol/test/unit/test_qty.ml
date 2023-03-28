@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (quantities)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] qty$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
     Subject:    On tez quantities.
 *)
 

@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (delegate_consensus_key)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] Delegate_consensus_key.ml"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
     Subject:    Functions from the module `Delegate_consensus_key`
 *)
 

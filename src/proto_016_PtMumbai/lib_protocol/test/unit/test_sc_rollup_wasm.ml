@@ -27,9 +27,7 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  -- test "^\[Unit\] sc rollup wasm$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
     Subject:      Unit test for the Wasm PVM
 *)
 
