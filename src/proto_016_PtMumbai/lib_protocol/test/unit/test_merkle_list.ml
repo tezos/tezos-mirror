@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Merkle list)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "\[Unit\] merkle list"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
     Subject:    test the ad-hoc merkle tree structure implemented to encode lists
 *)
 

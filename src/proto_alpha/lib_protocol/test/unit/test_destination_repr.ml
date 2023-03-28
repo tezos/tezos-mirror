@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Destination_repr
-    Invocation:   dune exec -- ./src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  test Destination_repr
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
     Subject:      To test the encoding of [Destination_repr] and assert it is
                   compatible with [Contract_repr.encoding].
 *)

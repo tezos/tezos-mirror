@@ -28,8 +28,7 @@
 (** Testing
     -------
     Component:  Protocol (tx rollup l2)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "tx rollup l2 apply"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
     Subject:    test the layer-2 apply implementation of transaction rollup
 *)
 

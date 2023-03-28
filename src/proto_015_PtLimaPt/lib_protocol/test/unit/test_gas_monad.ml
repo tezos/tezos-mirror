@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol Gas_monad
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-      -- test "^\[Unit\] gas monad$"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/unit/main.exe
     Subject:    Tests for the gas monad module
 *)
 

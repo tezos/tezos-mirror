@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Lib_dac_node Dac_hash
-    Invocation: dune exec src/proto_alpha/lib_dac_plugin/test/main.exe \
-                  -- test "^\[Unit\] Dac_plugin_registration.ml$"   
+    Invocation: dune exec src/proto_alpha/lib_dac_plugin/test/main.exe
     Subject:    Tests for the interoperability between Dac hash
                 and given protocol hash
 *)

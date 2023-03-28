@@ -1,8 +1,7 @@
 (** Testing
     -------
     Component:  Protocol (time repr)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] time$"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/unit/main.exe
     Subject:    Error handling of time operations 
 *)
 

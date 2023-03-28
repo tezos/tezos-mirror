@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (skip lists)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] skip list$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
     Subject:    Test skip list implementation
 *)
 
