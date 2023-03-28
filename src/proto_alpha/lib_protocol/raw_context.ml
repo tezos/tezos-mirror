@@ -972,6 +972,20 @@ let prepare_first_block ~level ~timestamp ctxt =
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
           }
       in
+      let proof_of_work_threshold =
+        let mainnet_previous_proof_of_work_threshold =
+          Int64.(sub (shift_left 1L 46) 1L)
+        in
+        let new_proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L) in
+        (* Only override constants that match the mainnet's existing
+           value; otherwise, it might affect testnets that set
+           different values. *)
+        if
+          Compare.Int64.(
+            c.proof_of_work_threshold = mainnet_previous_proof_of_work_threshold)
+        then new_proof_of_work_threshold
+        else c.proof_of_work_threshold
+      in
       let constants =
         Constants_parametric_repr.
           {
@@ -983,7 +997,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             cycles_per_voting_period = c.cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
-            proof_of_work_threshold = c.proof_of_work_threshold;
+            proof_of_work_threshold;
             minimal_stake = c.minimal_stake;
             vdf_difficulty = c.vdf_difficulty;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
