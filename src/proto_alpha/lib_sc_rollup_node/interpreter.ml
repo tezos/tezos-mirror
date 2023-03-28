@@ -285,8 +285,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let tick_state_cache = Tick_state_cache.create 64 (* size of 2 dissections *)
 
   (* Memoized version of [state_of_tick_aux]. *)
-  let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick
-      =
+  let memo_state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t)
+      tick =
     Tick_state_cache.bind_or_put
       tick_state_cache
       (tick, event.header.block_hash)
@@ -304,7 +304,12 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     | Some event ->
         assert (Raw_level.(event.header.level <= level)) ;
         let* result_state =
-          state_of_tick_aux node_ctxt ~start_state event tick
+          if Node_context.is_loser node_ctxt then
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253
+               The failures/loser mode does not work properly when restarting
+               from intermediate states. *)
+            state_of_tick_aux node_ctxt ~start_state:None event tick
+          else memo_state_of_tick_aux node_ctxt ~start_state event tick
         in
         return_some result_state
 end

@@ -66,6 +66,8 @@ let is_operator node_ctxt pkh =
 
 let is_accuser {mode; _} = mode = Accuser
 
+let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
+
 let get_fee_parameter node_ctxt purpose =
   Configuration.Operator_purpose_map.find purpose node_ctxt.fee_parameters
   |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())
