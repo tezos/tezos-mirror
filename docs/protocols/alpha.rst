@@ -154,6 +154,10 @@ Minor Changes
   Finally, this change makes mempool initialization faster.
   (MR :gl:`!7927`)
 
+- Divide by four the proof of work difficulty in order to match both
+  block times reduction to globally speed up bakers' block
+  production. (MR :gl:`!8243`)
+
 Internal
 --------
 
