@@ -324,21 +324,14 @@ module Dune = struct
 
   let run_exe exe_name args = run ("%{exe:" ^ exe_name ^ ".exe}") args
 
-  let runtest_js ?(alias = "runtest_js") ?package ~dep_files name =
-    alias_rule
-      alias
-      ?package
-      ~deps:dep_files
-      ~action:[S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")]
-
   let file name = [S "file"; S name]
 
   let glob_files expr = [S "glob_files"; S expr]
 
   let glob_files_rec expr = [S "glob_files_rec"; S expr]
 
-  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs ~dep_globs_rec
-      name =
+  let runtest ?(alias = "runtest") ?action ?package ~dep_files ~dep_globs
+      ~dep_globs_rec name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
@@ -347,11 +340,15 @@ module Dune = struct
       | [] -> None
       | deps -> Some (of_list deps)
     in
-    alias_rule
-      alias
-      ?package
-      ?deps_dune
-      ~action:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")]
+    let action =
+      Option.value ~default:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")] action
+    in
+    alias_rule alias ?package ?deps_dune ~action
+
+  let runtest_js ?(alias = "runtest_js") ?package ~dep_files ~dep_globs
+      ~dep_globs_rec name =
+    let action = [S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")] in
+    runtest ~alias ~action ?package ~dep_files ~dep_globs ~dep_globs_rec name
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
 
@@ -1528,6 +1525,8 @@ module Target = struct
                   Dune.runtest_js
                     ~alias:(alias ^ "_js")
                     ~dep_files
+                    ~dep_globs
+                    ~dep_globs_rec
                     ?package
                     name)
                 (Ne_list.to_list names)
