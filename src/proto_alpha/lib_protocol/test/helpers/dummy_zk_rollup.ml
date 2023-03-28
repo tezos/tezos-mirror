@@ -342,7 +342,10 @@ end) : sig
   val circuits : [`Public | `Private | `Fee] Plonk.SMap.t
 
   (** Commitment to the circuits  *)
-  val public_parameters : Plonk.Main_protocol.verifier_public_parameters
+  val lazy_pp :
+    (Plonk.Main_protocol.prover_public_parameters
+    * Plonk.Main_protocol.verifier_public_parameters)
+    lazy_t
 
   (** [craft_update state ~zk_rollup ?private_ops ?exit_validities public_ops]
       will apply first the [public_ops], then the [private_ops]. While doing so,
@@ -365,7 +368,7 @@ end) : sig
 
     val private_ops : Zk_rollup.Operation.t list list
 
-    val update_data : Zk_rollup.Update.t
+    val lazy_update_data : Zk_rollup.Update.t lazy_t
   end
 end = struct
   open Protocol.Alpha_context
@@ -374,9 +377,10 @@ end = struct
   module T = Types.P
   module VC = V (LibCircuit)
 
-  let srs =
-    let open Bls12_381_polynomial in
-    (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1)
+  let lazy_srs =
+    lazy
+      (let open Bls12_381_polynomial in
+      (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =
     Hex.to_bytes_exn (`Hex "0002298c03ed7d454a101eb7022bc95f7e5f41ac78")
@@ -438,11 +442,13 @@ end = struct
   let circuits =
     SMap.(add "op" `Public @@ add batch_name `Private @@ add "fee" `Fee empty)
 
-  let prover_pp, public_parameters =
-    Plonk.Main_protocol.setup
-      ~zero_knowledge:false
-      (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
-      ~srs
+  let lazy_pp =
+    lazy
+      (let srs = Lazy.force lazy_srs in
+       Plonk.Main_protocol.setup
+         ~zero_knowledge:false
+         (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
+         ~srs)
 
   let insert s x m =
     match SMap.find_opt s m with
@@ -457,6 +463,7 @@ end = struct
       Zk_rollup.Operation.t list ->
       Zk_rollup.State.t * Zk_rollup.Update.t =
    fun s ~zk_rollup ?(private_ops = []) ?exit_validities pending ->
+    let prover_pp, public_parameters = Lazy.force lazy_pp in
     let s = of_proto_state s in
     let rev_inputs = SMap.empty in
     let exit_validities =
@@ -616,15 +623,16 @@ end = struct
       @@ Stdlib.List.init Params.batch_size (fun i ->
              if i mod 2 = 0 then false_op else true_op)
 
-    let update_data =
-      snd
-      @@ craft_update
-           init_state
-           ~zk_rollup:
-             (Data_encoding.Binary.of_bytes_exn
-                Zk_rollup.Address.encoding
-                dummy_rollup_id)
-           ~private_ops
-           pending
+    let lazy_update_data =
+      lazy
+        (snd
+        @@ craft_update
+             init_state
+             ~zk_rollup:
+               (Data_encoding.Binary.of_bytes_exn
+                  Zk_rollup.Address.encoding
+                  dummy_rollup_id)
+             ~private_ops
+             pending)
   end
 end
