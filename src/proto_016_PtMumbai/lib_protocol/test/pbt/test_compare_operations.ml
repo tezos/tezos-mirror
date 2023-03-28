@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (Operation compare)
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_compare_operations.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe
     Subject:      Valid operations Comparison
 *)
 

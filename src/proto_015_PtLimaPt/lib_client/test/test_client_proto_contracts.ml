@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/proto_alpha/lib_client/test/test_client_proto_contracts.exe
+    Invocation:   dune exec src/proto_015_PtLimaPt/lib_client/test/main.exe
     Subject:      Unit tests for Client_proto_contracts
 *)
 

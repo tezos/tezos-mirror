@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell (Plugin)
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/test_plugin.exe
+    Invocation:   dune exec src/proto_015_PtLimaPt/lib_plugin/test/main.exe
     Subject:      Unit tests the plugin
 *)
 

@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Client
-   Invocation:   dune exec src/proto_alpha/lib_client/test/test_client_proto_context.exe
+   Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe
    Subject:      Tests roundtrips of batch_transfer_operation_encoding
 *)
 

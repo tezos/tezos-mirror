@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/proto_alpha/lib_client/runtest
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_client/test/main.exe
     Subject:      Test of --mode proxy and tezos-proxy-server heuristic
 *)
 

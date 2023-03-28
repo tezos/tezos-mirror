@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
-                  -- -f 'Smart rollup inbox'
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
     Subject:      Smart rollup inbox
 *)
 

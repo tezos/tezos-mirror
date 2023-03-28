@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/proto_alpha/lib_client/runtest
+    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe
     Dependencies: src/proto_alpha/lib_client/test/assert.ml
     Subject:      Expansion and unexpansion of Micheline terms.
 *)

@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (gas properties)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/pbt/test_gas_properties.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe
     Subject:    Arithmetic properties around gas.
 *)
 
