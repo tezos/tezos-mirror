@@ -75,7 +75,7 @@ let list_all_benchmarks formatter =
 (* -------------------------------------------------------------------------- *)
 (* Built-in commands implementations *)
 
-let benchmark_cmd (bench_pattern : Namespace.t)
+let perform_benchmark (bench_pattern : Namespace.t)
     (bench_opts : Cmdline.benchmark_options) =
   let bench =
     try Registration.find_benchmark_exn bench_pattern
@@ -94,12 +94,14 @@ let benchmark_cmd (bench_pattern : Namespace.t)
       Option.iter
         (fun filename -> Measure.to_csv ~filename ~bench ~workload_data)
         bench_opts.csv_export ;
-      ignore
-      @@ Measure.save
-           ~filename:bench_opts.save_file
-           ~options:bench_opts.options
-           ~bench
-           ~workload_data
+      Measure.save
+        ~filename:bench_opts.save_file
+        ~options:bench_opts.options
+        ~bench
+        ~workload_data
+
+let benchmark_cmd bench_pattern bench_opts =
+  ignore @@ perform_benchmark bench_pattern bench_opts
 
 let is_constant_input (type a t) (bench : (a, t) Benchmark.poly) workload_data =
   let module Bench = (val bench) in
@@ -214,7 +216,7 @@ and infer_cmd_full_auto model_name workload_data solver
   in
   let solver = solver_of_string solver infer_opts in
   let graph, measurements =
-    Dep_graph.load_workload_files ~local_model_name:model_name workload_files
+    Dep_graph.load_workload_files ~model_name workload_files
   in
   if Dep_graph.Graph.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
@@ -241,7 +243,7 @@ and infer_cmd_full_auto model_name workload_data solver
           | None ->
               Format.eprintf
                 "No valid model (%s or generic) found in the workload %a. \
-                 Availble models:.@."
+                 Available models:.@."
                 model_name
                 Namespace.pp
                 solved.name ;
