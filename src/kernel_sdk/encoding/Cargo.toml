@@ -17,7 +17,7 @@ categories = ["no-std", "no-std::no-alloc", "encoding", "wasm"]
 [dependencies]
 tezos_data_encoding = { version = "0.4", optional = true }
 tezos_data_encoding_derive = { version = "0.4", optional = true }
-nom = "6.1"
+nom = { version = "6.1", default-features = false }
 tezos_crypto_rs = { version = "0.4", default-features = false, optional = true }
 
 num-bigint = { version = "0.3", optional = true }

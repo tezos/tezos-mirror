@@ -43,6 +43,7 @@ publish-check: installer-template
 	@cargo check -p tezos-smart-rollup-encoding
 	@cargo check -p tezos-smart-rollup-storage
 	@cargo check -p tezos-smart-rollup-mock
+	@cargo check -p tezos-smart-rollup-installer-config
 	@cargo check -p tezos-smart-rollup-installer
 	@cargo check -p tezos-smart-rollup
 
