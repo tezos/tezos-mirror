@@ -567,14 +567,10 @@ fn store_get_subkey_unchecked(
             max_size,
         );
 
-        match Error::wrap(bytes_written) {
-            Ok(bytes_written) => {
-                buffer.set_len(bytes_written);
-
-                Ok(OwnedPath::from_bytes_unchecked(buffer))
-            }
-            Err(e) => Err(RuntimeError::HostErr(e)),
-        }
+        let bytes_written: usize =
+            Error::wrap(bytes_written).map_err(RuntimeError::HostErr)?;
+        buffer.set_len(bytes_written);
+        Ok(OwnedPath::from_bytes_unchecked(buffer))
     }
 }
 
