@@ -268,7 +268,7 @@ let test_lazy_vector () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc =
-    int_lazy_vector
+    Lazy_vector.IntVector.encoding
       (value [] Data_encoding.int31)
       (value [] Data_encoding.string)
   in
@@ -290,7 +290,7 @@ let test_lazy_vector_pop () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let int_vec_enc =
-    int_lazy_vector
+    Lazy_vector.IntVector.encoding
       (value [] Data_encoding.int31)
       (value [] Data_encoding.int31)
   in
@@ -325,7 +325,6 @@ let test_lazy_vector_pop () =
   return_unit
 
 let test_chunked_byte_vector () =
-  let open Tree_encoding in
   let open Lwt_result_syntax in
   let vector =
     Chunked_byte_vector.of_string
@@ -335,7 +334,7 @@ let test_chunked_byte_vector () =
   assert (Char.chr value = 'a') ;
   let*! value = Chunked_byte_vector.load_byte vector 10_005L in
   assert (Char.chr value = 'b') ;
-  let*! decoded_vector = encode_decode chunked_byte_vector vector in
+  let*! decoded_vector = encode_decode Chunked_byte_vector.encoding vector in
   let*! value = Chunked_byte_vector.load_byte decoded_vector 5L in
   assert (Char.chr value = 'a') ;
   let*! value = Chunked_byte_vector.load_byte decoded_vector 10_005L in
@@ -513,7 +512,7 @@ let test_swap_vectors () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let int_vec_enc =
-    int_lazy_vector
+    Lazy_vector.IntVector.encoding
       (value [] Data_encoding.int31)
       (value [] Data_encoding.int31)
   in

@@ -32,6 +32,7 @@
 
 open QCheck_alcotest
 open QCheck2
+open Tezos_tree_encoding
 
 module type S = sig
   module Chunk : sig
@@ -51,9 +52,9 @@ module type S = sig
   val name : string
 
   val create :
-    ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t Lwt.t) -> int64 -> t
+    ?origin:wrapped_tree -> ?get_chunk:(int64 -> Chunk.t Lwt.t) -> int64 -> t
 
-  val origin : t -> Lazy_map.tree option
+  val origin : t -> wrapped_tree option
 
   val allocate : int64 -> t
 

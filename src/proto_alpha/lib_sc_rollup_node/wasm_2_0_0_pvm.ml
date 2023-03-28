@@ -51,7 +51,7 @@ module type TreeS =
 
 module Make_wrapped_tree (Tree : TreeS) :
   Tezos_tree_encoding.TREE with type tree = Tree.tree = struct
-  type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
+  type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
   include Tree
 

@@ -452,8 +452,7 @@ let wrap_as_durable_storage tree =
       Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
       tree
   in
-  Tezos_webassembly_interpreter.Durable_storage.of_tree
-  @@ Tezos_tree_encoding.Wrapped.wrap tree
+  Tezos_webassembly_interpreter.Durable_storage.of_tree tree
 
 let has_stuck_flag tree =
   let open Lwt_syntax in

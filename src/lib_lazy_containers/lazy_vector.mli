@@ -98,7 +98,7 @@ module type S = sig
     ?first_key:key ->
     ?values:'a Map.Map.t ->
     ?produce_value:'a producer ->
-    ?origin:Lazy_map.tree ->
+    ?origin:Tezos_tree_encoding.wrapped_tree ->
     key ->
     'a t
 
@@ -106,7 +106,7 @@ module type S = sig
 
       {b Note:} The sole consumer of this function is expected to be
       the tree-encoding library. *)
-  val origin : 'a t -> Lazy_map.tree option
+  val origin : 'a t -> Tezos_tree_encoding.wrapped_tree option
 
   (** [empty ()] creates a vector of size zero. This is used in conjunction with
       {!cons} to model list-like structure. *)
@@ -203,6 +203,12 @@ module type S = sig
 
   (** [first_key v] returns the first key of the given vector [v]. *)
   val first_key : 'a t -> key
+
+  (** [encoding len_encoding elem_encoding] returns [Tezos_tree_encoding] for the vector *)
+  val encoding :
+    key Tezos_tree_encoding.t ->
+    'a Tezos_tree_encoding.t ->
+    'a t Tezos_tree_encoding.t
 end
 
 module Make (Key : KeyS) : S with type key = Key.t
@@ -234,11 +240,11 @@ module Mutable : sig
     val create :
       ?values:'a Vector.Map.Map.t ->
       ?produce_value:'a Vector.producer ->
-      ?origin:Lazy_map.tree ->
+      ?origin:Tezos_tree_encoding.wrapped_tree ->
       key ->
       'a t
 
-    val origin : 'a t -> Lazy_map.tree option
+    val origin : 'a t -> Tezos_tree_encoding.wrapped_tree option
 
     val get : key -> 'a t -> 'a Lwt.t
 

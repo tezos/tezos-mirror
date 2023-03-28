@@ -81,9 +81,7 @@ val scope : key -> 'a t -> 'a t
     During the encoding process, the subtree is added to the target tree
     under the prefix, before the key-value list is processed. *)
 val lazy_mapping :
-  ('k -> key) ->
-  'v t ->
-  (Tezos_lazy_containers.Lazy_map.tree option * ('k * 'v option) list) t
+  ('k -> key) -> 'v t -> (Tree.wrapped_tree option * ('k * 'v option) list) t
 
 (** [case tag enc f] return a partial encoder that represents a case in a
     sum-type. The encoder hides the (existentially bound) type of the

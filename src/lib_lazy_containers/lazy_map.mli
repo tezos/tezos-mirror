@@ -23,13 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** An extensible type to record the type of trees used as backend for
-    the lazy map.
-
-    {b Note:} If you use the 'tree-encoding' library, then its functor
-    takes care of adding a new constructor for the expected tree. *)
-type tree = ..
-
 (** [KeyS] is the qualifier signature for key types in the lazy map.
     Externally visible and accessible keys of the lazy map are always
     non-negative. However, the lazy map implementation may internally use
@@ -55,7 +48,7 @@ module type S = sig
 
       {b Note:} The sole consumer of this function is expected to be
       the tree-encoding library. *)
-  val origin : 'a t -> tree option
+  val origin : 'a t -> Tezos_tree_encoding.wrapped_tree option
 
   (** [string_of_key key] turns the given [key] into a string. *)
   val string_of_key : key -> string
@@ -81,7 +74,7 @@ module type S = sig
   val create :
     ?values:'a Map.t ->
     ?produce_value:'a producer ->
-    ?origin:tree ->
+    ?origin:Tezos_tree_encoding.wrapped_tree ->
     unit ->
     'a t
 
@@ -143,7 +136,7 @@ module Mutable : sig
     val create :
       ?values:'a Map.Map.t ->
       ?produce_value:'a Map.producer ->
-      ?origin:tree ->
+      ?origin:Tezos_tree_encoding.wrapped_tree ->
       unit ->
       'a t
 

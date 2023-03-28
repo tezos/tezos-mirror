@@ -117,6 +117,10 @@ module Chunk = struct
     let copied_bytes = String.to_bytes s in
     Bytes.set copied_bytes (Int64.to_int offset) chr ;
     Bytes.unsafe_to_string copied_bytes
+
+  let encoding =
+    let open Tezos_tree_encoding in
+    conv of_bytes to_bytes (raw [])
 end
 
 module Vector = Lazy_vector.Int64Vector
@@ -287,3 +291,21 @@ let to_string vector =
   Bytes.to_string buffer
 
 let loaded_chunks vector = Vector.loaded_bindings vector.chunks
+
+module Enc_intf = struct
+  type nonrec t = t
+
+  type chunk = Chunk.t
+
+  let origin = origin
+
+  let loaded_chunks = loaded_chunks
+
+  let length = length
+
+  let create = create
+end
+
+module Encoding = Tezos_tree_encoding.CBV_encoding.Make (Enc_intf)
+
+let encoding = Encoding.cbv Chunk.encoding

@@ -27,10 +27,12 @@ open Tezos_webassembly_interpreter.Eval
 module Parser = Binary_parser_encodings
 open Tezos_tree_encoding
 open Kont_encodings
+open Tezos_lazy_containers
 
 let tag_encoding = value [] Data_encoding.string
 
-let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
+let lazy_vec_encoding enc =
+  Lazy_vector.Int32Vector.encoding (value [] Data_encoding.int32) enc
 
 let eval_const_kont_encoding =
   tagged_union

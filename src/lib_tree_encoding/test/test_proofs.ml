@@ -45,9 +45,9 @@ let encoding =
   let open Tree_encoding in
   tup3
     ~flatten:false
-    (int_lazy_vector int_encoding int_encoding)
-    (int_lazy_vector int_encoding int_encoding)
-    (int_lazy_vector int_encoding int_encoding)
+    (Lazy_vector.IntVector.encoding int_encoding int_encoding)
+    (Lazy_vector.IntVector.encoding int_encoding int_encoding)
+    (Lazy_vector.IntVector.encoding int_encoding int_encoding)
 
 let proof_size proof =
   Data_encoding.Binary.length
@@ -155,10 +155,12 @@ let test_move_and_read_subtrees () =
   let v = make_vector (fun x -> x) 5_000 in
   let* context, tree = prepare_context () in
   let from_encoding =
-    Tree_encoding.(scope ["from"] (int_lazy_vector int_encoding int_encoding))
+    Tree_encoding.(
+      scope ["from"] (Lazy_vector.IntVector.encoding int_encoding int_encoding))
   in
   let to_encoding =
-    Tree_encoding.(scope ["to"] (int_lazy_vector int_encoding int_encoding))
+    Tree_encoding.(
+      scope ["to"] (Lazy_vector.IntVector.encoding int_encoding int_encoding))
   in
   let* tree = Tree_encoding.encode from_encoding v tree in
   let* proof =
@@ -181,7 +183,7 @@ let test_copy_subtrees () =
     let v = make_vector (fun x -> x) vec_size in
     let* context, tree = prepare_context () in
     let vec_encoding =
-      Tree_encoding.(int_lazy_vector int_encoding int_encoding)
+      Lazy_vector.IntVector.encoding int_encoding int_encoding
     in
     let* tree =
       Tree_encoding.encode

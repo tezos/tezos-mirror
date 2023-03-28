@@ -462,56 +462,56 @@ opam:tezos-clic:
 opam:tezos-client-000-Ps9mPmXa:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-000-Ps9mPmXa
 
 opam:tezos-client-001-PtCJ7pwo:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-001-PtCJ7pwo
 
 opam:tezos-client-002-PsYLVpVv:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-002-PsYLVpVv
 
 opam:tezos-client-003-PsddFKi3:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-003-PsddFKi3
 
 opam:tezos-client-004-Pt24m4xi:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-004-Pt24m4xi
 
 opam:tezos-client-005-PsBabyM1:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-005-PsBabyM1
 
 opam:tezos-client-006-PsCARTHA:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-006-PsCARTHA
 
 opam:tezos-client-007-PsDELPH1:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-client-007-PsDELPH1
 
@@ -602,14 +602,14 @@ opam:tezos-client-base-unix:
 opam:tezos-client-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-client-commands
 
 opam:tezos-client-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-demo-counter
 
@@ -791,49 +791,49 @@ opam:tezos-embedded-protocol-013-PtJakart:
 opam:tezos-embedded-protocol-014-PtKathma:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-014-PtKathma
 
 opam:tezos-embedded-protocol-015-PtLimaPt:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-015-PtLimaPt
 
 opam:tezos-embedded-protocol-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-016-PtMumbai
 
 opam:tezos-embedded-protocol-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-alpha
 
 opam:tezos-embedded-protocol-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-demo-counter
 
 opam:tezos-embedded-protocol-demo-noops:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-demo-noops
 
 opam:tezos-embedded-protocol-genesis:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-genesis
 
@@ -897,7 +897,7 @@ opam:tezos-layer2-utils-016-PtMumbai:
 opam:tezos-lazy-containers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-lazy-containers
 
@@ -929,7 +929,7 @@ opam:tezos-mockup:
 opam:tezos-mockup-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-mockup-commands
 
@@ -1119,7 +1119,7 @@ opam:tezos-protocol-demo-counter:
 opam:tezos-protocol-demo-noops:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-demo-noops
 
@@ -1335,7 +1335,7 @@ opam:tezos-rpc:
 opam:tezos-rpc-http:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-rpc-http
 
@@ -1438,7 +1438,7 @@ opam:tezos-signer-services:
 opam:tezos-smart-rollup-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-smart-rollup-016-PtMumbai
 
@@ -1489,7 +1489,7 @@ opam:tezos-test-helpers:
 opam:tezos-test-helpers-extra:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-test-helpers-extra
 
@@ -1523,7 +1523,7 @@ opam:tezos-validation:
 opam:tezos-version:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-version
 
@@ -1537,14 +1537,14 @@ opam:tezos-wasmer:
 opam:tezos-webassembly-interpreter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-webassembly-interpreter
 
 opam:tezos-webassembly-interpreter-extra:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-webassembly-interpreter-extra
 

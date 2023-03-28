@@ -1260,30 +1260,6 @@ let octez_base_test_helpers =
     ~linkall:true
     ~bisect_ppx:No
 
-let lazy_containers =
-  public_lib
-    "tezos-lazy-containers"
-    ~path:"src/lib_lazy_containers"
-    ~synopsis:
-      "A collection of lazy containers whose contents is fetched from \
-       arbitrary backend on-demand"
-    ~deps:[octez_lwt_result_stdlib; zarith]
-
-let _lazy_containers_tests =
-  tezt
-    ["chunked_byte_vector_tests"; "lazy_vector_tests"]
-    ~path:"src/lib_lazy_containers/test"
-    ~opam:"tezos-lazy-containers-tests"
-    ~synopsis:"Various tests for the lazy containers library"
-    ~deps:
-      [
-        lazy_containers |> open_;
-        qcheck_core;
-        qcheck_alcotest;
-        lwt_unix;
-        alcotezt;
-      ]
-
 let octez_context_sigs =
   public_lib
     "tezos-context.sigs"
@@ -1301,10 +1277,33 @@ let tree_encoding =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
-        lazy_containers;
         octez_context_sigs;
         octez_lwt_result_stdlib;
         data_encoding;
+      ]
+
+let lazy_containers =
+  public_lib
+    "tezos-lazy-containers"
+    ~path:"src/lib_lazy_containers"
+    ~synopsis:
+      "A collection of lazy containers whose contents is fetched from \
+       arbitrary backend on-demand"
+    ~deps:[zarith; tree_encoding]
+
+let _lazy_containers_tests =
+  tezt
+    ["chunked_byte_vector_tests"; "lazy_vector_tests"]
+    ~path:"src/lib_lazy_containers/test"
+    ~opam:"tezos-lazy-containers-tests"
+    ~synopsis:"Various tests for the lazy containers library"
+    ~deps:
+      [
+        lazy_containers |> open_;
+        qcheck_core;
+        qcheck_alcotest;
+        lwt_unix;
+        alcotezt;
       ]
 
 let octez_webassembly_interpreter =

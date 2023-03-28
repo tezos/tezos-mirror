@@ -33,6 +33,8 @@ type key = string trace
 
 exception Key_not_found of key
 
+type tree_instance = Tree.tree_instance = ..
+
 (** {2 Types}*)
 
 (** Represents a partial encoder for a specific constructor of a sum-type. *)
@@ -199,41 +201,6 @@ val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
     branch [key]. *)
 val scope : key -> 'a t -> 'a t
 
-module Lazy_map_encoding : sig
-  module type S = sig
-    type 'a map
-
-    val lazy_map : 'a t -> 'a map t
-  end
-
-  (** [Make (YouMap)] creates a module with the [lazy_map]
-      combinator which can be used to decode [YouMap] specifically. *)
-  module Make (Map : Tezos_lazy_containers.Lazy_map.S) :
-    S with type 'a map := 'a Map.t
-end
-
-val int_lazy_vector :
-  int t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.IntVector.t t
-
-val int32_lazy_vector :
-  int32 t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.Int32Vector.t t
-
-val int64_lazy_vector :
-  int64 t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.Int64Vector.t t
-
-val z_lazy_vector :
-  Z.t t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.ZVector.t t
-
-(** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
-val chunk : Tezos_lazy_containers.Chunked_byte_vector.Chunk.t t
-
-(** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
-val chunked_byte_vector : Tezos_lazy_containers.Chunked_byte_vector.t t
-
-(** [immutable_chunked_byte_vector] is an encoder for [immutable_chunked_byte_vector]. *)
-val immutable_chunked_byte_vector :
-  Tezos_lazy_containers.Immutable_chunked_byte_vector.t t
-
 (** [case tag enc inj proj] returns a partial encoder that represents a case
     in a sum-type. The encoder hides the (existentially bound) type of the
     parameter to the specific case, provided converter functions [inj] and
@@ -277,9 +244,9 @@ module type TREE = sig
   type value := bytes
 
   (** @raise Incorrect_tree_type *)
-  val select : Tezos_lazy_containers.Lazy_map.tree -> tree
+  val select : Tree.tree_instance -> tree
 
-  val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
+  val wrap : tree -> Tree.tree_instance
 
   val remove : tree -> key -> tree Lwt.t
 
@@ -354,9 +321,9 @@ module Encodings_util : sig
 
       type tree = Ctx.tree
 
-      val select : Tezos_lazy_containers.Lazy_map.tree -> tree
+      val select : Tree.tree_instance -> tree
 
-      val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
+      val wrap : tree -> Tree.tree_instance
     end
 
     module Tree_encoding_runner : Runner.S with type tree = Ctx.tree
@@ -364,4 +331,108 @@ module Encodings_util : sig
     (* Create an empty tree *)
     val empty_tree : unit -> Ctx.tree Lwt.t
   end
+end
+
+module Lazy_map_encoding : sig
+  module type Lazy_map_sig = sig
+    type key
+
+    type 'a t
+
+    type 'a producer = key -> 'a Lwt.t
+
+    module Map : Stdlib.Map.S with type key = key
+
+    val origin : 'a t -> wrapped_tree option
+
+    val string_of_key : key -> string
+
+    val loaded_bindings : 'a t -> (key * 'a option) list
+
+    val create :
+      ?values:'a Map.t ->
+      ?produce_value:'a producer ->
+      ?origin:wrapped_tree ->
+      unit ->
+      'a t
+  end
+
+  module type S = sig
+    type 'a map
+
+    val lazy_map : 'a t -> 'a map t
+  end
+
+  (** [Make (YouMap)] creates a module with the [lazy_map]
+      combinator which can be used to decode [YouMap] specifically. *)
+  module Make (Map : Lazy_map_sig) : S with type 'a map := 'a Map.t
+end
+
+module Lazy_vector_encoding : sig
+  module type Lazy_vector_sig = sig
+    type 'a t
+
+    type key
+
+    type 'a producer = key -> 'a Lwt.t
+
+    module Map : Lazy_map_encoding.Lazy_map_sig with type key = key
+
+    val origin : 'a t -> wrapped_tree option
+
+    val string_of_key : key -> string
+
+    val loaded_bindings : 'a t -> (key * 'a option) list
+
+    val create :
+      ?first_key:key ->
+      ?values:'a Map.Map.t ->
+      ?produce_value:'a producer ->
+      ?origin:wrapped_tree ->
+      key ->
+      'a t
+
+    val num_elements : 'a t -> key
+
+    val first_key : 'a t -> key
+  end
+
+  module type S = sig
+    type 'a vector
+
+    type key
+
+    val lazy_vector : key t -> 'a t -> 'a vector t
+  end
+
+  module Make (Vector : Lazy_vector_sig) :
+    S with type 'a vector := 'a Vector.t and type key := Vector.key
+end
+
+module CBV_encoding : sig
+  module type CBV_sig = sig
+    type t
+
+    type chunk
+
+    val origin : t -> wrapped_tree option
+
+    val loaded_chunks : t -> (int64 * chunk option) list
+
+    val length : t -> int64
+
+    val create :
+      ?origin:wrapped_tree -> ?get_chunk:(int64 -> chunk Lwt.t) -> int64 -> t
+  end
+
+  module type S = sig
+    type cbv
+
+    type chunk
+
+    val cbv : chunk t -> cbv t
+  end
+
+  module Make (CBV : CBV_sig) :
+    S with type cbv := CBV.t and type chunk := CBV.chunk
 end

@@ -85,9 +85,7 @@ val scope : key -> 'a t -> 'a t
     This function is primarily useful when providing a [~produce_value]
     function to [Lazy_map.create]. *)
 val lazy_mapping :
-  ('i -> key) ->
-  'a t ->
-  (Tezos_lazy_containers.Lazy_map.tree option * ('i -> 'a Lwt.t)) t
+  ('i -> key) -> 'a t -> (Tree.wrapped_tree option * ('i -> 'a Lwt.t)) t
 
 (** [delayed f] produces a tree decoder that delays evaluation of [f ()] until
     the decoder is actually needed. This is required to allow for directly

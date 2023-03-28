@@ -6,5 +6,5 @@
  (public_name tezos-lazy-containers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-lwt-result-stdlib
-  zarith))
+  zarith
+  tezos-tree-encoding))
