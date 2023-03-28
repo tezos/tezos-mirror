@@ -161,6 +161,21 @@ module Events = struct
 
   let section = ["node"; "context"; "disk"]
 
+  let init_context =
+    declare_3
+      ~section
+      ~level:Info
+      ~name:"init_context"
+      ~msg:
+        "initializing context (readonly: {readonly}, index_log_size: \
+         {index_log_size}, lru_size: {lru_size})"
+      ~pp1:Format.pp_print_bool
+      ("readonly", Data_encoding.bool)
+      ~pp2:Format.pp_print_int
+      ("index_log_size", Data_encoding.int31)
+      ~pp3:Format.pp_print_int
+      ("lru_size", Data_encoding.int31)
+
   let starting_gc =
     declare_1
       ~section
@@ -784,6 +799,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           ~default:Tezos_context_helpers.Env.(env.index_log_size)
       in
       let lru_size = env.lru_size in
+      let* () =
+        Events.(emit init_context (readonly, index_log_size, lru_size))
+      in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly

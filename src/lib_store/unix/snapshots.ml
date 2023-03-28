@@ -4167,6 +4167,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         in
         let*! () =
           if check_consistency then
+            Animation.three_dots
+              ~progress_display_mode:Auto
+              ~msg:"Checking context integrity"
+            @@ fun () ->
             Context.Checks.Pack.Integrity_check.run
               ~root:dst_context_dir
               ~auto_repair:false
