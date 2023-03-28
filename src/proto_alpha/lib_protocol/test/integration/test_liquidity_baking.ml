@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:    liquidity baking
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/main.exe \
-                  -- test "^liquidity baking$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
     Subject:      Test liquidity baking subsidies, CPMM storage updates,
                   and toggle vote.
 *)

@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Context Storage
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test storage
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:    Test the correctnesss of debug message from storage_functor
  *)
 

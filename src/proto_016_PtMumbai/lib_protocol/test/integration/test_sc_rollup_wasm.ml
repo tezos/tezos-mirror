@@ -27,9 +27,7 @@
 (** Testing
     -------
     Component:    sc rollup wasm
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/main.exe \
-                  -- test "^sc rollup wasm$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:      Test the WASM 2.0 PVM.
 *)
 

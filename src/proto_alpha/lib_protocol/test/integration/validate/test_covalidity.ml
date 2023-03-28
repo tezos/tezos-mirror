@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                -- test "^covalidity"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe
     Subject:    Validation of operation.
 *)
 open Validate_helpers
