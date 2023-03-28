@@ -553,8 +553,8 @@ module External_validator_process = struct
 
   type validator_process = {
     process : Lwt_process.process_none;
-    stdin : Lwt_io.output_channel;
-    stdout : Lwt_io.input_channel;
+    input : Lwt_io.output_channel;
+    output : Lwt_io.input_channel;
     canceler : Lwt_canceler.t;
     clean_up_callback_id : Lwt_exit.clean_up_callback_id;
   }
@@ -595,6 +595,81 @@ module External_validator_process = struct
     | Some xdg_runtime_dir when xdg_runtime_dir <> "" -> xdg_runtime_dir
     | Some _ | None -> Filename.get_temp_dir_name ()
 
+  (* Ad-hoc request to make the handshake with the external validator.
+     This is expected to be used each time the external validator
+     process is (re)started.
+     The scenario of the handshake is the following:
+     - the node sends some magic bytes,
+     - the external validator checks the bytes and sends it's magic
+       bytes,
+     - the node checks the received bytes,
+     - handshake is finished. *)
+  let process_handshake process_input process_output =
+    let open Lwt_result_syntax in
+    let*! () =
+      External_validation.send
+        process_input
+        Data_encoding.Variable.bytes
+        External_validation.magic
+    in
+    let*! magic =
+      External_validation.recv process_output Data_encoding.Variable.bytes
+    in
+    fail_when
+      (not (Bytes.equal magic External_validation.magic))
+      (Block_validator_errors.Validation_process_failed
+         (Inconsistent_handshake "bad magic"))
+
+  (* Ad-hoc request to pass startup arguments to the external
+     validator. This is expected to be run after the
+     [process_handshake].
+     This is expected to be used each time the external validator
+     process is (re)started.
+     The scenario of the init is the following:
+     - execute the handshake,
+     - the node sends some parameters and waits for an ack,
+     - the external validator initializes it's state thanks to the
+       given parameters,
+     - the external validator returns a ack to confirm a successful
+       initialization,
+     - the node receives the ack and continues,
+     - initialization is finished.
+  *)
+  let process_init vp process_input process_output =
+    let open Lwt_result_syntax in
+    let parameters =
+      {
+        External_validation.context_root = vp.context_root;
+        protocol_root = vp.protocol_root;
+        sandbox_parameters = vp.sandbox_parameters;
+        genesis = vp.genesis;
+        user_activated_upgrades = vp.user_activated_upgrades;
+        user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
+        operation_metadata_size_limit = vp.operation_metadata_size_limit;
+        dal_config = vp.dal_config;
+        log_config = vp.log_config;
+      }
+    in
+    let*! () =
+      External_validation.send
+        process_input
+        External_validation.parameters_encoding
+        parameters
+    in
+    let* () =
+      External_validation.recv
+        process_output
+        (Error_monad.result_encoding Data_encoding.empty)
+    in
+    return_unit
+
+  (* Proceeds to a full initialization of the external validator
+     process by opening the communication channels, spawning the
+     external validator and calling the handshake and initialization
+     functions.
+     TODO: Add critical section for external validator launch, see
+     https://gitlab.com/tezos/tezos/-/issues/5175
+  *)
   let start_process vp =
     let open Lwt_result_syntax in
     let canceler = Lwt_canceler.create () in
@@ -678,82 +753,61 @@ module External_validator_process = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           Lwt.return (Stdlib.at_exit (fun () -> process#terminate)))
     in
-    let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
-    let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
+    let process_input = Lwt_io.of_fd ~mode:Output process_socket in
+    let process_output = Lwt_io.of_fd ~mode:Input process_socket in
     let*! () = Events.(emit validator_started process#pid) in
-    let parameters =
-      {
-        External_validation.context_root = vp.context_root;
-        protocol_root = vp.protocol_root;
-        sandbox_parameters = vp.sandbox_parameters;
-        genesis = vp.genesis;
-        user_activated_upgrades = vp.user_activated_upgrades;
-        user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
-        operation_metadata_size_limit = vp.operation_metadata_size_limit;
-        dal_config = vp.dal_config;
-        log_config = vp.log_config;
-      }
-    in
     vp.validator_process <-
       Running
         {
           process;
-          stdin = process_stdin;
-          stdout = process_stdout;
+          input = process_input;
+          output = process_output;
           canceler;
           clean_up_callback_id;
         } ;
-    let*! () =
-      External_validation.send
-        process_stdin
-        Data_encoding.Variable.bytes
-        External_validation.magic
-    in
-    let*! magic =
-      External_validation.recv process_stdout Data_encoding.Variable.bytes
-    in
-    let* () =
-      fail_when
-        (not (Bytes.equal magic External_validation.magic))
-        (Block_validator_errors.Validation_process_failed
-           (Inconsistent_handshake "bad magic"))
-    in
-    let*! () =
-      External_validation.send
-        process_stdin
-        External_validation.parameters_encoding
-        parameters
-    in
-    return (process, process_stdin, process_stdout)
+    let* () = process_handshake process_input process_output in
+    let* () = process_init vp process_input process_output in
+    return (process, process_input, process_output)
 
+  (* Inspects the validator's state and return it. If the process is
+     in an inconsistent state, it will be restarted automatically --
+     by running [start_process]. *)
+  let validator_state vp =
+    let open Lwt_result_syntax in
+    match vp.validator_process with
+    | Running
+        {
+          process;
+          input = process_input;
+          output = process_output;
+          canceler;
+          clean_up_callback_id;
+        } -> (
+        match process#state with
+        | Running -> return (process, process_input, process_output)
+        | Exited status ->
+            (* When the process is in an inconsistent state, we restart
+               it automatically. *)
+            let*! () = Error_monad.cancel_with_exceptions canceler in
+            Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
+            vp.validator_process <- Uninitialized ;
+            let*! () = Events.(emit process_exited_abnormally status) in
+            start_process vp)
+    | Uninitialized -> start_process vp
+    | Exiting ->
+        let*! () = Events.(emit cannot_start_process ()) in
+        tzfail Block_validator_errors.Cannot_validate_while_shutting_down
+
+  (* Sends the given request to the external validator. If the request
+     failed to be fulfilled, the status of the external validator is
+     set to Uninitialized and the associated error is propagated. *)
   let send_request vp request result_encoding =
     let open Lwt_result_syntax in
-    let* process, process_stdin, process_stdout =
-      match vp.validator_process with
-      | Running
-          {
-            process;
-            stdin = process_stdin;
-            stdout = process_stdout;
-            canceler;
-            clean_up_callback_id;
-          } -> (
-          match process#state with
-          | Running -> return (process, process_stdin, process_stdout)
-          | Exited status ->
-              let*! () = Error_monad.cancel_with_exceptions canceler in
-              Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
-              vp.validator_process <- Uninitialized ;
-              let*! () = Events.(emit process_exited_abnormally status) in
-              start_process vp)
-      | Uninitialized -> start_process vp
-      | Exiting ->
-          let*! () = Events.(emit cannot_start_process ()) in
-          tzfail Block_validator_errors.Cannot_validate_while_shutting_down
-    in
+    let* process, process_input, process_output = validator_state vp in
     Lwt.catch
       (fun () ->
-        (* Make sure that the promise is not canceled between a send and recv *)
+        (* Make sure that the promise is not cancelled between a send
+           and recv *)
         let* res =
           Lwt.protected
             (Lwt_mutex.with_lock vp.lock (fun () ->
@@ -761,13 +815,13 @@ module External_validator_process = struct
                  let*! () = Events.(emit request_for request) in
                  let*! () =
                    External_validation.send
-                     process_stdin
+                     process_input
                      External_validation.request_encoding
                      request
                  in
                  let*! res =
                    External_validation.recv_result
-                     process_stdout
+                     process_output
                      result_encoding
                  in
                  let timespan =
@@ -794,6 +848,12 @@ module External_validator_process = struct
         in
         fail_with_exn exn)
 
+  (* The initialization phase aims to configure the external validator
+     and start it's associated process. This will result in the call
+     of [process_handshake] and [process_init].
+     Note that it is important to have [init] as a blocking promise as
+     the external validator must initialize the context (in RW) before
+     the node tries to open it (in RO).*)
   let init
       ({
          user_activated_upgrades;
@@ -823,8 +883,11 @@ module External_validator_process = struct
         log_config;
       }
     in
-    let* () =
-      send_request validator External_validation.Init Data_encoding.empty
+    let* (_ :
+           Lwt_process.process_none
+           * Lwt_io.output Lwt_io.channel
+           * Lwt_io.input Lwt_io.channel) =
+      start_process validator
     in
     return validator
 
@@ -940,7 +1003,7 @@ module External_validator_process = struct
     let open Lwt_syntax in
     let* () = Events.(emit close ()) in
     match vp.validator_process with
-    | Running {process; stdin = process_stdin; canceler; _} ->
+    | Running {process; input = process_input; canceler; _} ->
         let request = External_validation.Terminate in
         let* () = Events.(emit request_for request) in
         let* () =
@@ -950,7 +1013,7 @@ module External_validator_process = struct
               (* Try to trigger the clean shutdown of the validation
                  process. *)
               External_validation.send
-                process_stdin
+                process_input
                 External_validation.request_encoding
                 request)
             (function

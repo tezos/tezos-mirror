@@ -42,7 +42,6 @@ type parameters = {
 }
 
 type request =
-  | Init
   | Validate of {
       chain_id : Chain_id.t;
       block_header : Block_header.t;

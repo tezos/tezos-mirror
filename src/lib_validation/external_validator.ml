@@ -165,6 +165,9 @@ let inconsistent_handshake msg =
   Block_validator_errors.(
     Validation_process_failed (Inconsistent_handshake msg))
 
+(* Handshake with the node. See
+   [Block_validator_process.process_handshake] for the handshake
+   scenario. *)
 let handshake input output =
   let open Lwt_syntax in
   let* () =
@@ -178,14 +181,18 @@ let handshake input output =
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
 
-let init ~readonly input =
+(* Initialization of the external process thanks to the parameters
+   sent by the node. This is expected to be run after the
+   [handshake]. See [Block_validator_process.process_init] for
+   the init scenario. *)
+let init ~readonly input output =
   let open Lwt_result_syntax in
   let*! () = Events.(emit initialization_request ()) in
   let*! {
           context_root;
           protocol_root;
-          sandbox_parameters;
           genesis;
+          sandbox_parameters;
           user_activated_upgrades;
           user_activated_protocol_overrides;
           operation_metadata_size_limit;
@@ -213,6 +220,16 @@ let init ~readonly input =
       ~readonly
       context_root
   in
+  (* It is necessary to send the ok result, as a blocking promise for
+     the node (see [Block_validator_process.process_init]), after a
+     complete initialization as the node relies on the external
+     validator for the context's initialization. *)
+  let*! () =
+    External_validation.send
+      output
+      (Error_monad.result_encoding Data_encoding.empty)
+      (Ok ())
+  in
   return
     ( context_index,
       protocol_root,
@@ -232,7 +249,7 @@ let run ~readonly ~using_std_channel input output =
          user_activated_protocol_overrides,
          operation_metadata_size_limit,
          log_config ) =
-    init ~readonly input
+    init ~readonly input output
   in
   let*! () =
     (* if the external validator is spawned in a standalone way and communicates
@@ -244,21 +261,16 @@ let run ~readonly ~using_std_channel input output =
         ~lwt_log_sink:log_config.lwt_log_sink_unix
         ()
   in
+  (* Main loop waiting for request to be processed, forever, until the
+     [Terminate] request is received.
+     TODO: https://gitlab.com/tezos/tezos/-/issues/5177
+  *)
   let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
     let*! recved =
       External_validation.recv input External_validation.request_encoding
     in
     match recved with
-    | External_validation.Init ->
-        let init : unit Lwt.t =
-          External_validation.send
-            output
-            (Error_monad.result_encoding Data_encoding.empty)
-            (Ok ())
-        in
-        let*! () = init in
-        loop cache None
     | External_validation.Commit_genesis {chain_id} ->
         let*! () = Events.(emit commit_genesis_request genesis.block) in
         let*! commit =
