@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "^frozen bonds"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
     Subject:    Frozen bonds applicable to contracts and part of their stake.
 *)
 

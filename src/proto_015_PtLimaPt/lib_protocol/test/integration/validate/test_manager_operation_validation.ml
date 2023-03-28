@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec \
-                src/proto_015_PtLimaPt/lib_protocol/test/integration/validate/main.exe \
-                -- test "^single"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/validate/main.exe
     Subject:    Validation of manager operation.
 *)
 

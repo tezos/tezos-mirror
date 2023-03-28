@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/validate
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe
     Subject:      Integration > Validate
 *)
 

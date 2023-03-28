@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                  -- test "^Mempool"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe
     Subject:      Integration > Validate > Mempool mode
 *)
 

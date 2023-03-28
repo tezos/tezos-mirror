@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                -- test "^one-manager"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe
     Subject:    1M restriction in validation of manager operation.
 *)
 
