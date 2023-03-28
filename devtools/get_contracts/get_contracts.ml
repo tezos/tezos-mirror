@@ -379,6 +379,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         match code_opt with
         | Error `AlreadyWarned -> Lwt.return (m, i)
         | Ok (script, code_costs) ->
+            let* ctxt, script = P.Global_constants.expand ctxt script in
             let+ add_storage =
               if Config.(collect_lambdas || collect_storage || collect_gas) then
                 let* storage_opt =
