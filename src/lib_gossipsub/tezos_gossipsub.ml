@@ -136,6 +136,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_peer_with_negative_score : [`Graft] output
     | Grafting_successfully : [`Graft] output
     | Peer_backed_off : [`Graft] output
+    | Mesh_full : [`Graft] output
     | No_peer_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
@@ -672,6 +673,16 @@ module Make (C : AUTOMATON_CONFIG) :
         let* () = add_backoff prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
 
+    let check_mesh_size mesh connection =
+      let open Monad.Syntax in
+      let*! degree_high in
+      (* Check the number of mesh peers; if it is at (or over) [degree_high], we only accept grafts
+         from peers with outbound connections; this is a defensive check to restrict potential
+         mesh takeover attacks combined with love bombing *)
+      if Peer.Set.cardinal mesh >= degree_high && not connection.outbound then
+        Mesh_full |> fail
+      else unit
+
     let check_backoff peer topic {backoff; score; _} =
       let open Monad.Syntax in
       let*! prune_backoff in
@@ -693,6 +704,8 @@ module Make (C : AUTOMATON_CONFIG) :
             fail Peer_backed_off
 
     let handle peer topic =
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5264
+         Be sure that the peers that requested failed/rejected graft are properly pruned. *)
       let open Monad.Syntax in
       let*? () = check_filter peer in
       let*! mesh_opt = find_mesh topic in
@@ -701,13 +714,14 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? connection = check_not_direct peer in
       let*? () = check_backoff peer topic connection in
       let*? () = check_score peer topic connection in
+      let*? () = check_mesh_size mesh connection in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
       (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
          Probably the [topics] field needs to be updated here.
       *)
       (* FIXME https://gitlab.com/tezos/tezos/-/issues/5007
 
-         Handle negative score  and the size check is missing *)
+         Handle negative scores *)
       Grafting_successfully |> return
   end
 

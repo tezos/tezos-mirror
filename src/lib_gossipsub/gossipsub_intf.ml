@@ -235,6 +235,7 @@ module type AUTOMATON = sig
     | Grafting_peer_with_negative_score : [`Graft] output
     | Grafting_successfully : [`Graft] output
     | Peer_backed_off : [`Graft] output
+    | Mesh_full : [`Graft] output
     | No_peer_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
