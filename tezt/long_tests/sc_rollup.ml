@@ -213,7 +213,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
                 ~amount:Tez.zero
                 ~giver:Constant.bootstrap1.alias
                 ~receiver:forwarder
-                ~arg:(sf "Pair %S %S" sc_rollup message)
+                ~arg:(sf "Pair %S %S" message sc_rollup)
             in
             Client.bake_for_and_wait client
       in
