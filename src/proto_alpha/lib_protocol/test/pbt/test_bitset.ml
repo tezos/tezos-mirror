@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/test_bitset.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
     Subject:      Bitset structure
 *)
 

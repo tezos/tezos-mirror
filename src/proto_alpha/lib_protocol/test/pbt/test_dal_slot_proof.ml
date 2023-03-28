@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    PBT for refutation proofs of Dal
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_dal_slot_proof.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
     Subject:      Refutation proof-related functions of Dal
 *)
 
