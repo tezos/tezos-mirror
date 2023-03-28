@@ -34,6 +34,8 @@ module Time = struct
     assert (dt >= 0) ;
     t := !t + dt
 
+  let set now = t := now
+
   let reset () = t := 0
 end
 
