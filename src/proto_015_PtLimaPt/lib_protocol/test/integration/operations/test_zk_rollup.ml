@@ -87,11 +87,12 @@ let test_disable_feature_flag () =
       }
   in
   let* i = Incremental.begin_construction b in
+  let public_parameters = Lazy.force Operator.lazy_public_parameters in
   let* op, _zk_rollup =
     Op.zk_rollup_origination
       (I i)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -124,12 +125,13 @@ let test_origination_fees () =
   let expected_size =
     (* TODO: create ZK constant *)
     let origination_size = constants.parametric.tx_rollup.origination_size in
+    let public_parameters = Lazy.force Operator.lazy_public_parameters in
     let init_account =
       Zk_rollup.Account.
         {
           static =
             {
-              public_parameters = Operator.public_parameters;
+              public_parameters;
               state_length = 1;
               circuits_info = of_plonk_smap Operator.circuits;
               nb_ops = 1;
@@ -150,11 +152,12 @@ let test_origination_fees () =
   let expected_fees =
     Tez.mul_exn constants.parametric.cost_per_byte expected_size
   in
+  let public_parameters = Lazy.force Operator.lazy_public_parameters in
   let* operation, _rollup =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -172,11 +175,12 @@ let test_origination_fees () =
 let test_origination_negative_nb_ops () =
   let* ctxt, contracts = context_init 1 in
   let contract = Stdlib.List.hd contracts in
+  let public_parameters = Lazy.force Operator.lazy_public_parameters in
   let* operation, _rollup =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:(-1)
@@ -195,11 +199,12 @@ let test_origination_negative_nb_ops () =
 let init_and_originate n =
   let* ctxt, contracts = context_init n in
   let contract = Stdlib.List.hd contracts in
+  let public_parameters = Lazy.force Operator.lazy_public_parameters in
   let* operation, rollup =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -214,11 +219,12 @@ let no_ticket op = (op, None)
 let test_originate_two_rollups () =
   let* ctxt, contracts, zk_rollup1 = init_and_originate 1 in
   let contract = Stdlib.List.hd contracts in
+  let public_parameters = Lazy.force Operator.lazy_public_parameters in
   let* operation, zk_rollup2 =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
