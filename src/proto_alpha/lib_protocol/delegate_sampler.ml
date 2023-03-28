@@ -152,13 +152,17 @@ let load_sampler_for_cycle ctxt cycle =
   return ctxt
 
 let get_stakes_for_selected_index ctxt index =
+  let open Lwt_result_syntax in
+  let frozen_deposits_percentage =
+    Int64.of_int @@ Constants_storage.frozen_deposits_percentage ctxt
+  in
+  let*? overflow_bound = Tez_repr.(max_mutez /? 100L) in
   Stake_storage.fold_snapshot
     ctxt
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
       let delegate_contract = Contract_repr.Implicit delegate in
       let open Tez_repr in
-      let open Lwt_result_syntax in
       let* frozen_deposits_limit =
         Delegate_storage.frozen_deposits_limit ctxt delegate
       in
@@ -172,15 +176,10 @@ let get_stakes_for_selected_index ctxt index =
         balance_and_frozen_bonds +? frozen_deposits.current_amount
       in
       let* stake_for_cycle =
-        let frozen_deposits_percentage =
-          Int64.of_int @@ Constants_storage.frozen_deposits_percentage ctxt
-        in
-        let max_mutez = of_mutez_exn Int64.max_int in
         let frozen_deposits_limit =
           match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
         in
         let aux = min total_balance frozen_deposits_limit in
-        let*? overflow_bound = max_mutez /? 100L in
         if aux <= overflow_bound then
           let*? aux = aux *? 100L in
           let*? v = aux /? frozen_deposits_percentage in
