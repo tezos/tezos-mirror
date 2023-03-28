@@ -68,7 +68,7 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
-  val cryptobox : Cryptobox.t
+  val cryptobox : Cryptobox.t Lazy.t
 end) =
 struct
   (* Some global constants. *)
@@ -91,6 +91,7 @@ struct
 
   let dal_mk_polynomial_from_slot slot_data =
     let open Result_syntax in
+    let cryptobox = Lazy.force cryptobox in
     match Cryptobox.polynomial_from_slot cryptobox slot_data with
     | Ok p -> return p
     | Error (`Slot_wrong_size s) ->
@@ -109,6 +110,7 @@ struct
 
   let dal_mk_prove_page polynomial page_id =
     let open Result_syntax in
+    let cryptobox = Lazy.force cryptobox in
     match Cryptobox.prove_page cryptobox polynomial page_id.P.page_index with
     | Ok p -> return p
     | Error `Page_index_out_of_range ->
@@ -121,6 +123,7 @@ struct
     let open Result_syntax in
     let slot_data = Bytes.init params.slot_size fill_function in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
+    let cryptobox = Lazy.force cryptobox in
     let* commitment = dal_commit cryptobox polynomial in
     return
       ( slot_data,

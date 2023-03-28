@@ -44,6 +44,7 @@ struct
     include Parameters
 
     let cryptobox =
+      Lazy.from_fun @@ fun () ->
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end
@@ -78,7 +79,8 @@ struct
         (fun _i -> 'x')
     in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
-    let* commitment = dal_commit ARG.cryptobox polynomial in
+    let cryptobox = Lazy.force ARG.cryptobox in
+    let* commitment = dal_commit cryptobox polynomial in
     let add_slot level sindex (cell, cache, slots_info) skip_slot =
       let index =
         Option.value_f
