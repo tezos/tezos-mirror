@@ -6,10 +6,6 @@ use crate::error::Error;
 use crate::storage;
 use crate::storage::receipt_path;
 use crate::L2Block;
-use debug::debug_msg;
-use host::path::OwnedPath;
-use host::rollup_core::RawRollupCore;
-use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
 use tezos_ethereum::eth_gen::Address;
@@ -20,6 +16,9 @@ use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_ethereum::transaction::TransactionStatus;
 use tezos_ethereum::transaction::TransactionType;
 use tezos_ethereum::wei::{self, Wei};
+use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 struct MintAccount {
     mint_address: &'static str,
@@ -51,7 +50,7 @@ const MINT_ACCOUNTS: [MintAccount; MINT_ACCOUNTS_NUMBER] = [
     },
 ];
 
-fn store_genesis_mint_account<Host: Runtime + RawRollupCore>(
+fn store_genesis_mint_account<Host: Runtime>(
     host: &mut Host,
     account: &Account,
     path: &OwnedPath,
@@ -59,13 +58,13 @@ fn store_genesis_mint_account<Host: Runtime + RawRollupCore>(
     match storage::store_account(host, account, path) {
         Ok(_) => Ok(()),
         Err(_) => {
-            debug_msg!(host; "Error, cannot initialize genesis' mint account.");
+            debug_msg!(host, "Error, cannot initialize genesis' mint account.");
             Err(Error::Generic)
         }
     }
 }
 
-fn forge_genesis_mint_account<Host: Runtime + RawRollupCore>(
+fn forge_genesis_mint_account<Host: Runtime>(
     host: &mut Host,
     mint_address: &str,
     balance: Wei,
@@ -75,7 +74,7 @@ fn forge_genesis_mint_account<Host: Runtime + RawRollupCore>(
     match storage::account_path(&mint_address.as_bytes().to_vec()) {
         Ok(path) => store_genesis_mint_account(host, &account, &path),
         Err(_) => {
-            debug_msg!(host; "Error, cannot forge genesis' mint account path.");
+            debug_msg!(host, "Error, cannot forge genesis' mint account path.");
             Err(Error::Generic)
         }
     }
@@ -94,7 +93,7 @@ fn collect_mint_transactions<T, E>(
     Ok(new_vec)
 }
 
-fn bootstrap_genesis_accounts<Host: Runtime + RawRollupCore>(
+fn bootstrap_genesis_accounts<Host: Runtime>(
     host: &mut Host,
 ) -> Result<Vec<TransactionHash>, Error> {
     let transactions_hashes = MINT_ACCOUNTS.map(
@@ -108,7 +107,7 @@ fn bootstrap_genesis_accounts<Host: Runtime + RawRollupCore>(
             match hex::decode(genesis_tx_hash) {
                 Ok(raw_tx_hash) => raw_tx_hash.try_into().map_err(|_| Error::Generic),
                 Err(_) => {
-                    debug_msg!(host; "Error while decoding raw transaction hash.");
+                    debug_msg!(host, "Error while decoding raw transaction hash.");
                     Err(Error::Generic)
                 }
             }
@@ -125,7 +124,7 @@ fn craft_mint_address(genesis_mint_address: &str) -> Option<Address> {
     Some(mint_address)
 }
 
-fn store_genesis_receipts<Host: Runtime + RawRollupCore>(
+fn store_genesis_receipts<Host: Runtime>(
     host: &mut Host,
     genesis_block: L2Block,
 ) -> Result<(), Error> {
@@ -158,17 +157,17 @@ fn store_genesis_receipts<Host: Runtime + RawRollupCore>(
     Ok(())
 }
 
-pub fn init_block<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), Error> {
+pub fn init_block<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     // Forge the genesis' transactions that will mint the very first accounts
     let transaction_hashes = bootstrap_genesis_accounts(host)?;
 
     // Produce and store genesis' block
     let genesis_block = L2Block::new(GENESIS_LEVEL, transaction_hashes);
     storage::store_current_block(host, &genesis_block).map_err(|_| {
-        debug_msg!(host; "Error while storing the genesis block.");
+        debug_msg!(host, "Error while storing the genesis block.");
         Error::Generic
     })?;
-    debug_msg!(host; "Genesis block was initialized.\n");
+    debug_msg!(host, "Genesis block was initialized.\n");
 
     store_genesis_receipts(host, genesis_block)
 }
@@ -177,7 +176,7 @@ pub fn init_block<Host: Runtime + RawRollupCore>(host: &mut Host) -> Result<(), 
 mod tests {
     use super::*;
 
-    use mock_runtime::host::MockHost;
+    use tezos_smart_rollup_mock::MockHost;
 
     #[test]
     // Test if the genesis block can be initialized

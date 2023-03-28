@@ -3,18 +3,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![allow(dead_code)]
-
-use host::input::Message;
-use host::rollup_core::RawRollupCore;
-use host::runtime::Runtime;
+use tezos_smart_rollup_host::input::Message;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::helpers::ensures;
 
 use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
 
 pub struct Transaction {
-    pub level: i32,
+    pub level: u32,
     pub tx_hash: TransactionHash,
     pub tx: RawTransaction,
 }
@@ -51,12 +48,11 @@ impl Transaction {
     }
 }
 
-pub fn read_input<Host: Runtime + RawRollupCore>(
+pub fn read_input<Host: Runtime>(
     host: &mut Host,
-    max_bytes: usize,
     smart_rollup_address: [u8; 20],
 ) -> Result<Option<Transaction>, Error> {
-    match Runtime::read_input(host, max_bytes) {
+    match host.read_input() {
         Ok(Some(input)) => Ok(Transaction::parse(input, smart_rollup_address)),
         _ => Err(Error::ReadInputError),
     }

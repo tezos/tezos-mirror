@@ -1,10 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
-use host::path::PathError;
-
-use host::runtime::RuntimeError;
 use std::str::Utf8Error;
+use tezos_smart_rollup_host::path::PathError;
+use tezos_smart_rollup_host::runtime::RuntimeError;
 
 #[derive(Debug)]
 pub enum TransferError {

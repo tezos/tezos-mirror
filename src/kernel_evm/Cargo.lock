@@ -160,30 +160,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "crypto"
-version = "3.1.1"
-source = "git+https://github.com/trilitech/tezedge.git?branch=master#8e938c0882a97c3bea316632047cefa30e9d7895"
-dependencies = [
- "anyhow",
- "base58",
- "blst",
- "byteorder",
- "cryptoxide",
- "ed25519-compact",
- "hex",
- "libsecp256k1",
- "num-bigint",
- "num-traits",
- "p256",
- "rand 0.7.3",
- "serde",
- "strum",
- "strum_macros",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
 name = "crypto-bigint"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -222,14 +198,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "382ce8820a5bb815055d3553a610e8cb542b2d767bbacea99038afda96cd760d"
 
 [[package]]
-name = "debug"
-version = "0.1.0"
-source = "git+https://gitlab.com/tezos/kernel?branch=main#8b1059c3ef14eea7addc2988f9b0811ba9b650d2"
-dependencies = [
- "host",
-]
-
-[[package]]
 name = "der"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -252,6 +220,15 @@ checksum = "8168378f4e5023e7218c89c891c0fd8ecdb5e5e4f18cb78f38cf245dd021e76f"
 dependencies = [
  "block-buffer 0.10.3",
  "crypto-common",
+]
+
+[[package]]
+name = "dlmalloc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "203540e710bfadb90e5e29930baf5d10270cec1f43ab34f46f78b147b2de715a"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -298,14 +275,16 @@ name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
  "clarity",
- "debug",
  "hex",
- "host",
- "kernel",
- "mock_runtime",
  "num-traits",
  "primitive-types",
  "tezos_ethereum",
+ "tezos_smart_rollup_core",
+ "tezos_smart_rollup_debug",
+ "tezos_smart_rollup_encoding",
+ "tezos_smart_rollup_entrypoint",
+ "tezos_smart_rollup_host",
+ "tezos_smart_rollup_mock",
 ]
 
 [[package]]
@@ -395,15 +374,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "host"
-version = "0.1.0"
-source = "git+https://gitlab.com/tezos/kernel?branch=main#8b1059c3ef14eea7addc2988f9b0811ba9b650d2"
-dependencies = [
- "crypto",
- "tezos_smart_rollup_core",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -416,15 +386,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3afef3b6eff9ce9d8ff9b3601125eec7f0c8cbac7abd14f355d053fa56c98768"
 dependencies = [
  "cpufeatures",
-]
-
-[[package]]
-name = "kernel"
-version = "0.1.0"
-source = "git+https://gitlab.com/tezos/kernel?branch=main#8b1059c3ef14eea7addc2988f9b0811ba9b650d2"
-dependencies = [
- "debug",
- "host",
 ]
 
 [[package]]
@@ -502,16 +463,6 @@ name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
-
-[[package]]
-name = "mock_runtime"
-version = "0.1.0"
-source = "git+https://gitlab.com/tezos/kernel?branch=main#8b1059c3ef14eea7addc2988f9b0811ba9b650d2"
-dependencies = [
- "crypto",
- "host",
- "tezos_rollup_encoding",
-]
 
 [[package]]
 name = "nom"
@@ -880,26 +831,53 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
-name = "tezos_encoding"
-version = "3.1.1"
-source = "git+https://github.com/trilitech/tezedge.git?branch=master#8e938c0882a97c3bea316632047cefa30e9d7895"
+name = "tezos_crypto_rs"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "451933adf818795c3a9b926c8e29ff3ca6cb12c067e6db4e0c1e583163df1f1c"
+dependencies = [
+ "anyhow",
+ "base58",
+ "blst",
+ "byteorder",
+ "cryptoxide",
+ "ed25519-compact",
+ "hex",
+ "libsecp256k1",
+ "num-bigint",
+ "num-traits",
+ "p256",
+ "rand 0.7.3",
+ "serde",
+ "strum",
+ "strum_macros",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "tezos_data_encoding"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d51d212e9031c6c1bc1c1b998238691077dc91ba4fb801901fc7df4f43c279b2"
 dependencies = [
  "bit-vec",
- "crypto",
  "hex",
  "lazy_static",
  "nom",
  "num-bigint",
  "num-traits",
  "serde",
- "tezos_encoding_derive",
+ "tezos_crypto_rs",
+ "tezos_data_encoding_derive",
  "thiserror",
 ]
 
 [[package]]
-name = "tezos_encoding_derive"
-version = "3.1.1"
-source = "git+https://github.com/trilitech/tezedge.git?branch=master#8e938c0882a97c3bea316632047cefa30e9d7895"
+name = "tezos_data_encoding_derive"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3e3aa1ee4bfaadd4f3509b96c21c3bf27200d72f3d7855e43d0ef2585aac685"
 dependencies = [
  "lazy_static",
  "once_cell",
@@ -918,25 +896,70 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_rollup_encoding"
+name = "tezos_smart_rollup_core"
 version = "0.1.0"
-source = "git+https://gitlab.com/tezos/kernel?branch=main#8b1059c3ef14eea7addc2988f9b0811ba9b650d2"
+
+[[package]]
+name = "tezos_smart_rollup_debug"
+version = "0.1.0"
 dependencies = [
- "crypto",
- "host",
+ "tezos_smart_rollup_core",
+ "tezos_smart_rollup_host",
+]
+
+[[package]]
+name = "tezos_smart_rollup_encoding"
+version = "0.1.0"
+dependencies = [
+ "hex",
  "nom",
  "num-bigint",
  "num-traits",
- "tezos_encoding",
- "tezos_encoding_derive",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_data_encoding_derive",
  "tezos_smart_rollup_core",
+ "tezos_smart_rollup_host",
+ "thiserror",
  "time",
 ]
 
 [[package]]
-name = "tezos_smart_rollup_core"
+name = "tezos_smart_rollup_entrypoint"
 version = "0.1.0"
-source = "git+https://gitlab.com/tezos/kernel?branch=main#8b1059c3ef14eea7addc2988f9b0811ba9b650d2"
+dependencies = [
+ "dlmalloc",
+ "tezos_smart_rollup_debug",
+ "tezos_smart_rollup_host",
+ "tezos_smart_rollup_panic_hook",
+]
+
+[[package]]
+name = "tezos_smart_rollup_host"
+version = "0.1.0"
+dependencies = [
+ "tezos_crypto_rs",
+ "tezos_smart_rollup_core",
+]
+
+[[package]]
+name = "tezos_smart_rollup_mock"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_smart_rollup_core",
+ "tezos_smart_rollup_encoding",
+ "tezos_smart_rollup_host",
+]
+
+[[package]]
+name = "tezos_smart_rollup_panic_hook"
+version = "0.1.0"
+dependencies = [
+ "tezos_smart_rollup_core",
+]
 
 [[package]]
 name = "thiserror"

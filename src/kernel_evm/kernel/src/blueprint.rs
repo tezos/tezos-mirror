@@ -4,8 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::inbox::{read_input, Transaction};
-use host::rollup_core::RawRollupCore;
-use host::runtime::Runtime;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 /// The blueprint of a block is a list of transactions.
 pub struct Blueprint {
@@ -39,21 +38,18 @@ fn push(blueprint: &mut Blueprint, transaction: Option<Transaction>) {
     }
 }
 
-fn fetch_transactions<Host: Runtime + RawRollupCore>(
+fn fetch_transactions<Host: Runtime>(
     host: &mut Host,
     blueprint: &mut Blueprint,
     smart_rollup_address: [u8; 20],
 ) {
-    if let Ok(transaction) = read_input(host, 4096, smart_rollup_address) {
+    if let Ok(transaction) = read_input(host, smart_rollup_address) {
         push(blueprint, transaction);
         fetch_transactions(host, blueprint, smart_rollup_address)
     }
 }
 
-pub fn fetch<Host: Runtime + RawRollupCore>(
-    host: &mut Host,
-    smart_rollup_address: [u8; 20],
-) -> Queue {
+pub fn fetch<Host: Runtime>(host: &mut Host, smart_rollup_address: [u8; 20]) -> Queue {
     let mut blueprint = Blueprint {
         transactions: Vec::new(),
     };
