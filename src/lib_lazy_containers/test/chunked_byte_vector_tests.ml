@@ -238,7 +238,7 @@ module Tests (CBV : S) = struct
       check int64 name 1L (Chunk.num_needed (Int64.pred Chunk.size)) ;
       check int64 name 2L (Chunk.num_needed (Int64.succ Chunk.size))
     in
-    ("Chunk: num_pages edge case", `Quick, test)
+    (to_name "Chunk: num_pages edge case", `Quick, test)
 
   let all_tests =
     internal_num_pages_edge_case

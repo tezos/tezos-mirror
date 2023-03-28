@@ -425,7 +425,7 @@ let tests =
          ~param_2:"5"
          ~expected_storage_str_2:"Left 120");
     Tztest.tztest
-      "test lambda_rec instruction storage"
+      "test lambda_rec instruction storage apply store"
       `Quick
       (test_store_and_reload
          (path // "contracts/rec_fact_apply_store.tz")

@@ -248,7 +248,6 @@ let () =
                (0.6, 4, 1, true);
                (0.6, 5, 1, true);
                (0.5, 2, 2, true);
-               (0.01, 1, 2, true);
              ] );
       ("Consensus consistency", qcheck_wrap [test_consensus_spec]);
     ]

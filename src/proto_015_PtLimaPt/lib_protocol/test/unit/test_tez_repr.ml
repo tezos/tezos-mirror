@@ -180,10 +180,6 @@ let tests =
       `Quick
       Test_tez_repr.test_of_mutez_non_negative;
     tztest
-      "Tez.of_mutez: of non-negative ints"
-      `Quick
-      Test_tez_repr.test_of_mutez_non_negative;
-    tztest
       "Tez.of_mutez: of negative ints"
       `Quick
       Test_tez_repr.test_of_mutez_negative;
