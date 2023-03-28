@@ -41,7 +41,7 @@ val derive_dal_parameters :
 module Make (P : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
-  val cryptobox : Cryptobox.t
+  val cryptobox : Cryptobox.t Lazy.t
 end) : sig
   (** Some global constants. *)
 
