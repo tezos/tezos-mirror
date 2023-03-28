@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -40,27 +41,45 @@
     one possible solution, we use a simple heuristic to pick one.
 *)
 
-exception Missing_file_for_free_variable of {free_var : Free_variable.t}
+(** Decide dependencies/provides of free variables *)
+module Solver : sig
+  type solved = {
+    dependencies : Free_variable.Set.t;
+    provides : Free_variable.Set.t;
+    name : Namespace.t;
+  }
+end
 
-(** Definition of the dependency graph *)
-module G : Graph.Graphviz.GraphWithDotAttrs with type V.t = string
+(** Dependency graph of benchmarks using dependencies/provides *)
+module Graph : sig
+  type t
 
-(** Dot representation of the graph [G] *)
-module D : module type of Graph.Graphviz.Dot (G)
+  val is_empty : t -> bool
 
-(** Topological operations on the graph [G] *)
-module T : module type of Graph.Topological.Make (G)
+  (** Build a dependency graph.  Any ambiguity to build a dependency graph
+      is resolved with a heuristics.  It also returns ambiguity information.
+  *)
+  val build : Solver.solved list -> t
+
+  val fold : (Solver.solved -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val iter : (Solver.solved -> unit) -> t -> unit
+
+  val dependencies : t -> Namespace.t list -> Solver.solved list
+
+  val save_graphviz : t -> string -> unit
+end
 
 (** [find_model_or_generic model_name model_list] returns the model matching
     the local name [model_name] from a [model_list] of a benchmark. If none
     match, then searches for models named ["*"]. *)
-val find_model_or_generic : string -> (string * 'a) list -> 'a option
+val find_model_or_generic : string -> (string * 'model) list -> 'model option
 
-(** [load_files model_name files] loads [.workload] files given in [files],
+(** [load_workload_files model_name files] loads [.workload] files given in [files],
     looks for the model [model_name], and if found, adds it to a dependency
     graph. Returns [(G, H)] where [G] is the final graph obtained this way,
-    and [H] is a table that maps the name of a file with its contents. *)
-val load_files :
+    and [H] is a table that maps the name of a benchmark with its contents. *)
+val load_workload_files :
   string ->
   string list ->
-  G.t * (string, Measure.packed_measurement) Stdlib.Hashtbl.t
+  Graph.t * Measure.packed_measurement Namespace.Hashtbl.t
