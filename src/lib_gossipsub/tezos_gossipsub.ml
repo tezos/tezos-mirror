@@ -286,6 +286,12 @@ module Make (C : AUTOMATON_CONFIG) :
     }
 
   module Helpers = struct
+    let fail_if cond output_err =
+      let open Monad.Syntax in
+      if cond then fail output_err else unit
+
+    let fail_if_not cond output_err = fail_if (not cond) output_err
+
     (* These projections enable let-punning. *)
     let max_recv_ihave_per_heartbeat state =
       state.limits.max_recv_ihave_per_heartbeat
@@ -510,8 +516,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let _check_peer_score peer =
       let open Monad.Syntax in
       let*! peer_score = get_score ~default:Score.zero peer in
-      if Score.(peer_score < zero) then Negative_peer_score peer_score |> fail
-      else unit
+      fail_if Score.(peer_score < zero) @@ Negative_peer_score peer_score
   end
 
   include Helpers
@@ -520,10 +525,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_too_many_recv_ihave_message count =
       let open Monad.Syntax in
       let*! max_recv_ihave_per_heartbeat in
-      if count > max_recv_ihave_per_heartbeat then
-        Too_many_recv_ihave_messages {count; max = max_recv_ihave_per_heartbeat}
-        |> fail
-      else unit
+      fail_if (count > max_recv_ihave_per_heartbeat)
+      @@ Too_many_recv_ihave_messages
+           {count; max = max_recv_ihave_per_heartbeat}
 
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/5016
 
@@ -533,21 +537,18 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_too_many_sent_iwant_message count =
       let open Monad.Syntax in
       let*! max_sent_iwant_per_heartbeat in
-      if count > max_sent_iwant_per_heartbeat then
-        Too_many_sent_iwant_messages {count; max = max_sent_iwant_per_heartbeat}
-        |> fail
-      else unit
+      fail_if (count > max_sent_iwant_per_heartbeat)
+      @@ Too_many_sent_iwant_messages
+           {count; max = max_sent_iwant_per_heartbeat}
 
     let check_topic_tracked topic =
       let open Monad.Syntax in
       let*! is_topic_tracked = topic_is_tracked topic in
-      if not is_topic_tracked then Message_topic_not_tracked |> fail else unit
+      fail_if (not is_topic_tracked) Message_topic_not_tracked
 
     let check_not_empty iwant_message_ids =
-      let open Monad.Syntax in
-      match iwant_message_ids with
-      | [] -> Message_requested_message_ids [] |> fail
-      | _ -> unit
+      fail_if (List.is_empty iwant_message_ids)
+      @@ Message_requested_message_ids []
 
     let filter peer message_ids : Message_id.t list Monad.t =
       let open Monad.Syntax in
@@ -645,7 +646,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_filter peer =
       let open Monad.Syntax in
       let*! peer_filter in
-      if peer_filter peer `Graft then unit else Peer_filtered |> fail
+      fail_if_not (peer_filter peer `Graft) Peer_filtered
 
     let check_topic_known mesh_opt =
       let open Monad.Syntax in
@@ -654,8 +655,7 @@ module Make (C : AUTOMATON_CONFIG) :
       | Some mesh -> pass mesh
 
     let check_not_in_mesh mesh peer =
-      let open Monad.Syntax in
-      if Peer.Set.mem peer mesh then Peer_already_in_mesh |> fail else unit
+      fail_if (Peer.Set.mem peer mesh) Peer_already_in_mesh
 
     let check_not_direct peer =
       let open Monad.Syntax in
@@ -733,9 +733,8 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! accept_px_threshold in
       let*! score = get_score ~default:Score.zero peer in
-      if Compare.Float.(score |> Score.float < accept_px_threshold) then
-        Ignore_PX_score_too_low score |> fail
-      else unit
+      fail_if Compare.Float.(score |> Score.float < accept_px_threshold)
+      @@ Ignore_PX_score_too_low score
 
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
@@ -856,9 +855,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_is_not_subscribed topic : (unit, [`Join] output) Monad.check =
       let open Monad.Syntax in
       let*! mesh in
-      match Topic.Map.find topic mesh with
-      | None -> unit
-      | Some _ -> Already_subscribed |> fail
+      fail_if (Topic.Map.mem topic mesh) Already_subscribed
 
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
