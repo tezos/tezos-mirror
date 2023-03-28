@@ -31,9 +31,6 @@ module M = QCheck2.Gen
 
 type 'a t := 'a QCheck2.Gen.t
 
-(** We need monadic sequences to represent sequence generators. *)
-module SeqM : module type of Seqes.Monadic.Make1 (QCheck2.Gen)
-
 (** The type of inputs to the gossipsub automaton. *)
 type input =
   | Add_peer of GS.add_peer (* case 0 *)
@@ -126,12 +123,12 @@ val subscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.subscribe t
 val unsubscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.unsubscribe t
 
 (** We fuzz the automaton by composing basic sequences of inputs, called {e fragments}.
-    Fragments can be composed sequentially (see {!SeqM}), but most importantly
+    Fragments can be composed sequentially, but most importantly
     we can model concurrent interactions with the automaton by generating interleavings
     of fragments. *)
 module Fragment : sig
   (** [t] is the type of fragments, modelled as {!event} sequence generators. *)
-  type t = event SeqM.t
+  type t
 
   (** [of_list inputs] injects a deterministic sequence of events as a fragment. *)
   val of_list : input list -> t
