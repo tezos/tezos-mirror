@@ -1140,6 +1140,29 @@ module Signature_manager = struct
       assert_verify_aggregate_signature [member] hex_root_hash certificate ;
       unit
 
+    (* Tests that the Coordinator refuses to store a [signature] for
+       a [root_hash] that it doesn't know *)
+    let invalid_signature (coordinator_node, _hex_root_hash, dac_committee) =
+      let false_root_hash =
+        `Hex
+          "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1826"
+      in
+      let member = List.nth dac_committee 0 in
+      let signature = bls_sign_hex_hash member false_root_hash in
+      let dac_member_pkh = member.aggregate_public_key_hash in
+      let result =
+        RPC.call
+          coordinator_node
+          (Dac_rpc.put_dac_member_signature
+             ~hex_root_hash:false_root_hash
+             ~dac_member_pkh
+             ~signature)
+      in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected failure when unknown root_hash"
+        result
+
     let test_handle_store_signature _protocol _tezos_node tz_client coordinator
         _threshold dac_committee =
       let* hex_root_hash = init_hex_root_hash coordinator in
@@ -1152,6 +1175,7 @@ module Signature_manager = struct
       let* () =
         test_store_same_signature_more_than_once_should_be_noop dac_env
       in
+      let* () = invalid_signature dac_env in
       unit
   end
 end

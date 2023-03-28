@@ -63,6 +63,7 @@ module Coordinator : sig
         * string)
     | Public_key_for_dac_member_not_available of
         Tezos_crypto.Aggregate_signature.public_key_hash
+    | Unknown_root_hash of string
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
      Verify that root hash is one that the coordinator has *)
@@ -78,6 +79,7 @@ module Coordinator : sig
         3. Update the aggregate signature in [Aggregate_signature_store]
   *)
   val handle_put_dac_member_signature :
+    Dac_plugin.t ->
     Node_context.t ->
     #Client_context.wallet ->
     Signature_repr.t ->
