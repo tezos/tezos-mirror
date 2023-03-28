@@ -16,7 +16,7 @@ use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
 use crate::input::Message;
 use crate::metadata::RollupMetadata;
 #[cfg(feature = "alloc")]
-use crate::path::{OwnedPath, Path, RefPath, PATH_MAX_SIZE};
+use crate::path::{OwnedPath, Path, RefPath, PATH_MAX_SIZE, PATH_SEPARATOR};
 #[cfg(not(feature = "alloc"))]
 use crate::path::{Path, RefPath};
 use crate::{Error, METADATA_SIZE};
@@ -556,20 +556,21 @@ fn store_get_subkey_unchecked(
     index: i64,
 ) -> Result<OwnedPath, RuntimeError> {
     let max_size = PATH_MAX_SIZE - path.size();
-    let mut buffer = Vec::with_capacity(max_size);
-
+    let mut buffer: Vec<u8> = Vec::with_capacity(max_size);
+    buffer.push(PATH_SEPARATOR);
+    let ptr = buffer.as_mut_ptr();
     unsafe {
         let bytes_written = host.store_get_nth_key(
             path.as_ptr(),
             path.size(),
             index,
-            buffer.as_mut_ptr(),
-            max_size,
+            ptr.wrapping_offset(1),
+            max_size - 1,
         );
 
         let bytes_written: usize =
             Error::wrap(bytes_written).map_err(RuntimeError::HostErr)?;
-        buffer.set_len(bytes_written);
+        buffer.set_len(bytes_written + 1);
         Ok(OwnedPath::from_bytes_unchecked(buffer))
     }
 }
@@ -926,7 +927,8 @@ mod tests {
 
         let subkey_index = 14;
         let subkey_count = 20;
-        let buffer_size = PATH_MAX_SIZE - PATH.size();
+        // -1 for leading `/`
+        let buffer_size = PATH_MAX_SIZE - PATH.size() - 1;
 
         let mut mock = MockSmartRollupCore::new();
         mock.expect_store_list_size()
@@ -946,7 +948,7 @@ mod tests {
                     && buffer_size == *max_bytes
             })
             .return_once(|_, _, _, buf_ptr, _| {
-                let path_bytes = "/short/suffix".as_bytes();
+                let path_bytes = "short/suffix".as_bytes();
                 let buffer = unsafe { from_raw_parts_mut(buf_ptr, path_bytes.len()) };
                 buffer.copy_from_slice(path_bytes);
 
