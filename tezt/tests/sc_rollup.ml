@@ -3705,47 +3705,15 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
   let originate_source_contract () =
-    (* A script that receives bytes as a parameter and transfers them
-       to the rollup as is. The transfer will appear as an internal
-       message targetting this specific rollup in the rollups'
-       inbox. *)
-    let prg =
-      Format.asprintf
-        {|
-      {
-        parameter (bytes %%default);
-        storage (unit);
-
-        code
-          {
-            CAR;
-            PUSH address "%s";
-            CONTRACT bytes;
-            IF_NONE { PUSH string "Invalid address"; FAILWITH; }
-                    {
-                      PUSH mutez 0;
-                      DIG 2;
-                      TRANSFER_TOKENS;
-                      NIL operation;
-                      SWAP;
-                      CONS;
-                      PUSH unit Unit;
-                      SWAP;
-                      PAIR;
-                    }
-          }
-      } |}
-        sc_rollup
-    in
-    let* address =
-      Client.originate_contract
-        ~alias:"source"
-        ~amount:(Tez.of_int 100)
-        ~burn_cap:(Tez.of_int 100)
-        ~src
-        ~prg
+    let* _alias, address =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
         ~init:"Unit"
+        ~burn_cap:Tez.(of_int 1)
         client
+        ["mini_scenarios"; "sc_rollup_forward"]
+        protocol
     in
     let* () = Client.bake_for_and_wait client in
     return address
@@ -3764,7 +3732,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             ~storage_limit:100000
             ~giver:"bootstrap1"
             ~receiver:source_address
-            ~arg:payload
+            ~arg:(sf "Pair %s %S" payload sc_rollup)
             client
     in
     let blocks_to_wait =
