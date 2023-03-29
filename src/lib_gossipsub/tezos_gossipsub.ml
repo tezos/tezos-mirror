@@ -142,9 +142,9 @@ module Make (C : AUTOMATON_CONFIG) :
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
     | Publish_message : Peer.Set.t -> [`Publish] output
-    | Already_subscribed : [`Join] output
+    | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
-    | Not_subscribed : [`Leave] output
+    | Not_joined : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
     | Heartbeat : {
         to_graft : Topic.Set.t Peer.Map.t;
@@ -855,7 +855,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_is_not_subscribed topic : (unit, [`Join] output) Monad.check =
       let open Monad.Syntax in
       let*! mesh in
-      fail_if (Topic.Map.mem topic mesh) Already_subscribed
+      fail_if (Topic.Map.mem topic mesh) Already_joined
 
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
@@ -919,7 +919,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! mesh in
       match Topic.Map.find topic mesh with
-      | None -> Not_subscribed |> fail
+      | None -> Not_joined |> fail
       | Some mesh -> pass mesh
 
     let handle_mesh topic mesh : [`Leave] output Monad.t =
