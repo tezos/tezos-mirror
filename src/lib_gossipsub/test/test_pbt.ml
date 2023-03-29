@@ -28,6 +28,10 @@
 open Test_gossipsub_shared
 open Gossipsub_intf
 open Tezt_core.Base
+module Peer = C.Subconfig.Peer
+module Topic = C.Subconfig.Topic
+module Message_id = C.Subconfig.Message_id
+module Message = C.Subconfig.Message
 
 module Basic_fragments = struct
   open Gossipsub_pbt_generators
@@ -67,7 +71,7 @@ module Test_message_cache = struct
 
     type t = {
       mutable ticks : int;
-      cache : C.Message.t C.Message_id.Map.t C.Topic.Map.t M.t;
+      cache : Message.t Message_id.Map.t Topic.Map.t M.t;
       history_slots : int;
       gossip_slots : int;
     }
@@ -85,19 +89,19 @@ module Test_message_cache = struct
             t.ticks
             (function
               | None ->
-                  C.Topic.Map.singleton
+                  Topic.Map.singleton
                     topic
-                    (C.Message_id.Map.singleton message_id message)
+                    (Message_id.Map.singleton message_id message)
                   |> Option.some
               | Some map ->
-                  C.Topic.Map.update
+                  Topic.Map.update
                     topic
                     (function
                       | None ->
-                          C.Message_id.Map.singleton message_id message
+                          Message_id.Map.singleton message_id message
                           |> Option.some
                       | Some topic_map ->
-                          C.Message_id.Map.add message_id message topic_map
+                          Message_id.Map.add message_id message topic_map
                           |> Option.some)
                     map
                   |> Option.some)
@@ -110,9 +114,9 @@ module Test_message_cache = struct
         match M.find x t.cache with
         | None -> ()
         | Some topic_map ->
-            C.Topic.Map.iter
+            Topic.Map.iter
               (fun _topic map ->
-                match C.Message_id.Map.find message_id map with
+                match Message_id.Map.find message_id map with
                 | None -> ()
                 | Some message -> found := Some message)
               topic_map
@@ -121,19 +125,19 @@ module Test_message_cache = struct
       Option.map (fun message -> (t, message)) r
 
     let get_message_ids_to_gossip topic t =
-      let found = ref C.Message_id.Set.empty in
+      let found = ref Message_id.Set.empty in
       for x = max 0 (t.ticks - t.gossip_slots + 1) to t.ticks do
         match M.find x t.cache with
         | None -> ()
         | Some topic_map -> (
-            match C.Topic.Map.find topic topic_map with
+            match Topic.Map.find topic topic_map with
             | None -> ()
             | Some message_map ->
                 let set =
-                  message_map |> C.Message_id.Map.to_seq |> Seq.map fst
-                  |> C.Message_id.Set.of_seq
+                  message_map |> Message_id.Map.to_seq |> Seq.map fst
+                  |> Message_id.Set.of_seq
                 in
-                found := C.Message_id.Set.union !found set)
+                found := Message_id.Set.union !found set)
       done ;
       !found
 
@@ -237,14 +241,14 @@ module Test_message_cache = struct
     | Get_message_ids_to_gossip {topic} :: actions ->
         let left_result = L.get_message_ids_to_gossip topic left in
         let right_result = R.get_message_ids_to_gossip topic right in
-        let left_set = C.Message_id.Set.of_list left_result in
-        if C.Message_id.Set.equal left_set right_result then
+        let left_set = Message_id.Set.of_list left_result in
+        if Message_id.Set.equal left_set right_result then
           run (left, right) actions
         else
           let pp_set fmt s =
-            if C.Message_id.Set.is_empty s then Format.fprintf fmt "empty set"
+            if Message_id.Set.is_empty s then Format.fprintf fmt "empty set"
             else
-              s |> C.Message_id.Set.to_seq |> List.of_seq
+              s |> Message_id.Set.to_seq |> List.of_seq
               |> Format.fprintf
                    fmt
                    "%a"

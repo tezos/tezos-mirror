@@ -42,7 +42,7 @@ module type ITERABLE = sig
   module Map : Map.S with type key = t
 end
 
-module type AUTOMATON_CONFIG = sig
+module type AUTOMATON_SUBCONFIG = sig
   module Peer : ITERABLE
 
   module Topic : ITERABLE
@@ -50,6 +50,10 @@ module type AUTOMATON_CONFIG = sig
   module Message_id : ITERABLE
 
   module Message : PRINTABLE
+end
+
+module type AUTOMATON_CONFIG = sig
+  module Subconfig : AUTOMATON_SUBCONFIG
 
   module Span : PRINTABLE
 

@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make
-    (Peer : Gossipsub_intf.ITERABLE)
-    (Topic : Gossipsub_intf.ITERABLE)
-    (Message_id : Gossipsub_intf.ITERABLE)
-    (Message : Gossipsub_intf.PRINTABLE) =
-struct
+module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
+  module Peer = C.Peer
+  module Topic = C.Topic
+  module Message_id = C.Message_id
+  module Message = C.Message
+
   type message_with_counters = {
     message : Message.t;
     store_counter : int;

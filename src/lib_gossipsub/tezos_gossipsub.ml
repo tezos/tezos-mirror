@@ -36,14 +36,14 @@ module Make (C : AUTOMATON_CONFIG) :
   AUTOMATON
     with type Time.t = C.Time.t
      and module Span = C.Span
-     and module Peer = C.Peer
-     and module Topic = C.Topic
-     and module Message_id = C.Message_id
-     and module Message = C.Message = struct
-  module Peer = C.Peer
-  module Topic = C.Topic
-  module Message_id = C.Message_id
-  module Message = C.Message
+     and module Peer = C.Subconfig.Peer
+     and module Topic = C.Subconfig.Topic
+     and module Message_id = C.Subconfig.Message_id
+     and module Message = C.Subconfig.Message = struct
+  module Peer = C.Subconfig.Peer
+  module Topic = C.Subconfig.Topic
+  module Message_id = C.Subconfig.Message_id
+  module Message = C.Subconfig.Message
   module Span = C.Span
   module Time = C.Time
 
@@ -180,8 +180,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
 
-  module Message_cache =
-    Message_cache.Make (Peer) (Topic) (Message_id) (Message)
+  module Message_cache = Message_cache.Make (C.Subconfig)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
 

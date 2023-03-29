@@ -33,11 +33,7 @@
     [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
     shifts have been executed in the meanwhile).
 *)
-module Make
-    (Peer : Gossipsub_intf.ITERABLE)
-    (Topic : Gossipsub_intf.ITERABLE)
-    (Message_id : Gossipsub_intf.ITERABLE)
-    (Message : Gossipsub_intf.PRINTABLE) : sig
+module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
   type t
 
   (** [create ~history_slots ~gossip_slots] creates a sliding window cache of
@@ -58,19 +54,19 @@ module Make
   (** Add message to the most recent cache slot. If the message already exists
       in the cache, the message is not overridden, instead a duplicate is
       stored. *)
-  val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+  val add_message : C.Message_id.t -> C.Message.t -> C.Topic.t -> t -> t
 
   (** Get the message associated to the given message id, increase the access
       counter for the peer requesting the message, and also return the updated
       counter. *)
   val get_message_for_peer :
-    Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
+    C.Peer.t -> C.Message_id.t -> t -> (t * C.Message.t * int) option
 
   (** Get the message ids for the given topic in the last [gossip_slots] slots
       of the cache. If there were duplicates added in the cache, then there will
       be duplicates in the output. There is no guarantee about the order of
       messages in the output. *)
-  val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
+  val get_message_ids_to_gossip : C.Topic.t -> t -> C.Message_id.t list
 
   (** Shift the sliding window by one slot (usually corresponding to one
       heartbeat tick). *)

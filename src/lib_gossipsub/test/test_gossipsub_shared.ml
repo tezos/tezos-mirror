@@ -41,10 +41,10 @@ module Automaton_config :
   AUTOMATON_CONFIG
     with type Time.t = int
      and type Span.t = int
-     and type Peer.t = int
-     and type Topic.t = string
-     and type Message_id.t = int
-     and type Message.t = string = struct
+     and type Subconfig.Peer.t = int
+     and type Subconfig.Topic.t = string
+     and type Subconfig.Message_id.t = int
+     and type Subconfig.Message.t = string = struct
   module Span = struct
     type t = int
 
@@ -85,10 +85,12 @@ module Automaton_config :
     module Set = Set.Make (String)
   end
 
-  module Peer = Int_iterable
-  module Topic = String_iterable
-  module Message_id = Int_iterable
-  module Message = String_iterable
+  module Subconfig = struct
+    module Peer = Int_iterable
+    module Topic = String_iterable
+    module Message_id = Int_iterable
+    module Message = String_iterable
+  end
 end
 
 module C = Automaton_config

@@ -29,6 +29,10 @@ open Test_gossipsub_shared
 open Gossipsub_intf
 open Tezt
 open Tezt_core.Base
+module Peer = C.Subconfig.Peer
+module Topic = C.Subconfig.Topic
+module Message_id = C.Subconfig.Message_id
+module Message = C.Subconfig.Message
 
 let assert_output ~__LOC__ actual expected =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
@@ -100,10 +104,10 @@ let make_peers ~number =
 
 (** [add_and_subscribe_peers topics peers] adds [peers] to the
     gossipsub connections and subscribes each peer to [topics]. *)
-let add_and_subscribe_peers (topics : C.Topic.t list) (peers : C.Peer.t list)
-    ~(to_subscribe : C.Peer.t * C.Topic.t -> bool)
-    ?(direct : C.Peer.t -> bool = fun _ -> false)
-    ?(outbound : C.Peer.t -> bool = fun _ -> false) state =
+let add_and_subscribe_peers (topics : Topic.t list) (peers : Peer.t list)
+    ~(to_subscribe : Peer.t * Topic.t -> bool)
+    ?(direct : Peer.t -> bool = fun _ -> false)
+    ?(outbound : Peer.t -> bool = fun _ -> false) state =
   let subscribe_peer_to_topics peer topics state =
     List.fold_left
       (fun state topic ->
@@ -126,10 +130,10 @@ let add_and_subscribe_peers (topics : C.Topic.t list) (peers : C.Peer.t list)
     peers
 
 let init_state ~rng ~limits ~parameters ~peers ~topics
-    ?(to_join : C.Topic.t -> bool = fun _ -> true)
-    ?(direct : C.Peer.t -> bool = fun _ -> false)
-    ?(outbound : C.Peer.t -> bool = fun _ -> false)
-    ~(to_subscribe : C.Peer.t * C.Topic.t -> bool) () =
+    ?(to_join : Topic.t -> bool = fun _ -> true)
+    ?(direct : Peer.t -> bool = fun _ -> false)
+    ?(outbound : Peer.t -> bool = fun _ -> false)
+    ~(to_subscribe : Peer.t * Topic.t -> bool) () =
   let state = GS.make rng limits parameters in
   (* Add and subscribe the given peers. *)
   let state =
@@ -284,7 +288,7 @@ let test_join_adds_peers_to_mesh rng limits parameters =
   (* re-join - there should be peers associated with the topic *)
   let state, to_graft =
     match GS.join {topic} state with
-    | state, Joining_topic {to_graft} -> (state, C.Peer.Set.elements to_graft)
+    | state, Joining_topic {to_graft} -> (state, Peer.Set.elements to_graft)
     | _, _ -> Test.fail ~__LOC__ "Expected Join to succeed"
   in
   (* should have added [degree_optimal] nodes to the mesh *)
@@ -363,7 +367,7 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
   (* Join to topic0 *)
   let state, to_graft =
     match GS.join {topic = "topic0"} state with
-    | state, Joining_topic {to_graft} -> (state, C.Peer.Set.elements to_graft)
+    | state, Joining_topic {to_graft} -> (state, Peer.Set.elements to_graft)
     | _, _ -> Test.fail ~__LOC__ "Expected Join to succeed"
   in
   let peers_in_topic =
@@ -435,7 +439,7 @@ let test_publish_without_flood_publishing rng limits parameters =
   in
   (* Should return [degree_optimal] peers to publish to. *)
   Check.(
-    (C.Peer.Set.cardinal peers_to_publish = limits.degree_optimal)
+    (Peer.Set.cardinal peers_to_publish = limits.degree_optimal)
       int
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
@@ -486,7 +490,7 @@ let test_fanout rng limits parameters =
   assert_fanout_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
   (* Should return [degree_optimal] peers to publish to. *)
   Check.(
-    (C.Peer.Set.cardinal peers_to_publish = limits.degree_optimal)
+    (Peer.Set.cardinal peers_to_publish = limits.degree_optimal)
       int
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
@@ -659,7 +663,7 @@ let test_mesh_addition rng limits parameters =
   (* Heartbeat. *)
   let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
   (* There should be two grafting requests to fill the mesh. *)
-  let grafts = C.Peer.Map.bindings to_graft in
+  let grafts = Peer.Map.bindings to_graft in
   Check.((List.length grafts = 2) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
   unit
 
@@ -700,7 +704,7 @@ let test_mesh_subtraction rng limits parameters =
   (* Heartbeat. *)
   let _state, Heartbeat {to_prune; _} = GS.heartbeat state in
   (* There should be enough prune requests to bring back the mesh size to [degree_optimal]. *)
-  let prunes = C.Peer.Map.bindings to_prune in
+  let prunes = Peer.Map.bindings to_prune in
   Check.(
     (List.length prunes = peer_number - limits.degree_optimal)
       int
