@@ -862,6 +862,66 @@ let test_unsubscribe_backoff rng limits parameters =
   Check.((List.length grafts = 1) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
   unit
 
+(* Tests that only grafts for outbound peers are accepted when the mesh is full.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L2254
+*)
+let test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Accept only outbound peer grafts when mesh full"
+    ~tags:["gossipsub"; "graft"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:limits.degree_high in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Graft all the peers. This should fill the mesh. *)
+  let state =
+    List.fold_left
+      (fun state peer ->
+        let state, _ = GS.handle_graft {peer; topic} state in
+        state)
+      state
+      peers
+  in
+  (* Assert that the mesh is full. *)
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_high state ;
+  (* Add an outbound peer and an inbound peer. *)
+  let inbound_peer = 99 in
+  let outbound_peer = 98 in
+  let state, _ =
+    GS.add_peer {direct = false; outbound = false; peer = inbound_peer} state
+  in
+  let state, _ =
+    GS.add_peer {direct = false; outbound = true; peer = outbound_peer} state
+  in
+  (* Send grafts. *)
+  let state, _ = GS.handle_graft {peer = inbound_peer; topic} state in
+  let state, _ = GS.handle_graft {peer = outbound_peer; topic} state in
+  (* Assert that only the outbound has been added to the mesh *)
+  assert_mesh_inclusion
+    ~__LOC__
+    ~topic
+    ~peer:inbound_peer
+    ~is_included:false
+    state ;
+  assert_mesh_inclusion
+    ~__LOC__
+    ~topic
+    ~peer:outbound_peer
+    ~is_included:true
+    state ;
+  unit
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
@@ -876,3 +936,4 @@ let register rng limits parameters =
   test_mesh_subtraction rng limits parameters ;
   test_do_not_graft_within_backoff_period rng limits parameters ;
   test_unsubscribe_backoff rng limits parameters ;
+  test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters
