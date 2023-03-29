@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (double preendorsement) in Full_construction & Application modes
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^double preendorsement$"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/consensus/main.exe
     Subject:    These tests target different cases for double preendorsement *)
 
 open Protocol

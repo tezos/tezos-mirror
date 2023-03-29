@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (seed)
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                  -- test "^seed$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
     Subject:      - seed_nonce_hash included in some blocks
                   - revelation operation of seed_nonce that should correspond
                   to each seed_nonce_hash

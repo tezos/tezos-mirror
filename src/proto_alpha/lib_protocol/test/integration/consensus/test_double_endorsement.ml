@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (double endorsement)
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe -- --test "alpha: double endorsement"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
     Subject:      Double endorsement evidence operation may happen when an
                   endorser endorsed two different blocks on the same level.
 *)

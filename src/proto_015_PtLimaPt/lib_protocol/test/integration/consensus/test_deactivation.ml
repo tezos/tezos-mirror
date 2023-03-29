@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^deactivation$"
+    Invocation: dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/consensus/main.exe
     Subject:    After a given number of cycles during which a delegate has not
                 made use of its baking and endorsing rights, its account will
                 be deactivated for validator selection. To bake/endorse

@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (endorsement)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^endorsement$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe
     Subject:    Endorsing a block adds an extra layer of confidence
                 to the Tezos' PoS algorithm. The block endorsing
                 operation must be included in the following block.

@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (increase_paid_storage)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^paid storage increase$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:    On increasing a paid amount of contract storage.
 *)
 

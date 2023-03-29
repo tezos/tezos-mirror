@@ -28,8 +28,7 @@
 (** Testing
     -------
     Component:    Tx rollup layer 1 logic
-    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/operations \
-                  && dune exec ./main.exe -- test "^tx rollup$"
+    Invocation:   dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/main.exe
     Subject:      Test rollup
 *)
 
