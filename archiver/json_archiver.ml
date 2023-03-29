@@ -285,7 +285,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
         unknown
 
 let dump_included_in_block cctxt path block_level block_hash block_round
-    timestamp reception_time baker consensus_ops =
+    timestamp reception_times baker consensus_ops =
   let open Lwt.Infix in
   Wallet.of_context cctxt >>= fun aliases_opt ->
   let aliases =
@@ -344,7 +344,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
             delegate = baker;
             delegate_alias = Wallet.alias_of_pkh aliases baker;
             round = block_round;
-            reception_time = Some reception_time;
+            reception_times;
             timestamp;
             nonce = None;
           }
@@ -502,7 +502,7 @@ type chunk =
       * Block_hash.t
       * Int32.t
       * Time.Protocol.t
-      * Time.System.t
+      * (string * Time.System.t) list
       * Tezos_crypto.Signature.Public_key_hash.t
       * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
@@ -517,7 +517,7 @@ let launch cctxt prefix =
             block_hash,
             round,
             timestamp,
-            reception_time,
+            reception_times,
             baker,
             block_info ) ->
           dump_included_in_block
@@ -527,7 +527,7 @@ let launch cctxt prefix =
             block_hash
             round
             timestamp
-            reception_time
+            reception_times
             baker
             block_info
       | Mempool (unaccurate, level, items) ->
@@ -547,7 +547,7 @@ let add_block ~level (block, (endos, preendos)) =
             block.Data.Block.hash,
             block.round,
             block.timestamp,
-            Stdlib.Option.get block.reception_time,
+            block.reception_times,
             block.delegate,
             endos @ preendos )))
 

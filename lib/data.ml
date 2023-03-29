@@ -186,7 +186,7 @@ module Block = struct
     delegate_alias : string option;
     round : Int32.t;
     timestamp : Time.Protocol.t;
-    reception_time : Time.System.t option;
+    reception_times : (string * Time.System.t) list;
     nonce : unit option;
   }
 
@@ -198,16 +198,22 @@ module Block = struct
              delegate;
              delegate_alias;
              round;
-             reception_time;
+             reception_times;
              timestamp;
              nonce;
            } ->
-        (hash, delegate, delegate_alias, round, reception_time, timestamp, nonce))
+        ( hash,
+          delegate,
+          delegate_alias,
+          round,
+          reception_times,
+          timestamp,
+          nonce ))
       (fun ( hash,
              delegate,
              delegate_alias,
              round,
-             reception_time,
+             reception_times,
              timestamp,
              nonce ) ->
         {
@@ -215,7 +221,7 @@ module Block = struct
           delegate;
           delegate_alias;
           round;
-          reception_time;
+          reception_times;
           timestamp;
           nonce;
         })
@@ -227,7 +233,13 @@ module Block = struct
             Tezos_crypto.Signature.Public_key_hash.zero)
          (opt "delegate_alias" string)
          (dft "round" int32 0l)
-         (opt "reception_time" Time.System.encoding)
+         (dft
+            "reception_times"
+            (list
+               (obj2
+                  (req "source" string)
+                  (req "timestamp" Time.System.encoding)))
+            [])
          (dft "timestamp" Time.Protocol.encoding Time.Protocol.epoch)
          (opt "nonce" unit))
 end

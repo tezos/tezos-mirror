@@ -26,35 +26,73 @@
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
 let parse_block_row
-    ((hash, delegate, delegate_alias), (round, reception_time, timestamp)) =
-  let nonce = None in
-  Teztale_lib.Data.Block.
-    {hash; delegate; delegate_alias; round; reception_time; timestamp; nonce}
+    ( (hash, delegate, delegate_alias, round),
+      (timestamp, reception_time, source) ) acc =
+  Tezos_crypto.Hashed.Block_hash.Map.update
+    hash
+    (function
+      | Some
+          Teztale_lib.Data.Block.
+            {
+              hash;
+              delegate;
+              delegate_alias;
+              round;
+              reception_times;
+              timestamp;
+              nonce;
+            } ->
+          Some
+            Teztale_lib.Data.Block.
+              {
+                hash;
+                delegate;
+                delegate_alias;
+                round;
+                reception_times = (source, reception_time) :: reception_times;
+                timestamp;
+                nonce;
+              }
+      | None ->
+          Some
+            Teztale_lib.Data.Block.
+              {
+                hash;
+                delegate;
+                delegate_alias;
+                round;
+                reception_times = [(source, reception_time)];
+                timestamp;
+                nonce = None;
+              })
+    acc
 
 let select_blocks db_pool level =
   let q =
-    "SELECT b.hash, d.address, d.alias, b.round, r.timestamp, b.timestamp FROM \
-     blocks b, blocks_reception r, delegates d ON r.block = b.id AND d.id = \
-     b.baker WHERE b.level = ?"
+    "SELECT b.hash, d.address, d.alias, b.round, b.timestamp, r.timestamp, \
+     n.name FROM blocks b, blocks_reception r, delegates d , nodes n ON \
+     r.block = b.id AND d.id = b.baker AND n.id = r.source WHERE b.level = ?"
   in
   let request =
     Caqti_request.Infix.(
       Caqti_type.int32
       ->* Caqti_type.(
             tup2
-              (tup3
+              (tup4
                  Sql_requests.Type.block_hash
                  Sql_requests.Type.public_key_hash
-                 (option string))
-              (tup3 int32 (option ptime) Sql_requests.Type.time_protocol)))
+                 (option string)
+                 int32)
+              (tup3 Sql_requests.Type.time_protocol ptime string)))
       q
   in
-  let f r acc =
-    let block = parse_block_row r in
-    block :: acc
-  in
   Caqti_lwt.Pool.use
-    (fun (module Db : Caqti_lwt.CONNECTION) -> Db.fold request f level [])
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Db.fold
+        request
+        parse_block_row
+        level
+        Tezos_crypto.Hashed.Block_hash.Map.empty)
     db_pool
 
 module Op_key = struct
@@ -212,16 +250,18 @@ let select_ops db_pool level =
 
 let translate_ops info =
   let translate pkh_ops =
-    List.map
-      (fun (Op_key.{kind; round}, op_info) ->
+    Pkh_ops.fold
+      (fun Op_key.{kind; round} op_info acc ->
         Teztale_lib.Data.Delegate_operations.
           {
             kind;
             round;
             mempool_inclusion = op_info.received;
             block_inclusion = op_info.included;
-          })
-      (Pkh_ops.bindings pkh_ops)
+          }
+        :: acc)
+      pkh_ops
+      []
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
     (fun pkh (alias, power, pkh_ops) acc ->
@@ -270,6 +310,9 @@ let data_at_level db_pool level =
   let* delegate_operations = select_ops db_pool level in
   let* blocks = blocks_e in
   let delegate_operations = translate_ops delegate_operations in
+  let blocks =
+    Tezos_crypto.Hashed.Block_hash.Map.fold (fun _ x acc -> x :: acc) blocks []
+  in
   let unaccurate = false in
   return Teztale_lib.Data.{blocks; delegate_operations; unaccurate}
 

@@ -89,7 +89,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
-  let block_data cctx (delegate, timestamp, round, hash) reception_time =
+  let block_data cctx (delegate, timestamp, round, hash) reception_times =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
     return
       ( Data.Block.
@@ -100,23 +100,23 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
             hash;
             nonce = None;
             delegate_alias = None;
-            reception_time;
+            reception_times;
           },
         split_endorsements_preendorsements operations )
 
   let block_of ctxt level =
     let cctx = Services.wrap_full ctxt in
     let* block_info = Services.get_block_info cctx level in
-    block_data cctx block_info None
+    block_data cctx block_info []
 
   let () = Protocol_hash.Table.add block_machine Services.hash block_of
 
-  let get_block ctxt hash header reception_time =
+  let get_block ctxt hash header reception_times =
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
     let* delegate = Services.baker cctx hash in
-    block_data cctx (delegate, timestamp, round, hash) (Some reception_time)
+    block_data cctx (delegate, timestamp, round, hash) reception_times
 
   let () =
     Protocol_hash.Table.add
@@ -407,7 +407,12 @@ module Loops (Archiver : Archiver.S) = struct
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
                 print_failures
-                  (block_recorder cctx block_level hash header reception_time)
+                  (block_recorder
+                     cctx
+                     block_level
+                     hash
+                     header
+                     [("archiver", reception_time)])
               in
               Lwt.return acc')
             block_stream

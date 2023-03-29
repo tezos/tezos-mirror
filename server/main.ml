@@ -265,7 +265,7 @@ let endorsing_rights_callback db_pool g rights =
 
 let block_callback db_pool g source
     ( Teztale_lib.Data.Block.
-        {delegate; timestamp; reception_time; round; hash; _},
+        {delegate; timestamp; reception_times; round; hash; _},
       (endorsements, preendorsements) ) =
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -281,12 +281,12 @@ let block_callback db_pool g source
             in
 
             let* () =
-              Tezos_lwt_result_stdlib.Lwtreslib.Bare.Option.iter_es
-                (fun reception_time ->
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun (_, reception_time) ->
                   Db.exec
                     Sql_requests.insert_received_block
                     (reception_time, hash, source))
-                reception_time
+                reception_times
             in
             let* () =
               insert_operations_from_block

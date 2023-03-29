@@ -47,8 +47,8 @@ function get_info_block(dict_data, msec = false) {
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) {
 		    t_baker[round] = new Date(element["timestamp"]);
-		    if ("reception_time" in element) {
-			let block_delay = new Date(element["reception_time"]) - t_baker[round];
+		    if ("reception_times" in element && element["reception_times"].length > 0) {
+			let block_delay = Math.min(...element["reception_times"].map(v => new Date(v["timestamp"]))) - t_baker[round];
 			if (msec) {
 			    t_delay_block[round] = block_delay;
 			} else {
