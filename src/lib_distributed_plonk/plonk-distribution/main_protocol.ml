@@ -271,7 +271,7 @@ module Common (PP : Polynomial_protocol.S) = struct
   let worker_commit_to_wires pp worker_inputs_map =
     let inputs_map = SMap.map (fun wi -> wi.inputs) worker_inputs_map in
     let shifts_map = SMap.map (fun wi -> wi.shift) worker_inputs_map in
-    let all_keys = build_all_keys (get_wires_names nb_wires) shifts_map in
+    let all_keys = build_all_keys (wire_names nb_wires) shifts_map in
     let wires_list_map, f_wires, _, all_f_wires, cm_wires, cm_aux_wires =
       commit_to_wires ~all_keys ~shifts_map pp inputs_map
     in

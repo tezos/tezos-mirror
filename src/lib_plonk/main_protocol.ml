@@ -158,12 +158,16 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                  k)))
       inputs
 
-  (* Returns wires names as a list of strings ; the i-th wire is named after
-     the i-th letter of the alphabet
-  *)
-  let get_wires_names nb_wires =
-    let alphabet = "abcdefghijklmnopqrstuvwxyz" in
-    List.init nb_wires (fun i -> Char.escaped alphabet.[i])
+  (* Returns the wire names as a string list *)
+  let wire_names nb_wires = List.init nb_wires (fun i -> "w_" ^ string_of_int i)
+
+  (* Convert the wire arrays into maps, keyed as in [wire_names] *)
+  let name_wires wires_array =
+    SMap.map
+      (List.map (fun array ->
+           let n = Array.length array in
+           List.combine (wire_names n) (Array.to_list array) |> SMap.of_list))
+      wires_array
 
   let hash_verifier_inputs verifier_inputs =
     let open Utils.Hash in
@@ -250,19 +254,20 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                  are fewer constraints than n, the array is padded with 0's,
                  except qpub, that should be [||] if there are public inputs.
        - tables : [tables] is a list of scalar arrays, one per wire, so the list
-                 length is nb_wires, typically 5.
+                 length is Plompiler.Csir.nb_wires_arch.
                  Each array is the concatenation of one of the columns of all
                  Plookup tables. (One column per wire, tables which use fewer
                  columns are completed with dummy ones).
                  Each scalar array is a concatenation of tables
-       - wires : map from wire names to an array of indices (one index per
-                 constraint representing the variable that such wire takes at
-                 that constraint).
+       - wires : an array where each of the components corresponds to a wire in
+                 the architecture and contains an array of indices (one index
+                 per constraint representing the variable that such wire takes
+                 at that constraint).
                  Again, the length of such array is the domain size (i.e. n).
                  If there are fewer constraints than n, the array is padded with
                  the last array element.
        - permutation: indices corresponding to a permutation that preserves
-                 [wires]. Its length is [n * nb_wires], typically [5n] and
+                 [wires]. Its length is [n * Plompiler.Csir.nb_wires_arch] and
                  should be maximal in the sense that it splits in as many cycles
                  as there are variables in the circuit.
        - evaluations : similar as the common_pp evaluations, but for the
@@ -277,7 +282,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       public_input_size : int;
       gates : Scalar.t array SMap.t;
       tables : Scalar.t array list;
-      wires : int array SMap.t;
+      wires : int array array;
       permutation : int array;
       rc_permutation : int array;
       evaluations : Evaluations.t SMap.t;
@@ -296,7 +301,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
 
     let enforce_wire_values wire_indices wire_values =
       try
-        SMap.map
+        Array.map
           (fun l ->
             let w_array = Array.map (fun index -> wire_values.(index)) l in
             Evaluations.of_array (Array.length w_array - 1, w_array))
@@ -304,8 +309,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       with Invalid_argument _ ->
         failwith
           "Compute_wire_polynomial : x's length does not match with circuit. \
-           Either your witness is too short, or some indexes in a, b or c are \
-           greater than the witness size."
+           Either your witness is too short, or some indexes are greater than \
+           the witness size."
 
     let compute_wire_polynomials ~zero_knowledge ~gates n domain wires =
       let unblinded_res =
@@ -313,17 +318,15 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       if zero_knowledge then
         let nb_blinds_map = Gates.aggregate_blinds ~gates in
-        let polys_and_blinds =
-          SMap.mapi
-            (fun name f ->
-              (* 1 more blind is added for the commitment evaluation *)
-              let nb_blinds =
-                1 + Option.value ~default:0 (SMap.find_opt name nb_blinds_map)
-              in
-              Poly.blind ~nb_blinds n f)
+        let nb_extra_blinds = SMap.fold (fun _ -> Int.max) nb_blinds_map 0 in
+        let polys, blinds =
+          SMap.map
+            (* 1 more blind is added for the commitment evaluation *)
+              (fun f -> Poly.blind ~nb_blinds:(1 + nb_extra_blinds) n f)
             unblinded_res
+          |> SMap.two_maps_of_pair_map
         in
-        (SMap.map fst polys_and_blinds, Some (SMap.map snd polys_and_blinds))
+        (polys, Some blinds)
       else (unblinded_res, None)
 
     (* returns informations about wires, including commitment, blinds &
@@ -339,8 +342,9 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               (fun w -> enforce_wire_values circuit_pp.wires w.witness)
               input)
           inputs_map
+        |> name_wires
       in
-      (* wires polynomials map list map & there blinds *)
+      (* wire-polynomials array list map & there blinds *)
       let f_wires, f_blinds =
         SMap.mapi
           (fun name w_list ->
@@ -356,7 +360,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           wires_list_map
         |> SMap.two_maps_of_pair_map
       in
-      (* all wires polynomials gather in a map *)
+      (* all wire-polynomials gathered in a map *)
       let all_f_wires = SMap.Aggregation.gather_maps ?shifts_map f_wires in
       let cm_wires, cm_aux_wires =
         Commitment.commit
@@ -379,9 +383,10 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
        C(X) := \sum_i delta^{i-1} c_i(X)
        We will perform a single permutation argument for A, B and C. *)
     let build_batched_wires_values {delta; _} wires_list_map =
-      let nb_wires = SMap.(cardinal (List.hd (choose wires_list_map |> snd))) in
       let agg_map =
-        SMap.of_list ((List.map (fun i -> (i, []))) (get_wires_names nb_wires))
+        SMap.of_list
+          ((List.map (fun i -> (i, [])))
+             (wire_names Plompiler.Csir.nb_wires_arch))
       in
       SMap.map
         (fun l ->
@@ -571,10 +576,13 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     let build_perm_identities pp rd =
       SMap.mapi
         (fun circuit_name circuit_pp ->
-          let wires_names = SMap.keys circuit_pp.wires in
           let perm_identities =
             (* Using the batched wires *)
-            let wires_names = List.map String.capitalize_ascii wires_names in
+            let wires_names =
+              List.map
+                String.capitalize_ascii
+                (wire_names @@ Array.length circuit_pp.wires)
+            in
             Perm.prover_identities
               ~circuit_name
               ~wires_names
@@ -593,7 +601,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         SMap.mapi
           (fun circuit_name inputs_list ->
             let circuit_pp = SMap.find circuit_name pp.circuits_map in
-            let wires_names = SMap.keys circuit_pp.wires in
+            let wires_names = wire_names @@ Array.length circuit_pp.wires in
             (* Identities that must be computed for each proof *)
             let shift, nb_proofs =
               match shifts_map with
@@ -754,14 +762,12 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
 
     (* - gates : map of selector names ; they are binded to unit because we
                  just need their name for the verification
-       - nb_wires : wire architecture (number of wires per gate, typically 3)
        - alpha : scalar used by plookup.
        - ultra : flag to specify whether plookup is being used.
        - input_com_sizes : the size of each input_commitment
     *)
     type circuit_verifier_pp = {
       gates : unit SMap.t;
-      nb_wires : int;
       alpha : Scalar.t option;
       ultra : bool;
       input_com_sizes : int list;
@@ -773,8 +779,6 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         (prover_pp : Prover.circuit_prover_pp) =
       {
         gates = SMap.map (Fun.const ()) prover_pp.gates;
-        (* TODO: remove obsolete nb_wires field from circuit_verifier_pp *)
-        nb_wires = Plompiler.Csir.nb_wires_arch;
         alpha = prover_pp.alpha;
         ultra = prover_pp.ultra;
         input_com_sizes = prover_pp.input_com_sizes;
@@ -787,7 +791,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           (fun circuit_name pi_list ->
             let circuit_pp = SMap.find circuit_name circuits_map in
             let nb_proofs = List.length pi_list in
-            let wires_names = get_wires_names circuit_pp.nb_wires in
+            let wires_names = wire_names Plompiler.Csir.nb_wires_arch in
             let perm_identities =
               Perm.verifier_identities
                 ~circuit_name
@@ -1004,7 +1008,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let extended_wires =
         let li_array = Array.init l (fun i -> i) in
         (* Adding public inputs and resizing *)
-        SMap.map (fun w -> Array.pad (Array.append li_array w) n) c.wires
+        Array.map (fun w -> Array.pad (Array.append li_array w) n) c.wires
       in
       let adapted_range_checks =
         (List.map (Int.add l) (fst c.range_checks), snd c.range_checks)
@@ -1014,7 +1018,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         else
           Plook.format_tables
             ~tables:c.tables
-            ~nb_columns:c.nb_wires
+            ~nb_columns:Plompiler.Csir.nb_wires_arch
             ~length_not_padded:c.table_size
             ~length_padded:n
       in
@@ -1044,7 +1048,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           let g_map_perm =
             Perm.preprocessing
               ~domain
-              ~nb_wires:circuit.nb_wires
+              ~nb_wires:Plompiler.Csir.nb_wires_arch
               ~permutation
               ()
           in
@@ -1088,7 +1092,6 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             Verifier.
               {
                 gates;
-                nb_wires = circuit.nb_wires;
                 alpha;
                 ultra = circuit.ultra;
                 input_com_sizes = circuit.input_com_sizes;
@@ -1107,7 +1110,6 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             public_input_size;
             input_com_sizes;
             circuit_size;
-            nb_wires;
             table_size;
             nb_lookups;
             ultra;
@@ -1134,10 +1136,12 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         (* L1, Ssi, selectors, ultra stuff *)
         let nb_g_map_polys =
           let ultra_polys = if ultra then 2 else 0 in
-          1 + nb_wires + SMap.cardinal gates + ultra_polys
+          1 + Plompiler.Csir.nb_wires_arch + SMap.cardinal gates + ultra_polys
         in
         let nb_extra_polys = if ultra then 5 else 1 in
-        let online = max nb_wires nb_extra_polys * nb_proofs in
+        let online =
+          max Plompiler.Csir.nb_wires_arch nb_extra_polys * nb_proofs
+        in
         (* 5 stands for the max number of T polynomials, if we split T *)
         let offline = max nb_g_map_polys 5 in
         (* Multiply by 2 to have more than needed, just in case *)
@@ -1162,7 +1166,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           (fun _ ((c : Circuit.t), _) acc_deg_eval ->
             let deg_eval =
               degree_evaluations
-                ~nb_wires:c.nb_wires
+                ~nb_wires:Plompiler.Csir.nb_wires_arch
                 ~gates:c.gates
                 ~ultra:c.ultra
             in
@@ -1185,19 +1189,16 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         get_sizes ~zero_knowledge circuits_map
       in
       let evaluations =
-        let nb_wires =
-          SMap.fold
-            (fun _ ((c : Circuit.t), _) m -> max m c.nb_wires)
-            circuits_map
-            0
-        in
         (* Add X evaluations, which is the domain needed for other evaluations *)
         let evaluations =
           SMap.singleton "X" (Evaluations.of_domain domain_evals)
         in
         (* Add L₁, Sid₁, Sid₂, Sid₃, Sid₄, Sid₅ *)
         let evaluations =
-          Perm.common_preprocessing ~nb_wires ~domain ~evaluations
+          Perm.common_preprocessing
+            ~nb_wires:Plompiler.Csir.nb_wires_arch
+            ~domain
+            ~evaluations
         in
 
         (* if ultra add L_n_plus_1 *)

@@ -35,15 +35,15 @@ let mone = Scalar.negate one
 
 let two = Scalar.add one one
 
-let left = "a"
+let left = "w_0"
 
-let right = "b"
+let right = "w_1"
 
-let output = "c"
+let output = "w_2"
 
-let top = "d"
+let top = "w_3"
 
-let bottom = "e"
+let bottom = "w_4"
 
 let com_label = "com"
 

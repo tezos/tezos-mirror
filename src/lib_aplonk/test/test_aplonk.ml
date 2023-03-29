@@ -194,13 +194,12 @@ module External = struct
     let l = PI.nb_inner in
     let circuit =
       let wires =
-        Plonk.Circuit.make_wires
-          ~a:[0; 1; 2; 7; 8]
-          ~b:[3; 4; 5; 9; 10]
-          ~c:[2; 5; 6; 11; 12]
-          ~d:[0; 0; 0; 0; 0]
-          ~e:[0; 0; 0; 0; 0]
-          ()
+        let a = [0; 1; 2; 7; 8] in
+        let b = [3; 4; 5; 9; 10] in
+        let c = [2; 5; 6; 11; 12] in
+        let d = [0; 0; 0; 0; 0] in
+        let e = [0; 0; 0; 0; 0] in
+        [|a; b; c; d; e|]
       in
       let gates =
         Plonk.Circuit.make_gates

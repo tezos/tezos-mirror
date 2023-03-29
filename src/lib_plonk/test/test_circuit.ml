@@ -35,7 +35,12 @@ module Make = struct
 
   let test_make_one_sel sel () =
     let open Plonk.Circuit in
-    let wires = SMap.of_list [("a", [1]); ("b", [1]); ("c", [1])] in
+    let wires =
+      let a = [1] in
+      let b = [1] in
+      let c = [1] in
+      [|a; b; c|]
+    in
     let gates = SMap.add sel [Scalar.one] SMap.empty in
     let gates, tables =
       match sel with
@@ -44,9 +49,9 @@ module Make = struct
       | _ -> (gates, [])
     in
     let c = make ~tables ~wires ~gates ~public_input_size:0 () in
-    let wires = Tables.map Array.of_list wires in
+    let wires = Array.map Array.of_list wires in
     let gates = Tables.map Array.of_list gates in
-    assert (c.wires = wires) ;
+    assert (Array.sub c.wires 0 (Array.length wires) = wires) ;
     assert (gates_equal c.gates gates)
 
   let tests_one_sel =
@@ -57,27 +62,41 @@ module Make = struct
 
   let test_empty () =
     let open Plonk.Circuit in
-    let wires = SMap.of_list [("a", [1]); ("b", [1]); ("c", [1])] in
+    let wires =
+      let a = [1] in
+      let b = [1] in
+      let c = [1] in
+      [|a; b; c|]
+    in
     let gates = SMap.add "qc" [Scalar.one] SMap.empty in
     Helpers.must_fail (fun () ->
-        ignore @@ make ~wires:SMap.empty ~gates ~public_input_size:0 ()) ;
+        ignore @@ make ~wires:[||] ~gates ~public_input_size:0 ()) ;
     Helpers.must_fail (fun () ->
         ignore @@ make ~wires ~gates:SMap.empty ~public_input_size:0 ())
 
   let test_different_size () =
     let open Plonk.Circuit in
     (* wires have different size wrt to gates *)
-    let wires = SMap.of_list [("a", [1]); ("b", [1]); ("c", [1])] in
+    let wires =
+      let a = [1] in
+      let b = [1] in
+      let c = [1] in
+      [|a; b; c|]
+    in
     let gates = SMap.add "qc" Scalar.[one; one] SMap.empty in
     Helpers.must_fail (fun () ->
         ignore @@ make ~wires ~gates ~public_input_size:0 ()) ;
     (* wires have different sizes *)
-    let wires = SMap.of_list [("a", [1; 1]); ("b", [1]); ("c", [1])] in
+    let wrong_wires =
+      let a = [1; 1] in
+      let b = [1] in
+      let c = [1] in
+      [|a; b; c|]
+    in
     let gates = SMap.add "qc" Scalar.[one] SMap.empty in
     Helpers.must_fail (fun () ->
-        ignore @@ make ~wires ~gates ~public_input_size:0 ()) ;
+        ignore @@ make ~wires:wrong_wires ~gates ~public_input_size:0 ()) ;
     (* gates have different sizes *)
-    let wires = SMap.of_list [("a", [1]); ("b", [1]); ("c", [1])] in
     let gates = SMap.of_list Scalar.[("qc", [one]); ("ql", [one; one])] in
     Helpers.must_fail (fun () ->
         ignore @@ make ~wires ~gates ~public_input_size:0 ())
@@ -87,7 +106,10 @@ module Make = struct
     let open Plonk.Circuit in
     let x = Scalar.[|one; add one one; of_string "3"; of_string "4"|] in
     let wires =
-      SMap.of_list [("a", [0; 2; 0]); ("b", [0; 3; 3]); ("c", [0; 1; 1])]
+      let a = [0; 2; 0] in
+      let b = [0; 3; 3] in
+      let c = [0; 1; 1] in
+      [|a; b; c|]
     in
     let gates =
       SMap.of_list
@@ -105,7 +127,10 @@ module Make = struct
   let test_wrong_selectors () =
     let open Plonk.Circuit in
     let wires =
-      SMap.of_list [("a", [0; 2; 0]); ("b", [0; 3; 3]); ("c", [0; 1; 1])]
+      let a = [0; 2; 0] in
+      let b = [0; 3; 3] in
+      let c = [0; 1; 1] in
+      [|a; b; c|]
     in
     let gates =
       SMap.of_list
@@ -129,7 +154,12 @@ module Make = struct
 
   let test_vector () =
     let open Plonk.Circuit in
-    let wires = SMap.of_list [("a", [1; 1]); ("b", [1; 1]); ("c", [1; 1])] in
+    let wires =
+      let a = [1; 1] in
+      let b = [1; 1] in
+      let c = [1; 1] in
+      [|a; b; c|]
+    in
     let gates =
       SMap.of_list Scalar.[("qc", [zero; one]); ("qr", [zero; zero])]
     in
@@ -137,8 +167,8 @@ module Make = struct
       SMap.of_list Scalar.[("qc", [|zero; one|]); ("ql", [|zero; zero|])]
     in
     let c = make ~wires ~gates ~public_input_size:1 () in
-    let wires = Tables.map Array.of_list wires in
-    assert (c.wires = wires) ;
+    let wires = Array.map Array.of_list wires in
+    assert (Array.sub c.wires 0 (Array.length wires) = wires) ;
     assert (gates_equal c.gates gates_expected)
 
   (* TODO add more tests about lookup *)
@@ -204,14 +234,12 @@ module To_plonk = struct
     in
     let c = to_plonk ~public_input_size:0 [g1; g2] in
     let expected_wires =
-      SMap.of_list
-        [
-          ("a", [|0; 1|]);
-          ("b", [|1; 2|]);
-          ("c", [|0; 1|]);
-          ("d", [|0; 0|]);
-          ("e", [|0; 0|]);
-        ]
+      let a = [|0; 1|] in
+      let b = [|1; 2|] in
+      let c = [|0; 1|] in
+      let d = [|0; 0|] in
+      let e = [|0; 0|] in
+      [|a; b; c; d; e|]
     in
     let expected_gates =
       SMap.of_list [("qr", [|one; zero|]); ("qm", [|zero; two|])]

@@ -69,8 +69,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
 
     type t = IntSet.t IntMap.t
 
-    (* receives [wire_indices], a map from wire names (e.g. "a", "b", "c") to
-       [int list], flattens its data into a concatenated list of indices [idxs]
+    (* receives [wire_indices], an array of [int array],
+       flattens its data into a concatenated array of indices [idxs]
        and outputs a map keyed by indices, pointing to the set of (integer)
        positions where the index appears in [idxs] *)
     let build_partition wire_indices =
@@ -80,9 +80,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         let set = Option.value (IntMap.find_opt i map) ~default:IntSet.empty in
         IntMap.add i (IntSet.add e set) map
       in
-      let idxs = SMap.values wire_indices in
       let map, _i =
-        List.fold_left
+        Array.fold_left
           (fun (int_map, i) wire_indices_i ->
             let new_map, j =
               Array.fold_left
@@ -94,7 +93,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
             in
             (new_map, i + j))
           (IntMap.empty, 0)
-          idxs
+          wire_indices
       in
       map
 
@@ -542,7 +541,7 @@ module type S = sig
 
   val polynomials_degree : nb_wires:int -> int
 
-  val build_permutation : int array SMap.t -> int array
+  val build_permutation : int array array -> int array
 
   val preprocessing :
     domain:Domain.t ->

@@ -23,7 +23,7 @@ module External (PC : Polynomial_commitment.S) = struct
   open Plonk_test.Cases
 
   let test_range_checks_single ~zero_knowledge () =
-    let wires = SMap.map Array.to_list General.circuit.wires in
+    let wires = Array.map Array.to_list General.circuit.wires in
     let gates = SMap.map Array.to_list General.circuit.gates in
     let circuit =
       Plonk.Circuit.make
@@ -53,7 +53,7 @@ module External (PC : Polynomial_commitment.S) = struct
 
   (* This test does not work since several proofs are not supported yet *)
   let test_range_checks_multi ~zero_knowledge () =
-    let wires = SMap.map Array.to_list General.circuit.wires in
+    let wires = Array.map Array.to_list General.circuit.wires in
     let gates = SMap.map Array.to_list General.circuit.gates in
     let circuit1 =
       Plonk.Circuit.make
