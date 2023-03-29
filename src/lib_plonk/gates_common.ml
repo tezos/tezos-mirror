@@ -35,7 +35,7 @@ let mone = Scalar.negate one
 
 let two = Scalar.add one one
 
-let wire_name i = "w_" ^ string_of_int i
+let wire_name = Plompiler.Csir.wire_name
 
 let com_label = "com"
 

@@ -97,185 +97,23 @@ module AddWire (Params : Params) : Base_sig = struct
   let cs = Params.cs
 end
 
-(* Add next output gate
-   Arith monomial
+(* Linear arith monomial
    degree : 2n
    advice selectors : None
-   equations : + q·c
+   equations : + q·w
 *)
-module AddOutput = AddWire (struct
-  let wire = 2
+let linear_monomial ?(is_next = false) wire selector =
+  (module AddWire (struct
+    let wire = wire
 
-  let selector = "qo"
+    let selector = selector
 
-  let is_next = false
+    let is_next = is_next
 
-  let cs ~q:qo ~wires ~wires_g:_ ?precomputed_advice:_ () =
-    let c = wires.(2) in
-    map_singleton (L.Num.mul qo c)
-end)
-
-(* Add next left gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·a
-*)
-module AddLeft = AddWire (struct
-  let wire = 0
-
-  let selector = "ql"
-
-  let is_next = false
-
-  let cs ~q:ql ~wires ~wires_g:_ ?precomputed_advice:_ () =
-    let a = wires.(0) in
-    map_singleton (L.Num.mul ql a)
-end)
-
-(* Add next right gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·b
-*)
-module AddRight = AddWire (struct
-  let wire = 1
-
-  let selector = "qr"
-
-  let is_next = false
-
-  let cs ~q:qr ~wires ~wires_g:_ ?precomputed_advice:_ () =
-    let b = wires.(1) in
-    map_singleton (L.Num.mul qr b)
-end)
-
-(* Add top gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·d
-*)
-module AddTop = AddWire (struct
-  let wire = 3
-
-  let selector = "qd"
-
-  let is_next = false
-
-  let cs ~q:qd ~wires ~wires_g:_ ?precomputed_advice:_ () =
-    let d = wires.(3) in
-    map_singleton (L.Num.mul qd d)
-end)
-
-(* Add bottom gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·e
-*)
-module AddBottom = AddWire (struct
-  let wire = 4
-
-  let selector = "qe"
-
-  let is_next = false
-
-  let cs ~q:qe ~wires ~wires_g:_ ?precomputed_advice:_ () =
-    let e = wires.(4) in
-    map_singleton (L.Num.mul qe e)
-end)
-
-(* Add next output gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·cg
-*)
-module AddNextOutput = AddWire (struct
-  let wire = 2
-
-  let selector = "qog"
-
-  let is_next = true
-
-  let cs ~q:qog ~wires:_ ~wires_g ?precomputed_advice:_ () =
-    let cg = wires_g.(2) in
-    map_singleton (L.Num.mul qog cg)
-end)
-
-(* Add next left gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·ag
-*)
-module AddNextLeft = AddWire (struct
-  let wire = 0
-
-  let selector = "qlg"
-
-  let is_next = true
-
-  let cs ~q:qlg ~wires:_ ~wires_g ?precomputed_advice:_ () =
-    let ag = wires_g.(0) in
-    map_singleton (L.Num.mul qlg ag)
-end)
-
-(* Add next right gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·bg
-*)
-module AddNextRight = AddWire (struct
-  let wire = 1
-
-  let selector = "qrg"
-
-  let is_next = true
-
-  let cs ~q:qrg ~wires:_ ~wires_g ?precomputed_advice:_ () =
-    let bg = wires_g.(1) in
-    map_singleton (L.Num.mul qrg bg)
-end)
-
-(* Add next top gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·dg
-*)
-module AddNextTop = AddWire (struct
-  let wire = 3
-
-  let selector = "qdg"
-
-  let is_next = true
-
-  let cs ~q:qdg ~wires:_ ~wires_g ?precomputed_advice:_ () =
-    let dg = wires_g.(3) in
-    map_singleton (L.Num.mul qdg dg)
-end)
-
-(* Add next bottom gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·eg
-*)
-module AddNextBottom = AddWire (struct
-  let wire = 4
-
-  let selector = "qeg"
-
-  let is_next = true
-
-  let cs ~q:qeg ~wires:_ ~wires_g ?precomputed_advice:_ () =
-    let eg = wires_g.(4) in
-    map_singleton (L.Num.mul qeg eg)
-end)
+    let cs ~q ~wires ~wires_g ?precomputed_advice:_ () =
+      let w = if is_next then wires_g.(wire) else wires.(wire) in
+      map_singleton (L.Num.mul q w)
+  end) : Base_sig)
 
 (* Add constant
    Arith monomial

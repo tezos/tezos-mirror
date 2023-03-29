@@ -159,7 +159,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       inputs
 
   (* Returns the wire names as a string list *)
-  let wire_names nb_wires = List.init nb_wires (fun i -> "w_" ^ string_of_int i)
+  let wire_names nb_wires = List.init nb_wires Plompiler.Csir.wire_name
 
   (* Convert the wire arrays into maps, keyed as in [wire_names] *)
   let name_wires wires_array =
