@@ -34,6 +34,8 @@ module Inbox_add_message : Benchmark.S = struct
 
   let info = "Benchmark for Merkle.add_message"
 
+  let module_filename = __FILE__
+
   let tags = ["tx_rollup"; "merkle"; "inbox"; "add_message"]
 
   type config = {max_messages : int}
@@ -115,6 +117,8 @@ module Commitment_full_compact_bench : Benchmark.S = struct
   let name = ns "Commitment_full_compact_bench"
 
   let info = "Benchmark for Tx_rollup_commitment_repr.Full.compact"
+
+  let module_filename = __FILE__
 
   let tags = ["tx_rollup"; "merkle"; "commitment"; "compact"]
 
@@ -544,6 +548,8 @@ module Verify_proof_compute_bench : Benchmark.S = struct
   let name = ns "Tx_rollup_verify_proof"
 
   let info = "Benchmark for Tx_rollup.verify_proof"
+
+  let module_filename = __FILE__
 
   let tags = ["tx_rollup"; "merkle"; "verify"; "proof"]
 
