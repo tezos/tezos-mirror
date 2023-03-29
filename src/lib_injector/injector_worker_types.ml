@@ -80,15 +80,3 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
           level
     | Inject -> Format.fprintf ppf "injection"
 end
-
-module Name = struct
-  type t = Signature.public_key_hash
-
-  let encoding = Signature.Public_key_hash.encoding
-
-  let base = ["injector"]
-
-  let pp = Signature.Public_key_hash.pp_short
-
-  let equal = Signature.Public_key_hash.equal
-end
