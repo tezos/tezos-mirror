@@ -81,7 +81,8 @@ let register_protocol_migration_tests () =
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[migrate_from]
+    ~loser_protocols:[migrate_from] ;
+  Sc_rollup.register_migration ~migrate_from:Protocol.Mumbai ~migrate_to
 
 (* Tests related to one-off protocol migrations used in the past. *)
 let register_older_protocol_migration_tests () =

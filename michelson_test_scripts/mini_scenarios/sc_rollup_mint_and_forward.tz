@@ -1,0 +1,17 @@
+parameter (pair (pair bytes nat) (contract (ticket bytes)) );
+storage unit;
+code
+  {
+    UNPAIR;
+    UNPAIR;
+    UNPAIR;
+    TICKET;
+    ASSERT_SOME;
+    PUSH mutez 0;
+    SWAP;
+    TRANSFER_TOKENS;
+    NIL operation;
+    SWAP;
+    CONS;
+    PAIR
+  }

@@ -293,6 +293,38 @@ let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
   in
   scenario sc_rollup tezos_node tezos_client
 
+let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
+    ?variant ?(tags = []) ~kind ~migrate_from ~migrate_to ~scenario_prior
+    ~scenario_after ~description () =
+  let tags = kind :: "migration" :: tags in
+  Test.register
+    ~__FILE__
+    ~tags
+    ~title:(format_title_scenario kind {variant; tags; description})
+  @@ fun () ->
+  let* tezos_node, tezos_client =
+    setup_l1 ~commitment_period:10 ~challenge_window:10 ~timeout:10 migrate_from
+  in
+  let* sc_rollup = originate_sc_rollup ?parameters_ty ~kind ~src tezos_client in
+  let* prior_res = scenario_prior tezos_client ~sc_rollup in
+  let current_level = Node.get_level tezos_node in
+  let migration_level = current_level + 1 in
+  let* () = Node.terminate tezos_node in
+  let patch_config =
+    Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* () = Node.run ~patch_config tezos_node nodes_args in
+  let* () = Node.wait_for_ready tezos_node in
+  let* () =
+    repeat migration_level (fun () -> Client.bake_for_and_wait tezos_client)
+  in
+  let* () = scenario_after tezos_client ~sc_rollup prior_res in
+  unit
+
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     {variant; tags; description} scenario =
@@ -4318,6 +4350,117 @@ let test_recover_bond_of_stakers =
   in
   unit
 
+(** Test that it is still possible to send message after a migration
+(internal and external). *)
+let test_migration_inbox ~kind ~migrate_from ~migrate_to =
+  let tags = ["internal"; "external"; "message"; "inbox"]
+  and description = "testing to send inbox operation post migration."
+  and scenario_prior tezos_client ~sc_rollup =
+    let* minter_address =
+      originate_forward_smart_contract tezos_client migrate_from
+    in
+    let* () = send_messages 2 tezos_client in
+    let* () =
+      Client.transfer
+        ~amount:Tez.(of_int 100)
+        ~burn_cap:Tez.(of_int 100)
+        ~storage_limit:100000
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:minter_address
+        ~arg:
+          (Format.sprintf "Pair 0x%s %S " (hex_encode "pred_message") sc_rollup)
+        tezos_client
+    in
+    return minter_address
+  and scenario_after tezos_client ~sc_rollup minter_address =
+    let* () = send_messages 2 tezos_client in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5286
+       Check messages are correctly added in the inbox. *)
+    Client.transfer
+      ~amount:Tez.(of_int 100)
+      ~burn_cap:Tez.(of_int 100)
+      ~storage_limit:100000
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:minter_address
+      ~arg:
+        (Format.sprintf "Pair 0x%s %S " (hex_encode "next_message") sc_rollup)
+      tezos_client
+  in
+  test_l1_migration_scenario
+    ~parameters_ty:"bytes"
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
+(** Test to continue to send messages after a migration. *)
+let test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to =
+  let tags = ["internal"; "inbox"; "ticket"]
+  and description =
+    "testing to send internal message with ticket post migration."
+  and scenario_prior tezos_client ~sc_rollup =
+    (* Originate forwarder contract to send internal messages to rollup *)
+    let* alias, minter_address =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
+        ~init:"Unit"
+        ~burn_cap:Tez.(of_int 1)
+        tezos_client
+        ["mini_scenarios"; "sc_rollup_mint_and_forward"]
+        migrate_from
+    in
+    let* () = Client.bake_for_and_wait tezos_client in
+    Log.info
+      "The minter-forwarder %s (%s) contract was successfully originated"
+      alias
+      minter_address ;
+    let* () =
+      Client.transfer
+        ~amount:Tez.(of_int 100)
+        ~burn_cap:Tez.(of_int 100)
+        ~storage_limit:100000
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:minter_address
+        ~arg:
+          (Format.sprintf
+             "Pair (Pair 0x%s 10) %S "
+             (hex_encode "pred_message")
+             sc_rollup)
+        tezos_client
+    in
+    return minter_address
+  and scenario_after tezos_client ~sc_rollup minter_address =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5286
+       Check messages are correctly added in the inbox. *)
+    Client.transfer
+      ~amount:Tez.(of_int 100)
+      ~burn_cap:Tez.(of_int 100)
+      ~storage_limit:100000
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:minter_address
+      ~arg:
+        (Format.sprintf
+           "Pair (Pair 0x%s 10) %S "
+           (hex_encode "pred_message")
+           sc_rollup)
+      tezos_client
+  in
+  test_l1_migration_scenario
+    ~parameters_ty:"ticket bytes"
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -4488,3 +4631,11 @@ let register ~protocols =
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
+
+let register_migration ~kind ~migrate_from ~migrate_to =
+  test_migration_inbox ~kind ~migrate_from ~migrate_to ;
+  test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to
+
+let register_migration ~migrate_from ~migrate_to =
+  register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
+  register_migration ~kind:"wasm_2_0_0" ~migrate_from ~migrate_to
