@@ -158,7 +158,7 @@ let subtree backend tree prefix =
                in the tree to avoid it. *)
             assert false)
   in
-  Tree.wrap backend subtree
+  subtree
 
 let scope key {decode} =
   {
@@ -178,7 +178,7 @@ let lazy_mapping to_key field_enc =
             input_prefix
         in
         let+ tree = subtree backend input_tree input_prefix in
-        (Some tree, produce_value));
+        (Some (Tree.Wrapped_tree (tree, backend)), produce_value));
   }
 
 let case_lwt tag decode extract = Case {tag; decode; extract}
@@ -225,5 +225,5 @@ let wrapped_tree =
       (fun backend tree prefix ->
         let open Lwt.Syntax in
         let+ tree = subtree backend tree prefix in
-        Tree.Wrapped_tree (Tree.select backend tree, backend));
+        Tree.Wrapped_tree (tree, backend));
   }

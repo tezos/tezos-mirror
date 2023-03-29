@@ -43,6 +43,7 @@ module Utils = struct
   module C = Chunked_byte_vector
   include Encodings_util
   include Test_encodings_util
+  include Tezos_tree_encoding
 end
 
 module Byte_vector = struct

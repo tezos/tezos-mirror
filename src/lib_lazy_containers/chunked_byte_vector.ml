@@ -91,6 +91,10 @@ module Chunk = struct
           argument. *)
       Int64.(div (pred length) size |> succ)
     else 0L
+
+  let encoding =
+    let open Tezos_tree_encoding in
+    conv of_bytes to_bytes (raw [])
 end
 
 module Vector = Lazy_vector.Mutable.Int64Vector
@@ -271,3 +275,21 @@ let to_string vector =
 
 let loaded_chunks vector =
   Vector.Vector.loaded_bindings (Vector.snapshot vector.chunks)
+
+module Enc_intf = struct
+  type nonrec t = t
+
+  type chunk = Chunk.t
+
+  let origin = origin
+
+  let loaded_chunks = loaded_chunks
+
+  let length = length
+
+  let create = create
+end
+
+module Encoding = Tezos_tree_encoding.CBV_encoding.Make (Enc_intf)
+
+let encoding = Encoding.cbv Chunk.encoding

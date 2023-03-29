@@ -35,7 +35,7 @@ module Pvm_state_generator = struct
   module Context = Tezos_context_memory.Context_binary
 
   module Wasm_context = struct
-    type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
+    type Tezos_tree_encoding.tree_instance += Tree of Context.tree
 
     module Tree = struct
       include Context.Tree

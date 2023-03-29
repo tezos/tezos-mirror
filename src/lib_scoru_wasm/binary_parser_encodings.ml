@@ -37,7 +37,7 @@ let no_region_encoding enc =
   conv (fun s -> Source.(s @@ no_region)) (fun {it; _} -> it) enc
 
 let vector_encoding value_enc =
-  int32_lazy_vector (value [] Data_encoding.int32) value_enc
+  Lazy_vector.Int32Vector.encoding (value [] Data_encoding.int32) value_enc
 
 module Lazy_vec = struct
   let raw_encoding vector_encoding =

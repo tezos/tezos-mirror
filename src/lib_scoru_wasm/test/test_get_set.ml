@@ -46,7 +46,7 @@ let empty_tree () =
   let empty_store = Context.empty index in
   return @@ Context.Tree.empty empty_store
 
-type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
+type Tezos_tree_encoding.tree_instance += Tree of Context.tree
 
 module Tree : Tezos_tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree

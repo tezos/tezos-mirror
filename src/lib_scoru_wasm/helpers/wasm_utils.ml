@@ -30,12 +30,6 @@ open Tezos_lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
 module Wasm_fast = Tezos_scoru_wasm_fast.Pvm.Make (Tree)
 
-let empty_tree () =
-  let open Lwt_syntax in
-  let* index = Context.init "/tmp" in
-  let empty_store = Context.empty index in
-  return @@ Context.Tree.empty empty_store
-
 let parse_module code =
   let def = Parse.string_to_module code in
   match def.it with
@@ -458,8 +452,7 @@ let wrap_as_durable_storage tree =
       Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
       tree
   in
-  Tezos_webassembly_interpreter.Durable_storage.of_tree
-  @@ Tezos_tree_encoding.Wrapped.wrap tree
+  Tezos_webassembly_interpreter.Durable_storage.of_tree tree
 
 let has_stuck_flag tree =
   let open Lwt_syntax in

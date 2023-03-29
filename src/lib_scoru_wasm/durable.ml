@@ -27,6 +27,7 @@ module T = Tezos_tree_encoding.Wrapped
 module Runner = Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
 module E = Tezos_tree_encoding
 module Storage = Tezos_webassembly_interpreter.Durable_storage
+open Tezos_lazy_containers
 
 type t = T.tree
 
@@ -52,11 +53,11 @@ exception Readonly_value
 let encoding = E.wrapped_tree
 
 let of_storage ~default s =
-  match Storage.to_tree s with Some t -> T.select t | None -> default
+  match Storage.to_tree s with Some t -> t | None -> default
 
-let of_storage_exn s = T.select @@ Storage.to_tree_exn s
+let of_storage_exn s = Storage.to_tree_exn s
 
-let to_storage d = Storage.of_tree @@ T.wrap d
+let to_storage d = Storage.of_tree d
 
 type key = Writeable of string list | Readonly of string list
 
@@ -117,7 +118,7 @@ let find_value tree key =
   match opt with
   | None -> Lwt.return_none
   | Some subtree ->
-      let+ value = Runner.decode E.chunked_byte_vector subtree in
+      let+ value = Runner.decode Chunked_byte_vector.encoding subtree in
       Some value
 
 let find_value_exn tree key =
@@ -181,7 +182,7 @@ let hash_exn tree key =
 let set_value_exn tree ?(edit_readonly = false) key str =
   if not edit_readonly then assert_key_writeable key ;
   let key = to_value_key @@ key_contents key in
-  let encoding = E.scope key E.chunked_byte_vector in
+  let encoding = E.scope key Chunked_byte_vector.encoding in
   Runner.encode
     encoding
     (Tezos_lazy_containers.Chunked_byte_vector.of_string str)
@@ -197,7 +198,7 @@ let write_value_exn tree ?(edit_readonly = false) key offset bytes =
 
   let key = to_value_key @@ key_contents key in
   let* opt = T.find_tree tree key in
-  let encoding = E.scope key E.chunked_byte_vector in
+  let encoding = E.scope key Chunked_byte_vector.encoding in
   let* value =
     match opt with
     | None -> Lwt.return @@ Chunked_byte_vector.allocate 0L

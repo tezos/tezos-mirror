@@ -36,20 +36,8 @@ open Tezos_lazy_containers
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
-
-type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
-
-module Tree : Tezos_tree_encoding.TREE with type tree = Context.tree = struct
-  type tree = Context.tree
-
-  include Context.Tree
-
-  let select = function
-    | Tree t -> t
-    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
-
-  let wrap t = Tree t
-end
+module E = Tezos_tree_encoding.Encodings_util.Make (Context)
+module Tree = E.Tree
 
 module Map = Lazy_map.Make (struct
   type t = string
@@ -280,7 +268,7 @@ let test_lazy_vector () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc =
-    int_lazy_vector
+    Lazy_vector.IntVector.encoding
       (value [] Data_encoding.int31)
       (value [] Data_encoding.string)
   in
@@ -302,7 +290,7 @@ let test_lazy_vector_pop () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let int_vec_enc =
-    int_lazy_vector
+    Lazy_vector.IntVector.encoding
       (value [] Data_encoding.int31)
       (value [] Data_encoding.int31)
   in
@@ -337,7 +325,6 @@ let test_lazy_vector_pop () =
   return_unit
 
 let test_chunked_byte_vector () =
-  let open Tree_encoding in
   let open Lwt_result_syntax in
   let vector =
     Chunked_byte_vector.of_string
@@ -347,7 +334,7 @@ let test_chunked_byte_vector () =
   assert (Char.chr value = 'a') ;
   let*! value = Chunked_byte_vector.load_byte vector 10_005L in
   assert (Char.chr value = 'b') ;
-  let*! decoded_vector = encode_decode chunked_byte_vector vector in
+  let*! decoded_vector = encode_decode Chunked_byte_vector.encoding vector in
   let*! value = Chunked_byte_vector.load_byte decoded_vector 5L in
   assert (Char.chr value = 'a') ;
   let*! value = Chunked_byte_vector.load_byte decoded_vector 10_005L in
@@ -525,7 +512,7 @@ let test_swap_vectors () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let int_vec_enc =
-    int_lazy_vector
+    Lazy_vector.IntVector.encoding
       (value [] Data_encoding.int31)
       (value [] Data_encoding.int31)
   in

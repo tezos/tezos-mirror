@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_scoru_wasm_helpers
+
 (* [error loc category msg] fails with the location of an error and a message,
    returned by either the parser of the typechecker of the WASM reference
    interpreter. *)
@@ -80,9 +82,9 @@ let find_key_in_durable tree key =
 let print_durable ?(depth = 10) ?(show_values = true) ?(path = []) tree =
   let open Lwt_syntax in
   let durable_path = "durable" :: path in
-  let* path_exists = Encodings_util.Context.Tree.mem_tree tree durable_path in
+  let* path_exists = Encodings_util.Tree.mem_tree tree durable_path in
   if path_exists then
-    Encodings_util.Context.Tree.fold
+    Encodings_util.Tree.fold
       ~depth:(`Le depth)
       tree
       ("durable" :: path)
@@ -93,7 +95,7 @@ let print_durable ?(depth = 10) ?(show_values = true) ?(path = []) tree =
         (* If we need to show the values, we show every keys, even the root and
            '@'. *)
         if show_values then
-          let+ value = Encodings_util.Context.Tree.find tree [] in
+          let+ value = Encodings_util.Tree.find tree [] in
           let value = Option.value ~default:(Bytes.create 0) value in
           Format.printf "/%s\n  %a\n%!" full_key Hex.pp (Hex.of_bytes value)
         else if key <> [] && key <> ["@"] then

@@ -27,6 +27,7 @@
 open Wasm_pvm_state.Internal_state
 module Wasm = Tezos_webassembly_interpreter
 module Parsing = Binary_parser_encodings
+open Tezos_lazy_containers
 
 let durable_scope = ["durable"]
 
@@ -54,7 +55,7 @@ let tick_state_encoding =
            @@ Parsing.(no_region_encoding Module.module_encoding))
            (scope
               ["externs"]
-              (int32_lazy_vector
+              (Lazy_vector.Int32Vector.encoding
                  (value [] Data_encoding.int32)
                  Wasm_encoding.extern_encoding))
            (value ["imports_offset"] Data_encoding.int32))

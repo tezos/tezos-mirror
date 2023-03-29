@@ -33,9 +33,9 @@
 *)
 
 open Tezos_scoru_wasm
+open Tezos_scoru_wasm_helpers.Encodings_util
 open Wasm_utils
 open Tztest_helper
-open Encodings_util
 
 let should_boot_unreachable_kernel ~version ~batch_size kernel =
   let open Lwt_syntax in
@@ -116,7 +116,9 @@ let add_value ?(content = "a very long value") tree key_steps =
   let value = Chunked_byte_vector.of_string content in
   Tree_encoding_runner.encode
     Tezos_tree_encoding.(
-      scope ("durable" :: List.append key_steps ["@"]) chunked_byte_vector)
+      scope
+        ("durable" :: List.append key_steps ["@"])
+        Chunked_byte_vector.encoding)
     value
     tree
 
