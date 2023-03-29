@@ -183,7 +183,10 @@ let final_dissection ~our_states dissection =
     [our_states] as the state hashes for each tick. *)
 let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
   let open Lwt_result_syntax in
-  let state_hash_from_tick tick = return @@ list_assoc tick our_states in
+  let state_of_tick ?start_state:_ tick =
+    return @@ list_assoc tick our_states
+  in
+  let state_hash_of_eval_state = Fun.id in
   let our_stop_chunk =
     Dissection_chunk.
       {stop_chunk with state_hash = list_assoc stop_chunk.tick our_states}
@@ -196,7 +199,11 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
   Lwt_main.run
   @@ let*! r =
        Game_helpers.(
-         make_dissection ~state_hash_from_tick ~start_chunk ~our_stop_chunk
+         make_dissection
+           ~state_of_tick
+           ~state_hash_of_eval_state
+           ~start_chunk
+           ~our_stop_chunk
          @@ default_new_dissection
               ~start_chunk
               ~our_stop_chunk
@@ -1604,8 +1611,9 @@ let test_wasm_dissection name kind =
       let+ dissection =
         Game_helpers.(
           make_dissection
-            ~state_hash_from_tick:(fun _ ->
+            ~state_of_tick:(fun ?start_state:_ _ ->
               return_some Sc_rollup.State_hash.zero)
+            ~state_hash_of_eval_state:Fun.id
             ~start_chunk
             ~our_stop_chunk:stop_chunk
           @@ Wasm.new_dissection
