@@ -87,17 +87,12 @@ module Take_fees_benchmark = struct
     Sparse_vec.String.of_list [("batch_length", float_of_int batch_length)]
 
   let model =
+    let open Benchmarks_proto in
     Model.make
       ~conv:(fun {batch_length} -> (batch_length, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "take_fees_const")
-           ~coeff:(fv "take_fees_coeff"))
+      ~model:Model.affine
 
-  let models = [("take_fees", model)]
-
-  let benchmark rng_state _conf () =
+  let create_benchmark ~rng_state _conf =
     let open Annotated_manager_operation in
     let open Alpha_context in
     let open Lwt_result_syntax in
@@ -145,9 +140,6 @@ module Take_fees_benchmark = struct
       | Error _ -> assert false (* TODO better error *)
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
 end
 
-let () = Registration_helpers.register (module Take_fees_benchmark)
+let () = Benchmarks_proto.Registration.register (module Take_fees_benchmark)
