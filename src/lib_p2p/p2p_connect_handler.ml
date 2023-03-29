@@ -213,7 +213,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   let* () =
-    if t.config.max_connections <= P2p_pool.active_connections t.pool then (
+    if t.config.max_connections < P2p_pool.active_connections t.pool then (
       P2p_trigger.broadcast_too_many_connections t.triggers ;
       Events.(emit trigger_maintenance_too_many_connections)
         (P2p_pool.active_connections t.pool, t.config.max_connections))
