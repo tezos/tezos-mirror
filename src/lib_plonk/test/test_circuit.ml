@@ -237,14 +237,12 @@ module To_plonk = struct
       let a = [|0; 1|] in
       let b = [|1; 2|] in
       let c = [|0; 1|] in
-      let d = [|0; 0|] in
-      let e = [|0; 0|] in
-      [|a; b; c; d; e|]
+      [|a; b; c|]
     in
     let expected_gates =
       SMap.of_list [("qr", [|one; zero|]); ("qm", [|zero; two|])]
     in
-    assert (c.wires = expected_wires) ;
+    assert (Array.sub c.wires 0 (Array.length expected_wires) = expected_wires) ;
     assert (gates_equal c.gates expected_gates)
 end
 

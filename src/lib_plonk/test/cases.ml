@@ -51,9 +51,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 0] in
         let b = [0; 0] in
         let c = [0; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qo:![0; -1] ~qc:![0; 1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -68,9 +66,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [0; 0] in
         let c = [0; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~ql:![1; 1] ~qo:![0; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -85,9 +81,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 0] in
         let b = [0; 1] in
         let c = [0; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qr:![1; 1] ~qo:![0; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -103,8 +97,7 @@ module Unit_tests_for_each_selector = struct
         let b = [0; 0] in
         let c = [0; 1] in
         let d = [0; 1] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c; d|]
       in
       let gates = Circuit.make_gates ~qd:![1; 1] ~qo:![0; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -136,9 +129,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [0; 0] in
         let c = [1; 0] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qlg:![1; 0] ~qo:![-1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -153,9 +144,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 0] in
         let b = [0; 1] in
         let c = [1; 0] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qrg:![1; 0] ~qo:![-1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -170,9 +159,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 0] in
         let b = [0; 0] in
         let c = [1; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qog:![1; 0] ~qo:![-1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -188,8 +175,7 @@ module Unit_tests_for_each_selector = struct
         let b = [0; 0] in
         let c = [1; 0] in
         let d = [0; 1] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c; d|]
       in
       let gates = Circuit.make_gates ~qdg:![1; 0] ~qo:![-1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -221,9 +207,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [1; 1] in
         let c = [0; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qm:![1; 1] ~qo:![0; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -238,9 +222,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 0; 0] in
         let b = [0; 1; 2] in
         let c = [0; 3; 3] in
-        let d = [0; 0; 0] in
-        let e = [0; 0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qx2b:![1; 1; 1] ~qo:![0; -1; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -255,9 +237,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [0; 0] in
         let c = [0; 2] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qx5a:![1; 1] ~qo:![0; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -272,9 +252,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [0; 0] in
         let c = [0; 2] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qx5c:![1; 1] ~ql:![0; -1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -291,9 +269,7 @@ module Unit_tests_for_each_selector = struct
         let a = [2; 0] in
         let b = [3; 3] in
         let c = [1; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qecc_ws_add:![1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -308,9 +284,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [0; 1] in
         let c = [0; 1] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qecc_ed_add:![1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -344,9 +318,7 @@ module Unit_tests_for_each_selector = struct
         let a = [0; 1] in
         let b = [0; 0] in
         let c = [0; 0] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qbool:![1; 1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
@@ -466,9 +438,7 @@ module General_circuits = struct
         let a = [0; 0] in
         let b = [0; 0] in
         let c = [1; 0] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~qo:![-1; -1] ~qc:![1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:1 ()
@@ -509,9 +479,7 @@ module General = struct
     let a = [0; 1; 2; 3; 4; 2; 0] in
     let b = [9; 8; 7; 6; 5; 3; 3] in
     let c = [10; 9; 8; 7; 6; 1; 1] in
-    let d = [0; 0; 0; 0; 0; 0; 0] in
-    let e = [0; 0; 0; 0; 0; 0; 0] in
-    [|a; b; c; d; e|]
+    [|a; b; c|]
 
   let gates =
     Circuit.make_gates
@@ -731,9 +699,7 @@ module Lookup = struct
       let a = [1] in
       let b = [1] in
       let c = [2] in
-      let d = [0] in
-      let e = [0] in
-      let wires = [|a; b; c; d; e|] in
+      let wires = [|a; b; c|] in
       let gates = Circuit.make_gates ~q_plookup:![1] ~q_table:![0] () in
       let tables = [table_add_mod_5] in
       Circuit.make ~tables ~wires ~gates ~public_input_size:0 ()
@@ -749,9 +715,7 @@ module Lookup = struct
         let a = [2; 3] in
         let b = [2; 1] in
         let c = [1; 0] in
-        let d = [0; 0] in
-        let e = [0; 0] in
-        [|a; b; c; d; e|]
+        [|a; b; c|]
       in
       let gates = Circuit.make_gates ~q_plookup:![1; 1] ~q_table:![0; 1] () in
       let tables = [table_add_mod_5; table_add_mod_10] in
@@ -765,9 +729,7 @@ module Lookup = struct
     let a = [1; 1; 4; 2; 4; 3; 1] in
     let b = [2; 1; 2; 2; 3; 4; 4] in
     let c = [3; 1; 1; 4; 2; 2; 2] in
-    let d = [0; 0; 0; 0; 0; 0; 0] in
-    let e = [0; 0; 0; 0; 0; 0; 0] in
-    [|a; b; c; d; e|]
+    [|a; b; c|]
 
   let gates =
     Circuit.make_gates
@@ -822,9 +784,7 @@ module Lookup = struct
       let a = [1; 1; 4; 2; 4; 3; 1] in
       let b = [2; 1; 2; 2; 3; 4; 4] in
       let c = [3; 1; 1; 3; 2; 2; 2] in
-      let d = [0; 0; 0; 0; 0; 0; 0] in
-      let e = [0; 0; 0; 0; 0; 0; 0] in
-      [|a; b; c; d; e|]
+      [|a; b; c|]
       (* """mistake""" here in arith. constraint *)
     in
     let circuit = Circuit.make ~tables ~wires ~gates ~public_input_size:1 () in
@@ -836,9 +796,7 @@ module Lookup = struct
       let a = [0; 1; 4; 2; 4; 3; 1] in
       let b = [2; 1; 2; 2; 3; 4; 4] in
       let c = [3; 1; 1; 4; 2; 2; 2] in
-      let d = [0; 0; 0; 0; 0; 0; 0] in
-      let e = [0; 0; 0; 0; 0; 0; 0] in
-      [|a; b; c; d; e|]
+      [|a; b; c|]
       (* """mistake""" here in lookup constraint *)
     in
     let circuit = Circuit.make ~tables ~wires ~gates ~public_input_size:1 () in
