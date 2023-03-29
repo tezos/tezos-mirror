@@ -51,12 +51,17 @@ module AddWeierstrass : Base_sig = struct
 
   let gx_composition = true
 
-  let equations ~q ~a ~b ~c ~d:_ ~e:_ ~ag ~bg ~cg ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
     if Scalar.is_zero q then Scalar.[zero; zero]
     else if not (Scalar.(is_one) q) then
       failwith "AddWeierstrass.equations : qecc_ws_add must be zero or one."
     else
+      let a = wires.(0) in
+      let b = wires.(1) in
+      let c = wires.(2) in
+      let ag = wires_g.(0) in
+      let bg = wires_g.(1) in
+      let cg = wires_g.(2) in
       let lambda = Scalar.(div_exn (sub bg ag) (sub b a)) in
       let x = Scalar.(sub (lambda * lambda) (a + b)) in
       let y = Scalar.(sub (lambda * sub a x) ag) in
@@ -243,12 +248,17 @@ module AddEdwards : Base_sig = struct
     Scalar.of_string
       "19257038036680949359750312669786877991949435402254120286184196891950884077233"
 
-  let equations ~q ~a:px ~b:qx ~c:rx ~d:_ ~e:_ ~ag:py ~bg:qy ~cg:ry ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
     if Scalar.is_zero q then Scalar.[zero; zero]
     else if not (Scalar.is_one q) then
       failwith "AddEdwards.equations : qecc_ed_add must be zero or one."
     else
+      let px = wires.(0) in
+      let py = wires_g.(0) in
+      let qx = wires.(1) in
+      let qy = wires_g.(1) in
+      let rx = wires.(2) in
+      let ry = wires_g.(2) in
       let pxqy = Scalar.(px * qy) in
       let qxpy = Scalar.(qx * py) in
       let pyqy = Scalar.(py * qy) in
@@ -477,10 +487,16 @@ module ConditionalAddEdwards : Base_sig = struct
         r_x =     (p_x * (b * q_y + 1 - b) + b * q_x * p_y) / (1 + b * d * p_x * q_x * p_y * q_y)
         r_y = (p_y * (b * q_y + 1 - b) - b * a * p_x * q_x) / (1 - b * d * p_x * q_x * p_y * q_y)
   *)
-  let equations ~q ~a:bit ~b:qx ~c:qy ~d:px ~e:py ~ag:_ ~bg:_ ~cg:_ ~dg:rx
-      ~eg:ry ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
     if Scalar.is_zero q then Scalar.[zero; zero]
     else
+      let bit = wires.(0) in
+      let qx = wires.(1) in
+      let qy = wires.(2) in
+      let px = wires.(3) in
+      let py = wires.(4) in
+      let rx = wires_g.(3) in
+      let ry = wires_g.(4) in
       let qx' = Scalar.(bit * qx) in
       let qy' = Scalar.((bit * qy) + sub one bit) in
       let pxqy' = Scalar.(px * qy') in

@@ -43,16 +43,8 @@ module type S = sig
   val get_eqs :
     string ->
     q:Scalar.t ->
-    a:Scalar.t ->
-    b:Scalar.t ->
-    c:Scalar.t ->
-    d:Scalar.t ->
-    e:Scalar.t ->
-    ag:Scalar.t ->
-    bg:Scalar.t ->
-    cg:Scalar.t ->
-    dg:Scalar.t ->
-    eg:Scalar.t ->
+    wires:Scalar.t array ->
+    wires_g:Scalar.t array ->
     ?precomputed_advice:Scalar.t SMap.t ->
     unit ->
     Scalar.t list

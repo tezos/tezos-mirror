@@ -166,8 +166,13 @@ module AnemoiDouble : Base_sig = struct
     in
     (qid1, qid2)
 
-  let equations ~q ~a:_ ~b:x1 ~c:y1 ~d:x0 ~e:y0 ~ag:_ ~bg:_ ~cg:_ ~dg:x2 ~eg:y2
-      ?(precomputed_advice = SMap.empty) () =
+  let equations ~q ~wires ~wires_g ?(precomputed_advice = SMap.empty) () =
+    let x1 = wires.(1) in
+    let y1 = wires.(2) in
+    let x0 = wires.(3) in
+    let y0 = wires.(4) in
+    let x2 = wires_g.(3) in
+    let y2 = wires_g.(4) in
     if Scalar.is_zero q then Scalar.[zero; zero; zero; zero]
     else
       let kx1 = SMap.find kx1_label precomputed_advice in
@@ -256,16 +261,8 @@ module AnemoiDouble : Base_sig = struct
     let identities =
       equations
         ~q
-        ~a:0
-        ~b:x1
-        ~c:y1
-        ~d:x0
-        ~e:y0
-        ~ag:0
-        ~bg:0
-        ~cg:0
-        ~dg:x2
-        ~eg:y2
+        ~wires:Scalar.[|zero; x1; y1; x0; y0|]
+        ~wires_g:Scalar.[|zero; zero; zero; x2; y2|]
         ~precomputed_advice
         ()
       |> List.map (Scalar.mul q)

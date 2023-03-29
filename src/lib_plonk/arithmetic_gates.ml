@@ -66,17 +66,18 @@ module AddWire (Params : Params) : Base_sig = struct
 
   let gx_composition = Params.is_next
 
-  let equations ~q ~a ~b ~c ~d ~e ~ag ~bg ~cg ~dg ~eg ?precomputed_advice:_ () =
-    let var =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
+    let i =
       match Params.wire with
-      | s when s = left -> if Params.is_next then ag else a
-      | s when s = right -> if Params.is_next then bg else b
-      | s when s = output -> if Params.is_next then cg else c
-      | s when s = top -> if Params.is_next then dg else d
-      | s when s = bottom -> if Params.is_next then eg else e
+      | s when s = left -> 0
+      | s when s = right -> 1
+      | s when s = output -> 2
+      | s when s = top -> 3
+      | s when s = bottom -> 4
       | _ -> assert false
     in
-    Scalar.[q * var]
+    let ws = if Params.is_next then wires_g else wires in
+    Scalar.[q * ws.(i)]
 
   let blinds =
     let array = if Params.is_next then [|0; 1|] else [|1; 0|] in
@@ -311,9 +312,7 @@ module Constant : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    [q]
+  let equations ~q ~wires:_ ~wires_g:_ ?precomputed_advice:_ () = [q]
 
   let blinds = SMap.empty
 
@@ -363,8 +362,9 @@ module Multiplication : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
+    let b = wires.(1) in
     Scalar.[q * a * b]
 
   let blinds = SMap.of_list [(right, [|1; 0|]); (left, [|1; 0|])]
@@ -418,8 +418,8 @@ module X2B : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:_ ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let b = wires.(1) in
     Scalar.[q * square b]
 
   let blinds = SMap.singleton right [|1; 0|]
@@ -475,8 +475,8 @@ module X5A : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     Scalar.[q * pow a (Z.of_int 5)]
 
   let blinds = SMap.singleton left [|1; 0|]
@@ -535,8 +535,8 @@ module X5C : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:_ ~b:_ ~c ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let c = wires.(2) in
     Scalar.[q * pow c (Z.of_int 5)]
 
   let blinds = SMap.singleton output [|1; 0|]
@@ -597,8 +597,7 @@ module Public : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q:_ ~wires:_ ~wires_g:_ ?precomputed_advice:_ () =
     Scalar.[zero]
 
   let compute_PI ~start public_inputs domain evaluations =
@@ -690,8 +689,7 @@ end) : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q:_ ~wires:_ ~wires_g:_ ?precomputed_advice:_ () =
     Scalar.[zero]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ :

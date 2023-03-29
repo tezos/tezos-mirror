@@ -48,8 +48,8 @@ module BoolCheck : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     Scalar.[q * sub one a * a]
 
   let blinds = SMap.of_list [(left, [|1; 0|])]
@@ -114,8 +114,12 @@ module CondSwap : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:bit ~b ~c ~d ~e ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let bit = wires.(0) in
+    let b = wires.(1) in
+    let c = wires.(2) in
+    let d = wires.(3) in
+    let e = wires.(4) in
     let bbit = Scalar.(sub one bit) in
     Scalar.
       [q * ((bbit * b) + sub (bit * c) d); q * ((bit * b) + sub (bbit * c) e)]

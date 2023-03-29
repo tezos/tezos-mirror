@@ -376,6 +376,8 @@ end = struct
                   (* Retrieving the selector's identity name and equations *)
                   let s_id_name, _ = Custom_gates.get_ids s_name in
                   let s_ids = SMap.find s_id_name id_map in
+                  let wires = [|a; b; c; d; e|] in
+                  let wires_g = [|ag; bg; cg; dg; eg|] in
                   let precomputed_advice = SMap.of_list ci.precomputed_advice in
                   (* Updating the identities with the equations' output *)
                   List.iteri
@@ -383,16 +385,8 @@ end = struct
                     ((Custom_gates.get_eqs s_name)
                        ~precomputed_advice
                        ~q
-                       ~a
-                       ~b
-                       ~c
-                       ~d
-                       ~e
-                       ~ag
-                       ~bg
-                       ~cg
-                       ~dg
-                       ~eg
+                       ~wires
+                       ~wires_g
                        ()) ;
                   SMap.add s_id_name s_ids id_map)
             identities
