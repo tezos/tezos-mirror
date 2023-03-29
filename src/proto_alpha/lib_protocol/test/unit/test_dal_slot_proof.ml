@@ -46,6 +46,7 @@ struct
     include Parameters
 
     let cryptobox =
+      Lazy.from_fun @@ fun () ->
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end)

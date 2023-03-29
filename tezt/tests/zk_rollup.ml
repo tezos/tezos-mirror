@@ -51,10 +51,11 @@ module MakeHelpers () = struct
 
   let () =
     let contents =
+      let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
       Data_encoding.Binary.(
         to_string_exn
           Tezos_protocol_alpha.Environment.Plonk.public_parameters_encoding
-          Operator.public_parameters)
+          public_parameters)
     in
     write_file public_parameters_file ~contents
 

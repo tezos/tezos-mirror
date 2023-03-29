@@ -333,7 +333,7 @@ end) : sig
   val circuits : bool Plonk.SMap.t
 
   (** Commitment to the circuits  *)
-  val public_parameters : Environment.Plonk.public_parameters
+  val lazy_public_parameters : Environment.Plonk.public_parameters lazy_t
 
   module Internal_for_tests : sig
     val true_op : Zk_rollup.Operation.t
@@ -351,9 +351,10 @@ end = struct
   module T = Types.P
   module VC = V (LibCircuit)
 
-  let srs =
-    let open Bls12_381_polynomial in
-    (Srs.generate_insecure 8 1, Srs.generate_insecure 1 1)
+  let lazy_srs =
+    lazy
+      (let open Bls12_381_polynomial in
+      (Srs.generate_insecure 8 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =
     Hex.to_bytes_exn (`Hex "0002298c03ed7d454a101eb7022bc95f7e5f41ac78")
@@ -413,16 +414,18 @@ end = struct
   let circuits =
     SMap.(add "op" false @@ add batch_name true @@ add "fee" false empty)
 
-  let public_parameters =
-    let dummy_transcript = Bytes.empty in
-    let verifier_public_parameters =
-      snd
-      @@ Plonk.Main_protocol.setup
-           ~zero_knowledge:false
-           (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
-           ~srs
-    in
-    (verifier_public_parameters, dummy_transcript)
+  let lazy_public_parameters =
+    lazy
+      (let srs = Lazy.force lazy_srs in
+       let dummy_transcript = Bytes.empty in
+       let verifier_public_parameters =
+         snd
+         @@ Plonk.Main_protocol.setup
+              ~zero_knowledge:false
+              (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
+              ~srs
+       in
+       (verifier_public_parameters, dummy_transcript))
 
   let _insert s x m =
     match SMap.find_opt s m with

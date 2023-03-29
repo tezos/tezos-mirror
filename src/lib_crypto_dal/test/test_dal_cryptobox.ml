@@ -37,18 +37,20 @@ module Test = struct
   (* The set of parameters maximizing the SRS length, and which
      is in the codomain of [generate_parameters]. *)
   let max_parameters =
-    let max_parameters : Cryptobox.parameters =
-      {
-        slot_size = 1 lsl max_slot_size_log2;
-        page_size = 1 lsl max_page_size_log2;
-        redundancy_factor = 1 lsl max_redundancy_factor_log2;
-        number_of_shards = 1;
-      }
-    in
-    Cryptobox.Internal_for_tests.parameters_initialisation max_parameters
+    lazy
+      (let max_parameters : Cryptobox.parameters =
+         {
+           slot_size = 1 lsl max_slot_size_log2;
+           page_size = 1 lsl max_page_size_log2;
+           redundancy_factor = 1 lsl max_redundancy_factor_log2;
+           number_of_shards = 1;
+         }
+       in
+       Cryptobox.Internal_for_tests.parameters_initialisation max_parameters)
 
   (* Initializes the DAL parameters *)
-  let init () = Cryptobox.Internal_for_tests.load_parameters max_parameters
+  let init () =
+    Cryptobox.Internal_for_tests.load_parameters (Lazy.force max_parameters)
 
   type parameters = {
     slot_size : int;
