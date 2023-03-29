@@ -342,7 +342,8 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
-let cement_commitment ?(src = "bootstrap1") ?fail ~sc_rollup ~hash client =
+let cement_commitment ?(src = Constant.bootstrap1.alias) ?fail ~sc_rollup ~hash
+    client =
   let p =
     Client.Sc_rollup.cement_commitment ~hooks ~dst:sc_rollup ~src ~hash client
   in
@@ -1841,7 +1842,9 @@ let attempt_withdraw_stake =
     | None ->
         let*! () = inject_op () in
         let* old_bal = contract_balances ~pkh:staker client in
-        let* () = Client.bake_for_and_wait ~keys:["bootstrap2"] client in
+        let* () =
+          Client.bake_for_and_wait ~keys:[Constant.bootstrap2.alias] client
+        in
         let* new_bal = contract_balances ~pkh:staker client in
         let expected_liq_new_bal =
           old_bal.liquid - recover_bond_fee + sc_rollup_stake_amount
@@ -3123,7 +3126,7 @@ let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 client =
     Client.Sc_rollup.timeout
       ~hooks
       ~dst:sc_rollup
-      ~src:"bootstrap1"
+      ~src:Constant.bootstrap1.alias
       ~staker1
       ~staker2
       client
@@ -3730,7 +3733,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             ~amount:Tez.(of_int 100)
             ~burn_cap:Tez.(of_int 100)
             ~storage_limit:100000
-            ~giver:"bootstrap1"
+            ~giver:Constant.bootstrap1.alias
             ~receiver:source_address
             ~arg:(sf "Pair %s %S" payload sc_rollup)
             client
