@@ -17,6 +17,9 @@ path = "../../kernel_sdk/tezos_smart_rollup_core"
 [dependencies.tezos_smart_rollup_host]
 path = "../../kernel_sdk/tezos_smart_rollup_host"
 
+[dependencies.tezos_smart_rollup_panic_hook]
+path = "../../kernel_sdk/tezos_smart_rollup_panic_hook"
+
 [dependencies.tezos_smart_rollup_entrypoint]
 path = "../../kernel_sdk/tezos_smart_rollup_entrypoint"
 
@@ -36,3 +39,7 @@ primitive-types = { version = "0.11.1", default-features = false }
 hex = "0.4"
 num-traits = "0.2.8"
 clarity = { version = "0.7.0", default-features = false }
+
+[features]
+default = ["panic-hook"]
+panic-hook = []

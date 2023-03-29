@@ -494,6 +494,7 @@ dependencies = [
  "tezos_smart_rollup_entrypoint",
  "tezos_smart_rollup_host",
  "tezos_smart_rollup_mock",
+ "tezos_smart_rollup_panic_hook",
 ]
 
 [[package]]
