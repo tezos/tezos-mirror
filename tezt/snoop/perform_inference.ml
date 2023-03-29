@@ -69,8 +69,8 @@ let main () =
       "list_key_values";
       "skip_list/next/model";
       "skip_list/hash_cell/model";
-      "verify_output_proof";
-      "deserialize_output_proof";
+      "sc_rollup/Sc_rollup_deserialize_output_proof_benchmark/model";
+      "sc_rollup/Sc_rollup_verify_output_proof_benchmark/model";
     ]
   in
   Lwt_list.iter_s

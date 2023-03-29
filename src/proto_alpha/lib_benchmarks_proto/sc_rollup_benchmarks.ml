@@ -420,20 +420,15 @@ module Sc_rollup_verify_output_proof_benchmark = struct
   let workload_to_vector {proof_length} =
     Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
 
-  let verify_output_proof_model =
+  let model =
+    let open Benchmarks_proto in
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "verify_const")
-           ~coeff:(fv "verify_proof_length"))
-
-  let models = [("verify_output_proof", verify_output_proof_model)]
+      ~model:Model.affine
 
   let pvm_state = ref None
 
-  let benchmark rng_state conf () =
+  let create_benchmark ~rng_state conf =
     let nb_output_buffer_levels = conf.nb_output_buffer_levels in
     let output_buffer_size = conf.output_buffer_size in
     let prepare_benchmark_scenario () =
@@ -488,9 +483,6 @@ module Sc_rollup_verify_output_proof_benchmark = struct
       ignore (Lwt_main.run @@ Full_Wasm.verify_output_proof output_proof)
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
 end
 
 (** This benchmark estimates the cost of verifying an output proof for the
@@ -569,20 +561,15 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   let workload_to_vector {proof_length} =
     Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
 
-  let verify_output_proof_model =
+  let model =
+    let open Benchmarks_proto in
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "deserialize_const")
-           ~coeff:(fv "deserialize_proof_length"))
-
-  let models = [("deserialize_output_proof", verify_output_proof_model)]
+      ~model:Model.affine
 
   let pvm_state = ref None
 
-  let benchmark rng_state conf () =
+  let create_benchmark ~rng_state conf =
     let prepared_benchmark_scenario =
       let nb_output_buffer_levels = conf.nb_output_buffer_levels in
       let output_buffer_size = conf.output_buffer_size in
@@ -644,14 +631,12 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
            encoded_proof)
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
 end
 
 let () =
-  Registration_helpers.register (module Sc_rollup_verify_output_proof_benchmark)
+  Benchmarks_proto.Registration.register
+    (module Sc_rollup_verify_output_proof_benchmark)
 
 let () =
-  Registration_helpers.register
+  Benchmarks_proto.Registration.register
     (module Sc_rollup_deserialize_output_proof_benchmark)
