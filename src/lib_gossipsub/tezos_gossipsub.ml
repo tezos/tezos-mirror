@@ -1008,6 +1008,47 @@ module Make (C : AUTOMATON_CONFIG) :
          Apply IWANT request penalties *)
       return ()
 
+    (* Update mesh for grafted and pruned peers. Note that in the Go
+       implementation this update is done on-the-fly. The semantics is however
+       the same, given that a peer cannot be grafted and then pruned or
+       vice-versa. The reasoning for why that is the case is as follows. There
+       are three blocks of updates in the code above:
+         1) graft peers if [d_mesh < degree_low]
+         2) prune peers if [d_mesh > degree_high]
+         3) graft peers if [d_mesh > degree_low] and not enough outbound peers
+       ([d_mesh] denotes [Peer.Set.cardinal peers])
+
+       Condition 1) is mutually exclusive with the other two.
+       Now, a peer p cannot be pruned in 2) and then grafted in 3) because in 2):
+         A) Either we have enough outbound peers, then we don't execute 3).
+         B) Or we don't have enough outbound peers, so p is not outbound and in 3)
+            we only graft outbound peers. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
+       Revisit this comment if opportunistic grafting is implemented. *)
+    let update_mesh mesh ~to_graft ~to_prune =
+      let update f =
+        Peer.Map.fold (fun peer topicset mesh ->
+            Topic.Set.fold
+              (fun topic mesh -> Topic.Map.update topic (f peer) mesh)
+              topicset
+              mesh)
+      in
+      let add_peer peer = function
+        | None -> Peer.Set.singleton peer |> Option.some
+        | Some peers ->
+            (* Note: [peer] should not be in [peers] already *)
+            Peer.Set.add peer peers |> Option.some
+      in
+      let remove_peer peer = function
+        | None ->
+            (* Note: this should not occur *)
+            None
+        | Some peers -> Peer.Set.remove peer peers |> Option.some
+      in
+      mesh |> update add_peer to_graft
+      |> update remove_peer to_prune
+      |> set_mesh
+
     (* Mesh maintenance. For each topic, do in order:
 
        - Prune all peers with negative score, do not enable peer exchange for
@@ -1036,7 +1077,6 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! connections in
       let*! rng in
-      let*! mesh in
       let*! prune_backoff in
       let*! degree_optimal in
       let*! degree_low in
@@ -1236,6 +1276,7 @@ module Make (C : AUTOMATON_CONFIG) :
         (to_graft, to_prune, noPX_peers)
       in
 
+      let*! mesh in
       let to_graft, to_prune, noPX_peers =
         Topic.Map.fold
           maintain_topic_mesh
@@ -1256,6 +1297,8 @@ module Make (C : AUTOMATON_CONFIG) :
           connections
         |> set_connections
       in
+      (* Update mesh for grafted and pruned peers *)
+      let* () = update_mesh mesh ~to_graft ~to_prune in
       return (to_graft, to_prune, noPX_peers)
 
     let expire_fanout =
