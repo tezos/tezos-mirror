@@ -317,10 +317,10 @@ module type AUTOMATON = sig
       unsubscribe to a [topic]. *)
   val handle_unsubscribe : unsubscribe -> [`Unsubscribe] monad
 
-  (** [join { topic }] join/subscribe to a new topic. *)
+  (** [join { topic }] handles a join/subscribe to a new topic. *)
   val join : join -> [`Join] monad
 
-  (** [leave { topic }] leave/unscribe a topic. *)
+  (** [leave { topic }] handles a leave/unsubscribe from a topic. *)
   val leave : leave -> [`Leave] monad
 
   val pp_add_peer : Format.formatter -> add_peer -> unit
@@ -475,7 +475,8 @@ module type WORKER = sig
 
   (** [start ~heartbeat_span topics state] runs the (not already started) worker
       whose [state] is given. The worker is started with the given
-      [heartbeat_span] and the list of [topics] the caller is interested in. *)
+      [heartbeat_span] and the initial list of [topics] the caller is interested
+      in. *)
   val start : heartbeat_span:GS.Span.t -> GS.Topic.t list -> t -> t
 
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
@@ -484,4 +485,10 @@ module type WORKER = sig
   (** [inject state msg_id msg topic] is used to inject a message [msg] with
       ID [msg_id] and that belongs to [topic] to the network. *)
   val inject : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
+
+  (** [join t topics] joins [topics] even if the worker is running. *)
+  val join : t -> GS.Topic.t list -> unit
+
+  (** [leave t topics] leaves [topics] even if the worker is running. *)
+  val leave : t -> GS.Topic.t list -> unit
 end

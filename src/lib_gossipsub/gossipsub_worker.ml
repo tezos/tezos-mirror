@@ -41,7 +41,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Running of {
         heartbeat_handle : unit Monad.t;
         event_loop_handle : unit Monad.t;
-        topics : GS.Topic.t list;
       }
 
   type p2p_message
@@ -57,6 +56,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         message_id : GS.Message_id.t;
         topic : GS.Topic.t;
       }
+    | Join of GS.Topic.t
+    | Leave of GS.Topic.t
 
   (** The worker's state is made of its status, the gossipsub automaton's state,
       and a stream of events to process.  *)
@@ -112,6 +113,20 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle received p2p messages. *)
         ignore (Received_message m) ;
         assert false
+    | Join topic ->
+        let gossip_state, output = GS.join {topic} gossip_state in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
+
+           Handle Join's output. *)
+        ignore output ;
+        gossip_state
+    | Leave topic ->
+        let gossip_state, output = GS.leave {topic} gossip_state in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
+
+           Handle Leave's output. *)
+        ignore output ;
+        gossip_state
 
   (** A helper function that pushes events in the state *)
   let push e t = Stream.push e t.events_stream
@@ -125,9 +140,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let disconnection t peer = push (Disconnection {peer}) t
 
+  let join t = List.iter (fun topic -> push (Join topic) t)
+
+  let leave t = List.iter (fun topic -> push (Leave topic) t)
+
   (** This function returns a never-ending loop that periodically pushes
       [Heartbeat] events in the stream.  *)
-  let heartbeat_events_producer ~heartbeat_span stream =
+  let heartbeat_events_producer ~heartbeat_span t =
+    let stream = t.events_stream in
     let rec loop () =
       let open Monad in
       let* () = Monad.sleep heartbeat_span in
@@ -149,20 +169,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let start ~heartbeat_span topics t =
     match t.status with
     | Starting ->
-        let heartbeat_handle =
-          heartbeat_events_producer ~heartbeat_span t.events_stream
-        in
+        let heartbeat_handle = heartbeat_events_producer ~heartbeat_span t in
         let event_loop_handle = event_loop t in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5167
-
-           We should probably do something with the topics. Currently, they are
-           not used. Should we use [GS.join] and [GS.leave] to dynamically join
-           or leave topics instead (In which case, we should probably expose
-           them in the worker?). *)
-        let status = Running {heartbeat_handle; event_loop_handle; topics} in
+        let status = Running {heartbeat_handle; event_loop_handle} in
+        let t = {t with status} in
         let () = P2P.Connections_handler.on_connection (new_connection t) in
         let () = P2P.Connections_handler.on_diconnection (disconnection t) in
-        {t with status}
+        join t topics ;
+        t
     | Running _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5166
 
