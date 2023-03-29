@@ -143,6 +143,8 @@ module List_key_values_benchmark_boilerplate = struct
 
   let info = "List key values"
 
+  let module_filename = __FILE__
+
   let config_encoding =
     let open Data_encoding in
     conv

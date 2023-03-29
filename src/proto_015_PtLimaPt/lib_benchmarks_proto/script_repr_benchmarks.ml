@@ -78,6 +78,8 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
     "Benchmarking the time it takes to compute the number of nodes of a \
      Micheline term"
 
+  let module_filename = __FILE__
+
   let size_based_model =
     Model.make
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
@@ -116,6 +118,8 @@ module Script_repr_strip_annotations : Benchmark.S = struct
   let name = "strip_annotations"
 
   let info = "Benchmarking Script_repr.strip_annotations"
+
+  let module_filename = __FILE__
 
   let strip_annotations_model =
     Model.(

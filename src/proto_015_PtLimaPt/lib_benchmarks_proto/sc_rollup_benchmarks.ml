@@ -41,6 +41,8 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
     "Estimating the cost of updating the number and total size of messages \
      when adding a message to a sc_rollup inbox"
 
+  let module_filename = __FILE__
+
   let tags = ["scoru"]
 
   type config = {
@@ -142,6 +144,8 @@ module Sc_rollup_add_external_messages_benchmark = struct
   let name = "Sc_rollup_inbox_add_external_message"
 
   let info = "Estimating the costs of adding a single message to a rollup inbox"
+
+  let module_filename = __FILE__
 
   let tags = ["scoru"]
 

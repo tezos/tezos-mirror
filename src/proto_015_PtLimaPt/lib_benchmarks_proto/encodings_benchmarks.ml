@@ -135,6 +135,8 @@ module Encoding_micheline : Benchmark.S = struct
 
   let info = "Benchmarking strip_location + encoding of Micheline to bytes"
 
+  let module_filename = __FILE__
+
   let micheline_serialization_trace (micheline_node : Alpha_context.Script.node)
       =
     match
@@ -203,6 +205,8 @@ module Decoding_micheline : Benchmark.S = struct
 
   let info = "Decoding of bytes to Micheline"
 
+  let module_filename = __FILE__
+
   let micheline_deserialization_trace (micheline_str : string) =
     match
       Data_encoding.Binary.of_string
@@ -267,27 +271,31 @@ end
 
 let () = Registration_helpers.register (module Decoding_micheline)
 
+module Encodings =
+Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+end)
+
 module Timestamp = struct
   let () =
     Registration_helpers.register
-    @@
-    let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
-    fixed_size_shared
-      ~name:"TIMESTAMP_READABLE_ENCODING"
-      ~generator:(fun rng_state ->
-        let seconds_in_year = 30_000_000 in
-        let offset = Random.State.int rng_state seconds_in_year in
-        Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
-      ~make_bench:(fun generator () ->
-        let tstamp_string = generator () in
-        let closure () = ignore (Script_timestamp.to_notation tstamp_string) in
-        Generator.Plain {workload = (); closure})
-      ()
+    @@ Encodings.fixed_size_shared
+         ~name:"TIMESTAMP_READABLE_ENCODING"
+         ~generator:(fun rng_state ->
+           let seconds_in_year = 30_000_000 in
+           let offset = Random.State.int rng_state seconds_in_year in
+           Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
+         ~make_bench:(fun generator () ->
+           let tstamp_string = generator () in
+           let closure () =
+             ignore (Script_timestamp.to_notation tstamp_string)
+           in
+           Generator.Plain {workload = (); closure})
+         ()
 
   let () =
     let b, b_intercept =
-      let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
-      nsqrtn_shared_with_intercept
+      Encodings.nsqrtn_shared_with_intercept
         ~name:"TIMESTAMP_READABLE_DECODING"
         ~generator:(fun rng_state ->
           let offset =
@@ -322,8 +330,6 @@ end
    https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
 *)
 module BLS = struct
-  open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
-
   let check () =
     if not Bls12_381.built_with_blst_portable then (
       Format.eprintf
@@ -334,7 +340,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_bytes
+    @@ Encodings.make_encode_fixed_size_to_bytes
          ~check
          ~name:"ENCODING_BLS_FR"
          ~to_bytes:Bls12_381.Fr.to_bytes
@@ -343,7 +349,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_bytes
+    @@ Encodings.make_encode_fixed_size_to_bytes
          ~check
          ~name:"ENCODING_BLS_G1"
          ~to_bytes:Bls12_381.G1.to_bytes
@@ -352,7 +358,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_bytes
+    @@ Encodings.make_encode_fixed_size_to_bytes
          ~check
          ~name:"ENCODING_BLS_G2"
          ~to_bytes:Bls12_381.G2.to_bytes
@@ -361,7 +367,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ make_decode_fixed_size_from_bytes
+    @@ Encodings.make_decode_fixed_size_from_bytes
          ~check
          ~name:"DECODING_BLS_FR"
          ~to_bytes:Bls12_381.Fr.to_bytes
@@ -371,7 +377,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ make_decode_fixed_size_from_bytes
+    @@ Encodings.make_decode_fixed_size_from_bytes
          ~check
          ~name:"DECODING_BLS_G1"
          ~to_bytes:Bls12_381.G1.to_bytes
@@ -381,7 +387,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ make_decode_fixed_size_from_bytes
+    @@ Encodings.make_decode_fixed_size_from_bytes
          ~check
          ~name:"DECODING_BLS_G2"
          ~to_bytes:Bls12_381.G2.to_bytes
@@ -391,7 +397,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ fixed_size_shared
+    @@ Encodings.fixed_size_shared
          ~check
          ~name:"BLS_FR_FROM_Z"
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
@@ -404,7 +410,7 @@ module BLS = struct
 
   let () =
     Registration_helpers.register
-    @@ fixed_size_shared
+    @@ Encodings.fixed_size_shared
          ~check
          ~name:"BLS_FR_TO_Z"
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
@@ -416,8 +422,6 @@ module BLS = struct
 end
 
 module Timelock = struct
-  open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
-
   let generator rng_state =
     let log_time =
       Base_samplers.sample_in_interval ~range:{min = 0; max = 29} rng_state
@@ -433,7 +437,7 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_variable_size_to_string
+    @@ Encodings.make_encode_variable_size_to_string
          ~name:"ENCODING_Chest"
          ~to_string:
            (Data_encoding.Binary.to_string_exn
@@ -445,7 +449,7 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_string
+    @@ Encodings.make_encode_fixed_size_to_string
          ~name:"ENCODING_Chest_key"
          ~to_string:
            (Data_encoding.Binary.to_string_exn
@@ -457,7 +461,7 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_decode_variable_size_from_bytes
+    @@ Encodings.make_decode_variable_size_from_bytes
          ~name:"DECODING_Chest"
          ~to_bytes:
            (Data_encoding.Binary.to_bytes_exn
@@ -477,7 +481,7 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_decode_fixed_size_from_bytes
+    @@ Encodings.make_decode_fixed_size_from_bytes
          ~name:"DECODING_Chest_key"
          ~to_bytes:
            (Data_encoding.Binary.to_bytes_exn

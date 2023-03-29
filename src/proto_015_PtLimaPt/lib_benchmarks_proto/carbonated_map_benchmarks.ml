@@ -81,6 +81,8 @@ module Fold_benchmark : Benchmark.S = struct
 
   let info = "Carbonated map to list"
 
+  let module_filename = __FILE__
+
   let fold_model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
@@ -169,6 +171,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let info =
       Printf.sprintf "Carbonated map compare cost for %s keys" CS.type_name
 
+    let module_filename = __FILE__
+
     let models =
       [
         ( "carbonated_map",
@@ -208,6 +212,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let name = carbonated_map_cost_name "find"
 
     let info = Printf.sprintf "Carbonated find model"
+
+    let module_filename = __FILE__
 
     (**
        Given the cost of comparing keys, the model is used for deducing [intercept]
@@ -311,6 +317,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let name = carbonated_map_cost_name "find_intercept"
 
     let info = Printf.sprintf "Carbonated find model (intercept case)"
+
+    let module_filename = __FILE__
 
     let models =
       [

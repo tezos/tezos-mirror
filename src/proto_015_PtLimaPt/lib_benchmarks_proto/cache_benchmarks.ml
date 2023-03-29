@@ -131,6 +131,8 @@ module Cache_update_benchmark : Benchmark.S = struct
 
   let info = "Benchmarking the time it takes to update a key in the cache"
 
+  let module_filename = __FILE__
+
   (** It is expected that cache keys are non-adversarial,
       ie do not share a long common prefix. This is the case for [Script_cache],
       for which the keys are B58-encoded contract hashes.
