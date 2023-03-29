@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Lib_bls12_381_polynomial
+    Invocation: dune exec src/lib_bls12_381_polynomial/test/main.exe
+    Subject:    Test for bls12_381 polynomial
+*)
+
 let () =
   (* Seed for deterministic pseudo-randomness:
      If the environment variable RANDOM_SEED is set, then its value is used as
@@ -46,7 +53,6 @@ let () =
   Printf.printf "Random seed: %d\n" seed ;
   Random.init seed ;
   Alcotest.run
-    ~verbose:false
     "PlonK"
     [
       ("Domains", Test_domains.tests);

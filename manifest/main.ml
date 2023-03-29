@@ -941,13 +941,22 @@ let octez_bls12_381_polynomial_internal =
       }
 
 let _octez_bls12_381_polynomial_tests =
-  tests
-    ["main"]
+  tezt
+    [
+      "test_main";
+      "helpers";
+      "test_coefficients";
+      "test_domains";
+      "test_evaluations";
+      "test_pbt";
+      "test_polynomial";
+      "test_srs";
+    ]
     ~path:"src/lib_bls12_381_polynomial/test"
     ~opam:"tezos-bls12-381-polynomial-internal"
     ~deps:
       [
-        alcotest;
+        alcotezt;
         qcheck_alcotest;
         polynomial;
         bisect_ppx;

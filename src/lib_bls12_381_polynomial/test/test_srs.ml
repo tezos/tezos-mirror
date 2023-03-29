@@ -163,8 +163,10 @@ let bigstring_of_file filename =
        false
        [|(* [-1] means read the whole file *) -1|]
 
+let path = project_root // Filename.dirname __FILE__
+
 let test_load_from_file () =
-  let bs = bigstring_of_file "srs_zcash_g1_5" in
+  let bs = bigstring_of_file (path // "srs_zcash_g1_5") in
   let max_size = 1 lsl 5 in
   let srs = Srs.of_bigstring bs ~len:max_size |> Result.get_ok in
   assert (Srs.size srs = max_size) ;
@@ -173,7 +175,7 @@ let test_load_from_file () =
   | _ -> assert false
 
 let test_load_from_file_vector () =
-  let bs = bigstring_of_file "srs_zcash_g1_5" in
+  let bs = bigstring_of_file (path // "srs_zcash_g1_5") in
   let srs = Srs.of_bigstring bs ~len:(1 lsl 5) |> Result.get_ok in
   let v =
     [
