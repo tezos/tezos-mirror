@@ -26,30 +26,14 @@
 open Protocol.Alpha_context
 
 let origination_proof ~boot_sector kind =
-  let aux = function
-    | Sc_rollup.Kind.Example_arith ->
-        let open Lwt_result_syntax in
-        let context = Context_helpers.In_memory.make_empty_context () in
-        let* proof =
-          Pvm.Arith_pvm_in_memory.produce_origination_proof context boot_sector
-        in
-        let*? proof =
-          Sc_rollup.Proof.serialize_pvm_step
-            ~pvm:(module Pvm.Arith_pvm_in_memory)
-            proof
-        in
-        return proof
-    | Sc_rollup.Kind.Wasm_2_0_0 ->
-        let open Lwt_result_syntax in
-        let context = Context_helpers.In_memory.make_empty_context () in
-        let* proof =
-          Pvm.Wasm_pvm_in_memory.produce_origination_proof context boot_sector
-        in
-        let*? proof =
-          Sc_rollup.Proof.serialize_pvm_step
-            ~pvm:(module Pvm.Wasm_pvm_in_memory)
-            proof
-        in
-        return proof
+  let open Lwt_result_syntax in
+  let context = Context_helpers.In_memory.make_empty_context () in
+  let pvm : (module Pvm_in_memory.S) =
+    match kind with
+    | Sc_rollup.Kind.Example_arith -> (module Pvm_in_memory.Arith)
+    | Sc_rollup.Kind.Wasm_2_0_0 -> (module Pvm_in_memory.Wasm)
   in
-  aux kind
+  let module Pvm = (val pvm) in
+  let* proof = Pvm.produce_origination_proof context boot_sector in
+  let*? proof = Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Pvm) proof in
+  return proof
