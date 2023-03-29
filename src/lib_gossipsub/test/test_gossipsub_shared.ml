@@ -41,10 +41,10 @@ module Automaton_config :
   AUTOMATON_CONFIG
     with type Time.t = int
      and type Span.t = int
-     and type Peer.t = int
-     and type Topic.t = string
-     and type Message_id.t = int
-     and type Message.t = string = struct
+     and type Subconfig.Peer.t = int
+     and type Subconfig.Topic.t = string
+     and type Subconfig.Message_id.t = int
+     and type Subconfig.Message.t = string = struct
   module Span = struct
     type t = int
 
@@ -85,10 +85,12 @@ module Automaton_config :
     module Set = Set.Make (String)
   end
 
-  module Peer = Int_iterable
-  module Topic = String_iterable
-  module Message_id = Int_iterable
-  module Message = String_iterable
+  module Subconfig = struct
+    module Peer = Int_iterable
+    module Topic = String_iterable
+    module Message_id = Int_iterable
+    module Message = String_iterable
+  end
 end
 
 module C = Automaton_config
@@ -112,6 +114,8 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     degree_high;
     degree_score;
     degree_out;
+    history_length;
+    history_gossip_length;
   } =
     l
   in
@@ -133,7 +137,9 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      degree_low = %d;@;\
      degree_high = %d;@;\
      degree_score = %d;@;\
-     degree_out = %d }@]"
+     degree_out = %d;@;\
+     history_length = %d;@;\
+     history_gossip_length = %d }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
     degree_optimal
@@ -156,3 +162,5 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     degree_high
     degree_score
     degree_out
+    history_length
+    history_gossip_length

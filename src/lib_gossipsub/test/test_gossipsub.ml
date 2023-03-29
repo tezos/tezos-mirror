@@ -45,6 +45,8 @@ let default_limits =
     degree_high = 12;
     degree_score = 4;
     degree_out = 2;
+    history_length = 5;
+    history_gossip_length = 3;
   }
 
 let parameters = {peer_filter = (fun _peer _action -> true)}

@@ -42,7 +42,7 @@ module type ITERABLE = sig
   module Map : Map.S with type key = t
 end
 
-module type AUTOMATON_CONFIG = sig
+module type AUTOMATON_SUBCONFIG = sig
   module Peer : ITERABLE
 
   module Topic : ITERABLE
@@ -50,6 +50,10 @@ module type AUTOMATON_CONFIG = sig
   module Message_id : ITERABLE
 
   module Message : PRINTABLE
+end
+
+module type AUTOMATON_CONFIG = sig
+  module Subconfig : AUTOMATON_SUBCONFIG
 
   module Span : PRINTABLE
 
@@ -128,6 +132,19 @@ type ('peer, 'message_id, 'span) limits = {
           attackers from overwhelming our mesh with incoming connections.
 	        [degree_out] must be set below {degree_low}, and must not exceed
           [degree_optimal / 2]. *)
+  history_length : int;
+      (** [history_length] controls the size of the message cache used for
+          gossip. The message cache will remember messages for [history_length]
+          heartbeats. *)
+  history_gossip_length : int;
+      (** [history_gossip_length] controls how many cached message ids the local
+          peer will advertise in IHAVE gossip messages. When asked for its seen
+          message ids, the local peer will return only those from the most
+          recent [history_gossip_length] heartbeats. The slack between
+          [history_gossip_length] and [history_length] allows the local peer to
+          avoid advertising messages that will be expired by the time they're
+          requested. [history_gossip_length] must be less than or equal to
+          [history_length]. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -424,14 +441,19 @@ module type AUTOMATON = sig
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
-    module Memory_cache : sig
-      type value = {message : message; access : int Peer.Map.t}
+    module Message_cache : sig
+      type t
 
-      type t = {messages : value Message_id.Map.t}
+      val create : history_slots:int -> gossip_slots:int -> t
 
-      (** [get_memory_cache_value message_id state] returns the
-          cached value for [message_id]. *)
-      val get_value : Message_id.t -> state -> value option
+      val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+
+      val get_message_for_peer :
+        Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
+
+      val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
+
+      val shift : t -> t
     end
 
     type view = {
@@ -443,7 +465,7 @@ module type AUTOMATON = sig
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
       seen_messages : Message_id.Set.t;
-      memory_cache : Memory_cache.t;
+      message_cache : Message_cache.t;
       rng : Random.State.t;
       heartbeat_ticks : int64;
     }
@@ -548,7 +570,7 @@ module type WORKER = sig
   val shutdown : t -> unit
 
   (** [inject state msg_id msg topic] is used to inject a message [msg] with
-      ID [msg_id] and that belongs to [topic] to the network. *)
+      id [msg_id] and that belongs to [topic] to the network. *)
   val inject : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
 
   (** [join t topics] joins [topics] even if the worker is running. *)
