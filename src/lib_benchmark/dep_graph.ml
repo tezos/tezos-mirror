@@ -415,7 +415,7 @@ let find_model_or_generic model_name model_list =
   | None -> List.assoc_opt ~equal:String.equal "*" model_list
   | res -> res
 
-let load_workload_files model_name files =
+let load_workload_files ~local_model_name:model_name files =
   (* Use a table to store loaded measurements *)
   let table = Namespace.Hashtbl.create 51 in
   let unsolved =

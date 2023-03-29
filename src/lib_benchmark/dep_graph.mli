@@ -80,11 +80,11 @@ end
     match, then searches for models named ["*"]. *)
 val find_model_or_generic : string -> (string * 'model) list -> 'model option
 
-(** [load_workload_files model_name files] loads [.workload] files given in [files],
+(** [load_workload_files ~model_name files] loads [.workload] files given in [files],
     looks for the model [model_name], and if found, adds it to a dependency
     graph. Returns [(G, H)] where [G] is the final graph obtained this way,
     and [H] is a table that maps the name of a benchmark with its contents. *)
 val load_workload_files :
-  string ->
+  model_name:string ->
   string list ->
   Graph.t * Measure.packed_measurement Namespace.Hashtbl.t

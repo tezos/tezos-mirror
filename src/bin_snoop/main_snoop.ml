@@ -214,7 +214,7 @@ and infer_cmd_full_auto model_name workload_data solver
   in
   let solver = solver_of_string solver infer_opts in
   let graph, measurements =
-    Dep_graph.load_workload_files model_name workload_files
+    Dep_graph.load_workload_files ~local_model_name:model_name workload_files
   in
   if Dep_graph.Graph.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
