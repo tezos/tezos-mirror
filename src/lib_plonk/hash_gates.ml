@@ -198,11 +198,14 @@ module AnemoiDouble : Base_sig = struct
    fun evaluations ->
     let domain_size = Domain.length domain in
     let buffers, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; b; c; d; e; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-    let selector, x1, y1, x0, y0, x2, y2 = (q, b, c, d, e, d, e) in
-
+    let selector = q in
+    let x1, y1 = (wires.(1), wires.(2)) in
+    let x0, y0 = (wires.(3), wires.(4)) in
+    (* (x2, y2) will be evaluated on GX *)
+    let x2, y2 = (x0, y0) in
     let kx1, ky1, kx2, ky2 =
       ( Evaluations.find_evaluation evaluations (prefix_common kx1_label),
         Evaluations.find_evaluation evaluations (prefix_common ky1_label),
@@ -245,11 +248,15 @@ module AnemoiDouble : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let {q; b; c; d; e; dg; eg; _} =
+    let {q; wires; wires_g} =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
-    let x0, y0, x1, y1, x2, y2 = (d, e, b, c, dg, eg) in
-
+    let x0 = wires.(3) in
+    let y0 = wires.(4) in
+    let x1 = wires.(1) in
+    let y1 = wires.(2) in
+    let x2 = wires_g.(3) in
+    let y2 = wires_g.(4) in
     let kx1 = get_answer answers X @@ prefix_common kx1_label in
     let ky1 = get_answer answers X @@ prefix_common ky1_label in
     let kx2 = get_answer answers X @@ prefix_common kx2_label in

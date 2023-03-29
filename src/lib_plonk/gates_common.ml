@@ -41,28 +41,9 @@ let com_label = "com"
 
 let tmp_buffers = ref [||]
 
-type answers = {
-  q : Poly.scalar;
-  a : Poly.scalar;
-  b : Poly.scalar;
-  c : Poly.scalar;
-  d : Poly.scalar;
-  e : Poly.scalar;
-  ag : Poly.scalar;
-  bg : Poly.scalar;
-  cg : Poly.scalar;
-  dg : Poly.scalar;
-  eg : Poly.scalar;
-}
+type answers = {q : Scalar.t; wires : Scalar.t array; wires_g : Scalar.t array}
 
-type witness = {
-  q : Evaluations.t;
-  a : Evaluations.t;
-  b : Evaluations.t;
-  c : Evaluations.t;
-  d : Evaluations.t;
-  e : Evaluations.t;
-}
+type witness = {q : Evaluations.t; wires : Evaluations.t array}
 
 let get_buffers ~nb_buffers ~nb_ids =
   let precomputed = !tmp_buffers in
@@ -91,12 +72,10 @@ let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
     | None -> (dummy, dummy)
   in
   let q = prefix_common q_label |> answer X in
-  let a, ag = answer_wire 0 in
-  let b, bg = answer_wire 1 in
-  let c, cg = answer_wire 2 in
-  let d, dg = answer_wire 3 in
-  let e, eg = answer_wire 4 in
-  {q; a; b; c; d; e; ag; bg; cg; dg; eg}
+  let wires, wires_g =
+    Array.init Plompiler.Csir.nb_wires_arch answer_wire |> Array.split
+  in
+  {q; wires; wires_g}
 
 let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
   let dummy = Evaluations.zero in
@@ -111,11 +90,7 @@ let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
   in
   {
     q = Evaluations.find_evaluation evaluations (prefix_common q_label);
-    a = find_wire 0;
-    b = find_wire 1;
-    c = find_wire 2;
-    d = find_wire 3;
-    e = find_wire 4;
+    wires = Array.init Plompiler.Csir.nb_wires_arch find_wire;
   }
 
 (* Block names to merge identities within, if identities are independent, use q_label instead.

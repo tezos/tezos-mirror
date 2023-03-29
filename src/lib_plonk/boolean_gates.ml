@@ -56,10 +56,10 @@ module BoolCheck : Base_sig = struct
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let a = wires.(0) in
     let one_minus_a =
       Evaluations.linear_c
         ~res:tmps.(0)
@@ -136,11 +136,12 @@ module CondSwap : Base_sig = struct
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; b; c; d; e} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-    let b, x, y, u, v = (a, b, c, d, e) in
-
+    let b = wires.(0) in
+    let x, y = (wires.(1), wires.(2)) in
+    let u, v = (wires.(3), wires.(4)) in
     let bb =
       Evaluations.linear_c
         ~res:tmps.(0)
@@ -177,10 +178,12 @@ module CondSwap : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let ({q; a; b; c; d; e; _} : answers) =
+    let ({q; wires; _} : answers) =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
-    let bit, x, y, u, v = (a, b, c, d, e) in
+    let bit = wires.(0) in
+    let x, y = (wires.(1), wires.(2)) in
+    let u, v = (wires.(3), wires.(4)) in
     let bbit = Scalar.(sub one bit) in
     (* 0 = q · [(1 - bit) · x + bit       · y - u] *)
     let id1 = Scalar.(q * ((bbit * x) + sub (bit * y) u)) in
