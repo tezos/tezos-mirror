@@ -288,6 +288,8 @@ module Sc_rollup_verify_output_proof_benchmark = struct
 
   let info = "Estimating the cost of verifying an output proof"
 
+  let module_filename = __FILE__
+
   let tags = ["sc_rollup"]
 
   type config = {
@@ -502,6 +504,8 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   let name = ns "Sc_rollup_deserialize_output_proof_benchmark"
 
   let info = "Estimating the cost of deserializing an output proof"
+
+  let module_filename = __FILE__
 
   let tags = ["sc_rollup"]
 

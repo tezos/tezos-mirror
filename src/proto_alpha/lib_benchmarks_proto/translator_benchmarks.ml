@@ -24,6 +24,12 @@
 (*****************************************************************************)
 
 open Protocol
+
+module Encodings =
+Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+end)
+
 module Size = Gas_input_size
 
 let ns = Translator_model.ns
@@ -195,6 +201,8 @@ module Typechecking_data : Benchmark.S = struct
 
   let info = "Benchmarking typechecking of data"
 
+  let module_filename = __FILE__
+
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
@@ -266,6 +274,8 @@ module Unparsing_data : Benchmark.S = struct
   let name = ns "UNPARSING_DATA"
 
   let info = "Benchmarking unparsing of data"
+
+  let module_filename = __FILE__
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
@@ -346,6 +356,8 @@ module Typechecking_code : Benchmark.S = struct
 
   let info = "Benchmarking typechecking of code"
 
+  let module_filename = __FILE__
+
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
     Lwt_main.run
@@ -421,6 +433,8 @@ module Unparsing_code : Benchmark.S = struct
   let name = ns "UNPARSING_CODE"
 
   let info = "Benchmarking unparsing of code"
+
+  let module_filename = __FILE__
 
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -502,6 +516,7 @@ let rec check_printable_ascii v i =
 
 let check_printable_benchmark =
   let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
+  let open Encodings in
   linear_shared
     ~name:"CHECK_PRINTABLE"
     ~generator:(fun rng_state ->
@@ -549,6 +564,8 @@ module Ty_eq : Benchmark.S = struct
   let name = ns "TY_EQ"
 
   let info = "Benchmarking equating types"
+
+  let module_filename = __FILE__
 
   let tags = [Tags.translator]
 
@@ -695,6 +712,8 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let info = "Benchmarking parse_ty"
 
+  let module_filename = __FILE__
+
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
@@ -746,6 +765,8 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let name = ns "UNPARSE_TYPE"
 
   let info = "Benchmarking unparse_ty"
+
+  let module_filename = __FILE__
 
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->

@@ -266,6 +266,8 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
 
   let tags = ["io"]
 
+  let module_filename = __FILE__
+
   include Context_size_dependent_shared
 
   let make_bench rng_state cfg () =
@@ -350,6 +352,8 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
   let info =
     "Benchmarking the write accesses with contexts of various sizes (with \
      fixed storage size except for the written key)"
+
+  let module_filename = __FILE__
 
   let tags = ["io"]
 
@@ -569,6 +573,8 @@ module Irmin_pack_read_bench : Benchmark.S = struct
 
   let info = "Benchmarking read accesses in irmin-pack directories"
 
+  let module_filename = __FILE__
+
   let tags = ["io"]
 
   type workload =
@@ -734,6 +740,8 @@ module Irmin_pack_write_bench : Benchmark.S = struct
 
   let info = "Benchmarking write accesses in irmin-pack directories"
 
+  let module_filename = __FILE__
+
   let tags = ["io"]
 
   type workload =
@@ -894,6 +902,8 @@ module Read_random_key_bench : Benchmark.S = struct
 
   let info = "Benchmarking random read accesses in a subdirectory"
 
+  let module_filename = __FILE__
+
   let tags = ["io"]
 
   type workload = Read_random_key of {depth : int; storage_bytes : int}
@@ -1036,6 +1046,8 @@ module Write_random_keys_bench : Benchmark.S = struct
   let name = ns "WRITE_RANDOM_KEYS"
 
   let info = "Benchmarking random read accesses in a subdirectory"
+
+  let module_filename = __FILE__
 
   let tags = ["io"]
 

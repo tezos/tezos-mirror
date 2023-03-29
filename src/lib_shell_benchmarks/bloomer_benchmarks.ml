@@ -42,6 +42,8 @@ let make_bench ~name ~info ~model ~generator ~make_bench :
 
     let default_config = ()
 
+    let module_filename = __FILE__
+
     let config_encoding = Data_encoding.unit
 
     type workload = unit

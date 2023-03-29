@@ -36,6 +36,8 @@ module Apply_diff_bench : Benchmark.S = struct
 
   let info = "Benchmarking SAPLING_APPLY_DIFF"
 
+  let module_filename = __FILE__
+
   let tags = ["sapling"]
 
   let diff_from_tx (tx : Alpha_context.Sapling.transaction) =

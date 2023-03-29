@@ -296,6 +296,8 @@ module Set_add : Benchmark.S = struct
   let info =
     "Benchmarks and cost model for set element addition from OCaml stdlib."
 
+  let module_filename = __FILE__
+
   let tags = ["global_constants"]
 
   type config = unit
@@ -348,6 +350,8 @@ module Set_elements : Benchmark.S = struct
   let name = ns "Set_elements"
 
   let info = "Benchmarks and cost model for set elements from OCaml stdlib."
+
+  let module_filename = __FILE__
 
   let tags = ["global_constants"]
 
@@ -403,6 +407,8 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
   let name = ns "Script_expr_hash_of_b58check_opt"
 
   let info = "Benchmark for Script_expr_hash.of_b58check_opt"
+
+  let module_filename = __FILE__
 
   let tags = ["global_constants"]
 
@@ -475,6 +481,8 @@ struct
     "Benchmark for the  \
      Global_constants_storage.Internal_for_tests.expr_to_address_in_context \
      function"
+
+  let module_filename = __FILE__
 
   let tags = ["global_constants"]
 
@@ -559,6 +567,8 @@ module Global_constants_storage_expand_models = struct
       "Benchmark for the constant branch Global_constants_storage.expand \
        function"
 
+    let module_filename = __FILE__
+
     let tags = ["global_constants"]
 
     type config = unit
@@ -632,6 +642,8 @@ module Global_constants_storage_expand_models = struct
     let info =
       "Benchmark for the Global_constants_storage.expand function on the case \
        without constants"
+
+    let module_filename = __FILE__
 
     let tags = ["global_constants"]
 

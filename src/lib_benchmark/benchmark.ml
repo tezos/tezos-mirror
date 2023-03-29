@@ -34,6 +34,9 @@ module type S = sig
   (** Description of the benchmark *)
   val info : string
 
+  (** File where the benchmark module is defined *)
+  val module_filename : string
+
   (** Tags of the benchmark *)
   val tags : string list
 

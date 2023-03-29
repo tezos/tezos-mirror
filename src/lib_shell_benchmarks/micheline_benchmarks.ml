@@ -133,6 +133,8 @@ module Micheline_strip_locations : Benchmark.S = struct
 
   let info = "Benchmarking Micheline.strip_locations"
 
+  let module_filename = __FILE__
+
   let tags = ["micheline"]
 
   type config = unit

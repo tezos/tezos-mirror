@@ -62,6 +62,8 @@ module Take_fees_benchmark = struct
 
   let info = "Benchmark for take_fees"
 
+  let module_filename = __FILE__
+
   let tags = ["apply"]
 
   type config = unit
