@@ -217,8 +217,8 @@ let baker_early_preendorsement_test =
       client2
   in
 
-  let recover_endorsing_rights ~max_round client level =
-    let* endorsing_rights =
+  let recover_baking_rights ~max_round client level =
+    let* baking_rights =
       RPC.Client.call client
       @@ RPC.get_chain_block_helper_baking_rights ~level ()
     in
@@ -237,7 +237,7 @@ let baker_early_preendorsement_test =
                    Some (round, bootstrap.alias)
                  else None)
                bootstraps)
-         JSON.(endorsing_rights |> as_list)
+         JSON.(baking_rights |> as_list)
   in
   (* This levels have been chosen such as the first baker can propose at round 0
      on the [prev_level] and the [test_level], and that the second baker can
@@ -253,27 +253,27 @@ let baker_early_preendorsement_test =
     test_lvl
     (Baker.name baker2)
     test_lvl ;
-  let* endorsing_rights_prev_lvl =
-    recover_endorsing_rights ~max_round:1 client1 prev_lvl
+  let* baking_rights_prev_lvl =
+    recover_baking_rights ~max_round:1 client1 prev_lvl
   in
-  let* endorsing_rights_test_lvl =
-    recover_endorsing_rights ~max_round:0 client1 test_lvl
+  let* baking_rights_test_lvl =
+    recover_baking_rights ~max_round:0 client1 test_lvl
   in
-  let print_endorsing_rights level rights =
+  let print_baking_rights level rights =
     Log.info
-      "Endorsing rights at level %d:%a"
+      "Baking rights at level %d:%a"
       level
       pp_list
       (List.map (fun (round, key) -> sf " round:%d -> key:%s" round key) rights)
   in
-  print_endorsing_rights prev_lvl endorsing_rights_prev_lvl ;
-  print_endorsing_rights test_lvl endorsing_rights_test_lvl ;
+  print_baking_rights prev_lvl baking_rights_prev_lvl ;
+  print_baking_rights test_lvl baking_rights_test_lvl ;
   assert (
     List.for_all
       (fun (round, key) ->
         if round = 0 then List.mem key baker1_delegates_alias
         else List.mem key baker2_delegates_alias)
-      (endorsing_rights_prev_lvl @ endorsing_rights_test_lvl)) ;
+      (baking_rights_prev_lvl @ baking_rights_test_lvl)) ;
 
   Log.info "Wait for the nodes to reach level %d" prev_lvl ;
   Log.info

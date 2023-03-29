@@ -635,6 +635,15 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
   let expected_commitment = JSON.(json |-> "expected_commitment" |> as_bool) in
   {level; level_position; cycle; cycle_position; expected_commitment}
 
+let get_chain_block_helper_attestation_rights ?(chain = "main")
+    ?(block = "head") ?delegate () =
+  let query_string = Query_arg.opt "delegate" Fun.id delegate in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "attestation_rights"]
+    Fun.id
+
 let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ?delegate () =
   let query_string = Query_arg.opt "delegate" Fun.id delegate in

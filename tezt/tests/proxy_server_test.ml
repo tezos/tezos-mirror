@@ -273,37 +273,54 @@ let test_multi_protocols =
       (* Launch the proxy server and plug the client to it *)
       let* proxy_server = Proxy_server.init node in
       Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
+      let check_attestation_levels ~__LOC__ ?block ~expected_level proto =
+        let check levels =
+          let returned_level =
+            JSON.(levels |> geti 0 |> get "level" |> as_int)
+          in
+          Check.(
+            (expected_level = returned_level)
+              int
+              ~error_msg:
+                (sf
+                   "%s: Unexpected level returned in proxy_server multi \
+                    protocol test, expected %%L instead of %%R"
+                   __LOC__))
+        in
+        let* () =
+          if Protocol.(number proto > number Mumbai) then (
+            let* proto_attestation_rights =
+              RPC.Client.call client
+              @@ RPC.get_chain_block_helper_attestation_rights ?block ()
+            in
+            check proto_attestation_rights ;
+            unit)
+          else unit
+        in
+        let* proto_endorsing_rights =
+          RPC.Client.call client
+          @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
+        in
+        check proto_endorsing_rights ;
+        unit
+      in
       (* Ensure the proxy serves a query to a block in [to_protocol] *)
-      let* from_proto_rights =
-        Client.rpc
-          Client.GET
-          ["chains"; "main"; "blocks"; "3"; "helpers"; "endorsing_rights"]
-          client
+      let* () =
+        check_attestation_levels
+          ~__LOC__
+          ~block:"3"
+          ~expected_level:3
+          from_protocol
       in
-      let from_level_returned =
-        JSON.(from_proto_rights |> geti 0 |> get "level" |> as_int)
-      in
-      Check.(
-        (from_level_returned = 3)
-          int
-          ~error_msg:
-            "Unexpected level returned in proxy_server multi protocol test") ;
       (* Ensure the proxy serves a query to a block in [from_protocol] *)
-      let* to_proto_rights =
-        Client.rpc
-          Client.GET
-          ["chains"; "main"; "blocks"; "head~1"; "helpers"; "endorsing_rights"]
-          client
+      let* () =
+        check_attestation_levels
+          ~__LOC__
+          ~block:"head~1"
+          ~expected_level:5
+          to_protocol
       in
-      let to_level_returned =
-        JSON.(to_proto_rights |> geti 0 |> get "level" |> as_int)
-      in
-      Check.(
-        (to_level_returned = 5)
-          int
-          ~error_msg:
-            "Unexpected level returned in proxy_server multi protocol test") ;
-      Lwt.return_unit
+      unit
 
 let register ~protocols =
   let register mode =
