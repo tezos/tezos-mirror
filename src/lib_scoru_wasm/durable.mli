@@ -121,17 +121,18 @@ val subtree_name_at : t -> key -> int -> string Lwt.t
 *)
 val delete : ?edit_readonly:bool -> t -> key -> t Lwt.t
 
-(** [hash durable key] retrieves the tree hash of the value at the given [key].
-    This is not the same as the hash of the value.
-*)
-val hash : t -> key -> Context_hash.t option Lwt.t
+(** [hash ~kind durable key] retrieves the tree hash of the value (if
+    [kind = `Value]) or the subtree ([kind = `Subtree]) at the given
+    [key].  This is not the same as the hash of the value. *)
+val hash : kind:[`Value | `Subtree] -> t -> key -> Context_hash.t option Lwt.t
 
-(** [hash_exn durable key] retrieves the tree hash of the value at the given [key].
-    This is not the same as the hash of the value.
+(** [hash_exn ~kind durable key] retrieves the tree hash of the value
+    (if [kind = `Value]) or the subtree ([kind = `Subtree]) at the
+    given [key]. This is not the same as the hash of the value.
 
-    @raise Value_not_found when [key] is not found
-*)
-val hash_exn : t -> key -> Context_hash.t Lwt.t
+    @raise Value_not_found when [key] is not found and [kind = `Subtree]
+    @raise Tree_not_found when [key] is not found and [kind = `Value]. *)
+val hash_exn : kind:[`Value | `Subtree] -> t -> key -> Context_hash.t Lwt.t
 
 (** [set_value_exn durable key str] installs the value [str] in
     [durable] under [key], replacing any previous contents under this

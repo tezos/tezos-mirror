@@ -165,14 +165,16 @@ struct
                  dur
                  (Durable.key_of_string_exn @@ Durable_operation.key_to_str key)
                  idx
-        | Operation (Hash, key) ->
+        | Operation (Hash, (key, kind)) ->
             value_res
             @@ Durable.hash
+                 ~kind
                  dur
                  (Durable.key_of_string_exn @@ Durable_operation.key_to_str key)
-        | Operation (Hash_exn, key) ->
+        | Operation (Hash_exn, (key, kind)) ->
             value_res
             @@ Durable.hash_exn
+                 ~kind
                  dur
                  (Durable.key_of_string_exn @@ Durable_operation.key_to_str key)
         | Operation (Write_value_exn, (edit_readonly, key, offset, value)) ->
