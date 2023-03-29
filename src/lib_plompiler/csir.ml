@@ -66,21 +66,9 @@ module Table : sig
 
   val size : t -> int
 
-  type entry = {
-    a : Scalar.t;
-    b : Scalar.t;
-    c : Scalar.t;
-    d : Scalar.t;
-    e : Scalar.t;
-  }
+  type entry = Scalar.t array
 
-  type partial_entry = {
-    a : Scalar.t option;
-    b : Scalar.t option;
-    c : Scalar.t option;
-    d : Scalar.t option;
-    e : Scalar.t option;
-  }
+  type partial_entry = Scalar.t option array
 
   val mem : entry -> t -> bool
 
@@ -101,21 +89,9 @@ end = struct
        [|0; 0; 0; 0|] ;
      ]
   *)
-  type entry = {
-    a : Scalar.t;
-    b : Scalar.t;
-    c : Scalar.t;
-    d : Scalar.t;
-    e : Scalar.t;
-  }
+  type entry = Scalar.t array
 
-  type partial_entry = {
-    a : Scalar.t option;
-    b : Scalar.t option;
-    c : Scalar.t option;
-    d : Scalar.t option;
-    e : Scalar.t option;
-  }
+  type partial_entry = Scalar.t option array
 
   type t = Scalar.t array array [@@deriving repr]
 
@@ -132,18 +108,10 @@ end = struct
       Option.(value ~default:true @@ map (Scalar.eq s) o)
     in
     if
-      match_partial_entry pe.a table.(0).(i)
-      && match_partial_entry pe.b table.(1).(i)
-      && match_partial_entry pe.c table.(2).(i)
-    then
-      Some
-        {
-          a = table.(0).(i);
-          b = table.(1).(i);
-          c = table.(2).(i);
-          d = table.(3).(i);
-          e = table.(4).(i);
-        }
+      match_partial_entry pe.(0) table.(0).(i)
+      && match_partial_entry pe.(1) table.(1).(i)
+      && match_partial_entry pe.(2) table.(2).(i)
+    then Some (Array.map (fun x -> x.(i)) table)
     else None
 
   let find pe table =
@@ -160,17 +128,7 @@ end = struct
 
   let mem : entry -> t -> bool =
    fun entry table ->
-    match
-      find
-        {
-          a = Some entry.a;
-          b = Some entry.b;
-          c = Some entry.c;
-          d = Some entry.d;
-          e = Some entry.e;
-        }
-        table
-    with
+    match find (Array.map (fun x -> Some x) entry) table with
     | Some _ -> true
     | None -> false
 

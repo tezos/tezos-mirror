@@ -332,7 +332,7 @@ end = struct
               | "q_plookup" -> id_map
               | "q_table" ->
                   (* We assume there can be only one lookup per gate *)
-                  let entry : Table.entry = Table.{a; b; c; d; e} in
+                  let entry : Table.entry = [|a; b; c; d; e|] in
                   let sub_table = List.nth tables (Scalar.to_z q |> Z.to_int) in
                   let b = Table.mem entry sub_table in
                   let id = [|(if b then Scalar.zero else Scalar.one)|] in

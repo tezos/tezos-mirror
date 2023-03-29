@@ -185,16 +185,14 @@ module Make = struct
           [|zero; zero; zero; zero|];
         ]
     in
-    let entry =
-      ({a = zero; b = zero; c = zero; d = zero; e = zero} : Table.entry)
-    in
-    let input =
-      Table.{a = Some zero; b = Some zero; c = None; d = None; e = None}
-    in
+    let entry = ([|zero; zero; zero; zero; zero|] : Table.entry) in
+    let input = [|Some zero; Some zero; None; None; None|] in
     assert (Table.size table_or = 4) ;
     assert (Table.mem entry table_or) ;
     Table.find input table_or |> Option.get |> fun res ->
-    assert (Scalar.(eq entry.a res.a && eq entry.b res.b && eq entry.c res.c)) ;
+    assert (
+      Scalar.(
+        eq entry.(0) res.(0) && eq entry.(1) res.(1) && eq entry.(2) res.(2))) ;
     ()
 end
 

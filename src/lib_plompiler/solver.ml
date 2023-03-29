@@ -306,12 +306,12 @@ let solve_one trace solver =
       let a, b, c, d, e =
         Utils.map5 (Option.map (fun i -> trace.(i))) (a, b, c, d, e)
       in
-      let entry = Option.get Csir.Table.(find {a; b; c; d; e} tbl) in
-      trace.(wa) <- entry.a ;
-      trace.(wb) <- entry.b ;
-      trace.(wc) <- entry.c ;
-      trace.(wd) <- entry.d ;
-      trace.(we) <- entry.e
+      let entry = Option.get Csir.Table.(find [|a; b; c; d; e|] tbl) in
+      trace.(wa) <- entry.(0) ;
+      trace.(wb) <- entry.(1) ;
+      trace.(wc) <- entry.(2) ;
+      trace.(wd) <- entry.(3) ;
+      trace.(we) <- entry.(4)
   | IsZero {a; b; c; _} ->
       let av = trace.(a) in
       trace.(c) <- S.(if av = zero then one else zero) ;
