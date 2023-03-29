@@ -144,6 +144,26 @@ let get_sc_rollup_constants client =
       timeout_period_in_blocks;
     }
 
+let originate_forward_smart_contract ?(src = Constant.bootstrap1.alias) client
+    protocol =
+  (* Originate forwarder contract to send internal messages to rollup *)
+  let* alias, contract_id =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src
+      ~init:"Unit"
+      ~burn_cap:Tez.(of_int 1)
+      client
+      ["mini_scenarios"; "sc_rollup_forward"]
+      protocol
+  in
+  let* () = Client.bake_for_and_wait client in
+  Log.info
+    "The forwarder %s (%s) contract was successfully originated"
+    alias
+    contract_id ;
+  return contract_id
+
 (* List of scoru errors messages used in tests below. *)
 
 let commit_too_recent =
@@ -1039,21 +1059,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
   let* level, forwarder =
     if not internal then return (level, None)
     else
-      (* Originate forwarder contract to send internal messages to rollup *)
-      let* _alias, contract_id =
-        Client.originate_contract_at
-          ~amount:Tez.zero
-          ~src:Constant.bootstrap1.alias
-          ~init:"Unit"
-          ~burn_cap:Tez.(of_int 1)
-          client
-          ["mini_scenarios"; "sc_rollup_forward"]
-          protocol
-      in
-      let* () = Client.bake_for_and_wait client in
-      Log.info
-        "The forwarder %s contract was successfully originated"
-        contract_id ;
+      let* contract_id = originate_forward_smart_contract client protocol in
       return (level + 1, Some contract_id)
   in
   (* Called with monotonically increasing [i] *)
@@ -3707,20 +3713,6 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            string
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
-  let originate_source_contract () =
-    let* _alias, address =
-      Client.originate_contract_at
-        ~amount:Tez.zero
-        ~src:Constant.bootstrap1.alias
-        ~init:"Unit"
-        ~burn_cap:Tez.(of_int 1)
-        client
-        ["mini_scenarios"; "sc_rollup_forward"]
-        protocol
-    in
-    let* () = Client.bake_for_and_wait client in
-    return address
-  in
   let perform_rollup_execution_and_cement source_address target_address =
     let* payload = input_message sc_client target_address in
     let* () =
@@ -3838,7 +3830,9 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             Process.check_error ~msg process)
   in
   let* target_contract_address = originate_target_contract () in
-  let* source_contract_address = originate_source_contract () in
+  let* source_contract_address =
+    originate_forward_smart_contract client protocol
+  in
   let* () =
     perform_rollup_execution_and_cement
       source_contract_address
