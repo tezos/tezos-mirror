@@ -154,36 +154,17 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       | [cs] -> ret cs
       | _ -> raise (Invalid_argument "Invalid format for Arith constraint.")
 
-    (* Makes fetching wires from wires lists easy *)
-    let format_wires = function
-      | [a; b; c; d; e], [ag; bg; cg; dg; eg] ->
-          (a, b, c, d, e, ag, bg, cg, dg, eg)
-      | _ -> raise (Invalid_argument "Unexpected wire list format.")
-
     (* For a selector name and value q, given the wires values wires & wires_g, returns the evaluation of arithmetic monomial associated with the selector. *)
     let cs_of_arith_sel name q wires wires_g =
-      let a, b, c, d, e, ag, bg, cg, dg, eg = format_wires (wires, wires_g) in
-      format_arith_cs
-        (Gates.get_cs name ~q ~a ~b ~c ~d ~e ~ag ~bg ~cg ~dg ~eg ())
+      let wires = Array.of_list wires in
+      let wires_g = Array.of_list wires_g in
+      format_arith_cs (Gates.get_cs name ~q ~wires ~wires_g ())
 
     (* For a selector name and value q, given the wires values wires & wires_g, returns the evaluation of identity given by the selector. *)
     let cs_of_custom_sel ?precomputed_advice name q wires wires_g =
-      let a, b, c, d, e, ag, bg, cg, dg, eg = format_wires (wires, wires_g) in
-      Gates.get_cs
-        name
-        ~q
-        ~a
-        ~b
-        ~c
-        ~d
-        ~e
-        ~ag
-        ~bg
-        ~cg
-        ~dg
-        ~eg
-        ?precomputed_advice
-        ()
+      let wires = Array.of_list wires in
+      let wires_g = Array.of_list wires_g in
+      Gates.get_cs name ~q ~wires ~wires_g ?precomputed_advice ()
 
     (* Circuit that computes x^n for n given as a scalar *)
     let compute_xn x n =

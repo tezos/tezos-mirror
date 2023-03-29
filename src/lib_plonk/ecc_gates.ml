@@ -197,8 +197,13 @@ module AddWeierstrass : Base_sig = struct
   let polynomials_degree =
     SMap.of_list [(left, 4); (right, 4); (output, 4); (q_label, 4)]
 
-  let cs ~q:qec ~a ~b ~c ~d:_ ~e:_ ~ag ~bg ~cg ~dg:_ ~eg:_ ?precomputed_advice:_
-      () =
+  let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
+    let a = wires.(0) in
+    let b = wires.(1) in
+    let c = wires.(2) in
+    let ag = wires_g.(0) in
+    let bg = wires_g.(1) in
+    let cg = wires_g.(2) in
     let open L in
     let open Num in
     let sub = add ~qr:mone in
@@ -414,8 +419,13 @@ module AddEdwards : Base_sig = struct
   let polynomials_degree =
     SMap.of_list [(left, 6); (right, 6); (output, 6); (q_label, 6)]
 
-  let cs ~q:qec ~a:px ~b:qx ~c:rx ~d:_ ~e:_ ~ag:py ~bg:qy ~cg:ry ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
+    let px = wires.(0) in
+    let py = wires_g.(0) in
+    let qx = wires.(1) in
+    let qy = wires_g.(1) in
+    let rx = wires.(2) in
+    let ry = wires_g.(2) in
     let open L in
     let open Num in
     let sub = add ~qr:mone in
@@ -688,8 +698,14 @@ module ConditionalAddEdwards : Base_sig = struct
     SMap.of_list
       [(left, 7); (right, 7); (output, 7); (top, 7); (bottom, 7); (q_label, 7)]
 
-  let cs ~q:qec ~a:bit ~b:qx ~c:qy ~d:px ~e:py ~ag:_ ~bg:_ ~cg:_ ~dg:rx ~eg:ry
-      ?precomputed_advice:_ () =
+  let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
+    let bit = wires.(0) in
+    let qx = wires.(1) in
+    let qy = wires.(2) in
+    let px = wires.(3) in
+    let py = wires.(4) in
+    let rx = wires_g.(3) in
+    let ry = wires_g.(4) in
     let open L in
     let open Num in
     let sub x y = add ~qr:mone x y in

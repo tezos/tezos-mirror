@@ -54,16 +54,8 @@ module type S = sig
   val get_cs :
     string ->
     q:L.scalar L.repr ->
-    a:L.scalar L.repr ->
-    b:L.scalar L.repr ->
-    c:L.scalar L.repr ->
-    d:L.scalar L.repr ->
-    e:L.scalar L.repr ->
-    ag:L.scalar L.repr ->
-    bg:L.scalar L.repr ->
-    cg:L.scalar L.repr ->
-    dg:L.scalar L.repr ->
-    eg:L.scalar L.repr ->
+    wires:L.scalar L.repr array ->
+    wires_g:L.scalar L.repr array ->
     ?precomputed_advice:L.scalar L.repr SMap.t ->
     unit ->
     L.scalar L.repr list L.t

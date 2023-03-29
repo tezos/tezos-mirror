@@ -82,8 +82,8 @@ module BoolCheck : Base_sig = struct
 
   let polynomials_degree = SMap.of_list [(left, 3); (q_label, 3)]
 
-  let cs ~q ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     let open L in
     map_singleton
       (let* tmp = Num.mul q a in
@@ -193,8 +193,12 @@ module CondSwap : Base_sig = struct
     SMap.of_list
       [(q_label, 3); (left, 3); (right, 3); (output, 3); (top, 3); (bottom, 3)]
 
-  let cs ~q:qbool ~a:bit ~b:x ~c:y ~d:u ~e:v ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qbool ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let bit = wires.(0) in
+    let x = wires.(1) in
+    let y = wires.(2) in
+    let u = wires.(3) in
+    let v = wires.(4) in
     let open L in
     let open Num in
     let* bit_times_x = mul bit x in

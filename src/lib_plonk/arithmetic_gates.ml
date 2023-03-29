@@ -37,16 +37,8 @@ module type Params = sig
 
   val cs :
     q:L.scalar L.repr ->
-    a:L.scalar L.repr ->
-    b:L.scalar L.repr ->
-    c:L.scalar L.repr ->
-    d:L.scalar L.repr ->
-    e:L.scalar L.repr ->
-    ag:L.scalar L.repr ->
-    bg:L.scalar L.repr ->
-    cg:L.scalar L.repr ->
-    dg:L.scalar L.repr ->
-    eg:L.scalar L.repr ->
+    wires:L.scalar L.repr array ->
+    wires_g:L.scalar L.repr array ->
     ?precomputed_advice:L.scalar L.repr SMap.t ->
     unit ->
     L.scalar L.repr list L.t
@@ -126,8 +118,8 @@ module AddOutput = AddWire (struct
 
   let is_next = false
 
-  let cs ~q:qo ~a:_ ~b:_ ~c ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qo ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let c = wires.(2) in
     map_singleton (L.Num.mul qo c)
 end)
 
@@ -144,8 +136,8 @@ module AddLeft = AddWire (struct
 
   let is_next = false
 
-  let cs ~q:ql ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:ql ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     map_singleton (L.Num.mul ql a)
 end)
 
@@ -162,8 +154,8 @@ module AddRight = AddWire (struct
 
   let is_next = false
 
-  let cs ~q:qr ~a:_ ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qr ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let b = wires.(1) in
     map_singleton (L.Num.mul qr b)
 end)
 
@@ -180,8 +172,8 @@ module AddTop = AddWire (struct
 
   let is_next = false
 
-  let cs ~q:qd ~a:_ ~b:_ ~c:_ ~d ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qd ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let d = wires.(3) in
     map_singleton (L.Num.mul qd d)
 end)
 
@@ -198,8 +190,8 @@ module AddBottom = AddWire (struct
 
   let is_next = false
 
-  let cs ~q:qe ~a:_ ~b:_ ~c:_ ~d:_ ~e ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qe ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let e = wires.(4) in
     map_singleton (L.Num.mul qe e)
 end)
 
@@ -216,8 +208,8 @@ module AddNextOutput = AddWire (struct
 
   let is_next = true
 
-  let cs ~q:qog ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qog ~wires:_ ~wires_g ?precomputed_advice:_ () =
+    let cg = wires_g.(2) in
     map_singleton (L.Num.mul qog cg)
 end)
 
@@ -234,8 +226,8 @@ module AddNextLeft = AddWire (struct
 
   let is_next = true
 
-  let cs ~q:qlg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qlg ~wires:_ ~wires_g ?precomputed_advice:_ () =
+    let ag = wires_g.(0) in
     map_singleton (L.Num.mul qlg ag)
 end)
 
@@ -252,8 +244,8 @@ module AddNextRight = AddWire (struct
 
   let is_next = true
 
-  let cs ~q:qrg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qrg ~wires:_ ~wires_g ?precomputed_advice:_ () =
+    let bg = wires_g.(1) in
     map_singleton (L.Num.mul qrg bg)
 end)
 
@@ -270,8 +262,8 @@ module AddNextTop = AddWire (struct
 
   let is_next = true
 
-  let cs ~q:qdg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qdg ~wires:_ ~wires_g ?precomputed_advice:_ () =
+    let dg = wires_g.(3) in
     map_singleton (L.Num.mul qdg dg)
 end)
 
@@ -288,8 +280,8 @@ module AddNextBottom = AddWire (struct
 
   let is_next = true
 
-  let cs ~q:qeg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg
-      ?precomputed_advice:_ () =
+  let cs ~q:qeg ~wires:_ ~wires_g ?precomputed_advice:_ () =
+    let eg = wires_g.(4) in
     map_singleton (L.Num.mul qeg eg)
 end)
 
@@ -338,9 +330,7 @@ module Constant : Base_sig = struct
 
   let polynomials_degree = SMap.empty
 
-  let cs ~q:qc ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    L.ret [qc]
+  let cs ~q:qc ~wires:_ ~wires_g:_ ?precomputed_advice:_ () = L.ret [qc]
 end
 
 (* Add multiplication
@@ -391,9 +381,10 @@ module Multiplication : Base_sig = struct
 
   let polynomials_degree = SMap.of_list [(left, 3); (right, 3); (q_label, 3)]
 
-  let cs ~q:qm ~a ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qm ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let a = wires.(0) in
+    let b = wires.(1) in
     map_singleton
       (let* tmp = Num.mul qm a in
        Num.mul tmp b)
@@ -448,9 +439,9 @@ module X2B : Base_sig = struct
 
   let polynomials_degree = SMap.of_list [(right, 3); (q_label, 3)]
 
-  let cs ~q:qx2b ~a:_ ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qx2b ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let b = wires.(1) in
     map_singleton
       (let* b2 = Num.square b in
        Num.mul qx2b b2)
@@ -508,9 +499,9 @@ module X5A : Base_sig = struct
 
   let polynomials_degree = SMap.of_list [(left, 6); (q_label, 6)]
 
-  let cs ~q:qx5 ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qx5 ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let a = wires.(0) in
     map_singleton
       (let* a5 = Num.pow5 a in
        Num.mul qx5 a5)
@@ -568,9 +559,9 @@ module X5C : Base_sig = struct
 
   let polynomials_degree = SMap.of_list [(output, 6); (q_label, 6)]
 
-  let cs ~q:qx5c ~a:_ ~b:_ ~c ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qx5c ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let c = wires.(2) in
     map_singleton
       (let* c5 = Num.pow5 c in
        Num.mul qx5c c5)
@@ -658,8 +649,7 @@ module Public : Base_sig = struct
   let polynomials_degree = SMap.empty
 
   (* this function will not be used *)
-  let cs ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:_ ~wires:_ ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
     ret []
 end
@@ -717,6 +707,7 @@ end) : Base_sig = struct
   let polynomials_degree = SMap.of_list [(com_label, 2); (q_label, 2)]
 
   (* TODO: implement *)
-  let cs ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_ =
-    failwith "input commitments in aPlonK proofs are not supported yet"
+  let cs ~q:_ ~wires:_ ~wires_g:_ =
+    failwith
+      "input commitments in meta-verification proofs are not supported yet"
 end

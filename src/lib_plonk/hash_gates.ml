@@ -275,8 +275,13 @@ module AnemoiDouble : Base_sig = struct
   let polynomials_degree =
     SMap.of_list [(right, 6); (output, 6); (top, 6); (bottom, 6); (q_label, 6)]
 
-  let cs ~q ~a:_ ~b:x1 ~c:y1 ~d:x0 ~e:y0 ~ag:_ ~bg:_ ~cg:_ ~dg:x2 ~eg:y2
-      ?(precomputed_advice = SMap.empty) () =
+  let cs ~q ~wires ~wires_g ?(precomputed_advice = SMap.empty) () =
+    let x1 = wires.(1) in
+    let y1 = wires.(2) in
+    let x0 = wires.(3) in
+    let y0 = wires.(4) in
+    let x2 = wires_g.(3) in
+    let y2 = wires_g.(4) in
     let open L in
     let kx1 = SMap.find kx1_label precomputed_advice in
     let ky1 = SMap.find ky1_label precomputed_advice in
