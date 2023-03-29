@@ -218,49 +218,109 @@ module type AUTOMATON = sig
   (** Output produced by one of the actions below. *)
   type _ output =
     | Negative_peer_score : Score.t -> [`IHave] output
+        (** The peer who sent an [`IHave] message has a negative score. *)
     | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
+        (** The peer sent us more than [max] ihave messages within two
+            successive heartbeat calls. *)
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
+        (** We sent more than [max] iwant messages to this peer within two
+            successive heartbeat calls. *)
     | Message_topic_not_tracked : [`IHave] output
+        (** We received an [`IHave] message for a topic we don't track. *)
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+        (** The messages IDs we want to request from the peer which sent us an
+            [`IHave] message. The implementation honors the
+            [max_sent_iwant_per_heartbeat] limit. *)
     | On_iwant_messages_to_route : {
         routed_message_ids :
           [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
       }
         -> [`IWant] output
+        (** As an answer for an [`IWant] message, the automaton returns a map
+            associating to each requested message_id either [`Ignored] if the
+            peer is filtered out by [peer_filter], [`Not_found] if the message
+            is not found, or [Message m] if [m] is the message of the given
+            ID. *)
     | Peer_filtered : [`Graft] output
+        (** The peer we attempt to graft has not been selected by
+            [peer_filter]. *)
     | Unknown_topic : [`Graft] output
+        (** We didn't join the topic for which we are attempting to graft a
+            peer. *)
     | Peer_already_in_mesh : [`Graft] output
+        (** Attempting to graft a peer which has already been grafted. *)
     | Grafting_direct_peer : [`Graft] output
+        (** Attempting to graft a direct peer. *)
     | Unexpected_grafting_peer : [`Graft] output
+        (** The peer we attempt to graft is not known. *)
     | Grafting_peer_with_negative_score : [`Graft] output
+        (** Attempting to graft a peer with a negative score. *)
     | Grafting_successfully : [`Graft] output
+        (** Grafting the given peer for the provided topic succeeded. *)
     | Peer_backed_off : [`Graft] output
+        (** We cannot graft the given peer because it is backed off. *)
     | Mesh_full : [`Graft] output
+        (** Grafting a peer for a topic whose mesh has already sufficiently many
+            peers. *)
     | No_peer_in_mesh : [`Prune] output
+        (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
+        (** The given peer has been pruned for the given topic, but no
+            alternative peers are returned because the peer's score is too low.
+            The score of the peer is included in the return value. *)
     | No_PX : [`Prune] output
+        (** The given peer has been pruned for the given topic. But the given
+            set of peers alternatives in {!prune} is empty. *)
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5251
+
+       Some fixes might be needed for the prune case. Once done, update the
+       docstring. *)
     | PX : Peer.Set.t -> [`Prune] output
+        (** The given peer has been pruned for the given topic. The given set of
+            peers alternatives in {!prune} for that topic is returned. *)
     | Publish_message : Peer.Set.t -> [`Publish] output
-    | Already_subscribed : [`Join] output
+        (** If the peer is subscribed to the topic, returns the set of peers in the topic's mesh.
+            Otherwise, it will return the set of peers in the topic's fanout.*)
+    | Already_joined : [`Join] output
+        (** Attempting to join a topic we already joined. *)
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
-    | Not_subscribed : [`Leave] output
+        (** When successfully joining a topic, the set of grafted peers for that
+            topic is returned. *)
+    | Not_joined : [`Leave] output
+        (** Attempting to leave a topic which we didn't join or had already
+            left. *)
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+        (** When successfully leaving a topic, the set of pruned peers for that
+            topic is returned. *)
     | Heartbeat : {
-        (* topics per peer to graft to *)
         to_graft : Topic.Set.t Peer.Map.t;
-        (* topics per peer to prune from *)
+            (** The set of topics per peer that have been grafted. *)
         to_prune : Topic.Set.t Peer.Map.t;
-        (* set of peers for which peer exchange (PX) will not be proposed *)
+            (** The set of topics per peer that have been pruned. *)
         noPX_peers : Peer.Set.t;
+            (** Set of peers for which peer exchange (PX) will not be
+                proposed. *)
       }
         -> [`Heartbeat] output
     | Peer_added : [`Add_peer] output
+        (** The output returned when successfully adding a peer. *)
     | Peer_already_known : [`Add_peer] output
+        (** The output returned when attempting to add a peer which is already
+            known. *)
     | Removing_peer : [`Remove_peer] output
+        (** The output returned when successfully removing a peer. *)
     | Subscribed : [`Subscribe] output
+        (** The output returned once we successfully processed a subscribe
+            request sent from a peer. *)
     | Subscribe_to_unknown_peer : [`Subscribe] output
+        (** The output returned when we receive a subscribe message from a peer
+            we don't know.*)
     | Unsubscribed : [`Unsubscribe] output
+        (** The output returned once we successfully processed an unsubscribe
+            request sent from a peer. *)
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
+        (** The output returned when we receive an unsubscribe message from a
+            peer we don't know.*)
 
   (** A type alias for the state monad. *)
   type 'a monad := state -> state * 'a output
@@ -301,26 +361,31 @@ module type AUTOMATON = sig
       on this topic. *)
   val handle_prune : prune -> [`Prune] monad
 
-  (** [publish { sender; topic; message_id; message }] allows to route a
-      message on the gossip network. If [sender=None], the message
-      comes from the application layer and the local node is the sender. *)
+  (** [publish { sender; topic; message_id; message }] allows to route a message
+      on the gossip network. If [sender=None], the message comes from the
+      application layer and the local node is the sender. The function returns a
+      set of peers to which the (full) message will be directly forwarded.  *)
   val publish : publish -> [`Publish] monad
 
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
   val heartbeat : [`Heartbeat] monad
 
-  (** [handle_subscribe {topic; peer}] handles a request from a remote [peer] to
-      subscribe to a [topic]. *)
+  (** [handle_subscribe {topic; peer}] handles a request from a remote [peer]
+      informing us that it is subscribed to [topic]. *)
   val handle_subscribe : subscribe -> [`Subscribe] monad
 
-  (** [handle_unsubscribe {topic; peer}] handles a request from a remote [peer] to
-      unsubscribe to a [topic]. *)
+  (** [handle_unsubscribe {topic; peer}] handles a request from a remote [peer]
+      informing us that it unsubscribed from [topic]. *)
   val handle_unsubscribe : unsubscribe -> [`Unsubscribe] monad
 
-  (** [join { topic }] handles a join/subscribe to a new topic. *)
+  (** [join { topic }] handles a join to a new topic. On success, the function
+      returns the set of peers that have been grafted to form the mesh of the
+      joined topic. *)
   val join : join -> [`Join] monad
 
-  (** [leave { topic }] handles a leave/unsubscribe from a topic. *)
+  (** [leave { topic }] handles a leave from a topic. On success, the function
+      returns the set of peers, forming the mesh, that have been pruned for that
+      topic. *)
   val leave : leave -> [`Leave] monad
 
   val pp_add_peer : Format.formatter -> add_peer -> unit

@@ -142,9 +142,9 @@ module Make (C : AUTOMATON_CONFIG) :
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
     | Publish_message : Peer.Set.t -> [`Publish] output
-    | Already_subscribed : [`Join] output
+    | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
-    | Not_subscribed : [`Leave] output
+    | Not_joined : [`Leave] output
     | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
     | Heartbeat : {
         to_graft : Topic.Set.t Peer.Map.t;
@@ -286,6 +286,12 @@ module Make (C : AUTOMATON_CONFIG) :
     }
 
   module Helpers = struct
+    let fail_if cond output_err =
+      let open Monad.Syntax in
+      if cond then fail output_err else unit
+
+    let fail_if_not cond output_err = fail_if (not cond) output_err
+
     (* These projections enable let-punning. *)
     let max_recv_ihave_per_heartbeat state =
       state.limits.max_recv_ihave_per_heartbeat
@@ -510,8 +516,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let _check_peer_score peer =
       let open Monad.Syntax in
       let*! peer_score = get_score ~default:Score.zero peer in
-      if Score.(peer_score < zero) then Negative_peer_score peer_score |> fail
-      else unit
+      fail_if Score.(peer_score < zero) @@ Negative_peer_score peer_score
   end
 
   include Helpers
@@ -520,10 +525,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_too_many_recv_ihave_message count =
       let open Monad.Syntax in
       let*! max_recv_ihave_per_heartbeat in
-      if count > max_recv_ihave_per_heartbeat then
-        Too_many_recv_ihave_messages {count; max = max_recv_ihave_per_heartbeat}
-        |> fail
-      else unit
+      fail_if (count > max_recv_ihave_per_heartbeat)
+      @@ Too_many_recv_ihave_messages
+           {count; max = max_recv_ihave_per_heartbeat}
 
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/5016
 
@@ -533,21 +537,18 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_too_many_sent_iwant_message count =
       let open Monad.Syntax in
       let*! max_sent_iwant_per_heartbeat in
-      if count > max_sent_iwant_per_heartbeat then
-        Too_many_sent_iwant_messages {count; max = max_sent_iwant_per_heartbeat}
-        |> fail
-      else unit
+      fail_if (count > max_sent_iwant_per_heartbeat)
+      @@ Too_many_sent_iwant_messages
+           {count; max = max_sent_iwant_per_heartbeat}
 
     let check_topic_tracked topic =
       let open Monad.Syntax in
       let*! is_topic_tracked = topic_is_tracked topic in
-      if not is_topic_tracked then Message_topic_not_tracked |> fail else unit
+      fail_if_not is_topic_tracked Message_topic_not_tracked
 
     let check_not_empty iwant_message_ids =
-      let open Monad.Syntax in
-      match iwant_message_ids with
-      | [] -> Message_requested_message_ids [] |> fail
-      | _ -> unit
+      fail_if (List.is_empty iwant_message_ids)
+      @@ Message_requested_message_ids []
 
     let filter peer message_ids : Message_id.t list Monad.t =
       let open Monad.Syntax in
@@ -619,18 +620,18 @@ module Make (C : AUTOMATON_CONFIG) :
            exceed some pre-defined limit. *)
         List.fold_left
           (fun (memory_cache, messages) message_id ->
-            match
-              Memory_cache.record_message_access peer message_id memory_cache
-            with
-            | None ->
-                (memory_cache, Message_id.Map.add message_id `Not_found messages)
-            | Some (memory_cache, message) ->
-                let messages =
-                  if peer_filter peer (`IWant message_id) then
-                    Message_id.Map.add message_id (`Message message) messages
-                  else Message_id.Map.add message_id `Ignored messages
-                in
-                (memory_cache, messages))
+            let memory_cache, info =
+              match
+                Memory_cache.record_message_access peer message_id memory_cache
+              with
+              | None -> (memory_cache, `Not_found)
+              | Some (memory_cache, message) ->
+                  ( memory_cache,
+                    if peer_filter peer (`IWant message_id) then
+                      `Message message
+                    else `Ignored )
+            in
+            (memory_cache, Message_id.Map.add message_id info messages))
           (memory_cache, routed_message_ids)
           message_ids
       in
@@ -645,17 +646,17 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_filter peer =
       let open Monad.Syntax in
       let*! peer_filter in
-      if peer_filter peer `Graft then unit else Peer_filtered |> fail
+      fail_if_not (peer_filter peer `Graft) Peer_filtered
 
-    let check_topic_known mesh_opt =
+    let check_topic_known topic =
       let open Monad.Syntax in
+      let*! mesh_opt = find_mesh topic in
       match mesh_opt with
       | None -> Unknown_topic |> fail
       | Some mesh -> pass mesh
 
     let check_not_in_mesh mesh peer =
-      let open Monad.Syntax in
-      if Peer.Set.mem peer mesh then Peer_already_in_mesh |> fail else unit
+      fail_if (Peer.Set.mem peer mesh) Peer_already_in_mesh
 
     let check_not_direct peer =
       let open Monad.Syntax in
@@ -676,12 +677,13 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_mesh_size mesh connection =
       let open Monad.Syntax in
       let*! degree_high in
-      (* Check the number of mesh peers; if it is at (or over) [degree_high], we only accept grafts
-         from peers with outbound connections; this is a defensive check to restrict potential
-         mesh takeover attacks combined with love bombing *)
-      if Peer.Set.cardinal mesh >= degree_high && not connection.outbound then
-        Mesh_full |> fail
-      else unit
+      (* Check the number of mesh peers; if it is at (or over) [degree_high], we
+         only accept grafts from peers with outbound connections; this is a
+         defensive check to restrict potential mesh takeover attacks combined
+         with love bombing *)
+      fail_if
+        ((not connection.outbound) && Peer.Set.cardinal mesh >= degree_high)
+        Mesh_full
 
     let check_backoff peer topic {backoff; score; _} =
       let open Monad.Syntax in
@@ -708,8 +710,7 @@ module Make (C : AUTOMATON_CONFIG) :
          Be sure that the peers that requested failed/rejected graft are properly pruned. *)
       let open Monad.Syntax in
       let*? () = check_filter peer in
-      let*! mesh_opt = find_mesh topic in
-      let*? mesh = check_topic_known mesh_opt in
+      let*? mesh = check_topic_known topic in
       let*? () = check_not_in_mesh mesh peer in
       let*? connection = check_not_direct peer in
       let*? () = check_backoff peer topic connection in
@@ -733,27 +734,30 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! accept_px_threshold in
       let*! score = get_score ~default:Score.zero peer in
-      if Compare.Float.(score |> Score.float < accept_px_threshold) then
-        Ignore_PX_score_too_low score |> fail
-      else unit
+      fail_if Compare.Float.(score |> Score.float < accept_px_threshold)
+      @@ Ignore_PX_score_too_low score
 
-    let handle peer topic ~px ~backoff =
+    let check_topic_known topic =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
       match mesh_opt with
-      | None -> return No_peer_in_mesh
-      | Some mesh ->
-          (* FIXME https://gitlab.com/tezos/tezos/-/issues/5006
+      | None -> No_peer_in_mesh |> fail
+      | Some mesh -> pass mesh
 
-             backoff computation. *)
-          let mesh = Peer.Set.remove peer mesh in
-          let* () = set_mesh_topic topic mesh in
-          let* _ = add_backoff backoff topic peer in
-          let px = Peer.Set.of_seq px in
-          if Peer.Set.is_empty px then No_PX |> return
-          else
-            let*? () = check_px_score peer in
-            return (PX px)
+    let handle peer topic ~px ~backoff =
+      let open Monad.Syntax in
+      let*? mesh = check_topic_known topic in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5006
+
+         backoff computation. *)
+      let mesh = Peer.Set.remove peer mesh in
+      let* () = set_mesh_topic topic mesh in
+      let* () = add_backoff backoff topic peer in
+      let px = Peer.Set.of_seq px in
+      if Peer.Set.is_empty px then No_PX |> return
+      else
+        let*? () = check_px_score peer in
+        return (PX px)
   end
 
   let handle_prune : prune -> [`Prune] output Monad.t =
@@ -810,22 +814,24 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! fanout_opt = find_fanout topic in
       match fanout_opt with
       | None ->
-          let filter _peer {direct; score; _} =
-            (not direct)
-            && Compare.Float.(score |> Score.float >= gossip_publish_threshold)
+          let filter_by_score score =
+            Compare.Float.(score |> Score.float >= gossip_publish_threshold)
+          in
+          let filter1 _peer {direct; score; _} =
+            (not direct) && filter_by_score score
           in
           let* not_direct_peers =
-            select_peers topic ~filter ~max:degree_optimal
+            select_peers topic ~filter:filter1 ~max:degree_optimal
           in
           let* () = set_fanout_topic topic now not_direct_peers in
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5010
 
              We could avoid this call by directly having a map
              of direct peers in the state. *)
-          let filter peer ({direct; _} as connection) =
-            filter peer connection || direct
+          let filter2 _peer {direct; score; _} =
+            direct || filter_by_score score
           in
-          select_peers topic ~filter ~max:degree_optimal
+          select_peers topic ~filter:filter2 ~max:degree_optimal
       | Some fanout ->
           let* () = set_fanout_topic topic now fanout.peers in
           return fanout.peers
@@ -845,6 +851,10 @@ module Make (C : AUTOMATON_CONFIG) :
           ~some:(fun peer -> Peer.Set.remove peer peers)
           sender
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
+
+         Filter out peers from which we already received the message, or an
+         IHave message? *)
       Publish_message peers |> return
   end
 
@@ -856,9 +866,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_is_not_subscribed topic : (unit, [`Join] output) Monad.check =
       let open Monad.Syntax in
       let*! mesh in
-      match Topic.Map.find topic mesh with
-      | None -> unit
-      | Some _ -> Already_subscribed |> fail
+      fail_if (Topic.Map.mem topic mesh) Already_joined
 
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
@@ -885,12 +893,11 @@ module Make (C : AUTOMATON_CONFIG) :
         (* We prioritize fanout peers to be in the mesh for this
            topic. If we need more peers, we look at all our peers
            subscribed to this topic. *)
-        if Peer.Set.cardinal valid_fanout_peers >= degree_optimal then
+        let valid_fanout_peers_len = Peer.Set.cardinal valid_fanout_peers in
+        if valid_fanout_peers_len >= degree_optimal then
           return valid_fanout_peers
         else
-          let max =
-            max 0 (degree_optimal - Peer.Set.cardinal valid_fanout_peers)
-          in
+          let max = max 0 (degree_optimal - valid_fanout_peers_len) in
           let* more_peers =
             let filter peer {backoff; score; direct; _} =
               not
@@ -922,7 +929,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! mesh in
       match Topic.Map.find topic mesh with
-      | None -> Not_subscribed |> fail
+      | None -> Not_joined |> fail
       | Some mesh -> pass mesh
 
     let handle_mesh topic mesh : [`Leave] output Monad.t =
