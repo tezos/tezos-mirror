@@ -799,6 +799,69 @@ let test_do_not_graft_within_backoff_period rng limits parameters =
   Check.((List.length grafts = 1) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
   unit
 
+(* Tests that the node leaving a topic introduces a backoff period,
+   and that the heartbeat respects the introduced backoff.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L2041
+*)
+let test_unsubscribe_backoff rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Unsubscribe backoff"
+    ~tags:["gossipsub"; "heartbeat"; "join"; "leave"]
+  @@ fun () ->
+  let topic = "topic" in
+  (* Only one peer => mesh too small and will try to regraft as early as possible *)
+  let peers = make_peers ~number:1 in
+  let state =
+    init_state
+      ~rng
+      ~limits:
+        {
+          limits with
+          (* Run backoff clearing on every heartbeat tick. *)
+          backoff_cleanup_ticks = 1;
+          (* We will run the heartbeat tick on each time tick to simplify the test. *)
+          heartbeat_interval = 1;
+          (* Set unsubscribe backoff to 5. *)
+          unsubscribe_backoff = 5;
+        }
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Peer unsubscribes then subscribes from topic. *)
+  let state, _ = GS.leave {topic} state in
+  let state, _ = GS.join {topic} state in
+  (* No graft should be emitted until 7 time ticks pass.
+     The additional 2 time ticks from the backoff is due to the "backoff slack". *)
+  let state =
+    List.init ~when_negative_length:() 6 (fun i -> i + 1)
+    |> WithExceptions.Result.get_ok ~loc:__LOC__
+    |> List.fold_left
+         (fun state i ->
+           Time.elapse 1 ;
+           Log.info "%d time tick(s) elapsed..." i ;
+           let state, Heartbeat {to_graft; _} = GS.heartbeat state in
+           let grafts = Peer.Map.bindings to_graft in
+           Check.(
+             (List.length grafts = 0)
+               int
+               ~error_msg:"Expected %R, got %L"
+               ~__LOC__) ;
+           state)
+         state
+  in
+  (* After elapsing one more second,
+     the backoff should be cleared and the graft should be emitted. *)
+  Time.elapse 1 ;
+  let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
+  let grafts = Peer.Map.bindings to_graft in
+  Check.((List.length grafts = 1) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
+  unit
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
@@ -812,3 +875,4 @@ let register rng limits parameters =
   test_mesh_addition rng limits parameters ;
   test_mesh_subtraction rng limits parameters ;
   test_do_not_graft_within_backoff_period rng limits parameters ;
+  test_unsubscribe_backoff rng limits parameters ;
