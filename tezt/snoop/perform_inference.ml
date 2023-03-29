@@ -60,7 +60,7 @@ let main () =
       "Global_constants_storage_expr_to_address_in_context";
       "Global_constants_storage_expand_constant_branch";
       "Global_constants_storage_expand_no_constant_branch";
-      "cache_model";
+      "cache/CACHE_UPDATE/model";
       "ir_size_model";
       "carbonated_map";
       "size_collect_tickets_step_model";
