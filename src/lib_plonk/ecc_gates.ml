@@ -68,7 +68,10 @@ module AddWeierstrass : Base_sig = struct
       Scalar.[sub x c; sub y cg]
 
   let blinds =
-    SMap.of_list [(right, [|1; 1|]); (left, [|1; 1|]); (output, [|1; 1|])]
+    SMap.of_list
+      [
+        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
+      ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
@@ -195,7 +198,8 @@ module AddWeierstrass : Base_sig = struct
       ]
 
   let polynomials_degree =
-    SMap.of_list [(left, 4); (right, 4); (output, 4); (q_label, 4)]
+    SMap.of_list
+      [(wire_name 0, 4); (wire_name 1, 4); (wire_name 2, 4); (q_label, 4)]
 
   let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
     let a = wires.(0) in
@@ -277,7 +281,10 @@ module AddEdwards : Base_sig = struct
       Scalar.[rx' + negate rx; ry' + negate ry]
 
   let blinds =
-    SMap.of_list [(right, [|1; 1|]); (left, [|1; 1|]); (output, [|1; 1|])]
+    SMap.of_list
+      [
+        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
+      ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
@@ -417,7 +424,8 @@ module AddEdwards : Base_sig = struct
       ]
 
   let polynomials_degree =
-    SMap.of_list [(left, 6); (right, 6); (output, 6); (q_label, 6)]
+    SMap.of_list
+      [(wire_name 0, 6); (wire_name 1, 6); (wire_name 2, 6); (q_label, 6)]
 
   let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
     let px = wires.(0) in
@@ -524,11 +532,11 @@ module ConditionalAddEdwards : Base_sig = struct
   let blinds =
     SMap.of_list
       [
-        (left, [|1; 0|]);
-        (right, [|1; 0|]);
-        (output, [|1; 0|]);
-        (top, [|1; 1|]);
-        (bottom, [|1; 1|]);
+        (wire_name 0, [|1; 0|]);
+        (wire_name 1, [|1; 0|]);
+        (wire_name 2, [|1; 0|]);
+        (wire_name 3, [|1; 1|]);
+        (wire_name 4, [|1; 1|]);
       ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain evaluations =
@@ -696,7 +704,14 @@ module ConditionalAddEdwards : Base_sig = struct
 
   let polynomials_degree =
     SMap.of_list
-      [(left, 7); (right, 7); (output, 7); (top, 7); (bottom, 7); (q_label, 7)]
+      [
+        (wire_name 0, 7);
+        (wire_name 1, 7);
+        (wire_name 2, 7);
+        (wire_name 3, 7);
+        (wire_name 4, 7);
+        (q_label, 7);
+      ]
 
   let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
     let bit = wires.(0) in

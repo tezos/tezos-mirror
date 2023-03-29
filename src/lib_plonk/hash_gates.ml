@@ -186,11 +186,11 @@ module AnemoiDouble : Base_sig = struct
   let blinds =
     SMap.of_list
       [
-        (left, [|0; 0|]);
-        (right, [|1; 0|]);
-        (output, [|1; 0|]);
-        (top, [|1; 1|]);
-        (bottom, [|1; 1|]);
+        (wire_name 0, [|0; 0|]);
+        (wire_name 1, [|1; 0|]);
+        (wire_name 2, [|1; 0|]);
+        (wire_name 3, [|1; 1|]);
+        (wire_name 4, [|1; 1|]);
       ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
@@ -273,7 +273,14 @@ module AnemoiDouble : Base_sig = struct
          identities
 
   let polynomials_degree =
-    SMap.of_list [(right, 6); (output, 6); (top, 6); (bottom, 6); (q_label, 6)]
+    SMap.of_list
+      [
+        (wire_name 1, 6);
+        (wire_name 2, 6);
+        (wire_name 3, 6);
+        (wire_name 4, 6);
+        (q_label, 6);
+      ]
 
   let cs ~q ~wires ~wires_g ?(precomputed_advice = SMap.empty) () =
     let x1 = wires.(1) in

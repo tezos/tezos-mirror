@@ -52,7 +52,7 @@ module BoolCheck : Base_sig = struct
     let a = wires.(0) in
     Scalar.[q * sub one a * a]
 
-  let blinds = SMap.of_list [(left, [|1; 0|])]
+  let blinds = SMap.of_list [(wire_name 0, [|1; 0|])]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
@@ -76,11 +76,11 @@ module BoolCheck : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ _ answers =
     let q = get_answer answers X @@ prefix_common q_label in
-    let a = get_answer answers X @@ prefix left in
+    let a = get_answer answers X @@ prefix (wire_name 0) in
     let res = Scalar.(q * a * sub one a) in
     SMap.singleton (prefix @@ q_label ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(left, 3); (q_label, 3)]
+  let polynomials_degree = SMap.of_list [(wire_name 0, 3); (q_label, 3)]
 
   let cs ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let a = wires.(0) in
@@ -127,11 +127,11 @@ module CondSwap : Base_sig = struct
   let blinds =
     SMap.of_list
       [
-        (left, [|1; 0|]);
-        (right, [|1; 0|]);
-        (output, [|1; 0|]);
-        (top, [|1; 0|]);
-        (bottom, [|1; 0|]);
+        (wire_name 0, [|1; 0|]);
+        (wire_name 1, [|1; 0|]);
+        (wire_name 2, [|1; 0|]);
+        (wire_name 3, [|1; 0|]);
+        (wire_name 4, [|1; 0|]);
       ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
@@ -191,7 +191,14 @@ module CondSwap : Base_sig = struct
 
   let polynomials_degree =
     SMap.of_list
-      [(q_label, 3); (left, 3); (right, 3); (output, 3); (top, 3); (bottom, 3)]
+      [
+        (q_label, 3);
+        (wire_name 0, 3);
+        (wire_name 1, 3);
+        (wire_name 2, 3);
+        (wire_name 3, 3);
+        (wire_name 4, 3);
+      ]
 
   let cs ~q:qbool ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let bit = wires.(0) in

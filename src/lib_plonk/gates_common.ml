@@ -35,15 +35,7 @@ let mone = Scalar.negate one
 
 let two = Scalar.add one one
 
-let left = "w_0"
-
-let right = "w_1"
-
-let output = "w_2"
-
-let top = "w_3"
-
-let bottom = "w_4"
+let wire_name i = "w_" ^ string_of_int i
 
 let com_label = "com"
 
@@ -88,6 +80,7 @@ let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
   let dummy = Scalar.zero in
   let answer = get_answer answers in
   let answer_wire w =
+    let w = wire_name w in
     match SMap.find_opt w blinds with
     | Some array ->
         assert (Array.length array = 2) ;
@@ -98,16 +91,17 @@ let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
     | None -> (dummy, dummy)
   in
   let q = prefix_common q_label |> answer X in
-  let a, ag = answer_wire left in
-  let b, bg = answer_wire right in
-  let c, cg = answer_wire output in
-  let d, dg = answer_wire top in
-  let e, eg = answer_wire bottom in
+  let a, ag = answer_wire 0 in
+  let b, bg = answer_wire 1 in
+  let c, cg = answer_wire 2 in
+  let d, dg = answer_wire 3 in
+  let e, eg = answer_wire 4 in
   {q; a; b; c; d; e; ag; bg; cg; dg; eg}
 
 let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
   let dummy = Evaluations.zero in
   let find_wire w =
+    let w = wire_name w in
     match SMap.find_opt w blinds with
     | Some array ->
         assert (Array.length array = 2) ;
@@ -117,11 +111,11 @@ let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
   in
   {
     q = Evaluations.find_evaluation evaluations (prefix_common q_label);
-    a = find_wire left;
-    b = find_wire right;
-    c = find_wire output;
-    d = find_wire top;
-    e = find_wire bottom;
+    a = find_wire 0;
+    b = find_wire 1;
+    c = find_wire 2;
+    d = find_wire 3;
+    e = find_wire 4;
   }
 
 (* Block names to merge identities within, if identities are independent, use q_label instead.
