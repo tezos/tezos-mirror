@@ -43,16 +43,38 @@
 
 (** Decide dependencies/provides of free variables *)
 module Solver : sig
-  type solved = {
-    dependencies : Free_variable.Set.t;
-    provides : Free_variable.Set.t;
-    name : Namespace.t;
-  }
+  module Unsolved : sig
+    type t
+
+    (** [build name ~fvs_unapplied fvs_applied] builds an unsolved node
+        of a benchmark of name [name]. [fvs_unapplied] is the set of
+        free variables of the models of the benchmark without workload
+        application. [fvs_applied] is the set of free variables of
+        the models of the benchmark applied with workloads.
+    *)
+    val build :
+      Namespace.t ->
+      fvs_unapplied:Free_variable.Set.t ->
+      Free_variable.Set.t ->
+      t
+  end
+
+  module Solved : sig
+    type t = {
+      dependencies : Free_variable.Set.t;
+      provides : Free_variable.Set.t;
+      name : Namespace.t;
+    }
+
+    val pp : Format.formatter -> t -> unit
+  end
+
+  val solve : Unsolved.t list -> Solved.t list
 end
 
 (** Visualization of solutions using Graphviz *)
 module Graphviz : sig
-  val save : string -> Solver.solved list -> unit
+  val save : string -> Solver.Solved.t list -> unit
 end
 
 (** Dependency graph of benchmarks using dependencies/provides *)
@@ -61,17 +83,37 @@ module Graph : sig
 
   val is_empty : t -> bool
 
-  (** Build a dependency graph.  Any ambiguity to build a dependency graph
-      is resolved with a heuristics.  It also returns ambiguity information.
-  *)
-  val build : Solver.solved list -> t
+  (** Which benchmarks provide each variable *)
+  type providers_map = Solver.Solved.t list Free_variable.Map.t
 
-  val fold : (Solver.solved -> 'a -> 'a) -> t -> 'a -> 'a
+  val is_ambiguous : providers_map -> bool
 
-  val iter : (Solver.solved -> unit) -> t -> unit
+  (** Print out the ambiguity information to stderr *)
+  val warn_ambiguities : providers_map -> unit
 
-  val dependencies : t -> Namespace.t list -> Solver.solved list
+  type result = {
+    (* Graph without ambiguities.  The ambiguities are resolved by heuristics *)
+    resolved : t;
+    (* Graph with possible ambiguity *)
+    with_ambiguities : t;
+    (* Which benchmarks provide each variable *)
+    providers_map : providers_map;
+  }
 
+  (** Build dependency graphs *)
+  val build : Solver.Solved.t list -> result
+
+  (** Dependency topological folding *)
+  val fold : (Solver.Solved.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  (** Dependency topological iteration *)
+  val iter : (Solver.Solved.t -> unit) -> t -> unit
+
+  (** [dependency graph fvs] returns the list of benchmarks required to
+      infer the free variables [fvs] in the dependency order *)
+  val dependencies : t -> Free_variable.Set.t -> Solver.Solved.t list
+
+  (** Visualize the graph using Graphviz *)
   val save_graphviz : t -> string -> unit
 end
 

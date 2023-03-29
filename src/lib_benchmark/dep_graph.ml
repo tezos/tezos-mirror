@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,12 +30,6 @@ module Fv_set = Free_variable.Set
 
 let pp_sep s ppf () = Format.fprintf ppf "%s@;" s
 
-let pp_print_set fmtr (set : Free_variable.Set.t) =
-  let elts = Free_variable.Set.elements set in
-  Format.fprintf fmtr "{ @[" ;
-  Format.pp_print_list ~pp_sep:(pp_sep "; ") Free_variable.pp fmtr elts ;
-  Format.fprintf fmtr "@] }"
-
 (* Decide dependencies/provides of free variables *)
 module Solver = struct
   (* We proceed iteratively on a set of _nodes_.
@@ -52,46 +47,65 @@ module Solver = struct
      A node is _redundant_ when it is solved and its set of _provided_ variables
      is empty. *)
 
-  type unsolved = {
-    dependencies : Fv_set.t;
-    undecided_variables : Fv_set.t;
-    name : Namespace.t;
-  }
+  module Unsolved = struct
+    type t = {
+      dependencies : Fv_set.t;
+      undecided_variables : Fv_set.t;
+      name : Namespace.t;
+    }
 
-  type solved = {
-    dependencies : Fv_set.t;
-    provides : Fv_set.t;
-    name : Namespace.t;
-  }
-
-  module Solved = struct
-    type t = solved
-
-    let equal s1 s2 = Namespace.equal s1.name s2.name
-
-    let compare s1 s2 = Namespace.compare s1.name s2.name
-
-    let hash s = Namespace.hash s.name
+    (* [build name ~fvs_unapplied fvs] makes an initial [unsolved]:
+       - [fvs_unapplied]: free variables occur in the models without workload
+                          application.
+       - [fvs]: free variables occur in the applied models.
+    *)
+    let build name ~fvs_unapplied fvs =
+      (* Free variables in an applied model which do not in the unapplied
+         model must be provided by other benchmarks, therefore they are
+         dependencies. *)
+      let dependencies = Fv_set.diff fvs fvs_unapplied in
+      let undecided_variables = Fv_set.diff fvs dependencies in
+      {name; dependencies; undecided_variables}
   end
 
-  type problem = unsolved list
+  module Solved = struct
+    type t = {dependencies : Fv_set.t; provides : Fv_set.t; name : Namespace.t}
 
-  type node = Solved of solved | Redundant of solved | Unsolved of unsolved
+    (* Comparison only by names for graph building *)
+    module ForGraph : Graph.Sig.COMPARABLE with type t = t = struct
+      type nonrec t = t
 
-  type state = {solved : solved list; unsolved : unsolved list}
+      let equal s1 s2 = Namespace.equal s1.name s2.name
 
-  let empty_problem : problem = []
+      let compare s1 s2 = Namespace.compare s1.name s2.name
 
-  let make_unsolved name fvs =
-    {dependencies = Fv_set.empty; undecided_variables = fvs; name}
+      let hash s = Namespace.hash s.name
+    end
 
-  let add_to_problem (name, fvs) problem = make_unsolved name fvs :: problem
+    let pp ppf ({name; dependencies; provides} : t) =
+      Format.fprintf
+        ppf
+        "@[<v2>name: %a;@ dep: @[%a@]@ prv: @[%a@]@]"
+        Namespace.pp
+        name
+        Fv_set.pp
+        dependencies
+        Fv_set.pp
+        provides
+  end
 
-  let force_solved {dependencies; undecided_variables; name} =
-    {dependencies; provides = undecided_variables; name}
+  type node =
+    | Solved of Solved.t
+    | Redundant of Solved.t
+    | Unsolved of Unsolved.t
+
+  type state = {solved : Solved.t list; unsolved : Unsolved.t list}
+
+  let force_solved Unsolved.{dependencies; undecided_variables; name} =
+    Solved.{dependencies; provides = undecided_variables; name}
 
   (* Sets free variable [v] to be 'solved' in node [n] *)
-  let set_variable_as_solved (n : unsolved) (v : Free_variable.t) =
+  let set_variable_as_solved (n : Unsolved.t) v =
     if not (Fv_set.mem v n.undecided_variables) then Unsolved n
     else
       let undecided = Fv_set.remove v n.undecided_variables in
@@ -109,7 +123,7 @@ module Solver = struct
 
   let empty_state = {solved = []; unsolved = []}
 
-  let rec propagate_solved state (n : solved) solved_but_not_propagated =
+  let rec propagate_solved state (n : Solved.t) solved_but_not_propagated =
     let solved_but_not_propagated, unsolved =
       List.fold_left
         (fun (solved_acc, unsolved_acc) unsolved ->
@@ -133,31 +147,32 @@ module Solver = struct
     | [] -> state
     | solved :: solved_list -> propagate_solved state solved solved_list
 
-  let solve unsolved =
+  let solve unsolved_list =
     let roots, others =
       List.partition
-        (fun (node : unsolved) ->
+        (fun (node : Unsolved.t) ->
           Fv_set.is_empty node.dependencies
           && Fv_set.cardinal node.undecided_variables = 1)
-        unsolved
+        unsolved_list
     in
     (* Set the roots as solved. *)
     let roots =
       List.map
         (fun root ->
-          {
-            dependencies = Fv_set.empty;
-            provides = root.undecided_variables;
-            name = root.name;
-          })
+          Solved.
+            {
+              dependencies = Fv_set.empty;
+              provides = root.Unsolved.undecided_variables;
+              name = root.name;
+            })
         roots
     in
     (* Propagate iteratively. *)
     let state = {empty_state with unsolved = others} in
     propagate_solved_loop state roots
 
-  let solve unsolved =
-    let least_constrained = solve unsolved in
+  let solve unsolved_list =
+    let least_constrained = solve unsolved_list in
     match least_constrained.unsolved with
     | [] -> least_constrained.solved
     | _ ->
@@ -165,9 +180,8 @@ module Solver = struct
         least_constrained.solved @ set_solved
 end
 
-(* Named Graph for now to avoid the name collision with OCamlGraph's Graph *)
+(* Visualization of dependencies of benchmarks and free variables *)
 module Graphviz = struct
-  open Solver
   module G = Graph.Imperative.Digraph.Concrete (Namespace)
 
   module D () = struct
@@ -190,13 +204,17 @@ module Graphviz = struct
 
       let get_subgraph _ = None
 
-      let vertex_name ns = Namespace.to_filename ns
+      (* Node name including '.' and other symbols must be double-quoted *)
+      let vertex_name ns = Printf.sprintf "%S" @@ Namespace.to_filename ns
     end)
   end
 
   let add_solved vattrs g solved =
-    let data_name = solved.name in
-    let fv_node fv = Free_variable.to_namespace fv in
+    let data_name = solved.Solver.Solved.name in
+    (* Some free variables have the same name as the benchmark.
+       We must suffix "fv" for distinction.
+    *)
+    let fv_node fv = Namespace.cons (Free_variable.to_namespace fv) "fv" in
     let add_vertex name shape =
       (* We cannot always use [Namespace.basename] here because of
          ".../intercept" *)
@@ -235,27 +253,43 @@ module Graph : sig
 
   val is_empty : t -> bool
 
-  val build : Solver.solved list -> t
+  type providers_map = Solver.Solved.t list Fv_map.t
 
-  val fold : (Solver.solved -> 'a -> 'a) -> t -> 'a -> 'a
+  val is_ambiguous : providers_map -> bool
 
-  val iter : (Solver.solved -> unit) -> t -> unit
+  val warn_ambiguities : providers_map -> unit
 
-  val dependencies : t -> Namespace.t list -> Solver.solved list
+  type result = {
+    (* Graph without ambiguities. The ambiguities are resolved by heuristics *)
+    resolved : t;
+    (* Graph with possible ambiguities *)
+    with_ambiguities : t;
+    (* Which benchmarks provide each variable *)
+    providers_map : providers_map;
+  }
+
+  val build : Solver.Solved.t list -> result
+
+  val fold : (Solver.Solved.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val iter : (Solver.Solved.t -> unit) -> t -> unit
+
+  val dependencies : t -> Free_variable.Set.t -> Solver.Solved.t list
 
   val save_graphviz : t -> string -> unit
 end = struct
   open Solver
+  open Solved (* This module is for the graph of [Solved.t] *)
 
   module G = struct
-    module G = Graph.Imperative.Digraph.Concrete (Solver.Solved)
+    module G = Graph.Imperative.Digraph.Concrete (Solver.Solved.ForGraph)
     include G
     include Graph.Topological.Make (G)
   end
 
   type t = G.t
 
-  let is_empty g = G.is_empty g
+  let is_empty = G.is_empty
 
   exception Missing_file_for_free_variable of {free_var : Free_variable.t}
 
@@ -272,95 +306,133 @@ end = struct
             Some error
         | _ -> None)
 
-  let warn_ambiguity solved_to_benchmark solved_list ambiguity =
-    let open Format in
-    Fv_map.iter
-      (fun fv ({name; _}, _) ->
-        Option.iter (fun ns ->
-            let ns = Namespace.Set.remove name ns in
-            let ns = name :: List.of_seq (Namespace.Set.to_seq ns) in
-            eprintf
-              "@[<v2>Warning: A variable is provided by multiple benchmarks. \
-               Choosing the first one:@ " ;
-            eprintf "Variable: %a@ " Free_variable.pp fv ;
-            eprintf
-              "@[<2>Benchmarks@ @[<v>%a@]@]"
-              (pp_print_list ~pp_sep:(pp_sep " ") (fun ppf n ->
-                   let x =
-                     match
-                       List.find
-                         (fun solved -> Namespace.equal solved.name n)
-                         solved_list
-                     with
-                     | None -> assert false
-                     | Some x -> x
-                   in
-                   fprintf
-                     ppf
-                     "@[<2>%a@ @[dep: @[%a@]@ prv: @[%a@]"
-                     Namespace.pp
-                     n
-                     pp_print_set
-                     x.dependencies
-                     pp_print_set
-                     x.provides ;
-                   fprintf ppf "@]@]"))
-              ns ;
-            eprintf "@]@.")
-        @@ Fv_map.find fv ambiguity)
-      solved_to_benchmark
+  type providers_map = Solver.Solved.t list Fv_map.t
 
-  let build_with_ambiguity solved_list =
-    let solved_to_benchmark, ambiguity =
+  let is_ambiguous =
+    Fv_map.exists (fun _ -> function
+      | [] -> assert false (* impossible *) | [_] -> false | _ -> true)
+
+  let warn_ambiguities =
+    let open Format in
+    Fv_map.iter (fun fv -> function
+      | [] -> assert false (* impossible *)
+      | [_] -> () (* not ambiguous *)
+      | solved_list ->
+          eprintf
+            "@[<v2>Warning: A variable is provided by multiple benchmarks. \
+             Choosing the first one:@ " ;
+          eprintf "Variable: %a@ " Free_variable.pp fv ;
+          eprintf
+            "@[<2>Benchmarks@ @[<v>%a@]@]"
+            (pp_print_list ~pp_sep:(pp_sep " ") Solver.Solved.pp)
+            solved_list ;
+          eprintf "@]@.")
+
+  type result = {
+    resolved : t;
+    with_ambiguities : t;
+    providers_map : providers_map;
+  }
+
+  let build solved_list =
+    (* Which benchmarks provide each variable? *)
+    let providers_map : providers_map =
       List.fold_left
-        (fun (map, ambiguity) ({provides; name; dependencies} as solved) ->
+        (fun map ({provides; _} as solved) ->
           Fv_set.fold
-            (fun free_var (map, ambiguity) ->
-              match Fv_map.find free_var map with
-              | None ->
-                  (Fv_map.add free_var (solved, dependencies) map, ambiguity)
-              | Some (other, other_deps) ->
-                  let ambiguity =
-                    let ns =
-                      Option.value ~default:Namespace.Set.empty
-                      @@ Fv_map.find free_var ambiguity
-                    in
-                    Fv_map.add
-                      free_var
-                      Namespace.Set.(add name (add other.name ns))
-                      ambiguity
-                  in
-                  (* Ambiguity resolved by some heuristics.  Not good. *)
-                  let this_card = Fv_set.cardinal dependencies in
-                  let other_card = Fv_set.cardinal other_deps in
-                  let map =
-                    if this_card < other_card then
-                      Fv_map.add free_var (solved, dependencies) map
-                    else map
-                  in
-                  (map, ambiguity))
+            (fun free_var map ->
+              Fv_map.update
+                free_var
+                (function
+                  | None -> Some [solved]
+                  | Some others -> Some (solved :: others))
+                map)
             provides
-            (map, ambiguity))
-        (Fv_map.empty, Fv_map.empty)
+            map)
+        Fv_map.empty
         solved_list
     in
-    warn_ambiguity solved_to_benchmark solved_list ambiguity ;
-    let len = List.length solved_list in
-    let g = G.create ~size:len () in
-    List.iter
-      (fun ({dependencies; _} as s) ->
-        if Fv_set.is_empty dependencies then G.add_vertex g s
-        else
-          Fv_set.iter
-            (fun dep ->
-              match Fv_map.find dep solved_to_benchmark with
-              | None -> raise (Missing_file_for_free_variable {free_var = dep})
-              | Some (dep, _) -> G.add_edge g dep s)
-            dependencies)
-      solved_list ;
-    (g, ambiguity)
+    (* Sort the benchmarks in the order of the numbers of dependencies.
+       If ambiguous, the one with the least dependencies is chosen.
+    *)
+    let providers_map : providers_map =
+      Fv_map.map
+        (fun solved_list ->
+          let compare a b =
+            Int.compare
+              (Fv_set.cardinal a.dependencies)
+              (Fv_set.cardinal b.dependencies)
+          in
+          List.sort compare solved_list)
+        providers_map
+    in
 
-  let build solved_list = fst @@ build_with_ambiguity solved_list
+    (* Resolve ambiguities by heuristics *)
+    let provider_map_without_ambiguities : Solved.t Fv_map.t =
+      (* Choose the provider with the least dependencies *)
+      let m =
+        Fv_map.map
+          (fun providers ->
+            match providers with
+            | [] -> assert false (* impossible *)
+            | s :: _ -> s)
+          providers_map
+      in
+      (* Move the dropped provided variables to dependencies *)
+      Fv_map.map
+        (fun provider ->
+          let provides, dropped =
+            Fv_set.partition
+              (fun fv ->
+                match Fv_map.find fv m with
+                | None -> assert false (* impossible *)
+                | Some s -> s.name = provider.name)
+              provider.provides
+          in
+          let dependencies = Fv_set.union provider.dependencies dropped in
+          {provider with provides; dependencies})
+        m
+    in
+    let solved_list_without_ambiguities =
+      List.sort_uniq (fun s1 s2 ->
+          Namespace.compare s1.Solved.name s2.Solved.name)
+      @@ List.map snd @@ List.of_seq
+      @@ Fv_map.to_seq provider_map_without_ambiguities
+    in
+    let build_graph iter_fun pmap solved_list =
+      let len = List.length solved_list in
+      let g = G.create ~size:len () in
+      List.iter
+        (fun ({dependencies; _} as s) ->
+          G.add_vertex g s ;
+          Fv_set.iter
+            (fun fv_dep ->
+              match Fv_map.find fv_dep pmap with
+              | None ->
+                  raise (Missing_file_for_free_variable {free_var = fv_dep})
+              | Some d -> iter_fun (fun dep -> G.add_edge g dep s) d)
+            dependencies)
+        solved_list ;
+      g
+    in
+    (* Make a graph, keeping ambiguities *)
+    let g_with_ambiguities =
+      let iter_fun add_edge deps = List.iter add_edge deps in
+      build_graph iter_fun providers_map solved_list
+    in
+    (* Make a graph, resolving ambiguities by heuristics *)
+    let g_without_ambiguities =
+      let iter_fun add_edge dep = add_edge dep in
+      build_graph
+        iter_fun
+        provider_map_without_ambiguities
+        solved_list_without_ambiguities
+    in
+    {
+      resolved = g_without_ambiguities;
+      with_ambiguities = g_with_ambiguities;
+      providers_map;
+    }
 
   let fold = G.fold
 
@@ -387,18 +459,18 @@ end = struct
         let analyze _ x = x
       end)
 
-  let dependencies g init =
+  let dependencies g free_variables =
     let init =
       G.fold_vertex
         (fun solved acc ->
-          if List.mem ~equal:Namespace.equal solved.name init then solved :: acc
-          else acc)
+          if Fv_set.disjoint solved.provides free_variables then acc
+          else solved :: acc)
         g
         []
     in
     let p =
       Reachability.analyze
-        (fun n -> List.mem ~equal:Solver.Solved.equal n init)
+        (fun n -> List.mem ~equal:Solver.Solved.ForGraph.equal n init)
         g
     in
     List.rev
@@ -415,7 +487,7 @@ let find_model_or_generic model_name model_list =
   | None -> List.assoc_opt ~equal:String.equal "*" model_list
   | res -> res
 
-let load_workload_files ~local_model_name:model_name files =
+let load_workload_files ~model_name files =
   (* Use a table to store loaded measurements *)
   let table = Namespace.Hashtbl.create 51 in
   let unsolved =
@@ -438,9 +510,14 @@ let load_workload_files ~local_model_name:model_name files =
                     Free_variable.Set.empty
                     m.Measure.workload_data
                 in
-                Solver.add_to_problem (Bench.name, fvs) unsolved))
-      Solver.empty_problem
+                let fvs_unapplied =
+                  Benchmark.get_free_variable_set (module Bench)
+                in
+                Solver.Unsolved.build Bench.name ~fvs_unapplied fvs :: unsolved))
+      []
       files
   in
   let solved = Solver.solve unsolved in
-  (Graph.build solved, table)
+  let Graph.{resolved; providers_map; _} = Graph.build solved in
+  Graph.warn_ambiguities providers_map ;
+  (resolved, table)
