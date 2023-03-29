@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (double baking)
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                  -- test "^double baking$"
+    Invocation:   dune exec src/proto_015_PtLimaPt/lib_protocol/test/integration/consensus/main.exe
     Subject:      A double baking evidence operation may be injected when it has
                   been observed that a baker baked two different blocks at the
                   same level and same round.

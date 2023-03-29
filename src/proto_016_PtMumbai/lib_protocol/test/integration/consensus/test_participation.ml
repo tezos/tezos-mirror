@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (participation monitoring)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^participation"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe
     Subject:    Participation monitoring in Tenderbake
 *)
 

@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (frozen_deposits)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^frozen deposits$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
     Subject:    consistency of frozen deposits and the [set_deposits_limit] operation
  *)
 

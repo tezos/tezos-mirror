@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (activation)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^activation$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:    The activation operation creates an implicit contract from a
                 registered commitment present in the context. It is
                 parametrized by a public key hash (pkh) and a secret.

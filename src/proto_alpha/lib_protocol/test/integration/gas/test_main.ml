@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol > Gas
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/gas
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
     Subject:      Entrypoint
 *)
 

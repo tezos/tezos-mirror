@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (preendorsement)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^preendorsement$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
 *)
 
 open Protocol

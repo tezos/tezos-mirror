@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (delegate_storage)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^consensus key$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
     Subject:    consistency of the [Drain_delegate] operation
  *)
 

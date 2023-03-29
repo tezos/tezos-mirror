@@ -26,9 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (transfer)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^transfer$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
     Subject:    Quantities transfer between contracts.
 *)
 

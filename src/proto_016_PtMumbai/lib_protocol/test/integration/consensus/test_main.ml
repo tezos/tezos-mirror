@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/consensus
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe
     Subject:      Entrypoint
 *)
 
