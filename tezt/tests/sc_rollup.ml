@@ -2747,12 +2747,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_dissections ()
     in
-    let* () =
-      Sc_rollup_node.run
-        ~event_sections_levels:[("sc_rollup_node.refutation_game", `Debug)]
-        sc_rollup_node
-        []
-    in
+    let* () = Sc_rollup_node.run ~event_level:`Debug sc_rollup_node [] in
     return
       [
         gather_conflicts_promise;

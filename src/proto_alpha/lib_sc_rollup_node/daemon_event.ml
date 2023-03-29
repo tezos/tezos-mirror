@@ -26,7 +26,7 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "daemon"]
+  let section = [Protocol.name; "sc_rollup_node"; "daemon"]
 
   let head_processing =
     declare_3

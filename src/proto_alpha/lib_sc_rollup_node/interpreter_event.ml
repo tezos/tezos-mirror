@@ -28,7 +28,7 @@ open Protocol.Alpha_context.Sc_rollup
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "interpreter"]
+  let section = [Protocol.name; "sc_rollup_node"; "interpreter"]
 
   let transitioned_pvm =
     declare_4

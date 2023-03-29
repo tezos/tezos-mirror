@@ -280,10 +280,12 @@ module Make (Simulation : Simulation.S) : S = struct
     let base =
       (* But we can have multiple instances in the unit tests. This is just to
          avoid conflicts in the events declarations. *)
-      [
-        ("sc_rollup_batcher"
-        ^ if !instances_count = 1 then "" else string_of_int !instances_count);
-      ]
+      Batcher_events.Worker.section
+      @ [
+          ("worker"
+          ^ if !instances_count = 1 then "" else string_of_int !instances_count
+          );
+        ]
 
     let pp _ _ = ()
 

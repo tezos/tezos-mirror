@@ -33,6 +33,9 @@ val starting : unit -> unit Lwt.t
 
 val stopping : unit -> unit Lwt.t
 
+(** Section for commitment events. *)
+val section : string list
+
 (** [commitment_stored commitment_hash commitment] emits the event
    that the [commitment] was stored. *)
 val commitment_stored :

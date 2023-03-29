@@ -421,11 +421,13 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let base =
         (* But we can have multiple instances in the unit tests. This is just to
            avoid conflicts in the events declarations. *)
-        [
-          ("sc_rollup_commitment_publisher"
-          ^ if !instances_count = 1 then "" else string_of_int !instances_count
-          );
-        ]
+        Commitment_event.section
+        @ [
+            ("publisher"
+            ^
+            if !instances_count = 1 then "" else string_of_int !instances_count
+            );
+          ]
 
       let pp _ _ = ()
 
