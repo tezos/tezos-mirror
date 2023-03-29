@@ -225,7 +225,24 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
   let* () = wait_for_ready baker in
   return baker
 
-(** Short and readable logs for baker events. *)
+(** Logging helpers for baker events. *)
+
+let log_block_injection ?color baker =
+  on_event baker (fun event ->
+      if String.equal event.name "block_injected.v0" then
+        let open JSON in
+        let level = event.value |-> "level" |> as_int in
+        let round = event.value |-> "round" |> as_int in
+        let delegate = event.value |-> "delegate" |-> "alias" |> as_string in
+        Log.info
+          ?color
+          "[%s] Block injected at level %d round %d for %s."
+          (name baker)
+          level
+          round
+          delegate)
+
+(** Short and readable logging of all baker events, for debugging purposes. *)
 
 let encode_mini json =
   Ezjsonm.value_to_string ~minify:true (JSON.unannotate json)
