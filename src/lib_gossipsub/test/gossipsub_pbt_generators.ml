@@ -98,7 +98,7 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
       fprintf fmtr "[%a] " GS.Time.pp t ;
       Option.iter (fun pp -> fprintf fmtr "%a => " pp s) pp_state ;
       pp_input fmtr i ;
-      Option.iter (fun pp -> fprintf fmtr "/ %a" pp o) pp_output ;
+      Option.iter (fun pp -> fprintf fmtr " / %a" pp o) pp_output ;
       Option.iter (fun pp -> fprintf fmtr " => %a" pp s') pp_state'
     in
     fprintf
