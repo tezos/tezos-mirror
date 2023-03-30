@@ -92,26 +92,6 @@ let max_op_ttl = 120
 let manager_operation_gas_cost ~protocol =
   match protocol with Protocol.Nairobi | Alpha -> 100 | Mumbai -> 1000
 
-(** A valid base58 encoded layer-2 address to be used to test
-    transaction rollups. *)
-let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
-
-let tx_rollup_empty_l2_context =
-  "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
-
-let tx_rollup_empty_withdraw_list_hash =
-  "txw1sFoLju3ySMAdY6v1dcHUMqJ4Zxc1kcynC8xkYgCmH6bpNSDhV"
-
-let tx_rollup_initial_message_result =
-  "txmr344vtdPzvWsfnoSd3mJ3MCFA5ehKLQs1pK9WGcX4FEACg1rVgC"
-
-(** A valid rejection proof for the initial layer2 state. *)
-let tx_rollup_proof_initial_state =
-  {|{ "version": 3,
-  "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" },
-  "after": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
-  "state": [] }|}
-
 (** A valid base58 encoded compressed state hash. *)
 let sc_rollup_compressed_state =
   "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj"
