@@ -826,148 +826,25 @@ A detailed description of the following instructions can be found in the `intera
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 -  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
-   Forge a new contract from a literal.
-
-::
-
-    :: option key_hash : mutez : 'g : 'S
-       -> operation : address : 'S
-
-Originate a contract based on a literal. The parameters are the
-optional delegate, the initial amount taken from the current
-contract, and the initial storage of the originated contract.
-The contract is returned as a first class value (to be dropped, passed
-as parameter or stored). The ``CONTRACT 'p`` instruction will fail
-until it is actually originated. Note that since ``tz4`` addresses
-cannot be registered as delegates, the origination operation will fail
-if the delegate is a ``tz4``.
-
--  ``TRANSFER_TOKENS``: Forge a transaction.
-
-::
-
-    :: 'p : mutez : contract 'p : 'S   ->   operation : 'S
-
-The parameter must be consistent with the one expected by the
-contract, unit for an account.
-
-.. _MichelsonSetDelegate_alpha:
-
--  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
-
-::
-
-    :: option key_hash : 'S   ->   operation : 'S
-
-Using this instruction is the only way to modify the delegation of a
-smart contract. If the parameter is ``None`` then the delegation of the
-current contract is withdrawn; if it is ``Some kh`` where ``kh`` is the
-key hash of a registered delegate that is not the current delegate of
-the contract, then this operation sets the delegate of the contract to
-this registered delegate. The operation fails if ``kh`` is the current
-delegate of the contract or if ``kh`` is not a registered delegate.
-Note that ``tz4`` addresses cannot be registered as delegates.
-
+   Forge a new contract from a literal (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__).
+-  ``TRANSFER_TOKENS``: Forge a transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TRANSFER_TOKENS>`__).
+-  ``SET_DELEGATE``: Set or withdraw the contract's delegation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__).
 -  ``BALANCE``: Push the current amount of mutez held by the executing
-   contract, including any mutez added by the calling transaction.
-
-::
-
-    :: 'S   ->   mutez : 'S
-
--  ``ADDRESS``: Cast the contract to its address.
-
-::
-
-    :: contract _ : 'S   ->   address : 'S
-
-    > ADDRESS / addr : S  =>  addr : S
-
--  ``CONTRACT 'p``: Cast the address to the given contract type if possible.
-
-::
-
-    :: address : 'S   ->   option (contract 'p) : 'S
-
-    > CONTRACT / addr : S  =>  Some addr : S
-        iff addr exists and is a contract of parameter type 'p
-    > CONTRACT / addr : S  =>  Some addr : S
-        iff 'p = unit and addr is an implicit contract
-    > CONTRACT / addr : S  =>  None : S
-        otherwise
-
+   contract, including any mutez added by the calling transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__).
+-  ``ADDRESS``: Cast the contract to its address (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADDRESS>`__).
+-  ``CONTRACT 'p``: Cast the address to the given contract type if possible (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__).
 -  ``SOURCE``: Push the contract that initiated the current
-   transaction, i.e. the contract that paid the fees and
-   storage cost, and whose manager signed the operation
-   that was sent on the blockchain. Note that since
-   ``TRANSFER_TOKENS`` instructions can be chained,
-   ``SOURCE`` and ``SENDER`` are not necessarily the same.
-
-::
-
-    :: 'S   ->   address : 'S
-
+   transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__).
 -  ``SENDER``: Push the contract that initiated the current
-   internal transaction. It may be the ``SOURCE``, but may
-   also be different if the source sent an order to an intermediate
-   smart contract, which then called the current contract.
-
-::
-
-    :: 'S   ->   address : 'S
-
--  ``SELF``: Push the current contract.
-
-::
-
-    :: 'S   ->   contract 'p : 'S
-       where   contract 'p is the type of the current contract
-
-Note that ``SELF`` is forbidden in lambdas because it cannot be
-type-checked; the type of the contract executing the lambda cannot be
-known at the point of type-checking the lambda's body.
-
--  ``SELF_ADDRESS``: Push the address of the current contract. This is
-   equivalent to ``SELF; ADDRESS`` except that it is allowed in
-   lambdas.
-
-::
-
-    :: 'S   ->   address : 'S
-
-Note that ``SELF_ADDRESS`` inside a lambda returns the address of the
-contract executing the lambda, which can be different from the address
-of the contract in which the ``SELF_ADDRESS`` instruction is written.
-
--  ``AMOUNT``: Push the amount of the current transaction.
-
-::
-
-    :: 'S   ->   mutez : 'S
-
--  ``IMPLICIT_ACCOUNT``: Return a default contract with the given
-   public/private key pair. Any funds deposited in this contract can
-   immediately be spent by the holder of the private key. This contract
-   cannot execute Michelson code and will always exist on the
-   blockchain.
-
-::
-
-    :: key_hash : 'S   ->   contract unit : 'S
-
-- ``VOTING_POWER``: Return the voting power of a given contract. This
-   voting power coincides with the weight of the contract in the
-   voting listings, which is calculated at the beginning of every
-   voting period. Currently the voting power is proportional to the
-   full staking balance of the contract, but this might change in
-   future version of the protocol and developers should not rely on
-   this. Hence, the value returned by ``VOTING_POWER`` should only be
-   considered relative to the one returned by ``TOTAL_VOTING_POWER``.
-
-::
-
-    :: key_hash : 'S   ->   nat : 'S
+   internal transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__).
+-  ``SELF``: Push the current contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__).
+-  ``SELF_ADDRESS``: Push the address of the current contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__).
+-  ``AMOUNT``: Push the amount of the current transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__).
+-  ``IMPLICIT_ACCOUNT``: Push on the stack the contract value corresponding to the implicit account of a public key hash (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IMPLICIT_ACCOUNT>`__).
+- ``VOTING_POWER``: Push the voting power of a given contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-VOTING_POWER>`__).
 
 Special operations
 ~~~~~~~~~~~~~~~~~~
