@@ -66,6 +66,24 @@ module Basic_fragments = struct
     ]
 
   let heartbeat : t = of_list [Heartbeat]
+
+  (* This creates a list of [count] [add_peer;graft] with distinct peers
+     such that exactly [count_outbound] of them are [outbound] peers. *)
+  let add_distinct_peers_and_graft count count_outbound topic =
+    assert (count_outbound <= count) ;
+    let many_peer_gens =
+      List.init ~when_negative_length:() count (fun i ->
+          let open M in
+          let+ ap = add_peer ~gen_peer:(M.return i) in
+          (* Setting [direct=false] otherwise the peers won't be grafted. *)
+          if i < count_outbound then {ap with direct = false; outbound = true}
+          else ap)
+      |> WithExceptions.Result.get_ok ~loc:__LOC__
+      |> M.flatten_l
+    in
+    of_input_gen many_peer_gens @@ fun peers ->
+    List.map (fun ap -> [Add_peer ap; Graft {topic; peer = ap.peer}]) peers
+    |> List.flatten
 end
 
 module Test_message_cache = struct
@@ -558,6 +576,219 @@ module Test_remove_peer = struct
     unit
 end
 
+module Test_peers_below_degree_high = struct
+  open Gossipsub_pbt_generators
+
+  (* This test checks the logic around pruning overflowing peers.
+     The test works as follows:
+     1. Add many distinct peers (some direct, some not) on some unique topic.
+        We do so by performing a sequence of [Add_peer] followed by [Graft].
+        When the mesh becomes full, only [outbound] peers are added by [Graft] so
+        we add more outbound peers than [degree_high].
+     2. Perform a heartbeat.
+     3.1 Check just before the heartbeat that the [to_prune] record is well-formed
+         and that there are indeed too many peers in the mesh.
+     3.2 Check in the heartbeat output that the automaton requests to prune enough
+         peers to reach [degree_optimal].
+  *)
+
+  let topic = "dummy_topic"
+
+  let pp_state fmtr state =
+    let v = GS.Introspection.view state in
+    Fmt.Dump.record
+      Fmt.Dump.
+        [
+          field
+            "mesh"
+            (fun v -> v.GS.Introspection.mesh)
+            GS.Introspection.(pp_topic_map pp_peer_set);
+          field
+            "connections"
+            (fun v -> v.GS.Introspection.connections)
+            GS.Introspection.pp_connections;
+        ]
+      fmtr
+      v
+
+  let predicate degree_high ({t; i; s; s'; o} : transition) () =
+    let open Result_syntax in
+    let (O o') = o in
+    match i with
+    | Graft _ -> (
+        match o' with
+        | Peer_filtered | Unknown_topic | Unexpected_grafting_peer
+        | Grafting_peer_with_negative_score ->
+            fail (`unexpected_output o)
+        | Peer_backed_off | Grafting_direct_peer | Peer_already_in_mesh
+        | Grafting_successfully ->
+            return_unit
+        | _ -> return_unit)
+    | Heartbeat -> (
+        match o' with
+        | Heartbeat {to_prune; _} ->
+            let open GS.Introspection in
+            let previous_state_has_enough_peers_in_mesh s =
+              (* The mesh should have too many peers in [s]. *)
+              let v = view s in
+              (* Get number of peers on the single topic. *)
+              let peer_set = GS.Topic.Map.find topic v.mesh in
+              let card =
+                match peer_set with
+                | None -> 0
+                | Some set -> GS.Peer.Set.cardinal set
+              in
+              (* Cardinality should be > [degree_high]. *)
+              if card <= degree_high then
+                fail (`invalid_state_before_heartbeat s)
+              else return_unit
+            in
+            let pruned_enough_peers s' =
+              (* The automaton should have pruned enough peers. *)
+              let v = view s' in
+              (* First perform an unrelated, opportunistic check: the prune
+                 record doesn't map empty topic sets to any peer. *)
+              let inconsistent_prune_record =
+                GS.Peer.Map.exists
+                  (fun _peer topic_set -> GS.Topic.Set.is_empty topic_set)
+                  to_prune
+              in
+              if inconsistent_prune_record then
+                fail (`inconsistent_prune_record to_prune)
+              else
+                (* Check that we pruned enough peers to reach [target]. *)
+                let target = v.limits.degree_optimal in
+                let peer_set = GS.Topic.Map.find topic v.mesh in
+                let card =
+                  match peer_set with
+                  | None -> 0
+                  | Some set -> GS.Peer.Set.cardinal set
+                in
+                if card <> target then
+                  fail (`too_many_peers (t, card, target, degree_high))
+                else return_unit
+            in
+            let* () = previous_state_has_enough_peers_in_mesh s in
+            pruned_enough_peers s'
+        | _ -> fail (`unexpected_output o))
+    | _ -> return_unit
+
+  let scenario limits =
+    let open Fragment in
+    let open Basic_fragments in
+    let open M in
+    (* In order to satisfy the predicate, [count_outbound > degree_high ] *)
+    bind_gen
+      (let* count_outbound =
+         M.int_range (limits.degree_high + 1) (limits.degree_high * 2)
+       in
+       (* We need [peer_count >= count_outbound] *)
+       let* peer_count = M.int_range count_outbound (count_outbound * 2) in
+       return (count_outbound, peer_count))
+    @@ fun (count_outbound, peer_count) ->
+    of_list [Join {topic}]
+    @% add_distinct_peers_and_graft peer_count count_outbound topic
+    @% heartbeat
+
+  let pp_output fmtr (O o) = GS.pp_output fmtr o
+
+  (* A generator that should satisfy [Tezos_gossipsub.check_limits]. *)
+  let limit_generator (default_limits : (_, _, _, _) limits) =
+    let open M in
+    let* degree_optimal = M.int_range 1 20 in
+    let* degree_low, degree_high =
+      M.pair
+        (M.int_range 1 degree_optimal)
+        (M.int_range degree_optimal (2 * degree_optimal))
+    in
+    let* degree_out = M.int_range 0 (Int.min degree_low (degree_optimal / 2)) in
+    let* degree_score = M.int_range 0 (degree_optimal - degree_out) in
+    let* history_length = M.int_range 1 50 in
+    let* history_gossip_length = M.int_range 1 history_length in
+    return
+      {
+        default_limits with
+        degree_optimal;
+        degree_low;
+        degree_high;
+        degree_out;
+        degree_score;
+        history_length;
+        history_gossip_length;
+      }
+
+  let test rng limits parameters =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: peers below degree high"
+      ~tags:["gossipsub"; "heartbeat"; "degree"]
+    @@ fun () ->
+    let scenario =
+      let open M in
+      let* limits = limit_generator limits in
+      let state = GS.make rng limits parameters in
+      let+ trace = run state (scenario limits) in
+      (trace, limits)
+    in
+    let test =
+      QCheck2.Test.make
+        ~count:1_000
+        ~name:"Gossipsub: peers_below_degree_high"
+        scenario
+      @@ fun (trace, limits) ->
+      match check_fold (predicate limits.degree_high) () trace with
+      | Ok () -> true
+      | Error (e, prefix) -> (
+          match e with
+          | `invalid_state_before_heartbeat s ->
+              Tezt.Test.fail
+                ~__LOC__
+                "Dumping trace until failure:@;\
+                 @[<hov>%a@]@;\
+                 Limits:@;\
+                 %a@;\
+                 Faulty test: invalid state before heartbeat %a@;"
+                (pp_trace ~pp_output ~pp_state ())
+                prefix
+                pp_limits
+                limits
+                pp_state
+                s
+          | `unexpected_output (O o) ->
+              Tezt.Test.fail
+                ~__LOC__
+                "Faulty test: unexpected output %a"
+                GS.pp_output
+                o
+          | `inconsistent_prune_record to_prune ->
+              Tezt.Test.fail
+                ~__LOC__
+                "At heartbeat, the prune record is ill-formed: %a"
+                GS.Introspection.(pp_peer_map pp_topic_set)
+                to_prune
+          | `too_many_peers (t, remaining, target, degree_high) ->
+              Tezt.Test.fail
+                ~__LOC__
+                "@[<v 2>Dumping trace until failure:@;\
+                 @[<hov>%a@]@;\
+                 At time %d: peers in mesh=%d, target = %d, degree_high = %d@;\
+                 Limits:@;\
+                 %a@;\
+                 @]"
+                (pp_trace ~pp_state ~pp_output ())
+                prefix
+                t
+                remaining
+                target
+                degree_high
+                pp_limits
+                limits)
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 let register rng limits parameters =
   Test_remove_peer.test rng limits parameters ;
-  Test_message_cache.test rng
+  Test_message_cache.test rng ;
+  Test_peers_below_degree_high.test rng limits parameters
