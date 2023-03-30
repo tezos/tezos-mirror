@@ -140,12 +140,10 @@ module Handler = struct
             }
         in
         let* () =
-          Dac_node_client.call
+          Dac_node_client.put_dac_member_signature
+            dac_plugin
             coordinator_cctxt
-            (RPC_services.store_dac_member_signature dac_plugin)
-            ()
-            ()
-            signature_repr
+            ~signature:signature_repr
         in
         let*! () = Event.emit_signature_pushed_to_coordinator signature in
         return_unit

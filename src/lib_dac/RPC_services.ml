@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4933
-   Add .mli file for RPC_services.ml. *)
-
 (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
    encoding over b58check encoding for JSON. *)
 let store_preimage_request_encoding =
@@ -46,7 +43,7 @@ let external_message_query =
   |+ opt_field "external_message" Tezos_rpc.Arg.string (fun s -> s)
   |> seal
 
-let dac_store_preimage ctx =
+let post_store_preimage ctx =
   Tezos_rpc.Service.post_service
     ~description:"Split DAC reveal data"
     ~query:Tezos_rpc.Query.empty
@@ -56,7 +53,7 @@ let dac_store_preimage ctx =
 
 (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4263
    remove this endpoint once end-to-end tests are in place. *)
-let verify_external_message_signature :
+let get_verify_signature :
     ([`GET], unit, unit, string option, unit, bool) Tezos_rpc.Service.service =
   Tezos_rpc.Service.get_service
     ~description:"Verify signature of an external message to inject in L1"
@@ -64,14 +61,14 @@ let verify_external_message_signature :
     ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "verify_signature")
 
-let retrieve_preimage ((module P) : Dac_plugin.t) =
+let get_preimage ((module P) : Dac_plugin.t) =
   Tezos_rpc.Service.get_service
     ~description:"Retrieves a page by its page hash and returns its contents"
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
     Tezos_rpc.Path.(open_root / "preimage" /: P.hash_rpc_arg)
 
-let store_dac_member_signature dac_plugin =
+let put_dac_member_signature dac_plugin =
   Tezos_rpc.Service.put_service
     ~description:
       "Verifies and stores the Dac member signature of a root page hash"
@@ -93,16 +90,18 @@ let get_certificate ((module P) : Dac_plugin.t) =
    also return expiration level. Additionally, when it pushes a new root hash to
    all attached subscribers, it should push it together with expiration level. *)
 
-(** [Coordinator]'s endpoint for serializing dac payload. In addition to
+module Coordinator = struct
+  (** [Coordinator]'s endpoint for serializing dac payload. In addition to
     returning a root page hash, it also pushes it to the subscribed [Observer]s
     and [Dac_member]s. *)
-let coordinator_post_preimage ((module P) : Dac_plugin.t) =
-  Tezos_rpc.Service.post_service
-    ~description:
-      "Stores the preimage in a sequence of pages. Returns a root page hash \
-       representing the stored preimage. Additionally, it triggers streaming \
-       of root page hash to subscribed committee members and observers. "
-    ~query:Tezos_rpc.Query.empty
-    ~input:Data_encoding.bytes
-    ~output:P.encoding
-    Tezos_rpc.Path.(open_root / "preimage")
+  let post_preimage ((module P) : Dac_plugin.t) =
+    Tezos_rpc.Service.post_service
+      ~description:
+        "Stores the preimage in a sequence of pages. Returns a root page hash \
+         representing the stored preimage. Additionally, it triggers streaming \
+         of root page hash to subscribed committee members and observers. "
+      ~query:Tezos_rpc.Query.empty
+      ~input:Data_encoding.bytes
+      ~output:P.encoding
+      Tezos_rpc.Path.(open_root / "preimage")
+end

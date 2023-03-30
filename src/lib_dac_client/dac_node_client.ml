@@ -44,15 +44,46 @@ let make_unix_cctxt ~scheme ~host ~port =
   in
   new unix_cctxt ~rpc_config
 
-let call (cctxt : #cctxt) = cctxt#call_service
-
-let streamed_call (cctxt : #cctxt) = cctxt#call_streamed_service
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
    If the preimage was generated using a different plugin, the computation of
    the hash might fail. In practice it would be better to retrieve the
    hash of the protocol that the coordinator was using when the page hash
    was computed.
 *)
-let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) page_hash =
-  call cctxt (RPC_services.retrieve_preimage plugin) ((), page_hash) () ()
+let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~page_hash =
+  cctxt#call_service (RPC_services.get_preimage plugin) ((), page_hash) () ()
+
+let post_store_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
+    ~pagination_scheme =
+  cctxt#call_service
+    (RPC_services.post_store_preimage plugin)
+    ()
+    ()
+    (payload, pagination_scheme)
+
+let get_verify_signature (cctxt : #cctxt) ~external_message =
+  cctxt#call_service RPC_services.get_verify_signature () external_message ()
+
+let put_dac_member_signature (plugin : Dac_plugin.t) (cctxt : #cctxt) ~signature
+    =
+  cctxt#call_service
+    (RPC_services.put_dac_member_signature plugin)
+    ()
+    ()
+    signature
+
+let get_certificate (plugin : Dac_plugin.t) (cctxt : #cctxt) ~root_page_hash =
+  cctxt#call_service
+    (RPC_services.get_certificate plugin)
+    ((), root_page_hash)
+    ()
+    ()
+
+module Coordinator = struct
+  let post_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload =
+    cctxt#call_service
+      (RPC_services.Coordinator.post_preimage plugin)
+      ()
+      ()
+      payload
+end

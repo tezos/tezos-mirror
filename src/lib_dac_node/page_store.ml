@@ -228,7 +228,8 @@ module Remote : S with type configuration = remote_configuration = struct
       (struct
         type remote_context = Dac_node_client.cctxt
 
-        let fetch = Dac_node_client.get_preimage
+        let fetch dac_plugin remote_context hash =
+          Dac_node_client.get_preimage dac_plugin remote_context ~page_hash:hash
       end)
       (F)
 
