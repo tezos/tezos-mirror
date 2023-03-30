@@ -87,10 +87,10 @@ let regression_test ~executors ~__FILE__ ?(tags = []) title f =
 
 let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let parameters =
-    make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
-    @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
-    @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
-    @ [(["sc_rollup_enable"], `Bool true)]
+    make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
+    @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
+    @ make_parameter "smart_rollup_timeout_period_in_blocks" timeout
+    @ [(["smart_rollup_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
@@ -213,7 +213,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
                 ~amount:Tez.zero
                 ~giver:Constant.bootstrap1.alias
                 ~receiver:forwarder
-                ~arg:(sf "Pair %S %S" sc_rollup message)
+                ~arg:(sf "Pair %S %S" message sc_rollup)
             in
             Client.bake_for_and_wait client
       in

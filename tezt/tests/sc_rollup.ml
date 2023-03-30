@@ -342,7 +342,8 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
-let cement_commitment ?(src = "bootstrap1") ?fail ~sc_rollup ~hash client =
+let cement_commitment ?(src = Constant.bootstrap1.alias) ?fail ~sc_rollup ~hash
+    client =
   let p =
     Client.Sc_rollup.cement_commitment ~hooks ~dst:sc_rollup ~src ~hash client
   in
@@ -1076,7 +1077,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
               ~amount:Tez.zero
               ~giver:Constant.bootstrap1.alias
               ~receiver:forwarder
-              ~arg:(sf "Pair %S 0x%s" sc_rollup message)
+              ~arg:(sf "Pair 0x%s %S" message sc_rollup)
           in
           Client.bake_for_and_wait client
     in
@@ -1841,7 +1842,9 @@ let attempt_withdraw_stake =
     | None ->
         let*! () = inject_op () in
         let* old_bal = contract_balances ~pkh:staker client in
-        let* () = Client.bake_for_and_wait ~keys:["bootstrap2"] client in
+        let* () =
+          Client.bake_for_and_wait ~keys:[Constant.bootstrap2.alias] client
+        in
         let* new_bal = contract_balances ~pkh:staker client in
         let expected_liq_new_bal =
           old_bal.liquid - recover_bond_fee + sc_rollup_stake_amount
@@ -3123,7 +3126,7 @@ let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 client =
     Client.Sc_rollup.timeout
       ~hooks
       ~dst:sc_rollup
-      ~src:"bootstrap1"
+      ~src:Constant.bootstrap1.alias
       ~staker1
       ~staker2
       client
@@ -3705,47 +3708,15 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
   let originate_source_contract () =
-    (* A script that receives bytes as a parameter and transfers them
-       to the rollup as is. The transfer will appear as an internal
-       message targetting this specific rollup in the rollups'
-       inbox. *)
-    let prg =
-      Format.asprintf
-        {|
-      {
-        parameter (bytes %%default);
-        storage (unit);
-
-        code
-          {
-            CAR;
-            PUSH address "%s";
-            CONTRACT bytes;
-            IF_NONE { PUSH string "Invalid address"; FAILWITH; }
-                    {
-                      PUSH mutez 0;
-                      DIG 2;
-                      TRANSFER_TOKENS;
-                      NIL operation;
-                      SWAP;
-                      CONS;
-                      PUSH unit Unit;
-                      SWAP;
-                      PAIR;
-                    }
-          }
-      } |}
-        sc_rollup
-    in
-    let* address =
-      Client.originate_contract
-        ~alias:"source"
-        ~amount:(Tez.of_int 100)
-        ~burn_cap:(Tez.of_int 100)
-        ~src
-        ~prg
+    let* _alias, address =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
         ~init:"Unit"
+        ~burn_cap:Tez.(of_int 1)
         client
+        ["mini_scenarios"; "sc_rollup_forward"]
+        protocol
     in
     let* () = Client.bake_for_and_wait client in
     return address
@@ -3762,9 +3733,9 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             ~amount:Tez.(of_int 100)
             ~burn_cap:Tez.(of_int 100)
             ~storage_limit:100000
-            ~giver:"bootstrap1"
+            ~giver:Constant.bootstrap1.alias
             ~receiver:source_address
-            ~arg:payload
+            ~arg:(sf "Pair %s %S" payload sc_rollup)
             client
     in
     let blocks_to_wait =
