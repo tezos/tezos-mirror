@@ -382,19 +382,21 @@ module Test_remove_peer = struct
     in
     let* () = check_map "connections" view.connections in
     (* We don't check [ihave/iwant_per_heartbeat], as these maps are
-       only cleaned on heartbeat. There's a potential issue with smap though.
+       only cleaned on heartbeat. There's a potential issue with spam though.
        FIXME https://gitlab.com/tezos/tezos/-/issues/5252 *)
     let* () =
-      Topic.Map.to_seq view.mesh
-      |> Seq.E.iter (fun (topic, peer_set) ->
-             let str = Format.asprintf "mesh[topic=%a]" Topic.pp topic in
-             check_set str peer_set)
+      Topic.Map.iter_e
+        (fun topic peer_set ->
+          let str = Format.asprintf "mesh[topic=%a]" Topic.pp topic in
+          check_set str peer_set)
+        view.mesh
     in
     let* () =
-      Topic.Map.to_seq view.fanout
-      |> Seq.E.iter (fun (topic, fanout_peers) ->
-             let str = Format.asprintf "fanout[topic=%a]" Topic.pp topic in
-             check_set str fanout_peers.peers)
+      Topic.Map.iter_e
+        (fun topic fanout_peers ->
+          let str = Format.asprintf "fanout[topic=%a]" Topic.pp topic in
+          check_set str fanout_peers.peers)
+        view.fanout
     in
     Message_cache.Internal_for_tests.get_access_counters view.message_cache
     |> Seq.E.iter (fun (message_id, map) ->
@@ -460,7 +462,7 @@ module Test_remove_peer = struct
       ]
 
   let pp_backoff fmtr (backoff : int GS.Topic.Map.t) =
-    let list = backoff |> GS.Topic.Map.to_seq |> List.of_seq in
+    let list = backoff |> GS.Topic.Map.bindings in
     Format.pp_print_list
       ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
       (fun fmtr (topic, backoff) ->
