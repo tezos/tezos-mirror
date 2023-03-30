@@ -194,7 +194,18 @@ module Make (C : AUTOMATON_CONFIG) :
     ihave_per_heartbeat : int Peer.Map.t;
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
+        (** The mesh for a topic is a random subset of the connected peers
+            subscribed to that topic and that have non-negative score, are not
+            backed-off, and are not direct peers. The local peer routes
+            full-messages to these peers. A topic is in the domain of the mesh
+            iff the local peer has joined the topic (we also say that it tracks
+            the topic). *)
     fanout : fanout_peers Topic.Map.t;
+        (** The fanout for a topic is a random subset of the connected peers
+            subscribed to that topic and that are not direct and have a score
+            above some given threshold. The local peer routes full-messages to
+            these peers. In contrast to the mesh, the fanout map contains topics
+            the local peer has not joined. *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5302
 
        Introduce TTL to [seen_messages]. *)
@@ -205,7 +216,7 @@ module Make (C : AUTOMATON_CONFIG) :
   }
   (* Invariants:
 
-     - Forall t set, Topic.Map.find t mesh = Some set -> Peer.Set set <> Peer.Set.empty
+     - Forall t, Topic.Map.mem t mesh <=> not (Map.mem t fanout)
 
      - Forall t set, Topic.Map.find t fanout = Some set -> Peer.Set set <> Peer.Set.empty
 
@@ -1058,7 +1069,7 @@ module Make (C : AUTOMATON_CONFIG) :
        [degree_low], then select as many random peers (not already in the mesh
        topic) to graft as possible so that to have [degree_optimal] in the topic
        mesh. The selected peers should have a non-negative score, should not
-       backedoff, and should not be direct peers.
+       be backedoff, and should not be direct peers.
 
        - If the number of remaining peers in the topic mesh is higher than
        [degree_high], then select as many peers (not already in the mesh topic)
