@@ -189,10 +189,7 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
       the gossipsub automaton. Fragments support sequential and parallel
       composition. *)
   module Fragment = struct
-    type raw =
-      | Thread of event SeqM.t
-      | Par of raw list
-      | Seq of raw list (* [raw SeqM.t]? TODO *)
+    type raw = Thread of event SeqM.t | Par of raw list | Seq of raw list
 
     type t = raw M.t
 
@@ -399,8 +396,14 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
       in
       return (List.rev rev_trace)
 
+    (* By default, shrinking is deactivated as it may be very costly, or even
+       diverge for unknown reasons. We leave the option to reactivate it should
+       you need it. *)
+    let shrinking_deactivated = true
+
     let raw_generator (fragment : t) : raw M.t =
-      M.set_shrink shrink_raw fragment
+      if shrinking_deactivated then fragment
+      else M.set_shrink shrink_raw fragment
   end
 
   let run state fragment : trace t =
