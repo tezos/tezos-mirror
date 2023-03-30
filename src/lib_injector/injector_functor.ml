@@ -644,6 +644,8 @@ module Make (Parameters : PARAMETERS) = struct
         end in
         return (results, (module Unsigned_op : Proto_unsigned_op))
 
+  let register_error _state op error = Inj_operation.register_error op error
+
   let inject_on_node state ~nb (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in
     let* signed_op_bytes =
@@ -688,6 +690,7 @@ module Make (Parameters : PARAMETERS) = struct
                   op.Inj_operation.operation
                   error
               in
+              register_error state op error ;
               failure := true ;
               acc
           | Successful | Unsuccessful (Backtracked | Skipped | Other_branch) ->
@@ -894,6 +897,9 @@ module Make (Parameters : PARAMETERS) = struct
                       info.op.operation
                       status
                   in
+                  (match status with
+                  | Failed error -> register_error state info.op error
+                  | Other_branch | Backtracked | Skipped -> ()) ;
                   match retry with
                   | Retry -> return (included, info.op :: to_retry)
                   | Forget -> return (included, to_retry)

@@ -47,22 +47,43 @@ module Make (O : PARAM_OPERATION) :
 
   type hash = Hash.t
 
-  type t = {hash : hash; operation : O.t}
+  type errors = {count : int; last_error : tztrace option}
+
+  type t = {hash : hash; operation : O.t; mutable errors : errors}
 
   let hash_inner_operation op =
     Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn O.encoding op]
 
+  let no_errors = {count = 0; last_error = None}
+
   let make operation =
     let hash = hash_inner_operation operation in
-    {hash; operation}
+    {hash; operation; errors = no_errors}
+
+  let errors_encoding =
+    let open Data_encoding in
+    conv
+      (fun {count; last_error} -> (count, last_error))
+      (fun (count, last_error) -> {count; last_error})
+    @@ obj2 (req "count" int31) (opt "last_error" trace_encoding)
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {hash; operation} -> (hash, operation))
-      (fun (hash, operation) -> {hash; operation})
-    @@ obj2 (req "hash" Hash.encoding) (req "operation" O.encoding)
+      (fun {hash; operation; errors} -> (hash, operation, errors))
+      (fun (hash, operation, errors) -> {hash; operation; errors})
+    @@ obj3
+         (req "hash" Hash.encoding)
+         (req "operation" O.encoding)
+         (dft "errors" errors_encoding no_errors)
 
-  let pp ppf {hash; operation} =
-    Format.fprintf ppf "%a (%a)" O.pp operation Hash.pp hash
+  let pp ppf {hash; operation; errors} =
+    let pp_errors ppf errors =
+      if errors.count = 0 then ()
+      else Format.fprintf ppf " [%d errors]" errors.count
+    in
+    Format.fprintf ppf "%a (%a)%a" O.pp operation Hash.pp hash pp_errors errors
+
+  let register_error op error_trace =
+    op.errors <- {count = op.errors.count + 1; last_error = Some error_trace}
 end

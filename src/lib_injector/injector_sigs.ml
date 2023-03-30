@@ -106,9 +106,12 @@ module type INJECTOR_OPERATION = sig
   (** Alias for L1 operations hashes *)
   type hash = Hash.t
 
+  (** Structure to keep track of injection errors. *)
+  type errors = {count : int; last_error : tztrace option}
+
   (** The type of L1 operations that are injected on Tezos. These have a hash
       attached to them that allows tracking and retrieving their status. *)
-  type t = private {hash : hash; operation : operation}
+  type t = private {hash : hash; operation : operation; mutable errors : errors}
 
   (** [make op] returns an L1 operation with the corresponding hash. *)
   val make : operation -> t
@@ -119,6 +122,10 @@ module type INJECTOR_OPERATION = sig
   (** Pretty printer for L1 operations. Only the relevant part for the rollup node
       is printed. *)
   val pp : Format.formatter -> t -> unit
+
+  (** Register an error as occurring during injection of an operation. Its
+      internal error counter is incremented. *)
+  val register_error : t -> tztrace -> unit
 end
 
 (** Module type for parameter of functor {!Injector_functor.Make}. *)
