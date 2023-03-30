@@ -83,6 +83,8 @@ module Fold_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let fold_model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
@@ -173,6 +175,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
+    let generated_code_destination = None
+
     let models =
       [
         ( "carbonated_map",
@@ -214,6 +218,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let info = Printf.sprintf "Carbonated find model"
 
     let module_filename = __FILE__
+
+    let generated_code_destination = None
 
     (**
        Given the cost of comparing keys, the model is used for deducing [intercept]
@@ -319,6 +325,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let info = Printf.sprintf "Carbonated find model (intercept case)"
 
     let module_filename = __FILE__
+
+    let generated_code_destination = None
 
     let models =
       [

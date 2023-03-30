@@ -137,6 +137,8 @@ module Encoding_micheline : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let micheline_serialization_trace (micheline_node : Alpha_context.Script.node)
       =
     match
@@ -207,6 +209,8 @@ module Decoding_micheline : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let micheline_deserialization_trace (micheline_str : string) =
     match
       Data_encoding.Binary.of_string
@@ -274,6 +278,8 @@ let () = Registration_helpers.register (module Decoding_micheline)
 module Encodings =
 Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
+
+  let generated_code_destination = None
 end)
 
 module Timestamp = struct
