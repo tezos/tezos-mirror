@@ -227,6 +227,8 @@ module Default_answerer = struct
         return
         @@ swap config pool source_peer_id ~connect proposed_peer_id new_point
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5187
+         Handle silently ignored error cases. *)
       Result.get_or_recover_from
         (function
           | `No_swap_candidate source_peer_id ->
