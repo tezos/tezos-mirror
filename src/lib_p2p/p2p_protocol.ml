@@ -212,16 +212,20 @@ module Default_answerer = struct
             ~no_private:true
           |> Option.to_result ~none:(`No_swap_candidate source_peer_id)
         in
-        let* can_swap =
-          conn.write_swap_ack proposed_point proposed_peer_id
-          |> Result.map_error (fun e -> `Couldnt_write_swap_ack e)
+        let* () =
+          let* sent_succeeded =
+            conn.write_swap_ack proposed_point proposed_peer_id
+            |> Result.map_error (fun _ ->
+                   `Couldnt_write_swap_ack "Connection closed")
+          in
+          if sent_succeeded then return_unit
+          else
+            fail @@ `Couldnt_write_swap_ack "Buffer is full. Message dropped."
         in
-        if can_swap then (
-          log (Swap_ack_sent {source = source_peer_id}) ;
-          Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
-          return
-          @@ swap config pool source_peer_id ~connect proposed_peer_id new_point)
-        else Error `Couldnt_swap
+        log (Swap_ack_sent {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
+        return
+        @@ swap config pool source_peer_id ~connect proposed_peer_id new_point
       in
       Result.get_or_recover_from
         (function
@@ -229,7 +233,7 @@ module Default_answerer = struct
               Events.(emit no_swap_candidate) source_peer_id
           | `Couldnt_find_by_peer
           (* The connection has been lost so ignore the request *)
-          | `Couldnt_write_swap_ack _ | `Couldnt_swap ->
+          | `Couldnt_write_swap_ack _ ->
               Lwt.return_unit)
         do_swap
 
