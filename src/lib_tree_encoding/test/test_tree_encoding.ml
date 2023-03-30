@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Lib_tree_encoding
-    Invocation:   dune runtest src/lib_tree_encoding/
+    Invocation:   dune exec src/lib_tree_encoding/main.exe
     Subject:      Tests for the tree-encoding library
 *)
 

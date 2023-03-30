@@ -1921,8 +1921,8 @@ let octez_context_disk =
       ]
 
 let _tree_encoding_tests =
-  test
-    "test_tree_encoding"
+  tezt
+    ["test_tree_encoding"; "test_proofs"; "test_encoding"]
     ~path:"src/lib_tree_encoding/test"
     ~opam:"tezos-tree-encoding-test"
     ~synopsis:"Tests for the tree encoding library"
@@ -1936,7 +1936,7 @@ let _tree_encoding_tests =
         octez_test_helpers |> open_;
         octez_webassembly_interpreter;
         qcheck_alcotest;
-        alcotest_lwt;
+        alcotezt;
       ]
 
 let octez_context =

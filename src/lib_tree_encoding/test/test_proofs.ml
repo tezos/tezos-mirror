@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Tree_encoding
-    Invocation:   dune exec src/lib_tree_encoding/test/test_tree_encoding.exe \
-                  -- test "^Proofs$"
+    Invocation:   dune exec src/lib_tree_encoding/test/main.exe
     Subject:      Proof-related tests for the tree-encoding library
 *)
 
