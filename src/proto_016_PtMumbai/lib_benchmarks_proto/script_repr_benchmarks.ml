@@ -82,6 +82,8 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let size_based_model =
     Model.make
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
@@ -127,6 +129,8 @@ module Script_repr_strip_annotations : Benchmark.S = struct
   let info = "Benchmarking Script_repr.strip_annotations"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let strip_annotations_model =
     Model.(

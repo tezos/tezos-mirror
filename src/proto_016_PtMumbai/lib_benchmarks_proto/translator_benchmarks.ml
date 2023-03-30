@@ -197,6 +197,8 @@ module Typechecking_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
@@ -270,6 +272,8 @@ module Unparsing_data : Benchmark.S = struct
   let info = "Benchmarking unparsing of data"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
@@ -352,6 +356,8 @@ module Typechecking_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
     Lwt_main.run
@@ -429,6 +435,8 @@ module Unparsing_code : Benchmark.S = struct
   let info = "Benchmarking unparsing of code"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -512,6 +520,8 @@ let check_printable_benchmark =
   let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
   let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
     let file = __FILE__
+
+    let generated_code_destination = None
   end) in
   linear_shared
     ~name:"CHECK_PRINTABLE"
@@ -562,6 +572,8 @@ module Ty_eq : Benchmark.S = struct
   let info = "Benchmarking equating types"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let tags = [Tags.translator]
 
@@ -721,6 +733,8 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
@@ -774,6 +788,8 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let info = "Benchmarking unparse_ty"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->

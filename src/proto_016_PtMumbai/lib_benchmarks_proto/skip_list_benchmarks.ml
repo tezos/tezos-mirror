@@ -47,6 +47,8 @@ module Next : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let tags = ["skip_list"]
 
   type config = {max_items : int}
@@ -100,6 +102,8 @@ module Hash_cell = struct
   let info = "Estimating the costs of hashing a skip list cell"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let tags = ["skip_list"]
 
