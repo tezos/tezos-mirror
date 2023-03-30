@@ -216,10 +216,19 @@ let process_consensus_op (type kind) state cctxt
     chain_id level round slot =
   let open Lwt_result_syntax in
   let diff = Raw_level.diff state.highest_level_encountered level in
-  if Int32.(diff > of_int state.preserved_levels) then return_unit
+  if Int32.(diff > of_int state.preserved_levels) then
     (* We do not handle operations older than [preserved_levels] *)
-  else if diff < -2l then return_unit
+    let*! () =
+      Events.(emit consensus_operation_too_old) (Operation.hash new_op)
+    in
+    return_unit
+  else if diff < -2l then
     (* We do not handle operations too far in the future *)
+    let*! () =
+      Events.(emit consensus_operation_too_far_in_future)
+        (Operation.hash new_op)
+    in
+    return_unit
   else
     let* endorsing_rights = get_validator_rights state cctxt level in
     match Slot.Map.find slot endorsing_rights with

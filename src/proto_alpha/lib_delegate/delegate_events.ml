@@ -90,6 +90,22 @@ module Denunciator = struct
       ~msg:"double consensus operation already denounced in {hash}"
       ("hash", Operation_hash.encoding)
 
+  let consensus_operation_too_old =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"consensus_operation_too_old"
+      ~msg:"operation {hash} is too old to be handled"
+      ("hash", Operation_hash.encoding)
+
+  let consensus_operation_too_far_in_future =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"consensus_operation_too_far_in_future"
+      ~msg:"operation {hash} too far in the future"
+      ("hash", Operation_hash.encoding)
+
   let inconsistent_endorsement =
     declare_1
       ~section
