@@ -24,12 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Result = struct
-  include Stdlib.Result
-
-  let get_or_recover_from : ('e -> 'a) -> ('a, 'e) result -> 'a =
-   fun f -> function Ok v -> v | Error e -> f e
-end
+let id x = x
 
 module Events = P2p_events.P2p_protocol
 
@@ -229,8 +224,9 @@ module Default_answerer = struct
       in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5187
          Handle silently ignored error cases. *)
-      Result.get_or_recover_from
-        (function
+      Result.fold
+        ~ok:id
+        ~error:(function
           | `No_swap_candidate source_peer_id ->
               Events.(emit no_swap_candidate) source_peer_id
           | `Couldnt_find_by_peer
