@@ -171,6 +171,9 @@ module Merkle_tree = struct
   *)
   type 'a page = Contents of bytes | Hashes of 'a list
 
+  (** Since 1 byte is used for the version tag, we can use numbers in range the
+      0...255. Since we have both [Contents] and [Hashes] pages, that means that
+      for every page type, we have at max 0...127 range available. *)
   let max_version = 127
 
   (** [Make_buffered] is a functor for creating a [Buffered_dac_codec] module.
@@ -524,10 +527,12 @@ module Merkle_tree = struct
   end
 
   module V0_metadata = struct
-    (* [contents_version_tag] used in contents pages is 0. *)
+    (* [contents_version_tag] used in contents pages is 0 since
+       [contents_version_tag] = 2 x [content_version]. *)
     let content_version = 0
 
-    (* [hashes_version_tag] used in hashes pages is 1. *)
+    (* [hashes_version_tag] used in hashes pages is 1 since
+       [hashes_version_tag] = 2 x [hashes_version] + 1. *)
     let hashes_version = 0
   end
 
