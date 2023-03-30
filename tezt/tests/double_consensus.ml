@@ -286,10 +286,147 @@ let double_preendorsement_wrong_branch =
     ~tags:["double"; "preendorsement"; "accuser"; "branch"; "node"]
   @@ fun protocol -> double_consensus_wrong_branch preendorse_utils protocol
 
+let consensus_operation_too_old_waiter accuser =
+  Accuser.wait_for accuser "consensus_operation_too_old.v0" (fun _ -> Some ())
+
+let operation_too_old =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"operation too old"
+    ~supports:Protocol.(From_protocol (number Nairobi))
+    ~tags:["accuser"; "old"; "operation"]
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let* accuser =
+    (* We set the preserved_levels to 0 to ensure that an operation for the
+       previous level is accepted by the mempool and discarded by the
+       accuser. *)
+    Accuser.init ~preserved_levels:0 ~event_level:`Debug ~protocol node
+  in
+  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  Log.info "Inject valid endorsement." ;
+  let waiter = Node.wait_for_request ~request:`Inject node in
+  let* () =
+    Client.endorse_for
+      ~protocol
+      ~force:true
+      ~key:[Constant.bootstrap1.alias]
+      client
+  in
+  let* () = waiter in
+  Log.info "Get mempool and recover consensus information." ;
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
+  let op = List.hd JSON.(mempool |-> "applied" |> as_list) in
+  let branch = JSON.(op |-> "branch" |> as_string) in
+  let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
+  let level = JSON.(content |-> "level" |> as_int) in
+  let slot = JSON.(content |-> "slot" |> as_int) in
+  let block_payload_hash =
+    JSON.(content |-> "block_payload_hash" |> as_string)
+  in
+  Log.info "Bake 1 block." ;
+  let* () = Client.bake_for client in
+  Log.info
+    "Craft and inject an endorsement 1 level in the past and wait for \
+     [consensus_operation_too_old.v0] event from the accuser." ;
+  let op =
+    Operation.Consensus.endorsement ~slot ~level ~round:3 ~block_payload_hash
+  in
+  let waiter = consensus_operation_too_old_waiter accuser in
+  let* _ =
+    Operation.Consensus.inject
+      ~force:true
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter in
+  unit
+
+let consensus_operation_too_far_in_future_waiter accuser =
+  Accuser.wait_for accuser "consensus_operation_too_far_in_future.v0" (fun _ ->
+      Some ())
+
+let operation_too_far_in_future =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"operation too far in the future"
+    ~supports:Protocol.(From_protocol (number Nairobi))
+    ~tags:["accuser"; "future"; "operation"]
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let* accuser =
+    Accuser.init ~preserved_levels:2 ~event_level:`Debug ~protocol node
+  in
+  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  Log.info "Inject valid endorsement." ;
+  let waiter = Node.wait_for_request ~request:`Inject node in
+  let* () =
+    Client.endorse_for
+      ~protocol
+      ~force:true
+      ~key:[Constant.bootstrap1.alias]
+      client
+  in
+  let* () = waiter in
+  Log.info "Get mempool and recover consensus information." ;
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
+  let op = List.hd JSON.(mempool |-> "applied" |> as_list) in
+  let branch = JSON.(op |-> "branch" |> as_string) in
+  let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
+  let block_payload_hash =
+    JSON.(content |-> "block_payload_hash" |> as_string)
+  in
+  let level = 6 in
+  Log.info
+    "Recover available slots for %s at level %d."
+    Constant.bootstrap1.alias
+    level ;
+  let* slots =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_helper_validators
+         ~delegate:Constant.bootstrap1.public_key_hash
+         ~level
+         ()
+  in
+  let slots =
+    List.map
+      JSON.as_int
+      JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+  in
+  Log.info
+    "Craft and inject an endorsement 3 levels in the future and wait for \
+     [consensus_operation_too_far_in_future.v0] event from the accuser." ;
+  let op =
+    Operation.Consensus.endorsement
+      ~slot:(List.hd slots)
+      ~level
+      ~round:0
+      ~block_payload_hash
+  in
+  let waiter = consensus_operation_too_far_in_future_waiter accuser in
+  let* _ =
+    Operation.Consensus.inject
+      ~force:true
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter in
+  unit
+
 let register ~protocols =
   double_endorsement_wrong_slot protocols ;
   double_preendorsement_wrong_slot protocols ;
   double_endorsement_wrong_block_payload_hash protocols ;
   double_preendorsement_wrong_block_payload_hash protocols ;
   double_endorsement_wrong_branch protocols ;
-  double_preendorsement_wrong_branch protocols
+  double_preendorsement_wrong_branch protocols ;
+  operation_too_old protocols ;
+  operation_too_far_in_future protocols
