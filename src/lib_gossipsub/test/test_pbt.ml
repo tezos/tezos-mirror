@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {2 PBT for gossipsub.} *)
+(* Testing
+   -------
+   Component:  Gossipsub
+   Invocation: dune exec test/test_gossipsub.exe -- --file test_pbt.ml
+   Subject:    PBT for gossipsub.
+*)
 
 open Test_gossipsub_shared
 open Gossipsub_intf

@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {2 Unit tests for gossipsub.} *)
+(* Testing
+   -------
+   Component:  Gossipsub
+   Invocation: dune exec test/test_gossipsub.exe -- --file test_unit.ml
+   Subject:    Unit tests for gossipsub
+*)
 
 open Test_gossipsub_shared
 open Gossipsub_intf
