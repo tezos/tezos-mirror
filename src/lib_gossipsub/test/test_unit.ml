@@ -1011,6 +1011,82 @@ let test_do_not_remove_too_many_outbound_peers rng limits parameters =
     outbound_peers ;
   unit
 
+(* Tests that outbound peers are added to the mesh
+   if the number of outbound peers is below [degree_out].
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L2338
+*)
+let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Add outbound peers if min is not satisfied"
+    ~tags:["gossipsub"; "heartbeat"; "outbound"]
+  @@ fun () ->
+  let topic = "topic" in
+  let inbound_peers, outbound_peers =
+    make_peers ~number:(limits.degree_high + limits.degree_out)
+    |> List.split_n limits.degree_high
+  in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers:inbound_peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ~outbound:(fun _ -> false)
+      ()
+  in
+  (* Graft all the inbound peers.
+     This workes because number of inbound peers is equal to [degree_high]. *)
+  let state =
+    List.fold_left
+      (fun state peer ->
+        let state, _ = GS.handle_graft {peer; topic} state in
+        state)
+      state
+      inbound_peers
+  in
+  (* Create [degree_out] outbound connections without grafting. *)
+  let state =
+    add_and_subscribe_peers
+      [topic]
+      outbound_peers
+      ~to_subscribe:(fun _ -> true)
+      ~outbound:(fun _ -> true)
+      state
+  in
+  (* At this point the mesh size filled with [degree_high] inbound peers. *)
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_high state ;
+  (* Heartbeat. *)
+  let _state, Heartbeat {to_prune; to_graft; _} = GS.heartbeat state in
+  (* The outbound peers should have been additionally added. *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
+     Uncomment once we change mesh size in heartbeat. *)
+  (* assert_mesh_size *)
+  (*   ~__LOC__ *)
+  (*   ~topic *)
+  (*   ~expected_size:(limits.degree_optimal + limits.degree_out) *)
+  (*   state ; *)
+  let peers_to_prune =
+    to_prune |> Peer.Map.bindings |> List.map (fun (peer, _topics) -> peer)
+  in
+  let peers_to_graft =
+    to_graft |> Peer.Map.bindings |> List.map (fun (peer, _topics) -> peer)
+  in
+  Check.(
+    (List.length peers_to_prune = 0)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  Check.(
+    (List.length peers_to_graft = limits.degree_out)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  unit
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
@@ -1026,4 +1102,5 @@ let register rng limits parameters =
   test_do_not_graft_within_backoff_period rng limits parameters ;
   test_unsubscribe_backoff rng limits parameters ;
   test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters ;
-  test_do_not_remove_too_many_outbound_peers rng limits parameters
+  test_do_not_remove_too_many_outbound_peers rng limits parameters ;
+  test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters
