@@ -263,6 +263,13 @@ Baker
   necessary causing unexpected out of space errors making the baker
   crash.
 
+Signer
+------
+
+- **Breaking change**: Versioning of signature module for protocol
+  specific support and future extensibility. Signatures length became
+  variable which changed their binary encoding. This breaks the
+  compatibility with octez-signer <= 15.1 in local and socket modes.
 
 Proxy Server
 ------------
@@ -288,9 +295,6 @@ Rollups
 
 Miscellaneous
 -------------
-
-- Versioning of signature module for protocol specific support and future
-  extensibility.
 
 - Removed binaries and mempool RPCs of Kathmandu.
 
