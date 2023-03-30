@@ -663,8 +663,22 @@ let test_mesh_addition rng limits parameters =
   (* Heartbeat. *)
   let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
   (* There should be two grafting requests to fill the mesh. *)
-  let grafts = Peer.Map.bindings to_graft in
-  Check.((List.length grafts = 2) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
+  let peers_to_graft =
+    to_graft |> Peer.Map.bindings |> List.map (fun (peer, _topic) -> peer)
+  in
+  Check.(
+    (List.length peers_to_graft = 2)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  (* Mesh size should be [degree_optimal] and the newly grafted peers should be in the mesh.  *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
+     Uncomment once we change mesh size in heartbeat. *)
+  (* assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ; *)
+  (* List.iter *)
+  (*   (fun peer -> *)
+  (*     assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included:true state) *)
+  (*   peers_to_graft ; *)
   unit
 
 (** Test mesh subtraction in maintainance heartbeat.
@@ -704,12 +718,22 @@ let test_mesh_subtraction rng limits parameters =
   (* Heartbeat. *)
   let _state, Heartbeat {to_prune; _} = GS.heartbeat state in
   (* There should be enough prune requests to bring back the mesh size to [degree_optimal]. *)
-  let prunes = Peer.Map.bindings to_prune in
+  let peers_to_prune =
+    to_prune |> Peer.Map.bindings |> List.map (fun (peer, _topic) -> peer)
+  in
   Check.(
-    (List.length prunes = peer_number - limits.degree_optimal)
+    (List.length peers_to_prune = peer_number - limits.degree_optimal)
       int
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
+  (* Mesh size should be [degree_optimal] and the pruned peers should not be in the mesh.  *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
+     Uncomment once we change mesh size in heartbeat. *)
+  (* assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ; *)
+  (* List.iter *)
+  (*   (fun peer -> *)
+  (*     assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included:false state) *)
+  (*   peers_to_prune ; *)
   unit
 
 let register rng limits parameters =
