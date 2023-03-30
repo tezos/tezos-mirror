@@ -3397,18 +3397,60 @@ let test_forking_scenario ~kind ~variant scenario =
 let cement_commitments client sc_rollup ?fail =
   Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
 
-let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 client =
+let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 ?(src = staker1) client
+    =
   let*! () =
     Client.Sc_rollup.timeout
       ~hooks
       ~dst:sc_rollup
-      ~src:Constant.bootstrap1.alias
+      ~src
       ~staker1
       ~staker2
       client
       ?expect_failure
   in
   Client.bake_for_and_wait client
+
+let start_refute client ~source ~opponent ~sc_rollup ~player_commitment_hash
+    ~opponent_commitment_hash =
+  let module M = Operation.Manager in
+  let refutation = M.Start {player_commitment_hash; opponent_commitment_hash} in
+  bake_operation_via_rpc ~__LOC__ client
+  @@ M.make ~source
+  @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
+
+(** [move_refute_with_unique_state_hash
+    ?number_of_sections_in_dissection client ~source ~opponent
+    ~sc_rollup ~state_hash] submits a dissection refutation
+    operation. The dissection is always composed of the same
+    state_hash and should only be used for test. *)
+let move_refute_with_unique_state_hash ?number_of_sections_in_dissection client
+    ~source ~opponent ~sc_rollup ~state_hash =
+  let module M = Operation.Manager in
+  let* number_of_sections_in_dissection =
+    match number_of_sections_in_dissection with
+    | Some n -> return n
+    | None ->
+        let* {number_of_sections_in_dissection; _} =
+          get_sc_rollup_constants client
+        in
+        return number_of_sections_in_dissection
+  in
+  (* Construct a valid dissection with valid initial hash of size
+     [sc_rollup.number_of_sections_in_dissection]. The state hash
+     given is the state hash of the parent commitment of the refuted
+     one and the one used for all tick. *)
+  let rec aux i acc =
+    if i = number_of_sections_in_dissection - 1 then
+      List.rev (M.{state_hash = None; tick = i} :: acc)
+    else aux (i + 1) (M.{state_hash = Some state_hash; tick = i} :: acc)
+  in
+  let refutation =
+    M.Move {choice_tick = 0; refutation_step = Dissection (aux 0 [])}
+  in
+  bake_operation_via_rpc ~__LOC__ client
+  @@ M.make ~source
+  @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
 
 (** Given a commitment tree constructed by {test_forking_scenario}, this function:
     - tests different (failing and non-failing) cementation of commitments
@@ -3448,18 +3490,14 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
      loses the dispute, and the branch c32 --- c321 dies. *)
 
   (* [operator1] starts a dispute. *)
-  let module M = Operation.Manager in
   let* () =
-    let refutation =
-      M.Start {player_commitment_hash = c32; opponent_commitment_hash = c31}
-    in
-    bake_operation_via_rpc ~__LOC__ client
-    @@ M.make ~source:operator2
-    @@ M.sc_rollup_refute
-         ~sc_rollup
-         ~opponent:operator1.public_key_hash
-         ~refutation
-         ()
+    start_refute
+      client
+      ~source:operator2
+      ~opponent:operator1.public_key_hash
+      ~sc_rollup
+      ~player_commitment_hash:c32
+      ~opponent_commitment_hash:c31
   in
   (* [operator1] will not play and will be timeout-ed. *)
   let timeout_period = constants.timeout_period_in_blocks in
@@ -3489,9 +3527,6 @@ let test_valid_dispute_dissection =
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
   let commitment_period = constants.commitment_period_in_blocks in
-  let number_of_sections_in_dissection =
-    constants.number_of_sections_in_dissection
-  in
   let* () =
     (* Be able to cement both c1 and c2 *)
     repeat (challenge_window + commitment_period) (fun () ->
@@ -3503,37 +3538,28 @@ let test_valid_dispute_dissection =
   let source = operator2 in
   let opponent = operator1.public_key_hash in
   let* () =
-    let refutation =
-      M.Start {player_commitment_hash = c32; opponent_commitment_hash = c31}
-    in
-    bake_operation_via_rpc ~__LOC__ client
-    @@ M.make ~source
-    @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
+    start_refute
+      client
+      ~source
+      ~opponent
+      ~sc_rollup
+      ~player_commitment_hash:c32
+      ~opponent_commitment_hash:c31
   in
-  (* Construct a valid dissection with valid initial hash of size
-     [sc_rollup.number_of_sections_in_dissection]. The state hash below is
-     the hash of the state computed after submitting the first commitment c1
-     (which is also equal to states's hashes of subsequent commitments, as we
-     didn't add any message in inboxes). If this hash needs to be recomputed,
-     run this test with --verbose and grep for 'compressed_state' in the
-     produced logs. *)
+  (* If this hash needs to be recomputed, run this test with --verbose
+     and grep for 'compressed_state' in the produced logs. *)
   let state_hash = "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj" in
 
-  let rec aux i acc =
-    if i = number_of_sections_in_dissection - 1 then
-      List.rev ({M.state_hash = None; tick = i} :: acc)
-    else aux (i + 1) ({M.state_hash = Some state_hash; tick = i} :: acc)
-  in
   (* Inject a valid dissection move *)
-  let refutation =
-    M.Move {choice_tick = 0; refutation_step = Dissection (aux 0 [])}
+  let* () =
+    move_refute_with_unique_state_hash
+      client
+      ~source
+      ~opponent
+      ~sc_rollup
+      ~state_hash
   in
 
-  let* () =
-    bake_operation_via_rpc ~__LOC__ client
-    @@ M.make ~source
-    @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
-  in
   (* We cannot cement neither c31, nor c32 because refutation game hasn't
      ended. *)
   cement [c31; c32] ~fail:"Attempted to cement a disputed commitment"
@@ -3573,16 +3599,13 @@ let test_timeout =
   let module M = Operation.Manager in
   (* [operator2] starts a dispute, but won't be playing then. *)
   let* () =
-    let refutation =
-      M.Start {player_commitment_hash = c32; opponent_commitment_hash = c31}
-    in
-    bake_operation_via_rpc ~__LOC__ client
-    @@ M.make ~source:operator2
-    @@ M.sc_rollup_refute
-         ~sc_rollup
-         ~opponent:operator1.public_key_hash
-         ~refutation
-         ()
+    start_refute
+      client
+      ~source:operator2
+      ~opponent:operator1.public_key_hash
+      ~sc_rollup
+      ~player_commitment_hash:c32
+      ~opponent_commitment_hash:c31
   in
   (* Get exactly to the block where we are able to timeout. *)
   let* () =
@@ -3816,20 +3839,13 @@ let test_refutation_reward_and_punishment ~kind =
   let module M = Operation.Manager in
   (* [operator1] starts a dispute, but will never play. *)
   let* () =
-    let refutation =
-      M.Start
-        {
-          player_commitment_hash = operator1_commitment;
-          opponent_commitment_hash = operator2_commitment;
-        }
-    in
-    bake_operation_via_rpc ~__LOC__ client
-    @@ M.make ~source:operator1
-    @@ M.sc_rollup_refute
-         ~sc_rollup
-         ~opponent:operator2.public_key_hash
-         ~refutation
-         ()
+    start_refute
+      client
+      ~source:operator1
+      ~opponent:operator2.public_key_hash
+      ~sc_rollup
+      ~player_commitment_hash:operator1_commitment
+      ~opponent_commitment_hash:operator2_commitment
   in
   (* Get exactly to the block where we are able to timeout. *)
   let* () =
@@ -3840,6 +3856,7 @@ let test_refutation_reward_and_punishment ~kind =
       ~sc_rollup
       ~staker1:operator2.public_key_hash
       ~staker2:operator1.public_key_hash
+      ~src:Constant.bootstrap1.alias
       client
   in
 
