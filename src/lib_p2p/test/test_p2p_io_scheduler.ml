@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler_ipv4
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      On I/O scheduling of client-server connections.
 *)
