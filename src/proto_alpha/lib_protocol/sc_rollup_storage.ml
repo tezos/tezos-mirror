@@ -121,6 +121,9 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
   let* ctxt, commitment_size_diff =
     init_commitment_storage ctxt address genesis_info genesis_commitment
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4551
+     There is no need to have both `origination_size` and the size of storage.
+     We should remove one of them. *)
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
