@@ -1007,7 +1007,7 @@ module Make (C : AUTOMATON_CONFIG) :
        - If the number of remaining peers in the topic mesh is higher than
        [degree_low] and the number of outbound peers therein is smaller than
        [degree_out], then select an additional number of peers to graft (with
-       the same conditions for grafting) to ensure that here at least
+       the same conditions for grafting) to ensure that there are at least
        [degree_out] outbound peers in the mesh.
 
        Finally, for pruned peers, back them off for [prune_backoff] time.

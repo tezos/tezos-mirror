@@ -25,7 +25,7 @@
 
 (** A sliding window cache of published messages. The module also keeps track of
     the number of accesses to a message by a peer, thus indirectly tracking the
-    number of IWANT requests a peer makes for the same message.
+    number of IWant requests a peer makes for the same message.
 
     The module assumes that no two messages have the same message id. However,
     the cache stores duplicates; for instance, if [add_message id msg topic] is
@@ -43,7 +43,7 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
       the last [gossip_slots]. The [gossip_slots] must be smaller or equal to
       [history_slots]. The slack between [gossip_slots] and [history_slots]
       accounts for the reaction time between when a message is advertised via
-      IHAVE gossip, and when the peer pulls it via an IWANT command.
+      IHave gossip, and when the peer pulls it via an IWant command.
 
       @raise Assert_failure when [gossip_slots <= 0 || gossip_slots > history_slots]
 
