@@ -52,7 +52,10 @@ type event = {name : string; value : JSON.t; timestamp : float}
     will communicate with it.
 
     If [runner] is specified, the accuser will be spawned on this
-    runner using SSH. *)
+    runner using SSH.
+
+    [preserved_levels] is the number of effective levels kept in the accuser's
+    memory*)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -60,6 +63,7 @@ val create :
   ?event_pipe:string ->
   ?base_dir:string ->
   ?runner:Runner.t ->
+  ?preserved_levels:int ->
   Node.t ->
   t
 
@@ -148,7 +152,10 @@ val log_events : t -> unit
     will communicate with it.
 
     If [runner] is specified, the accuser will be spawned on this
-    runner using SSH. *)
+    runner using SSH.
+
+    [preserved_levels] is the number of effective levels kept in the accuser's
+    memory *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
@@ -157,6 +164,7 @@ val init :
   ?event_level:Daemon.Level.default_level ->
   ?base_dir:string ->
   ?runner:Runner.t ->
+  ?preserved_levels:int ->
   Node.t ->
   t Lwt.t
 

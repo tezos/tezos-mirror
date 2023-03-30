@@ -29,6 +29,7 @@ module Parameters = struct
     base_dir : string;
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
+    preserved_levels : int option;
   }
 
   type session_state = {mutable ready : bool}
@@ -59,7 +60,8 @@ let set_ready accuser =
 let handle_raw_stdout accuser line =
   if line =~ rex "^Waiting for protocol .+ to start...$" then set_ready accuser
 
-let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
+let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner
+    ?preserved_levels node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -71,7 +73,7 @@ let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
       ?color
       ?event_pipe
       ?runner
-      {runner; base_dir; node; pending_ready = []}
+      {runner; base_dir; node; pending_ready = []; preserved_levels}
   in
   on_stdout accuser (handle_raw_stdout accuser) ;
   accuser
@@ -84,6 +86,12 @@ let run ?event_level accuser =
   let node_runner = Node.runner accuser.persistent_state.node in
   let node_rpc_port = node_rpc_port accuser in
   let address = "http://" ^ Runner.address ?from:runner node_runner ^ ":" in
+  let preserved_levels =
+    Cli_arg.optional_arg
+      "preserved-levels"
+      string_of_int
+      accuser.persistent_state.preserved_levels
+  in
   let arguments =
     [
       "-E";
@@ -92,6 +100,7 @@ let run ?event_level accuser =
       accuser.persistent_state.base_dir;
       "run";
     ]
+    @ preserved_levels
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
@@ -117,11 +126,19 @@ let wait_for_ready accuser =
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?event_level ?base_dir ?runner node
-    =
+let init ~protocol ?name ?color ?event_pipe ?event_level ?base_dir ?runner
+    ?preserved_levels node =
   let* () = Node.wait_for_ready node in
   let accuser =
-    create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node
+    create
+      ~protocol
+      ?name
+      ?color
+      ?event_pipe
+      ?base_dir
+      ?runner
+      ?preserved_levels
+      node
   in
   let* () = run ?event_level accuser in
   let* () = wait_for_ready accuser in
