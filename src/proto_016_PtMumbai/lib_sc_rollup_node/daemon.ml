@@ -552,7 +552,8 @@ module Make (PVM : Pvm.S) = struct
           (Node_context.readonly node_ctxt)
           ~data_dir:node_ctxt.data_dir
           ~signers
-          ~retention_period:configuration.injector_retention_period
+          ~retention_period:configuration.injector.retention_period
+          ~allowed_attempts:configuration.injector.attempts
       in
       let* () =
         match
