@@ -227,14 +227,14 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_low > 0) ;
     assert (l.degree_out >= 0) ;
     assert (l.degree_score >= 0) ;
-    assert (l.degree_low < l.degree_optimal) ;
-    assert (l.degree_high > l.degree_optimal) ;
+    assert (l.degree_low <= l.degree_optimal) ;
+    assert (l.degree_high >= l.degree_optimal) ;
     assert (l.backoff_cleanup_ticks > 0) ;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
        This requirement is not imposed in the spec/Go implementation. Relax this
        requirement or delete the todo. *)
     assert (l.degree_score + l.degree_out <= l.degree_optimal) ;
-    assert (l.degree_out < l.degree_low) ;
+    assert (l.degree_out <= l.degree_low) ;
     assert (l.degree_out <= l.degree_optimal / 2) ;
     assert (l.history_gossip_length > 0) ;
     assert (l.history_gossip_length <= l.history_length)
