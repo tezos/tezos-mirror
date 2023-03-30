@@ -82,6 +82,11 @@ type ('peer, 'message_id, 'span) limits = {
   max_sent_iwant_per_heartbeat : int;
       (** The maximum number of control messages [IWant] we can sent
           to our peers between two heartbeats. *)
+  max_gossip_retransmission : int;
+      (** The maximum number of times the local peer allows a remote peer to
+          request the same message id through IWant gossip before the local peer
+          starts ignoring them. This is designed to prevent peers from spamming
+          with requests. *)
   degree_optimal : int;
       (** The optimal number of full connections per topic. For
           example, if it is 6, each peer will want to have about six peers in
@@ -250,7 +255,8 @@ module type AUTOMATON = sig
             [max_sent_iwant_per_heartbeat] limit. *)
     | On_iwant_messages_to_route : {
         routed_message_ids :
-          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
+          [`Ignored | `Not_found | `Too_many_requests | `Message of message]
+          Message_id.Map.t;
       }
         -> [`IWant] output
         (** As an answer for an [`IWant] message, the automaton returns a map

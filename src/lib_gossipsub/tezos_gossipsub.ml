@@ -125,7 +125,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
     | On_iwant_messages_to_route : {
         routed_message_ids :
-          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
+          [`Ignored | `Not_found | `Too_many_requests | `Message of message]
+          Message_id.Map.t;
       }
         -> [`IWant] output
     | Peer_filtered : [`Graft] output
@@ -300,6 +301,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let degree_score state = state.limits.degree_score
 
     let degree_out state = state.limits.degree_out
+
+    let max_gossip_retransmission state = state.limits.max_gossip_retransmission
 
     let mesh state = state.mesh
 
@@ -591,11 +594,8 @@ module Make (C : AUTOMATON_CONFIG) :
       let routed_message_ids = Message_id.Map.empty in
       let*! message_cache in
       let*! peer_filter in
+      let*! max_gossip_retransmission in
       let message_cache, routed_message_ids =
-        (* FIXME https://gitlab.com/tezos/tezos/-/issues/5011
-
-           A check should ensure that the number of accesses do not
-           exceed some pre-defined limit. *)
         List.fold_left
           (fun (message_cache, messages) message_id ->
             let message_cache, info =
@@ -603,9 +603,11 @@ module Make (C : AUTOMATON_CONFIG) :
                 Message_cache.get_message_for_peer peer message_id message_cache
               with
               | None -> (message_cache, `Not_found)
-              | Some (message_cache, message, _access_counter) ->
+              | Some (message_cache, message, access_counter) ->
                   ( message_cache,
-                    if peer_filter peer (`IWant message_id) then
+                    if access_counter > max_gossip_retransmission then
+                      `Too_many_requests
+                    else if peer_filter peer (`IWant message_id) then
                       `Message message
                     else `Ignored )
             in
