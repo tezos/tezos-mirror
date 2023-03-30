@@ -1829,6 +1829,9 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let pp_topic_set = Fmt.Dump.iter Topic.Set.iter Fmt.nop Topic.pp
 
+  let pp_topic_map pp_elt =
+    Fmt.Dump.iter_bindings Topic.Map.iter Fmt.nop Topic.pp pp_elt
+
   let pp_output (type a) fmtr (o : a output) =
     let open Format in
     match o with
@@ -2036,5 +2039,31 @@ module Make (C : AUTOMATON_CONFIG) :
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh
+
+    let pp_connection fmtr c =
+      let fields =
+        List.concat
+          [
+            (if Topic.Set.is_empty c.topics then []
+            else [Fmt.field "topics" (fun c -> c.topics) pp_topic_set]);
+            [Fmt.field "direct" (fun c -> c.direct) Fmt.bool];
+            [Fmt.field "outbound" (fun c -> c.outbound) Fmt.bool];
+          ]
+      in
+      Fmt.record fields fmtr c
+
+    let pp_connections =
+      Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_connection
+
+    (* re-export printers *)
+    let pp_peer_map = pp_peer_map
+
+    let pp_message_id_map = pp_message_id_map
+
+    let pp_topic_map = pp_topic_map
+
+    let pp_peer_set = pp_peer_set
+
+    let pp_topic_set = pp_topic_set
   end
 end
