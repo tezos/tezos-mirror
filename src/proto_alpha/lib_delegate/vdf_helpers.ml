@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+open Protocol.Alpha_context
 
-type event = {name : string; value : JSON.t; timestamp : float}
-
-val create :
-  protocol:Protocol.t ->
-  ?name:string ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?runner:Runner.t ->
-  Node.t ->
-  t
-
-(** Send SIGTERM and wait for the process to terminate.
-
-    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
-val terminate : ?timeout:float -> t -> unit Lwt.t
-
-(** Send SIGKILL and wait for the process to terminate. *)
-val kill : t -> unit Lwt.t
-
-val run : t -> unit Lwt.t
-
-val init :
-  protocol:Protocol.t ->
-  ?name:string ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?runner:Runner.t ->
-  Node.t ->
-  t Lwt.t
-
-val restart : t -> unit Lwt.t
-
-val on_event : t -> (event -> unit) -> unit
-
-(** [Helpers] models functions from [Lib_delegate.Vdf_helpers]. *)
-module Helpers : sig
-  val is_in_nonce_revelation_stage :
-    nonce_revelation_threshold:int32 -> level:RPC.level -> bool
-end
+let is_in_nonce_revelation_stage ~nonce_revelation_threshold ~(level : Level.t)
+    =
+  let cycle_position = level.cycle_position in
+  Int32.compare cycle_position nonce_revelation_threshold < 0

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+open Protocol.Alpha_context
 
-type event = {name : string; value : JSON.t; timestamp : float}
-
-val create :
-  protocol:Protocol.t ->
-  ?name:string ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?runner:Runner.t ->
-  Node.t ->
-  t
-
-(** Send SIGTERM and wait for the process to terminate.
-
-    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
-val terminate : ?timeout:float -> t -> unit Lwt.t
-
-(** Send SIGKILL and wait for the process to terminate. *)
-val kill : t -> unit Lwt.t
-
-val run : t -> unit Lwt.t
-
-val init :
-  protocol:Protocol.t ->
-  ?name:string ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?runner:Runner.t ->
-  Node.t ->
-  t Lwt.t
-
-val restart : t -> unit Lwt.t
-
-val on_event : t -> (event -> unit) -> unit
-
-(** [Helpers] models functions from [Lib_delegate.Vdf_helpers]. *)
-module Helpers : sig
-  val is_in_nonce_revelation_stage :
-    nonce_revelation_threshold:int32 -> level:RPC.level -> bool
-end
+(** [is_in_nonce_revelation_stage ~nonce_revelation_threshold ~level] checks
+    whether [level] is part of the nonce revelation stage of its cycle, which
+    is defined as the first [nonce_revelation_threshold] blocks of every cycle.
+    It is used to avoid calling the [Seed_computation] RPC on blocks which are
+    part of the nonce revelation stage.
+ *)
+val is_in_nonce_revelation_stage :
+  nonce_revelation_threshold:int32 -> level:Level.t -> bool
