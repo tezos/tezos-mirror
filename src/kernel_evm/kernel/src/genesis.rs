@@ -35,17 +35,20 @@ const MINT_ACCOUNTS_NUMBER: usize = 3;
 const MINT_ACCOUNTS: [MintAccount; MINT_ACCOUNTS_NUMBER] = [
     MintAccount {
         mint_address: "6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
-        genesis_tx_hash: "47454e4553495341444452455353000000000000000000000000000000000001",
+        genesis_tx_hash:
+            "47454e4553495341444452455353000000000000000000000000000000000001",
         eth_amount: 9999,
     },
     MintAccount {
         mint_address: "b53dc01974176e5dff2298c5a94343c2585e3c54",
-        genesis_tx_hash: "47454e4553495341444452455353000000000000000000000000000000000002",
+        genesis_tx_hash:
+            "47454e4553495341444452455353000000000000000000000000000000000002",
         eth_amount: 9999,
     },
     MintAccount {
         mint_address: "9b49c988b5817be31dfb00f7a5a4671772dcce2b",
-        genesis_tx_hash: "47454e4553495341444452455353000000000000000000000000000000000003",
+        genesis_tx_hash:
+            "47454e4553495341444452455353000000000000000000000000000000000003",
         eth_amount: 9999,
     },
 ];

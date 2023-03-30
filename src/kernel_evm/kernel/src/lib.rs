@@ -19,7 +19,10 @@ mod helpers;
 mod inbox;
 mod storage;
 
-pub fn stage_one<Host: Runtime>(host: &mut Host, smart_rollup_address: [u8; 20]) -> Queue {
+pub fn stage_one<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Queue {
     let queue = fetch(host, smart_rollup_address);
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
@@ -56,7 +59,9 @@ pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Err
     Ok(())
 }
 
-fn retrieve_smart_rollup_address<Host: Runtime>(host: &mut Host) -> Result<[u8; 20], Error> {
+fn retrieve_smart_rollup_address<Host: Runtime>(
+    host: &mut Host,
+) -> Result<[u8; 20], Error> {
     match read_smart_rollup_address(host) {
         Ok(smart_rollup_address) => Ok(smart_rollup_address),
         Err(_) => {
@@ -88,7 +93,9 @@ fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 pub fn main<Host: Runtime>(host: &mut Host) {
     let smart_rollup_address = match retrieve_smart_rollup_address(host) {
         Ok(smart_rollup_address) => smart_rollup_address,
-        Err(_) => panic!("Error while retrieving smart rollup's address: stopping the daemon."),
+        Err(_) => {
+            panic!("Error while retrieving smart rollup's address: stopping the daemon.")
+        }
     };
 
     if genesis_initialisation(host).is_err() {

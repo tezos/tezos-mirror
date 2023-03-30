@@ -12,12 +12,15 @@ use crate::block::L2Block;
 use crate::error::Error;
 use tezos_ethereum::account::*;
 use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level};
-use tezos_ethereum::transaction::{TransactionHash, TransactionReceipt, TRANSACTION_HASH_SIZE};
+use tezos_ethereum::transaction::{
+    TransactionHash, TransactionReceipt, TRANSACTION_HASH_SIZE,
+};
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::U256;
 
-const SMART_ROLLUP_ADDRESS: RefPath = RefPath::assert_from(b"/metadata/smart_rollup_address");
+const SMART_ROLLUP_ADDRESS: RefPath =
+    RefPath::assert_from(b"/metadata/smart_rollup_address");
 
 const EVM_ACCOUNTS: RefPath = RefPath::assert_from(b"/eth_accounts");
 
@@ -47,7 +50,9 @@ const HASH_MAX_SIZE: usize = 32;
 // TRANSACTION_HASH_SIZE * 128 = 4096.
 const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
 
-pub fn read_smart_rollup_address<Host: Runtime>(host: &mut Host) -> Result<[u8; 20], Error> {
+pub fn read_smart_rollup_address<Host: Runtime>(
+    host: &mut Host,
+) -> Result<[u8; 20], Error> {
     let mut buffer = [0u8; 20];
 
     match host.store_read_slice(&SMART_ROLLUP_ADDRESS, 0, &mut buffer) {
@@ -73,7 +78,11 @@ fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     Ok(Wei::from_little_endian(&bytes))
 }
 
-fn write_u256(host: &mut impl Runtime, path: &OwnedPath, value: U256) -> Result<(), Error> {
+fn write_u256(
+    host: &mut impl Runtime,
+    path: &OwnedPath,
+    value: U256,
+) -> Result<(), Error> {
     let mut bytes: [u8; WORD_SIZE] = value.into();
     value.to_little_endian(&mut bytes);
     host.store_write(path, &bytes, 0).map_err(Error::from)
@@ -143,7 +152,10 @@ pub fn read_account_code_hash<Host: Runtime>(
         .map_err(Error::from)
 }
 
-pub fn read_account<Host: Runtime>(host: &mut Host, address: Hash) -> Result<Account, Error> {
+pub fn read_account<Host: Runtime>(
+    host: &mut Host,
+    address: Hash,
+) -> Result<Account, Error> {
     let account_path = account_path(address)?;
     let nonce = read_account_nonce(host, &account_path)?;
     let balance = read_account_balance(host, &account_path)?;
@@ -270,12 +282,18 @@ fn store_block<Host: Runtime>(
     store_block_transactions(host, block_path, &block.transactions)
 }
 
-pub fn store_block_by_number<Host: Runtime>(host: &mut Host, block: &L2Block) -> Result<(), Error> {
+pub fn store_block_by_number<Host: Runtime>(
+    host: &mut Host,
+    block: &L2Block,
+) -> Result<(), Error> {
     let block_path = block_path(block.number)?;
     store_block(host, block, &block_path)
 }
 
-pub fn store_current_block<Host: Runtime>(host: &mut Host, block: &L2Block) -> Result<(), Error> {
+pub fn store_current_block<Host: Runtime>(
+    host: &mut Host,
+    block: &L2Block,
+) -> Result<(), Error> {
     let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
     // We only need to store current block's number so we avoid the storage of duplicate informations.
     store_block_number(host, &current_block_path, block.number)?;
