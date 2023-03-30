@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Lib_dac_node Data_streamer
+    Invocation: dune exec src/lib_dac_node/test/main.exe   
+    Subject:    Tests for the data streamer component.
+*)
+
 module Unit_test : sig
   (**
    * Example: [spec "Data_streamer.ml" Test_data_streamer.tests]
