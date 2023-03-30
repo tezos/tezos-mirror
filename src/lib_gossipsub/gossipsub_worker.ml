@@ -32,6 +32,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   Gossipsub_intf.WORKER with module GS = C.GS = struct
   open C
   module GS = GS
+  module Topic = GS.Topic
+  module Peer = GS.Peer
+  module Message_id = GS.Message_id
+  module Message = GS.Message
 
   (** A worker has one of the following statuses:
      - [Starting] in case it is initialized with {!make} but not started yet.
@@ -43,21 +47,37 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_handle : unit Monad.t;
       }
 
-  type p2p_message
+  type p2p_message =
+    | Graft of {topic : Topic.t}
+    | Prune of {topic : Topic.t; px : Peer.t Seq.t}
+    | IHave of {topic : Topic.t; message_ids : Message_id.t list}
+    | IWant of {message_ids : Message_id.t list}
+    | Subscribe of {topic : Topic.t}
+    | Unsubscribe of {topic : Topic.t}
+    | Publish of {
+        topic : Topic.t;
+        message_id : Message_id.t;
+        message : Message.t;
+      }
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
+
+     The payloads of the variants about are quite simular to those of GS (types
+     graft, prune, ...). We could reuse them if we move the peer field
+     outside. *)
 
   (** The different kinds of events the Gossipsub worker handles. *)
   type event =
     | Heartbeat
     | New_connection of P2P.Connections_handler.connection
-    | Disconnection of {peer : GS.Peer.t}
-    | Received_message of {peer : GS.Peer.t; message : p2p_message}
+    | Disconnection of {peer : Peer.t}
+    | Received_message of {peer : Peer.t; p2p_message : p2p_message}
     | Inject_message of {
-        message : GS.Message.t;
-        message_id : GS.Message_id.t;
-        topic : GS.Topic.t;
+        message : Message.t;
+        message_id : Message_id.t;
+        topic : Topic.t;
       }
-    | Join of GS.Topic.t
-    | Leave of GS.Topic.t
+    | Join of Topic.t
+    | Leave of Topic.t
 
   (** The worker's state is made of its status, the gossipsub automaton's state,
       and a stream of events to process.  *)
@@ -130,6 +150,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** A helper function that pushes events in the state *)
   let push e t = Stream.push e t.events_stream
+
+  let p2p_message t peer p2p_message =
+    push (Received_message {peer; p2p_message}) t
 
   (** A set of functions that push different kinds of events in the worker's
       state. *)
