@@ -4803,6 +4803,148 @@ let test_migration_recover ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+(* Test to refute a commitment pre-migration. *)
+let test_migration_refute ~kind ~migrate_from ~migrate_to =
+  let tags = ["refutation"]
+  and description = "Refuting a pre-migration commitment."
+  and scenario_prior tezos_client ~sc_rollup =
+    let* commitment1, hash1 =
+      bake_period_then_publish_commitment
+        ~sc_rollup
+        ~number_of_ticks:1
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    let* _commitment2, hash2 =
+      forge_and_publish_commitment
+        ~inbox_level:commitment1.inbox_level
+        ~predecessor:commitment1.predecessor
+        ~sc_rollup
+        ~number_of_ticks:2
+        ~src:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    return (hash1, hash2)
+  and scenario_after tezos_client ~sc_rollup
+      (player_commitment_hash, opponent_commitment_hash) =
+    let* {timeout_period_in_blocks = timeout_period; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let* () =
+      start_refute
+        tezos_client
+        ~sc_rollup
+        ~source:Constant.bootstrap1
+        ~opponent:Constant.bootstrap2.public_key_hash
+        ~player_commitment_hash
+        ~opponent_commitment_hash
+    in
+    let* Sc_rollup_client.{compressed_state = state_hash; _} =
+      Sc_rollup_helpers.genesis_commitment ~sc_rollup tezos_client
+    in
+    let* () =
+      move_refute_with_unique_state_hash
+        ~number_of_sections_in_dissection:3
+        tezos_client
+        ~source:Constant.bootstrap1
+        ~opponent:Constant.bootstrap2.public_key_hash
+        ~sc_rollup
+        ~state_hash
+    in
+    let* () =
+      repeat (timeout_period + 1) (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    let* () =
+      timeout
+        ~sc_rollup
+        ~staker1:Constant.bootstrap1.public_key_hash
+        ~staker2:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    unit
+  in
+  test_l1_migration_scenario
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
+(* Test to refute a commitment pre-migration. *)
+let test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to =
+  let tags = ["refutation"]
+  and description =
+    "Refuting a commitment pre-migration when the game started pre-migration."
+  and scenario_prior tezos_client ~sc_rollup =
+    let* commitment1, player_commitment_hash =
+      bake_period_then_publish_commitment
+        ~sc_rollup
+        ~number_of_ticks:1
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    let* _commitment2, opponent_commitment_hash =
+      forge_and_publish_commitment
+        ~inbox_level:commitment1.inbox_level
+        ~predecessor:commitment1.predecessor
+        ~sc_rollup
+        ~number_of_ticks:2
+        ~src:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    let* () =
+      start_refute
+        tezos_client
+        ~sc_rollup
+        ~source:Constant.bootstrap1
+        ~opponent:Constant.bootstrap2.public_key_hash
+        ~player_commitment_hash
+        ~opponent_commitment_hash
+    in
+    unit
+  and scenario_after tezos_client ~sc_rollup () =
+    let* {timeout_period_in_blocks = timeout_period; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let* Sc_rollup_client.{compressed_state = state_hash; _} =
+      Sc_rollup_helpers.genesis_commitment ~sc_rollup tezos_client
+    in
+    let* () =
+      move_refute_with_unique_state_hash
+        ~number_of_sections_in_dissection:3
+        tezos_client
+        ~source:Constant.bootstrap1
+        ~opponent:Constant.bootstrap2.public_key_hash
+        ~sc_rollup
+        ~state_hash
+    in
+    let* () =
+      repeat (timeout_period + 1) (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    let* () =
+      timeout
+        ~sc_rollup
+        ~staker1:Constant.bootstrap1.public_key_hash
+        ~staker2:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    unit
+  in
+  test_l1_migration_scenario
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
 let test_injector_auto_discard =
   test_full_scenario
     {
@@ -5033,7 +5175,9 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
   test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to ;
   test_migration_cement ~kind ~migrate_from ~migrate_to ;
-  test_migration_recover ~kind ~migrate_from ~migrate_to
+  test_migration_recover ~kind ~migrate_from ~migrate_to ;
+  test_migration_refute ~kind ~migrate_from ~migrate_to ;
+  test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;

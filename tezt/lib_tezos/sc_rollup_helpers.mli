@@ -84,3 +84,9 @@ val default_boot_sector_of : kind:string -> string
 
 val last_cemented_commitment_hash_with_level :
   sc_rollup:string -> Client.t -> (string * int) Lwt.t
+
+(** [genesis_commitment ~sc_rollup client] returns the genesis
+    commitment, fails if this commitment have been cleaned from the
+    context. *)
+val genesis_commitment :
+  sc_rollup:string -> Client.t -> Sc_rollup_client.commitment Lwt.t
