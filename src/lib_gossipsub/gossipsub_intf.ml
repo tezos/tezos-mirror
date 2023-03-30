@@ -289,6 +289,10 @@ module type SCORE = sig
   val of_float : float -> value
 
   include Compare.S with type t := value
+
+  include PRINTABLE with type t := t
+
+  val pp_value : Format.formatter -> value -> unit
 end
 
 module type AUTOMATON = sig
