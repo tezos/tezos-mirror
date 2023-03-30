@@ -66,6 +66,14 @@ type batcher = {
   max_batch_size : int;  (** The maximum size in bytes of a batch. *)
 }
 
+type injector = {
+  retention_period : int;
+      (** The number of blocks during which the injector will keep track of an
+          operation (in addition to the confirmation period). *)
+  attempts : int;
+      (** The number of attempts that will be made to inject an operation. *)
+}
+
 type t = {
   sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
   sc_rollup_node_operators : operators;
@@ -82,7 +90,7 @@ type t = {
   *)
   dal_node_endpoint : Uri.t option;
   batcher : batcher;
-  injector_retention_period : int;
+  injector : injector;
   l2_blocks_cache_size : int;
   log_kernel_debug : bool;
 }
@@ -136,9 +144,9 @@ val default_fee_parameters : fee_parameters
 (** [default_batcher] is the default configuration parameters for the batcher. *)
 val default_batcher : batcher
 
-(** [default_injector_retention_period] is the default number of blocks the
-    injector will keep in memory. *)
-val default_injector_retention_period : int
+(** [default_injector] is the default configuration parameters for the
+    injector. *)
+val default_injector : injector
 
 (** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
     cached by the rollup node *)
