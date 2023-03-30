@@ -50,6 +50,8 @@ type batcher = {
   max_batch_size : int;
 }
 
+type injector = {retention_period : int; attempts : int}
+
 type t = {
   sc_rollup_address : Sc_rollup.t;
   sc_rollup_node_operators : operators;
@@ -64,7 +66,7 @@ type t = {
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
   batcher : batcher;
-  injector_retention_period : int;
+  injector : injector;
   l2_blocks_cache_size : int;
   log_kernel_debug : bool;
 }
@@ -219,10 +221,10 @@ let default_batcher =
     max_batch_size = default_batcher_max_batch_size;
   }
 
+let default_injector = {retention_period = 2048; attempts = 100}
+
 let max_injector_retention_period =
   5 * 8192 (* Preserved cycles (5) for mainnet *)
-
-let default_injector_retention_period = 2048
 
 let default_l2_blocks_cache_size = 64
 
@@ -478,6 +480,21 @@ let batcher_encoding =
        (dft "max_batch_elements" int31 default_batcher_max_batch_elements)
        (dft "max_batch_size" int31 default_batcher_max_batch_size)
 
+let injector_encoding : injector Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {retention_period; attempts} -> (retention_period, attempts))
+    (fun (retention_period, attempts) ->
+      if retention_period > max_injector_retention_period then
+        Format.ksprintf
+          Stdlib.failwith
+          "injector_retention_period should be smaller than %d"
+          max_injector_retention_period ;
+      {retention_period; attempts})
+  @@ obj2
+       (dft "retention_period" uint16 default_injector.retention_period)
+       (dft "attempts" uint16 default_injector.attempts)
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -495,7 +512,7 @@ let encoding : t Data_encoding.t =
            dac_observer_endpoint;
            dac_timeout;
            batcher;
-           injector_retention_period;
+           injector;
            l2_blocks_cache_size;
            log_kernel_debug;
          } ->
@@ -512,7 +529,7 @@ let encoding : t Data_encoding.t =
           dac_observer_endpoint,
           dac_timeout,
           batcher,
-          injector_retention_period,
+          injector,
           l2_blocks_cache_size,
           log_kernel_debug ) ))
     (fun ( ( sc_rollup_address,
@@ -528,14 +545,9 @@ let encoding : t Data_encoding.t =
              dac_observer_endpoint,
              dac_timeout,
              batcher,
-             injector_retention_period,
+             injector,
              l2_blocks_cache_size,
              log_kernel_debug ) ) ->
-      if injector_retention_period > max_injector_retention_period then
-        Format.ksprintf
-          Stdlib.failwith
-          "injector_retention_period should be smaller than %d"
-          max_injector_retention_period ;
       {
         sc_rollup_address;
         sc_rollup_node_operators;
@@ -550,7 +562,7 @@ let encoding : t Data_encoding.t =
         dac_observer_endpoint;
         dac_timeout;
         batcher;
-        injector_retention_period;
+        injector;
         l2_blocks_cache_size;
         log_kernel_debug;
       })
@@ -597,10 +609,7 @@ let encoding : t Data_encoding.t =
           (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
           (opt "dac-timeout" Data_encoding.z)
           (dft "batcher" batcher_encoding default_batcher)
-          (dft
-             "injector_retention_period"
-             uint16
-             default_injector_retention_period)
+          (dft "injector" injector_encoding default_injector)
           (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
           (dft "log-kernel-debug" Data_encoding.bool false)))
 
