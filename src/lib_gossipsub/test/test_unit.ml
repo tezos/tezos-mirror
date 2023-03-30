@@ -870,7 +870,7 @@ let test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters =
   Tezt_core.Test.register
     ~__FILE__
     ~title:"Gossipsub: Accept only outbound peer grafts when mesh full"
-    ~tags:["gossipsub"; "graft"]
+    ~tags:["gossipsub"; "graft"; "outbound"]
   @@ fun () ->
   let topic = "topic" in
   let peers = make_peers ~number:limits.degree_high in
@@ -922,6 +922,95 @@ let test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters =
     state ;
   unit
 
+(* Tests that the number of kept outbound peers is at least [degree_out]
+   when removing peers from mesh in heartbeat.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L2291
+*)
+let test_do_not_remove_too_many_outbound_peers rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Do not remove too many outbound peers"
+    ~tags:["gossipsub"; "heartbeat"; "outbound"]
+  @@ fun () ->
+  let topic = "topic" in
+  (* Create [degree_high] inbound peers and [degree_out] outbound peers. *)
+  let inbound_peers, outbound_peers =
+    make_peers ~number:(limits.degree_high + limits.degree_out)
+    |> List.split_n limits.degree_high
+  in
+  (* Initiate the state with inbound peers. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers:inbound_peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ~outbound:(fun _ -> false)
+      ()
+  in
+  (* Graft all the inbound peers.
+     This works because the number of inbound peers is equal to [degree_high]. *)
+  let state =
+    List.fold_left
+      (fun state peer ->
+        let state, _ = GS.handle_graft {peer; topic} state in
+        state)
+      state
+      inbound_peers
+  in
+  (* Connect to all [degree_out] outbound peers. The grafts will be accepted since
+     outbound connections are accepted even when the mesh is full. *)
+  let state =
+    add_and_subscribe_peers
+      [topic]
+      outbound_peers
+      ~to_subscribe:(fun _ -> true)
+      ~outbound:(fun _ -> true)
+      state
+  in
+  let state =
+    List.fold_left
+      (fun state peer ->
+        let state, _ = GS.handle_graft {peer; topic} state in
+        state)
+      state
+      outbound_peers
+  in
+  (* At this point the mesh should be overly full.
+     It has [degree_high + degree_out] peers where the upper limit is [degree_high]. *)
+  assert_mesh_size
+    ~__LOC__
+    ~topic
+    ~expected_size:(limits.degree_high + limits.degree_out)
+    state ;
+  (* Run heartbeat. *)
+  let _state, Heartbeat {to_prune; _} = GS.heartbeat state in
+  (* There should be enough prune requests to bring back the mesh size to [degree_optimal]. *)
+  let peers_to_prune =
+    to_prune |> Peer.Map.bindings |> List.map (fun (peer, _topics) -> peer)
+  in
+  Check.(
+    (List.length peers_to_prune
+    = limits.degree_high + limits.degree_out - limits.degree_optimal)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  (* No outbound peer should have been pruned since pruning any of them would
+     bring the number of outbound peers to below [degree_out]. *)
+  List.iter
+    (fun peer ->
+      (* Outbound peer should continue to be in mesh. *)
+      assert_mesh_inclusion ~__LOC__ ~topic ~peer state ~is_included:true ;
+      (* Should be no prune request for the outbound peer.  *)
+      if List.mem ~equal:Peer.equal peer peers_to_prune then
+        Test.fail ~__LOC__ "Outbound peer should not be pruned."
+      else ())
+    outbound_peers ;
+  unit
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
@@ -936,4 +1025,5 @@ let register rng limits parameters =
   test_mesh_subtraction rng limits parameters ;
   test_do_not_graft_within_backoff_period rng limits parameters ;
   test_unsubscribe_backoff rng limits parameters ;
-  test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters
+  test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters ;
+  test_do_not_remove_too_many_outbound_peers rng limits parameters
