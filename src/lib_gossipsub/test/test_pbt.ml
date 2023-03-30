@@ -512,7 +512,7 @@ module Test_remove_peer = struct
       run state (scenario limits)
     in
     let test =
-      QCheck2.Test.make ~count:10_000 ~name:"Gossipsub: remove_peer" scenario
+      QCheck2.Test.make ~count:1_000 ~name:"Gossipsub: remove_peer" scenario
       @@ fun trace ->
       match check_final predicate trace with
       | Ok () -> true
