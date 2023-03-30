@@ -28,8 +28,8 @@ type error +=
   | Payload_cannot_be_empty
   | Cannot_serialize_page_payload
   | Cannot_deserialize_page
-  | Non_positive_size_of_payload
-  | Merkle_tree_branching_factor_not_high_enough
+  | Non_positive_size_of_payload of int
+  | Merkle_tree_branching_factor_not_high_enough of int
   | Cannot_combine_pages_data_of_different_type
   | Hashes_page_repr_expected_single_element
 
@@ -86,7 +86,7 @@ let () =
     `Permanent
     ~id:"cannot_deserialize_dac_page_payload"
     ~title:"DAC payload could not be deserialized"
-    ~description:"Error when recovering DAC payload payload from binary"
+    ~description:"Error when recovering DAC payload from binary"
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
@@ -108,11 +108,15 @@ let () =
     ~id:"non_positive_payload_size"
     ~title:"Non positive size for dac payload"
     ~description:"Dac page payload (excluded preamble) are non positive"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Dac page payload (excluded preamble) are non positive")
-    Data_encoding.(unit)
-    (function Non_positive_size_of_payload -> Some () | _ -> None)
-    (fun () -> Non_positive_size_of_payload) ;
+    ~pp:(fun ppf size ->
+      Format.fprintf
+        ppf
+        "Dac page payload (excluded preamble) is non positive. The calculated \
+         size is [%d]"
+        size)
+    Data_encoding.(obj1 (req "branching_factor" int31))
+    (function Non_positive_size_of_payload size -> Some size | _ -> None)
+    (fun size -> Non_positive_size_of_payload size) ;
   register_error_kind
     `Permanent
     ~id:"dac_payload_cannot_be_empty"
@@ -127,15 +131,19 @@ let () =
     ~id:"merkle_tree_branching_factor_not_high_enough"
     ~title:"Merkle tree branching factor must be at least 2"
     ~description:"Merkle tree branching factor must be at least 2"
-    ~pp:(fun ppf () ->
+    ~pp:(fun ppf branching_factor ->
       Format.fprintf
         ppf
         "Cannot serialize DAC payload: pages must be able to contain at least \
-         two hashes")
-    Data_encoding.(unit)
+         two hashes, but [%d] got."
+        branching_factor)
+    Data_encoding.(obj1 (req "branching_factor" int31))
     (function
-      | Merkle_tree_branching_factor_not_high_enough -> Some () | _ -> None)
-    (fun () -> Merkle_tree_branching_factor_not_high_enough) ;
+      | Merkle_tree_branching_factor_not_high_enough branching_factor ->
+          Some branching_factor
+      | _ -> None)
+    (fun branching_factor ->
+      Merkle_tree_branching_factor_not_high_enough branching_factor) ;
   register_error_kind
     `Permanent
     ~id:"cannot_combine_pages_data_of_different_type"
@@ -144,9 +152,9 @@ let () =
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Merkle level serizalization: when adding page data to a given level \
-         repr., the type of page data received is different then the one \
-         inside a level repr.")
+        "Merkle level serizalization: when adding a page data to a given \
+         level, the type of page data received is different from the one \
+         inside of it.")
     Data_encoding.(unit)
     (function
       | Cannot_combine_pages_data_of_different_type -> Some () | _ -> None)
@@ -309,7 +317,8 @@ module Merkle_tree = struct
         let open Result_syntax in
         (* 1 byte for the version size, 4 bytes for the size of the payload. *)
         let actual_page_size = C.max_page_size - page_preamble_size in
-        if actual_page_size <= 0 then tzfail Non_positive_size_of_payload
+        if actual_page_size <= 0 then
+          tzfail @@ Non_positive_size_of_payload actual_page_size
         else
           let+ splitted_payload = String.chunk_bytes actual_page_size payload in
           List.map
@@ -323,7 +332,8 @@ module Merkle_tree = struct
            per page, then the number of pages at height `n-1` could be
            potentially equal to the number of pages at height `n`. *)
         if number_of_hashes < 2 then
-          Result_syntax.tzfail Merkle_tree_branching_factor_not_high_enough
+          Result_syntax.tzfail
+          @@ Merkle_tree_branching_factor_not_high_enough number_of_hashes
         else
           let rec go aux list =
             match list with
@@ -423,9 +433,8 @@ module Merkle_tree = struct
          per page, then the number of pages at height `n-1`could be potentially
          equal to the number of pages at height `n`. *)
       let* () =
-        fail_unless
-          (number_of_hashes > 1)
-          Merkle_tree_branching_factor_not_high_enough
+        fail_unless (number_of_hashes > 1)
+        @@ Merkle_tree_branching_factor_not_high_enough number_of_hashes
       in
       add_rec dac_plugin ~page_store stack (Cont_data payload)
 

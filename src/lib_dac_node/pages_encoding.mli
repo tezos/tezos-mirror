@@ -30,8 +30,8 @@ type error +=
   | Payload_cannot_be_empty
   | Cannot_serialize_page_payload
   | Cannot_deserialize_page
-  | Non_positive_size_of_payload
-  | Merkle_tree_branching_factor_not_high_enough
+  | Non_positive_size_of_payload of int
+  | Merkle_tree_branching_factor_not_high_enough of int
   | Cannot_combine_pages_data_of_different_type
   | Hashes_page_repr_expected_single_element
 
