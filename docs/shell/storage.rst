@@ -197,12 +197,12 @@ possible values for this variable: ``v`` for ``Info`` logging and
 ``vv`` for ``Debug`` logging (warning: the ``Debug`` mode is very
 talkative). Additionally, this environment variable allows to tweak,
 with care, the following context parameters (using the standard
-`TEZOS_CONTEXT="variable=value"` pattern, separating the items with
-commas such as `TEZOS_CONTEXT="v, variable=value"`):
+``TEZOS_CONTEXT="variable=value"`` pattern, separating the items with
+commas such as ``TEZOS_CONTEXT="v, variable=value"``):
 
-- "index-log-size": number of entries stored in the Irmin's index
-  (default `2_500_000`)
-- "auto-flush": number of tree mutations allowed before a disk flush
-  (default `10_000`)
-- "lru-size": number of entries stored in the Irmin's LRU cache
-  (default `5_000`)
+- ``index-log-size``: number of entries stored in the Irmin's index
+  (default ``2_500_000``)
+- ``auto-flush``: number of tree mutations allowed before a disk flush
+  (default ``10_000``)
+- ``lru-size``: number of entries stored in the Irmin's LRU cache
+  (default ``5_000``)
