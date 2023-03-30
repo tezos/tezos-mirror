@@ -667,60 +667,13 @@ Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. _OperationsOnBigMaps_alpha:
 
-Big maps have three possible representations. A map literal is always
-a valid representation for a big map. Big maps can also be represented
-by integers called big-map identifiers. Finally, big maps can be
-represented as pairs of a big-map identifier (an integer) and a
-big-map diff (written in the same syntax as a map whose values are
-options).
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-So for example, ``{ Elt "bar" True ; Elt "foo" False }``, ``42``, and
-``Pair 42 { Elt "foo" (Some False) }`` are all valid representations
-of type ``big_map string bool``.
-
-The behavior of big-map operations is the same as if they were normal
-maps, except that under the hood, the elements are loaded and
-deserialized on demand.
-
--  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map from keys of a
-   given type to values of another given type.
-
-   The ``'key`` type must be comparable (the ``COMPARE`` primitive must
-   be defined over it).
-
-::
-
-    :: 'S -> map 'key 'val : 'S
-
--  ``GET``: Access an element in a ``big_map``, returns an optional value to be
-   checked with ``IF_SOME``.
-
-::
-
-    :: 'key : big_map 'key 'val : 'S   ->   option 'val : 'S
-
--  ``MEM``: Check for the presence of an element in a ``big_map``.
-
-::
-
-    :: 'key : big_map 'key 'val : 'S   ->  bool : 'S
-
--  ``UPDATE``: Assign or remove an element in a ``big_map``.
-
-::
-
-    :: 'key : option 'val : big_map 'key 'val : 'S   ->   big_map 'key 'val : 'S
-
-
--  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions.
-
-::
-
-    :: 'key : option 'val : big_map 'key 'val : 'S   ->   option 'val : big_map 'key 'val : 'S
-
-This instruction is similar to ``UPDATE`` but it also returns the
-value that was previously stored in the ``big_map`` at the same key as
-``GET`` would.
+-  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_BIG_MAP>`__).
+-  ``GET``: Access an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET>`__).
+-  ``MEM``: Check for the presence of an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
+-  ``UPDATE``: Add, update, or remove an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
+-  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET_AND_UPDATE>`__).
 
 
 Operations on optional values
