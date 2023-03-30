@@ -1093,6 +1093,9 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ~__LOC__) ;
   unit
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
+   Add test the described test scenario *)
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
