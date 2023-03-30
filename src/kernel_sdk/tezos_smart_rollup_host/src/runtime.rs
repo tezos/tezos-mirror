@@ -955,7 +955,7 @@ mod tests {
                     && buffer_size == *max_bytes
             })
             .return_once(|_, _, _, buf_ptr, _| {
-                let path_bytes = "short/suffix".as_bytes();
+                let path_bytes = "short".as_bytes();
                 let buffer = unsafe { from_raw_parts_mut(buf_ptr, path_bytes.len()) };
                 buffer.copy_from_slice(path_bytes);
 
@@ -966,7 +966,7 @@ mod tests {
         let result = mock.store_get_subkey(&PATH, subkey_index);
 
         // Assert
-        let expected = Some(RefPath::assert_from("/short/suffix".as_bytes()).into());
+        let expected = Some(RefPath::assert_from("/short".as_bytes()).into());
 
         assert_eq!(Ok(expected), result);
     }
