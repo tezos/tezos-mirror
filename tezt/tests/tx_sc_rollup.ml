@@ -456,7 +456,9 @@ let test_tx_kernel_e2e protocol =
   let* () = assert_ticks_advanced sc_rollup_client prev_ticks in
 
   (* EXECUTE withdrawal *)
-  let blocks_to_wait = 1 + (2 * commitment_period) + challenge_window in
+  (* We bake a few more blocks in case the injection of the cementation
+     operation is late *)
+  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
   let* () =
     repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
   in

@@ -172,6 +172,10 @@ val wait_for_ready : t -> unit Lwt.t
    passed. *)
 val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
 
+(** Wait until the layer 1 of the sc node is synchronized with its
+    underlying l1 node. *)
+val wait_sync : t -> timeout:float -> int Lwt.t
+
 (** [wait_for ?where sc_node event_name filter] waits for the SCORU node
     [sc_node] to emit an event named [name] (usually this is the name the event
     is declared with, concatenated with [".v0"]). [wait_for] continues to wait
@@ -183,4 +187,5 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Stops the rollup node and restart it, connected to another Tezos Layer 1
     node. *)
-val change_node_and_restart : t -> string -> Node.t -> unit Lwt.t
+val change_node_and_restart :
+  ?event_level:Daemon.Level.default_level -> t -> string -> Node.t -> unit Lwt.t
