@@ -9,7 +9,7 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 use std::str::from_utf8;
 
 use crate::block::L2Block;
-use crate::error::Error;
+use crate::error::{Error, StorageError};
 use tezos_ethereum::account::*;
 use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level};
 use tezos_ethereum::transaction::{
@@ -50,15 +50,29 @@ const HASH_MAX_SIZE: usize = 32;
 // TRANSACTION_HASH_SIZE * 128 = 4096.
 const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
 
+fn store_read_slice<Host: Runtime, T: Path>(
+    host: &mut Host,
+    path: &T,
+    buffer: &mut [u8],
+    expected_size: usize,
+) -> Result<(), Error> {
+    let size = Runtime::store_read_slice(host, path, 0, buffer)?;
+    if size == expected_size {
+        Ok(())
+    } else {
+        Err(Error::Storage(StorageError::InvalidLoadValue {
+            expected: expected_size,
+            actual: size,
+        }))
+    }
+}
+
 pub fn read_smart_rollup_address<Host: Runtime>(
     host: &mut Host,
 ) -> Result<[u8; 20], Error> {
     let mut buffer = [0u8; 20];
-
-    match host.store_read_slice(&SMART_ROLLUP_ADDRESS, 0, &mut buffer) {
-        Ok(20) => Ok(buffer),
-        _ => Err(Error::Generic),
-    }
+    store_read_slice(host, &SMART_ROLLUP_ADDRESS, &mut buffer, 20)?;
+    Ok(buffer)
 }
 
 pub fn store_smart_rollup_address<Host: Runtime>(
@@ -74,7 +88,7 @@ pub const WORD_SIZE: usize = 32usize;
 
 /// Read a single unsigned 256 bit value from storage at the path given.
 fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
-    let bytes = host.store_read(path, 0, WORD_SIZE).map_err(Error::from)?;
+    let bytes = host.store_read(path, 0, WORD_SIZE)?;
     Ok(Wei::from_little_endian(&bytes))
 }
 
@@ -89,7 +103,8 @@ fn write_u256(
 }
 
 fn address_path(address: Hash) -> Result<OwnedPath, Error> {
-    let address: &str = from_utf8(address)?;
+    let address: &str =
+        from_utf8(address).map_err(crate::error::TransferError::InvalidAddressFormat)?;
     let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
@@ -102,13 +117,13 @@ pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
 pub fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
     let number: &str = &number.to_string();
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
-    let number_path = OwnedPath::try_from(raw_number_path).map_err(Error::from)?;
+    let number_path = OwnedPath::try_from(raw_number_path)?;
     concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
 }
 pub fn receipt_path(receipt: &TransactionReceipt) -> Result<OwnedPath, Error> {
     let hash = hex::encode(receipt.hash);
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
-    let receipt_path = OwnedPath::try_from(raw_receipt_path).map_err(Error::from)?;
+    let receipt_path = OwnedPath::try_from(raw_receipt_path)?;
     concat(&TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
 }
 
@@ -116,7 +131,7 @@ pub fn has_account<Host: Runtime>(
     host: &mut Host,
     account_path: &OwnedPath,
 ) -> Result<bool, Error> {
-    match host.store_has(account_path).map_err(Error::from)? {
+    match host.store_has(account_path)? {
         Some(ValueType::Subtree | ValueType::ValueWithSubtree) => Ok(true),
         _ => Ok(false),
     }
@@ -128,11 +143,8 @@ pub fn read_account_nonce<Host: Runtime>(
 ) -> Result<u64, Error> {
     let path = concat(account_path, &EVM_ACCOUNT_NONCE)?;
     let mut buffer = [0_u8; 8];
-
-    match host.store_read_slice(&path, 0, &mut buffer) {
-        Ok(8) => Ok(u64::from_le_bytes(buffer)),
-        _ => Err(Error::Generic),
-    }
+    store_read_slice(host, &path, &mut buffer, 8)?;
+    Ok(u64::from_le_bytes(buffer))
 }
 
 pub fn read_account_balance<Host: Runtime>(
@@ -209,11 +221,8 @@ pub fn store_account<Host: Runtime>(
 pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_NUMBER)?;
     let mut buffer = [0_u8; 8];
-
-    match host.store_read_slice(&path, 0, &mut buffer) {
-        Ok(8) => Ok(u64::from_le_bytes(buffer)),
-        _ => Err(Error::Generic),
-    }
+    store_read_slice(host, &path, &mut buffer, 8)?;
+    Ok(u64::from_le_bytes(buffer))
 }
 
 fn read_nth_block_transactions<Host: Runtime>(
@@ -222,9 +231,7 @@ fn read_nth_block_transactions<Host: Runtime>(
 ) -> Result<Vec<TransactionHash>, Error> {
     let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
 
-    let transactions_bytes = host
-        .store_read(&path, 0, MAX_TRANSACTION_HASHES)
-        .map_err(Error::from)?;
+    let transactions_bytes = host.store_read(&path, 0, MAX_TRANSACTION_HASHES)?;
 
     Ok(transactions_bytes
         .chunks(TRANSACTION_HASH_SIZE)
@@ -311,28 +318,23 @@ pub fn store_transaction_receipt<Host: Runtime>(
 ) -> Result<(), Error> {
     // Transaction hash
     let hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_HASH)?;
-    host.store_write(&hash_path, &receipt.hash, 0)
-        .map_err(Error::from)?;
+    host.store_write(&hash_path, &receipt.hash, 0)?;
     // Index
     let index_path = concat(receipt_path, &TRANSACTION_RECEIPT_INDEX)?;
-    host.store_write(&index_path, &receipt.index.to_le_bytes(), 0)
-        .map_err(Error::from)?;
+    host.store_write(&index_path, &receipt.index.to_le_bytes(), 0)?;
     // Block hash
     let block_hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
-    host.store_write(&block_hash_path, &receipt.block_hash, 0)
-        .map_err(Error::from)?;
+    host.store_write(&block_hash_path, &receipt.block_hash, 0)?;
     // Block number
     let block_number_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
     host.store_write(
         &block_number_path,
         &u64::to_le_bytes(receipt.block_number),
         0,
-    )
-    .map_err(Error::from)?;
+    )?;
     // From
     let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
-    host.store_write(&from_path, &receipt.from, 0)
-        .map_err(Error::from)?;
+    host.store_write(&from_path, &receipt.from, 0)?;
     // Type
     let type_path = concat(receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
     host.store_write(&type_path, (&receipt.type_).into(), 0)?;

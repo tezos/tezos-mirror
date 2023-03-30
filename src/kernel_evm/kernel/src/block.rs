@@ -103,17 +103,15 @@ impl L2Block {
 }
 
 fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
-    match tx.sender() {
-        // We reencode in hexadecimal, since the accounts hash are encoded in
-        // hexadecimal in the storage.
-        Ok(address) => {
-            let hash = address_to_hash(address);
-            let address: Address = address.into();
-            let path = storage::account_path(&hash)?;
-            Ok((path, address))
-        }
-        Err(_) => Err(Error::Generic),
-    }
+    let address = tx
+        .sender()
+        .map_err(|_| Error::Transfer(TransferError::InvalidSignature))?;
+    // We reencode in hexadecimal, since the accounts hash are encoded in
+    // hexadecimal in the storage.
+    let hash = address_to_hash(address);
+    let address: Address = address.into();
+    let path = storage::account_path(&hash)?;
+    Ok((path, address))
 }
 
 fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
@@ -134,7 +132,7 @@ fn validate_transaction<Host: Runtime>(
     let sender_balance =
         storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
     let sender_nonce = storage::read_account_nonce(host, &sender_path).unwrap_or(0u64);
-    let nonce = tx.nonce.to_u64().ok_or(Error::Generic)?;
+    let nonce = tx.nonce.to_u64().expect("The nonce can actually be contained into an `u64` and can be safely converted. Temporary code");
     // For now, we consider there's no gas to pay
     let gas = Wei::zero();
 
@@ -278,37 +276,17 @@ fn apply_transactions<Host: Runtime>(
 
 pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     for proposal in queue.proposals {
-        let current_level = storage::read_current_block_number(host);
-        let next_level = match current_level {
-            Ok(current_level) => Ok(current_level + 1),
-            Err(_) => {
-                debug_msg!(
-                    host,
-                    "Error, cannot produce a new block from a non existing block number."
-                );
-                Err(Error::Generic)
-            }
-        }?;
-
+        let current_level = storage::read_current_block_number(host)?;
+        let next_level = current_level + 1;
         let transaction_hashes =
             proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
 
         match validate(host, proposal.transactions) {
             Ok(transactions) => {
                 let valid_block = L2Block::new(next_level, transaction_hashes);
-                storage::store_current_block(host, &valid_block).map_err(|_| {
-                    debug_msg!(host, "Error while storing the current block.");
-                    Error::Generic
-                })?;
-                let receipts = apply_transactions(host, &valid_block, &transactions)
-                    .map_err(|_| {
-                        debug_msg!(host, "Error while applying the transactions.");
-                        Error::Generic
-                    })?;
-                storage::store_transaction_receipts(host, &receipts).map_err(|_| {
-                    debug_msg!(host, "Error while storing the transactions receipts.");
-                    Error::Generic
-                })?;
+                storage::store_current_block(host, &valid_block)?;
+                let receipts = apply_transactions(host, &valid_block, &transactions)?;
+                storage::store_transaction_receipts(host, &receipts)?;
             }
             Err(e) => debug_msg!(host, "Blueprint is invalid: {:?}\n", e),
         }

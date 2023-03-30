@@ -65,48 +65,36 @@ fn retrieve_smart_rollup_address<Host: Runtime>(
     match read_smart_rollup_address(host) {
         Ok(smart_rollup_address) => Ok(smart_rollup_address),
         Err(_) => {
-            let rollup_metadata = Runtime::reveal_metadata(host).map_err(|_| {
-                debug_msg!(host, "Error while storing the transactions receipts.");
-                Error::Generic
-            })?;
+            let rollup_metadata = Runtime::reveal_metadata(host)?;
             let address = rollup_metadata.raw_rollup_address;
-            store_smart_rollup_address(host, &address).map_err(|_| {
-                debug_msg!(host, "Error while storing the smart rollup's address.");
-                Error::Generic
-            })?;
+            store_smart_rollup_address(host, &address)?;
             Ok(address)
         }
     }
 }
 
 fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    let block_path = storage::block_path(0).map_err(|_| {
-        debug_msg!(host, "Error while retrieving genesis block's path.");
-        Error::Generic
-    })?;
+    let block_path = storage::block_path(0)?;
     match Runtime::store_has(host, &block_path) {
         Ok(Some(_)) => Ok(()),
         _ => genesis::init_block(host),
     }
 }
 
-pub fn main<Host: Runtime>(host: &mut Host) {
-    let smart_rollup_address = match retrieve_smart_rollup_address(host) {
-        Ok(smart_rollup_address) => smart_rollup_address,
-        Err(_) => {
-            panic!("Error while retrieving smart rollup's address: stopping the daemon.")
-        }
-    };
-
-    if genesis_initialisation(host).is_err() {
-        panic!("Error while initializing block genesis: stopping the daemon.")
-    }
+pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    let smart_rollup_address = retrieve_smart_rollup_address(host)?;
+    genesis_initialisation(host)?;
 
     let queue = stage_one(host, smart_rollup_address);
 
-    if stage_two(host, queue).is_err() {
-        panic!("Error during stage two: stopping the daemon.")
+    stage_two(host, queue)
+}
+
+pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
+    match main(host) {
+        Ok(()) => (),
+        Err(e) => panic!("Kernel loop failed: {:?}", e),
     }
 }
 
-kernel_entry!(main);
+kernel_entry!(kernel_loop);
