@@ -614,6 +614,8 @@ module type AUTOMATON = sig
 
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
+  val pp_output : Format.formatter -> 'a output -> unit
+
   module Introspection : sig
     type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
