@@ -159,7 +159,17 @@ module Aux : sig
       key_length:int32 ->
       int32 Lwt.t
 
-    val store_delete :
+    (** [generic_store_delete ~kind ~durable ~memory ~key_offset ~key_length]
+        either removes the value if [kind = Value] or the complete directory if
+        [kind = Directory] at the given key.
+
+        [store_delete] from version 2.0.0 is actually [generic_store_delete
+        ~kind:Durable.Directory].
+
+        @since 2.0.0~r1
+    *)
+    val generic_store_delete :
+      kind:Durable.kind ->
       durable:Durable.t ->
       memory:memory ->
       key_offset:int32 ->
@@ -327,6 +337,8 @@ module Internal_for_tests : sig
   val store_has : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_delete : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_delete_value : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_copy : Tezos_webassembly_interpreter.Instance.func_inst
 

@@ -128,7 +128,7 @@ let save_fallback_kernel durable =
   let open Lwt.Syntax in
   let* kernel_hash = Durable.hash ~kind:Value durable Constants.kernel_key in
   let* kernel_fallback_hash =
-    Durable.hash ~kind:Durable.Value durable Constants.kernel_fallback_key
+    Durable.hash ~kind:Value durable Constants.kernel_fallback_key
   in
   if kernel_hash <> kernel_fallback_hash then
     Durable.copy_tree_exn

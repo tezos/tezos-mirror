@@ -95,13 +95,14 @@ let make ~version ~reveal_builtins ~write_debug state =
         state.durable <- durable ;
         result)
   in
-  let store_delete =
+  let store_delete_generic ~kind =
     fn
       (i32 @-> i32 @-> returning1 i32)
       (fun key_offset key_length ->
         with_mem @@ fun memory ->
         let+ durable, result =
-          Host_funcs.Aux.store_delete
+          Host_funcs.Aux.generic_store_delete
+            ~kind
             ~durable:state.durable
             ~memory
             ~key_offset
@@ -110,6 +111,8 @@ let make ~version ~reveal_builtins ~write_debug state =
         state.durable <- durable ;
         result)
   in
+  let store_delete = store_delete_generic ~kind:Directory in
+  let store_delete_value = store_delete_generic ~kind:Value in
   let write_debug =
     fn
       (i32 @-> i32 @-> returning nothing)
@@ -278,7 +281,11 @@ let make ~version ~reveal_builtins ~write_debug state =
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
-    | V1 -> [("__internal_store_get_hash", store_get_hash)]
+    | V1 ->
+        [
+          ("__internal_store_get_hash", store_get_hash);
+          ("store_delete_value", store_delete_value);
+        ]
   in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
