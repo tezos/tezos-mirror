@@ -36,7 +36,7 @@ function of the peer's score.
 Encryption
 ~~~~~~~~~~
 
-The connection between each peer is encrypted using `NaCl`
+The connection between each peer is encrypted using ``NaCl``
 authenticated-encryption `API <http://nacl.cr.yp.to/box.html>`__. This
 is done to provide an additional level of security and tamper-proof
 guarantees in the communication between peers.

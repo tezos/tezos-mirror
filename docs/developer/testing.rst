@@ -176,7 +176,7 @@ References:
 Long Tests and Performance regression Test Framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A library called `tezt-performance-regression`, which is a wrapper around Tezt, is used for tests that are too long to run in the CI and for performance testing. Those
+A library called ``tezt-performance-regression``, which is a wrapper around Tezt, is used for tests that are too long to run in the CI and for performance testing. Those
 tests are run on dedicated machines and can send data points to an
 `InfluxDB <https://github.com/influxdata/influxdb>`__ instance to produce
 graphs using `Grafana <https://github.com/grafana/grafana>`__ and/or
@@ -615,7 +615,7 @@ follow this convention:
     *)
 
 2. For each test in the unit test module, the function name shall
-   start with `test_` and one must add a small doc comment that
+   start with ``test_`` and one must add a small doc comment that
    explains what the test actually asserts (2-4 lines are
    enough). These lines should appear at the beginning of each test
    unit function that is called by e.g. ``Alcotest_lwt.test_case``. For

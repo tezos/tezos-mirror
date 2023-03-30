@@ -221,7 +221,7 @@ Three kinds of economic protocols are included in the main Octez repository.
     the genesis block. It accepts a single block, signed by an
     activator whose public key is hardcoded, and whose single action is to
     switch to a new protocol chosen by the activator.
-    The `master` branch contains additional variants of the genesis
+    The ``master`` branch contains additional variants of the genesis
     protocol, one for each of the existing :ref:`test
     networks<test-networks>`.
   - The active protocols. ``tezos-protocol-nnn-hhhhhhhh``

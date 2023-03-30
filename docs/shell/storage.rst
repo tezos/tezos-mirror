@@ -79,7 +79,7 @@ Other features
 
 Note that after pruning metadata of some blocks, the store has the capability to reconstruct it
 by replaying every block and operation present and repopulating the
-context. Hence, it is possible to transform a `Full` store into an `Archive` one (see also :ref:`Switch_mode_restrictions`).
+context. Hence, it is possible to transform a ``Full`` store into an ``Archive`` one (see also :ref:`Switch_mode_restrictions`).
 
 It is also possible to retrieve a canonical representation of the
 store and context for a given block (provided that its metadata are

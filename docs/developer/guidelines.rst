@@ -21,7 +21,7 @@ Note that:
   + If there is one, mentioning any year, it is not required to add the current year (but this is allowed). In no case should you *replace* the existing year with the current one.
   + If there is no line for your copyright holder, you should add one, with the current year.
 
-- Old source files may contain on the first line `Open Source License` instead of `MIT License`. When touching such a file, please replace the former with the latter, correct form.
+- Old source files may contain on the first line ``Open Source License`` instead of ``MIT License``. When touching such a file, please replace the former with the latter, correct form.
 
 For example, for a source file with multiple contributors spanning several years, the copyright lines may look as follows:
 
@@ -199,7 +199,7 @@ the template, and address any gap if needed.
 Logging Levels
 --------------
 
-The Octez libraries use a logging library with 5 different verbosity `levels`
+The Octez libraries use a logging library with 5 different verbosity *levels*
 defined in ``src/lib_event_logging/internal_event.mli`` for shell and
 ``src/lib_protocol_environment/sigs/v3/logging.mli`` for protocol code.
 
@@ -346,8 +346,8 @@ The following pieces of advice should be applied in general, although exceptions
     have a compelling reason to catch either ``Stack_overflow`` or
     ``Out_of_memory``, you **must** include a comment explaining why.
 
-  - Note that catch-all patterns (such as wildcard (`| _ ->`) and variable
-    (`| exn ->`) include ``Stack_overflow`` and ``Out_of_memory``.
+  - Note that catch-all patterns (such as wildcard (``| _ ->``) and variable
+    (``| exn ->``) include ``Stack_overflow`` and ``Out_of_memory``.
 
 - Do not let low-level, implementation-dependent exceptions and errors bubble up
   to high-level code. For example, you should catch ``Unix_error`` near the

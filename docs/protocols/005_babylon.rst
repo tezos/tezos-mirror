@@ -26,9 +26,9 @@ Emmy+
 -----
 
 Protocol 004 implements a consensus algorithm nick-named
-`Emmy`.
+``Emmy``.
 Protocol 005 introduces several improvements to this algorithm,
-regrouped under the name `Emmy+`.
+regrouped under the name ``Emmy+``.
 In particular:
 
 - the fewer endorsements a block carries the longer it takes before it
@@ -569,21 +569,21 @@ Bug affecting Bigmaps in 005_PsBABY5H
 
 Protocol 005_PsBABY5H contains a bug affecting Bigmaps.
 
-The `has_big_map` function used to compute whether or not a Michelson
-type contains a `big_map` was wrongly implemented and always returned
-`false`. This had the following consequences:
+The ``has_big_map`` function used to compute whether or not a Michelson
+type contains a ``big_map`` was wrongly implemented and always returned
+``false``. This had the following consequences:
 
-- For newly originated contracts, storing several `big_map`s and
-  operating on them is possible but regular `map`s are used under the
+- For newly originated contracts, storing several ``big_map``\ s and
+  operating on them is possible but regular maps are used under the
   hood so the efficiency is much worse than expected. Sending a
-  `big_map` to another contract is not always possible.
+  ``big_map`` to another contract is not always possible.
 
-- For migrated contracts storing a `big_map`, updating the
-  stored `big_map` is not possible anymore; getting the stored values
+- For migrated contracts storing a ``big_map``, updating the
+  stored ``big_map`` is not possible anymore; getting the stored values
   is possible but less efficient than expected.
 
 Additionally there is also a small regression affecting the
-`trace_code` RPC.
+``trace_code`` RPC.
 As a result, the tracing functionality of the interpreter was
 disabled.
 
@@ -703,14 +703,14 @@ Michelson
     allow external tools such as steppers or debuggers to control more
     finely the Michelson interpreter from outside the protocol.
 
-- Proto/Michelson: add `APPLY` instruction to partially apply a lambda
+- Proto/Michelson: add ``APPLY`` instruction to partially apply a lambda
 
 ::
 
     This instruction applies a tuplified function from the stack.  Such a
     lambda is storable, and thus values that cannot be stored (values of
     type `operation`, `contract _` and `big_map _ _`) cannot be
-    captured by `APPLY` (cannot appear in ``'a``).
+    captured by `APPLY` (cannot appear in `'a`).
 
 - Proto/Michelson: relax big_map restrictions
 
@@ -810,14 +810,14 @@ Michelson
 ::
 
     Michelson's `COMPARE` instruction can currently only compare simple
-    values (`string`s, `int`s, etc.). This limitation also applies to
+    values (`string`\ s, `int`\ s, etc.). This limitation also applies to
     `set`, `map` and `big_map` indexes.
 
-    This is an issue in particular for `big_map`s that cannot be nested,
+    This is an issue in particular for `big_map`\ s that cannot be nested,
     because it prevents indexing data by a pair of indexes, such as a
     `key_hash` and a `string`.
 
-    This patch lifts that restriction, allowing to compare `pair`s of
+    This patch lifts that restriction, allowing to compare `pair`\ s of
     values, as long as their left component remains a simple value,
     implicitly making comparable values right combs whose leaves are simple
     values. The ordering is naturally lexicographic.
@@ -842,7 +842,7 @@ Michelson
 
     This fixes issue #546
 
-- Proto/Michelson: add special encoding for `do` and `set/remove_delegate` entrypoints
+- Proto/Michelson: add special encoding for ``do`` and ``set/remove_delegate`` entrypoints
 
 ::
 
@@ -870,7 +870,7 @@ Michelson
     This is to implement replay protection between the main chain and the
     test chain spawned in phase 3 of the voting procedure.
 
-- Proto/Michelson: new instructions `DIG n`, `DUG n`, `DIP n { code }`, `DROP n`
+- Proto/Michelson: new instructions ``DIG n``, ``DUG n``, ``DIP n { code }``, ``DROP n``
 
 ::
 
@@ -1013,7 +1013,7 @@ Michelson
     the new protocol, or simply avoid hardcoding the `CREATE_CONTRACT`
     instruction when possible.
 
-- Proto/Michelson: disable storing values of type `contract t` in newly originated contracts
+- Proto/Michelson: disable storing values of type ``contract t`` in newly originated contracts
 
 ::
 
@@ -1035,7 +1035,7 @@ Michelson
      - everything added to the chain (parameters of transactions and code
        and storage of originations cannot.
 
-    Smart contract developers should adapt their code to store `address`es
+    Smart contract developers should adapt their code to store `address`\ es
     and use instruction `CONTRACT`.
 
 - Proto/Michelson: eliminate useless storage read for parse_contract
@@ -1113,7 +1113,7 @@ Accounts rehaul
     delegatable flags disappear from the origination operation format
     (JSON and binary) as well as everywhere in the RPC API.
 
-- Proto: add code stubs to handle `%default` entrypoints originated before migration
+- Proto: add code stubs to handle ``%default`` entrypoints originated before migration
 
 ::
 
@@ -1164,7 +1164,7 @@ Accounts rehaul
 Migration
 ~~~~~~~~~
 
-- Proto/Migration: switch scripted KT1s to new `big_map` storage
+- Proto/Migration: switch scripted KT1s to new ``big_map`` storage
 
 ::
 

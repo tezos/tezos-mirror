@@ -3,7 +3,7 @@
 FA1.2 asset smart contracts
 ===========================
 
-Financial application 1.2, or `FA1.2` for short, is a standard that
+Financial application 1.2, or **FA1.2** for short, is a standard that
 describes the interface of smart contracts that implement ledger with
 balances that is described by `tzip-007
 <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_.
@@ -68,9 +68,9 @@ transfer an amount of tokens from its own address to any third party.
   ``amount`` of tokens from ``sender`` to any other account: this is
   the allowance described above.
 
-For example, let's assume two accounts: `Alice` and `Bob`, and a
-contract token `tk`. If `Alice` gives an allowance of 10 to `Bob`,
-then `Bob` can transfer up to 10 tokens of `tk` from `Alice` to any
+For example, let's assume two accounts: Alice and Bob, and a
+contract token ``tk``. If Alice gives an allowance of 10 to Bob,
+then Bob can transfer up to 10 tokens of ``tk`` from Alice to any
 other account.
 
 Batch transfer of tokens
@@ -82,8 +82,8 @@ source to multiple recipients on multiple FA1.2 contracts, using the command
 
 To be on par with batch transactions, only one account can be the source of the
 transfer. However, thanks to the approval mechanism, this command takes an
-optional argument ``--as <operator>``, allowing an approved account `operator` to
-make transfers from `source` to any other accounts. The JSON format for the
+optional argument ``--as <operator>``, allowing an approved account operator to
+make transfers from the source to any other accounts. The JSON format for the
 transfers is the following:
 
 .. code-block:: javascript

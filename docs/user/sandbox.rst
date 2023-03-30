@@ -54,7 +54,7 @@ It will also define in the current shell session an alias ``octez-client``
 preconfigured for communicating with the same-numbered node.
 
 When you bootstrap a new network, the network is initialized with a
-dummy economic protocol, called `genesis`. If you want to run the whole implemented
+dummy economic protocol, called *genesis*. If you want to run the whole implemented
 protocol, ``init-sandboxed-client`` also defines an
 alias ``octez-activate-alpha``, that you need to execute once for
 activating the whole network.
@@ -126,12 +126,12 @@ Preserve data
 ~~~~~~~~~~~~~
 
 If you want to preserve data and configuration files at the end of your run, you
-can use the `DATA_DIR` environment variable.
+can use the ``DATA_DIR`` environment variable.
 
 ::
 
     mkdir /tmp/tz-data
     DATA_DIR='/tmp/tz-data' ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
 
-You can even provide a custom `identity.json` and `config.json` to the
+You can even provide a custom ``identity.json`` and ``config.json`` to the
 sandboxed node by placing them in the data directory.

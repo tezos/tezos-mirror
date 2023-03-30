@@ -36,11 +36,11 @@ A validator emits at most one endorsement per round, but can emit more
 endorsements per level; therefore, the current high-water mark
 mechanism used by the signer has been adapted (see :ref:`Signer<signer_chgs>`).
 
-There is a new consensus operation, `preendorsement`, with the same layout as an endorsement.
+There is a new consensus operation, ``preendorsement``, with the same layout as an endorsement.
 
-There is a new anonymous operation, `double preendorsement evidence`, with the same layout as a double endorsement evidence.
+There is a new anonymous operation, ``double preendorsement evidence``, with the same layout as a double endorsement evidence.
 
-There is a new manager operation, `set deposits limit`, which takes an
+There is a new manager operation, ``set deposits limit``, which takes an
 optional positive integer argument. When the limit argument is given,
 the given limit on the signer's security deposit is set. When the
 limit argument is not present, the previous limit is unset and no
@@ -282,7 +282,7 @@ The command ``octez-client bake for`` has been changed:
 
 The following commands have been added:
 
-- ``octez-client propose for``: forge and inject a candidate block (a `proposal`).
+- ``octez-client propose for``: forge and inject a candidate block (a ``proposal``).
 
 - ``octez-client preendorse for``: forge and inject a preendorsement operation.
 

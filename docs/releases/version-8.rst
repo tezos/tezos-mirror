@@ -18,7 +18,7 @@ Version 8.1 fixes a performance regression related to operations
 involving ``tz3`` addresses and several compilation problems in
 some contexts.
 
-Version 8.2 replaces `PtEdoTez` by `PtEdo2Zk` and provides RPCs to
+Version 8.2 replaces ``PtEdoTez`` by ``PtEdo2Zk`` and provides RPCs to
 "normalize" Michelson expressions returned by the Edo protocol along
 with constraining the size of p2p messages at low level and updating
 some external dependencies.

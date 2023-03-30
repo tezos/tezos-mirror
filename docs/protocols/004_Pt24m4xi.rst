@@ -62,7 +62,7 @@ larger.
 
 In all cases, it is recommended to simulate an operation before
 injecting it on the chain.
-Using `tezos-client`, it is possible to run only a simulation using
+Using ``tezos-client``, it is possible to run only a simulation using
 the ``--dry-run`` option.
 
 
@@ -104,14 +104,14 @@ Breaking changes
 - [Alpha/RPCs: fix wrong encoding name fields](:gl:`nomadic-labs/tezos@5b410693`)
 
     This patch fixes a mislabeled field in the JSON encoding of operation receipts.
-    The balance updates had a field `level` that actually contained a cycle.
-    It is now named `cycle`.
+    The balance updates had a field ``level`` that actually contained a cycle.
+    It is now named ``cycle``.
 
     Third party software that make use of receipts such as block explorers
     or wallets may need to be updated accordingly. A simple solution is to
     support both during the protocol change period.
 
-- [Alpha/RPCs: change `managerPubkey` to underscores in json field names](:gl:`nomadic-labs/tezos@50cf26f0`)
+- [Alpha/RPCs: change ``managerPubkey`` to underscores in json field names](:gl:`nomadic-labs/tezos@50cf26f0`)
 
     This renames a field in the JSON format of origination operations to
     make it consistent with the others.
@@ -120,7 +120,7 @@ Breaking changes
     For applications that just consume this format, it is enough to just recognise
     both field names during the protocol change period. For applications that send
     this format to the node, it is necessary to send the right one depending on the
-    `next_protocol` field of the interrogated block.
+    ``next_protocol`` field of the interrogated block.
 
 - [Alpha/RPCs: rename field labels in Michelson typechecker output](:gl:`nomadic-labs/tezos@7b4fe1b9`)
 
@@ -166,7 +166,7 @@ Minor changes
     too big in a future update. This bug cannot happen with the current
     value.
 
-- [Alpha/Vote: new constant `test_chain_duration`](:gl:`nomadic-labs/tezos@34aaf6c7`)
+- [Alpha/Vote: new constant ``test_chain_duration``](:gl:`nomadic-labs/tezos@34aaf6c7`)
 
     This patch turns the test chain lifetime from a hardcoded two-days
     constant in the code to a parameter. This is useful for testing of
@@ -206,7 +206,7 @@ Minor changes
     Replaces some allocations of common return values by preallocated constants.
     This is a cosmetic change that does not alter the semantics.
 
-- [Alpha/Refactor: simplify code of `Raw_context.prepare_first_block`](:gl:`nomadic-labs/tezos@a3d04dd2`)
+- [Alpha/Refactor: simplify code of ``Raw_context.prepare_first_block``](:gl:`nomadic-labs/tezos@a3d04dd2`)
 
     This patch simplifies the protocol migration code.
     It does not change the semantics.
@@ -217,20 +217,20 @@ Migration
 
 - [Alpha/Michelson/Migration: double hard_gas_limit_per_{operation,block}](:gl:`nomadic-labs/tezos@d65c58c2`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It performs the migration of the constants in mainnet to update them
     to the new (doubled) default values.
 
 - [Alpha/Delegation/Migration: reassign rolls](:gl:`nomadic-labs/tezos@b9408be7`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It performs the roll size update to 8000 tez.
 
 - [Alpha/Migration: invoicing example](:gl:`nomadic-labs/tezos@e010d700`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It credits the account of the authors of this protocol with a symbolic
     value of a hundred tez.
@@ -240,14 +240,14 @@ Migration
 
 - [Alpha/Vote/Migration: update constants binary representation](:gl:`nomadic-labs/tezos@d0c16b4f`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
-    Since we changed `Constants_repr.parametric_encoding` for adding the
-    new constant `test_chain_duration`, we need to upgrade the content
-    of the `constants_key` in the context.
+    Since we changed ``Constants_repr.parametric_encoding`` for adding the
+    new constant ``test_chain_duration``, we need to upgrade the content
+    of the ``constants_key`` in the context.
 
 - [Alpha/Contracts/Migration: reindex contracts](:gl:`nomadic-labs/tezos@8618b475`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It performs the migration of contracts to the new uniform storage format.

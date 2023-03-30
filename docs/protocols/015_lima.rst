@@ -220,7 +220,7 @@ can now be shut off with the toggle introduced in Jakarta. (MR :gl:`!6215`)
 Breaking Changes
 ----------------
 
-- Deprecate timelock functionality, that is the `CHEST_OPEN`
+- Deprecate timelock functionality, that is the ``CHEST_OPEN``
   instruction, in Michelson to prevent origination of new contracts using it. A
   safer version of timelock will come in a future procotol.  (MRs :gl:`!6260`,
   :gl:`!6327`)
@@ -296,13 +296,13 @@ Minor Changes
   (Proposals and Ballot), and move them to ``Validate_errors``.
   (MR :gl:`!5828`)
 
-- Replace `acceptable_passes` by `acceptable_pass` that returns an
+- Replace ``acceptable_passes`` by ``acceptable_pass`` that returns an
   optional integer instead of a list of at most one element. (MR
   :gl:`!6092`)
 
-- Removed `relative_position_within_block`. (MR :gl:`!6092`)
+- Removed ``relative_position_within_block``. (MR :gl:`!6092`)
 
-- New function `compare_operations` which defines a total ordering
+- New function ``compare_operations`` which defines a total ordering
   relation. (MR :gl:`!6092`)
 
 - Removed conflict between proposals/ballots operations and testnet

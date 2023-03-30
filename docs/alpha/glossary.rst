@@ -145,7 +145,7 @@ _`Implicit account`
     If *registered*, an `implicit account`_ can act as a delegate_.
 
     The address of an implicit account always starts with the
-    letters `tz` followed by `1`, `2`, `3`, or `4` (depending on the
+    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
     signature scheme) and finally the hash of the public key.
 
 _`Layer 1`

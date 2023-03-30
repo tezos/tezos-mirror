@@ -132,4 +132,4 @@ For more information on the client commands, see :doc:`cli-commands<cli-commands
 Example
 -------
 
-A coin flip contract on Tezos source code `here <https://gitlab.com/tezos/tezos/-/tree/master/src/proto_alpha/lib_protocol/contracts/timelock_flip.tz>` gives an example of using time-lock. Beware this contract is for educational purpose only and is not secure.
+A coin flip contract on Tezos source code `here <https://gitlab.com/tezos/tezos/-/tree/master/src/proto_alpha/lib_protocol/contracts/timelock_flip.tz>`__ gives an example of using time-lock. Beware this contract is for educational purpose only and is not secure.

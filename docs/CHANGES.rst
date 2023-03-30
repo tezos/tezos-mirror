@@ -41,10 +41,10 @@ Baker
 -----
 
 - Consensus operations that do not use the minimal slot of the delegate are
-  not counted for the (pre)quorums. (MR :gl: `!8175`)
+  not counted for the (pre)quorums. (MR :gl:`!8175`)
 
 - Consensus operations with identical consensus-related contents but different
-  ``branch`` fields are counted only once in the (pre)quorums. (MR :gl: `!8175`)
+  ``branch`` fields are counted only once in the (pre)quorums. (MR :gl:`!8175`)
 
 - Improved efficiency to solve the anti-spam Proof-of-Work challenge.
 
@@ -162,10 +162,10 @@ Node
   ``GET /monitor/validated_blocks`` and ``GET /monitor/applied_blocks``
   respectively returning validated blocks which are not yet applied
   nor stored, and applied blocks which are fully applied and stored by
-  the node. (MR :gl: `!7513`)
+  the node. (MR :gl:`!7513`)
 
 - Replaced some "precheck" occurrences with "validate" in event and
-  error identifiers and messages. (MR :gl: `!7513`)
+  error identifiers and messages. (MR :gl:`!7513`)
 
 - Document the usage of "Yay" as a deprecated synonym for "Yea", to encourage
   using the correct value in the future. (MR :gl:`!7960`)
@@ -295,7 +295,7 @@ Node
   required by the new protocol's semantics and the context's format to
   improve the disk usage footprint while running a context
   pruning. Upgrading to this new version is automatic and
-  irreversible. (MR :gl: `!6835` and :gl: `!6959`)
+  irreversible. (MR :gl:`!6835` and :gl:`!6959`)
 
 - **Breaking change**: bumped the snapshot version to ``5``. This
   version changes internal snapshot file representation to include
@@ -303,7 +303,7 @@ Node
   improve both import and export speed. Snapshots of version ``4``
   exported with previous versions of Octez can still be
   imported. Snapshots of version ``5`` are not backward compatible.
-  (MR :gl: `!6835` and :gl: `!6961`)
+  (MR :gl:`!6835` and :gl:`!6961`)
 
 - Upon receiving a new non-manager operation that conflicts with a
   previously validated operation, the mempool may now replace the old
@@ -312,17 +312,17 @@ Node
   and has simply be extended to non-manager operations. It should help
   all mempools converge toward the same set of accepted operations,
   regardless of the order in which the operations were
-  received. (MR :gl: `!6749`)
+  received. (MR :gl:`!6749`)
 
 - Changed the id and message of the error when the mempool rejects a
   new operation because it already contains a preferred conflicting
   operation. Changed the id and message of the error associated with
   an operation that is removed from the mempool to make room for a
-  better conflicting operation. (MR :gl: `!6749`)
+  better conflicting operation. (MR :gl:`!6749`)
 
 - Fixed a minor bug that caused the mempool to accept a manager
   operation that conflicts with an already present ``drain_delegate``
-  operation. (MR :gl: `!6749`)
+  operation. (MR :gl:`!6749`)
 
 - Removed the compatibility with storage snapshots of version ``2``
   and ``3``. These snapshot versions from Octez 12 cannot be imported
@@ -369,7 +369,7 @@ Baker
   the user directly removes the file
   ``<client-dir>/<chain_id>_baker_state``. On mainnet, this will have
   no effect as when the new protocol activates, previous bakers will
-  be permanently idle. (MR :gl: `!6835`)
+  be permanently idle. (MR :gl:`!6835`)
 
 - Fixed an issue where the baker would keep files opened longer than
   necessary causing unexpected out of space errors making the baker
@@ -520,8 +520,8 @@ Node
   backend. It is activated by default for all nodes running with a
   full or rolling history mode.
 
-- Add a `/chains/<chain>/blocks/<block>/merkle_tree_v2` RPC. This is an
-  evolution of the `../merkle_tree` RPC, using a simpler implementation of the
+- Add a ``/chains/<chain>/blocks/<block>/merkle_tree_v2`` RPC. This is an
+  evolution of the ``../merkle_tree`` RPC, using a simpler implementation of the
   Merkle tree/proof features that works with Irmin trees and proofs underneath
   instead of proof code internal to Octez, and is planned to eventually replace
   the old one in a future release.
@@ -561,8 +561,8 @@ Node
 Client
 ------
 
-- The light client (`tezos-client --mode light`) now uses the
-  `../block/<block_id>/merkle_tree_v2` RPC introduced in this version, removing
+- The light client (``tezos-client --mode light``) now uses the
+  ``../block/<block_id>/merkle_tree_v2`` RPC introduced in this version, removing
   a lot of delicate verification code and relying on Irmin instead. The client
   for this version will thus not work with older node versions that do not have
   this RPC.
@@ -1199,7 +1199,7 @@ Node
 
 - Manager operations do no longer need to be executed before being
   propagated over the network. This feature will be available from
-  protocol `I`, provided the latter is activated. The aim is to
+  protocol ``I``, provided the latter is activated. The aim is to
   increase the throughput of transactions gossiped over the network,
   while reducing the load on the Octez node's prevalidator
   (aka the mempool).

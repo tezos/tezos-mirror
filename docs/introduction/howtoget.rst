@@ -583,8 +583,8 @@ You may also activate Bash autocompletion by executing::
 
 .. warning::
 
-  Note that if your shell is `zsh`, you may need extra configuration to customize shell
-  completion (refer to the `zsh` documentation).
+  Note that if your shell is ``zsh``, you may need extra configuration to customize shell
+  completion (refer to the ``zsh`` documentation).
 
 .. _update_from_sources:
 

@@ -12,7 +12,7 @@ Installation
 
 Prerequisites:
 
-- `python 3.10.11`. It is recommended to use `pyenv
+- ``python 3.10.11``. It is recommended to use `pyenv
   <https://github.com/pyenv/pyenv>`_ to manage the python versions.
   If you want to use ``pyenv``:
 

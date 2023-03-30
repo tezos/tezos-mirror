@@ -8,7 +8,7 @@ while the unboxed items represent computational steps.
 
 .. image:: images/snoop_arch.png
 
-The code architecture of `octez-snoop` is itself divided in the following
+The code architecture of ``octez-snoop`` is itself divided in the following
 main packages:
 
 - ``bin_snoop`` is the main binary (you can have a look at the :ref:`manual<benchmark_tool_manual>`).
@@ -395,9 +395,9 @@ Case study: constructing the matrices
 
 We'd like to model the execution time of an hypothetical piece of code
 sorting an array using merge sort. We *know* that the time complexity of merge sort
-is :math:`O(n \log{n})` where `n` is the size of the array: we're
+is :math:`O(n \log{n})` where :math:`n` is the size of the array: we're
 interested in predicting the actual execution time as a function of
-:math:`n` for practical values of `n`.
+:math:`n` for practical values of :math:`n`.
 
 We pick the following cost model:
 
@@ -548,7 +548,7 @@ Here, ``solver`` describes the available optimization algorithms:
 
 The ``Lasso`` algorithm works well in practice. Setting the positivity
 constraint to ``true`` forces the variables to lie in the positive reals.
-At the time of writing, these are implemented as calls to the Python `Scikit-learn`
+At the time of writing, these are implemented as calls to the Python ``Scikit-learn``
 library. The ``solution`` type is defined as follows:
 
 .. code-block:: ocaml
