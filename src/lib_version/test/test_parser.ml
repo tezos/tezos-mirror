@@ -25,8 +25,9 @@
 
 (** Testing
     _______
-
-    Invocation: dune build @src/lib_version/test/runtest
+    Component: lib_version
+    Invocation: dune exec src/lib_version/test/main.exe
+    Subject: Test versions parser
  *)
 
 module Assert = struct
