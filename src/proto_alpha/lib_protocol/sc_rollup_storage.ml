@@ -49,25 +49,21 @@ let new_address ctxt =
       in
       (ctxt, Sc_rollup_repr.Address.hash_bytes [nonce_bytes])
 
-let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
+let init_genesis_info ctxt address genesis_commitment =
   let open Lwt_result_syntax in
-  let*? ctxt, genesis_commitment_hash =
+  let level = (Raw_context.current_level ctxt).level in
+  let*? ctxt, commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt genesis_commitment
   in
-  let*? ctxt, address = new_address ctxt in
-  let* ctxt, pvm_kind_size = Store.PVM_kind.init ctxt address kind in
-  let origination_level = (Raw_context.current_level ctxt).level in
-  let* ctxt, genesis_info_size =
-    Store.Genesis_info.init
-      ctxt
-      address
-      {commitment_hash = genesis_commitment_hash; level = origination_level}
-  in
-  let* ctxt, param_ty_size_diff =
-    Store.Parameters_type.init ctxt address parameters_ty
-  in
-  let* ctxt = Sc_rollup_staker_index_storage.init ctxt address in
-  let* ctxt, lcc_size_diff =
+  let genesis_info = Commitment.{commitment_hash; level} in
+  let* ctxt, size = Store.Genesis_info.init ctxt address genesis_info in
+  return (ctxt, genesis_info, size)
+
+let init_commitment_storage ctxt address
+    ({commitment_hash = genesis_commitment_hash; level = origination_level} :
+      Commitment.genesis_info) genesis_commitment =
+  let open Lwt_result_syntax in
+  let* ctxt, lcc_size =
     Store.Last_cemented_commitment.init ctxt address genesis_commitment_hash
   in
   let* ctxt, commitment_size_diff =
@@ -105,17 +101,35 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
       origination_level
       [genesis_commitment_hash]
   in
+  return
+    ( ctxt,
+      lcc_size + commitment_size_diff + commitment_added_size_diff
+      + commitment_first_publication_level_diff
+      + commitments_per_inbox_level_diff )
+
+let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
+  let open Lwt_result_syntax in
+  let*? ctxt, address = new_address ctxt in
+  let* ctxt, pvm_kind_size = Store.PVM_kind.init ctxt address kind in
+  let* ctxt, param_ty_size =
+    Store.Parameters_type.init ctxt address parameters_ty
+  in
+  let* ctxt = Sc_rollup_staker_index_storage.init ctxt address in
+  let* ctxt, genesis_info, genesis_info_size_diff =
+    init_genesis_info ctxt address genesis_commitment
+  in
+  let* ctxt, commitment_size_diff =
+    init_commitment_storage ctxt address genesis_info genesis_commitment
+  in
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
   let size =
     Z.of_int
-      (origination_size + stored_kind_size + addresses_size + lcc_size_diff
-     + commitment_size_diff + commitment_added_size_diff
-     + commitment_first_publication_level_diff + param_ty_size_diff
-     + pvm_kind_size + genesis_info_size + commitments_per_inbox_level_diff)
+      (origination_size + stored_kind_size + addresses_size + param_ty_size
+     + pvm_kind_size + genesis_info_size_diff + commitment_size_diff)
   in
-  return (address, size, genesis_commitment_hash, ctxt)
+  return (address, size, genesis_info.commitment_hash, ctxt)
 
 let kind ctxt address =
   let open Lwt_result_syntax in
