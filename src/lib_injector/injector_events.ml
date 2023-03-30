@@ -195,15 +195,18 @@ module Make
           ("force", Data_encoding.bool)
           ~pp1:pp_operations_list
 
-      let dropping_operation =
-        declare_2
-          ~name:"dropping_operation"
-          ~msg:"dropping operation {operation} failing with {error}"
+      let discard_error_operation =
+        declare_3
+          ~name:"discard_error_operation"
+          ~msg:
+            "discarding operation {operation} failing {count} times with \
+             {error}"
           ~level:Notice
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
-          ("error", Error_monad.trace_encoding)
-          ~pp2:Error_monad.pp_print_trace
+          ("count", Data_encoding.int31)
+          ("error", Data_encoding.option Error_monad.trace_encoding)
+          ~pp3:(fun ppf -> Option.iter (Error_monad.pp_print_trace ppf))
 
       let injected =
         declare_2

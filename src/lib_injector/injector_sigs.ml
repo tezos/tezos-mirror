@@ -293,6 +293,10 @@ module type S = sig
       be useful to set this value to something [> 0] if we want to retrieve
       information about operations included on L1 for a given period.
 
+      [allowed_attempts] is the number of attempts that will be made to inject
+      an operation. Operations whose injection fails a number of times greater
+      than this value will be discarded from the queue.
+
       The injector monitors L1 heads to update the statuses of its operations
       accordingly. The argument [reconnection_delay] gives an initial value for
       the delay before attempting a reconnection (see {!Layer_1.init}).
@@ -301,6 +305,7 @@ module type S = sig
     #Client_context.full ->
     data_dir:string ->
     ?retention_period:int ->
+    ?allowed_attempts:int ->
     ?reconnection_delay:float ->
     state ->
     signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
