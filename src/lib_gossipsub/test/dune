@@ -4,6 +4,7 @@
 (executable
  (name test_gossipsub)
  (libraries
+  fmt
   tezos-base
   tezos-base.unix
   tezos-gossipsub

@@ -8,6 +8,7 @@
  (libraries
   ringo
   aches
+  fmt
   tezos-error-monad
   tezos-base
   tezos-base.unix
