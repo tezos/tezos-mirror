@@ -122,7 +122,9 @@ let constants_mainnet =
     cycles_per_voting_period = 5l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 2_600_000);
-    proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
+    (* When reducing block times, consider adapting this constant so
+       the block production's overhead is not too important. *)
+    proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L);
     minimal_stake = Tez.(mul_exn one 6_000);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
