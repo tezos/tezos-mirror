@@ -4279,7 +4279,6 @@ end
 module Destination : sig
   type t =
     | Contract of Contract.t
-    | Tx_rollup of Tx_rollup.t
     | Sc_rollup of Sc_rollup.t
     | Zk_rollup of Zk_rollup.t
 

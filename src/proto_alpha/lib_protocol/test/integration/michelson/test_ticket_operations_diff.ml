@@ -334,34 +334,6 @@ let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
         },
       incr )
 
-let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
-    ~tx_rollup =
-  let open Lwt_result_wrap_syntax in
-  let ctxt = Incremental.alpha_ctxt incr in
-  let*@ params_node, ctxt =
-    Script_ir_translator.unparse_data
-      ctxt
-      Script_ir_unparser.Optimized_legacy
-      parameters_ty
-      parameters
-  in
-  let incr = Incremental.set_alpha_ctxt incr ctxt in
-  return
-    ( Script_typed_ir.Internal_operation
-        {
-          source = src;
-          operation =
-            Transaction_to_tx_rollup
-              {
-                unparsed_parameters = params_node;
-                destination = tx_rollup;
-                parameters_ty;
-                parameters;
-              };
-          nonce = 1;
-        },
-      incr )
-
 let ticket_diffs_of_operations incr operations =
   Ticket_operations_diff.ticket_diffs_of_operations
     (Incremental.alpha_ctxt incr)

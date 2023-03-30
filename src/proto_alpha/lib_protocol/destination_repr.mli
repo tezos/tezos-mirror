@@ -43,7 +43,6 @@
     tooling perspective.  *)
 type t =
   | Contract of Contract_repr.t
-  | Tx_rollup of Tx_rollup_repr.t
   | Sc_rollup of Sc_rollup_repr.t
   | Zk_rollup of Zk_rollup_repr.t
 

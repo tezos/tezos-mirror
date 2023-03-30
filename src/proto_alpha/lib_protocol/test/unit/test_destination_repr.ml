@@ -180,14 +180,11 @@ let test_encoding_json_compat = test_contracts encoding_json_compat
 let test_compare_destination () =
   let tz1 = !!(Destination_repr.of_b58check null_address) in
   let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
-  let txr1 = !!(Destination_repr.of_b58check tx_rollup_address) in
   let scr1 = !!(Destination_repr.of_b58check sc_rollup_address) in
   let epx1 = !!(Destination_repr.of_b58check zk_rollup_address) in
 
   assert (Destination_repr.(tz1 < kt1)) ;
-  assert (Destination_repr.(kt1 < txr1)) ;
-  assert (Destination_repr.(tz1 < txr1)) ;
-  assert (Destination_repr.(txr1 < scr1)) ;
+  assert (Destination_repr.(kt1 < scr1)) ;
   assert (Destination_repr.(scr1 < epx1)) ;
 
   return_unit

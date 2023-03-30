@@ -250,13 +250,6 @@ open Apply_results
 open Apply_operation_result
 open Apply_internal_results
 
-let assert_tx_rollup_feature_enabled ctxt =
-  let open Result_syntax in
-  let level = (Level.current ctxt).level in
-  let* sunset = Raw_level.of_int32 @@ Constants.tx_rollup_sunset_level ctxt in
-  let* () = error_when Raw_level.(sunset <= level) Tx_rollup_feature_disabled in
-  error_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
-
 let assert_sc_rollup_feature_enabled ctxt =
   error_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
@@ -308,8 +301,7 @@ let transfer_from_any_address ctxt source destination amount =
   match source with
   | Destination.Contract source ->
       Token.transfer ctxt (`Contract source) (`Contract destination) amount
-  | Destination.Sc_rollup _ | Destination.Tx_rollup _ | Destination.Zk_rollup _
-    ->
+  | Destination.Sc_rollup _ | Destination.Zk_rollup _ ->
       (* We do not allow transferring tez from rollups to other contracts. *)
       error_unless Tez.(amount = zero) (Non_empty_transaction_from source)
       >>?= fun () -> return (ctxt, [])
@@ -461,68 +453,6 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
           in
           (ctxt, result, operations) )
 
-let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
-    ~dst_rollup ~since =
-  assert_tx_rollup_feature_enabled ctxt >>?= fun () ->
-  (* If the ticket deposit fails on L2 for some reason
-     (e.g. [Balance_overflow] in the recipient), then it is
-     returned to [payer]. As [payer] is implicit, it cannot own
-     tickets directly. Therefore, erroneous deposits are
-     returned using the L2 withdrawal mechanism: a failing
-     deposit emits a withdrawal that can be executed by
-     [payer]. *)
-  let Tx_rollup_parameters.{ex_ticket; l2_destination} =
-    Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
-  in
-  Ticket_scanner.ex_ticket_size ctxt ex_ticket >>=? fun (ticket_size, ctxt) ->
-  let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
-  fail_when
-    Saturation_repr.(ticket_size >! limit)
-    (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
-       {payload_size = ticket_size; limit})
-  >>=? fun () ->
-  let ex_token, ticket_amount =
-    Ticket_scanner.ex_token_and_amount_of_ex_ticket ex_ticket
-  in
-  Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
-  >>=? fun (ticket_hash, ctxt) ->
-  Option.value_e
-    ~error:
-      (Error_monad.trace_of_error Tx_rollup_invalid_transaction_ticket_amount)
-    (Option.bind
-       (Script_int.to_int64 (ticket_amount :> Script_int.n Script_int.num))
-       Tx_rollup_l2_qty.of_int64)
-  >>?= fun ticket_amount ->
-  error_when
-    Tx_rollup_l2_qty.(ticket_amount <= zero)
-    Script_tc_errors.Forbidden_zero_ticket_quantity
-  >>?= fun () ->
-  let deposit, message_size =
-    Tx_rollup_message.make_deposit
-      payer
-      l2_destination
-      ticket_hash
-      ticket_amount
-  in
-  Tx_rollup_state.get ctxt dst_rollup >>=? fun (ctxt, state) ->
-  Tx_rollup_state.burn_cost ~limit:None state message_size >>?= fun cost ->
-  Token.transfer ctxt (`Contract (Contract.Implicit payer)) `Burned cost
-  >>=? fun (ctxt, balance_updates) ->
-  Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
-  >>=? fun (ctxt, state, paid_storage_size_diff) ->
-  Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
-  let result =
-    ITransaction_result
-      (Transaction_to_tx_rollup_result
-         {
-           balance_updates;
-           consumed_gas = Gas.consumed ~since ~until:ctxt;
-           ticket_hash;
-           paid_storage_size_diff;
-         })
-  in
-  return (ctxt, result, [])
-
 let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
     ~contract:contract_hash ~delegate ~source ~credit ~before_operation =
   Script_ir_translator.collect_lazy_storage ctxt storage_type storage
@@ -668,15 +598,6 @@ let apply_internal_operation_contents :
         ~internal:true
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
       >|=? fun (ctxt, res, ops) -> (ctxt, ITransaction_result res, ops)
-  | Transaction_to_tx_rollup
-      {destination; unparsed_parameters = _; parameters_ty; parameters} ->
-      apply_transaction_to_tx_rollup
-        ~ctxt
-        ~parameters_ty
-        ~parameters
-        ~payer
-        ~dst_rollup:destination
-        ~since:ctxt_before_op
   | Transaction_to_sc_rollup
       {
         destination;

@@ -1185,11 +1185,6 @@ and 'arg typed_contract =
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract
-  | Typed_tx_rollup : {
-      arg_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
-      tx_rollup : Tx_rollup.t;
-    }
-      -> ('a ticket, tx_rollup_l2_address) pair typed_contract
   | Typed_sc_rollup : {
       arg_ty : ('arg, _) ty;
       sc_rollup : Sc_rollup.t;
@@ -1622,13 +1617,6 @@ and 'kind internal_operation_contents =
       location : Script.location;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
-      unparsed_parameters : Script.expr;
-    }
-      -> Kind.transaction internal_operation_contents
-  | Transaction_to_tx_rollup : {
-      destination : Tx_rollup.t;
-      parameters_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
-      parameters : ('a ticket, tx_rollup_l2_address) pair;
       unparsed_parameters : Script.expr;
     }
       -> Kind.transaction internal_operation_contents
