@@ -3949,7 +3949,6 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
 let test_outbox_message protocols ~kind =
   let test (expected_error, earliness, entrypoint, message_kind) =
     test_outbox_message
-      ~regression:true
       ?expected_error
       ~earliness
       ?entrypoint
@@ -3960,7 +3959,6 @@ let test_outbox_message protocols ~kind =
     if kind <> "arith" then
       test_outbox_message
         ~supports:(Protocol.From_protocol 17)
-        ~regression:true
         ?expected_error
         ~earliness
         ?entrypoint
@@ -3988,7 +3986,6 @@ let test_outbox_message protocols ~kind =
         (Base.rex "A data expression was invalid for its expected type.")
       ~supports:(Protocol.From_protocol 17)
       ~earliness:0
-      ~regression:true
       ~message_kind:`Internal
       ~outbox_parameters_ty:"string"
       protocols
@@ -3998,7 +3995,6 @@ let test_outbox_message protocols ~kind =
         (Base.rex ".*or a parameter was supplied of the wrong type")
       ~supports:(Protocol.From_protocol 17)
       ~earliness:0
-      ~regression:true
       ~message_kind:`Internal
       ~init_storage:{|"word"|}
       ~storage_ty:"string"
