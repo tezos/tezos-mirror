@@ -39,15 +39,10 @@ val lookup_opt :
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
-(** [all ~version] represents all registered host functions that are
-    supported for the [version] of the WASM PVM. *)
-val all :
-  version:Wasm_pvm_state.version ->
-  Tezos_webassembly_interpreter.Host_funcs.registry
-
-(** [all_debug ~version] contains the same functions as
-    [all ~version], with the alternative implementation of [write_debug]. *)
-val all_debug :
+(** [registry ~version ~write_debug] returns the host functions registry for
+    the expected PVM [version], and with the expected implementation for the
+    [write_debug] function.  *)
+val registry :
   version:Wasm_pvm_state.version ->
   write_debug:Builtins.write_debug ->
   Tezos_webassembly_interpreter.Host_funcs.registry

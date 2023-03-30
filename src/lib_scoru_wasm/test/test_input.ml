@@ -155,7 +155,7 @@ let test_host_fun ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      (Host_funcs.all ~version)
+      (Host_funcs.registry ~write_debug:Noop ~version)
       ~input
       Host_funcs.Internal_for_tests.read_input
       values

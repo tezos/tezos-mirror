@@ -49,7 +49,7 @@ let register_new_write_debug ~version added_ticks =
   let current_write_debug =
     Tezos_webassembly_interpreter.Host_funcs.lookup
       ~global_name:name
-      (Host_funcs.all ~version)
+      (Host_funcs.registry ~version ~write_debug:Noop)
   in
   let alternative_write_debug =
     match current_write_debug with
@@ -65,7 +65,7 @@ let register_new_write_debug ~version added_ticks =
     Tezos_webassembly_interpreter.Host_funcs.register
       ~global_name:name
       impl
-      (Host_funcs.all ~version)
+      (Host_funcs.registry ~version ~write_debug:Noop)
   in
   (register alternative_write_debug, register current_write_debug)
 
