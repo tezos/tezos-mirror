@@ -733,15 +733,12 @@ module Stake_storage_tests = struct
     let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
     return_unit
 
-  (** Test that publish twice to the same level is allowed unless the
-      commitment changes. *)
+  (** Test that publish twice to the same level is not allowed. *)
   let test_publish_twice () =
     let open Lwt_result_wrap_syntax in
-    (* In contrary to deposit, cement and withdraw, the same commitment
-       can be published twice (and even more). *)
     let* ctxt, staker = new_context_1 () in
     let*@ rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
-    let commitment, _hash =
+    let commitment, hash =
       commitment
         ~predecessor:genesis_hash
         ~inbox_level:(valid_inbox_level ctxt 1l)
@@ -750,12 +747,15 @@ module Stake_storage_tests = struct
     let*@ ctxt = publish_commitment ctxt rollup staker commitment in
     let* () = assert_commitment_exists ctxt rollup commitment in
     let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
-    (* Assert that publishing twice succeeds and the commitment still exist. *)
-    let*@ ctxt = publish_commitment ctxt rollup staker commitment in
-    let* () = assert_commitment_exists ctxt rollup commitment in
-    let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
-
-    (* However, you can publish at most one unique commitment per inbox level. *)
+    (* Assert that publishing twice the same commitment fails. *)
+    let* () =
+      assert_fails_with
+        ~loc:__LOC__
+        (publish_commitment ctxt rollup staker commitment)
+        (Sc_rollup_errors.Sc_rollup_double_publish hash)
+    in
+    (* Assert that publishing twice to the same inbox level but with
+       distinct commitment fails. *)
     let new_commitment =
       {
         commitment with
