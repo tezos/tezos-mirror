@@ -391,6 +391,18 @@ module Swap = struct
      - Check that the new topology is one of the following:
        1b-swaper-1a-2a-2b if swaper sent its request to 1a or
        1b-1a-2a-swaper-2b if swaper sent its request to 2a. *)
+
+  (* NOTE: This test has previously been flaky because of some race conditions that
+     where caused by inconsistencies regarding the way the maintenance was
+     triggered. Please see the following patch that solves the race condition
+     for more details:
+     https://gitlab.com/tezos/tezos/-/commit/9df348f7447df7c89bd1456e8640b7686e51aebe
+
+     More precisely, as the node [swaper] is configured with [Connection = 2],
+     the max number of connexions it accepted was [3]. Thus, during the swap,
+     as a connection is added (before removing the replaced one), the number
+     of connections was equal to [3]. The maintainance was then triggered
+     unexpectedly. This should not occur anymore. *)
   let test_swap_raw () =
     let create_node name = Node.create ~name [Disable_p2p_maintenance] in
     let run_node node =
