@@ -95,6 +95,7 @@ type ('peer, 'message_id, 'span) limits = {
   publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
+  do_px : bool;  (** The flag controls whether peer exchange (PX) is enabled. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
   unsubscribe_backoff : 'span;

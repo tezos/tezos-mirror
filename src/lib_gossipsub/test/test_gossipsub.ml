@@ -34,6 +34,7 @@ let default_limits =
     max_gossip_retransmission = 3;
     degree_optimal = 6;
     publish_threshold = 0.;
+    do_px = true;
     accept_px_threshold = 0.;
     unsubscribe_backoff = 10;
     graft_flood_backoff = -50;
