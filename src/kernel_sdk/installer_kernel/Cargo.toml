@@ -20,17 +20,6 @@ entrypoint = []
 version = "0.3.10"
 features = ["portable"]
 
-[dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
-
-[dependencies.tezos_smart_rollup_host]
-path = "../tezos_smart_rollup_host"
-default-features = false
-
-[dependencies.tezos_smart_rollup_encoding]
-path = "../tezos_smart_rollup_encoding"
-default-features = false
-
-[dependencies.tezos_smart_rollup_entrypoint]
-path = "../tezos_smart_rollup_entrypoint"
+[dependencies.tezos_smart_rollup]
+path = "../tezos_smart_rollup"
 default-features = false

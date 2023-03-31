@@ -18,13 +18,13 @@
 #![forbid(unsafe_code)]
 
 use core::panic::PanicInfo;
-use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_encoding::dac::reveal_loop;
-use tezos_smart_rollup_encoding::dac::V0SliceContentPage;
-use tezos_smart_rollup_encoding::dac::MAX_PAGE_SIZE;
-use tezos_smart_rollup_host::path::RefPath;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup::core_unsafe::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup::core_unsafe::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup::dac::reveal_loop;
+use tezos_smart_rollup::dac::V0SliceContentPage;
+use tezos_smart_rollup::dac::MAX_PAGE_SIZE;
+use tezos_smart_rollup::prelude::*;
+use tezos_smart_rollup::storage::path::RefPath;
 
 // Path of currently running kernel.
 const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
@@ -36,7 +36,7 @@ const PREPARE_KERNEL_PATH: RefPath = RefPath::assert_from(b"/installer/kernel/bo
 const MAX_DAC_LEVELS: usize = 4;
 
 #[cfg(all(feature = "entrypoint", target_arch = "wasm32"))]
-tezos_smart_rollup_entrypoint::kernel_entry!(installer);
+tezos_smart_rollup::kernel_entry!(installer);
 
 /// Installer.
 pub fn installer<Host: Runtime>(host: &mut Host) {

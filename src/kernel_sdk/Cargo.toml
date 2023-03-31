@@ -15,6 +15,7 @@ members = [
   "tezos_smart_rollup_storage",
   "tezos_smart_rollup_panic_hook",
   "tezos_smart_rollup_entrypoint",
+  "tezos_smart_rollup",
   # UX
   "installer_kernel",
   "installer_client"
