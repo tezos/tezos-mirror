@@ -263,11 +263,11 @@ let default_solver ?(to_solve = C) g =
   let get_sel = CS.(get_sel c.sels) in
   Arith
     {
-      a = c.a;
-      b = c.b;
-      c = c.c;
-      d = c.d;
-      e = c.e;
+      a = c.wires.(0);
+      b = c.wires.(1);
+      c = c.wires.(2);
+      d = c.wires.(3);
+      e = c.wires.(4);
       qc = get_sel "qc";
       ql = get_sel "ql";
       qr = get_sel "qr";

@@ -202,33 +202,19 @@ module To_plonk = struct
     let open CS in
     let zero, one, two = Scalar.(zero, one, one + one) in
     let precomputed_advice = [] in
+    let wires = Array.init Plompiler.Csir.nb_wires_arch (Fun.const 0) in
+    wires.(0) <- 0 ;
+    wires.(1) <- 1 ;
+    wires.(2) <- 0 ;
     let g1 =
-      [|
-        {
-          a = 0;
-          b = 1;
-          c = 0;
-          d = 0;
-          e = 0;
-          sels = [("qr", one)];
-          precomputed_advice;
-          label = [];
-        };
-      |]
+      [|{wires; sels = [("qr", one)]; precomputed_advice; label = []}|]
     in
+    let wires = Array.init Plompiler.Csir.nb_wires_arch (Fun.const 0) in
+    wires.(0) <- 1 ;
+    wires.(1) <- 2 ;
+    wires.(2) <- 1 ;
     let g2 =
-      [|
-        {
-          a = 1;
-          b = 2;
-          c = 1;
-          d = 0;
-          e = 0;
-          sels = [("qm", two)];
-          precomputed_advice;
-          label = [];
-        };
-      |]
+      [|{wires; sels = [("qm", two)]; precomputed_advice; label = []}|]
     in
     let c = to_plonk ~public_input_size:0 [g1; g2] in
     let expected_wires =

@@ -309,18 +309,18 @@ end = struct
           let j = (i + 1) mod nb_cs in
           let ci, cj = (gate.(i), gate.(j)) in
           let a, b, c, d, e =
-            ( trace.(ci.a),
-              trace.(ci.b),
-              trace.(ci.c),
-              trace.(ci.d),
-              trace.(ci.e) )
+            ( trace.(ci.wires.(0)),
+              trace.(ci.wires.(1)),
+              trace.(ci.wires.(2)),
+              trace.(ci.wires.(3)),
+              trace.(ci.wires.(4)) )
           in
           let ag, bg, cg, dg, eg =
-            ( trace.(cj.a),
-              trace.(cj.b),
-              trace.(cj.c),
-              trace.(cj.d),
-              trace.(cj.e) )
+            ( trace.(cj.wires.(0)),
+              trace.(cj.wires.(1)),
+              trace.(cj.wires.(2)),
+              trace.(cj.wires.(3)),
+              trace.(cj.wires.(4)) )
           in
           (* Folding on selectors *)
           List.fold_left
@@ -429,13 +429,13 @@ end = struct
         map
     in
     List.fold_left
-      (fun (wires, selectors_map, advice_map, pad)
-           {a; b; c; d; e; sels; precomputed_advice; label} ->
+      (fun (acc_wires, selectors_map, advice_map, pad)
+           {wires; sels; precomputed_advice; label} ->
         ignore label ;
-        let wires = add_wires [|a; b; c; d; e|] wires in
+        let acc_wires = add_wires wires acc_wires in
         let selectors_map = add_selectors sels selectors_map pad in
         let advice_map = add_selectors precomputed_advice advice_map pad in
-        (wires, selectors_map, advice_map, pad + 1))
+        (acc_wires, selectors_map, advice_map, pad + 1))
       SMap.([||], empty, empty, 0)
       cs
     |> fun (wires, selectors, advice, _) ->

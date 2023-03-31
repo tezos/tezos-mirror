@@ -235,11 +235,7 @@ module CS = struct
   let arithmetic_selectors = selectors_with_tags [Arithmetic]
 
   type raw_constraint = {
-    a : int;
-    b : int;
-    c : int;
-    d : int;
-    e : int;
+    wires : int array;
     sels : (string * Scalar.t) list;
     precomputed_advice : (string * Scalar.t) list;
     label : string list;
@@ -275,27 +271,27 @@ module CS = struct
            ~q_table
            ())
     in
-    {a; b; c; d; e; sels; precomputed_advice; label = label :: labels}
+    let wires = [|a; b; c; d; e|] in
+    {wires; sels; precomputed_advice; label = label :: labels}
 
   let get_sel sels s =
     match List.find_opt (fun (x, _) -> s = x) sels with
     | None -> Scalar.zero
     | Some (_, c) -> c
 
-  let to_string_raw_constraint {a; b; c; d; e; sels; precomputed_advice; label}
-      : string =
+  let to_string_raw_constraint {wires; sels; precomputed_advice; label} : string
+      =
     let pp_sel (s, c) = s ^ ":" ^ Scalar.string_of_scalar c in
     let selectors = String.concat " " (List.map pp_sel sels) in
     let precomputed_advice =
       String.concat " " (List.map pp_sel precomputed_advice)
     in
+    let wires_str =
+      Array.mapi (fun i w -> Format.sprintf "%s:%i" (wire_name i) w) wires
+    in
     Format.sprintf
-      "a:%i b:%i c:%i d:%i e:%i %s | %s [%s]"
-      a
-      b
-      c
-      d
-      e
+      "%s %s | %s [%s]"
+      (String.concat " " @@ Array.to_list wires_str)
       selectors
       precomputed_advice
       (String.concat " ; " label)
@@ -314,14 +310,7 @@ module CS = struct
     List.for_all is_linear_sel constr.sels
 
   let rename_wires_constr ~rename constr =
-    {
-      constr with
-      a = rename constr.a;
-      b = rename constr.b;
-      c = rename constr.c;
-      d = rename constr.d;
-      e = rename constr.e;
-    }
+    {constr with wires = Array.map rename constr.wires}
 
   let rename_wires ~rename gate = Array.map (rename_wires_constr ~rename) gate
 
@@ -337,8 +326,8 @@ module CS = struct
         Scalar.equal
         (SMap.of_seq @@ List.to_seq constr.sels)
         (SMap.of_seq @@ List.to_seq [("qm", Scalar.one); ("ql", Scalar.mone)])
-      && constr.a = constr.b
-    then Some constr.a
+      && constr.wires.(0) = constr.wires.(1)
+    then Some constr.wires.(0)
     else None
 
   let used_selectors gate i =
@@ -372,7 +361,7 @@ module CS = struct
     List.map2
       (fun wsels w -> if intersect wsels sels then w else -1)
       [a_selectors; b_selectors; c_selectors; d_selectors; e_selectors]
-      [gate.(i).a; gate.(i).b; gate.(i).c; gate.(i).d; gate.(i).e]
+      (gate.(i).wires |> Array.to_list)
 
   let gate_wires gate =
     List.init (Array.length gate) (wires_of_constr_i gate)
@@ -384,39 +373,38 @@ module CS = struct
     if not @@ is_linear_raw_constr constr then
       raise @@ Invalid_argument "constraint is non-linear"
     else
+      let module SMap = Map.Make (String) in
+      let linear_terms_map =
+        ("qc", -1)
+        :: List.init nb_wires_arch (fun i ->
+               (linear_selector_name i, constr.wires.(i)))
+        |> List.to_seq |> SMap.of_seq
+      in
       List.map
-        (fun (sel_name, coeff) ->
-          match sel_name with
-          | "qc" -> (coeff, -1)
-          | "ql" -> (coeff, constr.a)
-          | "qr" -> (coeff, constr.b)
-          | "qo" -> (coeff, constr.c)
-          | "qd" -> (coeff, constr.d)
-          | "qe" -> (coeff, constr.e)
-          | _ -> assert false)
+        (fun (sel_name, coeff) -> (coeff, SMap.find sel_name linear_terms_map))
         constr.sels
       |> List.filter (fun (q, _) -> not @@ Scalar.is_zero q)
 
   let mk_linear_constr (wires, sels) =
-    match wires with
-    | [a; b; c; d; e] ->
-        {a; b; c; d; e; sels; precomputed_advice = []; label = ["linear"]}
-    | _ -> assert false
+    {
+      wires = Array.of_list wires;
+      sels;
+      precomputed_advice = [];
+      label = ["linear"];
+    }
 
   let mk_bool_constr wire =
+    let wires = Array.init nb_wires_arch (Fun.const 0) in
+    wires.(0) <- wire ;
     {
-      a = wire;
-      b = 0;
-      c = 0;
-      d = 0;
-      e = 0;
+      wires;
       sels = [("qbool", Scalar.one)];
       precomputed_advice = [];
       label = ["bool"];
     }
 
   let raw_constraint_equal c1 c2 =
-    c1.a = c2.a && c1.b = c2.b && c1.c = c2.c && c1.d = c2.d && c1.e = c2.e
+    Array.for_all2 ( = ) c1.wires c2.wires
     && c1.label = c2.label
     && List.for_all2
          (fun (name, coeff) (name', coeff') ->
