@@ -5753,8 +5753,8 @@ end
 (* TESTS THAT USE PROTOCOLS *)
 
 let _octez_micheline_rewriting_tests =
-  test
-    "test_rewriting"
+  tezt
+    ["test_rewriting"]
     ~path:"src/lib_benchmark/lib_micheline_rewriting/test"
     ~with_macos_security_framework:true
     ~opam:"tezos-micheline-rewriting"
@@ -5765,7 +5765,6 @@ let _octez_micheline_rewriting_tests =
         Protocol.(main alpha);
         octez_error_monad;
         Protocol.(client_exn alpha);
-        alcotest_lwt;
       ]
 
 let _octez_store_tests =
