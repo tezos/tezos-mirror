@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -83,7 +83,7 @@ extern "C" {
     ///
     /// If the set of keys is `{/a/x, /a/y/z, /b/x}`, then:
     /// ```no_run
-    /// # use tezos_smart_rollup_core::smart_rollup_core::{store_list_size, store_list_get};
+    /// # use tezos_smart_rollup_core::smart_rollup_core::{store_list_size, store_get_nth_key};
     /// # use std::slice::from_raw_parts;
     ///
     /// let prefix = [b'/', b'a'];
@@ -95,8 +95,8 @@ extern "C" {
     /// let first_subkey = std::ptr::null_mut();
     /// let second_subkey = std::ptr::null_mut();
     ///
-    /// let first_size = unsafe { store_list_get(path, len, 0, first_subkey, 1024) };
-    /// let second_size = unsafe { store_list_get(path, len, 1, second_subkey, 1024) };
+    /// let first_size = unsafe { store_get_nth_key(path, len, 0, first_subkey, 1024) };
+    /// let second_size = unsafe { store_get_nth_key(path, len, 1, second_subkey, 1024) };
     ///
     /// let first_slice = unsafe { from_raw_parts(first_subkey, first_size as usize) };
     /// let second_slice = unsafe { from_raw_parts(second_subkey, second_size as usize) };
@@ -104,7 +104,7 @@ extern "C" {
     /// assert_eq!([b'/', b'x'], first_slice);
     /// assert_eq!([b'/', b'y', b'/', b'z'], second_slice);
     /// ```
-    pub fn store_list_get(
+    pub fn store_get_nth_key(
         path: *const u8,
         path_len: usize,
         index: i64,
@@ -271,13 +271,13 @@ pub unsafe trait SmartRollupCore {
     /// - `path_len` must be the length of that slice.
     unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64;
 
-    /// See [store_list_get].
+    /// See [store_get_nth_key].
     ///
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
     /// - `path_len` must be the length of that slice.
     /// - `dst` must point to a mutable slice of bytes with `capacity >= max_size`.
-    unsafe fn store_list_get(
+    unsafe fn store_get_nth_key(
         &self,
         path: *const u8,
         path_len: usize,

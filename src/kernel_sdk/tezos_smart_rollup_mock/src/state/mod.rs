@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -226,7 +226,7 @@ impl HostState {
             .ok_or(Error::StoreNotANode)
     }
 
-    pub(crate) fn handle_store_list_get(
+    pub(crate) fn handle_store_get_nth_key(
         &self,
         prefix: &[u8],
         index: i64,
@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn store_list_get() {
+    fn store_get_nth_key() {
         // Arrange
         let mut state = HostState::default();
         let prefix = "/a/long/prefix";
@@ -540,7 +540,7 @@ mod tests {
         for i in 0..10 {
             results.push(
                 state
-                    .handle_store_list_get(prefix.as_bytes(), i)
+                    .handle_store_get_nth_key(prefix.as_bytes(), i)
                     .expect("Subkey exists"),
             );
         }
@@ -548,11 +548,11 @@ mod tests {
 
         // Assert
         let expected = (0..10).map(|i| i.to_string()).collect::<Vec<_>>();
-        assert_eq!(results, expected, "Expected stable store_list_get");
+        assert_eq!(results, expected, "Expected stable store_get_nth_key");
     }
 
     #[test]
-    fn store_list_get_value() {
+    fn store_get_nth_key_value() {
         // Arrange
         let mut state = HostState::default();
         let prefix = "/hello".as_bytes();
@@ -560,7 +560,7 @@ mod tests {
         state.handle_store_write(prefix, 0, &[]).unwrap();
 
         // Act
-        let result = state.handle_store_list_get(prefix, 0).unwrap();
+        let result = state.handle_store_get_nth_key(prefix, 0).unwrap();
 
         // Assert
         assert_eq!(

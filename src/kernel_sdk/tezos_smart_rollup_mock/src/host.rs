@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -152,7 +152,7 @@ unsafe impl SmartRollupCore for MockHost {
             .unwrap_or_else(|e| e.code() as i64)
     }
 
-    unsafe fn store_list_get(
+    unsafe fn store_get_nth_key(
         &self,
         path: *const u8,
         len: usize,
@@ -162,7 +162,7 @@ unsafe impl SmartRollupCore for MockHost {
     ) -> i32 {
         let path = from_raw_parts(path, len);
 
-        let subkey = self.state.borrow().handle_store_list_get(path, index);
+        let subkey = self.state.borrow().handle_store_get_nth_key(path, index);
 
         match subkey {
             Ok(subkey) => {

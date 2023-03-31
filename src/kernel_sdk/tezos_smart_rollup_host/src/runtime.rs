@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -16,7 +16,7 @@ use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
 use crate::input::Message;
 use crate::metadata::RollupMetadata;
 #[cfg(feature = "alloc")]
-use crate::path::{OwnedPath, Path, RefPath, PATH_MAX_SIZE};
+use crate::path::{OwnedPath, Path, RefPath, PATH_MAX_SIZE, PATH_SEPARATOR};
 #[cfg(not(feature = "alloc"))]
 use crate::path::{Path, RefPath};
 use crate::{Error, METADATA_SIZE};
@@ -117,13 +117,14 @@ pub trait Runtime {
     /// Get the subkey under `prefix` at `index`.
     ///
     /// # Returns
-    /// Returns the subkey as an [OwnedPath], **excluding** the `prefix`.
+    /// Returns the subkey as an [Some<OwnedPath>], **excluding** the
+    /// `prefix`. Returns none if the index points to the value.
     #[cfg(feature = "alloc")]
     fn store_get_subkey<T: Path>(
         &self,
         prefix: &T,
         index: i64,
-    ) -> Result<OwnedPath, RuntimeError>;
+    ) -> Result<Option<OwnedPath>, RuntimeError>;
 
     /// Move one part of durable storage to a different location
     ///
@@ -374,7 +375,7 @@ where
         &self,
         path: &T,
         index: i64,
-    ) -> Result<OwnedPath, RuntimeError> {
+    ) -> Result<Option<OwnedPath>, RuntimeError> {
         let size = self.store_count_subkeys(path)?;
 
         if index >= 0 && index < size {
@@ -554,26 +555,29 @@ fn store_get_subkey_unchecked(
     host: &impl SmartRollupCore,
     path: &impl Path,
     index: i64,
-) -> Result<OwnedPath, RuntimeError> {
+) -> Result<Option<OwnedPath>, RuntimeError> {
     let max_size = PATH_MAX_SIZE - path.size();
-    let mut buffer = Vec::with_capacity(max_size);
-
+    let mut buffer: Vec<u8> = Vec::with_capacity(max_size);
+    buffer.push(PATH_SEPARATOR);
+    let ptr = buffer.as_mut_ptr();
     unsafe {
-        let bytes_written = host.store_list_get(
+        let bytes_written = host.store_get_nth_key(
             path.as_ptr(),
             path.size(),
             index,
-            buffer.as_mut_ptr(),
-            max_size,
+            ptr.wrapping_offset(1),
+            max_size - 1,
         );
 
-        match Error::wrap(bytes_written) {
-            Ok(bytes_written) => {
-                buffer.set_len(bytes_written);
-
-                Ok(OwnedPath::from_bytes_unchecked(buffer))
-            }
-            Err(e) => Err(RuntimeError::HostErr(e)),
+        let bytes_written: usize =
+            Error::wrap(bytes_written).map_err(RuntimeError::HostErr)?;
+        if bytes_written > 0 {
+            // SAFETY: capacity of vector is size of maximum subkey length,
+            // including initial PATH_SEPARATOR.
+            buffer.set_len(bytes_written + 1);
+            Ok(Some(OwnedPath::from_bytes_unchecked(buffer)))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -930,7 +934,8 @@ mod tests {
 
         let subkey_index = 14;
         let subkey_count = 20;
-        let buffer_size = PATH_MAX_SIZE - PATH.size();
+        // -1 for leading `/`
+        let buffer_size = PATH_MAX_SIZE - PATH.size() - 1;
 
         let mut mock = MockSmartRollupCore::new();
         mock.expect_store_list_size()
@@ -941,7 +946,7 @@ mod tests {
             })
             .return_const(subkey_count);
 
-        mock.expect_store_list_get()
+        mock.expect_store_get_nth_key()
             .withf(move |path_ptr, path_size, index, _, max_bytes| {
                 let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
 
@@ -950,7 +955,7 @@ mod tests {
                     && buffer_size == *max_bytes
             })
             .return_once(|_, _, _, buf_ptr, _| {
-                let path_bytes = "/short/suffix".as_bytes();
+                let path_bytes = "short".as_bytes();
                 let buffer = unsafe { from_raw_parts_mut(buf_ptr, path_bytes.len()) };
                 buffer.copy_from_slice(path_bytes);
 
@@ -961,9 +966,47 @@ mod tests {
         let result = mock.store_get_subkey(&PATH, subkey_index);
 
         // Assert
-        let expected = RefPath::assert_from("/short/suffix".as_bytes()).into();
+        let expected = Some(RefPath::assert_from("/short".as_bytes()).into());
 
         assert_eq!(Ok(expected), result);
+    }
+
+    #[test]
+    fn store_get_subkey_value() {
+        // Arrange
+        const PATH: RefPath<'static> =
+            RefPath::assert_from("/prefix/of/other/paths".as_bytes());
+
+        let subkey_index = 0;
+        let subkey_count = 1;
+        // -1 for leading `/`
+        let buffer_size = PATH_MAX_SIZE - PATH.size() - 1;
+
+        let mut mock = MockSmartRollupCore::new();
+        mock.expect_store_list_size()
+            .withf(|ptr, size| {
+                let slice = unsafe { from_raw_parts(*ptr, *size) };
+
+                PATH.as_bytes() == slice
+            })
+            .return_const(subkey_count);
+        mock.expect_store_get_nth_key()
+            .withf(move |path_ptr, path_size, index, _, max_bytes| {
+                let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+
+                PATH.as_bytes() == slice
+                    && subkey_index == *index
+                    && buffer_size == *max_bytes
+            })
+            .return_once(|_, _, _, _, _| 0);
+        mock.expect_store_has()
+            .return_const(tezos_smart_rollup_core::VALUE_TYPE_VALUE);
+
+        // Act
+        let result = mock.store_get_subkey(&PATH, subkey_index);
+
+        // Assert
+        assert_eq!(Ok(None), result);
     }
 
     #[test]

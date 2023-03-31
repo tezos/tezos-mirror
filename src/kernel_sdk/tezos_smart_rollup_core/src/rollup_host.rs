@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -86,7 +86,7 @@ unsafe impl SmartRollupCore for RollupHost {
         core::store_list_size(path, path_len)
     }
 
-    unsafe fn store_list_get(
+    unsafe fn store_get_nth_key(
         &self,
         path: *const u8,
         path_len: usize,
@@ -94,7 +94,7 @@ unsafe impl SmartRollupCore for RollupHost {
         dst: *mut u8,
         max_size: usize,
     ) -> i32 {
-        core::store_list_get(path, path_len, index, dst, max_size)
+        core::store_get_nth_key(path, path_len, index, dst, max_size)
     }
 
     unsafe fn store_move(
