@@ -94,14 +94,9 @@ module Term = struct
 
   let ( and+ ) a b = Term.(const (fun x y -> (x, y)) $ a $ b)
 
-  let read_config_file config_file =
-    let open Lwt_result_syntax in
-    let+ config =
-      Option.filter Sys.file_exists config_file
-      |> Option.map_es Config_file.read
-    in
-    Option.value ~default:Config_file.default_config config
-
+  (* This is actually a weak check. The irmin command should take care
+     of checking whether or not the directory is valid/initialized or
+     not. *)
   let ensure_context_dir context_dir =
     let open Lwt_result_syntax in
     Lwt.catch
@@ -109,7 +104,8 @@ module Term = struct
         let*! b = Lwt_unix.file_exists context_dir in
         if not b then
           tzfail
-            (Data_version.Invalid_data_dir {data_dir = context_dir; msg = None})
+            (Data_version.Invalid_data_dir
+               {data_dir = context_dir; msg = Some "invalid directory"})
         else return_unit)
       (function
         | Unix.Unix_error _ ->
@@ -117,14 +113,6 @@ module Term = struct
               (Data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
         | exc -> Lwt.reraise exc)
-
-  let root config_file data_dir =
-    let open Lwt_result_syntax in
-    let* cfg = read_config_file config_file in
-    let data_dir = Option.value ~default:cfg.data_dir data_dir in
-    let context_dir = Data_version.context_dir data_dir in
-    let* () = ensure_context_dir context_dir in
-    return context_dir
 
   let resolve_block chain_store block =
     let open Lwt_result_syntax in
@@ -156,9 +144,23 @@ module Term = struct
       in
       let* chain_store = Store.get_chain_store store chain_id in
       let* block = resolve_block chain_store block in
-      let*! () = Store.close_store store in
       let context_hash = Store.Block.context_hash block in
       let context_hash_str = Context_hash.to_b58check context_hash in
+      let*! exists = Store.Block.context_exists chain_store block in
+      let* () =
+        when_ (not exists) (fun () ->
+            tzfail
+              (Data_version.Invalid_data_dir
+                 {
+                   data_dir = context_dir;
+                   msg =
+                     Some
+                       (Format.sprintf
+                          "cannot find context hash %s"
+                          context_hash_str);
+                 }))
+      in
+      let*! () = Store.close_store store in
       let*! () =
         Event.(
           emit
@@ -179,14 +181,22 @@ module Term = struct
   let stat_index config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* root = root config_file data_dir in
+      let* data_dir, _ =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      let root = Data_version.context_dir data_dir in
+      let* () = ensure_context_dir root in
       Tezos_context.Context.Checks.Index.Stat.run ~root ;
       return_unit)
 
   let stat_pack config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* root = root config_file data_dir in
+      let* data_dir, _ =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      let root = Data_version.context_dir data_dir in
+      let* () = ensure_context_dir root in
       let*! () = Tezos_context.Context.Checks.Pack.Stat.run ~root in
       return_unit)
 
@@ -199,7 +209,11 @@ module Term = struct
   let reconstruct_index config_file data_dir output index_log_size =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* root = root config_file data_dir in
+      let* data_dir, _ =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      let root = Data_version.context_dir data_dir in
+      let* () = ensure_context_dir root in
       let* () = index_dir_exists root output in
       Tezos_context.Context.Checks.Pack.Reconstruct_index.run
         ~root
@@ -246,7 +260,11 @@ module Term = struct
   let check_index config_file data_dir auto_repair =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* root = root config_file data_dir in
+      let* data_dir, _ =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      let root = Data_version.context_dir data_dir in
+      let* () = ensure_context_dir root in
       Tezos_context.Context.Checks.Pack.Integrity_check_index.run
         ~root
         ~auto_repair
