@@ -86,17 +86,6 @@ unsafe impl SmartRollupCore for RollupHost {
         core::store_list_size(path, path_len)
     }
 
-    unsafe fn store_get_nth_key(
-        &self,
-        path: *const u8,
-        path_len: usize,
-        index: i64,
-        dst: *mut u8,
-        max_size: usize,
-    ) -> i32 {
-        core::store_get_nth_key(path, path_len, index, dst, max_size)
-    }
-
     unsafe fn store_move(
         &self,
         from_path: *const u8,

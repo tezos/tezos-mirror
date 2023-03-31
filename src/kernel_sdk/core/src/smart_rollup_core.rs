@@ -71,47 +71,6 @@ extern "C" {
     /// Get the number of subkeys of the prefix given by `path`.
     pub fn store_list_size(path: *const u8, path_len: usize) -> i64;
 
-    /// Get subkey path at `index` with a given prefix.
-    ///
-    /// Writes the encoded path of the subkey given by `index` - minus the
-    /// *prefix* `path` - to `dst`.  Returns the size of the subkey path in
-    /// bytes.
-    ///
-    /// It can be used together with `store_list_size` to *enumerate* subkeys.
-    ///
-    /// # Examples
-    ///
-    /// If the set of keys is `{/a/x, /a/y/z, /b/x}`, then:
-    /// ```no_run
-    /// # use tezos_smart_rollup_core::smart_rollup_core::{store_list_size, store_get_nth_key};
-    /// # use std::slice::from_raw_parts;
-    ///
-    /// let prefix = [b'/', b'a'];
-    /// let path = prefix.as_ptr();
-    /// let len = prefix.len();
-    ///
-    /// assert_eq!(2, unsafe { store_list_size(path, len) });
-    ///
-    /// let first_subkey = std::ptr::null_mut();
-    /// let second_subkey = std::ptr::null_mut();
-    ///
-    /// let first_size = unsafe { store_get_nth_key(path, len, 0, first_subkey, 1024) };
-    /// let second_size = unsafe { store_get_nth_key(path, len, 1, second_subkey, 1024) };
-    ///
-    /// let first_slice = unsafe { from_raw_parts(first_subkey, first_size as usize) };
-    /// let second_slice = unsafe { from_raw_parts(second_subkey, second_size as usize) };
-    ///
-    /// assert_eq!([b'/', b'x'], first_slice);
-    /// assert_eq!([b'/', b'y', b'/', b'z'], second_slice);
-    /// ```
-    pub fn store_get_nth_key(
-        path: *const u8,
-        path_len: usize,
-        index: i64,
-        dst: *mut u8,
-        max_size: usize,
-    ) -> i32;
-
     /// Moves the value and/or subkeys of `from_path` to `to_path`.
     ///
     /// Overwrites the destination, if it already exists.
@@ -270,21 +229,6 @@ pub unsafe trait SmartRollupCore {
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
     /// - `path_len` must be the length of that slice.
     unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64;
-
-    /// See [store_get_nth_key].
-    ///
-    /// # Safety
-    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
-    /// - `path_len` must be the length of that slice.
-    /// - `dst` must point to a mutable slice of bytes with `capacity >= max_size`.
-    unsafe fn store_get_nth_key(
-        &self,
-        path: *const u8,
-        path_len: usize,
-        index: i64,
-        dst: *mut u8,
-        max_size: usize,
-    ) -> i32;
 
     /// See [store_move] above.
     ///

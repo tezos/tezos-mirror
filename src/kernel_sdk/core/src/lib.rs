@@ -66,9 +66,6 @@ pub const STORE_NOT_A_NODE: i32 = -10;
 /// The outbox is full an cannot accept new messages at this level.
 pub const FULL_OUTBOX: i32 = -11;
 
-/// Trying to get the nth subkey, where n is too big.
-pub const STORE_INVALID_SUBKEY_INDEX: i32 = -12;
-
 /// None ValueType discriminant.
 pub const VALUE_TYPE_NONE: i32 = 0;
 
