@@ -187,49 +187,35 @@ module CS = struct
     | Arithmetic
     | ThisConstr
     | NextConstr
-    | WireA
-    | WireB
-    | WireC
-    | WireD
-    | WireE
+    | Wire of int
   [@@deriving repr]
 
   let all_selectors =
     let linear =
-      [
-        (0, [ThisConstr; Linear; Arithmetic; WireA]);
-        (1, [ThisConstr; Linear; Arithmetic; WireB]);
-        (2, [ThisConstr; Linear; Arithmetic; WireC]);
-        (3, [ThisConstr; Linear; Arithmetic; WireD]);
-        (4, [ThisConstr; Linear; Arithmetic; WireE]);
-      ]
+      List.init nb_wires_arch (fun i ->
+          (i, [ThisConstr; Linear; Arithmetic; Wire i]))
     in
     let linear_g =
-      [
-        (0, [NextConstr; Linear; Arithmetic; WireA]);
-        (1, [NextConstr; Linear; Arithmetic; WireB]);
-        (2, [NextConstr; Linear; Arithmetic; WireC]);
-        (3, [NextConstr; Linear; Arithmetic; WireD]);
-        (4, [NextConstr; Linear; Arithmetic; WireE]);
-      ]
+      List.init nb_wires_arch (fun i ->
+          (i, [NextConstr; Linear; Arithmetic; Wire i]))
     in
     q_list
       ~qc:[ThisConstr; Arithmetic]
       ~linear
       ~linear_g
-      ~qm:[ThisConstr; Arithmetic; WireA; WireB]
-      ~qx2b:[ThisConstr; Arithmetic; WireB]
-      ~qx5a:[ThisConstr; Arithmetic; WireA]
-      ~qx5c:[ThisConstr; Arithmetic; WireC]
-      ~qecc_ws_add:[ThisConstr; NextConstr; WireA; WireB; WireC]
-      ~qecc_ed_add:[ThisConstr; NextConstr; WireA; WireB; WireC]
+      ~qm:[ThisConstr; Arithmetic; Wire 0; Wire 1]
+      ~qx2b:[ThisConstr; Arithmetic; Wire 1]
+      ~qx5a:[ThisConstr; Arithmetic; Wire 0]
+      ~qx5c:[ThisConstr; Arithmetic; Wire 2]
+      ~qecc_ws_add:[ThisConstr; NextConstr; Wire 0; Wire 1; Wire 2]
+      ~qecc_ed_add:[ThisConstr; NextConstr; Wire 0; Wire 1; Wire 2]
       ~qecc_ed_cond_add:
-        [ThisConstr; NextConstr; WireA; WireB; WireC; WireD; WireE]
-      ~qbool:[ThisConstr; WireA]
-      ~qcond_swap:[ThisConstr; WireA; WireB; WireC; WireD; WireE]
-      ~q_anemoi:[ThisConstr; NextConstr; WireB; WireC; WireD; WireE]
-      ~q_plookup:[ThisConstr; WireA; WireB; WireC; WireD; WireE]
-      ~q_table:[ThisConstr; WireA; WireB; WireC; WireD; WireE]
+        [ThisConstr; NextConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~qbool:[ThisConstr; Wire 0]
+      ~qcond_swap:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_anemoi:[ThisConstr; NextConstr; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_plookup:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_table:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ()
 
   let selectors_with_tags tags =
@@ -362,11 +348,11 @@ module CS = struct
     @ List.filter (fun (s, _) -> List.mem s next_constr_selectors) prev_sels
 
   let wires_of_constr_i gate i =
-    let a_selectors = selectors_with_tags [WireA] in
-    let b_selectors = selectors_with_tags [WireB] in
-    let c_selectors = selectors_with_tags [WireC] in
-    let d_selectors = selectors_with_tags [WireD] in
-    let e_selectors = selectors_with_tags [WireE] in
+    let a_selectors = selectors_with_tags [Wire 0] in
+    let b_selectors = selectors_with_tags [Wire 1] in
+    let c_selectors = selectors_with_tags [Wire 2] in
+    let d_selectors = selectors_with_tags [Wire 3] in
+    let e_selectors = selectors_with_tags [Wire 4] in
     let intersect names = List.exists (fun (s, _q) -> List.mem s names) in
     let sels = used_selectors gate i in
     (* We treat qecc_ed_cond_add exceptionally until we have a better interface
