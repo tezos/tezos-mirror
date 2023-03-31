@@ -33,6 +33,6 @@ Describe how reviewers and approvers can test this MR. -->
 
 /assign_reviewer @picdc @rodibozman @vch9
 
-/labels ~kernel::evm
+/labels ~kernel::EVM
 
 /milestone %"Deploy Uniswap on EVM smart rollups"
