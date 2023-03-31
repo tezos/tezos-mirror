@@ -720,6 +720,23 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
   let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
   parse_inbox inbox
 
+(** Configure the rollup node to pay more fees for its refute operations. *)
+let prioritize_refute_operations sc_rollup_node =
+  Log.info
+    "Prioritize refutation operations for rollup node %s"
+    (Sc_rollup_node.name sc_rollup_node) ;
+  Sc_rollup_node.Config_file.update sc_rollup_node @@ fun config ->
+  let open JSON in
+  update
+    "fee-parameters"
+    (update "refute"
+    @@ put
+         ( "minimal-nanotez-per-gas-unit",
+           JSON.annotate
+             ~origin:"higher-priority"
+             (`A [`String "200"; `String "1"]) ))
+    config
+
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
 
@@ -2675,7 +2692,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       final_level,
       empty_levels,
       stop_loser_at,
-      reset_honest_on ) =
+      reset_honest_on,
+      (priority : [`Priority_honest | `Priority_loser | `No_priority]) ) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -2760,6 +2778,10 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_dissections ()
     in
+    (* Write configuration to be able to change it *)
+    let* _ = Sc_rollup_node.config_init sc_rollup_node sc_rollup_address in
+    if priority = `Priority_honest then
+      prioritize_refute_operations sc_rollup_node ;
     let* () =
       Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
     in
@@ -2787,6 +2809,14 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let* gather_promises = run_honest_node sc_rollup_node
   and* () =
     Lwt_list.iter_p (fun (loser_mode, loser_sc_rollup_node) ->
+        let* _ =
+          Sc_rollup_node.config_init
+            ~loser_mode
+            loser_sc_rollup_node
+            sc_rollup_address
+        in
+        if priority = `Priority_loser then
+          prioritize_refute_operations loser_sc_rollup_node ;
         Sc_rollup_node.run loser_sc_rollup_node ~loser_mode sc_rollup_address [])
     @@ List.combine loser_modes loser_sc_rollup_nodes
   in
@@ -2940,62 +2970,112 @@ let test_refutation protocols ~kind =
              message index of the failure, and the third integer is the
              index of the failing tick during the processing of this
              message. *)
-          ("inbox_proof_at_genesis", (["3 0 0"], inputs_for 10, 80, [], [], []));
-          ("pvm_proof_at_genesis", (["3 0 1"], inputs_for 10, 80, [], [], []));
-          ("inbox_proof", (["5 0 0"], inputs_for 10, 80, [], [], []));
+          ( "inbox_proof_at_genesis",
+            (["3 0 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_at_genesis",
+            (["3 0 1"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "inbox_proof",
+            (["5 0 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
           ( "inbox_proof_with_new_content",
-            (["5 0 0"], inputs_for 30, 80, [], [], []) );
+            (["5 0 0"], inputs_for 30, 80, [], [], [], `Priority_honest) );
           (* In "inbox_proof_with_new_content" we add messages after the commitment
              period so the current inbox is not equal to the inbox snapshot-ted at the
              game creation. *)
           ( "inbox_proof_one_empty_level",
-            (["6 0 0"], inputs_for 10, 80, [2], [], []) );
+            (["6 0 0"], inputs_for 10, 80, [2], [], [], `Priority_honest) );
           ( "inbox_proof_many_empty_levels",
-            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], [], []) );
-          ("pvm_proof_0", (["5 2 1"], inputs_for 10, 80, [], [], []));
-          ("pvm_proof_1", (["7 2 0"], inputs_for 10, 80, [], [], []));
-          ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], [], []));
-          ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], [], []));
-          ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35], []));
+            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], [], [], `Priority_honest)
+          );
+          ( "pvm_proof_0",
+            (["5 2 1"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_1",
+            (["7 2 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_2",
+            (["7 2 5"], inputs_for 7, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_3",
+            (["9 2 5"], inputs_for 7, 80, [4; 5], [], [], `Priority_honest) );
+          ( "timeout",
+            (["5 2 1"], inputs_for 10, 80, [], [35], [], `Priority_honest) );
           ( "reset_honest_during_game",
             ( ["5 2 1"],
               inputs_for 10,
               80,
               [],
               [],
-              [("sc_rollup_node_conflict_detected.v0", 2)] ) );
+              [("sc_rollup_node_conflict_detected.v0", 2)],
+              `Priority_honest ) );
           ( "parallel_games_0",
-            (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], []) );
+            (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], [], `Priority_honest)
+          );
           ( "parallel_games_1",
-            (["3 0 0"; "3 0 1"; "3 0 0"], inputs_for 10, 200, [], [], []) );
+            ( ["3 0 0"; "3 0 1"; "3 0 0"],
+              inputs_for 10,
+              200,
+              [],
+              [],
+              [],
+              `Priority_honest ) );
         ]
     | "wasm_2_0_0" ->
         [
           (* First message of an inbox (level 3) *)
-          ("inbox_proof_0", (["3 0 0"], inputs_for 10, 80, [], [], []));
+          ( "inbox_proof_0",
+            (["3 0 0"], inputs_for 10, 80, [], [], [], `Priority_loser) );
           (* Fourth message of an inbox (level 3) *)
-          ("inbox_proof_1", (["3 4 0"], inputs_for 10, 80, [], [], []));
+          ( "inbox_proof_1",
+            (["3 4 0"], inputs_for 10, 80, [], [], [], `Priority_loser) );
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
           ( "pvm_proof_0",
-            (["5 7 11_000_000_001"], inputs_for 10, 80, [], [], []) );
+            ( ["5 7 11_000_000_001"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           ( "pvm_proof_1",
-            (["7 7 11_000_001_000"], inputs_for 10, 80, [], [], []) );
+            ( ["7 7 11_000_001_000"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           (* End of evaluation *)
           ( "pvm_proof_2",
-            (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], []) );
+            ( ["7 7 22_000_002_000"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           (* During padding *)
           ( "pvm_proof_3",
-            (["7 7 22_010_000_000"], inputs_for 10, 80, [], [], []) );
+            ( ["7 7 22_010_000_000"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           ( "parallel_games_0",
-            (["4 0 0"; "5 7 11_000_000_001"], inputs_for 10, 80, [], [], []) );
+            ( ["4 0 0"; "5 7 11_000_000_001"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           ( "parallel_games_1",
             ( ["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"],
               inputs_for 10,
               80,
               [],
               [],
-              [] ) );
+              [],
+              `Priority_loser ) );
         ]
     | _ -> assert false
   in
@@ -3019,7 +3099,7 @@ let test_accuser protocols =
     ~challenge_window:10
     ~commitment_period:10
     ~variant:"pvm_proof_2"
-    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [])
+    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [], `Priority_honest)
     protocols
 
 (** Helper to check that the operation whose hash is given is successfully
