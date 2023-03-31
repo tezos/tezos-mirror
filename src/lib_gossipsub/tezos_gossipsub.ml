@@ -163,10 +163,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
 
   type connection = {
-    topics : Topic.Set.t;
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
-
-       When does this field should be updated? *)
+    topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
     direct : bool;
         (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
     outbound : bool;
