@@ -2289,8 +2289,8 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let ctxt =
-    Sc_rollup.Inbox.add_info_per_level
+  let* ctxt =
+    Sc_rollup.Inbox.add_level_info
       ~predecessor:block_header.shell.predecessor
       ctxt
   in
@@ -2348,8 +2348,8 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let ctxt =
-    Sc_rollup.Inbox.add_info_per_level ~predecessor:predecessor_hash ctxt
+  let* ctxt =
+    Sc_rollup.Inbox.add_level_info ~predecessor:predecessor_hash ctxt
   in
   let mode =
     Full_construction
@@ -2385,14 +2385,14 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let ctxt =
+  let* ctxt =
     (* The mode [Partial_construction] is used in simulation. We try to
        put a realistic value of the block's timestamp. Even though, it should
        not have an impact on the simulation of the following smart rollup
        operations.
     *)
     let predecessor = predecessor_hash in
-    Sc_rollup.Inbox.add_info_per_level ~predecessor ctxt
+    Sc_rollup.Inbox.add_level_info ~predecessor ctxt
   in
   let mode = Partial_construction {predecessor_fitness} in
   return
