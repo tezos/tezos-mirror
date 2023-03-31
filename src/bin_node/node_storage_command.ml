@@ -34,10 +34,24 @@ module Event = struct
 
   let section = ["node"; "storage"]
 
-  let integrity_info =
+  let integrity_check =
     declare_3
       ~section
-      ~name:"integrity_info"
+      ~name:"integrity_check"
+      ~msg:
+        "running integrity check on inodes for block {block_hash} (level \
+         {block_level}) with context hash {context_hash}"
+      ~level:Notice
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+      ("block_level", Data_encoding.int32)
+      ~pp3:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
+
+  let integrity_check_inodes =
+    declare_3
+      ~section
+      ~name:"integrity_check_inodes"
       ~msg:
         "running integrity check on inodes for block {block_hash} (level \
          {block_level}) with context hash {context_hash}"
@@ -112,17 +126,52 @@ module Term = struct
     let* () = ensure_context_dir context_dir in
     return context_dir
 
-  let integrity_check config_file data_dir auto_repair =
+  let resolve_block chain_store block =
+    let open Lwt_result_syntax in
+    match block with
+    | Some block -> (
+        match Block_services.parse_block block with
+        | Error err -> tzfail (Cannot_resolve_block_alias (block, err))
+        | Ok block -> Store.Chain.block_of_identifier chain_store block)
+    | None ->
+        let*! current_head = Store.Chain.current_head chain_store in
+        return current_head
+
+  let integrity_check config_file data_dir auto_repair block =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let* root = root config_file data_dir in
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let* data_dir, node_config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      let ({genesis; _} : Config_file.blockchain_network) =
+        node_config.blockchain_network
+      in
+      let chain_id = Chain_id.of_block_hash genesis.block in
+      let* () = Data_version.ensure_data_dir genesis data_dir in
+      let context_dir = Data_version.context_dir data_dir in
+      let store_dir = Data_version.store_dir data_dir in
+      let* store =
+        Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+      in
+      let* chain_store = Store.get_chain_store store chain_id in
+      let* block = resolve_block chain_store block in
+      let*! () = Store.close_store store in
+      let context_hash = Store.Block.context_hash block in
+      let context_hash_str = Context_hash.to_b58check context_hash in
+      let*! () =
+        Event.(
+          emit
+            integrity_check
+            (Store.Block.hash block, Store.Block.level block, context_hash))
+      in
       let*! () =
         Tezos_context.Context.Checks.Pack.Integrity_check.run
           ~ppf:Format.std_formatter
-          ~root
+          ~root:context_dir
           ~auto_repair
           ~always:false
-          ~heads:None
+          ~heads:(Some [context_hash_str])
           ()
       in
       return_unit)
@@ -159,17 +208,6 @@ module Term = struct
         () ;
       return_unit)
 
-  let resolve_block chain_store block =
-    let open Lwt_result_syntax in
-    match block with
-    | Some block -> (
-        match Block_services.parse_block block with
-        | Error err -> tzfail (Cannot_resolve_block_alias (block, err))
-        | Ok block -> Store.Chain.block_of_identifier chain_store block)
-    | None ->
-        let*! current_head = Store.Chain.current_head chain_store in
-        return current_head
-
   let integrity_check_inodes config_file data_dir block =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
@@ -195,7 +233,7 @@ module Term = struct
       let*! () =
         Event.(
           emit
-            integrity_info
+            integrity_check_inodes
             (Store.Block.hash block, Store.Block.level block, context_hash))
       in
       let*! () =
@@ -311,7 +349,7 @@ module Term = struct
           ret
             (const (fun () -> integrity_check)
             $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir $ auto_repair));
+            $ Shared_arg.Term.data_dir $ auto_repair $ block));
       Cmd.v
         (Cmd.info
            ~doc:"print high-level statistics about the index store"
