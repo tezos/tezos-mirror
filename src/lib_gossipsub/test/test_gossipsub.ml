@@ -35,6 +35,7 @@ let default_limits =
     degree_optimal = 6;
     publish_threshold = 0.;
     do_px = true;
+    peers_to_px = 16;
     accept_px_threshold = 0.;
     unsubscribe_backoff = 10;
     graft_flood_backoff = -50;

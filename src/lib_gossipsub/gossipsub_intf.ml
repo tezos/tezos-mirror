@@ -98,6 +98,9 @@ type ('peer, 'message_id, 'span) limits = {
   do_px : bool;  (** The flag controls whether peer exchange (PX) is enabled. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
+  peers_to_px : int;
+      (** The number of peers to include in prune Peer eXchange. (This is called
+          [PrunePeers] in the Go implementation.) *)
   unsubscribe_backoff : 'span;
       (** The duration that prevent reconnections after leaving a topic to our full connections. *)
   graft_flood_backoff : 'span;

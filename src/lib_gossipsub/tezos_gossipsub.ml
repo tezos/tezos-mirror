@@ -292,6 +292,10 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let publish_threshold state = state.limits.publish_threshold
 
+    let do_px state = state.limits.do_px
+
+    let peers_to_px state = state.limits.peers_to_px
+
     let accept_px_threshold state = state.limits.accept_px_threshold
 
     let prune_backoff state = state.limits.prune_backoff
