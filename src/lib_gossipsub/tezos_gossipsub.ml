@@ -1056,8 +1056,9 @@ module Make (C : AUTOMATON_CONFIG) :
        - If the number of remaining peers in the topic mesh is less than
        [degree_low], then select as many random peers (not already in the mesh
        topic) to graft as possible so that to have [degree_optimal] in the topic
-       mesh. The selected peers should have a non-negative score, should not
-       be backedoff, and should not be direct peers.
+       mesh. The selected peers should have a non-negative score, should not be
+       backed off, and should not be direct peers (and should be subscribed to
+       the topic).
 
        - If the number of remaining peers in the topic mesh is higher than
        [degree_high], then select as many peers (not already in the mesh topic)
@@ -1300,22 +1301,6 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = update_mesh mesh ~to_graft ~to_prune in
       return (to_graft, to_prune, noPX_peers)
 
-    let expire_fanout =
-      let open Monad.Syntax in
-      let*! fanout in
-      let*! fanout_ttl in
-      let current = Time.now () in
-      let fanout =
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5184
-           Optimize by having a min and a max last published time to avoid
-           traversing the map when not needed? *)
-        Topic.Map.filter
-          (fun _topic {last_published_time; peers = _} ->
-            Time.(add last_published_time fanout_ttl >= current))
-          fanout
-      in
-      set_fanout fanout
-
     let update_fanout fanout ~to_add ~to_remove =
       let update f topic_peers_list fanout =
         List.fold_left
@@ -1352,12 +1337,35 @@ module Make (C : AUTOMATON_CONFIG) :
       |> update remove_peers to_remove
       |> set_fanout
 
+    (* Maintain the fanout map as follows:
+
+       - Remove topics to which the local peer has not published in the
+       [fanout_ttl] time.
+
+       - Remove peers that are not subscribed anymore or that have a score
+       below [gossip_publish_threshold].
+
+       - If for a topic the set of fanout peers is below [degree_optimal], then
+       try to fill the map so that to have [degree_optimal] in the topic
+       fanout. The selected peers should have a score above
+       [gossip_publish_threshold] and should not be direct peers (and should be
+       subscribed to the topic). *)
     let maintain_fanout =
       let open Monad.Syntax in
       let*! connections in
       let*! rng in
       let*! degree_optimal in
       let*! gossip_publish_threshold in
+      let*! fanout_ttl in
+
+      let expire_fanout =
+        let current = Time.now () in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5184
+           Optimize by having a min and a max last published time to avoid
+           traversing the map when not needed? *)
+        Topic.Map.filter (fun _topic {last_published_time; peers = _} ->
+            Time.(add last_published_time fanout_ttl >= current))
+      in
 
       let maintain_topic_fanout topic {peers; _} (to_add, to_remove) =
         (* Check whether our peers are still in the topic and have a score
@@ -1407,10 +1415,11 @@ module Make (C : AUTOMATON_CONFIG) :
       in
 
       let*! fanout in
+      (* Expire fanout for topics we haven't published to in a while. *)
+      let fanout = expire_fanout fanout in
       let to_add, to_remove =
         Topic.Map.fold maintain_topic_fanout fanout ([], [])
       in
-
       (* Update the fanout map. *)
       update_fanout fanout ~to_add ~to_remove
 
@@ -1430,9 +1439,6 @@ module Make (C : AUTOMATON_CONFIG) :
          respectively, so that the new number of peers per topic becomes
          [degree_optimal]. *)
       let* to_graft, to_prune, noPX_peers = maintain_mesh in
-
-      (* Expire fanout for topics we haven't published to in a while *)
-      let* () = expire_fanout in
 
       (* Maintain our fanout for topics we are publishing to, but we have not
          joined. *)
