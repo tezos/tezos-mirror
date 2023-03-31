@@ -709,6 +709,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle peer topic =
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5264
          Be sure that the peers that requested failed/rejected graft are properly pruned. *)
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5305
+         A peer can be grafted only if he subscribed to this topic. *)
       let open Monad.Syntax in
       let*? () = check_filter peer in
       let*? mesh = check_topic_known topic in
