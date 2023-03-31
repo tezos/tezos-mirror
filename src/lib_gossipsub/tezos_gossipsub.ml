@@ -143,6 +143,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
     | Publish_message : Peer.Set.t -> [`Publish] output
+    | Already_published : [`Publish] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
@@ -194,6 +195,9 @@ module Make (C : AUTOMATON_CONFIG) :
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
     fanout : fanout_peers Topic.Map.t;
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5302
+
+       Introduce TTL to [seen_messages]. *)
     seen_messages : Message_id.Set.t;
     message_cache : Message_cache.t;
     rng : Random.State.t;
@@ -449,6 +453,15 @@ module Make (C : AUTOMATON_CONFIG) :
               message
               topic
               state.message_cache;
+        }
+      in
+      (state, ())
+
+    let put_in_seen_messages message_id state =
+      let state =
+        {
+          state with
+          seen_messages = Message_id.Set.add message_id state.seen_messages;
         }
       in
       (state, ())
@@ -786,6 +799,11 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {topic; peer} -> Unsubscribe.handle topic peer
 
   module Publish = struct
+    let check_seen message_id =
+      let open Monad.Syntax in
+      let*! seen_messages in
+      fail_if (Message_id.Set.mem message_id seen_messages) Already_published
+
     let get_peers_for_unsubscribed_topic topic =
       let open Monad.Syntax in
       let*! gossip_publish_threshold in
@@ -818,6 +836,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let handle ~sender topic message_id message : [`Publish] output Monad.t =
       let open Monad.Syntax in
+      let*? () = check_seen message_id in
       let* () = put_message_in_cache message_id message topic in
       let*! mesh_opt = find_mesh topic in
       let* peers =
@@ -831,6 +850,7 @@ module Make (C : AUTOMATON_CONFIG) :
           ~some:(fun peer -> Peer.Set.remove peer peers)
           sender
       in
+      let* () = put_in_seen_messages message_id in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
 
          Filter out peers from which we already received the message, or an

@@ -304,6 +304,8 @@ module type AUTOMATON = sig
     | Publish_message : Peer.Set.t -> [`Publish] output
         (** If the peer is subscribed to the topic, returns the set of peers in the topic's mesh.
             Otherwise, it will return the set of peers in the topic's fanout.*)
+    | Already_published : [`Publish] output
+        (** Attempting to publish a message that has already been published. *)
     | Already_joined : [`Join] output
         (** Attempting to join a topic we already joined. *)
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
