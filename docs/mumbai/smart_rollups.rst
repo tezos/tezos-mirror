@@ -978,16 +978,6 @@ allow it to interact with the components of persistent state:
   Returns the number of child objects (either directories or files)
   under a given key.
 
-``store_get_nth_key``
-  Loads in memory at a given location the durable storage key to
-  access the nth child under a given key, and returns the number of
-  bytes loaded in memory. Children include both subtrees and the
-  value, if any. Note that the result is not stable w.r.t. key
-  additions and removals. This function can be used by the WASM kernel
-  to iterate over the contents under the input key. This function will
-  return :math:`0` for the index of the value (if any) under the input
-  key.
-
 ``reveal_preimage``
   Loads in memory the preimage of a hash. The size of the hash in
   bytes must be specified as an input to the function.
@@ -1014,7 +1004,6 @@ conveying errors, as shown in the next table.
   -9     Attempt to modify a readonly value
   -10    Key has no tree in the storage
   -11    Outbox is full, no new message can be appended
-  -12    No subkey at provided index. The index is out of bounds
 ======= =======================================================================================================
 
 Implementing a WASM Kernel in Rust
@@ -1169,16 +1158,6 @@ module that exports them (in our case, ``smart_rollup_core``).
        /// Returns the number of children (file and directories) under a
        /// given key.
        pub fn store_list_size(path: *const u8, path_len: usize) -> i64;
-
-       /// Returns the size of the key loaded in memory at `dst`, or an
-       /// error code.
-       pub fn store_get_nth_key(
-           path: *const u8,
-           path_len: usize,
-           index: i64,
-           dst: *mut u8,
-           max_size: usize,
-       ) -> i32;
 
        /// Returns 0 in case of success, or an error code.
        pub fn store_copy(
