@@ -78,3 +78,21 @@ val payloads_history_of_messages :
   predecessor_timestamp:Timestamp.time ->
   Sc_rollup.Inbox_message.t list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
+
+(**/**)
+
+module Internal_for_tests : sig
+  val process_messages :
+    Node_context.rw ->
+    predecessor:Layer1.head ->
+    predecessor_timestamp:Timestamp.time ->
+    level:int32 ->
+    Sc_rollup.Inbox_message.t list ->
+    (Sc_rollup.Inbox.Hash.t
+    * Sc_rollup.Inbox.t
+    * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+    * Sc_rollup.Inbox_message.t list
+    * Context.rw)
+    tzresult
+    Lwt.t
+end

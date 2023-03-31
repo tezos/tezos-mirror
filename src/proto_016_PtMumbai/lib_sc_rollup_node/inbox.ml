@@ -120,6 +120,46 @@ let add_messages ~predecessor_timestamp ~predecessor inbox messages =
          inbox,
          messages_with_protocol_internal_messages )
 
+let process_messages (node_ctxt : _ Node_context.t) ~predecessor
+    ~predecessor_timestamp ~level messages =
+  let open Lwt_result_syntax in
+  let* inbox = Node_context.inbox_of_head node_ctxt predecessor in
+  let inbox_metrics = Metrics.Inbox.metrics in
+  Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
+  let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
+  let* ctxt =
+    if Raw_level.(level <= node_ctxt.Node_context.genesis_info.level) then
+      (* This is before we have interpreted the boot sector, so we start
+         with an empty context in genesis *)
+      return (Context.empty node_ctxt.context)
+    else Node_context.checkout_context node_ctxt predecessor.hash
+  in
+  let* ( _messages_history,
+         witness_hash,
+         inbox,
+         messages_with_protocol_internal_messages ) =
+    add_messages
+      ~predecessor_timestamp
+      ~predecessor:predecessor.hash
+      inbox
+      messages
+  in
+  Metrics.Inbox.Stats.head_messages_list :=
+    messages_with_protocol_internal_messages ;
+  let* () =
+    Node_context.save_messages
+      node_ctxt
+      witness_hash
+      {predecessor = predecessor.hash; predecessor_timestamp; messages}
+  in
+  let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  return
+    ( inbox_hash,
+      inbox,
+      witness_hash,
+      messages_with_protocol_internal_messages,
+      ctxt )
+
 let process_head (node_ctxt : _ Node_context.t) ~predecessor
     Layer1.{level; hash = head_hash} =
   let open Lwt_result_syntax in
@@ -127,63 +167,30 @@ let process_head (node_ctxt : _ Node_context.t) ~predecessor
     Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
   in
   if level >= first_inbox_level then (
-    (*
-
-          We compute the inbox of this block using the inbox of its
-          predecessor. That way, the computation of inboxes is robust
-          to chain reorganization.
-
-    *)
-    let* inbox = Node_context.inbox_of_head node_ctxt predecessor in
-    let inbox_metrics = Metrics.Inbox.metrics in
-    Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
-    let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
-    let* ctxt =
-      if Raw_level.(level <= node_ctxt.Node_context.genesis_info.level) then
-        (* This is before we have interpreted the boot sector, so we start
-           with an empty context in genesis *)
-        return (Context.empty node_ctxt.context)
-      else Node_context.checkout_context node_ctxt predecessor.hash
-    in
+    (* We compute the inbox of this block using the inbox of its
+       predecessor. That way, the computation of inboxes is robust to chain
+       reorganization. *)
     let* collected_messages, predecessor_timestamp, predecessor_hash =
       get_messages node_ctxt head_hash
     in
+    assert (Block_hash.(predecessor.Layer1.hash = predecessor_hash)) ;
     let*! () =
-      Inbox_event.get_messages
-        head_hash
-        (Raw_level.to_int32 level)
-        (List.length collected_messages)
+      Inbox_event.get_messages head_hash level (List.length collected_messages)
     in
-    let* ( _messages_history,
-           witness_hash,
-           inbox,
-           messages_with_protocol_internal_messages ) =
-      add_messages
+    let* (( _inbox_hash,
+            inbox,
+            _witness_hash,
+            _messages_with_protocol_internal_messages,
+            _ctxt ) as res) =
+      process_messages
+        node_ctxt
+        ~predecessor
         ~predecessor_timestamp
-        ~predecessor:predecessor_hash
-        inbox
+        ~level
         collected_messages
     in
-    Metrics.Inbox.Stats.head_messages_list :=
-      messages_with_protocol_internal_messages ;
-    let* () =
-      Node_context.save_messages
-        node_ctxt
-        witness_hash
-        {
-          predecessor = predecessor_hash;
-          predecessor_timestamp;
-          messages = collected_messages;
-        }
-    in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
-    let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
-    return
-      ( inbox_hash,
-        inbox,
-        witness_hash,
-        messages_with_protocol_internal_messages,
-        ctxt ))
+    return res)
   else
     let* inbox = Node_context.genesis_inbox node_ctxt in
     return
@@ -218,3 +225,7 @@ let payloads_history_of_messages ~predecessor ~predecessor_timestamp messages =
          messages
      in
      payloads_history
+
+module Internal_for_tests = struct
+  let process_messages = process_messages
+end

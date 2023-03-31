@@ -31,7 +31,7 @@ open Protocol.Alpha_context
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "refutation_game"]
+  let section = [Protocol.name; "sc_rollup_node"; "refutation_game"]
 
   let timeout =
     declare_1
@@ -86,6 +86,7 @@ module Simple = struct
 
   let timeout_detected =
     declare_1
+      ~section
       ~name:"sc_rollup_node_timeout_detected"
       ~msg:
         "The rollup node has detected that opponent {other} can be timed out."

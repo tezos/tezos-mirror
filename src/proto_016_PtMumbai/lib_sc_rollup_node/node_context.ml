@@ -732,3 +732,57 @@ let find_confirmed_slots_histories {store; _} =
 
 let save_confirmed_slots_histories {store; _} =
   Store.Dal_confirmed_slots_histories.add store.irmin_store
+
+module Internal_for_tests = struct
+  let create_node_context cctxt
+      ?(constants = Default_parameters.constants_mainnet) ~data_dir kind =
+    let open Lwt_result_syntax in
+    let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
+    let protocol_constants =
+      constants
+      |> Data_encoding.Binary.to_bytes_exn Constants.Parametric.encoding
+      |> Data_encoding.Binary.of_bytes_exn Constants_parametric_repr.encoding
+      |> Constants_repr.all_of_parametric
+      |> Data_encoding.Binary.to_bytes_exn Constants_repr.encoding
+      |> Data_encoding.Binary.of_bytes_exn Constants.encoding
+    in
+    let* store =
+      Store.load
+        Read_write
+        ~l2_blocks_cache_size
+        Configuration.(default_storage_dir data_dir)
+    in
+    let*! context =
+      Context.load Read_write (Configuration.default_context_dir data_dir)
+    in
+    let genesis_info =
+      Sc_rollup.Commitment.{level = Raw_level.root; commitment_hash = Hash.zero}
+    in
+    let l1_ctxt = Layer1.Internal_for_tests.dummy cctxt in
+    let lcc =
+      Reference.new_
+        {commitment = Sc_rollup.Commitment.Hash.zero; level = Raw_level.root}
+    in
+    let lpc = Reference.new_ None in
+    return
+      {
+        cctxt;
+        dal_cctxt = None;
+        data_dir;
+        l1_ctxt;
+        rollup_address = Sc_rollup.Address.zero;
+        mode = Observer;
+        operators = Configuration.Operator_purpose_map.empty;
+        genesis_info;
+        lcc;
+        lpc;
+        kind;
+        injector_retention_period = 0;
+        block_finality_time = 2;
+        fee_parameters = Configuration.default_fee_parameters;
+        protocol_constants;
+        loser_mode = Loser_mode.no_failures;
+        store;
+        context;
+      }
+end

@@ -25,6 +25,10 @@
 
 open Protocol.Alpha_context
 
+let make_id id = String.concat "." [Protocol.name; id]
+
+let register_error_kind ~id = register_error_kind ~id:(make_id id)
+
 type error +=
   | Cannot_produce_proof of Sc_rollup.Inbox.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}

@@ -75,16 +75,3 @@ module Request = struct
           level
     | Batch -> Format.pp_print_string ppf "batch"
 end
-
-module Name = struct
-  (* We only have a single batcher right now *)
-  type t = unit
-
-  let encoding = Data_encoding.unit
-
-  let base = ["sc_rollup_batcher"]
-
-  let pp _ _ = ()
-
-  let equal () () = true
-end

@@ -95,109 +95,111 @@ let get_dal_slot_page node_ctxt block slot_index slot_page =
       | None -> assert false
       | Some _contents -> return ("Slot page is available", contents_opt))
 
-module Global_directory = Make_directory (struct
-  include Sc_rollup_services.Global
-
-  type context = Node_context.ro
-
-  let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
-end)
-
-module Proof_helpers_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Helpers
-
-  (* The context needs to be accessed with write permissions because we need to
-     commit on disk to generate the proofs. *)
-  type context = Node_context.rw
-
-  let context_of_prefix node_ctxt () = return node_ctxt
-end)
-
-module Local_directory = Make_directory (struct
-  include Sc_rollup_services.Local
-
-  type context = Node_context.ro
-
-  let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
-end)
-
-module Block_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Block
-
-  type context = Node_context.ro * Block_hash.t
-
-  let context_of_prefix node_ctxt (((), block) : prefix) =
-    let open Lwt_result_syntax in
-    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
-    (Node_context.readonly node_ctxt, block)
-end)
-
-module Outbox_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Block.Outbox
-
-  type context = Node_context.ro * Block_hash.t * Alpha_context.Raw_level.t
-
-  let context_of_prefix node_ctxt (((), block), level) =
-    let open Lwt_result_syntax in
-    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
-    (Node_context.readonly node_ctxt, block, level)
-end)
-
-module Common = struct
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.block
-    @@ fun (node_ctxt, block) () () ->
-    Node_context.get_full_l2_block node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
-    @@ fun (node_ctxt, block) () () ->
-    let open Lwt_result_syntax in
-    let* l2_block = Node_context.get_l2_block node_ctxt block in
-    let+ num_messages =
-      Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
-    in
-    Z.of_int num_messages
-
-  let () =
-    Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
-    @@ fun node_ctxt () () -> return @@ node_ctxt.rollup_address
-
-  let () =
-    Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
-    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt
-
-  let () =
-    Global_directory.register0 Sc_rollup_services.Global.current_tezos_level
-    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.hash
-    @@ fun (_node_ctxt, block) () () -> return block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.level
-    @@ fun (node_ctxt, block) () () ->
-    Node_context.level_of_hash node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.inbox
-    @@ fun (node_ctxt, block) () () ->
-    Node_context.get_inbox_by_block_hash node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.ticks
-    @@ fun (node_ctxt, block) () () ->
-    let open Lwt_result_syntax in
-    let+ l2_block = Node_context.get_l2_block node_ctxt block in
-    Z.of_int64 l2_block.num_ticks
-end
-
 module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   module PVM = Simulation.PVM
   module Interpreter = Simulation.Interpreter
   module Outbox = Outbox.Make (PVM)
   module Free_pvm = Interpreter.Free_pvm
+
+  module Global_directory = Make_directory (struct
+    include Sc_rollup_services.Global
+
+    type context = Node_context.ro
+
+    let context_of_prefix node_ctxt () =
+      return (Node_context.readonly node_ctxt)
+  end)
+
+  module Proof_helpers_directory = Make_directory (struct
+    include Sc_rollup_services.Global.Helpers
+
+    (* The context needs to be accessed with write permissions because we need to
+       commit on disk to generate the proofs. *)
+    type context = Node_context.rw
+
+    let context_of_prefix node_ctxt () = return node_ctxt
+  end)
+
+  module Local_directory = Make_directory (struct
+    include Sc_rollup_services.Local
+
+    type context = Node_context.ro
+
+    let context_of_prefix node_ctxt () =
+      return (Node_context.readonly node_ctxt)
+  end)
+
+  module Block_directory = Make_directory (struct
+    include Sc_rollup_services.Global.Block
+
+    type context = Node_context.ro * Block_hash.t
+
+    let context_of_prefix node_ctxt (((), block) : prefix) =
+      let open Lwt_result_syntax in
+      let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
+      (Node_context.readonly node_ctxt, block)
+  end)
+
+  module Outbox_directory = Make_directory (struct
+    include Sc_rollup_services.Global.Block.Outbox
+
+    type context = Node_context.ro * Block_hash.t * Alpha_context.Raw_level.t
+
+    let context_of_prefix node_ctxt (((), block), level) =
+      let open Lwt_result_syntax in
+      let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
+      (Node_context.readonly node_ctxt, block, level)
+  end)
+
+  module Common = struct
+    let () =
+      Block_directory.register0 Sc_rollup_services.Global.Block.block
+      @@ fun (node_ctxt, block) () () ->
+      Node_context.get_full_l2_block node_ctxt block
+
+    let () =
+      Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
+      @@ fun (node_ctxt, block) () () ->
+      let open Lwt_result_syntax in
+      let* l2_block = Node_context.get_l2_block node_ctxt block in
+      let+ num_messages =
+        Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
+      in
+      Z.of_int num_messages
+
+    let () =
+      Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
+      @@ fun node_ctxt () () -> return @@ node_ctxt.rollup_address
+
+    let () =
+      Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
+      @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt
+
+    let () =
+      Global_directory.register0 Sc_rollup_services.Global.current_tezos_level
+      @@ fun node_ctxt () () -> get_head_level_opt node_ctxt
+
+    let () =
+      Block_directory.register0 Sc_rollup_services.Global.Block.hash
+      @@ fun (_node_ctxt, block) () () -> return block
+
+    let () =
+      Block_directory.register0 Sc_rollup_services.Global.Block.level
+      @@ fun (node_ctxt, block) () () ->
+      Node_context.level_of_hash node_ctxt block
+
+    let () =
+      Block_directory.register0 Sc_rollup_services.Global.Block.inbox
+      @@ fun (node_ctxt, block) () () ->
+      Node_context.get_inbox_by_block_hash node_ctxt block
+
+    let () =
+      Block_directory.register0 Sc_rollup_services.Global.Block.ticks
+      @@ fun (node_ctxt, block) () () ->
+      let open Lwt_result_syntax in
+      let+ l2_block = Node_context.get_l2_block node_ctxt block in
+      Z.of_int64 l2_block.num_ticks
+  end
 
   let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in

@@ -1367,6 +1367,8 @@ opam:tezos-sapling:
   variables:
     package: tezos-sapling
 
+# Ignoring unreleased package tezos-sc-rollup-node-test.
+
 opam:tezos-scoru-wasm:
   extends:
     - .opam_template

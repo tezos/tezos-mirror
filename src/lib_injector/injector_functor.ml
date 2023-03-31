@@ -989,6 +989,18 @@ struct
     }
   end
 
+  module Name = struct
+    type t = Signature.public_key_hash
+
+    let encoding = Signature.Public_key_hash.encoding
+
+    let base = Parameters.events_section @ ["injector"]
+
+    let pp = Signature.Public_key_hash.pp_short
+
+    let equal = Signature.Public_key_hash.equal
+  end
+
   (* The worker for the injector. *)
   module Worker = Worker.MakeSingle (Name) (Request) (Types)
 

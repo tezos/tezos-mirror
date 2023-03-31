@@ -35,7 +35,7 @@ module Make
     struct
       include Internal_event.Simple
 
-      let section = Parameters.events_section
+      let section = Parameters.events_section @ ["injector"]
 
       let monitoring_error =
         declare_1

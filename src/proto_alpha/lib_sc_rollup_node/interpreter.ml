@@ -119,15 +119,15 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   let state_of_head node_ctxt ctxt Layer1.{hash; level} =
     let open Lwt_result_syntax in
-    let genesis_level =
-      Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-    in
-    if level = genesis_level then genesis_state hash node_ctxt ctxt
-    else
-      let*! state = PVM.State.find ctxt in
-      match state with
-      | None -> tzfail (Sc_rollup_node_errors.Missing_PVM_state (hash, level))
-      | Some state -> return (ctxt, state)
+    let*! state = PVM.State.find ctxt in
+    match state with
+    | None ->
+        let genesis_level =
+          Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
+        in
+        if level = genesis_level then genesis_state hash node_ctxt ctxt
+        else tzfail (Sc_rollup_node_errors.Missing_PVM_state (hash, level))
+    | Some state -> return (ctxt, state)
 
   (** [transition_pvm node_ctxt predecessor head] runs a PVM at the
       previous state from block [predecessor] by consuming as many messages

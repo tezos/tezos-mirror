@@ -202,6 +202,7 @@
 (package (name tezos-rpc-http-client-unix))
 (package (name tezos-rpc-http-server))
 (package (name tezos-sapling))
+(package (name tezos-sc-rollup-node-test)(allow_empty))
 (package (name tezos-scoru-wasm))
 (package (name tezos-scoru-wasm-durable-snapshot)(allow_empty))
 (package (name tezos-scoru-wasm-fast))
