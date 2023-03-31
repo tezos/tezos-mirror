@@ -817,21 +817,14 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter_by_score score =
             Compare.Float.(score |> Score.float >= gossip_publish_threshold)
           in
-          let filter1 _peer {direct; score; _} =
+          let filter _peer {direct; score; _} =
             (not direct) && filter_by_score score
           in
           let* not_direct_peers =
-            select_peers topic ~filter:filter1 ~max:degree_optimal
+            select_peers topic ~filter ~max:degree_optimal
           in
           let* () = set_fanout_topic topic now not_direct_peers in
-          (* FIXME https://gitlab.com/tezos/tezos/-/issues/5010
-
-             We could avoid this call by directly having a map
-             of direct peers in the state. *)
-          let filter2 _peer {direct; score; _} =
-            direct || filter_by_score score
-          in
-          select_peers topic ~filter:filter2 ~max:degree_optimal
+          return not_direct_peers
       | Some fanout ->
           let* () = set_fanout_topic topic now fanout.peers in
           return fanout.peers
