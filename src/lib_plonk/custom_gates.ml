@@ -136,7 +136,9 @@ module Aggregator = struct
        ]
       @ List.map (fun (q, i) -> (q, linear_monomial i q)) linear_monomials
       @ List.map
-          (fun (q, i) -> (q ^ "g", linear_monomial ~is_next:true i (q ^ "g")))
+          (fun (q, i) ->
+            let q = Plompiler.Csir.add_next_wire_suffix q in
+            (q, linear_monomial ~is_next:true i q))
           linear_monomials
       @ List.init nb_input_com (fun i ->
             ( "qcom" ^ string_of_int i,

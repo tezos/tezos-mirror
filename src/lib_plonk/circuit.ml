@@ -134,20 +134,17 @@ end = struct
       ?(precomputed_advice = SMap.empty) () =
     if q_anemoi <> [] && SMap.(is_empty precomputed_advice) then
       failwith "Make_gates : q_anemoi must come with advice selectors." ;
+    let filter = List.filter (fun (_, l) -> l <> []) in
+    let linear = [(0, ql); (1, qr); (2, qo); (3, qd); (4, qe)] |> filter in
+    let linear_g =
+      [(0, qlg); (1, qrg); (2, qog); (3, qdg); (4, qeg)] |> filter
+    in
     (* Filtering and mapping selectors with labels. *)
     let gate_list =
       CS.q_list
         ~qc
-        ~ql
-        ~qr
-        ~qo
-        ~qd
-        ~qe
-        ~qlg
-        ~qrg
-        ~qog
-        ~qdg
-        ~qeg
+        ~linear
+        ~linear_g
         ~qm
         ~qx2b
         ~qx5a

@@ -35,6 +35,8 @@ let linear_selector_name = function
   | 4 -> "qe"
   | n -> "q_w" ^ string_of_int n
 
+let add_next_wire_suffix s = s ^ "g"
+
 module Scalar = struct
   include Bls12_381.Fr
 
@@ -155,22 +157,12 @@ module Tables = Map.Make (String)
 let table_registry = Tables.add "or" table_or Tables.empty
 
 module CS = struct
-  let q_list ?q_table ~qc ~ql ~qr ~qo ~qd ~qe ~qlg ~qrg ~qog ~qdg ~qeg ~qm ~qx2b
-      ~qx5a ~qx5c ~qecc_ws_add ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap
-      ~q_anemoi ~q_plookup () =
+  let q_list ?q_table ~qc ~linear ~linear_g ~qm ~qx2b ~qx5a ~qx5c ~qecc_ws_add
+      ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap ~q_anemoi ~q_plookup ()
+      =
     let base =
       [
         ("qc", qc);
-        ("ql", ql);
-        ("qr", qr);
-        ("qo", qo);
-        ("qd", qd);
-        ("qe", qe);
-        ("qlg", qlg);
-        ("qrg", qrg);
-        ("qog", qog);
-        ("qdg", qdg);
-        ("qeg", qeg);
         ("qm", qm);
         ("qx2b", qx2b);
         ("qx5a", qx5a);
@@ -183,6 +175,10 @@ module CS = struct
         ("q_anemoi", q_anemoi);
         ("q_plookup", q_plookup);
       ]
+      @ List.map (fun (i, q) -> (linear_selector_name i, q)) linear
+      @ List.map
+          (fun (i, q) -> (linear_selector_name i |> add_next_wire_suffix, q))
+          linear_g
     in
     Option.(map (fun q -> ("q_table", q)) q_table |> to_list) @ base
 
@@ -199,18 +195,28 @@ module CS = struct
   [@@deriving repr]
 
   let all_selectors =
+    let linear =
+      [
+        (0, [ThisConstr; Linear; Arithmetic; WireA]);
+        (1, [ThisConstr; Linear; Arithmetic; WireB]);
+        (2, [ThisConstr; Linear; Arithmetic; WireC]);
+        (3, [ThisConstr; Linear; Arithmetic; WireD]);
+        (4, [ThisConstr; Linear; Arithmetic; WireE]);
+      ]
+    in
+    let linear_g =
+      [
+        (0, [NextConstr; Linear; Arithmetic; WireA]);
+        (1, [NextConstr; Linear; Arithmetic; WireB]);
+        (2, [NextConstr; Linear; Arithmetic; WireC]);
+        (3, [NextConstr; Linear; Arithmetic; WireD]);
+        (4, [NextConstr; Linear; Arithmetic; WireE]);
+      ]
+    in
     q_list
       ~qc:[ThisConstr; Arithmetic]
-      ~ql:[ThisConstr; Linear; Arithmetic; WireA]
-      ~qr:[ThisConstr; Linear; Arithmetic; WireB]
-      ~qo:[ThisConstr; Linear; Arithmetic; WireC]
-      ~qd:[ThisConstr; Linear; Arithmetic; WireD]
-      ~qe:[ThisConstr; Linear; Arithmetic; WireE]
-      ~qlg:[NextConstr; Linear; Arithmetic; WireA]
-      ~qrg:[NextConstr; Linear; Arithmetic; WireB]
-      ~qog:[NextConstr; Linear; Arithmetic; WireC]
-      ~qdg:[NextConstr; Linear; Arithmetic; WireD]
-      ~qeg:[NextConstr; Linear; Arithmetic; WireE]
+      ~linear
+      ~linear_g
       ~qm:[ThisConstr; Arithmetic; WireA; WireB]
       ~qx2b:[ThisConstr; Arithmetic; WireB]
       ~qx5a:[ThisConstr; Arithmetic; WireA]
@@ -258,8 +264,8 @@ module CS = struct
 
   type t = gate list [@@deriving repr]
 
-  let new_constraint ~a ~b ~c ?(d = 0) ?(e = 0) ?qc ?ql ?qr ?qo ?qd ?qe ?qlg
-      ?qrg ?qog ?qdg ?qeg ?qm ?qx2b ?qx5a ?qx5c ?qecc_ws_add ?qecc_ed_add
+  let new_constraint ~a ~b ~c ?(d = 0) ?(e = 0) ?qc ?(linear = [])
+      ?(linear_g = []) ?qm ?qx2b ?qx5a ?qx5c ?qecc_ws_add ?qecc_ed_add
       ?qecc_ed_cond_add ?qbool ?qcond_swap ?q_anemoi ?q_plookup ?q_table
       ?(precomputed_advice = []) ?(labels = []) label =
     let sels =
@@ -267,16 +273,8 @@ module CS = struct
         (fun (l, x) -> Option.bind x (fun c -> Some (l, c)))
         (q_list
            ~qc
-           ~ql
-           ~qr
-           ~qo
-           ~qd
-           ~qe
-           ~qlg
-           ~qrg
-           ~qog
-           ~qdg
-           ~qeg
+           ~linear:(List.map (fun (i, x) -> (i, Some x)) linear)
+           ~linear_g:(List.map (fun (i, x) -> (i, Some x)) linear_g)
            ~qm
            ~qx2b
            ~qx5a
@@ -346,8 +344,13 @@ module CS = struct
     List.for_all is_arithmetic_sel constr.sels
 
   let boolean_raw_constr constr =
+    let module SMap = Map.Make (String) in
     if
-      constr.sels = [("ql", Scalar.mone); ("qm", Scalar.one)]
+      (* We do equality through maps as a way to sort the list *)
+      SMap.equal
+        Scalar.equal
+        (SMap.of_seq @@ List.to_seq constr.sels)
+        (SMap.of_seq @@ List.to_seq [("qm", Scalar.one); ("ql", Scalar.mone)])
       && constr.a = constr.b
     then Some constr.a
     else None

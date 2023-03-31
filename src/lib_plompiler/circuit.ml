@@ -34,6 +34,8 @@ let one = S.one
 
 let mone = S.(negate one)
 
+let wql, wqr, wqo = (0, 1, 2)
+
 type scalar = X of S.t
 
 type _ repr =
@@ -377,7 +379,15 @@ let input : type a. ?kind:input_kind -> a Input.t -> a repr t =
             delayed =
               s.delayed
               >* append
-                   [|CS.new_constraint ~a:o ~b:o ~c:0 ~ql:mone ~qm:one "bool"|]
+                   [|
+                     CS.new_constraint
+                       ~a:o
+                       ~b:o
+                       ~c:0
+                       ~linear:[(wql, mone)]
+                       ~qm:one
+                       "bool";
+                   |]
                    ~solver:Skip;
             nvars;
             inputs;
@@ -430,7 +440,15 @@ let fresh : type a. a Input.t' -> a repr t =
         let Bool o, nvars = Input.make_repr input s.nvars in
         let s, _ =
           append
-            [|CS.new_constraint ~a:o ~b:o ~c:0 ~ql:mone ~qm:one "bool"|]
+            [|
+              CS.new_constraint
+                ~a:o
+                ~b:o
+                ~c:0
+                ~linear:[(wql, mone)]
+                ~qm:one
+                "bool";
+            |]
             ~solver:Skip
             {s with nvars}
         in
@@ -480,7 +498,16 @@ let deserialize : type a. S.t array -> a Input.t -> a Input.t =
 
 let constant_scalar s =
   let*& o = fresh Dummy.scalar in
-  append [|CS.new_constraint ~a:0 ~b:0 ~c:o ~qc:s ~qo:mone "constant_scalar"|]
+  append
+    [|
+      CS.new_constraint
+        ~a:0
+        ~b:0
+        ~c:o
+        ~qc:s
+        ~linear:[(wqo, mone)]
+        "constant_scalar";
+    |]
   >* ret (Scalar o)
 
 let scalar_of_bool (Bool b) = Scalar b
@@ -512,7 +539,14 @@ module Num = struct
        let* (Scalar r) = fresh Dummy.scalar in
        let gate =
          [|
-           CS.new_constraint ~a:l ~b:r ~c:bit ~qc:mone ~qo:one ~qm:one "is_zero";
+           CS.new_constraint
+             ~a:l
+             ~b:r
+             ~c:bit
+             ~qc:mone
+             ~linear:[(wqo, one)]
+             ~qm:one
+             "is_zero";
          |]
        in
        let solver = IsZero {a = l; b = r; c = bit; d = 0; e = 0} in
@@ -523,7 +557,15 @@ module Num = struct
     @@ let* (Bool bit) = fresh Dummy.bool in
        let* (Scalar r) = fresh Dummy.scalar in
        let gate =
-         [|CS.new_constraint ~a:l ~b:r ~c:bit ~qo:mone ~qm:one "is_not_zero"|]
+         [|
+           CS.new_constraint
+             ~a:l
+             ~b:r
+             ~c:bit
+             ~linear:[(wqo, mone)]
+             ~qm:one
+             "is_not_zero";
+         |]
        in
        let solver = IsNotZero {a = l; b = r; c = bit; d = 0; e = 0} in
        append gate ~solver >* assert_nonzero (Scalar r) >* ret @@ Bool bit
@@ -545,9 +587,7 @@ module Num = struct
           ~b:r
           ~c:o
           ~qc
-          ~ql
-          ~qr
-          ~qo
+          ~linear:[(wql, ql); (wqr, qr); (wqo, qo)]
           ~qm
           ?qx2b
           ?qx5a
@@ -558,35 +598,77 @@ module Num = struct
   let assert_custom ?(qc = S.zero) ?(ql = S.zero) ?(qr = S.zero) ?(qo = S.zero)
       ?(qm = S.zero) (Scalar l) (Scalar r) (Scalar o) =
     append
-      [|CS.new_constraint ~a:l ~b:r ~c:o ~qc ~ql ~qr ~qo ~qm "assert_custom"|]
+      [|
+        CS.new_constraint
+          ~a:l
+          ~b:r
+          ~c:o
+          ~qc
+          ~linear:[(wql, ql); (wqr, qr); (wqo, qo)]
+          ~qm
+          "assert_custom";
+      |]
       ~solver:Skip
 
   let add ?(qc = S.zero) ?(ql = S.one) ?(qr = S.one) (Scalar l) (Scalar r) =
     let*& o = fresh Dummy.scalar in
-    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qc ~ql ~qr ~qo:mone "add"|]
+    append
+      [|
+        CS.new_constraint
+          ~a:l
+          ~b:r
+          ~c:o
+          ~qc
+          ~linear:[(wql, ql); (wqr, qr); (wqo, mone)]
+          "add";
+      |]
     >* ret @@ Scalar o
 
   let add_constant ?(ql = S.one) (k : S.t) (Scalar l) =
     let*& o = fresh Dummy.scalar in
     append
-      [|CS.new_constraint ~a:l ~b:0 ~c:o ~qc:k ~ql ~qo:mone "add_constant"|]
+      [|
+        CS.new_constraint
+          ~a:l
+          ~b:0
+          ~c:o
+          ~qc:k
+          ~linear:[(wql, ql); (wqo, mone)]
+          "add_constant";
+      |]
     >* ret @@ Scalar o
 
   let sub (Scalar l) (Scalar r) =
     let*& o = fresh Dummy.scalar in
-    append [|CS.new_constraint ~a:l ~b:r ~c:o ~ql:one ~qr:mone ~qo:mone "sub"|]
+    append
+      [|
+        CS.new_constraint
+          ~a:l
+          ~b:r
+          ~c:o
+          ~linear:[(wql, one); (wqr, mone); (wqo, mone)]
+          "sub";
+      |]
     >* ret @@ Scalar o
 
   let mul ?(qm = one) (Scalar l) (Scalar r) =
     let*& o = fresh Dummy.scalar in
-    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qm ~qo:mone "mul"|]
+    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qm ~linear:[(wqo, mone)] "mul"|]
     >* ret @@ Scalar o
 
   let div ?(den_coeff = one) (Scalar l) (Scalar r) =
     with_label ~label:"Num.div" @@ assert_nonzero (Scalar r)
     >* let*& o = fresh Dummy.scalar in
        let gate =
-         [|CS.new_constraint ~a:r ~b:o ~c:l ~qm:den_coeff ~qo:mone "div"|]
+         [|
+           CS.new_constraint
+             ~a:r
+             ~b:o
+             ~c:l
+             ~qm:den_coeff
+             ~linear:[(wqo, mone)]
+             "div";
+         |]
        in
        let solver = default_solver gate ~to_solve:B in
        (* r * o - l = 0  <=> o = l / r *)
@@ -594,7 +676,11 @@ module Num = struct
 
   let pow5 (Scalar l) =
     let*& o = fresh Dummy.scalar in
-    let gate = [|CS.new_constraint ~a:l ~b:0 ~c:o ~qx5a:one ~qo:mone "pow5"|] in
+    let gate =
+      [|
+        CS.new_constraint ~a:l ~b:0 ~c:o ~qx5a:one ~linear:[(wqo, mone)] "pow5";
+      |]
+    in
     let solver = Pow5 {a = l; c = o} in
     append gate ~solver >* ret @@ Scalar o
 end
@@ -610,12 +696,20 @@ module Bool = struct
 
   let assert_true (Bool bit) =
     append
-      [|CS.new_constraint ~a:bit ~b:0 ~c:0 ~qc:mone ~ql:one "assert_true"|]
+      [|
+        CS.new_constraint
+          ~a:bit
+          ~b:0
+          ~c:0
+          ~qc:mone
+          ~linear:[(wql, one)]
+          "assert_true";
+      |]
       ~solver:Skip
 
   let assert_false (Bool bit) =
     append
-      [|CS.new_constraint ~a:bit ~b:0 ~c:0 ~ql:one "assert_false"|]
+      [|CS.new_constraint ~a:bit ~b:0 ~c:0 ~linear:[(wql, one)] "assert_false"|]
       ~solver:Skip
 
   let band : bool repr -> bool repr -> bool repr t =
@@ -628,7 +722,8 @@ module Bool = struct
     *)
     let*& o = fresh Dummy.scalar in
     (* o - l*r = 0 *)
-    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qm:mone ~qo:one "band"|]
+    append
+      [|CS.new_constraint ~a:l ~b:r ~c:o ~qm:mone ~linear:[(wqo, one)] "band"|]
     >* ret @@ Bool o
 
   let bnot (Bool b) =
@@ -640,7 +735,16 @@ module Bool = struct
     *)
     let*& o = fresh Dummy.scalar in
     (* o - (1 - i) = 0 *)
-    append [|CS.new_constraint ~a:b ~b:0 ~c:o ~qc:mone ~ql:one ~qo:one "bnot"|]
+    append
+      [|
+        CS.new_constraint
+          ~a:b
+          ~b:0
+          ~c:o
+          ~qc:mone
+          ~linear:[(wql, one); (wqo, one)]
+          "bnot";
+      |]
     >* ret @@ Bool o
 
   let xor (Bool l) (Bool r) =
@@ -654,7 +758,13 @@ module Bool = struct
     let mtwo = S.of_string "-2" in
     append
       [|
-        CS.new_constraint ~a:l ~b:r ~c:o ~ql:one ~qr:one ~qo:mone ~qm:mtwo "xor";
+        CS.new_constraint
+          ~a:l
+          ~b:r
+          ~c:o
+          ~linear:[(wql, one); (wqr, one); (wqo, mone)]
+          ~qm:mtwo
+          "xor";
       |]
     >* ret @@ Bool o
 
@@ -668,7 +778,13 @@ module Bool = struct
     let*& o = fresh Dummy.scalar in
     append
       [|
-        CS.new_constraint ~a:l ~b:r ~c:o ~ql:one ~qr:one ~qo:mone ~qm:mone "nor";
+        CS.new_constraint
+          ~a:l
+          ~b:r
+          ~c:o
+          ~linear:[(wql, one); (wqr, one); (wqo, mone)]
+          ~qm:mone
+          "nor";
       |]
     >* ret @@ Bool o
 
@@ -747,7 +863,14 @@ let assert_equal : type a. a repr -> a repr -> unit repr t =
     | Unit, Unit -> ret Unit
     | Bool a, Bool b | Scalar a, Scalar b ->
         append
-          [|CS.new_constraint ~a:0 ~b ~c:a ~qr:one ~qo:mone "assert_equal"|]
+          [|
+            CS.new_constraint
+              ~a:0
+              ~b
+              ~c:a
+              ~linear:[(wqr, one); (wqo, mone)]
+              "assert_equal";
+          |]
           ~solver:Skip
     | Pair (la, ra), Pair (lb, rb) -> aux la lb >* aux ra rb
     | List ls, List rs -> iter2M aux ls rs
@@ -926,9 +1049,8 @@ module Poseidon = struct
           ~c:y0
           ~qx5a:mone
           ~qc:(S.negate k_vec.(0).(0))
-          ~qo:minv.(0).(0)
-          ~qrg:minv.(0).(1)
-          ~qog:minv.(0).(2)
+          ~linear:[(wqo, minv.(0).(0))]
+          ~linear_g:[(wqr, minv.(0).(1)); (wqo, minv.(0).(2))]
           "pos128_full.1";
         CS.new_constraint
           ~a:x1
@@ -936,9 +1058,8 @@ module Poseidon = struct
           ~c:y2
           ~qx5a:mone
           ~qc:(S.negate k_vec.(1).(0))
-          ~qr:minv.(1).(1)
-          ~qo:minv.(1).(2)
-          ~qrg:minv.(1).(0)
+          ~linear:[(wqr, minv.(1).(1)); (wqo, minv.(1).(2))]
+          ~linear_g:[(wqr, minv.(1).(0))]
           "pos128_full.2";
         CS.new_constraint
           ~a:x2
@@ -946,9 +1067,8 @@ module Poseidon = struct
           ~c:y1
           ~qx5a:mone
           ~qc:(S.negate k_vec.(2).(0))
-          ~qr:minv.(2).(0)
-          ~qo:minv.(2).(1)
-          ~qrg:minv.(2).(2)
+          ~linear:[(wqr, minv.(2).(0)); (wqo, minv.(2).(1))]
+          ~linear_g:[(wqr, minv.(2).(2))]
           "pos128_full.3";
         CS.new_constraint ~a:0 ~b:y2 ~c:0 "pos128_full.4";
       |]
@@ -1068,9 +1188,12 @@ module Poseidon = struct
           ~c:0
           ~qc:eqs.(0).(0)
           ~qx5a:eqs.(0).(var "x2_5")
-          ~qlg:eqs.(0).(var "a")
-          ~qrg:eqs.(0).(var "x0")
-          ~qog:eqs.(0).(var "x1")
+          ~linear_g:
+            [
+              (wql, eqs.(0).(var "a"));
+              (wqr, eqs.(0).(var "x0"));
+              (wqo, eqs.(0).(var "x1"));
+            ]
           "pos128_4partial.1";
         CS.new_constraint
           ~a
@@ -1078,10 +1201,13 @@ module Poseidon = struct
           ~c:x1
           ~qc:eqs.(1).(0)
           ~qx5a:eqs.(1).(var "a_5")
-          ~ql:eqs.(1).(var "a")
-          ~qr:eqs.(1).(var "x0")
-          ~qo:eqs.(1).(var "x1")
-          ~qlg:eqs.(1).(var "b")
+          ~linear:
+            [
+              (wql, eqs.(1).(var "a"));
+              (wqr, eqs.(1).(var "x0"));
+              (wqo, eqs.(1).(var "x1"));
+            ]
+          ~linear_g:[(wql, eqs.(1).(var "b"))]
           "pos128_4partial.2";
         CS.new_constraint
           ~a:b
@@ -1089,12 +1215,18 @@ module Poseidon = struct
           ~c:x1
           ~qc:eqs.(2).(0)
           ~qx5a:eqs.(2).(var "b_5")
-          ~ql:eqs.(2).(var "b")
-          ~qr:eqs.(2).(var "y1")
-          ~qo:eqs.(2).(var "x1")
-          ~qlg:eqs.(2).(var "c")
-          ~qrg:eqs.(2).(var "y0")
-          ~qog:eqs.(2).(var "a")
+          ~linear:
+            [
+              (wql, eqs.(2).(var "b"));
+              (wqr, eqs.(2).(var "y1"));
+              (wqo, eqs.(2).(var "x1"));
+            ]
+          ~linear_g:
+            [
+              (wql, eqs.(2).(var "c"));
+              (wqr, eqs.(2).(var "y0"));
+              (wqo, eqs.(2).(var "a"));
+            ]
           "pos128_4partial.3";
         CS.new_constraint
           ~a:c
@@ -1102,12 +1234,18 @@ module Poseidon = struct
           ~c:a
           ~qc:eqs.(3).(0)
           ~qx5a:eqs.(3).(var "c_5")
-          ~ql:eqs.(3).(var "c")
-          ~qr:eqs.(3).(var "y0")
-          ~qo:eqs.(3).(var "a")
-          ~qlg:eqs.(3).(var "b")
-          ~qrg:eqs.(3).(var "x0")
-          ~qog:eqs.(3).(var "x1")
+          ~linear:
+            [
+              (wql, eqs.(3).(var "c"));
+              (wqr, eqs.(3).(var "y0"));
+              (wqo, eqs.(3).(var "a"));
+            ]
+          ~linear_g:
+            [
+              (wql, eqs.(3).(var "b"));
+              (wqr, eqs.(3).(var "x0"));
+              (wqo, eqs.(3).(var "x1"));
+            ]
           "pos128_4partial.4";
         CS.new_constraint
           ~a:b
@@ -1115,11 +1253,13 @@ module Poseidon = struct
           ~c:x1
           ~qc:eqs.(4).(0)
           ~qx5a:eqs.(4).(var "b_5")
-          ~ql:eqs.(4).(var "b")
-          ~qr:eqs.(4).(var "x0")
-          ~qo:eqs.(4).(var "x1")
-          ~qlg:eqs.(4).(var "c")
-          ~qrg:eqs.(4).(var "a")
+          ~linear:
+            [
+              (wql, eqs.(4).(var "b"));
+              (wqr, eqs.(4).(var "x0"));
+              (wqo, eqs.(4).(var "x1"));
+            ]
+          ~linear_g:[(wql, eqs.(4).(var "c")); (wqr, eqs.(4).(var "a"))]
           "pos128_4partial.5";
         CS.new_constraint
           ~a:c
@@ -1127,12 +1267,18 @@ module Poseidon = struct
           ~c:b
           ~qc:eqs.(5).(0)
           ~qx5a:eqs.(5).(var "c_5")
-          ~ql:eqs.(5).(var "c")
-          ~qr:eqs.(5).(var "a")
-          ~qo:eqs.(5).(var "b")
-          ~qlg:eqs.(5).(var "y2")
-          ~qrg:eqs.(5).(var "x0")
-          ~qog:eqs.(5).(var "x1")
+          ~linear:
+            [
+              (wql, eqs.(5).(var "c"));
+              (wqr, eqs.(5).(var "a"));
+              (wqo, eqs.(5).(var "b"));
+            ]
+          ~linear_g:
+            [
+              (wql, eqs.(5).(var "y2"));
+              (wqr, eqs.(5).(var "x0"));
+              (wqo, eqs.(5).(var "x1"));
+            ]
           "pos128_4partial.6";
         CS.new_constraint ~a:y2 ~b:x0 ~c:x1 "pos128_4partial.7";
       |]
@@ -1189,9 +1335,15 @@ module Anemoi = struct
           ~qc:gamma
           ~qm:beta
           ~qx5c:one
-          ~qlg:mone
+          ~linear_g:[(wql, mone)]
           "anemoi.1";
-        CS.new_constraint ~a:x0 ~b:y0 ~c:w ~qr:one ~qlg:mone ~qo:mone "anemoi.2";
+        CS.new_constraint
+          ~a:x0
+          ~b:y0
+          ~c:w
+          ~linear:[(wqr, one); (wqo, mone)]
+          ~linear_g:[(wql, mone)]
+          "anemoi.2";
         CS.new_constraint
           ~a:v
           ~b:v
@@ -1199,17 +1351,15 @@ module Anemoi = struct
           ~qc:S.(kx + delta + (g * ky))
           ~qm:beta
           ~qx5c:one
-          ~ql:g
-          ~qlg:mone
+          ~linear:[(wql, g)]
+          ~linear_g:[(wql, mone)]
           "anemoi.3";
         CS.new_constraint
           ~a:x1
           ~b:y1
           ~c:v
           ~qc:S.(negate ky)
-          ~ql:S.(negate g)
-          ~qr:one
-          ~qo:mone
+          ~linear:[(wql, S.(negate g)); (wqr, one); (wqo, mone)]
           "anemoi.4";
       |]
       ~solver
@@ -1264,10 +1414,8 @@ module Anemoi = struct
           ~c:x0
           ~qx2b:S.(negate g_beta)
           ~qm:S.(two * g_beta)
-          ~qr:g2_p_1
-          ~qo:S.(negate g)
-          ~ql:S.(negate g2_p_1)
-          ~qlg:S.one
+          ~linear:[(wql, S.(negate g2_p_1)); (wqr, g2_p_1); (wqo, S.(negate g))]
+          ~linear_g:[(wql, S.one)]
           ~qc:qca
           "anemoi_double.a";
         CS.new_constraint
@@ -1276,21 +1424,16 @@ module Anemoi = struct
           ~c:w0
           ~qx2b:S.(negate g_beta)
           ~qm:S.(two * g_beta)
-          ~qo:mone
-          ~qr:g2
-          ~qrg:g
-          ~qlg:one
-          ~ql:S.(negate g2_p_1)
+          ~linear:[(wql, S.(negate g2_p_1)); (wqr, g2); (wqo, mone)]
+          ~linear_g:[(wql, one); (wqr, g)]
           ~qc:qcb
           "anemoi_double.b";
         CS.new_constraint
           ~a:y0
           ~b:x2
           ~c:y2
-          ~qlg:one
-          ~qr:S.(negate g)
-          ~qrg:mone
-          ~qo:one
+          ~linear:[(wqr, S.(negate g)); (wqo, one)]
+          ~linear_g:[(wql, one); (wqr, mone)]
           ~qc:S.(negate ky2)
           "anemoi_double.c";
         CS.new_constraint
@@ -1299,9 +1442,8 @@ module Anemoi = struct
           ~c:y1
           ~qx5a:g
           ~qx2b:g_beta
-          ~qlg:mone
-          ~qrg:one
-          ~qr:mone
+          ~linear:[(wqr, mone)]
+          ~linear_g:[(wql, mone); (wqr, one)]
           ~qc:qcd
           "anemoi_double.d";
         CS.new_constraint
@@ -1310,7 +1452,7 @@ module Anemoi = struct
           ~c:x0
           ~qx5a:one
           ~qx2b:beta
-          ~qo:mone
+          ~linear:[(wqo, mone)]
           ~qc:gamma
           "anemoi_double.e";
       |]
