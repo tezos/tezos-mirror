@@ -673,7 +673,7 @@ let test_mesh_addition rng limits parameters =
     ~expected_size:(limits.degree_optimal - 2)
     state ;
   (* Heartbeat. *)
-  let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
+  let state, Heartbeat {to_graft; _} = GS.heartbeat state in
   (* There should be two grafting requests to fill the mesh. *)
   let peers_to_graft =
     to_graft |> Peer.Map.bindings |> List.map (fun (peer, _topic) -> peer)
@@ -684,13 +684,11 @@ let test_mesh_addition rng limits parameters =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
   (* Mesh size should be [degree_optimal] and the newly grafted peers should be in the mesh.  *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
-     Uncomment once we change mesh size in heartbeat. *)
-  (* assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ; *)
-  (* List.iter *)
-  (*   (fun peer -> *)
-  (*     assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included:true state) *)
-  (*   peers_to_graft ; *)
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
+  List.iter
+    (fun peer ->
+      assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included:true state)
+    peers_to_graft ;
   unit
 
 (** Test mesh subtraction in maintainance heartbeat.
@@ -728,7 +726,7 @@ let test_mesh_subtraction rng limits parameters =
   in
   assert_mesh_size ~__LOC__ ~topic ~expected_size:peer_number state ;
   (* Heartbeat. *)
-  let _state, Heartbeat {to_prune; _} = GS.heartbeat state in
+  let state, Heartbeat {to_prune; _} = GS.heartbeat state in
   (* There should be enough prune requests to bring back the mesh size to [degree_optimal]. *)
   let peers_to_prune =
     to_prune |> Peer.Map.bindings |> List.map (fun (peer, _topic) -> peer)
@@ -739,13 +737,11 @@ let test_mesh_subtraction rng limits parameters =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
   (* Mesh size should be [degree_optimal] and the pruned peers should not be in the mesh.  *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
-     Uncomment once we change mesh size in heartbeat. *)
-  (* assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ; *)
-  (* List.iter *)
-  (*   (fun peer -> *)
-  (*     assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included:false state) *)
-  (*   peers_to_prune ; *)
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
+  List.iter
+    (fun peer ->
+      assert_mesh_inclusion ~__LOC__ ~topic ~peer ~is_included:false state)
+    peers_to_prune ;
   unit
 
 (** Tests that the heartbeat does not graft peers that are waiting the backoff period.
@@ -1051,7 +1047,7 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ()
   in
   (* Graft all the inbound peers.
-     This workes because number of inbound peers is equal to [degree_high]. *)
+     This works because the number of inbound peers is equal to [degree_high]. *)
   let state =
     List.fold_left
       (fun state peer ->
@@ -1069,18 +1065,16 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ~outbound:(fun _ -> true)
       state
   in
-  (* At this point the mesh size filled with [degree_high] inbound peers. *)
+  (* At this point the mesh is filled with [degree_high] inbound peers. *)
   assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_high state ;
   (* Heartbeat. *)
-  let _state, Heartbeat {to_prune; to_graft; _} = GS.heartbeat state in
+  let state, Heartbeat {to_prune; to_graft; _} = GS.heartbeat state in
   (* The outbound peers should have been additionally added. *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
-     Uncomment once we change mesh size in heartbeat. *)
-  (* assert_mesh_size *)
-  (*   ~__LOC__ *)
-  (*   ~topic *)
-  (*   ~expected_size:(limits.degree_optimal + limits.degree_out) *)
-  (*   state ; *)
+  assert_mesh_size
+    ~__LOC__
+    ~topic
+    ~expected_size:(limits.degree_high + limits.degree_out)
+    state ;
   let peers_to_prune =
     to_prune |> Peer.Map.bindings |> List.map (fun (peer, _topics) -> peer)
   in
@@ -1098,6 +1092,9 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
   unit
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
+   Add test the described test scenario *)
 
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
