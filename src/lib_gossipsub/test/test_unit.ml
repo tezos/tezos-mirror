@@ -434,8 +434,14 @@ let test_publish_without_flood_publishing rng limits parameters =
   let publish_data = "some_data" in
   let message_id = 0 in
   (* Publish to a joined topic. *)
-  let state, Publish_message peers_to_publish =
+  let state, output =
     GS.publish {sender = None; topic; message_id; message = publish_data} state
+  in
+  let peers_to_publish =
+    match output with
+    | Already_published ->
+        Test.fail ~__LOC__ "Message shouldn't already be published."
+    | Publish_message peers -> peers
   in
   (* Should return [degree_optimal] peers to publish to. *)
   Check.(
@@ -483,8 +489,14 @@ let test_fanout rng limits parameters =
   (* Publish to the topic we left. *)
   let publish_data = "some data" in
   let message_id = 0 in
-  let state, Publish_message peers_to_publish =
+  let state, output =
     GS.publish {sender = None; topic; message_id; message = publish_data} state
+  in
+  let peers_to_publish =
+    match output with
+    | Already_published ->
+        Test.fail ~__LOC__ "Message shouldn't already be published."
+    | Publish_message peers -> peers
   in
   (* Fanout should contain [degree_optimal] peers. *)
   assert_fanout_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
