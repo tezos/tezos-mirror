@@ -253,3 +253,5 @@ linkcheck_allowed_redirects = dict(
 
 # Python module index generation is broken, deactivate it.
 html_domain_indices = False
+
+default_role = 'default'

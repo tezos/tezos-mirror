@@ -23,6 +23,7 @@ def setup(app):
     app.add_role('opam', opam_role)
     app.add_role('src', src_role)
     app.add_role('gl', gitlab_role)
+    app.add_role('default', default_role)
     global OPAM_CACHE
     if OPAM_CACHE is not None:
         raise ValueError('package_role: opam cache already set!!!')
@@ -181,4 +182,40 @@ def src_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
     else:  # most likely a directory
         url = project_url + "/-/tree/" + branch + "/" + src
     node = nodes.reference(rawtext, text, refuri=url, **options)
+    return [node], msg
+
+
+def default_role(
+    _name, rawtext, _text, lineno, inliner, options={}, _content=[]
+):
+    """Implement the default role. This role warns on the usage of single
+    backticks and points to preferred alternatives."""
+
+    node = nodes.Text(rawtext, **options)
+
+    file = inliner.document.current_source
+
+    # TODO tezos/tezos#2170: suppress the following check when protocol O
+    # becomes active, because at that point, the pages for all active protocols
+    # will have been fixed automatically by snapshotting Alpha.
+
+    # skip pages of protocols other than Alpha, to avoid manual backporting
+    if re.search("/(active|lima|mumbai|nairobi)/", file):
+        return [node], []
+
+    # skip automatically generated pages
+    if re.match(".*[.]txt$", file):
+        return [node], []
+
+    # raise a warning
+    msg = [
+        inliner.reporter.warning(
+            (
+                f'undefined syntax: {rawtext}, '
+                + 'use ``...``, *...*, **...**, "...", :math:`...`, etc.'
+            ),
+            line=lineno,
+        )
+    ]
+
     return [node], msg
