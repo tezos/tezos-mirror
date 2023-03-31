@@ -82,6 +82,11 @@ type ('peer, 'message_id, 'span) limits = {
   max_sent_iwant_per_heartbeat : int;
       (** The maximum number of control messages [IWant] we can sent
           to our peers between two heartbeats. *)
+  max_gossip_retransmission : int;
+      (** The maximum number of times the local peer allows a remote peer to
+          request the same message id through IWant gossip before the local peer
+          starts ignoring them. This is designed to prevent peers from spamming
+          with requests. *)
   degree_optimal : int;
       (** The optimal number of full connections per topic. For
           example, if it is 6, each peer will want to have about six peers in
@@ -138,7 +143,7 @@ type ('peer, 'message_id, 'span) limits = {
           heartbeats. *)
   history_gossip_length : int;
       (** [history_gossip_length] controls how many cached message ids the local
-          peer will advertise in IHAVE gossip messages. When asked for its seen
+          peer will advertise in IHave gossip messages. When asked for its seen
           message ids, the local peer will return only those from the most
           recent [history_gossip_length] heartbeats. The slack between
           [history_gossip_length] and [history_length] allows the local peer to
@@ -235,29 +240,30 @@ module type AUTOMATON = sig
   (** Output produced by one of the actions below. *)
   type _ output =
     | Negative_peer_score : Score.t -> [`IHave] output
-        (** The peer who sent an [`IHave] message has a negative score. *)
+        (** The peer who sent an IHave message has a negative score. *)
     | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
-        (** The peer sent us more than [max] ihave messages within two
+        (** The peer sent us more than [max] IHave messages within two
             successive heartbeat calls. *)
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
-        (** We sent more than [max] iwant messages to this peer within two
+        (** We sent more than [max] IWant messages to this peer within two
             successive heartbeat calls. *)
     | Message_topic_not_tracked : [`IHave] output
-        (** We received an [`IHave] message for a topic we don't track. *)
+        (** We received an IHave message for a topic we don't track. *)
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
-        (** The messages IDs we want to request from the peer which sent us an
-            [`IHave] message. The implementation honors the
+        (** The messages ids we want to request from the peer which sent us an
+            IHave message. The implementation honors the
             [max_sent_iwant_per_heartbeat] limit. *)
     | On_iwant_messages_to_route : {
         routed_message_ids :
-          [`Ignored | `Not_found | `Message of message] Message_id.Map.t;
+          [`Ignored | `Not_found | `Too_many_requests | `Message of message]
+          Message_id.Map.t;
       }
         -> [`IWant] output
         (** As an answer for an [`IWant] message, the automaton returns a map
             associating to each requested message_id either [`Ignored] if the
             peer is filtered out by [peer_filter], [`Not_found] if the message
-            is not found, or [Message m] if [m] is the message of the given
-            ID. *)
+            is not found, or [Message m] if [m] is the message with the given
+            id. *)
     | Peer_filtered : [`Graft] output
         (** The peer we attempt to graft has not been selected by
             [peer_filter]. *)

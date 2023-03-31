@@ -100,6 +100,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
   let {
     max_recv_ihave_per_heartbeat;
     max_sent_iwant_per_heartbeat;
+    max_gossip_retransmission;
     degree_optimal;
     gossip_publish_threshold;
     accept_px_threshold;
@@ -124,6 +125,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     fmtr
     "@[<v 2>{ max_recv_ihave_per_heartbeat = %d;@;\
      max_sent_iwant_per_heartbeat = %d;@;\
+     max_gossip_retransmission = %d;@;\
      degree_optimal = %d;@;\
      gossip_publish_threshold = %f;@;\
      accept_px_threshold = %f;@;\
@@ -142,6 +144,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      history_gossip_length = %d }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
+    max_gossip_retransmission
     degree_optimal
     gossip_publish_threshold
     accept_px_threshold

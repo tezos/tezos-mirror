@@ -31,6 +31,7 @@ let default_limits =
   {
     max_recv_ihave_per_heartbeat = 10;
     max_sent_iwant_per_heartbeat = 5000;
+    max_gossip_retransmission = 3;
     degree_optimal = 6;
     gossip_publish_threshold = 0.;
     accept_px_threshold = 0.;
