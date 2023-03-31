@@ -721,12 +721,6 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? () = check_score peer topic connection in
       let*? () = check_mesh_size mesh connection in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
-         Probably the [topics] field needs to be updated here.
-      *)
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5007
-
-         Handle negative scores *)
       Grafting_successfully |> return
   end
 
