@@ -34,7 +34,6 @@ path = "../../kernel_sdk/tezos_smart_rollup_mock"
 
 [dependencies]
 tezos_ethereum = { path = "../ethereum" }
-
 primitive-types = { version = "0.11.1", default-features = false }
 hex = "0.4"
 num-traits = "0.2.8"

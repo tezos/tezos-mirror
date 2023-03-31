@@ -3,7 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::{read_input, Transaction};
+use crate::inbox::{read_input, InputResult, Transaction};
+use crate::Error;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 /// The blueprint of a block is a list of transactions.
@@ -31,30 +32,32 @@ impl Queue {
     }
 }
 
-// Conditionally push a transaction in the blueprint.
-fn push(blueprint: &mut Blueprint, transaction: Option<Transaction>) {
-    if let Some(transaction) = transaction {
-        blueprint.transactions.push(transaction);
-    }
-}
-
 fn fetch_transactions<Host: Runtime>(
     host: &mut Host,
     blueprint: &mut Blueprint,
     smart_rollup_address: [u8; 20],
-) {
-    if let Ok(transaction) = read_input(host, smart_rollup_address) {
-        push(blueprint, transaction);
-        fetch_transactions(host, blueprint, smart_rollup_address)
+) -> Result<(), Error> {
+    match read_input(host, smart_rollup_address)? {
+        InputResult::NoInput => Ok(()),
+        InputResult::Unparsable => {
+            fetch_transactions(host, blueprint, smart_rollup_address)
+        }
+        InputResult::Transaction(tx) => {
+            blueprint.transactions.push(*tx);
+            fetch_transactions(host, blueprint, smart_rollup_address)
+        }
     }
 }
 
-pub fn fetch<Host: Runtime>(host: &mut Host, smart_rollup_address: [u8; 20]) -> Queue {
+pub fn fetch<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Result<Queue, Error> {
     let mut blueprint = Blueprint {
         transactions: Vec::new(),
     };
-    fetch_transactions(host, &mut blueprint, smart_rollup_address);
-    Queue {
+    fetch_transactions(host, &mut blueprint, smart_rollup_address)?;
+    Ok(Queue {
         proposals: vec![blueprint],
-    }
+    })
 }

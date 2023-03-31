@@ -6,7 +6,7 @@
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use crate::helpers::ensures;
+use crate::Error;
 
 use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
 
@@ -16,44 +16,66 @@ pub struct Transaction {
     pub tx: RawTransaction,
 }
 
-pub enum Error {
-    ReadInputError,
+pub enum InputResult {
+    NoInput,
+    Transaction(Box<Transaction>),
+    Unparsable,
 }
 
 impl Transaction {
-    pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Option<Self> {
+    pub fn to_raw_transaction(&self) -> RawTransaction {
+        self.tx.clone()
+    }
+}
+
+impl InputResult {
+    pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
         let bytes = Message::as_ref(&input);
-        let (input_tag, remaining) = bytes.split_first()?;
+        let (input_tag, remaining) = match bytes.split_first() {
+            Some(res) => res,
+            None => return InputResult::Unparsable,
+        };
         // External messages starts with the tag 1, they are the only
         // messages we consider.
-        ensures(*input_tag == 1)?;
+        if *input_tag != 1 {
+            return InputResult::Unparsable;
+        };
         // Next 20 bytes is the targeted smart rollup address.
-        let (target_smart_rollup_address, remaining) = remaining.split_at(20);
-        ensures(target_smart_rollup_address == smart_rollup_address)?;
+        let remaining = {
+            let (target_smart_rollup_address, remaining) = remaining.split_at(20);
+
+            if target_smart_rollup_address == smart_rollup_address {
+                remaining
+            } else {
+                return InputResult::Unparsable;
+            }
+        };
         // Next 32 bytes is the transaction hash.
         let (tx_hash, remaining) = remaining.split_at(32);
-        let tx_hash: TransactionHash = tx_hash.try_into().ok()?;
+        let tx_hash: TransactionHash = match tx_hash.try_into() {
+            Ok(tx_hash) => tx_hash,
+            Err(_) => return InputResult::Unparsable,
+        };
         // Remaining bytes is the rlp encoded transaction.
-        let tx = RawTransaction::decode_from_rlp(remaining).ok()?;
-
-        Some(Transaction {
+        let tx = match RawTransaction::decode_from_rlp(remaining) {
+            Ok(tx) => tx,
+            Err(_) => return InputResult::Unparsable,
+        };
+        InputResult::Transaction(Box::new(Transaction {
             level: input.level,
             tx_hash,
             tx,
-        })
-    }
-
-    pub fn to_raw_transaction(&self) -> RawTransaction {
-        self.tx.clone()
+        }))
     }
 }
 
 pub fn read_input<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-) -> Result<Option<Transaction>, Error> {
-    match host.read_input() {
-        Ok(Some(input)) => Ok(Transaction::parse(input, smart_rollup_address)),
-        _ => Err(Error::ReadInputError),
+) -> Result<InputResult, Error> {
+    let input = host.read_input()?;
+    match input {
+        Some(input) => Ok(InputResult::parse(input, smart_rollup_address)),
+        None => Ok(InputResult::NoInput),
     }
 }
