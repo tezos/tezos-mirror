@@ -25,22 +25,17 @@
 
 open Protocol.Alpha_context
 
-module Arith_pvm_in_memory :
+module type S =
   Sc_rollup.PVM.S
     with type context = Context_helpers.In_memory.Tree.t
      and type state = Context_helpers.In_memory.tree
      and type proof =
       Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.ArithPVM.Make (Context_helpers.In_memory)
+      Tezos_context_memory.Context.Proof.t
 
-module Wasm_pvm_in_memory :
-  Sc_rollup.PVM.S
-    with type context = Context_helpers.In_memory.Tree.t
-     and type state = Context_helpers.In_memory.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
+module Arith : S = Sc_rollup.ArithPVM.Make (Context_helpers.In_memory)
+
+module Wasm : S =
   Sc_rollup.Wasm_2_0_0PVM.Make
     (Environment.Wasm_2_0_0.Make)
     (Context_helpers.In_memory)

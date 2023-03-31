@@ -25,9 +25,7 @@
 
 open Protocol.Alpha_context
 
-(**  [Arith_pvm_in_memory]: Arith PVM with an in memory context
-     {!Tezos_context_memory}. *)
-module Arith_pvm_in_memory :
+module type S =
   Sc_rollup.PVM.S
     with type context = Context_helpers.In_memory.Tree.t
      and type state = Context_helpers.In_memory.tree
@@ -35,12 +33,8 @@ module Arith_pvm_in_memory :
       Tezos_context_memory.Context.Proof.tree
       Tezos_context_memory.Context.Proof.t
 
-(** [Wasm_pvm_in_memory] Wasm PVM with an in memory context
-    {!Tezos_context_memory}. *)
-module Wasm_pvm_in_memory :
-  Sc_rollup.PVM.S
-    with type context = Context_helpers.In_memory.Tree.t
-     and type state = Context_helpers.In_memory.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t
+(** [Arith]: Arith PVM with an in memory context {!Tezos_context_memory}. *)
+module Arith : S
+
+(** [Wasm] Wasm PVM with an in memory context {!Tezos_context_memory}. *)
+module Wasm : S
