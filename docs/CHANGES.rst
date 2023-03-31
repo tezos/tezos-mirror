@@ -58,6 +58,9 @@ Node
 - Replaced some "precheck" occurrences with "validate" in event and
   error identifiers and messages. (MR :gl: `!7513`)
 
+- Document the usage of "Yay" as a deprecated synonym for "Yea", to encourage
+  using the correct value in the future. (MR :gl:`!7960`)
+
 Baker
 -----
 
