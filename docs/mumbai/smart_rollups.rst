@@ -943,11 +943,11 @@ allow it to interact with the components of persistent state:
   the tree.
 
 ``store_read``
-  Loads at most 4,096 bytes from a file of the durable storage to a buffer
+  Loads at most 2048 bytes from a file of the durable storage to a buffer
   in the memory of the WASM kernel.
 
 ``store_write``
-  Writes at most 4,096 bytes from a buffer in the memory of the WASM
+  Writes at most 2048 bytes from a buffer in the memory of the WASM
   kernel to a file of the durable storage, increasing its size if
   necessary. Note that files in the durable storage cannot exceed
   :math:`2^{31} - 1` bytes (i.e. 2GB - 1).
