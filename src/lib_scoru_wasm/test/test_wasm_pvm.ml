@@ -475,6 +475,33 @@ let try_run_store_get_hash ~version () =
   assert (predicate state) ;
   Lwt_result_syntax.return_unit
 
+let nop_store_delete_value_module =
+  {|
+(module
+ (import "smart_rollup_core" "store_delete_value"
+         (func $store_delete_value_key (param i32 i32) (result i32)))
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+    (nop)))
+  |}
+
+let try_run_store_delete_value ~version () =
+  let open Lwt_syntax in
+  let* tree =
+    initial_tree ~version ~from_binary:false nop_store_delete_value_module
+  in
+  let* tree = set_empty_inbox_step 0l tree in
+  let* tree = eval_until_input_or_reveal_requested tree in
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  let predicate state =
+    match version with
+    | Wasm_pvm_state.V0 -> is_stuck state
+    | V1 -> not (is_stuck state)
+  in
+  assert (predicate state) ;
+  Lwt_result_syntax.return_unit
+
 let test_modify_read_only_storage_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
@@ -1704,6 +1731,7 @@ let tests =
       ( "Test __internal_store_get_hash available",
         `Quick,
         try_run_store_get_hash );
+      ("Test store_delete_value available", `Quick, try_run_store_delete_value);
       ( "Test unreachable kernel (tick per tick)",
         `Quick,
         fun ~version ->
