@@ -290,7 +290,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let degree_optimal state = state.limits.degree_optimal
 
-    let gossip_publish_threshold state = state.limits.gossip_publish_threshold
+    let publish_threshold state = state.limits.publish_threshold
 
     let accept_px_threshold state = state.limits.accept_px_threshold
 
@@ -812,14 +812,14 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let get_peers_for_unsubscribed_topic topic =
       let open Monad.Syntax in
-      let*! gossip_publish_threshold in
+      let*! publish_threshold in
       let*! degree_optimal in
       let now = Time.now () in
       let*! fanout_opt = find_fanout topic in
       match fanout_opt with
       | None ->
           let filter_by_score score =
-            Compare.Float.(score |> Score.float >= gossip_publish_threshold)
+            Compare.Float.(score |> Score.float >= publish_threshold)
           in
           let filter _peer {direct; score; _} =
             (not direct) && filter_by_score score
@@ -1342,20 +1342,20 @@ module Make (C : AUTOMATON_CONFIG) :
        - Remove topics to which the local peer has not published in the
        [fanout_ttl] time.
 
-       - Remove peers that are not subscribed anymore or that have a score
-       below [gossip_publish_threshold].
+       - Remove peers that are not subscribed anymore or that have a score below
+       [publish_threshold].
 
        - If for a topic the set of fanout peers is below [degree_optimal], then
        try to fill the map so that to have [degree_optimal] in the topic
-       fanout. The selected peers should have a score above
-       [gossip_publish_threshold] and should not be direct peers (and should be
-       subscribed to the topic). *)
+       fanout. The selected peers should have a score above [publish_threshold]
+       and should not be direct peers (and should be subscribed to the topic).
+    *)
     let maintain_fanout =
       let open Monad.Syntax in
       let*! connections in
       let*! rng in
       let*! degree_optimal in
-      let*! gossip_publish_threshold in
+      let*! publish_threshold in
       let*! fanout_ttl in
 
       let expire_fanout =
@@ -1381,8 +1381,7 @@ module Make (C : AUTOMATON_CONFIG) :
                   if
                     Topic.Set.mem topic connection.topics
                     && Compare.Float.(
-                         connection.score |> Score.float
-                         >= gossip_publish_threshold)
+                         connection.score |> Score.float >= publish_threshold)
                   then acc
                   else
                     let peers_to_keep, peers_to_remove = acc in
@@ -1402,7 +1401,7 @@ module Make (C : AUTOMATON_CONFIG) :
             let in_fanout = Peer.Set.mem peer peers_to_keep in
             (not in_fanout) && (not connection.direct)
             && Compare.Float.(
-                 connection.score |> Score.float >= gossip_publish_threshold)
+                 connection.score |> Score.float >= publish_threshold)
           in
           let new_peers =
             select_connections_peers connections rng topic ~filter ~max:ineed

@@ -102,7 +102,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     max_sent_iwant_per_heartbeat;
     max_gossip_retransmission;
     degree_optimal;
-    gossip_publish_threshold;
+    publish_threshold;
     accept_px_threshold;
     unsubscribe_backoff;
     graft_flood_backoff;
@@ -127,7 +127,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      max_sent_iwant_per_heartbeat = %d;@;\
      max_gossip_retransmission = %d;@;\
      degree_optimal = %d;@;\
-     gossip_publish_threshold = %f;@;\
+     publish_threshold = %f;@;\
      accept_px_threshold = %f;@;\
      unsubscribe_backoff = %a;@;\
      graft_flood_backoff = %a;@;\
@@ -146,7 +146,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     max_sent_iwant_per_heartbeat
     max_gossip_retransmission
     degree_optimal
-    gossip_publish_threshold
+    publish_threshold
     accept_px_threshold
     GS.Span.pp
     unsubscribe_backoff

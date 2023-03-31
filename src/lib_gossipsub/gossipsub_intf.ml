@@ -92,7 +92,7 @@ type ('peer, 'message_id, 'span) limits = {
           example, if it is 6, each peer will want to have about six peers in
           their mesh for each topic they're subscribed to. It should be set
           somewhere between {degree_low} and {degree_high}. *)
-  gossip_publish_threshold : float;
+  publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
   accept_px_threshold : float;
