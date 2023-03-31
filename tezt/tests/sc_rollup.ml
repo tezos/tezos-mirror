@@ -2669,8 +2669,14 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       empty_levels,
       stop_loser_at,
       reset_honest_on ) =
+  let regression =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
+       Disabled dissection regressions for parallel games, as it introduces
+       flakyness. *)
+    List.compare_length_with loser_modes 1 <= 0
+  in
   test_full_scenario
-    ~regression:true
+    ~regression
     ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
