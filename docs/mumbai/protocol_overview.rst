@@ -68,6 +68,7 @@ detail into the validation and application process for
 :ref:`blocks<block_validation_overview_mumbai>` and their
 :ref:`operations<operation_validity_mumbai>`.
 
+.. _shell_proto_interact:
 .. _shell_proto_interact_mumbai:
 
 Shell-protocol interaction
@@ -110,6 +111,7 @@ interface for quite different use cases, as follows:
   block, typically used in the :doc:`validator <../shell/validation>`
   to precheck a block, avoiding to further consider invalid blocks.
 
+.. _block_contents:
 .. _block_contents_mumbai:
 
 Blocks, Operations and their Validation
@@ -136,6 +138,7 @@ safely included in the Tezos blockchain -- and *application* --
 that is, how the effects of operations and blocks are taken into
 account -- for this economic protocol.
 
+.. _protocol_constants:
 .. _protocol_constants_mumbai:
 
 Protocol constants

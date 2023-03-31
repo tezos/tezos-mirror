@@ -31,10 +31,10 @@ dnf install -y dnf-plugins-core
 dnf copr enable -y $REPO && dnf update -y
 dnf install -y tezos-client
 dnf install -y tezos-node
-dnf install -y tezos-baker-PtLimaPt
-dnf install -y tezos-accuser-PtLimaPt
+dnf install -y tezos-baker-PtMumbai
+dnf install -y tezos-accuser-PtMumbai
 # [test executables]
-tezos-client --version
-tezos-node --version
-tezos-baker-PtLimaPt --version
-tezos-accuser-PtLimaPt --version
+octez-client --version
+octez-node --version
+octez-baker-PtMumbai --version
+octez-accuser-PtMumbai --version

@@ -515,6 +515,7 @@ Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-i
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
+.. _sending_external_inbox_message:
 .. _sending_external_inbox_message_mumbai:
 
 Sending an external inbox message
@@ -560,6 +561,7 @@ can encode an outbox transaction using the Octez rollup client as follows:
     EMESSAGE=$(octez-smart-rollup-client-PtMumbai encode outbox message "${MESSAGE}")
 
 
+.. _triggering_execution_outbox_message:
 .. _triggering_execution_outbox_message_mumbai:
 
 Triggering the execution of an outbox message
@@ -621,6 +623,7 @@ operation. More complex parameters, typically containing assets
 represented as tickets, can be used as long as they match the type of
 the entrypoint of the destination smart contract.
 
+.. _sending_internal_inbox_message:
 .. _sending_internal_inbox_message_mumbai:
 
 Sending an internal inbox message
@@ -671,6 +674,7 @@ to the rollup.
             PAIR;
           }
 
+.. _populating_the_reveal_channel:
 .. _populating_the_reveal_channel_mumbai:
 
 Populating the reveal channel
@@ -690,6 +694,7 @@ this. For instance, one can classify pages into two categories: index
 pages that are hashes for other pages and leaf pages that contain
 actual payloads.
 
+.. _configure_fast_exec:
 .. _configure_fast_exec_mumbai:
 
 Configure WebAssembly fast execution

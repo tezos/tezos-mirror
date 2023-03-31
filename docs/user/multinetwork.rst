@@ -58,8 +58,6 @@ the following built-in networks:
 
 - ``ghostnet``
 
-- ``limanet`` (available from version 15.0)
-
 - ``mumbainet`` (available from version :doc:`../releases/version-16`)
 
 If you did not initialize your node configuration, or if your configuration

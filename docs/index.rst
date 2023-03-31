@@ -193,23 +193,13 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Lima Protocol doc:
+   :caption: Mumbai Protocol doc:
    :hidden:
 
    active/protocol
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Mumbai Protocol doc:
-   :hidden:
-
-   mumbai/protocol
-   mumbai/glossary
-   mumbai/cli-commands
-   mumbai/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -253,7 +243,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    protocols/naming
-   protocols/015_lima
    protocols/016_mumbai
    protocols/alpha
    protocols/history

@@ -29,8 +29,8 @@ After a successful compilation, you should have the following binaries:
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.
-For instance, ``octez-baker-PtLimaPt`` is the baker
-for the Lima protocol, and ``octez-baker-alpha`` is the baker
+For instance, ``octez-baker-PtMumbai`` is the baker
+for the Mumbai protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 

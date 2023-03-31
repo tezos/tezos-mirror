@@ -41,6 +41,7 @@ Note however that one can still inject successive operations with the
 same counter using the ``replace-by-fee`` feature.
 
 
+.. _solvability:
 .. _solvability_mumbai:
 
 Solvable operations
