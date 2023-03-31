@@ -259,23 +259,19 @@ let make_eol ~inbox_level ~message_counter =
   let payload = make_internal_inbox_message End_of_level in
   make_input ~inbox_level ~message_counter payload
 
-let make_info_per_level ~during_migration ~inbox_level ~predecessor_timestamp
-    ~predecessor =
+let make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor =
   let payload =
     make_internal_inbox_message
       (Info_per_level {predecessor_timestamp; predecessor})
   in
-  make_input
-    ~inbox_level
-    ~message_counter:(if during_migration then Z.of_int 2 else Z.one)
-    payload
+  make_input ~inbox_level ~message_counter:Z.one payload
 
 let make_protocol_migration ~inbox_level =
   let payload =
     make_internal_inbox_message
       Sc_rollup.Inbox_message.protocol_migration_internal_message
   in
-  make_input ~inbox_level ~message_counter:Z.one payload
+  make_input ~inbox_level ~message_counter:Z.(succ one) payload
 
 (** Message is the combination of a [message] and its associated [input].
 
@@ -359,11 +355,7 @@ let make_inputs predecessor_timestamp predecessor messages inbox_level =
   let sol = make_sol ~inbox_level in
   (* Info_per_level is at index 1. *)
   let info_per_level =
-    make_info_per_level
-      ~during_migration:false
-      ~inbox_level
-      ~predecessor_timestamp
-      ~predecessor
+    make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor
   in
   (* External inputs start at index 2. *)
   let external_inputs =

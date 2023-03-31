@@ -2659,23 +2659,10 @@ let test_automatically_added_internal_messages () =
       (Some sol)
   in
 
-  let assert_protocol_migration ~snapshot ~full_history_inbox ~inbox_level =
-    let protocol_migration =
-      Sc_rollup_helpers.make_protocol_migration ~inbox_level
-    in
-    assert_input_included
-      ~snapshot
-      ~full_history_inbox
-      (inbox_level, Z.one)
-      (Some protocol_migration)
-  in
-
-  let assert_ipl ~during_migration ~snapshot ~full_history_inbox ~level_info
-      ~inbox_level =
+  let assert_ipl ~snapshot ~full_history_inbox ~level_info ~inbox_level =
     let predecessor_timestamp, predecessor = level_info in
     let info_per_level =
       Sc_rollup_helpers.make_info_per_level
-        ~during_migration
         ~inbox_level
         ~predecessor_timestamp
         ~predecessor
@@ -2683,8 +2670,19 @@ let test_automatically_added_internal_messages () =
     assert_input_included
       ~snapshot
       ~full_history_inbox
-      (inbox_level, if during_migration then Z.of_int 2 else Z.one)
+      (inbox_level, Z.one)
       (Some info_per_level)
+  in
+
+  let assert_protocol_migration ~snapshot ~full_history_inbox ~inbox_level =
+    let protocol_migration =
+      Sc_rollup_helpers.make_protocol_migration ~inbox_level
+    in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, Z.(succ one))
+      (Some protocol_migration)
   in
 
   let assert_eol ~snapshot ~full_history_inbox ~inbox_level ~message_counter =
@@ -2744,20 +2742,19 @@ let test_automatically_added_internal_messages () =
     assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_zero
   in
   let* () =
-    assert_protocol_migration
-      ~__LOC__
-      ~snapshot
-      ~full_history_inbox
-      ~inbox_level:level_zero
-  in
-  let* () =
     assert_ipl
-      ~during_migration:true
       ~__LOC__
       ~snapshot
       ~full_history_inbox
       ~inbox_level:level_zero
       ~level_info:level_zero_info
+  in
+  let* () =
+    assert_protocol_migration
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_zero
   in
   let* () =
     assert_eol
@@ -2775,7 +2772,6 @@ let test_automatically_added_internal_messages () =
   let* () =
     assert_ipl
       ~__LOC__
-      ~during_migration:false
       ~snapshot
       ~full_history_inbox
       ~inbox_level:level_one
@@ -2797,7 +2793,6 @@ let test_automatically_added_internal_messages () =
   let* () =
     assert_ipl
       ~__LOC__
-      ~during_migration:false
       ~snapshot
       ~full_history_inbox
       ~inbox_level:level_two

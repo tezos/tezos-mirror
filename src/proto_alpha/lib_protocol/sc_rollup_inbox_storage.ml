@@ -126,6 +126,12 @@ let add_level_info ~predecessor ctxt =
   let open Lwt_result_syntax in
   let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
   let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+  let witness =
+    Sc_rollup_inbox_repr.add_info_per_level_no_history
+      ~predecessor_timestamp
+      ~predecessor
+      witness
+  in
   let current_level = (Raw_context.current_level ctxt).level in
   let+ first_level = Storage.Tenderbake.First_level_of_protocol.get ctxt in
   let is_first_level_of_protocol =
@@ -139,12 +145,6 @@ let add_level_info ~predecessor ctxt =
         witness
         Raw_context.protocol_migration_serialized_message
     else witness
-  in
-  let witness =
-    Sc_rollup_inbox_repr.add_info_per_level_no_history
-      ~predecessor_timestamp
-      ~predecessor
-      witness
   in
   Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
 
