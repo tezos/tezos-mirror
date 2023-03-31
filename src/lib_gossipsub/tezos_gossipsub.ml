@@ -796,8 +796,8 @@ module Make (C : AUTOMATON_CONFIG) :
           in
           let connections = Peer.Map.add peer connection connections in
           let* () = set_connections connections in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
-             rust-libp2p removes unsubscribed peers from the mesh here. *)
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5143
+             Remove unsubscribed peers from the mesh. *)
           return Unsubscribed
   end
 
