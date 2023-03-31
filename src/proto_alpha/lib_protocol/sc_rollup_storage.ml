@@ -54,25 +54,23 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
   in
   let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
   let*? ctxt, address = address_from_nonce ctxt nonce in
-  let* ctxt, pvm_kind_size, _kind_existed =
-    Store.PVM_kind.add ctxt address kind
-  in
+  let* ctxt, pvm_kind_size = Store.PVM_kind.init ctxt address kind in
   let origination_level = (Raw_context.current_level ctxt).level in
-  let* ctxt, genesis_info_size, _info_existed =
-    Store.Genesis_info.add
+  let* ctxt, genesis_info_size =
+    Store.Genesis_info.init
       ctxt
       address
       {commitment_hash = genesis_commitment_hash; level = origination_level}
   in
-  let* ctxt, param_ty_size_diff, _added =
-    Store.Parameters_type.add ctxt address parameters_ty
+  let* ctxt, param_ty_size_diff =
+    Store.Parameters_type.init ctxt address parameters_ty
   in
   let* ctxt = Sc_rollup_staker_index_storage.init ctxt address in
   let* ctxt, lcc_size_diff =
     Store.Last_cemented_commitment.init ctxt address genesis_commitment_hash
   in
-  let* ctxt, commitment_size_diff, _was_bound =
-    Store.Commitments.add
+  let* ctxt, commitment_size_diff =
+    Store.Commitments.init
       (ctxt, address)
       genesis_commitment_hash
       genesis_commitment
@@ -83,8 +81,8 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
      [sc_rollup_state_storage.deallocate] function does not have to handle a
      edge case.
   *)
-  let* ctxt, commitment_added_size_diff, _commitment_existed =
-    Store.Commitment_added.add
+  let* ctxt, commitment_added_size_diff =
+    Store.Commitment_added.init
       (ctxt, address)
       genesis_commitment_hash
       origination_level
@@ -94,8 +92,8 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
      in order the [sc_rollup_state_storage.deallocate_commitment_metadata]
      function does not have to handle an edge case of genesis commitment hash.
   *)
-  let* ctxt, commitment_first_publication_level_diff, _existed =
-    Store.Commitment_first_publication_level.add
+  let* ctxt, commitment_first_publication_level_diff =
+    Store.Commitment_first_publication_level.init
       (ctxt, address)
       origination_level
       origination_level
