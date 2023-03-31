@@ -51,6 +51,9 @@ Node
   indexing strategy. For now, only the ``minimal`` indexing strategy
   is allowed.
 
+- **Breaking Change** Removed the ``--network limanet``
+  built-in network aliases.
+
 Client
 ------
 
