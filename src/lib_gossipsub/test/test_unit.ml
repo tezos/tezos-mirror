@@ -1047,7 +1047,7 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ()
   in
   (* Graft all the inbound peers.
-     This workes because number of inbound peers is equal to [degree_high]. *)
+     This works because the number of inbound peers is equal to [degree_high]. *)
   let state =
     List.fold_left
       (fun state peer ->
@@ -1065,18 +1065,16 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ~outbound:(fun _ -> true)
       state
   in
-  (* At this point the mesh size filled with [degree_high] inbound peers. *)
+  (* At this point the mesh is filled with [degree_high] inbound peers. *)
   assert_mesh_size ~__LOC__ ~topic ~expected_size:limits.degree_high state ;
   (* Heartbeat. *)
-  let _state, Heartbeat {to_prune; to_graft; _} = GS.heartbeat state in
+  let state, Heartbeat {to_prune; to_graft; _} = GS.heartbeat state in
   (* The outbound peers should have been additionally added. *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5274
-     Uncomment once we change mesh size in heartbeat. *)
-  (* assert_mesh_size *)
-  (*   ~__LOC__ *)
-  (*   ~topic *)
-  (*   ~expected_size:(limits.degree_optimal + limits.degree_out) *)
-  (*   state ; *)
+  assert_mesh_size
+    ~__LOC__
+    ~topic
+    ~expected_size:(limits.degree_high + limits.degree_out)
+    state ;
   let peers_to_prune =
     to_prune |> Peer.Map.bindings |> List.map (fun (peer, _topics) -> peer)
   in
