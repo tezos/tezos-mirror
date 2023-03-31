@@ -10,15 +10,13 @@
   tezos-micheline-rewriting
   tezos-protocol-alpha
   tezos-error-monad
-  tezos-client-alpha
-  octez-alcotezt)
+  tezos-client-alpha)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
-  -open Tezos_micheline
-  -open Octez_alcotezt)
+  -open Tezos_micheline)
  (modules test_rewriting))
 
 (executable

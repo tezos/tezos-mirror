@@ -5765,7 +5765,6 @@ let _octez_micheline_rewriting_tests =
         Protocol.(main alpha);
         octez_error_monad;
         Protocol.(client_exn alpha);
-        alcotezt;
       ]
 
 let _octez_store_tests =

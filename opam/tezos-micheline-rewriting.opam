@@ -19,7 +19,6 @@ depends: [
   "tezt" { with-test & >= "3.0.0" }
   "tezos-protocol-alpha" {with-test}
   "tezos-client-alpha" {with-test}
-  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]
