@@ -287,3 +287,11 @@ let emit_no_committee_member_address = emit no_committee_member_address
 
 let emit_cannot_retrieve_keys_from_address address =
   emit cannot_retrieve_keys_from_address address
+
+let fetched_missing_page ((module P) : Dac_plugin.t) =
+  declare_1
+    ~section
+    ~name:"missing_page_fetched"
+    ~msg:"Successfully fetched missing page for hash: {hash}"
+    ~level:Notice
+    ("hash", P.encoding)

@@ -95,3 +95,7 @@ val get_node_store : t -> 'a Store_sigs.mode -> 'a Store.Irmin_store.t
     [Configuration.Coordinator.dac_members_addresses] *)
 val get_committee_members :
   t -> Tezos_crypto.Aggregate_signature.public_key_hash list tzresult
+
+(** [get_coordinator_client ctx] returns the Coordinator client if it 
+    is available. *)
+val get_coordinator_client : t -> Dac_node_client.cctxt tzresult

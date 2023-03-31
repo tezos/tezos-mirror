@@ -85,6 +85,17 @@ let get_certificate ((module P) : Dac_plugin.t) =
     ~output:(Data_encoding.option (Certificate_repr.encoding (module P)))
     Tezos_rpc.Path.(open_root / "certificates" /: P.hash_rpc_arg)
 
+let get_missing_page ((module P) : Dac_plugin.t) =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Fetch a given page by forwarding the request to a Coordinator's GET \
+       /preimage. The page is then saved to the node's page store before being \
+       returned in the response. The endpoint should only be exposed in \
+       Observer mode."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.bytes
+    Tezos_rpc.Path.(open_root / "missing_page" /: P.hash_rpc_arg)
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4935
    Coordinator's "POST /preimage" endpoint should in addition to root page hash
    also return expiration level. Additionally, when it pushes a new root hash to

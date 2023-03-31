@@ -85,6 +85,9 @@ let get_certificate ~hex_root_hash =
       json |-> "aggregate_signature" |> as_string,
       json |-> "root_hash" |> as_string )
 
+let get_missing_page ~hex_root_hash =
+  make GET ["missing_page"; Hex.show hex_root_hash] JSON.as_string
+
 module Coordinator = struct
   let post_preimage ~payload =
     let preimage =

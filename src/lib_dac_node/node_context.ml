@@ -87,6 +87,7 @@ let set_ready ctxt dac_plugin =
 type error +=
   | Node_not_ready
   | Invalid_operation_for_mode of {mode : string; operation : string}
+  | Coordinator_client_not_defined_in_config
 
 let () =
   register_error_kind
@@ -119,7 +120,20 @@ let () =
     (function
       | Invalid_operation_for_mode {mode; operation} -> Some (mode, operation)
       | _ -> None)
-    (fun (mode, operation) -> Invalid_operation_for_mode {mode; operation})
+    (fun (mode, operation) -> Invalid_operation_for_mode {mode; operation}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dac_coordinator_client_not_defined_in_config"
+    ~title:"Coordinator client was not defined in config."
+    ~description:
+      "Coordinator client configuration was expected but not defined."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Coordinator client configuration was expected but not defined.")
+    Data_encoding.unit
+    (function Coordinator_client_not_defined_in_config -> Some () | _ -> None)
+    (fun () -> Coordinator_client_not_defined_in_config)
 
 let get_ready ctxt =
   let open Result_syntax in
@@ -162,3 +176,8 @@ let get_committee_members ctxt =
       tzfail
       @@ Invalid_operation_for_mode
            {mode = "dac_member"; operation = "get_committee_members"}
+
+let get_coordinator_client ctxt =
+  match ctxt.coordinator_opt with
+  | Some cctxt -> Ok cctxt
+  | None -> Result_syntax.tzfail Coordinator_client_not_defined_in_config
