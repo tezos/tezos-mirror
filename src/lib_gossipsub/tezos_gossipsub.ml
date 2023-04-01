@@ -163,10 +163,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
 
   type connection = {
-    topics : Topic.Set.t;
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
-
-       When does this field should be updated? *)
+    topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
     direct : bool;
         (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
     outbound : bool;
@@ -712,6 +709,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle peer topic =
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5264
          Be sure that the peers that requested failed/rejected graft are properly pruned. *)
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5305
+         A peer can be grafted only if he subscribed to this topic. *)
       let open Monad.Syntax in
       let*? () = check_filter peer in
       let*? mesh = check_topic_known topic in
@@ -721,12 +720,6 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? () = check_score peer topic connection in
       let*? () = check_mesh_size mesh connection in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4980
-         Probably the [topics] field needs to be updated here.
-      *)
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5007
-
-         Handle negative scores *)
       Grafting_successfully |> return
   end
 
@@ -826,21 +819,14 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter_by_score score =
             Compare.Float.(score |> Score.float >= gossip_publish_threshold)
           in
-          let filter1 _peer {direct; score; _} =
+          let filter _peer {direct; score; _} =
             (not direct) && filter_by_score score
           in
           let* not_direct_peers =
-            select_peers topic ~filter:filter1 ~max:degree_optimal
+            select_peers topic ~filter ~max:degree_optimal
           in
           let* () = set_fanout_topic topic now not_direct_peers in
-          (* FIXME https://gitlab.com/tezos/tezos/-/issues/5010
-
-             We could avoid this call by directly having a map
-             of direct peers in the state. *)
-          let filter2 _peer {direct; score; _} =
-            direct || filter_by_score score
-          in
-          select_peers topic ~filter:filter2 ~max:degree_optimal
+          return not_direct_peers
       | Some fanout ->
           let* () = set_fanout_topic topic now fanout.peers in
           return fanout.peers
