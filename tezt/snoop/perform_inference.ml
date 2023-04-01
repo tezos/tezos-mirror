@@ -54,12 +54,12 @@ let main () =
       "micheline";
       "micheline_bytes";
       "encoding";
-      "Set_add";
-      "Set_elements";
-      "Script_expr_hash_of_b58check_opt";
-      "Global_constants_storage_expr_to_address_in_context";
-      "Global_constants_storage_expand_constant_branch";
-      "Global_constants_storage_expand_no_constant_branch";
+      "global_constants_storage/Set_add/model";
+      "global_constants_storage/Set_elements/model";
+      "global_constants_storage/Script_expr_hash_of_b58check_opt/model";
+      "global_constants_storage/expr_to_address_in_context/model";
+      "global_constants_storage/expand_constant_branch/model";
+      "global_constants_storage/expand_no_constant_branch/model";
       "cache/CACHE_UPDATE/model";
       "ir_size_model";
       "carbonated_map";

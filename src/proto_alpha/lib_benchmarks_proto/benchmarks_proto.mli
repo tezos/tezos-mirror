@@ -104,4 +104,12 @@ module Model : sig
     (int * unit) model
 
   val logn : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
+
+  val nlogn :
+    ?intercept:Free_variable.t ->
+    ?coeff:Free_variable.t ->
+    Namespace.t ->
+    (int * unit) model
+
+  val linear : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
 end

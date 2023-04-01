@@ -98,4 +98,15 @@ module Model = struct
     let ns s = Free_variable.of_namespace (Namespace.cons name s) in
     let coeff = Option.value ~default:(ns "coeff") coeff in
     logn ~name ~coeff
+
+  let nlogn ?intercept ?coeff name =
+    let ns s = Free_variable.of_namespace (Namespace.cons name s) in
+    let coeff = Option.value ~default:(ns "coeff") coeff in
+    let intercept = Option.value ~default:(ns "intercept") intercept in
+    nlogn ~name ~intercept ~coeff
+
+  let linear ?coeff name =
+    let ns s = Free_variable.of_namespace (Namespace.cons name s) in
+    let coeff = Option.value ~default:(ns "coeff") coeff in
+    linear ~name ~coeff
 end
