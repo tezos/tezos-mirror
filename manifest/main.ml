@@ -74,6 +74,8 @@ let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
 let astring = external_lib ~js_compatible:true "astring" V.True
 
+let bigarray_compat = external_lib ~js_compatible:true "bigarray-compat" V.True
+
 let bigstring = external_lib ~js_compatible:true "bigstring" V.True
 
 let bigstringaf =
@@ -82,16 +84,12 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
-  let version = V.(at_least "6.0.1" && less_than "6.1.0") in
+  let version = V.(at_least "6.1.0" && less_than "6.2.0") in
   external_lib
     ~js_compatible:true
     ~npm_deps:[Npm.make "@nomadic-labs/ocaml-bls12-381" version]
     "bls12-381"
     version
-
-let bls12_381_signature =
-  let version = V.exactly "1.0.0" in
-  external_lib ~js_compatible:true "bls12-381-signature" version
 
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
@@ -139,6 +137,8 @@ let data_encoding =
 let dune_configurator = external_lib "dune-configurator" V.True
 
 let dynlink = external_lib "dynlink" V.True ~opam:""
+
+let eqaf = external_lib "eqaf" V.True
 
 let ezjsonm = external_lib ~js_compatible:true "ezjsonm" V.(at_least "1.1.0")
 
@@ -243,14 +243,6 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let plompiler =
-  external_lib "tezos-plompiler" V.(at_least "1.0.1" && less_than "2.0.0")
-
-let plonk = external_lib "tezos-plonk" V.(at_least "1.0.1" && less_than "2.0.0")
-
-let polynomial =
-  external_lib "polynomial" V.(at_least "0.4.0" && less_than "0.5.0")
-
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
 let ppx_import = external_lib "ppx_import" V.True
@@ -287,6 +279,8 @@ let qcheck_core = external_lib "qcheck-core" V.True
 
 let re = external_lib ~js_compatible:true "re" V.(at_least "1.9.0")
 
+let repr = external_lib "repr" V.True
+
 let resto_version = V.(at_least "1.0")
 
 let resto = external_lib ~js_compatible:true "resto" resto_version
@@ -320,6 +314,8 @@ let secp256k1_internal =
     version
 
 let seqes = external_lib ~js_compatible:true "seqes" V.(at_least "0.2")
+
+let stdint = external_lib "stdint" V.True
 
 let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
@@ -368,6 +364,25 @@ let () =
     ]
 
 (* INTERNAL LIBS *)
+
+(* Fork of https://github.com/essdotteedot/distributed, used for plonk.
+   uwt has been removed. The directories examples and tests have been dropped.
+*)
+let distributed_internal =
+  public_lib
+    "octez-distributed-internal"
+    ~internal_name:"distributed"
+    ~path:"src/lib_distributed_internal/src"
+    ~synopsis:"Fork of distributed. Use for Octez only"
+    ~deps:[unix]
+
+let distributed_internal_lwt =
+  public_lib
+    "octez-distributed-lwt-internal"
+    ~internal_name:"distributed_lwt"
+    ~path:"src/lib_distributed_internal/lwt"
+    ~synopsis:"Fork of distributed-lwt. Use for Octez only"
+    ~deps:[unix; distributed_internal; lwt; lwt_unix; logs_lwt]
 
 let tezt_lib =
   external_lib
@@ -835,6 +850,61 @@ let octez_rpc =
       ]
     ~js_compatible:true
 
+let octez_bls12_381_signature =
+  public_lib
+    "octez-bls12-381-signature"
+    ~path:"src/lib_bls12_381_signature"
+    ~internal_name:"bls12_381_signature"
+    ~synopsis:
+      "Implementation of BLS signatures for the pairing-friendly curve \
+       BLS12-381"
+    ~deps:[bls12_381]
+    ~modules:["bls12_381_signature"]
+    ~js_compatible:true
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = ["-Wall"; "-Wextra"; ":standard"];
+        names = ["blst_bindings_stubs"];
+      }
+    ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
+    ~js_of_ocaml:[[S "javascript_files"; S "blst_bindings_stubs.js"]]
+    ~linkall:true
+    ~dune:
+      Dune.
+        [
+          targets_rule
+            ["needed-wasm-names"]
+            ~promote:true
+            ~action:
+              [
+                S "with-outputs-to";
+                S "%{targets}";
+                [S "run"; S "./gen_wasm_needed_names.exe"; S "%{files}"];
+              ]
+            ~deps:[[S ":files"; S "blst_bindings_stubs.js"]];
+        ]
+
+(* TODO: dep_globs aren't added to the rules for JS tests *)
+let _octez_bls12_381_signature_tests =
+  tests
+    ["test_aggregated_signature"; "test_signature"]
+    ~path:"src/lib_bls12_381_signature/test"
+    ~opam:"octez-bls12-381-signature"
+    ~modes:[Native; JS]
+    ~deps:[bls12_381; octez_bls12_381_signature; alcotest; integers_stubs_js]
+    ~dep_globs_rec:["test_vectors/*"]
+    ~js_compatible:true
+
+let _octez_bls12_381_signature_gen_wasm_needed_names =
+  private_exe
+    "gen_wasm_needed_names"
+    ~path:"src/lib_bls12_381_signature"
+    ~opam:"octez-bls12-381-signature"
+    ~bisect_ppx:No
+    ~modules:["gen_wasm_needed_names"]
+    ~deps:[re]
+
 let octez_crypto =
   public_lib
     "tezos-crypto"
@@ -855,7 +925,7 @@ let octez_crypto =
         zarith;
         zarith_stubs_js;
         bls12_381;
-        bls12_381_signature;
+        octez_bls12_381_signature;
       ]
     ~js_compatible:true
 
@@ -914,9 +984,128 @@ let _octez_crypto_tests_unix =
         octez_test_helpers |> open_;
       ]
 
-let octez_bls12_381_polynomial_internal =
+let octez_bls12_381_hash =
   public_lib
-    "tezos-bls12-381-polynomial-internal"
+    "octez-bls12-381-hash"
+    ~path:"src/lib_bls12_381_hash"
+    ~internal_name:"bls12_381_hash"
+    ~synopsis:
+      "Implementation of some cryptographic hash primitives using the scalar \
+       field of BLS12-381"
+    ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
+    ~deps:[bls12_381; bisect_ppx]
+    ~js_compatible:false
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = [];
+        names =
+          [
+            "caml_rescue_stubs";
+            "caml_anemoi_stubs";
+            "caml_poseidon_stubs";
+            "caml_griffin_stubs";
+            "rescue";
+            "anemoi";
+            "poseidon";
+            "griffin";
+          ];
+      }
+    ~linkall:true
+
+let _octez_bls12_381_hash_tests =
+  tests
+    ["test_poseidon"; "test_rescue"; "test_anemoi"; "test_griffin"; "test_jive"]
+    ~path:"src/lib_bls12_381_hash/test"
+    ~opam:"octez-bls12-381-hash"
+    ~deps:[alcotest; bls12_381; octez_bls12_381_hash]
+    ~flags:(Flags.standard ~disable_warnings:[3] ())
+
+let octez_mec =
+  public_lib
+    "octez-mec"
+    ~path:"src/lib_mec"
+    ~internal_name:"mec"
+    ~synopsis:"Modular Experimental Cryptography library"
+    ~deps:[alcotest; bls12_381; bigarray_compat; eqaf]
+
+let _octez_mec_tests =
+  tests
+    [
+      "test_neptunus";
+      "test_orchard";
+      "test_pedersen_hash";
+      "test_poseidon128";
+      "test_poseidon252";
+      "test_sinsemilla";
+      "test_babyjubjub";
+      "test_babyjubjub_reduced";
+      "test_bandersnatch_affine_montgomery";
+      "test_bandersnatch_affine_weierstrass";
+      "test_bandersnatch_affine_edwards";
+      (* FIXME: test_bandersnatch_all has been removed from the repository, see
+         https://gitlab.com/tezos/tezos/-/issues/5147 *)
+      "test_bls12_381_affine";
+      "test_bls12_381_projective";
+      "test_bn254_affine";
+      "test_bn254_jacobian";
+      "test_bn254_projective";
+      "test_curve25519_affine_edwards";
+      "test_curve25519_conversions_between_forms";
+      "test_curve25519_montgomery";
+      "test_curve448";
+      "test_ec_functor";
+      "test_iso_pallas_affine";
+      "test_jubjub";
+      "test_jubjub_conversions_between_forms";
+      "test_jubjub_weierstrass";
+      "test_pallas_affine";
+      "test_pallas_jacobian";
+      "test_pallas_projective";
+      "test_secp256k1_affine";
+      "test_secp256k1_jacobian";
+      "test_secp256k1_projective";
+      "test_secp256r1_affine";
+      "test_secp256r1_jacobian";
+      "test_secp256r1_projective";
+      "test_tweedledee_affine";
+      "test_tweedledee_jacobian";
+      "test_tweedledee_projective";
+      "test_tweedledum_affine";
+      "test_tweedledum_jacobian";
+      "test_tweedledum_projective";
+      "test_vesta_affine";
+      "test_vesta_jacobian";
+      "test_vesta_projective";
+      "test_digestif";
+      "test_linear_trick";
+      "test_marvellous";
+      "test_redjubjub";
+      "test_find_group_hash";
+      "test_iterator";
+    ]
+    ~path:"src/lib_mec/test"
+    ~opam:"octez-mec"
+    ~deps:[alcotest; octez_mec |> open_]
+
+let octez_polynomial =
+  public_lib
+    "octez-polynomial"
+    ~path:"src/lib_polynomial"
+    ~internal_name:"polynomial"
+    ~synopsis:"Polynomials over finite fields"
+    ~deps:[bls12_381; bisect_ppx; zarith]
+
+let _octez_polynomial_tests =
+  tezt
+    ["test_with_finite_field"; "test_utils"; "polynomial_pbt"]
+    ~path:"src/lib_polynomial/test"
+    ~opam:"octez-polynomial"
+    ~deps:[bls12_381; octez_mec; alcotezt; octez_polynomial]
+
+let octez_bls12_381_polynomial =
+  public_lib
+    "octez-bls12-381-polynomial"
     ~path:"src/lib_bls12_381_polynomial"
     ~synopsis:
       "Polynomials over BLS12-381 finite field - Temporary vendored version of \
@@ -931,12 +1120,12 @@ let octez_bls12_381_polynomial_internal =
         flags = [];
         names =
           [
-            "caml_bls12_381_polynomial_internal_polynomial_stubs";
-            "caml_bls12_381_polynomial_internal_srs_stubs";
-            "caml_bls12_381_polynomial_internal_ec_array_stubs";
-            "caml_bls12_381_polynomial_internal_fft_stubs";
-            "bls12_381_polynomial_internal_polynomial";
-            "bls12_381_polynomial_internal_fft";
+            "caml_bls12_381_polynomial_polynomial_stubs";
+            "caml_bls12_381_polynomial_srs_stubs";
+            "caml_bls12_381_polynomial_ec_array_stubs";
+            "caml_bls12_381_polynomial_fft_stubs";
+            "bls12_381_polynomial_polynomial";
+            "bls12_381_polynomial_fft";
           ];
       }
 
@@ -953,17 +1142,516 @@ let _octez_bls12_381_polynomial_tests =
       "test_srs";
     ]
     ~path:"src/lib_bls12_381_polynomial/test"
-    ~opam:"tezos-bls12-381-polynomial-internal"
+    ~opam:"octez-bls12-381-polynomial"
     ~deps:
       [
         alcotezt;
         qcheck_alcotest;
-        polynomial;
+        octez_polynomial;
         bisect_ppx;
         bls12_381;
-        octez_bls12_381_polynomial_internal;
+        octez_bls12_381_polynomial;
       ]
     ~dep_files:["srs_zcash_g1_5"]
+
+let octez_srs_extraction =
+  public_lib
+    "octez-srs-extraction"
+    ~path:"src/lib_srs_extraction"
+    ~synopsis:
+      "Extracts SRS for G1 and G2 from powers-of-tau generated by the ZCash and\n\
+       Filecoin MPC ceremonies"
+    ~modules:["libsrs"]
+    ~bisect_ppx:No
+    ~deps:[bls12_381; octez_bls12_381_polynomial |> open_]
+
+let _octez_srs_extraction_main =
+  private_exe
+    "srs_extraction_main"
+    ~path:"src/lib_srs_extraction"
+    ~opam:"octez-srs-extraction"
+    ~modules:["srs_extraction_main"]
+    ~bisect_ppx:No
+    ~deps:
+      [
+        octez_srs_extraction |> open_;
+        cmdliner;
+        unix;
+        bls12_381;
+        octez_bls12_381_polynomial |> open_;
+      ]
+
+let _octez_srs_extraction_tests =
+  tests
+    ["main"]
+    ~path:"src/lib_srs_extraction/test"
+    ~opam:"octez-srs-extraction"
+    ~deps:[octez_srs_extraction |> open_; alcotest]
+    ~dep_files:["phase1radix2m5"]
+    ~dune:
+      Dune.(
+        let extract curve srs_file =
+          let generated_srs_file = srs_file ^ ".generated" in
+          [
+            S "rule";
+            [S "alias"; S "runtest"];
+            [S "package"; S "octez-srs-extraction"];
+            [S "deps"; S srs_file; S "phase1radix2m5"];
+            [
+              S "action";
+              [
+                S "progn";
+                [
+                  S "run";
+                  S "%{exe:../srs_extraction_main.exe}";
+                  S "extract";
+                  S "zcash";
+                  S curve;
+                  S "phase1radix2m5";
+                  S "-o";
+                  S generated_srs_file;
+                ];
+                [S "diff"; S generated_srs_file; S srs_file];
+              ];
+            ];
+          ]
+        in
+        [
+          extract "g1" "srs_zcash_g1_5";
+          extract "g2" "srs_zcash_g2_5";
+          alias_rule
+            "runtest"
+            ~package:"octez-srs-extraction"
+            ~deps:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
+            ~action:
+              (run
+                 "../srs_extraction_main.exe"
+                 ["check"; "srs_zcash_g1_5"; "srs_zcash_g2_5"]);
+          alias_rule
+            "runtest"
+            ~package:"octez-srs-extraction"
+            ~deps:["srs_filecoin_g1_6"; "srs_filecoin_g2_6"]
+            ~action:
+              (run
+                 "../srs_extraction_main.exe"
+                 ["check"; "srs_filecoin_g1_6"; "srs_filecoin_g2_6"]);
+        ])
+
+let octez_plompiler =
+  public_lib
+    "octez-plompiler"
+    ~internal_name:"plompiler"
+    ~path:"src/lib_plompiler"
+    ~synopsis:"Library to write arithmetic circuits for Plonk"
+    ~deps:
+      [
+        repr;
+        stdint;
+        hacl_star;
+        octez_bls12_381_hash;
+        octez_polynomial;
+        octez_mec;
+      ]
+    ~preprocess:[staged_pps [ppx_repr; ppx_deriving_show]]
+(* Deactivating z3 tests. z3 is not installed in the CI *)
+(* ~dune: *)
+(*   Dune. *)
+(*     [ *)
+(*       alias_rule *)
+(*         "runtest" *)
+(*         ~deps_dune:[S "z3/run_z3_tests.sh"; [S "glob_files"; S "z3/*.z3"]] *)
+(*         ~action:[S "chdir"; S "z3"; [S "run"; S "sh"; S "run_z3_tests.sh"]]; *)
+(*     ] *)
+
+let octez_plonk =
+  public_lib
+    "octez-plonk"
+    ~internal_name:"plonk"
+    ~path:"src/lib_plonk"
+    ~synopsis:"Plonk zero-knowledge proving system"
+    ~deps:
+      [
+        repr;
+        hacl_star;
+        data_encoding;
+        octez_bls12_381_polynomial |> open_;
+        octez_plompiler |> open_;
+      ]
+    ~preprocess:[pps ppx_repr]
+
+(* let _octez_plonk_tests = *)
+(*   private_lib *)
+(*     "octez-plonk.plonk-test" *)
+(*     ~path:"src/lib_plonk/test" *)
+(*     ~synopsis:"Test framework for Plonk zero-knowledge proving system test" *)
+(*     ~deps: *)
+(*       [ *)
+(*         octez_plonk; *)
+(*       ] *)
+(*       ~modules:["helpers"; "cases"] *)
+
+let octez_plonk_aggregation =
+  public_lib
+    "octez-plonk.aggregation"
+    ~path:"src/lib_aplonk/plonk-aggregation"
+    ~internal_name:"aggregation"
+    ~preprocess:[pps ppx_repr]
+    ~deps:[octez_plonk; octez_bls12_381_polynomial |> open_]
+
+let octez_aplonk =
+  public_lib
+    "octez-aplonk"
+    ~internal_name:"aplonk"
+    ~path:"src/lib_aplonk"
+    ~synopsis:
+      "Zero-knowledge proving system based on PlonK optimized for proofs \
+       aggregation"
+    ~preprocess:[pps ppx_repr]
+    ~deps:[octez_plonk_aggregation]
+
+let octez_plonk_distribution =
+  public_lib
+    "octez-plonk.distribution"
+    ~internal_name:"plonk_for_distribution"
+    ~path:"src/lib_distributed_plonk/plonk-distribution"
+    ~deps:[octez_plonk; octez_plonk_aggregation]
+    ~preprocess:[pps ppx_repr]
+
+let octez_plonk_communication =
+  public_lib
+    "octez-plonk.communication"
+    ~internal_name:"communication"
+    ~path:"src/lib_distributed_plonk/communication"
+    ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
+    ~preprocess:[pps ppx_repr]
+
+let octez_distributed_plonk =
+  public_lib
+    "octez-distributed-plonk"
+    ~internal_name:"distributed_plonk"
+    ~path:"src/lib_distributed_plonk"
+    ~synopsis:"Distributed version of the proving system"
+    ~deps:[octez_aplonk; octez_plonk_communication; octez_plonk |> open_]
+    ~modules:["distributed_prover"; "filenames"; "master_runner"; "worker"]
+    ~preprocess:[pps ppx_repr]
+    ~bisect_ppx:Yes
+
+let octez_plonk_test_helpers =
+  public_lib
+    "octez-plonk.plonk-test"
+    ~path:"src/lib_plonk/test"
+    ~internal_name:"plonk_test"
+    ~deps:[octez_plonk; octez_plonk_aggregation; octez_plonk_distribution]
+    ~modules:["helpers"; "cases"]
+    ~preprocess:[pps ppx_repr]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-plonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
+let _octez_plonk_test_helpers_main =
+  private_exe
+    "main"
+    ~path:"src/lib_plonk/test"
+    ~opam:"octez-plonk"
+    ~modules:
+      [
+        "main";
+        "test_circuit";
+        "test_evaluations";
+        "test_main_protocol";
+        "test_pack";
+        "test_permutations";
+        "test_plookup";
+        "test_polynomial_commitment";
+        "test_polynomial_protocol";
+        "test_range_checks";
+        "test_utils";
+      ]
+    ~bisect_ppx:No
+    ~deps:
+      [
+        octez_plonk_test_helpers;
+        qcheck_alcotest;
+        octez_bls12_381_polynomial |> open_;
+      ]
+
+let _octez_plonk_test_helpers_bench =
+  private_exe
+    "bench"
+    ~path:"src/lib_plonk/test"
+    ~opam:"octez-plonk"
+    ~modules:["bench"]
+    ~bisect_ppx:No
+    ~deps:[octez_plonk_test_helpers]
+
+let _octez_plonk_test_plompiler_afl =
+  private_exe
+    "afl"
+    ~path:"src/lib_plonk/test_plompiler"
+    ~opam:"octez-plonk"
+    ~modules:["afl"]
+    ~bisect_ppx:No
+    ~deps:[octez_plompiler; octez_plonk; bls12_381]
+
+let _octez_plonk_test_plompiler_main =
+  private_exe
+    "main"
+    ~path:"src/lib_plonk/test_plompiler"
+    ~opam:"octez-plonk"
+    ~modules:
+      [
+        "bench_poseidon";
+        "benchmark";
+        "main";
+        "test_anemoi";
+        "test_blake";
+        "test_core";
+        "test_edwards";
+        "test_encoding";
+        "test_enum";
+        "test_input_com";
+        "test_linear_algebra";
+        "test_lookup";
+        "test_merkle";
+        "test_merkle_narity";
+        "test_optimizer";
+        "test_poseidon";
+        "test_schnorr";
+        "test_serialization";
+        "test_weierstrass";
+      ]
+    ~bisect_ppx:No
+    ~deps:[octez_plonk_test_helpers]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-plonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
+let octez_distributed_plonk_test =
+  private_lib
+    "distributed_plonk_test"
+    ~opam:"octez-distributed-plonk"
+    ~path:"src/lib_distributed_plonk/test"
+    ~deps:
+      [
+        octez_distributed_plonk;
+        octez_plonk;
+        octez_plonk_aggregation;
+        octez_plonk_distribution;
+        octez_plonk_test_helpers;
+        octez_aplonk;
+      ]
+    ~modules:["distribution_helpers"]
+    ~bisect_ppx:No
+
+let _octez_distributed_plonk_test_main =
+  private_exe
+    "main"
+    ~path:"src/lib_distributed_plonk/test"
+    ~opam:"octez-distributed-plonk"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        octez_distributed_plonk_test;
+        octez_distributed_plonk;
+        octez_plonk_test_helpers;
+        qcheck_alcotest;
+      ]
+    ~modules:["main"; "test_distribution"]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-distributed-plonk"
+            ~action:[S "run"; S "%{exe:main.exe}"];
+        ]
+
+let _octez_distributed_plonk_worker_runner =
+  private_exe
+    "worker_runner"
+    ~path:"src/lib_distributed_plonk"
+    ~opam:"octez-distributed-plonk"
+    ~bisect_ppx:No
+    ~deps:[octez_distributed_plonk; octez_plonk_distribution]
+    ~modules:["worker_runner"]
+
+let _octez_aplonk_test_main =
+  private_exe
+    "main"
+    ~path:"src/lib_aplonk/test"
+    ~opam:"octez-aplonk"
+    ~deps:[octez_plonk_test_helpers; octez_aplonk]
+    ~modules:["main"; "test_aplonk"; "test_main_protocol"]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-aplonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-aplonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-aplonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
+
+let _octez_aplonk_test_helpers_bench =
+  private_exe
+    "bench"
+    ~path:"src/lib_aplonk/test"
+    ~opam:"octez-aplonk"
+    ~modules:["bench"]
+    ~bisect_ppx:No
+    ~deps:[octez_plonk_test_helpers; octez_aplonk]
+
+let octez_epoxy_tx =
+  public_lib
+    "octez-epoxy-tx"
+    ~path:"src/lib_epoxy_tx"
+    ~synopsis:"Circuits for transaction Epoxy rollup"
+    ~internal_name:"epoxy_tx"
+    ~deps:[octez_plompiler; hex; stdint; octez_plonk; octez_mec]
+
+let _octez_epoxy_tx_tests =
+  private_exe
+    "main"
+    ~path:"src/lib_epoxy_tx/test"
+    ~opam:"octez-epoxy-tx"
+    ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest"
+            ~package:"octez-epoxy-tx"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-epoxy-tx"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-epoxy-tx"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
+        ]
 
 let octez_crypto_dal =
   public_lib
@@ -977,7 +1665,7 @@ let octez_crypto_dal =
         octez_error_monad |> open_;
         data_encoding |> open_;
         octez_crypto;
-        octez_bls12_381_polynomial_internal;
+        octez_bls12_381_polynomial;
         lwt_unix;
       ]
 
@@ -995,7 +1683,7 @@ let _octez_crypto_dal_tests =
         data_encoding |> open_;
         alcotezt;
         qcheck_alcotest;
-        octez_bls12_381_polynomial_internal;
+        octez_bls12_381_polynomial;
         octez_test_helpers;
       ]
 
@@ -2145,7 +2833,7 @@ let octez_protocol_environment_structs =
         octez_scoru_wasm;
         data_encoding;
         bls12_381;
-        plonk;
+        octez_plonk |> open_;
       ]
 
 let octez_protocol_environment =
@@ -2174,7 +2862,7 @@ protocols.|}
         zarith;
         zarith_stubs_js;
         bls12_381;
-        plonk;
+        octez_plonk |> open_;
         octez_crypto_dal;
         vdf;
         aches;
@@ -4826,7 +5514,7 @@ module Protocol = Protocol
             octez_protocol_environment;
             plugin |> if_some |> open_;
             octez_shell_services |> open_;
-            plompiler |> if_ N.(number >= 015);
+            octez_plompiler |> if_ N.(number >= 015);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in

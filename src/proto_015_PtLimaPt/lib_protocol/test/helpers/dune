@@ -17,7 +17,7 @@
   tezos-protocol-environment
   tezos-protocol-plugin-015-PtLimaPt
   tezos-shell-services
-  tezos-plompiler)
+  octez-plompiler)
  (flags
   (:standard)
   -open Tezos_test_helpers

@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-epoxy-tx
+  octez-plonk.plonk-test
+  octez-aplonk))
+
+(rule
+ (alias runtest)
+ (package octez-epoxy-tx)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
+
+(rule
+ (alias runtest_slow)
+ (package octez-epoxy-tx)
+ (action (run %{exe:main.exe})))
+
+(rule
+ (alias runtest_slow_with_regression)
+ (package octez-epoxy-tx)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))

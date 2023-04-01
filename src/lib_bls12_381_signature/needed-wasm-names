@@ -1,0 +1,15 @@
+_blst_keygen
+_blst_pairing_aggregate_pk_in_g1
+_blst_pairing_aggregate_pk_in_g2
+_blst_pairing_chk_n_mul_n_aggr_pk_in_g1
+_blst_pairing_chk_n_mul_n_aggr_pk_in_g2
+_blst_pairing_commit
+_blst_pairing_finalverify
+_blst_pairing_init
+_blst_pairing_sizeof
+_blst_sign_pk_in_g1
+_blst_sign_pk_in_g2
+_blst_sk_to_pk_in_g1
+_blst_sk_to_pk_in_g2
+_free
+_malloc

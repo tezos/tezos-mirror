@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module P = Tezos_bls12_381_polynomial_internal.Polynomial
+module P = Octez_bls12_381_polynomial.Polynomial
 
 let polynomial_gen =
   QCheck.Gen.(sized (fun n -> return @@ P.generate_biased_random_polynomial n))

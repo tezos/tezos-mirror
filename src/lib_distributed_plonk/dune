@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name distributed_plonk)
+ (public_name octez-distributed-plonk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-aplonk
+  octez-plonk.communication
+  octez-plonk)
+ (preprocess (pps ppx_repr))
+ (flags
+  (:standard)
+  -open Plonk)
+ (modules distributed_prover filenames master_runner worker))
+
+(executable
+ (name worker_runner)
+ (libraries
+  octez-distributed-plonk
+  octez-plonk.distribution)
+ (modules worker_runner))

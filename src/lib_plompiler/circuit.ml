@@ -1,0 +1,1435 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* MIT License                                                               *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+include Lang_core
+module Tables = Csir.Tables
+open Solver
+module CS = Csir.CS
+
+let tables = Csir.table_registry
+
+let one = S.one
+
+let mone = S.(negate one)
+
+type scalar = X of S.t
+
+type _ repr =
+  | Unit : unit repr
+  | Scalar : int -> scalar repr
+  | Bool : int -> bool repr
+  | Pair : 'a repr * 'b repr -> ('a * 'b) repr
+  | List : 'a repr list -> 'a list repr
+
+type input_kind = [`InputCom | `Public | `Private] [@@deriving show]
+
+type trace_kind = [input_kind | `NoInput] [@@deriving show]
+
+let compare_trace_kind x y =
+  let to_int = function
+    | `InputCom -> 0
+    | `Public -> 1
+    | `Private -> 2
+    | `NoInput -> 3
+  in
+  Int.compare (to_int x) (to_int y)
+
+type state = {
+  nvars : int;
+  cs : CS.t;
+  inputs : S.t array;
+  input_com_sizes : int list;
+  pi_size : int;
+  (* Flag indicating the type of inputs we are expecting. Inputs must
+     come in order: (i) InputCom; (ii) Public; (iii) Private;
+     (iv) NoInput (corresponding to intermediary variables).
+     If we receive an input with earlier precedence than [input_flag], an
+     error should be raised. *)
+  input_flag : trace_kind;
+  (*
+    Boolean wires to be checked.
+    If at the end of the circuit ([get_cs]) this is not empty, their
+    conjunction will be asserted.
+  *)
+  check_wires : bool repr list;
+  (* Delayed computation, used to dump the implicit checks at the end.
+     This is necessary because some implicit checks on the inputs might
+     create intermediary variables, which would set to false the [input_flag]
+     before some inputs are processed.
+  *)
+  delayed : state -> state * unit repr;
+  tables : string list;
+  solver : Solver.t;
+  (* label trace *)
+  labels : string list;
+}
+
+type 'a t = state -> state * 'a
+
+let ret : 'a -> 'a t = fun x s -> (s, x)
+
+let ( let* ) : 'a t -> ('a -> 'b t) -> 'b t =
+ fun m f s ->
+  let s, o = m s in
+  f o s
+
+let ( let*& ) : scalar repr t -> (int -> 'b repr t) -> 'b repr t =
+ fun m f s ->
+  let s, Scalar o = m s in
+  f o s
+
+let ( >* ) m f =
+  let* Unit = m in
+  f
+
+let rec foldM f e l =
+  match l with
+  | [] -> ret e
+  | x :: xs ->
+      let* y = f e x in
+      foldM f y xs
+
+let rec mapM : ('a -> 'b t) -> 'a list -> 'b list t =
+ fun f ls ->
+  match ls with
+  | [] -> ret @@ []
+  | l :: ls ->
+      let* o = f l in
+      let* rest = mapM f ls in
+      ret @@ (o :: rest)
+
+let map2M f ls rs = mapM (fun (a, b) -> f a b) (List.combine ls rs)
+
+let rec iterM f l =
+  match l with
+  | [] -> ret Unit
+  | x :: xs ->
+      let* _ = f x in
+      iterM f xs
+
+let iter2M f ls rs = iterM (fun (a, b) -> f a b) (List.combine ls rs)
+
+let with_bool_check : bool repr t -> unit repr t =
+ fun c s ->
+  let s, b = c s in
+  ({s with check_wires = b :: s.check_wires}, Unit)
+
+module Input = struct
+  type 'a implicit_check = 'a repr -> unit repr t
+
+  let default_check : 'a implicit_check = fun _ -> ret Unit
+
+  type 'a t' =
+    | U : unit t'
+    | S : scalar -> scalar t'
+    | B : bool -> bool t'
+    | P : 'a t' * 'b t' -> ('a * 'b) t'
+    | L : 'a t' list -> 'a list t'
+
+  and 'a input = 'a t' * 'a implicit_check
+
+  type 'a t = 'a input
+
+  let with_implicit_bool_check bc (i, a) =
+    let check x s =
+      ({s with delayed = s.delayed >* with_bool_check (bc x)}, Unit)
+    in
+    (i, fun repr -> a repr >* check repr)
+
+  let with_assertion na (i, a) =
+    let delay_assertion x s = ({s with delayed = s.delayed >* na x}, Unit) in
+    (i, fun repr -> a repr >* delay_assertion repr)
+
+  let s x = (S (X x), default_check)
+
+  let scalar x = s x
+
+  let to_scalar (S (X x), _) = x
+
+  let bool b = (B b, default_check)
+
+  let to_bool (B b, _) = b
+
+  let unit = (U, default_check)
+
+  let pair : 'a t -> 'b t -> ('a * 'b) t =
+   fun (a, check_a) (b, check_b) ->
+    (P (a, b), fun (Pair (ar, br)) -> check_a ar >* check_b br)
+
+  let to_pair (P (a, b), _) = ((a, default_check), (b, default_check))
+
+  let list : 'a t list -> 'a list t =
+   fun l ->
+    ( L (List.map fst l),
+      fun (List lr) ->
+        let* _l =
+          mapM (fun ((_, asssertion), r) -> asssertion r) (List.combine l lr)
+        in
+        ret Unit )
+
+  let to_list (L l, _) = List.map (fun i -> (i, default_check)) l
+
+  let rec make_repr : type a. a t' -> int -> a repr * int =
+   fun input start ->
+    match input with
+    | U -> (Unit, start)
+    | S _ -> (Scalar start, start + 1)
+    | B _ -> (Bool start, start + 1)
+    | P (l, r) ->
+        let l, m = make_repr l start in
+        let r, e = make_repr r m in
+        (Pair (l, r), e)
+    | L l ->
+        let l, e =
+          List.fold_left
+            (fun (l, i) x ->
+              let r, i' = make_repr x i in
+              (r :: l, i'))
+            ([], start)
+            l
+        in
+        (List (List.rev l), e)
+end
+
+module Dummy = struct
+  let scalar = Input.(S (X S.zero))
+
+  let bool = Input.B false
+
+  let list n a = Input.L (List.init n (fun _ -> a))
+end
+
+let rec encode : type a. a Input.t' -> S.t list =
+ fun input ->
+  match input with
+  | U -> []
+  | S (X s) -> [s]
+  | B b -> if b then [S.one] else [S.zero]
+  | P (l, r) -> encode l @ encode r
+  | L l -> List.concat_map encode l
+
+let serialize i = Array.of_list @@ encode i
+
+let rec eq : type a. a repr -> a repr -> bool =
+ fun a b ->
+  match (a, b) with
+  | Scalar a, Scalar b | Bool a, Bool b -> a = b
+  | Pair (al, ar), Pair (bl, br) -> eq al bl && eq ar br
+  | List l1, List l2 -> List.for_all2 eq l1 l2
+  | Unit, Unit -> true
+
+let pair l r = Pair (l, r)
+
+let of_pair (Pair (l, r)) = (l, r)
+
+let to_list l = List l
+
+let of_list (List l) = l
+
+let with_label ~label m s =
+  let s' = {s with labels = label :: s.labels} in
+  let s'', a = m s' in
+  ({s'' with labels = s.labels}, a)
+
+let add_solver : solver:Solver.solver_desc -> unit repr t =
+ fun ~solver s -> ({s with solver = Solver.append_solver solver s.solver}, Unit)
+
+let default_solver ?(to_solve = C) g =
+  let c = g.(0) in
+  let get_sel = CS.(get_sel c.sels) in
+  Arith
+    {
+      a = c.a;
+      b = c.b;
+      c = c.c;
+      d = c.d;
+      e = c.e;
+      qc = get_sel "qc";
+      ql = get_sel "ql";
+      qr = get_sel "qr";
+      qo = get_sel "qo";
+      qd = get_sel "qd";
+      qe = get_sel "qe";
+      qm = get_sel "qm";
+      qx5a = get_sel "qx5a";
+      qx2b = get_sel "qx2b";
+      to_solve;
+    }
+
+let append : CS.gate -> ?solver:Solver.solver_desc -> unit repr t =
+ fun gate ?solver s ->
+  let solver =
+    match solver with
+    | Some s -> s
+    | None -> if Array.length gate = 1 then default_solver gate else Skip
+  in
+  let gate =
+    Array.map (fun c -> Csir.CS.{c with label = c.label @ s.labels}) gate
+  in
+  let cs = gate :: s.cs in
+  let solver = Solver.append_solver solver s.solver in
+  ({s with cs; solver}, Unit)
+
+let append_lookup :
+    a:int tagged ->
+    b:int tagged ->
+    c:int tagged ->
+    ?d:int tagged ->
+    ?e:int tagged ->
+    table:string ->
+    string ->
+    unit repr t =
+ fun ~a ~b ~c ?(d = Input 0) ?(e = Input 0) ~table label s ->
+  let rec find_index : 'a list -> int -> 'a -> int option =
+   fun l i y ->
+    match l with
+    | [] -> None
+    | x :: xs -> if x = y then Some i else find_index xs (i + 1) y
+  in
+  let use_table s id =
+    match find_index s.tables 0 id with
+    | Some i -> (s, i)
+    | None ->
+        let i = List.length s.tables in
+        let tables = s.tables @ [id] in
+        ({s with tables}, i)
+  in
+  let s, index = use_table s table in
+  let solver = Lookup {a; b; c; d; e; table} in
+  let a, b, c, d, e = Utils.map5 untag (a, b, c, d, e) in
+  let cstr =
+    CS.new_constraint
+      ~a
+      ~b
+      ~c
+      ~d
+      ~e
+      ~q_plookup:S.one
+      ~q_table:(S.of_z (Z.of_int index))
+      ~labels:s.labels
+      label
+  in
+  let cs = [|cstr|] :: s.cs in
+  ({s with cs; solver = Solver.append_solver solver s.solver}, Unit)
+
+(* Records inputs, for external use *)
+let input : type a. ?kind:input_kind -> a Input.t -> a repr t =
+ fun ?(kind = `Private) inp ->
+  let rec aux : type a. kind:input_kind -> a Input.t' -> a repr t =
+   fun ~kind inp s ->
+    if compare_trace_kind (kind :> trace_kind) s.input_flag < 0 then
+      raise
+      @@ Invalid_argument
+           (Format.sprintf
+              "Input order not respected : input_kind : %s, s.input_flag : %s; \
+               inputs must be declared in this order : `InputCom, `Public, \
+               `Private"
+              (show_input_kind kind)
+              (show_trace_kind s.input_flag)) ;
+    let serialized = serialize inp in
+    let n = Array.length serialized in
+    let inputs = Array.append s.inputs serialized in
+    let input_flag = (kind :> trace_kind) in
+    let input_com_sizes =
+      match kind with
+      | `InputCom -> (
+          match s.input_com_sizes with
+          | hd :: tl -> (hd + n) :: tl
+          | _ ->
+              raise
+              @@ Failure
+                   "initialize inputs commitments with new_input_commitment")
+      | _ -> s.input_com_sizes
+    in
+    let pi_size = s.pi_size + match kind with `Public -> n | _ -> 0 in
+    match inp with
+    | Input.U -> assert false
+    | Input.S _ ->
+        let r, nvars = Input.make_repr inp s.nvars in
+        ({s with nvars; inputs; input_com_sizes; pi_size; input_flag}, r)
+    | Input.B _ ->
+        let Bool o, nvars = Input.make_repr inp s.nvars in
+        let s =
+          {
+            s with
+            delayed =
+              s.delayed
+              >* append
+                   [|CS.new_constraint ~a:o ~b:o ~c:0 ~ql:mone ~qm:one "bool"|]
+                   ~solver:Skip;
+            nvars;
+            inputs;
+            input_com_sizes;
+            pi_size;
+            input_flag;
+          }
+        in
+        (s, Bool o)
+    | Input.P (l, r) ->
+        (let* l = aux ~kind l in
+         let* r = aux ~kind r in
+         ret @@ Pair (l, r))
+          s
+    | Input.L ls ->
+        (let* l = mapM (aux ~kind) ls in
+         ret @@ List l)
+          s
+  in
+  let inp, implicit_check = inp in
+  let* i = with_label ~label:"Core.input" @@ aux ~kind inp in
+  implicit_check i >* ret i
+
+let new_input_com : unit repr t =
+ fun s -> ({s with input_com_sizes = 0 :: s.input_com_sizes}, Unit)
+
+type 'b open_input_com = 'b t
+
+let begin_input_com : 'b -> 'b open_input_com = fun b -> new_input_com >* ret b
+
+let ( |: ) :
+    type c d. (c repr -> d) open_input_com -> c Input.t -> d open_input_com =
+ fun v i s ->
+  let s, f = v s in
+  let s, r = (input ~kind:`InputCom i) s in
+  (s, f r)
+
+let end_input_com : 'a open_input_com -> 'a t = Fun.id
+
+(* Doesn't record inputs, for interal use *)
+let fresh : type a. a Input.t' -> a repr t =
+  let rec aux : type a. a Input.t' -> a repr t =
+   fun input s ->
+    let s = {s with input_flag = `NoInput} in
+    match input with
+    | Input.U | Input.S _ ->
+        let r, nvars = Input.make_repr input s.nvars in
+        ({s with nvars}, r)
+    | Input.B _ ->
+        let Bool o, nvars = Input.make_repr input s.nvars in
+        let s, _ =
+          append
+            [|CS.new_constraint ~a:o ~b:o ~c:0 ~ql:mone ~qm:one "bool"|]
+            ~solver:Skip
+            {s with nvars}
+        in
+        (s, Bool o)
+    | Input.P (l, r) ->
+        (let* l = aux l in
+         let* r = aux r in
+         ret @@ Pair (l, r))
+          s
+    | Input.L ls ->
+        (let* l = mapM aux ls in
+         ret @@ List l)
+          s
+  in
+  fun input -> with_label ~label:"Core.fresh" @@ aux input
+
+let serialize (i, _) = serialize i
+
+let deserialize : type a. S.t array -> a Input.t -> a Input.t =
+  let rec aux : type a. S.t array -> a Input.t' -> int -> a Input.t' * int =
+   fun a w i ->
+    let open Input in
+    match w with
+    | U -> (U, i)
+    | S _ ->
+        let s = a.(i) in
+        (S (X s), i + 1)
+    | B _ ->
+        let s = a.(i) in
+        (B (S.is_one s), i + 1)
+    | P (wl, wr) ->
+        let l, i = aux a wl i in
+        let r, i = aux a wr i in
+        (P (l, r), i)
+    | L ws ->
+        let l, i =
+          List.fold_left
+            (fun (acc, i) w ->
+              let x, i = aux a w i in
+              (x :: acc, i))
+            ([], i)
+            ws
+        in
+        (L (List.rev l), i)
+  in
+  fun a (w, check) -> (fst @@ aux a w 0, check)
+
+let constant_scalar s =
+  let*& o = fresh Dummy.scalar in
+  append [|CS.new_constraint ~a:0 ~b:0 ~c:o ~qc:s ~qo:mone "constant_scalar"|]
+  >* ret (Scalar o)
+
+let scalar_of_bool (Bool b) = Scalar b
+
+let unsafe_bool_of_scalar (Scalar b) = Bool b
+
+let unit = Unit
+
+module Num = struct
+  type nonrec scalar = scalar
+
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
+
+  (* l ≠ 0  <=>  ∃ r ≠ 0 : l * r - 1 = 0 *)
+  let assert_nonzero (Scalar l) =
+    let*& r = fresh Dummy.scalar in
+    (* 0*l + 0*r + 0*0 + 1*l*r -1 = 0 *)
+    let gate =
+      [|CS.new_constraint ~a:l ~b:r ~c:0 ~qc:mone ~qm:one "assert_nonzero"|]
+    in
+    let solver = default_solver gate ~to_solve:B in
+    append gate ~solver
+
+  let is_zero (Scalar l) =
+    with_label ~label:"Num.is_zero"
+    @@ let* (Bool bit) = fresh Dummy.bool in
+       let* (Scalar r) = fresh Dummy.scalar in
+       let gate =
+         [|
+           CS.new_constraint ~a:l ~b:r ~c:bit ~qc:mone ~qo:one ~qm:one "is_zero";
+         |]
+       in
+       let solver = IsZero {a = l; b = r; c = bit; d = 0; e = 0} in
+       append gate ~solver >* assert_nonzero (Scalar r) >* ret @@ Bool bit
+
+  let is_not_zero (Scalar l) =
+    with_label ~label:"Num.is_not_zero"
+    @@ let* (Bool bit) = fresh Dummy.bool in
+       let* (Scalar r) = fresh Dummy.scalar in
+       let gate =
+         [|CS.new_constraint ~a:l ~b:r ~c:bit ~qo:mone ~qm:one "is_not_zero"|]
+       in
+       let solver = IsNotZero {a = l; b = r; c = bit; d = 0; e = 0} in
+       append gate ~solver >* assert_nonzero (Scalar r) >* ret @@ Bool bit
+
+  let assert_bool (Scalar l) =
+    with_label ~label:"Num.assert_bool"
+    @@
+    let gate = [|CS.new_constraint ~a:l ~b:0 ~c:0 ~qbool:one "assert_bool"|] in
+    let solver = Skip in
+    append gate ~solver
+
+  let custom ?(qc = S.zero) ?(ql = S.zero) ?(qr = S.zero) ?(qo = S.mone)
+      ?(qm = S.zero) ?qx2b ?qx5a (Scalar l) (Scalar r) =
+    let*& o = fresh Dummy.scalar in
+    append
+      [|
+        CS.new_constraint
+          ~a:l
+          ~b:r
+          ~c:o
+          ~qc
+          ~ql
+          ~qr
+          ~qo
+          ~qm
+          ?qx2b
+          ?qx5a
+          "custom";
+      |]
+    >* ret @@ Scalar o
+
+  let assert_custom ?(qc = S.zero) ?(ql = S.zero) ?(qr = S.zero) ?(qo = S.zero)
+      ?(qm = S.zero) (Scalar l) (Scalar r) (Scalar o) =
+    append
+      [|CS.new_constraint ~a:l ~b:r ~c:o ~qc ~ql ~qr ~qo ~qm "assert_custom"|]
+      ~solver:Skip
+
+  let add ?(qc = S.zero) ?(ql = S.one) ?(qr = S.one) (Scalar l) (Scalar r) =
+    let*& o = fresh Dummy.scalar in
+    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qc ~ql ~qr ~qo:mone "add"|]
+    >* ret @@ Scalar o
+
+  let add_constant ?(ql = S.one) (k : S.t) (Scalar l) =
+    let*& o = fresh Dummy.scalar in
+    append
+      [|CS.new_constraint ~a:l ~b:0 ~c:o ~qc:k ~ql ~qo:mone "add_constant"|]
+    >* ret @@ Scalar o
+
+  let sub (Scalar l) (Scalar r) =
+    let*& o = fresh Dummy.scalar in
+    append [|CS.new_constraint ~a:l ~b:r ~c:o ~ql:one ~qr:mone ~qo:mone "sub"|]
+    >* ret @@ Scalar o
+
+  let mul ?(qm = one) (Scalar l) (Scalar r) =
+    let*& o = fresh Dummy.scalar in
+    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qm ~qo:mone "mul"|]
+    >* ret @@ Scalar o
+
+  let div ?(den_coeff = one) (Scalar l) (Scalar r) =
+    with_label ~label:"Num.div" @@ assert_nonzero (Scalar r)
+    >* let*& o = fresh Dummy.scalar in
+       let gate =
+         [|CS.new_constraint ~a:r ~b:o ~c:l ~qm:den_coeff ~qo:mone "div"|]
+       in
+       let solver = default_solver gate ~to_solve:B in
+       (* r * o - l = 0  <=> o = l / r *)
+       append gate ~solver >* ret @@ Scalar o
+
+  let pow5 (Scalar l) =
+    let*& o = fresh Dummy.scalar in
+    let gate = [|CS.new_constraint ~a:l ~b:0 ~c:o ~qx5a:one ~qo:mone "pow5"|] in
+    let solver = Pow5 {a = l; c = o} in
+    append gate ~solver >* ret @@ Scalar o
+end
+
+module Bool = struct
+  include Num
+
+  let constant_bool : bool -> bool repr t =
+   fun b ->
+    let s = if b then S.one else S.zero in
+    let* (Scalar s) = constant_scalar s in
+    ret (Bool s)
+
+  let assert_true (Bool bit) =
+    append
+      [|CS.new_constraint ~a:bit ~b:0 ~c:0 ~qc:mone ~ql:one "assert_true"|]
+      ~solver:Skip
+
+  let assert_false (Bool bit) =
+    append
+      [|CS.new_constraint ~a:bit ~b:0 ~c:0 ~ql:one "assert_false"|]
+      ~solver:Skip
+
+  let band : bool repr -> bool repr -> bool repr t =
+   fun (Bool l) (Bool r) ->
+    (* NB: Here [o] is declared as a fresh scalar to avoid adding the constraint
+        asserting it's a bool. It's safe to do so because:
+        - We can assume that [l] and [r] are booleans
+        - This operation is closed in {0, 1}
+       This has additionally been proven using Z3 (see z3 directory).
+    *)
+    let*& o = fresh Dummy.scalar in
+    (* o - l*r = 0 *)
+    append [|CS.new_constraint ~a:l ~b:r ~c:o ~qm:mone ~qo:one "band"|]
+    >* ret @@ Bool o
+
+  let bnot (Bool b) =
+    (* NB: Here [o] is declared as a fresh scalar to avoid adding the constraint
+        asserting it's a bool. It's safe to do so because:
+        - We can assume that [b] is a boolen.
+        - This operation is closed in {0, 1}
+       This has additionally been proven using Z3 (see z3 directory).
+    *)
+    let*& o = fresh Dummy.scalar in
+    (* o - (1 - i) = 0 *)
+    append [|CS.new_constraint ~a:b ~b:0 ~c:o ~qc:mone ~ql:one ~qo:one "bnot"|]
+    >* ret @@ Bool o
+
+  let xor (Bool l) (Bool r) =
+    (* NB: Here [o] is declared as a fresh scalar to avoid adding the constraint
+        asserting it's a bool. It's safe to do so because:
+        - We can assume that [l] and [r] are booleans
+        - This operation is closed in {0, 1}
+       This has additionally been proven using Z3 (see z3 directory).
+    *)
+    let*& o = fresh Dummy.scalar in
+    let mtwo = S.of_string "-2" in
+    append
+      [|
+        CS.new_constraint ~a:l ~b:r ~c:o ~ql:one ~qr:one ~qo:mone ~qm:mtwo "xor";
+      |]
+    >* ret @@ Bool o
+
+  let bor (Bool l) (Bool r) =
+    (* NB: Here [o] is declared as a fresh scalar to avoid adding the constraint
+        asserting it's a bool. It's safe to do so because:
+        - We can assume that [l] and [r] are booleans
+        - This operation is closed in {0, 1}
+       This has additionally been proven using Z3 (see z3 directory).
+    *)
+    let*& o = fresh Dummy.scalar in
+    append
+      [|
+        CS.new_constraint ~a:l ~b:r ~c:o ~ql:one ~qr:one ~qo:mone ~qm:mone "nor";
+      |]
+    >* ret @@ Bool o
+
+  let bor_lookup (Bool l) (Bool r) =
+    let* (Bool o) = fresh Dummy.bool in
+    append_lookup
+      ~a:(Input l)
+      ~b:(Input r)
+      ~c:(Output o)
+      ~table:"or"
+      "bor lookup"
+    >* ret @@ Bool o
+
+  let swap : type a. bool repr -> a repr -> a repr -> (a * a) repr t =
+    let scalar_swap (Bool b) (Scalar x) (Scalar y) =
+      let*& u = fresh Dummy.scalar in
+      let*& v = fresh Dummy.scalar in
+      let solver = Swap {b; x; y; u; v} in
+      let gate =
+        [|CS.new_constraint ~a:b ~b:x ~c:y ~d:u ~e:v ~qcond_swap:one "swap"|]
+      in
+      append gate ~solver >* ret @@ pair (Scalar u) (Scalar v)
+    in
+    let rec aux : type a. bool repr -> a repr -> a repr -> (a * a) repr t =
+     fun b x y ->
+      match (x, y) with
+      | Unit, Unit -> ret (pair Unit Unit)
+      | Scalar _, Scalar _ -> scalar_swap b x y
+      | Bool _, Bool _ ->
+          let* res = scalar_swap b (scalar_of_bool x) (scalar_of_bool y) in
+          let Scalar u, Scalar v = of_pair res in
+          ret @@ pair (Bool u) (Bool v)
+      | Pair (x1, y1), Pair (x2, y2) ->
+          let* res_x = aux b x1 x2 in
+          let* res_y = aux b y1 y2 in
+          let (u1, v1), (u2, v2) = (of_pair res_x, of_pair res_y) in
+          ret @@ pair (pair u1 u2) (pair v1 v2)
+      | List ls, List rs ->
+          let* l = map2M (fun l r -> aux b l r) ls rs in
+          let l1, l2 = List.(map of_pair l |> split) in
+          ret @@ pair (List l1) (List l2)
+    in
+    fun b x y -> with_label ~label:"Bool.swap" @@ aux b x y
+
+  let ifthenelse : type a. bool repr -> a repr -> a repr -> a repr t =
+    let aux b l r =
+      let* swapped = swap b l r in
+      let _, res = of_pair swapped in
+      ret res
+    in
+    fun b l r -> with_label ~label:"Bool.ifthenelse" @@ aux b l r
+
+  let is_eq_const l s =
+    with_label ~label:"Bool.is_eq_const"
+    @@ let* diff = Num.add_constant ~ql:S.mone s l in
+       is_zero diff
+
+  let band_list l =
+    with_label ~label:"Bool.band_list"
+    @@
+    match l with
+    | [] -> constant_bool true
+    | hd :: tl ->
+        let* sum =
+          foldM Num.add (scalar_of_bool hd) (List.map scalar_of_bool tl)
+        in
+        is_eq_const sum (S.of_int @@ (List.length tl + 1))
+end
+
+let hd (List l) = match l with [] -> assert false | x :: _ -> ret x
+
+let assert_equal : type a. a repr -> a repr -> unit repr t =
+  let rec aux : type a. a repr -> a repr -> unit repr t =
+   fun a b ->
+    match (a, b) with
+    | Unit, Unit -> ret Unit
+    | Bool a, Bool b | Scalar a, Scalar b ->
+        append
+          [|CS.new_constraint ~a:0 ~b ~c:a ~qr:one ~qo:mone "assert_equal"|]
+          ~solver:Skip
+    | Pair (la, ra), Pair (lb, rb) -> aux la lb >* aux ra rb
+    | List ls, List rs -> iter2M aux ls rs
+  in
+  fun a b -> with_label ~label:"Core.assert_equal" @@ aux a b
+
+let equal : type a. a repr -> a repr -> bool repr t =
+  let rec aux : type a. a repr -> a repr -> bool repr t =
+   fun a b ->
+    let open Bool in
+    let open Num in
+    match (a, b) with
+    | Unit, Unit -> constant_bool true
+    | Bool a, Bool b ->
+        let* s = sub (Scalar a) (Scalar b) in
+        is_zero s
+    | Scalar _, Scalar _ ->
+        let* s = sub a b in
+        is_zero s
+    | Pair (la, ra), Pair (lb, rb) ->
+        let* le = aux la lb in
+        let* re = aux ra rb in
+        band le re
+    | List ls, List rs ->
+        let lrs = List.map2 pair ls rs in
+        let* acc = constant_bool true in
+        foldM
+          (fun acc (Pair (l, r)) ->
+            let* e = aux l r in
+            band acc e)
+          acc
+          lrs
+  in
+  fun a b -> with_label ~label:"Core.equal" @@ aux a b
+
+(* If [add_alpha], this function returns the binary decomposition of
+   [l + Utils.alpha], instead of the binary decompostion of [l], where
+   Utils.alpha is the difference between Scalar.order and its succeeding
+   power of 2 *)
+let bits_of_scalar ?(shift = Z.zero) ~nb_bits (Scalar l) =
+  with_label ~label:"Core.bits_of_scalar"
+  @@ let* bits = fresh @@ Dummy.list nb_bits Dummy.bool in
+     add_solver
+       ~solver:
+         (BitsOfS
+            {
+              nb_bits;
+              shift;
+              l;
+              bits = List.map (fun (Bool x) -> x) @@ of_list bits;
+            })
+     >* let* sum =
+          let powers =
+            List.init nb_bits (fun i -> S.of_z Z.(pow (of_int 2) i))
+          in
+          let sbits = List.map scalar_of_bool (of_list bits) in
+          foldM
+            (fun acc (qr, w) -> Num.add ~qr acc w)
+            (List.hd sbits)
+            List.(tl @@ combine powers sbits)
+        in
+        let* l =
+          if Z.(not @@ equal shift zero) then
+            Num.add_constant (S.of_z shift) (Scalar l)
+          else ret (Scalar l)
+        in
+        assert_equal l sum >* ret bits
+
+module Ecc = struct
+  let weierstrass_add (Pair (Scalar x1, Scalar y1))
+      (Pair (Scalar x2, Scalar y2)) =
+    with_label ~label:"Ecc.weierstrass_add"
+    @@ let*& x3 = fresh Dummy.scalar in
+       let*& y3 = fresh Dummy.scalar in
+       let gate =
+         [|
+           CS.new_constraint
+             ~a:x1
+             ~b:x2
+             ~c:x3
+             ~qecc_ws_add:one
+             "weierstrass-add.1";
+           CS.new_constraint ~a:y1 ~b:y2 ~c:y3 "weierstrass-add.2";
+         |]
+       in
+       let solver = Ecc_Ws {x1; x2; x3; y1; y2; y3} in
+       append gate ~solver >* ret (Pair (Scalar x3, Scalar y3))
+
+  let edwards_add (Pair (Scalar x1, Scalar y1)) (Pair (Scalar x2, Scalar y2)) =
+    (* Improve Me: Functorize to pass curve in parameter. *)
+    with_label ~label:"Ecc.edwards_add"
+    @@
+    let module W = Mec.Curve.Jubjub.AffineEdwards in
+    let s_of_base s = S.of_z (W.Base.to_z s) in
+    let a, d = (s_of_base W.a, s_of_base W.d) in
+    let*& x3 = fresh Dummy.scalar in
+    let*& y3 = fresh Dummy.scalar in
+    let gate =
+      [|
+        CS.new_constraint ~a:x1 ~b:x2 ~c:x3 ~qecc_ed_add:one "edwards-add.1";
+        CS.new_constraint ~a:y1 ~b:y2 ~c:y3 "edwards-add.2";
+      |]
+    in
+    let solver = Ecc_Ed {x1; x2; x3; y1; y2; y3; a; d} in
+    append gate ~solver >* ret (Pair (Scalar x3, Scalar y3))
+
+  let edwards_cond_add (Pair (Scalar x1, Scalar y1))
+      (Pair (Scalar x2, Scalar y2)) (Bool bit) =
+    (* Improve Me: Functorize to pass curve in parameter. *)
+    with_label ~label:"Ecc.edwards_cond_add"
+    @@
+    let module W = Mec.Curve.Jubjub.AffineEdwards in
+    let s_of_base s = S.of_z (W.Base.to_z s) in
+    let a, d = (s_of_base W.a, s_of_base W.d) in
+    let*& x3 = fresh Dummy.scalar in
+    let*& y3 = fresh Dummy.scalar in
+    let gate =
+      [|
+        CS.new_constraint
+          ~a:bit
+          ~b:x2
+          ~c:y2
+          ~d:x1
+          ~e:y1
+          ~qecc_ed_cond_add:one
+          "edwards-cond-add.1";
+        CS.new_constraint ~a:0 ~b:0 ~c:0 ~d:x3 ~e:y3 "edwards-cond-add.2";
+      |]
+    in
+    let solver = Ecc_Cond_Ed {x1; x2; x3; y1; y2; y3; bit; a; d} in
+    append gate ~solver >* ret (Pair (Scalar x3, Scalar y3))
+end
+
+module Poseidon = struct
+  module VS = Linear_algebra.Make_VectorSpace (S)
+  module Poly = Polynomial.MakeUnivariate (S)
+
+  module Poly_Module = Linear_algebra.Make_Module (struct
+    include Poly
+
+    let eq = Poly.equal
+
+    let negate p = Poly.(zero - p)
+
+    let mul = Poly.( * )
+  end)
+
+  let poseidon128_full_round ~matrix ~k ~variant
+      (Scalar x0, Scalar x1, Scalar x2) =
+    let*& y0 = fresh Dummy.scalar in
+    let*& y1 = fresh Dummy.scalar in
+    let*& y2 = fresh Dummy.scalar in
+    let solver = Poseidon128Full {x0; y0; x1; y1; x2; y2; k; variant} in
+    let minv = VS.inverse matrix in
+    let k_vec = VS.(mul minv (transpose [|k|])) in
+
+    (* We enforce the following constraints:
+
+       [x0    y0]  with selectors {qc, qx5, qo, qrg, qog}
+       [x1 y1 y2]  with selectors {qc, qx5, qr, qo, qrg}
+       [x2 y0 y1]  with selectors {qc, qx5, qr, qo, qrg}
+       [   y2   ]  with no selectors
+
+       where the selector constants are given by the inverse of the MDS
+       matrix. In particular:
+
+          y = M * x^5 + k    iff    M^{-1} * y - x^5 - M^{-1} * k = 0
+
+       (This allows us to have 1 power of 5 (instead of all 3) per constraint,
+       since vector x^5 is not multiplied by M in the second representation.) *)
+    append
+      [|
+        CS.new_constraint
+          ~a:x0
+          ~b:0
+          ~c:y0
+          ~qx5a:mone
+          ~qc:(S.negate k_vec.(0).(0))
+          ~qo:minv.(0).(0)
+          ~qrg:minv.(0).(1)
+          ~qog:minv.(0).(2)
+          "pos128_full.1";
+        CS.new_constraint
+          ~a:x1
+          ~b:y1
+          ~c:y2
+          ~qx5a:mone
+          ~qc:(S.negate k_vec.(1).(0))
+          ~qr:minv.(1).(1)
+          ~qo:minv.(1).(2)
+          ~qrg:minv.(1).(0)
+          "pos128_full.2";
+        CS.new_constraint
+          ~a:x2
+          ~b:y0
+          ~c:y1
+          ~qx5a:mone
+          ~qc:(S.negate k_vec.(2).(0))
+          ~qr:minv.(2).(0)
+          ~qo:minv.(2).(1)
+          ~qrg:minv.(2).(2)
+          "pos128_full.3";
+        CS.new_constraint ~a:0 ~b:y2 ~c:0 "pos128_full.4";
+      |]
+      ~solver
+    >* ret @@ to_list [Scalar y0; Scalar y1; Scalar y2]
+
+  let poseidon128_four_partial_rounds ~matrix ~ks ~variant
+      (Scalar x0, Scalar x1, Scalar x2) =
+    let*& a = fresh Dummy.scalar in
+    let*& a_5 = fresh Dummy.scalar in
+    let*& b = fresh Dummy.scalar in
+    let*& b_5 = fresh Dummy.scalar in
+    let*& c = fresh Dummy.scalar in
+    let*& c_5 = fresh Dummy.scalar in
+    let*& y0 = fresh Dummy.scalar in
+    let*& y1 = fresh Dummy.scalar in
+    let*& y2 = fresh Dummy.scalar in
+    let k_cols = Array.init 4 (fun i -> VS.filter_cols (Int.equal i) ks) in
+    let solver =
+      Poseidon128Partial
+        {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant}
+    in
+
+    (* We represent variables x0, x1, x2_5, a, a_5, b, b_5, c, c_5, y0, y1, y2
+       with monomials x, x^2, x^3, ..., x^12 respectively. *)
+    let module SMap = Map.Make (String) in
+    let vars =
+      ["x0"; "x1"; "x2_5"; "a"; "a_5"; "b"; "b_5"; "c"; "c_5"; "y0"; "y1"; "y2"]
+    in
+    let varsMap =
+      SMap.of_seq @@ List.(to_seq @@ mapi (fun i s -> (s, i + 1)) vars)
+    in
+
+    let var s = SMap.find s varsMap in
+    let pvar s = Poly.of_coefficients [(S.one, var s)] in
+    let state = [|[|pvar "x0"|]; [|pvar "x1"|]; [|pvar "x2_5"|]|] in
+
+    let to_poly = Array.(map (map (fun c -> Poly.of_coefficients [(c, 0)]))) in
+    let matrix = to_poly matrix in
+
+    (* Apply partial round 0 *)
+    let state = Poly_Module.(add (mul matrix state) @@ to_poly k_cols.(0)) in
+    let eq1 = Poly.(state.(2).(0) - pvar "a") in
+    state.(2) <- [|pvar "a_5"|] ;
+
+    (* Apply partial round 1 *)
+    let state = Poly_Module.(add (mul matrix state) @@ to_poly k_cols.(1)) in
+    let eq2 = Poly.(state.(2).(0) - pvar "b") in
+    state.(2) <- [|pvar "b_5"|] ;
+
+    (* Apply partial round 2 *)
+    let state = Poly_Module.(add (mul matrix state) @@ to_poly k_cols.(2)) in
+    let eq3 = Poly.(state.(2).(0) - pvar "c") in
+    state.(2) <- [|pvar "c_5"|] ;
+
+    (* Apply partial round 3 *)
+    let state = Poly_Module.(add (mul matrix state) @@ to_poly k_cols.(3)) in
+    let eq4 = Poly.(state.(0).(0) - pvar "y0") in
+    let eq5 = Poly.(state.(1).(0) - pvar "y1") in
+    let eq6 = Poly.(state.(2).(0) - pvar "y2") in
+
+    let eqs =
+      let row_of_eq eq =
+        (* This function gives coefficients in decending order of degree *)
+        let coeffs = Poly.get_dense_polynomial_coefficients eq in
+        List.(rev coeffs @ init (13 - List.length coeffs) (fun _ -> S.zero))
+        |> Array.of_list
+      in
+      Array.map row_of_eq [|eq1; eq2; eq3; eq4; eq5; eq6|]
+    in
+
+    let cancel i j x =
+      let x = var x in
+      VS.row_add ~coeff:S.(negate @@ (eqs.(i).(x) / eqs.(j).(x))) i j eqs
+    in
+
+    (* Cancel x2_5 *)
+    cancel 1 0 "x2_5" ;
+    cancel 2 0 "x2_5" ;
+    cancel 3 0 "x2_5" ;
+    cancel 4 0 "x2_5" ;
+    cancel 5 0 "x2_5" ;
+
+    (* Cancel a_5 *)
+    cancel 2 1 "a_5" ;
+    cancel 3 1 "a_5" ;
+    cancel 4 1 "a_5" ;
+    cancel 5 1 "a_5" ;
+
+    (* Cancel b_5 *)
+    cancel 3 2 "b_5" ;
+    cancel 4 2 "b_5" ;
+    cancel 5 2 "b_5" ;
+
+    (* Cancel c_5 *)
+    cancel 4 3 "c_5" ;
+
+    (* Cancel x0 in equation 5 (b_5 comes back) *)
+    cancel 4 2 "x0" ;
+
+    VS.row_swap 2 4 eqs ;
+
+    (* We enforce the following constraints:
+
+       [x2      ]  with selectors {qc, qx5, qlg, qrg, qog}
+       [a  x0 x1]  with selectors {qc, qx5, ql, qr, qo, qlg}
+       [b  y1 x1]  with selectors {qc, qx5, ql, qr, qo, qlg, qrg, qog}
+       [c  y0  a]  with selectors {qc, qx5, ql, qr, qo, qlg, qrg, qog}
+       [b  x0 x1]  with selectors {qc, qx5, ql, qr, qo, qlg, qrg}
+       [c  a   b]  with selectors {qc, qx5, ql, qr, qo, qlg, qrg, qog}
+       [y2 x0 x1]  with no selectors. *)
+    append
+      [|
+        CS.new_constraint
+          ~a:x2
+          ~b:0
+          ~c:0
+          ~qc:eqs.(0).(0)
+          ~qx5a:eqs.(0).(var "x2_5")
+          ~qlg:eqs.(0).(var "a")
+          ~qrg:eqs.(0).(var "x0")
+          ~qog:eqs.(0).(var "x1")
+          "pos128_4partial.1";
+        CS.new_constraint
+          ~a
+          ~b:x0
+          ~c:x1
+          ~qc:eqs.(1).(0)
+          ~qx5a:eqs.(1).(var "a_5")
+          ~ql:eqs.(1).(var "a")
+          ~qr:eqs.(1).(var "x0")
+          ~qo:eqs.(1).(var "x1")
+          ~qlg:eqs.(1).(var "b")
+          "pos128_4partial.2";
+        CS.new_constraint
+          ~a:b
+          ~b:y1
+          ~c:x1
+          ~qc:eqs.(2).(0)
+          ~qx5a:eqs.(2).(var "b_5")
+          ~ql:eqs.(2).(var "b")
+          ~qr:eqs.(2).(var "y1")
+          ~qo:eqs.(2).(var "x1")
+          ~qlg:eqs.(2).(var "c")
+          ~qrg:eqs.(2).(var "y0")
+          ~qog:eqs.(2).(var "a")
+          "pos128_4partial.3";
+        CS.new_constraint
+          ~a:c
+          ~b:y0
+          ~c:a
+          ~qc:eqs.(3).(0)
+          ~qx5a:eqs.(3).(var "c_5")
+          ~ql:eqs.(3).(var "c")
+          ~qr:eqs.(3).(var "y0")
+          ~qo:eqs.(3).(var "a")
+          ~qlg:eqs.(3).(var "b")
+          ~qrg:eqs.(3).(var "x0")
+          ~qog:eqs.(3).(var "x1")
+          "pos128_4partial.4";
+        CS.new_constraint
+          ~a:b
+          ~b:x0
+          ~c:x1
+          ~qc:eqs.(4).(0)
+          ~qx5a:eqs.(4).(var "b_5")
+          ~ql:eqs.(4).(var "b")
+          ~qr:eqs.(4).(var "x0")
+          ~qo:eqs.(4).(var "x1")
+          ~qlg:eqs.(4).(var "c")
+          ~qrg:eqs.(4).(var "a")
+          "pos128_4partial.5";
+        CS.new_constraint
+          ~a:c
+          ~b:a
+          ~c:b
+          ~qc:eqs.(5).(0)
+          ~qx5a:eqs.(5).(var "c_5")
+          ~ql:eqs.(5).(var "c")
+          ~qr:eqs.(5).(var "a")
+          ~qo:eqs.(5).(var "b")
+          ~qlg:eqs.(5).(var "y2")
+          ~qrg:eqs.(5).(var "x0")
+          ~qog:eqs.(5).(var "x1")
+          "pos128_4partial.6";
+        CS.new_constraint ~a:y2 ~b:x0 ~c:x1 "pos128_4partial.7";
+      |]
+      ~solver
+    >* ret @@ to_list [Scalar y0; Scalar y1; Scalar y2]
+end
+
+module Anemoi = struct
+  module AnemoiPerm = Bls12_381_hash.Permutation.Anemoi
+
+  let beta = AnemoiPerm.Parameters.beta
+
+  let gamma = AnemoiPerm.Parameters.gamma
+
+  let g = AnemoiPerm.Parameters.g
+
+  let delta = AnemoiPerm.Parameters.delta
+
+  (* Hash function described in https://eprint.iacr.org/2022/840.pdf *)
+
+  let anemoi_round ~kx ~ky (Scalar x0, Scalar y0) =
+    let*& w = fresh Dummy.scalar in
+    let*& v = fresh Dummy.scalar in
+    let*& x1 = fresh Dummy.scalar in
+    let*& y1 = fresh Dummy.scalar in
+    let solver = AnemoiRound {x0; y0; w; v; x1; y1; kx; ky} in
+
+    (*
+       The equations of a Anemoi round are as follows,
+           a. x1 - u - g*v - (kx + g*ky) = 0
+              Corresponds to Linear layer equation (after adding the round constant to x_i ), eq.4 page 24
+           b. y1 - g u - (g^2+1)*v - (g*kx + (g^2+1)*ky) = 0
+              Corresponds to Linear layer equation (after adding the round constant to y_i ), eq.5 page 24
+           c. w^5 + beta y0^2 + gamma - x0 = 0
+              Corresponds to the first equation of S-box, eq.2 page 24
+           d. y0 - v - w = 0
+               Corresponds to the second equation of S-box layer, eq.1 page 24
+           e. w^5 + beta v^2 + delta - u = 0
+              Corresponds to the third equation of S-box, eq.3 page 24
+
+       We inlined $u$ from a. in e. and re-ordered the equations so that the variables fit in the wires.
+       The result is as follows,
+           1. w^5 + beta y0^2 + gamma - x0 = 0                           <- c
+           2. y0 - v - w = 0                                             <- d
+           3. w^5 + beta v^2 + g*v - x1 + (delta + kx + g*ky) = 0        <- e - a
+           4. y1 - g x1 - v - ky = 0                                     <- b - g * a
+      *)
+    append
+      [|
+        CS.new_constraint
+          ~a:y0
+          ~b:y0
+          ~c:w
+          ~qc:gamma
+          ~qm:beta
+          ~qx5c:one
+          ~qlg:mone
+          "anemoi.1";
+        CS.new_constraint ~a:x0 ~b:y0 ~c:w ~qr:one ~qlg:mone ~qo:mone "anemoi.2";
+        CS.new_constraint
+          ~a:v
+          ~b:v
+          ~c:w
+          ~qc:S.(kx + delta + (g * ky))
+          ~qm:beta
+          ~qx5c:one
+          ~ql:g
+          ~qlg:mone
+          "anemoi.3";
+        CS.new_constraint
+          ~a:x1
+          ~b:y1
+          ~c:v
+          ~qc:S.(negate ky)
+          ~ql:S.(negate g)
+          ~qr:one
+          ~qo:mone
+          "anemoi.4";
+      |]
+      ~solver
+    >* ret @@ pair (Scalar x1) (Scalar y1)
+
+  let anemoi_double_round ~kx1 ~ky1 ~kx2 ~ky2 (Scalar x0, Scalar y0) =
+    let*& w0 = fresh Dummy.scalar in
+    let*& w1 = fresh Dummy.scalar in
+    let*& y1 = fresh Dummy.scalar in
+    let*& x2 = fresh Dummy.scalar in
+    let*& y2 = fresh Dummy.scalar in
+    let solver =
+      AnemoiDoubleRound {x0; y0; w0; w1; y1; x2; y2; kx1; kx2; ky1; ky2}
+    in
+
+    let two = S.(add one one) in
+    let g2 = S.(g * g) in
+    let g2_p_1 = S.(g2 + one) in
+    let g_beta = S.(g * beta) in
+
+    (*
+                                  Equations                                  |     Wires              |     Selectors
+      -------------------------------------------------------------------------------------------------------------
+      a <- 2. -(beta*g)*w0^2 + (2*beta*g)*w0*y0 + (g^2+1)*w0 - g*x0 - (g^2+1)*y0 + y1 + (g*gamma - delta*g - g*kx1 - (g^2+1)*ky1)
+      | a: y0, b: w0, c: x0
+      | qr2=-(beta*g)   qm:(2*beta*g)   qr:(g^2+1)   qo:-g   ql:-(g^2+1)   qlg:1  qc =(g*gamma - delta*g - g*kx1 - (g^2+1)*ky1)
+
+      b <- 4. -(g * beta)*w1^2 + (2 * g * beta)*w1*y1 - w0 + g^2*w1 + g*x2 + y0 - (g^2+1)*y1 + (g*gamma + ky1 - delta*g  - g*kx2 - g^2*ky2)
+      | a: y1, b: w1, c: w0
+      | qr2=-(g*beta)   qm:(2*g*beta)  qo:-1   qr:g^2   qrg:g   qlg:1   ql:-(g^2+1)   qc:(g*gamma + ky1 - delta*g  -g*kx2 - g^2*ky2)
+
+      c <- 5. w1 - g*x2 - y1 + y2 - ky2
+      | a: y0, b: x2, c: y2
+      | qlg:1   qr:-g   qrg:-1   qo:1  qc:-ky2
+
+      d <- 3. g*w1^5 + (g * beta)*y1^2 - w0 + y0 - y1 + (ky1 + g*gamma)
+      | a: w1, b: y1, c: __
+      | ql5=g    qr2=(g*beta)    qlg:-1   qrg:1    qr:-1    qc:(ky1 + g*gamma)
+
+      e <- 1. w0^5 + beta*y0^2 - x0 + gamma
+      | a: w0, b: y0, c: x0
+      | ql5=1   qr2=beta   qo:-1   qc:gamma
+      *)
+    let qca = S.(sub (gamma * g) ((g * (kx1 + delta)) + (g2_p_1 * ky1))) in
+    let qcb = S.(sub ((gamma * g) + ky1) ((g * (kx2 + delta)) + (g2 * ky2))) in
+    let qcd = S.(ky1 + (g * gamma)) in
+    append
+      [|
+        CS.new_constraint
+          ~a:y0
+          ~b:w0
+          ~c:x0
+          ~qx2b:S.(negate g_beta)
+          ~qm:S.(two * g_beta)
+          ~qr:g2_p_1
+          ~qo:S.(negate g)
+          ~ql:S.(negate g2_p_1)
+          ~qlg:S.one
+          ~qc:qca
+          "anemoi_double.a";
+        CS.new_constraint
+          ~a:y1
+          ~b:w1
+          ~c:w0
+          ~qx2b:S.(negate g_beta)
+          ~qm:S.(two * g_beta)
+          ~qo:mone
+          ~qr:g2
+          ~qrg:g
+          ~qlg:one
+          ~ql:S.(negate g2_p_1)
+          ~qc:qcb
+          "anemoi_double.b";
+        CS.new_constraint
+          ~a:y0
+          ~b:x2
+          ~c:y2
+          ~qlg:one
+          ~qr:S.(negate g)
+          ~qrg:mone
+          ~qo:one
+          ~qc:S.(negate ky2)
+          "anemoi_double.c";
+        CS.new_constraint
+          ~a:w1
+          ~b:y1
+          ~c:y1
+          ~qx5a:g
+          ~qx2b:g_beta
+          ~qlg:mone
+          ~qrg:one
+          ~qr:mone
+          ~qc:qcd
+          "anemoi_double.d";
+        CS.new_constraint
+          ~a:w0
+          ~b:y0
+          ~c:x0
+          ~qx5a:one
+          ~qx2b:beta
+          ~qo:mone
+          ~qc:gamma
+          "anemoi_double.e";
+      |]
+      ~solver
+    >* ret @@ pair (Scalar x2) (Scalar y2)
+
+  let anemoi_custom ~kx1 ~ky1 ~kx2 ~ky2 (Scalar x0, Scalar y0) =
+    with_label ~label:"custom_anemoi"
+    @@ let*& x1 = fresh Dummy.scalar in
+       let*& y1 = fresh Dummy.scalar in
+       let*& x2 = fresh Dummy.scalar in
+       let*& y2 = fresh Dummy.scalar in
+       let precomputed_advice =
+         [("qadv0", kx1); ("qadv1", ky1); ("qadv2", kx2); ("qadv3", ky2)]
+       in
+       let gate =
+         [|
+           CS.new_constraint
+             ~a:0
+             ~b:x1
+             ~c:y1
+             ~d:x0
+             ~e:y0
+             ~q_anemoi:one
+             ~precomputed_advice
+             "custom_anemoi.1";
+           CS.new_constraint ~a:0 ~b:0 ~c:0 ~d:x2 ~e:y2 "custom_anemoi.2";
+         |]
+       in
+       let solver = AnemoiCustom {x0; y0; x1; y1; x2; y2; kx1; kx2; ky1; ky2} in
+       append gate ~solver >* ret @@ pair (Scalar x2) (Scalar y2)
+end
+
+let get_checks_wire s =
+  let s, Unit = s.delayed s in
+  let s, w = Bool.band_list s.check_wires s in
+  ({s with check_wires = []; delayed = ret Unit}, w)
+
+let get f =
+  let s, res =
+    f
+      {
+        nvars = 0;
+        cs = [];
+        inputs = Array.init 0 (fun _ -> S.zero);
+        input_com_sizes = [];
+        pi_size = 0;
+        input_flag = `InputCom;
+        tables = [];
+        solver = Solver.empty_solver;
+        delayed = ret Unit;
+        check_wires = [];
+        labels = [];
+      }
+  in
+  let s, Unit = s.delayed s in
+  let s, res =
+    match s.check_wires with
+    | [] -> (s, res)
+    | ws ->
+        let s, w = Bool.band_list ws s in
+        let s, Unit = Bool.assert_true w s in
+        (s, res)
+  in
+  let solver =
+    {s.solver with final_size = s.nvars; initial_size = Array.length s.inputs}
+  in
+  let s = {s with solver} in
+  (s, res)
+
+let get_inputs f =
+  let s, _ = get f in
+  (s.inputs, s.pi_size)
+
+type cs_result = {
+  nvars : int;
+  free_wires : int list;
+  cs : Csir.CS.t;
+  input_com_sizes : int list;
+  tables : Csir.Table.t list;
+  solver : Solver.t;
+}
+[@@deriving repr]
+
+let cs_ti_t = Repr.pair Csir.CS.t Optimizer.trace_info_t
+
+let get_cs ?(optimize = false) f : cs_result =
+  let s, _ = get f in
+  let ts = List.map (fun t_id -> Tables.find t_id tables) s.tables in
+  let cs, solver, free_wires, nvars =
+    if optimize then
+      let circuit_id = Utils.get_circuit_id s.cs in
+      let path = Utils.circuit_path circuit_id in
+      let cs, ti =
+        if Sys.file_exists path then (
+          (* If defined, load it up *)
+          let inc = open_in path in
+          let size = in_channel_length inc in
+          let buffer = Bytes.create size in
+          really_input inc buffer 0 (in_channel_length inc) ;
+          close_in inc ;
+          Utils.of_bytes cs_ti_t buffer)
+        else
+          let nb_inputs = Array.length s.inputs in
+          let o = Optimizer.optimize ~nb_inputs s.cs in
+          let serialized = Utils.to_bytes cs_ti_t o in
+          let outc = open_out_bin path in
+          output_bytes outc serialized ;
+          close_out outc ;
+          o
+      in
+      (cs, Solver.append_solver (Updater ti) s.solver, ti.free_wires, s.nvars)
+    else (s.cs, s.solver, [], s.nvars)
+  in
+  {
+    nvars;
+    free_wires;
+    cs;
+    tables = ts;
+    input_com_sizes = List.rev s.input_com_sizes;
+    solver;
+  }

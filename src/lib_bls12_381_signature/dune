@@ -1,0 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (env-vars (NODE_PRELOAD ocaml-bls12-381))))
+
+(library
+ (name bls12_381_signature)
+ (public_name octez-bls12-381-signature)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381)
+ (js_of_ocaml (javascript_files blst_bindings_stubs.js))
+ (library_flags (:standard -linkall))
+ (modules bls12_381_signature)
+ (foreign_stubs
+  (language c)
+  (flags (-Wall -Wextra :standard))
+  (names blst_bindings_stubs))
+ (c_library_flags (-Wall -Wextra :standard -lpthread)))
+
+(rule
+ (targets needed-wasm-names)
+ (mode promote)
+ (deps (:files blst_bindings_stubs.js))
+ (action
+  (with-outputs-to %{targets} (run ./gen_wasm_needed_names.exe %{files}))))
+
+(executable
+ (name gen_wasm_needed_names)
+ (libraries
+  re)
+ (modules gen_wasm_needed_names))

@@ -42,7 +42,7 @@ module Stubs = struct
    - [res], [a] and [b] are either pairwise disjoint or equal
    - [size_b mod size_a = 0] *)
   external add : fr_array -> fr_array -> fr_array -> int -> int -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_evaluations_add_stubs"
+    = "caml_bls12_381_polynomial_polynomial_evaluations_add_stubs"
     [@@noalloc]
 
   (** [mul_arrays res eval_evallen_comp_power_powlen size_res nb_evals] writes
@@ -68,8 +68,7 @@ module Stubs = struct
     (fr_array * int * int * Bytes.t * int) array ->
     int ->
     int ->
-    unit
-    = "caml_bls12_381_polynomial_internal_polynomial_evaluations_mul_arrays_stubs"
+    unit = "caml_bls12_381_polynomial_polynomial_evaluations_mul_arrays_stubs"
     [@@noalloc]
 
   (** [linear_arrays res eval_evallen_coeff_comp add_constant size_res nb_evals]
@@ -91,7 +90,7 @@ module Stubs = struct
    - [res] and [p_i] are disjoint *)
   external linear_arrays :
     fr_array -> (fr_array * int * fr * int) array -> fr -> int -> int -> unit
-    = "caml_bls12_381_polynomial_internal_polynomial_evaluations_linear_arrays_stubs"
+    = "caml_bls12_381_polynomial_polynomial_evaluations_linear_arrays_stubs"
     [@@noalloc]
 
   (** [fft_inplace p domain log log_degree] computes Fast Fourier Transform.
@@ -105,7 +104,7 @@ module Stubs = struct
   [n]-th root of unity and [n = 2^log] (as done by {!Domain.Stubs.compute_domain}) *)
   external fft_inplace :
     fr_array -> domain:fr_array -> log:int -> log_degree:int -> unit
-    = "caml_bls12_381_polynomial_internal_fft_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_fft_inplace_on_stubs"
 
   (** [ifft_inplace p domain log] computes Inverse Fast Fourier Transform.
   It converts the evaluation representation of a polynomial [p] to
@@ -117,7 +116,7 @@ module Stubs = struct
   - [domain = [one; g; ..; g^{n-1}]] where [g] is a primitive
   [n]-th root of unity and [n = 2^log] (as done by {!Domain.Stubs.compute_domain}) *)
   external ifft_inplace : fr_array -> domain:fr_array -> log:int -> unit
-    = "caml_bls12_381_polynomial_internal_ifft_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_ifft_inplace_on_stubs"
     [@@noalloc]
 
   (** [dft_inplace coefficients domain inverse length] computes the Fourier Transform.
@@ -130,7 +129,7 @@ module Stubs = struct
   - [domain = [one; g; ..; g^{n-1}]] where [g] is a primitive
   [n]-th root of unity (as done by {!Domain.Stubs.compute_domain}) *)
   external dft_inplace : fr_array -> fr_array -> bool -> int -> unit
-    = "caml_bls12_381_polynomial_internal_dft_stubs"
+    = "caml_bls12_381_polynomial_dft_stubs"
     [@@noalloc]
 
   (** [fft_prime_factor_algorithm_inplace coefficient (domain1, domain1_length) (domain2, domain2_length) inverse]
@@ -149,7 +148,7 @@ module Stubs = struct
   [n]-th root of unity (as done by {!Domain.Stubs.compute_domain}) *)
   external fft_prime_factor_algorithm_inplace :
     fr_array -> fr_array * int -> fr_array * int -> bool -> unit
-    = "caml_bls12_381_polynomial_internal_prime_factor_algorithm_fft_stubs"
+    = "caml_bls12_381_polynomial_prime_factor_algorithm_fft_stubs"
     [@@noalloc]
 end
 

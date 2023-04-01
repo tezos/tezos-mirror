@@ -1,0 +1,29 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
+  "ppx_repr" { >= "0.6.0" }
+  "repr"
+  "hacl-star" { >= "0.6.1" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "octez-bls12-381-polynomial"
+  "octez-plompiler"
+  "logs"
+  "octez-distributed-lwt-internal"
+  "qcheck-alcotest" { >= "0.20" }
+  "bls12-381" { >= "6.1.0" & < "6.2.0" }
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Plonk zero-knowledge proving system"

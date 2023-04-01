@@ -270,33 +270,33 @@ module V (L : LIB) = struct
     >* ret expected_new_state
 
   (** Circuit definition for one public operation *)
-  let predicate_op ?(public = true) ~old_state ~new_state ~fee ~exit_validity
+  let predicate_op ?(kind = `Public) ~old_state ~new_state ~fee ~exit_validity
       ~rollup_id op =
-    let* old_state = input ~public:true @@ Input.bool old_state in
-    let* new_state = input ~public:true @@ Input.bool new_state in
+    let* old_state = input ~kind:`Public @@ Input.bool old_state in
+    let* new_state = input ~kind:`Public @@ Input.bool new_state in
     let* _fee =
-      input ~public:true
+      input ~kind:`Public
       @@ E.((fee_encoding ~safety:Bounded_e.Unsafe).input) fee
     in
-    let* _exit_validity = input ~public:true @@ Input.bool exit_validity in
+    let* _exit_validity = input ~kind:`Public @@ Input.bool exit_validity in
     let* rollup_id =
-      input ~public:true @@ E.(tezos_pkh_encoding.input) rollup_id
+      input ~kind:`Public @@ E.(tezos_pkh_encoding.input) rollup_id
     in
-    let* op = input ~public @@ E.op_encoding.input op in
+    let* op = input ~kind @@ E.op_encoding.input op in
     let op = E.op_encoding.decode op in
     let* expected_new_state = logic_op ~old_state ~rollup_id op in
     assert_equal expected_new_state new_state
 
   (** Circuit definition for a batch of private operations *)
   let predicate_batch ~old_state ~new_state ~fees ~rollup_id ops =
-    let* old_state = input ~public:true @@ Input.bool old_state in
-    let* new_state = input ~public:true @@ Input.bool new_state in
+    let* old_state = input ~kind:`Public @@ Input.bool old_state in
+    let* new_state = input ~kind:`Public @@ Input.bool new_state in
     let* _fees =
-      input ~public:true
+      input ~kind:`Public
       @@ E.((amount_encoding ~safety:Bounded_e.Unsafe).input) fees
     in
     let* rollup_id =
-      input ~public:true @@ E.(tezos_pkh_encoding.input) rollup_id
+      input ~kind:`Public @@ E.(tezos_pkh_encoding.input) rollup_id
     in
     let* ops = input @@ (Encodings.list_encoding E.op_encoding).input ops in
     let ops = (Encodings.list_encoding E.op_encoding).decode ops in
@@ -310,10 +310,10 @@ module V (L : LIB) = struct
 
   (** Fee circuit *)
   let predicate_fees ~old_state ~new_state ~fees =
-    let* old_state = input ~public:true @@ Input.bool old_state in
-    let* new_state = input ~public:true @@ Input.bool new_state in
+    let* old_state = input ~kind:`Public @@ Input.bool old_state in
+    let* new_state = input ~kind:`Public @@ Input.bool new_state in
     let* _fees =
-      input ~public:true
+      input ~kind:`Public
       @@ E.((amount_encoding ~safety:Bounded_e.Unsafe).input) fees
     in
     assert_equal old_state new_state
@@ -353,7 +353,7 @@ end = struct
 
   let lazy_srs =
     lazy
-      (let open Bls12_381_polynomial in
+      (let open Octez_bls12_381_polynomial.Bls12_381_polynomial in
       (Srs.generate_insecure 8 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =

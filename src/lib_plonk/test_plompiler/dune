@@ -1,0 +1,54 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name afl)
+ (libraries
+  octez-plompiler
+  octez-plonk
+  bls12-381)
+ (modules afl))
+
+(executable
+ (name main)
+ (libraries
+  octez-plonk.plonk-test)
+ (modules
+  bench_poseidon
+  benchmark
+  main
+  test_anemoi
+  test_blake
+  test_core
+  test_edwards
+  test_encoding
+  test_enum
+  test_input_com
+  test_linear_algebra
+  test_lookup
+  test_merkle
+  test_merkle_narity
+  test_optimizer
+  test_poseidon
+  test_schnorr
+  test_serialization
+  test_weierstrass))
+
+(rule
+ (alias runtest)
+ (package octez-plonk)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
+
+(rule
+ (alias runtest_slow)
+ (package octez-plonk)
+ (action (run %{exe:main.exe})))
+
+(rule
+ (alias runtest_slow_with_regression)
+ (package octez-plonk)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))

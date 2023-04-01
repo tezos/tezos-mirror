@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name aggregation)
+ (public_name octez-plonk.aggregation)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-plonk
+  octez-bls12-381-polynomial)
+ (preprocess (pps ppx_repr))
+ (flags
+  (:standard)
+  -open Octez_bls12_381_polynomial))

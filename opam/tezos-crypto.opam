@@ -21,8 +21,8 @@ depends: [
   "aches" { >= "1.0.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "bls12-381" { >= "6.0.1" & < "6.1.0" }
-  "bls12-381-signature" { = "1.0.0" }
+  "bls12-381" { >= "6.1.0" & < "6.2.0" }
+  "octez-bls12-381-signature"
   "tezt" { with-test & >= "3.0.0" }
   "octez-alcotezt" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }

@@ -1,0 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name plonk_for_distribution)
+ (public_name octez-plonk.distribution)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-plonk
+  octez-plonk.aggregation)
+ (preprocess (pps ppx_repr)))

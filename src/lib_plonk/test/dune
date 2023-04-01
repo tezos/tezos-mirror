@@ -1,0 +1,60 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name plonk_test)
+ (public_name octez-plonk.plonk-test)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-plonk
+  octez-plonk.aggregation
+  octez-plonk.distribution)
+ (preprocess (pps ppx_repr))
+ (modules helpers cases))
+
+(rule
+ (alias runtest)
+ (package octez-plonk)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
+
+(rule
+ (alias runtest_slow)
+ (package octez-plonk)
+ (action (run %{exe:main.exe})))
+
+(rule
+ (alias runtest_slow_with_regression)
+ (package octez-plonk)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))
+
+(executable
+ (name main)
+ (libraries
+  octez-plonk.plonk-test
+  qcheck-alcotest
+  octez-bls12-381-polynomial)
+ (flags
+  (:standard)
+  -open Octez_bls12_381_polynomial)
+ (modules
+  main
+  test_circuit
+  test_evaluations
+  test_main_protocol
+  test_pack
+  test_permutations
+  test_plookup
+  test_polynomial_commitment
+  test_polynomial_protocol
+  test_range_checks
+  test_utils))
+
+(executable
+ (name bench)
+ (libraries
+  octez-plonk.plonk-test)
+ (modules bench))

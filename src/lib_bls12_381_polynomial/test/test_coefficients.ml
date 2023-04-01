@@ -37,11 +37,9 @@ let rec repeat n f =
     repeat (n - 1) f)
 
 module Scalar = Bls12_381.Fr
-
-module Domain = Tezos_bls12_381_polynomial_internal.Domain.Domain_unsafe
-
-module Poly = Tezos_bls12_381_polynomial_internal.Polynomial
-module Evaluations = Tezos_bls12_381_polynomial_internal.Evaluations
+module Domain = Octez_bls12_381_polynomial.Domain.Domain_unsafe
+module Poly = Octez_bls12_381_polynomial.Polynomial
+module Evaluations = Octez_bls12_381_polynomial.Evaluations
 
 let raises_invalid_arg f =
   try

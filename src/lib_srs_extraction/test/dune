@@ -1,0 +1,62 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (libraries
+  octez-srs-extraction
+  alcotest)
+ (flags
+  (:standard)
+  -open Octez_srs_extraction))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps phase1radix2m5)
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_zcash_g1_5 phase1radix2m5)
+ (action
+  (progn
+   (run
+    %{exe:../srs_extraction_main.exe}
+    extract
+    zcash
+    g1
+    phase1radix2m5
+    -o
+    srs_zcash_g1_5.generated)
+   (diff srs_zcash_g1_5.generated srs_zcash_g1_5))))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_zcash_g2_5 phase1radix2m5)
+ (action
+  (progn
+   (run
+    %{exe:../srs_extraction_main.exe}
+    extract
+    zcash
+    g2
+    phase1radix2m5
+    -o
+    srs_zcash_g2_5.generated)
+   (diff srs_zcash_g2_5.generated srs_zcash_g2_5))))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_zcash_g1_5 srs_zcash_g2_5)
+ (action (run ../srs_extraction_main.exe check srs_zcash_g1_5 srs_zcash_g2_5)))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_filecoin_g1_6 srs_filecoin_g2_6)
+ (action
+  (run ../srs_extraction_main.exe check srs_filecoin_g1_6 srs_filecoin_g2_6)))

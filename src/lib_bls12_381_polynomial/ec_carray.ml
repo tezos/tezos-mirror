@@ -229,18 +229,18 @@ module Stubs_g1 = struct
 
   external evaluation_ecfft_inplace :
     ec_array -> domain:fr_array -> log:int -> log_degree:int -> unit
-    = "caml_bls12_381_polynomial_internal_fft_g1_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_fft_g1_inplace_on_stubs"
 
   external interpolation_ecfft_inplace :
     ec_array -> domain:fr_array -> log:int -> unit
-    = "caml_bls12_381_polynomial_internal_ifft_g1_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_ifft_g1_inplace_on_stubs"
 
   external add_arrays_inplace : ec_array -> ec_array -> int -> unit
-    = "caml_bls12_381_polynomial_internal_carray_g1_add_inplace_stubs"
+    = "caml_bls12_381_polynomial_carray_g1_add_inplace_stubs"
 
   external mul_arrays :
     ec_array array -> fr_array array -> ec_array array -> int * int -> unit
-    = "caml_bls12_381_polynomial_internal_evaluations_mul_arrays_g1_stubs"
+    = "caml_bls12_381_polynomial_evaluations_mul_arrays_g1_stubs"
 end
 
 module Stubs_g2 = struct
@@ -250,18 +250,18 @@ module Stubs_g2 = struct
 
   external evaluation_ecfft_inplace :
     ec_array -> domain:fr_array -> log:int -> log_degree:int -> unit
-    = "caml_bls12_381_polynomial_internal_fft_g2_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_fft_g2_inplace_on_stubs"
 
   external interpolation_ecfft_inplace :
     ec_array -> domain:fr_array -> log:int -> unit
-    = "caml_bls12_381_polynomial_internal_ifft_g2_inplace_on_stubs"
+    = "caml_bls12_381_polynomial_ifft_g2_inplace_on_stubs"
 
   external add_arrays_inplace : ec_array -> ec_array -> int -> unit
-    = "caml_bls12_381_polynomial_internal_carray_g2_add_inplace_stubs"
+    = "caml_bls12_381_polynomial_carray_g2_add_inplace_stubs"
 
   external mul_arrays :
     ec_array array -> fr_array array -> ec_array array -> int * int -> unit
-    = "caml_bls12_381_polynomial_internal_evaluations_mul_arrays_g2_stubs"
+    = "caml_bls12_381_polynomial_evaluations_mul_arrays_g2_stubs"
 end
 
 module G1_carray :

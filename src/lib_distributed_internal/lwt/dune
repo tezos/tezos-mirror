@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name distributed_lwt)
+ (public_name octez-distributed-lwt-internal)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  octez-distributed-internal
+  lwt
+  lwt.unix
+  logs.lwt))

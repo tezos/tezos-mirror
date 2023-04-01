@@ -8,9 +8,9 @@
   tezt.core
   octez-alcotezt
   qcheck-alcotest
-  polynomial
+  octez-polynomial
   bls12-381
-  tezos-bls12-381-polynomial-internal)
+  octez-bls12-381-polynomial)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -37,7 +37,7 @@
 
 (rule
  (alias runtezt)
- (package tezos-bls12-381-polynomial-internal)
+ (package octez-bls12-381-polynomial)
  (deps srs_zcash_g1_5)
  (action (run %{dep:./main.exe})))
 
