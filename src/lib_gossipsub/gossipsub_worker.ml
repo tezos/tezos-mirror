@@ -88,11 +88,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type event = Heartbeat | P2P_input of p2p_input | App_input of app_input
 
   (** The worker's state is made of its status, the gossipsub automaton's state,
-      and a stream of events to process.  *)
+      and a stream of events to process. It also has two output streams to
+      communicate with the application and P2P layers. *)
   type t = {
     gossip_state : GS.state;
     status : worker_status;
     events_stream : event Stream.t;
+    p2p_output_stream : p2p_output Stream.t;
+    app_output_stream : app_output Stream.t;
   }
 
   (** This is the main function of the worker. It interacts with the Gossipsub
@@ -216,5 +219,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       gossip_state = GS.make rng limits parameters;
       status = Starting;
       events_stream = Stream.empty;
+      p2p_output_stream = Stream.empty;
+      app_output_stream = Stream.empty;
     }
 end
