@@ -14,6 +14,10 @@ crate-type = ["rlib"]
 [dependencies]
 dlmalloc = { version = "0.2.3", features = ["global"], optional = true}
 
+[dependencies.tezos_smart_rollup_core]
+path = "../tezos_smart_rollup_core"
+default-features = false
+
 [dependencies.tezos_smart_rollup_panic_hook]
 path = "../tezos_smart_rollup_panic_hook"
 default-features = false
