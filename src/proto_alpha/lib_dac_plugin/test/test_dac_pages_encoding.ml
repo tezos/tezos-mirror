@@ -327,7 +327,7 @@ module Merkle_tree = struct
         ~loc:__LOC__
         ~max_page_size:50
         ~payload
-        ~error:Pages_encoding.Merkle_tree_branching_factor_not_high_enough
+        ~error:(Pages_encoding.Merkle_tree_branching_factor_not_high_enough 1)
 
     let serialize_empty_payload_fails () =
       (* Limit the number of hashes stored per page to 2. Because hashes
