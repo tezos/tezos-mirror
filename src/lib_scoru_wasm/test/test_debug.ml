@@ -52,11 +52,12 @@ let write_debug ~version ~debug ~init ~values memories =
   Eval.invoke
     ~module_reg
     ~caller:module_key
-    (if debug then
-     Host_funcs.all_debug
+    (Host_funcs.registry
        ~version
-       ~write_debug:(Printer (fun str -> Lwt.return @@ Format.printf "%s" str))
-    else Host_funcs.all ~version)
+       ~write_debug:
+         (if debug then
+          Printer (fun str -> Lwt.return @@ Format.printf "%s" str)
+         else Noop))
     ~input
     ~init
     Host_funcs.Internal_for_tests.write_debug

@@ -1283,35 +1283,32 @@ let with_write_debug ~write_debug:implem builder =
     ~implem:(write_debug ~implem)
     builder
 
-let all_V0 =
-  Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
+let registry_V0 ~write_debug =
+  Host_funcs.(base |> with_write_debug ~write_debug |> construct)
 
-let all_V1 =
+let registry_V0_noop = registry_V0 ~write_debug:Noop
+
+let registry_V1 ~write_debug =
   Host_funcs.(
     base
-    |> with_write_debug ~write_debug:Noop
+    |> with_write_debug ~write_debug
     |> with_host_function
          ~global_name:store_get_hash_name
          ~implem:store_get_hash
     |> construct)
 
-let all ~version =
-  match version with Wasm_pvm_state.V0 -> all_V0 | Wasm_pvm_state.V1 -> all_V1
+let registry_V1_noop = registry_V1 ~write_debug:Noop
 
-(* We build the registry at toplevel of the module to prevent recomputing it at
-   each initialization tick. *)
-let all_debug ~version ~write_debug =
-  match version with
-  | Wasm_pvm_state.V0 ->
-      Host_funcs.(base |> with_write_debug ~write_debug |> construct)
-  | V1 ->
-      Host_funcs.(
-        base
-        |> with_write_debug ~write_debug
-        |> with_host_function
-             ~global_name:store_get_hash_name
-             ~implem:store_get_hash
-        |> construct)
+let registry ~version ~write_debug =
+  (* We need to keep a top-level definition for the [Noop] case to be able to
+     run the tests related to the tick models. Besides, by doing so, we should
+     optimize (even slightly) the creation of the registry since it is done at
+     compile time for this particular case. *)
+  match (version, write_debug) with
+  | Wasm_pvm_state.V0, Builtins.Noop -> registry_V0_noop
+  | Wasm_pvm_state.V0, _ -> registry_V0 ~write_debug
+  | Wasm_pvm_state.V1, Noop -> registry_V1_noop
+  | Wasm_pvm_state.V1, _ -> registry_V1 ~write_debug
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size
