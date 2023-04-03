@@ -50,6 +50,30 @@ v0.6:
 - new tutorial
 - fix pathological performance issues when generating some binary descriptions for `mu`+`union` encodings
 
-dev:  
-- Fixed binary-schema reference duplication issue
+v0.6.1:  
+- improve error management when converting lazy-bytes into JSON
+
+v0.7:  
+- add module with safer encoding combinators
+- extend Registration API to allow introspection
+- improve binary schema generation
+- allow dynamic-width ints for ints (with proper overflow checks)
+- allow dynamic-width ints (à la `n`) as size headers
+- allow to use length-of-collection as header information instead of size
+- export type equalities between `Encoding.t` and `encoding` and so on
+- improve documentation
+- add new string/bytes combinator with parameters to control the JSON representation
+- fix bug in check-size combinator
+
+v0.7.1:  
+- fixed binary-schema reference duplication issue
+
+v1.0.0:
+- merge in the json-data-encoding repository
+- allow bigstring encodings
+- allow to chose endianness of integers
+- allow to ignore extra object fields when destructing JSON
+- improve performance of JSON construction/destruction
+- improve self documentation of compact encodings
+- improve (further) error management when converting lazy-bytes into JSON
 

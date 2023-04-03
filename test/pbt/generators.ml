@@ -1080,7 +1080,7 @@ let full_result : type a b. a full -> b full -> (a, b) result full =
 
     let ty = Result (Fulla.ty, Fullb.ty)
 
-    let eq = Result.equal ~ok:Fulla.eq ~error:Fullb.eq
+    let eq = Stdlib.Result.equal ~ok:Fulla.eq ~error:Fullb.eq
 
     let gen = Crowbar.result Fulla.gen Fullb.gen
 

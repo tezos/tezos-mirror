@@ -1,48 +1,87 @@
-(tests
- (names test_generated test_legacy_compatibility test_json_stream
-   test_json_stream_sizes test_classifiers test_sub_string
-   json_roundtrip_in_binary)
+; For JS tests we need to increase the stack size. So we need this convoluted
+; way to write what would normally just be a tests stanza
+; see https://github.com/dbuenzli/jsonm/pull/20
+
+(executables
+ (names
+  test_generated
+  test_legacy_compatibility
+  test_json_stream
+  test_json_stream_sizes
+  test_classifiers
+  json_roundtrip_in_binary)
  (modes native js)
  (js_of_ocaml)
  (libraries data_encoding zarith zarith_stubs_js crowbar bigstringaf))
 
-; We need to increase the stack size
+(rule
+ (alias runtest)
+ (package data-encoding)
+ (action
+  (run %{dep:./test_generated.exe})))
 
 (rule
- (alias runtest_js)
+ (alias runtest)
+ (package data-encoding)
+ (action
+  (run %{dep:./test_legacy_compatibility.exe})))
+
+(rule
+ (alias runtest)
+ (package data-encoding)
+ (action
+  (run %{dep:./test_json_stream.exe})))
+
+(rule
+ (alias runtest)
+ (package data-encoding)
+ (action
+  (run %{dep:./test_json_stream_sizes.exe})))
+
+(rule
+ (alias runtest)
+ (package data-encoding)
+ (action
+  (run %{dep:./test_classifiers.exe})))
+
+(rule
+ (alias runtest)
+ (package data-encoding)
+ (action
+  (run %{dep:./json_roundtrip_in_binary.exe})))
+
+(rule
+ (alias runtest)
+ (package data-encoding)
  (action
   (run node --stack-size=50000 %{dep:./test_generated.bc.js})))
 
 (rule
- (alias runtest_js)
+ (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./test_legacy_compatibility.bc.js})))
 
-; We need to increase the stack size because jsonm is no very jsoo friendly.
-; jsonm uses cps which cannot be optimized by jsoo.
-; see https://github.com/dbuenzli/jsonm/pull/20
-
 (rule
- (alias runtest_js)
+ (alias runtest)
+ (package data-encoding)
  (action
   (run node --stack-size=50000 %{dep:./test_json_stream.bc.js})))
 
 (rule
- (alias runtest_js)
+ (alias runtest)
+ (package data-encoding)
  (action
-  (run node %{dep:./test_json_stream_sizes.bc.js})))
+  (run node --stack-size=50000 %{dep:./test_json_stream_sizes.bc.js})))
 
 (rule
- (alias runtest_js)
+ (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./test_classifiers.bc.js})))
 
 (rule
- (alias runtest_js)
- (action
-  (run node %{dep:./test_sub_string.bc.js})))
-
-(rule
- (alias runtest_js)
+ (alias runtest)
+ (package data-encoding)
  (action
   (run node %{dep:./json_roundtrip_in_binary.bc.js})))

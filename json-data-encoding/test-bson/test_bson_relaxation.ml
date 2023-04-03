@@ -23,15 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = int list
-
 let non_empty_int_lists = [[0]; [-1]; [1]; [1; 2; 3; 6; 9; 10]; [1025; 242]]
 
 let all_lists = [] :: non_empty_int_lists
 
 let encoding = Json_encoding.(list int)
-
-type tt = int list list
 
 let non_empty_int_list_lists =
   [
@@ -48,14 +44,10 @@ let all_list_lists = [] :: non_empty_int_list_lists
 
 let encoding_encoding = Json_encoding.(list (list int))
 
-type ot = int list option
-
 let all_int_list_options =
   [None; Some []; Some [1]; Some [0]; Some [1; 3; 6; 234234; 2]]
 
 let encoding_option = Json_encoding.(option (list int))
-
-type t2 = int list * string list
 
 let all_t2_list =
   [

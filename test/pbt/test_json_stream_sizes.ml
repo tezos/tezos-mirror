@@ -35,17 +35,6 @@ type json =
   | `Null
   | `String of string ]
 
-let pp_json : json Crowbar.printer =
- fun fmt json -> Format.fprintf fmt "%s" (Data_encoding.Json.to_string json)
-
-let ascii_letter =
-  let open Crowbar in
-  map [choose [range ~min:65 26; range ~min:97 26]] Char.chr
-
-let names =
-  let open Crowbar in
-  map [list1 ascii_letter] (fun ls -> String.of_seq @@ List.to_seq ls)
-
 let strings =
   (* statically allocated collection *)
   let char n =

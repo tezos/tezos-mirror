@@ -77,7 +77,7 @@ let tree_encoding, forest_encoding =
 
 let tree_points_done = !tree_points
 
-let forest_points_done = !forest_points
+let _forest_points_done = !forest_points
 
 let points () =
   (* fixpointing functions are not called before they are used *)

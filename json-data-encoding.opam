@@ -6,8 +6,8 @@ authors: [ "Nomadic Labs" "Ocamlpro" ]
 homepage: "https://gitlab.com/nomadic-labs/json-data-encoding"
 bug-reports: "https://gitlab.com/nomadic-labs/json-data-encoding/issues"
 license: "MIT"
+version: "1.0.0"
 dev-repo: "git+https://gitlab.com/nomadic-labs/json-data-encoding"
-version: "1.0"
 
 build: [
   ["dune" "build" "-j" jobs "-p" name]
@@ -16,11 +16,16 @@ build: [
 
 depends: [
   "ocaml" {>= "4.10"}
-  "dune" {>= "2.0"}
+  "dune" {>= "3.0"}
   "uri" {>= "1.9.0" }
   "hex" {>= "1.3.0"}
   "crowbar" { with-test }
   "alcotest" { with-test }
-  "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
+  "ocamlformat" { = "0.24.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
   "odoc" { with-doc }
+  "js_of_ocaml-compiler" { with-test }
+  "conf-npm" { with-test }
+]
+conflicts: [
+  "data-encoding" {!= version}
 ]

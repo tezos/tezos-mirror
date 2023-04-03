@@ -28,6 +28,8 @@
  * simplify this file and increase coverage.
  * For now, this is a limited test-suite. *)
 
+[@@@ocaml.warning "-32"]
+
 let char = Crowbar.map [Crowbar.uint8] Char.chr
 
 let string = Crowbar.bytes

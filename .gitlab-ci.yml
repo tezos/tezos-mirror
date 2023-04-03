@@ -16,11 +16,11 @@ include: 'https://gitlab.com/nomadic-labs/gitlab-ocaml-ci-example/-/raw/main/.gi
     - sudo apt-get install --yes nodejs
   parallel:
     matrix:
-    - OCAML_COMPILER: ["4.10.2", "4.11.2", "4.12.1", "4.13.1", "4.14.0"]
+    - OCAML_COMPILER: ["4.10.2", "4.11.2", "4.12.1", "4.13.1", "4.14.1", "5.0.0"]
       DUNE_BUILD_TARGETS: "@src/all"
       DUNE_TEST_TARGETS: "@runtest @runtest_js"
       DUNE_DOC_TARGETS: [""]
-    - OCAML_COMPILER: "4.14.0"
+    - OCAML_COMPILER: "4.14.1"
       DUNE_BUILD_TARGETS: [""]
       DUNE_TEST_TARGETS: "@fmt"
       DUNE_DOC_TARGETS: "@doc"
