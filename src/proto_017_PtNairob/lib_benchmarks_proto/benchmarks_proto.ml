@@ -31,7 +31,7 @@ module Benchmark = struct
 
     val info : string
 
-    val module_location : string
+    val module_filename : string
 
     val tags : string list
 
