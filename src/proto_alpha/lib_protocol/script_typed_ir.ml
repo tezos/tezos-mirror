@@ -1168,11 +1168,6 @@ and 'arg typed_contract =
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract
-  | Typed_tx_rollup : {
-      arg_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
-      tx_rollup : Tx_rollup.t;
-    }
-      -> ('a ticket, tx_rollup_l2_address) pair typed_contract
   | Typed_sc_rollup : {
       arg_ty : ('arg, _) ty;
       sc_rollup : Sc_rollup.t;
@@ -1474,13 +1469,6 @@ and 'kind internal_operation_contents =
       unparsed_parameters : Script.expr;
     }
       -> Kind.transaction internal_operation_contents
-  | Transaction_to_tx_rollup : {
-      destination : Tx_rollup.t;
-      parameters_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
-      parameters : ('a ticket, tx_rollup_l2_address) pair;
-      unparsed_parameters : Script.expr;
-    }
-      -> Kind.transaction internal_operation_contents
   | Transaction_to_sc_rollup : {
       destination : Sc_rollup.t;
       entrypoint : Entrypoint.t;
@@ -1556,7 +1544,6 @@ let manager_kind :
   | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
   | Transaction_to_implicit_with_ticket _ -> Kind.Transaction_manager_kind
   | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
-  | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_sc_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_zk_rollup _ -> Kind.Transaction_manager_kind
   | Event _ -> Kind.Event_manager_kind
@@ -2284,7 +2271,6 @@ module Typed_contract = struct
         Destination.Contract (Implicit destination)
     | Typed_originated {contract_hash; _} ->
         Destination.Contract (Originated contract_hash)
-    | Typed_tx_rollup {tx_rollup; _} -> Destination.Tx_rollup tx_rollup
     | Typed_sc_rollup {sc_rollup; _} -> Destination.Sc_rollup sc_rollup
     | Typed_zk_rollup {zk_rollup; _} -> Destination.Zk_rollup zk_rollup
 
@@ -2292,13 +2278,11 @@ module Typed_contract = struct
     | Typed_implicit _ -> (Ty_ex_c Unit_t : a ty_ex_c)
     | Typed_implicit_with_ticket {ticket_ty; _} -> Ty_ex_c ticket_ty
     | Typed_originated {arg_ty; _} -> Ty_ex_c arg_ty
-    | Typed_tx_rollup {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_sc_rollup {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_zk_rollup {arg_ty; _} -> Ty_ex_c arg_ty
 
   let entrypoint : type a. a typed_contract -> Entrypoint.t = function
     | Typed_implicit _ | Typed_implicit_with_ticket _ -> Entrypoint.default
-    | Typed_tx_rollup _ -> Entrypoint.deposit
     | Typed_originated {entrypoint; _} | Typed_sc_rollup {entrypoint; _} ->
         entrypoint
     | Typed_zk_rollup _ -> Entrypoint.deposit
@@ -2314,13 +2298,6 @@ module Typed_contract = struct
           invalid_arg "Implicit contracts expect type unit"
       | Contract (Originated contract_hash), _ ->
           Typed_originated {arg_ty; contract_hash; entrypoint}
-      | Tx_rollup tx_rollup, Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _)
-        ->
-          (Typed_tx_rollup {arg_ty; tx_rollup} : a typed_contract)
-      | Tx_rollup _, _ ->
-          invalid_arg
-            "Transaction rollups expect type (pair (ticket _) \
-             tx_rollup_l2_address)"
       | Sc_rollup sc_rollup, _ ->
           Typed_sc_rollup {arg_ty; sc_rollup; entrypoint}
       | Zk_rollup zk_rollup, Pair_t (Ticket_t _, Bytes_t, _, _) ->

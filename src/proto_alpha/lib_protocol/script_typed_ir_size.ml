@@ -207,8 +207,6 @@ let contract_size : type t. t typed_contract -> nodes_and_size = function
       ret_adding
         (ty_size arg_ty)
         (h3w +! blake2b_hash_size +! Entrypoint.in_memory_size entrypoint)
-  | Typed_tx_rollup {arg_ty; tx_rollup} ->
-      ret_adding (ty_size arg_ty) (h2w +! Tx_rollup.in_memory_size tx_rollup)
   | Typed_sc_rollup {arg_ty; sc_rollup; entrypoint} ->
       ret_adding
         (ty_size arg_ty)

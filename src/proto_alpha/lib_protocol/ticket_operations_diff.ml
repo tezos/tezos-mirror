@@ -196,18 +196,6 @@ let tickets_of_operation ctxt
         ~destination:(Destination.Contract (Originated destination))
         ~parameters_ty
         ~parameters
-  | Transaction_to_tx_rollup
-      {destination; unparsed_parameters = _; parameters_ty; parameters} ->
-      let Tx_rollup_parameters.{ex_ticket; l2_destination = _} =
-        Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
-      in
-      return
-        ( Some
-            {
-              destination = Destination.Tx_rollup destination;
-              tickets = [ex_ticket];
-            },
-          ctxt )
   | Transaction_to_sc_rollup
       {
         destination;

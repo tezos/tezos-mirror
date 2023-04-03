@@ -567,39 +567,6 @@ let apply ctxt gas capture_ty capture lam =
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (lam', ctxt, gas)
 
-let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
-    ~(parameters_ty : ((t ticket, tx_rollup_l2_address) pair, _) ty) ~parameters
-    =
-  (* The entrypoints of a transaction rollup are polymorphic wrt. the
-     tickets it can process. However, two Michelson values can have
-     the same Micheline representation, but different types. What
-     this means is that when we start the execution of a transaction
-     rollup, the type of its argument is lost if we just give it the
-     values provided by the Michelson script.
-
-     To address this issue, we instrument a transfer to a transaction
-     rollup to inject the exact type of the entrypoint as used by
-     the smart contract. This allows the transaction rollup to extract
-     the type of the ticket. *)
-  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
-  >>?= fun () ->
-  let (Pair_t (Ticket_t (tp, _), _, _, _)) = parameters_ty in
-  unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  Lwt.return
-    ( Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt tp
-    >>? fun (ty, ctxt) ->
-      let unparsed_parameters =
-        Micheline.Seq
-          (Micheline.dummy_location, [Micheline.root unparsed_parameters; ty])
-      in
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-      >|? fun ctxt ->
-      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      ( Transaction_to_tx_rollup
-          {destination; parameters_ty; parameters; unparsed_parameters},
-        ctxt ) )
-
 let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     ~parameters_ty ~parameters =
   error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
@@ -700,14 +667,6 @@ let transfer (type t) (ctxt, sc) gas amount location
           },
         lazy_storage_diff,
         ctxt )
-  | Typed_tx_rollup {arg_ty = parameters_ty; tx_rollup = destination} ->
-      make_transaction_to_tx_rollup
-        ctxt
-        ~destination
-        ~amount
-        ~parameters_ty
-        ~parameters
-      >|=? fun (operation, ctxt) -> (operation, None, ctxt)
   | Typed_sc_rollup
       {arg_ty = parameters_ty; sc_rollup = destination; entrypoint} ->
       make_transaction_to_sc_rollup

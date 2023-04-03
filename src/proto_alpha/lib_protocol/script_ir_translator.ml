@@ -1622,8 +1622,6 @@ let parse_chain_id ctxt : Script.node -> (Script_chain_id.t * context) tzresult
 let parse_address ctxt : Script.node -> (address * context) tzresult =
   let destination_allowed loc {destination; entrypoint} ctxt =
     match destination with
-    | Destination.Tx_rollup _ when not (Constants.tx_rollup_enable ctxt) ->
-        error @@ Tx_rollup_addresses_disabled loc
     | Destination.Sc_rollup _ when not (Constants.sc_rollup_enable ctxt) ->
         error @@ Sc_rollup_disabled loc
     | Destination.Zk_rollup _ when not (Constants.zk_rollup_enable ctxt) ->
@@ -2139,7 +2137,7 @@ let rec parse_data :
         | Some amount -> (
             match destination with
             | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
-            | Tx_rollup _ | Sc_rollup _ | Zk_rollup _ ->
+            | Sc_rollup _ | Zk_rollup _ ->
                 tzfail (Unexpected_ticket_owner destination))
         | None -> traced_fail Forbidden_zero_ticket_quantity
       else traced_fail (Unexpected_forged_value (location expr))
@@ -4695,21 +4693,6 @@ and parse_contract :
                     ( ctxt,
                       entrypoint_arg >|? fun (entrypoint, arg_ty) ->
                       Typed_originated {arg_ty; contract_hash; entrypoint} )) ))
-  | Tx_rollup tx_rollup ->
-      Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
-      if Entrypoint.(is_deposit entrypoint) then
-        (* /!\ This pattern matching needs to remain in sync with
-           [parse_tx_rollup_deposit_parameters]. *)
-        match arg with
-        | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _) ->
-            ( ctxt,
-              ok
-              @@ (Typed_tx_rollup {arg_ty = arg; tx_rollup}
-                   : arg typed_contract) )
-        | _ ->
-            error ctxt (fun loc ->
-                Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
-      else error ctxt (fun _loc -> No_such_entrypoint entrypoint)
   | Zk_rollup zk_rollup ->
       Zk_rollup.assert_exist ctxt zk_rollup >|=? fun ctxt ->
       if Entrypoint.(is_deposit entrypoint) then
