@@ -33,4 +33,4 @@ features = ["testing"]
 path = "../tezos_smart_rollup_mock"
 
 [features]
-default = []
+default = ["tezos_smart_rollup_host/default"]
