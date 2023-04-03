@@ -352,7 +352,8 @@ let replay_one_block strict main_chain_store validator_process block =
           List.map (List.map fst) ops_metadata)
       check_receipt
 
-let replay ~singleprocess ~strict (config : Config_file.t) blocks =
+let replay ~singleprocess ~strict ~operation_metadata_size_limit
+    (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
   let context_root = Data_version.context_dir config.data_dir in
@@ -363,8 +364,7 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
       user_activated_upgrades = config.blockchain_network.user_activated_upgrades;
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
-      operation_metadata_size_limit =
-        config.shell.block_validator_limits.operation_metadata_size_limit;
+      operation_metadata_size_limit;
     }
   in
   let readonly = true in
@@ -445,7 +445,8 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
+let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
+    (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let* () =
     Data_version.ensure_data_dir
@@ -468,7 +469,13 @@ let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
   Lwt_exit.(
     wrap_and_exit
     @@ let*! res =
-         protect (fun () -> replay ~singleprocess ~strict config blocks)
+         protect (fun () ->
+             replay
+               ~singleprocess
+               ~strict
+               ~operation_metadata_size_limit
+               config
+               blocks)
        in
        let*! () = Tezos_base_unix.Internal_event_unix.close () in
        Lwt.return res)
@@ -484,7 +491,8 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess strict blocks data_dir config_file =
+let process verbosity singleprocess strict blocks data_dir config_file
+    operation_metadata_size_limit =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -494,8 +502,20 @@ let process verbosity singleprocess strict blocks data_dir config_file =
     let* data_dir, config =
       Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
     in
+    let operation_metadata_size_limit =
+      Option.value
+        operation_metadata_size_limit
+        ~default:
+          config.shell.block_validator_limits.operation_metadata_size_limit
+    in
     let* () = check_data_dir data_dir in
-    run ?verbosity ~singleprocess ~strict config blocks
+    run
+      ?verbosity
+      ~singleprocess
+      ~strict
+      ~operation_metadata_size_limit
+      config
+      blocks
   in
   match Lwt_main.run run with
   | Ok () -> `Ok ()
@@ -576,7 +596,8 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ verbosity $ singleprocess $ strict $ blocks
-       $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file))
+       $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
+       $ Shared_arg.Term.operation_metadata_size_limit))
 end
 
 module Manpage = struct
