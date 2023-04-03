@@ -111,7 +111,7 @@ module Raw_context_tests = struct
     let open Lwt_result_syntax in
     let open Zk_rollup_account_repr in
     let* ctx, contract = initial_ctx () in
-    let public_parameters = Operator.public_parameters in
+    let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
     let state = Operator.init_state in
     let state_length = Array.length state in
     let circuits_info = SMap.of_seq @@ Plonk.SMap.to_seq Operator.circuits in
