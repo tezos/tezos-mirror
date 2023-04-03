@@ -325,10 +325,10 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
     | Ok (type_map, gas) ->
         let program = Michelson_v1_printer.inject_types type_map program in
         cctxt#message
-          "@[<v 0>%tWell typed@,Gas remaining: %a@]"
-          (fun fmt -> if display_names then Format.fprintf fmt "%s@," name)
+          "@[Well typed (Gas remaining: %a)\t%t@]"
           Gas.pp
           gas
+          (fun fmt -> if display_names then Format.pp_print_string fmt name)
         >>= fun () ->
         if show_types then
           cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->
