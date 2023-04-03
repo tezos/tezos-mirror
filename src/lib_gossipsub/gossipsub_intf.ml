@@ -564,6 +564,13 @@ module type WORKER = sig
   (** The Gossipsub automaton of the worker. *)
   module GS : AUTOMATON
 
+  (** A full message is defined by its content, topic and id. *)
+  type full_message = {
+    message : GS.Message.t;
+    topic : GS.Topic.t;
+    message_id : GS.Message_id.t;
+  }
+
   (** The following type defines the different kinds of messages a peer could
       receive from or sent to the P2P layer. *)
   type p2p_message =
@@ -573,11 +580,7 @@ module type WORKER = sig
     | IWant of {message_ids : GS.Message_id.t list}
     | Subscribe of {topic : GS.Topic.t}
     | Unsubscribe of {topic : GS.Topic.t}
-    | Publish of {
-        topic : GS.Topic.t;
-        message_id : GS.Message_id.t;
-        message : GS.Message.t;
-      }
+    | Publish of full_message
 
   (** [make rng limits parameters] initializes a new Gossipsub automaton with
       the given arguments. Then, it initializes and returns a worker for it. *)

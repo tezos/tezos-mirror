@@ -47,6 +47,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_handle : unit Monad.t;
       }
 
+  type full_message = {
+    message : Message.t;
+    topic : Topic.t;
+    message_id : Message_id.t;
+  }
+
   type p2p_message =
     | Graft of {topic : Topic.t}
     | Prune of {topic : Topic.t; px : Peer.t Seq.t}
@@ -54,12 +60,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | IWant of {message_ids : Message_id.t list}
     | Subscribe of {topic : Topic.t}
     | Unsubscribe of {topic : Topic.t}
-    | Publish of {
-        topic : Topic.t;
-        message_id : Message_id.t;
-        message : Message.t;
-      }
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
+    | Publish of full_message
+  (* FIXME: FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
 
      The payloads of the variants about are quite simular to those of GS (types
      graft, prune, ...). We could reuse them if we move the peer field
@@ -71,11 +73,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | New_connection of P2P.Connections_handler.connection
     | Disconnection of {peer : Peer.t}
     | Received_message of {peer : Peer.t; p2p_message : p2p_message}
-    | Inject_message of {
-        message : Message.t;
-        message_id : Message_id.t;
-        topic : Topic.t;
-      }
+    | Inject_message of full_message
     | Join of Topic.t
     | Leave of Topic.t
 
