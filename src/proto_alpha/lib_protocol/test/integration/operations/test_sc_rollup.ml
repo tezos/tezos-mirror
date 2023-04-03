@@ -2778,12 +2778,19 @@ let test_automatically_added_internal_messages () =
       ~level_info:level_one_info
   in
   let* () =
+    assert_protocol_migration
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_zero
+  in
+  let* () =
     assert_eol
       ~__LOC__
       ~snapshot
       ~full_history_inbox
       ~inbox_level:level_one
-      ~message_counter:(Z.of_int 2)
+      ~message_counter:(Z.of_int 3)
   in
 
   (* Assertions about level 2. *)

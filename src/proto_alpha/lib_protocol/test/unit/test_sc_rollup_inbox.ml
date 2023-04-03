@@ -61,7 +61,7 @@ let assert_equal_payload_option ~__LOC__ found expected =
     (Format.pp_print_option
        ~none:(fun fmt () -> Format.pp_print_string fmt "None")
        (fun fmt v ->
-         Format.fprintf fmt "Some \"%s\"" (Message.unsafe_to_string v)))
+         Format.fprintf fmt "Some \"%S\"" (Message.unsafe_to_string v)))
     found
     expected
 
@@ -452,16 +452,17 @@ let test_inclusion_proof_production (payloads_for_levels, level) =
     against the snapshot of the next (empty) level. *)
 let test_inclusion_proof_verification (payloads_for_levels, level) =
   let open Lwt_result_wrap_syntax in
+  let inbox_creation_level = Raw_level.root in
   let*? node_inbox, proto_inbox =
-    construct_node_and_protocol_inbox
-      ~inbox_creation_level:Raw_level.root
-      payloads_for_levels
+    construct_node_and_protocol_inbox ~inbox_creation_level payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, _node_old_level_messages =
     Node_inbox.produce_inclusion_proof node_inbox node_inbox_snapshot level
   in
-  let*? proto_inbox = Protocol_inbox.add_new_level proto_inbox [] in
+  let*? proto_inbox =
+    Protocol_inbox.add_new_level ~inbox_creation_level proto_inbox []
+  in
   (* This snapshot is not the same one as node_inbox_snapshot because we
      added an empty level. *)
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
@@ -525,10 +526,9 @@ let test_payloads_proof_production
     against the snapshot of the next (empty) level. *)
 let test_payloads_proof_invalid_inbox_snapshot (payloads, message_counter) =
   let open Lwt_result_syntax in
+  let inbox_creation_level = Raw_level.root in
   let*? node_inbox, proto_inbox =
-    construct_node_and_protocol_inbox
-      ~inbox_creation_level:Raw_level.root
-      [payloads]
+    construct_node_and_protocol_inbox ~inbox_creation_level [payloads]
   in
   let* proof =
     let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
@@ -537,7 +537,9 @@ let test_payloads_proof_invalid_inbox_snapshot (payloads, message_counter) =
       node_head_cell_hash
       message_counter
   in
-  let*? proto_inbox = Protocol_inbox.add_new_level proto_inbox [] in
+  let*? proto_inbox =
+    Protocol_inbox.add_new_level ~inbox_creation_level proto_inbox []
+  in
   (* As we added one level in the [proto_inbox], it is one level further than
      the [node_inbox]. The proof will not match the history. *)
   let head_cell_hash = latest_level_proof_hash proto_inbox in
