@@ -534,20 +534,6 @@ module type WORKER_CONFIGURATION = sig
         stream is empty, the function will wait until some value is pushed. *)
     val pop : 'a t -> 'a Monad.t
   end
-
-  (** The interface for the P2P Network from the worker's point of view. It is
-      made of a [Connections_handler] module. *)
-  module P2P : sig
-    (** Interface for [Connections_handler] module. *)
-    module Connections_handler : sig
-      (** A connection is defined by a [peer] and two flags [direct] and
-          [outbound] to tell whether it is direct and outgoing, or not. *)
-      type connection = {peer : GS.Peer.t; direct : bool; outbound : bool}
-
-      (** This function allows disconnecting the given peer. *)
-      val disconnect : GS.Peer.t -> unit Monad.t
-    end
-  end
 end
 
 (** The interface of a gossipsub worker. *)
@@ -579,7 +565,7 @@ module type WORKER = sig
   (** The different kinds of input events that could be received from the P2P
       layer. *)
   type p2p_input =
-    | Message of {peer : GS.Peer.t; p2p_message : p2p_message}
+    | In_message of {peer : GS.Peer.t; p2p_message : p2p_message}
     | New_connection of {peer : GS.Peer.t; direct : bool; outbound : bool}
     | Disconnection of {peer : GS.Peer.t}
 
@@ -589,6 +575,13 @@ module type WORKER = sig
     | Inject_message of full_message
     | Join of GS.Topic.t
     | Leave of GS.Topic.t
+
+  (** The different kinds of outputs that could be emitted by the worker for the
+      P2P layer. *)
+  type p2p_output =
+    | Out_message of {peer : GS.Peer.t; p2p_message : p2p_message}
+    | Disconnect of {peer : GS.Peer.t}
+    | Kick of {peer : GS.Peer.t}
 
   (** The application layer will be advertised about full messages it's
       interested in. *)

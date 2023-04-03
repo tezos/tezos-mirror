@@ -61,26 +61,27 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Subscribe of {topic : Topic.t}
     | Unsubscribe of {topic : Topic.t}
     | Publish of full_message
-  (* FIXME: FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
 
      The payloads of the variants about are quite simular to those of GS (types
      graft, prune, ...). We could reuse them if we move the peer field
      outside. *)
 
   type p2p_input =
-    | Message of {peer : Peer.t; p2p_message : p2p_message}
+    | In_message of {peer : Peer.t; p2p_message : p2p_message}
     | New_connection of {peer : Peer.t; direct : bool; outbound : bool}
     | Disconnection of {peer : Peer.t}
 
-  (** The different kinds of input events that could be received from the
-      application layer. *)
   type app_input =
     | Inject_message of full_message
     | Join of Topic.t
     | Leave of Topic.t
 
-  (** The application layer will be advertised about full messages it's
-      interested in. *)
+  type p2p_output =
+    | Out_message of {peer : Peer.t; p2p_message : p2p_message}
+    | Disconnect of {peer : Peer.t}
+    | Kick of {peer : Peer.t}
+
   type app_output = full_message
 
   (** The different kinds of events the Gossipsub worker handles. *)
@@ -134,11 +135,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle Inject_message's output *)
         ignore output ;
         gossip_state
-    | P2P_input (Message m) ->
+    | P2P_input (In_message m) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
            Handle received p2p messages. *)
-        ignore (Message m) ;
+        ignore (In_message m) ;
         assert false
     | App_input (Join topic) ->
         let gossip_state, output = GS.join {topic} gossip_state in
