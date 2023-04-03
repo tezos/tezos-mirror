@@ -239,6 +239,15 @@ module Aux = struct
       max_size:int32 ->
       int32 Lwt.t
 
+    val store_get_hash :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      dst:int32 ->
+      max_size:int32 ->
+      int32 Lwt.t
+
     val reveal :
       memory:memory ->
       dst:int32 ->
@@ -545,6 +554,29 @@ module Aux = struct
         let* key = load_key_from_memory key_offset key_length memory in
         let* result =
           guard (fun () -> Durable.subtree_name_at durable key index)
+        in
+        let result_size = String.length result in
+        let max_size = Int32.to_int max_size in
+        let result =
+          if max_size < result_size then String.sub result 0 max_size
+          else result
+        in
+        let+ () =
+          if result <> "" then M.store_bytes memory dst result else return_unit
+        in
+        Int32.of_int @@ String.length result
+      in
+      extract_error_code res
+
+    let store_get_hash ~durable ~memory ~key_offset ~key_length ~dst ~max_size =
+      let open Lwt_result_syntax in
+      let*! res =
+        let* key = load_key_from_memory key_offset key_length memory in
+        let* result =
+          guard (fun () -> Durable.hash_exn ~kind:`Subtree durable key)
+        in
+        let result =
+          Data_encoding.Binary.to_string_exn Context_hash.encoding result
         in
         let result_size = String.length result in
         let max_size = Int32.to_int max_size in
@@ -896,6 +928,46 @@ let store_get_nth_key =
           (durable, [value result], store_get_nth_key_ticks key_length result)
       | _ -> raise Bad_input)
 
+let store_get_hash_name = "tezos_internal_store_get_hash"
+
+let store_get_hash_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let store_get_hash_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
+
+let store_get_hash =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | Values.
+          [
+            Num (I32 key_offset);
+            Num (I32 key_length);
+            Num (I32 dst);
+            Num (I32 max_size);
+          ] ->
+          let* memory = retrieve_memory memories in
+          let+ result =
+            Aux.store_get_hash
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+              ~dst
+              ~max_size
+          in
+          (durable, [value result], store_get_hash_ticks key_length result)
+      | _ -> raise Bad_input)
+
 let store_copy_name = "tezos_store_copy"
 
 let store_copy_type =
@@ -1142,7 +1214,7 @@ let store_write =
             store_write_ticks key_length num_bytes code )
       | _ -> raise Bad_input)
 
-let lookup_opt ~version:_ name =
+let lookup_opt ~version name =
   match name with
   | "read_input" ->
       Some (ExternFunc (HostFunc (read_input_type, read_input_name)))
@@ -1173,6 +1245,12 @@ let lookup_opt ~version:_ name =
       Some (ExternFunc (HostFunc (store_read_type, store_read_name)))
   | "store_write" ->
       Some (ExternFunc (HostFunc (store_write_type, store_write_name)))
+  | "__internal_store_get_hash" -> (
+      match version with
+      | Wasm_pvm_state.V0 -> None
+      | V1 ->
+          Some
+            (ExternFunc (HostFunc (store_get_hash_type, store_get_hash_name))))
   | _ -> None
 
 let lookup ~version name =
@@ -1209,7 +1287,13 @@ let all_V0 =
   Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
 
 let all_V1 =
-  Host_funcs.(base |> with_write_debug ~write_debug:Noop |> construct)
+  Host_funcs.(
+    base
+    |> with_write_debug ~write_debug:Noop
+    |> with_host_function
+         ~global_name:store_get_hash_name
+         ~implem:store_get_hash
+    |> construct)
 
 let all ~version =
   match version with Wasm_pvm_state.V0 -> all_V0 | Wasm_pvm_state.V1 -> all_V1
@@ -1218,8 +1302,16 @@ let all ~version =
    each initialization tick. *)
 let all_debug ~version ~write_debug =
   match version with
-  | Wasm_pvm_state.V0 | Wasm_pvm_state.V1 ->
+  | Wasm_pvm_state.V0 ->
       Host_funcs.(base |> with_write_debug ~write_debug |> construct)
+  | V1 ->
+      Host_funcs.(
+        base
+        |> with_write_debug ~write_debug
+        |> with_host_function
+             ~global_name:store_get_hash_name
+             ~implem:store_get_hash
+        |> construct)
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size
@@ -1248,6 +1340,8 @@ module Internal_for_tests = struct
 
   let store_get_nth_key =
     Func.HostFunc (store_get_nth_key_type, store_get_nth_key_name)
+
+  let store_get_hash = Func.HostFunc (store_get_hash_type, store_get_hash_name)
 
   let write_debug = Func.HostFunc (write_debug_type, write_debug_name)
 end

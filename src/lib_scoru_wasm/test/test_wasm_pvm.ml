@@ -448,6 +448,33 @@ let should_run_store_copy_kernel ~version () =
   let* () = assert_store_value tree "/a/b" (Some "ab") in
   return_ok_unit
 
+let nop_store_get_hash_module =
+  {|
+(module
+ (import "smart_rollup_core" "__internal_store_get_hash"
+         (func $store_get_hash_key (param i32 i32 i32 i32) (result i32)))
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+    (nop)))
+  |}
+
+let try_run_store_get_hash ~version () =
+  let open Lwt_syntax in
+  let* tree =
+    initial_tree ~version ~from_binary:false nop_store_get_hash_module
+  in
+  let* tree = set_empty_inbox_step 0l tree in
+  let* tree = eval_until_input_or_reveal_requested tree in
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  let predicate state =
+    match version with
+    | Wasm_pvm_state.V0 -> is_stuck state
+    | V1 -> not (is_stuck state)
+  in
+  assert (predicate state) ;
+  Lwt_result_syntax.return_unit
+
 let test_modify_read_only_storage_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
@@ -1674,6 +1701,9 @@ let tests =
   tztests_with_pvm
     ~versions:[V0; V1]
     [
+      ( "Test __internal_store_get_hash available",
+        `Quick,
+        try_run_store_get_hash );
       ( "Test unreachable kernel (tick per tick)",
         `Quick,
         fun ~version ->
