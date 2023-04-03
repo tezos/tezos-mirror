@@ -5,17 +5,20 @@
 
 //! Rollup Metadata definition
 #[cfg(feature = "crypto")]
-use tezos_crypto_rs::hash::{FromBytesError, HashTrait, SmartRollupHash};
+use tezos_crypto_rs::hash::SmartRollupHash;
 
-/// Size of raw rollup address - (SmartRollupHash)[tezos_crypto_rs::hash::SmartRollupHash].
+/// Size of raw rollup address - [`SmartRollupHash`].
 pub const RAW_ROLLUP_ADDRESS_SIZE: usize = 20;
 
 /// Size of raw metadata: 20 (rollup address) + 4 (origination level).
 pub const METADATA_SIZE: usize = RAW_ROLLUP_ADDRESS_SIZE + core::mem::size_of::<i32>();
 
-/// Type returned from (Runtime)[crate::runtime::Runtime::reveal_metadata]
+/// Type returned from [`reveal_metadata`].
+///
 /// The raw structure is 24 bytes (20-byte rollup address followed
 /// by 4-byte origination level (i32 big-endian) )
+///
+/// [`reveal_metadata`]: tezos_smart_rollup_host::runtime::Runtime::reveal_metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RollupMetadata {
     /// Rollup address
@@ -27,8 +30,8 @@ pub struct RollupMetadata {
 impl RollupMetadata {
     /// The address of the smart rollup.
     #[cfg(feature = "crypto")]
-    pub fn address(&self) -> Result<SmartRollupHash, FromBytesError> {
-        SmartRollupHash::try_from_bytes(&self.raw_rollup_address)
+    pub fn address(&self) -> SmartRollupHash {
+        SmartRollupHash(self.raw_rollup_address.to_vec())
     }
 }
 
