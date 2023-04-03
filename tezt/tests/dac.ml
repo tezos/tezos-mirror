@@ -1145,7 +1145,7 @@ module Signature_manager = struct
     let invalid_signature (coordinator_node, _hex_root_hash, dac_committee) =
       let false_root_hash =
         `Hex
-          "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1826"
+          "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
       in
       let member = List.nth dac_committee 0 in
       let signature = bls_sign_hex_hash member false_root_hash in

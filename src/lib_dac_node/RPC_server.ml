@@ -206,7 +206,6 @@ let register_put_dac_member_signature ctx dac_plugin cctxt =
     (RPC_services.put_dac_member_signature dac_plugin)
     (fun () dac_member_signature ->
       Signature_manager.Coordinator.handle_put_dac_member_signature
-        dac_plugin
         ctx
         cctxt
         dac_member_signature)

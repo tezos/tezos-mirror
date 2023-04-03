@@ -324,20 +324,24 @@ module Coordinator = struct
          (fun pkh -> Aggregate_signature.Public_key_hash.equal signer_pkh pkh)
          dac_committee
 
-  let handle_put_dac_member_signature ((module Plugin) : Dac_plugin.t) ctx cctxt
-      dac_member_signature =
+  let handle_put_dac_member_signature ctx cctxt dac_member_signature =
     let open Lwt_result_syntax in
     let*? dac_plugin = Node_context.get_dac_plugin ctx in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let page_store = Node_context.get_page_store ctx in
     let Signature_repr.{signer_pkh; root_hash; signature} =
       dac_member_signature
     in
-    let*! payload =
-      Page_store.Filesystem.load dac_plugin page_store root_hash
+    let*! has_payload =
+      Page_store.Filesystem.mem dac_plugin page_store root_hash
     in
-    match payload with
-    | Error _ -> tzfail @@ Unknown_root_hash (Plugin.to_hex root_hash)
-    | Ok _payload ->
+    match has_payload with
+    | Error _ ->
+        tzfail
+        @@ Page_store.Cannot_read_page_from_page_storage
+             (Plugin.to_hex root_hash)
+    | Ok false -> tzfail @@ Unknown_root_hash (Plugin.to_hex root_hash)
+    | Ok true ->
         let*? dac_committee = Node_context.get_committee_members ctx in
         let* () =
           fail_unless

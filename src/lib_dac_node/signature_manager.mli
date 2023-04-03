@@ -65,11 +65,9 @@ module Coordinator : sig
         Tezos_crypto.Aggregate_signature.public_key_hash
     | Unknown_root_hash of string
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
-     Verify that root hash is one that the coordinator has *)
-
   (** [handle_put_dac_member_signature ctxt cctxt dac_members_pkh dac_member_signature]
       does the following procedure:
+      1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
       1. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
       2. Checks that the dac member has not yet signed. If already signed, then noop
          and return.
@@ -79,7 +77,6 @@ module Coordinator : sig
         3. Update the aggregate signature in [Aggregate_signature_store]
   *)
   val handle_put_dac_member_signature :
-    Dac_plugin.t ->
     Node_context.t ->
     #Client_context.wallet ->
     Signature_repr.t ->
