@@ -1656,5 +1656,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let connections state = state.connections
 
     let limits state = state.limits
+
+    let has_joined topic {mesh; _} = Topic.Map.mem topic mesh
   end
 end
