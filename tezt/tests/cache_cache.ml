@@ -27,13 +27,14 @@
    -------
    Component:    Shell / Cache
    Invocation:   dune exec tezt/tests/main.exe -- --file cache_cache.ml
-   Subject:      Check that annotations in contracts do not break cache consistency.
+   Subject:      Check cache('s cache) consistency.
 *)
 
-let register =
+(* Check that annotations in contracts do not break cache consistency. *)
+let cache_annotation_consistency =
   Protocol.register_test
     ~__FILE__
-    ~title:"cache cache"
+    ~title:"cache annotation consistency"
     ~tags:["cache"; "node"; "baker"]
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
@@ -82,3 +83,76 @@ let register =
   in
   let* () = wait_injection in
   Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+
+let singleprocess_reorg =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"cache consistency on singleprocess reorg"
+    ~tags:["singleprocess"; "reorg"]
+  @@ fun protocol ->
+  let minimal_block_delay = 5 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, Some Constants_mainnet))
+      [(["minimal_block_delay"], `String (string_of_int minimal_block_delay))]
+  in
+  let* node1, client1 =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      ~timestamp:Now
+      ~parameter_file
+      `Client
+      ()
+  in
+  let* node2, _client2 =
+    Client.init_with_node
+      ~nodes_args:[Singleprocess; Synchronisation_threshold 0]
+      `Client
+      ()
+  in
+  let error_events =
+    [
+      "block_validation_inconsistent_cache.v0";
+      "validation_failure_after_precheck.v0";
+      "precheck_failure.v0";
+      "validation_failed.v0";
+    ]
+  in
+  List.iter
+    (fun name ->
+      let fail_on_event event =
+        if event.Node.name = name then
+          Test.fail "Received an inconsistent hash while validating a block"
+      in
+      Node.on_event node1 fail_on_event ;
+      Node.on_event node2 fail_on_event)
+    error_events ;
+  Log.info
+    "Connecting nodes and waiting for the activation block to be propagated" ;
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* (_level : int) = Node.wait_for_level node2 1 in
+  Log.info "Proposing a new block with round 0" ;
+  let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client1 in
+  let* (_level : int) = Node.wait_for_level node1 2 in
+  let* (_level : int) = Node.wait_for_level node2 2 in
+  Log.info "Waiting until we are sure to repropose a block at the same level..." ;
+  let* () = Lwt_unix.sleep (float minimal_block_delay) in
+  let wait_for_reorg_event node =
+    Node.wait_for node "branch_switch.v0" (fun _ -> Some ())
+  in
+  let waiter = Lwt.join (List.map wait_for_reorg_event [node1; node2]) in
+  Log.info "Bake a block on a different branch" ;
+  let* () = Client.bake_for ~minimal_timestamp:false ~keys:[] client1 in
+  Log.info "Waiting for both node to switch heads" ;
+  let* () = waiter in
+  Log.info "Baking block at level 3" ;
+  let* () = Client.bake_for ~minimal_timestamp:false ~keys:[] client1 in
+  Log.info "Waiting for both nodes to increase their head" ;
+  let* (_level : int) = Node.wait_for_level node1 3 in
+  let* (_level : int) = Node.wait_for_level node2 3 in
+  unit
+
+let register ~protocols =
+  cache_annotation_consistency protocols ;
+  singleprocess_reorg protocols

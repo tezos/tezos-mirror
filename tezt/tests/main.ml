@@ -110,7 +110,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Big_map_all.register ~protocols ;
   Big_map_arity.register ~protocols ;
   Bootstrap.register ~protocols ;
-  Cache_cache.register protocols ;
+  Cache_cache.register ~protocols ;
   Client_commands.register ~protocols ;
   Client_config.register ~protocols ;
   Client_fa12.register ~protocols ;
