@@ -381,9 +381,10 @@ module Test_remove_peer = struct
           `peer_not_removed_correctly (view, str, peer))
     in
     let* () = check_map "connections" view.connections in
-    (* We don't check [ihave/iwant_per_heartbeat], as these maps are
-       only cleaned on heartbeat. There's a potential issue with spam though.
-       FIXME https://gitlab.com/tezos/tezos/-/issues/5252 *)
+    (* The last step of the scenario is a heartbeat, which cleans the
+       [iwant/ihave_per_heartbeat] maps. *)
+    let* () = check_map "ihave_per_heartbeat" view.ihave_per_heartbeat in
+    let* () = check_map "iwant_per_heartbeat" view.iwant_per_heartbeat in
     let* () =
       Topic.Map.iter_e
         (fun topic peer_set ->
@@ -460,6 +461,7 @@ module Test_remove_peer = struct
         |> repeat_at_most 5;
         graft_then_prune_wait_and_clean () |> repeat_at_most 10;
       ]
+    @% heartbeat
 
   let pp_backoff fmtr (backoff : int GS.Topic.Map.t) =
     let list = backoff |> GS.Topic.Map.bindings in
