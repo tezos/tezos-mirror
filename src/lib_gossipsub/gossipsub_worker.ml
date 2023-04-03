@@ -79,6 +79,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Join of Topic.t
     | Leave of Topic.t
 
+  (** The application layer will be advertised about full messages it's
+      interested in. *)
+  type app_output = full_message
+
   (** The different kinds of events the Gossipsub worker handles. *)
   type event = Heartbeat | P2P_input of p2p_input | App_input of app_input
 

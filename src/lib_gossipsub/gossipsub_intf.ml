@@ -590,6 +590,10 @@ module type WORKER = sig
     | Join of GS.Topic.t
     | Leave of GS.Topic.t
 
+  (** The application layer will be advertised about full messages it's
+      interested in. *)
+  type app_output = full_message
+
   (** [make rng limits parameters] initializes a new Gossipsub automaton with
       the given arguments. Then, it initializes and returns a worker for it. *)
   val make :
