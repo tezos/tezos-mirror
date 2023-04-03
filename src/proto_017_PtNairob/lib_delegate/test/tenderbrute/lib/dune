@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tenderbrute_alpha)
- (public_name tezos-baking-alpha.tenderbrute)
+ (name tenderbrute_017_PtNairob)
+ (public_name tezos-baking-017-PtNairob.tenderbrute)
  (libraries
   data-encoding
   tezos-base
   tezos-base.unix
-  tezos-protocol-alpha
+  tezos-protocol-017-PtNairob
   tezos-client-base
-  tezos-client-alpha)
+  tezos-client-017-PtNairob)
  (flags
   (:standard)
   -open Data_encoding
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_base
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_017_PtNairob
   -open Tezos_client_base
-  -open Tezos_client_alpha))
+  -open Tezos_client_017_PtNairob))

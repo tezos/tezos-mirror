@@ -28,6 +28,9 @@ depends: [
   "tezos-client-016-PtMumbai"
   "tezos-baking-016-PtMumbai-commands"
   "tezos-protocol-plugin-016-PtMumbai"
+  "tezos-client-017-PtNairob"
+  "tezos-baking-017-PtNairob-commands"
+  "tezos-protocol-plugin-017-PtNairob"
 ]
 depopts: [
   "tezos-client-genesis"

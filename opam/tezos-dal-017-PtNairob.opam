@@ -1,0 +1,34 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
+  "ppx_expect"
+  "tezos-base"
+  "octez-protocol-compiler"
+  "tezos-stdlib-unix"
+  "tezos-dal-node-lib"
+  "tezos-client-017-PtNairob"
+  "tezos-protocol-plugin-017-PtNairob"
+  "tezos-embedded-protocol-017-PtNairob"
+  "tezos-layer2-utils-017-PtNairob"
+  "tezos-protocol-017-PtNairob"
+  "tezt" { with-test & >= "3.0.0" }
+  "tezos-base-test-helpers" {with-test}
+  "tezos-017-PtNairob-test-helpers" {with-test}
+  "octez-alcotezt" {with-test}
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: protocol specific library for the Data availability Layer"

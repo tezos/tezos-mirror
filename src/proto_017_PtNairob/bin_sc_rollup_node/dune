@@ -2,20 +2,20 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_sc_rollup_node_alpha)
- (public_name octez-smart-rollup-node-alpha)
- (package octez-smart-rollup-node-alpha)
+ (name main_sc_rollup_node_017_PtNairob)
+ (public_name octez-smart-rollup-node-PtNairob)
+ (package octez-smart-rollup-node-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-clic
-  tezos-protocol-alpha
+  tezos-protocol-017-PtNairob
   tezos-shell-services
   tezos-client-base
   tezos-client-base-unix
   tezos-client-commands
-  tezos-client-alpha
-  octez_smart_rollup_node_alpha)
+  tezos-client-017-PtNairob
+  octez_smart_rollup_node_PtNairob)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -25,10 +25,10 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_017_PtNairob
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_commands
-  -open Tezos_client_alpha
-  -open Octez_smart_rollup_node_alpha))
+  -open Tezos_client_017_PtNairob
+  -open Octez_smart_rollup_node_PtNairob))

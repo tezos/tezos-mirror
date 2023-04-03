@@ -1,0 +1,53 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
+  "tezos-base"
+  "tezos-stdlib-unix"
+  "tezos-client-base"
+  "tezos-client-base-unix"
+  "tezos-client-017-PtNairob"
+  "tezos-context"
+  "tezos-protocol-017-PtNairob"
+  "tezos-protocol-plugin-017-PtNairob"
+  "tezos-rpc"
+  "tezos-rpc-http"
+  "tezos-rpc-http-server"
+  "tezos-workers"
+  "tezos-dal-node-services"
+  "tezos-dal-node-lib"
+  "tezos-shell-services"
+  "tezos-smart-rollup-017-PtNairob"
+  "tezos-smart-rollup-layer2-017-PtNairob"
+  "tezos-layer2-utils-017-PtNairob"
+  "tezos-layer2-store"
+  "octez-crawler"
+  "tezos-tree-encoding"
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "irmin-pack" { >= "3.6.0" & < "3.7.0" }
+  "irmin" { >= "3.6.0" & < "3.7.0" }
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
+  "octez-injector"
+  "tezos-scoru-wasm"
+  "tezos-scoru-wasm-fast"
+  "tezos-crypto-dal"
+  "prometheus-app" { >= "1.2" }
+  "octez-node-config"
+  "tezos-clic"
+  "tezos-client-commands"
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: protocol specific Smart rollup node"

@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_alpha_test_helpers)
- (public_name tezos-alpha-test-helpers)
+ (name tezos_017_PtNairob_test_helpers)
+ (public_name tezos-017-PtNairob-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
@@ -12,12 +12,12 @@
   tezos-micheline
   tezos-stdlib-unix
   tezos-protocol-017-PtNairob
-  tezos-client-alpha
+  tezos-client-017-PtNairob
   tezos-protocol-017-PtNairob.parameters
   tezos-protocol-environment
-  tezos-protocol-plugin-alpha
+  tezos-protocol-plugin-017-PtNairob
   tezos-shell-services
-  tezos-plompiler
+  octez-plompiler
   tezos-crypto-dal)
  (flags
   (:standard)
@@ -27,7 +27,7 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_017_PtNairob
-  -open Tezos_client_alpha
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_client_017_PtNairob
+  -open Tezos_protocol_plugin_017_PtNairob
   -open Tezos_shell_services
   -open Tezos_crypto_dal))

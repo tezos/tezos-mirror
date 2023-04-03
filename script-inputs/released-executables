@@ -5,6 +5,10 @@ octez-codec
 octez-client
 octez-admin-client
 octez-node
+octez-smart-rollup-node-PtNairob
+octez-smart-rollup-client-PtNairob
+octez-accuser-PtNairob
+octez-baker-PtNairob
 octez-smart-rollup-node-PtMumbai
 octez-smart-rollup-client-PtMumbai
 octez-accuser-PtMumbai

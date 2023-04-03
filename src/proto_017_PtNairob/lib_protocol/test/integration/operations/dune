@@ -2,17 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib)
+ (name
+  src_proto_017_PtNairob_lib_protocol_test_integration_operations_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-alcotezt
   tezos-base
   tezos-protocol-017-PtNairob
-  tezos-client-alpha
-  tezos-alpha-test-helpers
+  tezos-client-017-PtNairob
+  tezos-017-PtNairob-test-helpers
   tezos-base-test-helpers
-  tezos-protocol-plugin-alpha)
+  tezos-protocol-plugin-017-PtNairob)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -22,10 +23,10 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_017_PtNairob
-  -open Tezos_client_alpha
-  -open Tezos_alpha_test_helpers
+  -open Tezos_client_017_PtNairob
+  -open Tezos_017_PtNairob_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_plugin_alpha)
+  -open Tezos_protocol_plugin_017_PtNairob)
  (modules
   test_main
   test_activation
@@ -45,7 +46,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_operations_tezt_lib
   tezt)
  (link_flags
   (:standard)

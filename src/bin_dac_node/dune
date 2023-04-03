@@ -24,6 +24,7 @@
   irmin-pack
   irmin-pack.unix
   irmin
+  tezos-dac-017-PtNairob
   (select void_for_linking-tezos-dac-alpha from
    (tezos-dac-alpha -> void_for_linking-tezos-dac-alpha.empty)
    (-> void_for_linking-tezos-dac-alpha.empty)))

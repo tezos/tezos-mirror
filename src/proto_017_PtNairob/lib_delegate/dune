@@ -2,19 +2,19 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_baking_alpha)
- (public_name tezos-baking-alpha)
+ (name tezos_baking_017_PtNairob)
+ (public_name tezos-baking-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-clic
   tezos-version
-  tezos-protocol-alpha
-  tezos-protocol-plugin-alpha
+  tezos-protocol-017-PtNairob
+  tezos-protocol-plugin-017-PtNairob
   tezos-protocol-environment
   tezos-shell-services
   tezos-client-base
-  tezos-client-alpha
+  tezos-client-017-PtNairob
   tezos-client-commands
   tezos-stdlib
   tezos-stdlib-unix
@@ -34,11 +34,11 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_protocol_plugin_017_PtNairob
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_017_PtNairob
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
@@ -49,19 +49,19 @@
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (library
- (name tezos_baking_alpha_commands)
- (public_name tezos-baking-alpha-commands)
+ (name tezos_baking_017_PtNairob_commands)
+ (public_name tezos-baking-017-PtNairob-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-alpha
+  tezos-protocol-017-PtNairob
   tezos-stdlib-unix
   tezos-protocol-environment
   tezos-shell-services
   tezos-client-base
-  tezos-client-alpha
+  tezos-client-017-PtNairob
   tezos-client-commands
-  tezos-baking-alpha
+  tezos-baking-017-PtNairob
   tezos-rpc
   uri)
  (library_flags (:standard -linkall))
@@ -69,39 +69,39 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_017_PtNairob
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_017_PtNairob
   -open Tezos_client_commands
-  -open Tezos_baking_alpha)
+  -open Tezos_baking_017_PtNairob)
  (modules Baking_commands))
 
 (library
- (name tezos_baking_alpha_commands_registration)
- (public_name tezos-baking-alpha-commands.registration)
+ (name tezos_baking_017_PtNairob_commands_registration)
+ (public_name tezos-baking-017-PtNairob-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-alpha
+  tezos-protocol-017-PtNairob
   tezos-protocol-environment
   tezos-shell-services
   tezos-client-base
-  tezos-client-alpha
+  tezos-client-017-PtNairob
   tezos-client-commands
-  tezos-baking-alpha
-  tezos-baking-alpha-commands
+  tezos-baking-017-PtNairob
+  tezos-baking-017-PtNairob-commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_017_PtNairob
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_017_PtNairob
   -open Tezos_client_commands
-  -open Tezos_baking_alpha
-  -open Tezos_baking_alpha_commands)
+  -open Tezos_baking_017_PtNairob
+  -open Tezos_baking_017_PtNairob_commands)
  (modules Baking_commands_registration))

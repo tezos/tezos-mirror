@@ -2,15 +2,15 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_dal_test_tezt_lib)
+ (name src_proto_017_PtNairob_lib_dal_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   tezos-base
-  tezos-dal-alpha
-  tezos-protocol-alpha
+  tezos-dal-017-PtNairob
+  tezos-protocol-017-PtNairob
   tezos-base-test-helpers
-  tezos-alpha-test-helpers
+  tezos-017-PtNairob-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -19,10 +19,10 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_dal_alpha
-  -open Tezos_protocol_alpha
+  -open Tezos_dal_017_PtNairob
+  -open Tezos_protocol_017_PtNairob
   -open Tezos_base_test_helpers
-  -open Tezos_alpha_test_helpers
+  -open Tezos_017_PtNairob_test_helpers
   -open Octez_alcotezt)
  (modules test_dal_slot_frame_encoding test_helpers))
 
@@ -30,7 +30,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_dal_test_tezt_lib
+  src_proto_017_PtNairob_lib_dal_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -39,7 +39,7 @@
 
 (rule
  (alias runtezt)
- (package tezos-dal-alpha)
+ (package tezos-dal-017-PtNairob)
  (action (run %{dep:./main.exe})))
 
 (rule
