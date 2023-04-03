@@ -1514,6 +1514,21 @@ module Make (C : AUTOMATON_CONFIG) :
   let remove_peer : remove_peer -> [`Remove_peer] output Monad.t =
    fun {peer} -> Remove_peer.handle peer
 
+  let select_px_peers state ~peer_to_prune topic ~noPX_peers =
+    let do_px = do_px state in
+    let peers_to_px = peers_to_px state in
+    let filter peer connection =
+      (not (Peer.equal peer_to_prune peer)) && Score.(connection.score >= zero)
+    in
+    if do_px && not (Peer.Set.mem peer_to_prune noPX_peers) then
+      select_connections_peers
+        state.connections
+        state.rng
+        topic
+        ~filter
+        ~max:peers_to_px
+    else []
+
   (* Helpers. *)
 
   let pp_add_peer fmtr ({direct; outbound; peer} : add_peer) =
