@@ -284,7 +284,8 @@ module Internal_validator_process = struct
       Ptime.diff then_ now
     in
     validator.cache <-
-      Some {context_hash = predecessor_resulting_context_hash; cache} ;
+      Some
+        {context_hash = result.validation_store.resulting_context_hash; cache} ;
     validator.preapply_result <- None ;
     let*! () = Events.(emit validation_success (block_hash, timespan)) in
     return result
