@@ -111,6 +111,11 @@ module Make (PVM : Pvm.S) = struct
                 Some (Raw_level.of_int32_exn head.Layer1.level);
             }
         in
+        let*! () =
+          Commitment_event.last_published_commitment_updated
+            commitment_hash
+            (Raw_level.of_int32_exn head.Layer1.level)
+        in
         return_unit
     | ( Sc_rollup_publish {commitment = their_commitment; rollup},
         Sc_rollup_publish_result
@@ -446,7 +451,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = Components.Commitment.Publisher.publish_commitments () in
     let* () = Components.Commitment.Publisher.cement_commitments () in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
-    let* () = Components.Refutation_game.process head node_ctxt in
+    let* () = Components.Refutation_coordinator.process head in
     let* () = Components.Batcher.batch () in
     let* () = Components.Batcher.new_head head in
     let*! () = Injector.inject ~header () in
@@ -467,6 +472,8 @@ module Make (PVM : Pvm.S) = struct
     let* () = Components.Batcher.shutdown () in
     let* () = message "Shutting down Commitment Publisher@." in
     let* () = Components.Commitment.Publisher.shutdown () in
+    let* () = message "Shutting down Refutation Coordinator@." in
+    let* () = Components.Refutation_coordinator.shutdown () in
     let* (_ : unit tzresult) = Node_context.close node_ctxt in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
@@ -520,6 +527,7 @@ module Make (PVM : Pvm.S) = struct
                (operator, strategy, purposes))
       in
       let* () = Components.Commitment.Publisher.init node_ctxt in
+      let* () = Components.Refutation_coordinator.init node_ctxt in
       let* () =
         Injector.init
           node_ctxt.cctxt

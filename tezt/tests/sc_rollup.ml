@@ -720,6 +720,23 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
   let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
   parse_inbox inbox
 
+(** Configure the rollup node to pay more fees for its refute operations. *)
+let prioritize_refute_operations sc_rollup_node =
+  Log.info
+    "Prioritize refutation operations for rollup node %s"
+    (Sc_rollup_node.name sc_rollup_node) ;
+  Sc_rollup_node.Config_file.update sc_rollup_node @@ fun config ->
+  let open JSON in
+  update
+    "fee-parameters"
+    (update "refute"
+    @@ put
+         ( "minimal-nanotez-per-gas-unit",
+           JSON.annotate
+             ~origin:"higher-priority"
+             (`A [`String "200"; `String "1"]) ))
+    config
+
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
 
@@ -878,10 +895,49 @@ let bake_levels ?hook n client =
   let* () = match hook with None -> unit | Some hook -> hook i in
   Client.bake_for_and_wait client
 
+(** Bake [at_least] levels.
+    Then continues baking until the rollup node updates the lpc,
+    waiting for the rollup node to catch up to the client's level.
+    Returns the level at which the lpc was updated. *)
+let bake_until_lpc_updated ?hook ?(at_least = 0) ~timeout client sc_rollup_node
+    =
+  let event_level = ref None in
+  let _ =
+    let* lvl =
+      Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_node_lpc_updated.v0"
+      @@ fun json -> JSON.(json |-> "level" |> as_int_opt)
+    in
+    event_level := Some lvl ;
+    unit
+  in
+  let rec bake_loop i =
+    let* () = match hook with None -> unit | Some hook -> hook i in
+    let* () = Client.bake_for_and_wait client in
+    match !event_level with
+    | Some level -> return level
+    | None -> bake_loop (i + 1)
+  in
+  let* () = bake_levels ?hook at_least client in
+  let* updated_level =
+    Lwt.catch
+      (fun () -> Lwt.pick [Lwt_unix.timeout timeout; bake_loop 0])
+      (function
+        | Lwt_unix.Timeout ->
+            Test.fail
+              "Timeout of %f seconds reached when waiting for LPC to be updated"
+              timeout
+        | e -> raise e)
+  in
+  (* Let the sc rollup node catch up *)
+  let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
+  return updated_level
+
 (* Rollup node batcher *)
 let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
     =
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
   Log.info "Sending one message to the batcher" ;
   let msg1 = "3 3 + out" in
   let*! hashes = Sc_rollup_client.inject sc_rollup_client [msg1] in
@@ -983,15 +1039,11 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   in
   let levels =
     levels_to_commitment + init_level - Node.get_level node
-    + block_finality_time + 1
+    + block_finality_time
   in
   Log.info "Baking %d blocks for commitment of first message" levels ;
-  let* () = bake_levels levels client in
   let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
+    bake_until_lpc_updated ~at_least:levels ~timeout:5. client sc_rollup_node
   in
   let*! _msg1, status_msg1 =
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
@@ -1308,6 +1360,11 @@ let test_commitment_scenario ?commitment_period ?challenge_window
       description = "rollup node - correct handling of commitments";
     }
 
+let bake_levels ?hook n client =
+  fold n () @@ fun i () ->
+  let* () = match hook with None -> unit | Some hook -> hook i in
+  Client.bake_for_and_wait client
+
 let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
     client =
   (* The rollup is originated at level `init_level`, and it requires
@@ -1329,10 +1386,9 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
-  let store_commitment_level =
-    init_level + levels_to_commitment + block_finality_time
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
   in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1356,12 +1412,6 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
      [init_level + sc_rollup_commitment_period_in_blocks] is
      processed by the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      store_commitment_level
-  in
   let* {
          commitment = {inbox_level = stored_inbox_level; _} as stored_commitment;
          hash = _;
@@ -1372,8 +1422,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
     Check.int
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
-  (* Bake one level for commitment to be included *)
-  let* () = Client.bake_for_and_wait client in
+  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node in
   let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1517,7 +1566,7 @@ let commitment_not_published_if_non_final _protocol sc_rollup_node
   unit
 
 let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
-    sc_rollup node client =
+    sc_rollup _node client =
   (* For `sc_rollup_commitment_period_in_blocks` levels after the sc rollup
      origination, i messages are sent to the rollup, for a total of
      `sc_rollup_commitment_period_in_blocks *
@@ -1539,7 +1588,9 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1561,12 +1612,6 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
      rollup node.
   *)
   let* () = bake_levels (levels_to_commitment + block_finality_time) client in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (init_level + (2 * levels_to_commitment) + block_finality_time)
-  in
   let* {
          commitment =
            {
@@ -1599,8 +1644,7 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
-  let* () = Client.bake_for_and_wait client in
-  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (Node.get_level node) in
+  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node in
   let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1729,7 +1773,9 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
 
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node ~event_level:`Debug sc_rollup []
+  in
   (* We bake `sc_rollup_commitment_period_in_blocks - 1` levels, which
      should cause both nodes to observe level
      `sc_rollup_commitment_period_in_blocks + init_level - 1 . *)
@@ -1778,18 +1824,22 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
   in
 
   let* () = divergence () in
-  let* client, node =
+  let* client =
     if switch_l1_node then (
       (* Switch the L1 node of a rollup node so that reverted blocks are not *)
       (* available in the new L1 node. *)
       Log.info "Changing L1 node for rollup node" ;
       let* () =
-        Sc_rollup_node.change_node_and_restart sc_rollup_node sc_rollup node'
+        Sc_rollup_node.change_node_and_restart
+          ~event_level:`Debug
+          sc_rollup_node
+          sc_rollup
+          node'
       in
-      return (client', node'))
+      return client')
     else
       let* () = trigger_reorg () in
-      return (client, node)
+      return client
   in
   (* After triggering a reorganisation the node should see that there is a more
      attractive head at level `init_level +
@@ -1845,8 +1895,7 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
-  let* () = Client.bake_for_and_wait client in
-  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (Node.get_level node) in
+  let* _ = bake_until_lpc_updated ~timeout:5.0 client sc_rollup_node in
   let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1925,7 +1974,9 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1939,16 +1990,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
       sc_rollup_node
       (init_level + commitment_period)
   in
-  (* Bake `block_finality_time` additional level to ensure that block number
-     `init_level + sc_rollup_commitment_period_in_blocks` is processed by
-     the rollup node as finalized and one additional for commitment inclusion. *)
-  let* () = bake_levels (block_finality_time + 1) client in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
-  in
+  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node in
   let* {commitment = _; hash = rollup_node1_stored_hash} =
     get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
@@ -2105,7 +2147,9 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -2119,15 +2163,8 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
       sc_rollup_node
       (init_level + commitment_period)
   in
-  (* Bake `block_finality_time` additional level to ensure that block number
-     `init_level + sc_rollup_commitment_period_in_blocks` is processed by
-     the rollup node as finalized. *)
-  let* () = bake_levels (block_finality_time + 1) client in
-  let* _commitment_finalized_level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
+  let* commitment_publish_level =
+    bake_until_lpc_updated ~timeout:5. client sc_rollup_node
   in
   let* rollup_node1_published_commitment =
     get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
@@ -2138,7 +2175,6 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
     Check.int
     ~error_msg:
       "Commitment has been published for a level %L different than expected %R" ;
-  let commitment_publish_level = Node.get_level node in
   Check.(
     commitment_info_first_published_at_level rollup_node1_published_commitment
     = Some commitment_publish_level)
@@ -2159,7 +2195,9 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
       ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
-  let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node' sc_rollup []
+  in
 
   let* _ =
     Sc_rollup_node.wait_for_level
@@ -2177,11 +2215,7 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
     = None)
     (Check.option Check.int)
     ~error_msg:"Rollup node 2 cannot publish commitment without any new block." ;
-  let* () = Client.bake_for_and_wait client in
-  let commitment_publish_level2 = Node.get_level node in
-  let* _ =
-    Sc_rollup_node.wait_for_level sc_rollup_node' commitment_publish_level2
-  in
+  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node' in
   let* rollup_node2_published_commitment =
     get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
@@ -2675,7 +2709,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       final_level,
       empty_levels,
       stop_loser_at,
-      reset_honest_on ) =
+      reset_honest_on,
+      (priority : [`Priority_honest | `Priority_loser | `No_priority]) ) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -2760,6 +2795,10 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       in
       gather_dissections ()
     in
+    (* Write configuration to be able to change it *)
+    let* _ = Sc_rollup_node.config_init sc_rollup_node sc_rollup_address in
+    if priority = `Priority_honest then
+      prioritize_refute_operations sc_rollup_node ;
     let* () =
       Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
     in
@@ -2787,6 +2826,14 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let* gather_promises = run_honest_node sc_rollup_node
   and* () =
     Lwt_list.iter_p (fun (loser_mode, loser_sc_rollup_node) ->
+        let* _ =
+          Sc_rollup_node.config_init
+            ~loser_mode
+            loser_sc_rollup_node
+            sc_rollup_address
+        in
+        if priority = `Priority_loser then
+          prioritize_refute_operations loser_sc_rollup_node ;
         Sc_rollup_node.run loser_sc_rollup_node ~loser_mode sc_rollup_address [])
     @@ List.combine loser_modes loser_sc_rollup_nodes
   in
@@ -2940,62 +2987,112 @@ let test_refutation protocols ~kind =
              message index of the failure, and the third integer is the
              index of the failing tick during the processing of this
              message. *)
-          ("inbox_proof_at_genesis", (["3 0 0"], inputs_for 10, 80, [], [], []));
-          ("pvm_proof_at_genesis", (["3 0 1"], inputs_for 10, 80, [], [], []));
-          ("inbox_proof", (["5 0 0"], inputs_for 10, 80, [], [], []));
+          ( "inbox_proof_at_genesis",
+            (["3 0 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_at_genesis",
+            (["3 0 1"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "inbox_proof",
+            (["5 0 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
           ( "inbox_proof_with_new_content",
-            (["5 0 0"], inputs_for 30, 80, [], [], []) );
+            (["5 0 0"], inputs_for 30, 80, [], [], [], `Priority_honest) );
           (* In "inbox_proof_with_new_content" we add messages after the commitment
              period so the current inbox is not equal to the inbox snapshot-ted at the
              game creation. *)
           ( "inbox_proof_one_empty_level",
-            (["6 0 0"], inputs_for 10, 80, [2], [], []) );
+            (["6 0 0"], inputs_for 10, 80, [2], [], [], `Priority_honest) );
           ( "inbox_proof_many_empty_levels",
-            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], [], []) );
-          ("pvm_proof_0", (["5 2 1"], inputs_for 10, 80, [], [], []));
-          ("pvm_proof_1", (["7 2 0"], inputs_for 10, 80, [], [], []));
-          ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], [], []));
-          ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], [], []));
-          ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35], []));
+            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], [], [], `Priority_honest)
+          );
+          ( "pvm_proof_0",
+            (["5 2 1"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_1",
+            (["7 2 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_2",
+            (["7 2 5"], inputs_for 7, 80, [], [], [], `Priority_honest) );
+          ( "pvm_proof_3",
+            (["9 2 5"], inputs_for 7, 80, [4; 5], [], [], `Priority_honest) );
+          ( "timeout",
+            (["5 2 1"], inputs_for 10, 80, [], [35], [], `Priority_honest) );
           ( "reset_honest_during_game",
             ( ["5 2 1"],
               inputs_for 10,
               80,
               [],
               [],
-              [("sc_rollup_node_conflict_detected.v0", 2)] ) );
+              [("sc_rollup_node_conflict_detected.v0", 2)],
+              `Priority_honest ) );
           ( "parallel_games_0",
-            (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], []) );
+            (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], [], `Priority_honest)
+          );
           ( "parallel_games_1",
-            (["3 0 0"; "3 0 1"; "3 0 0"], inputs_for 10, 200, [], [], []) );
+            ( ["3 0 0"; "3 0 1"; "3 0 0"],
+              inputs_for 10,
+              200,
+              [],
+              [],
+              [],
+              `Priority_honest ) );
         ]
     | "wasm_2_0_0" ->
         [
           (* First message of an inbox (level 3) *)
-          ("inbox_proof_0", (["3 0 0"], inputs_for 10, 80, [], [], []));
+          ( "inbox_proof_0",
+            (["3 0 0"], inputs_for 10, 80, [], [], [], `Priority_loser) );
           (* Fourth message of an inbox (level 3) *)
-          ("inbox_proof_1", (["3 4 0"], inputs_for 10, 80, [], [], []));
+          ( "inbox_proof_1",
+            (["3 4 0"], inputs_for 10, 80, [], [], [], `Priority_loser) );
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
           ( "pvm_proof_0",
-            (["5 7 11_000_000_001"], inputs_for 10, 80, [], [], []) );
+            ( ["5 7 11_000_000_001"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           ( "pvm_proof_1",
-            (["7 7 11_000_001_000"], inputs_for 10, 80, [], [], []) );
+            ( ["7 7 11_000_001_000"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           (* End of evaluation *)
           ( "pvm_proof_2",
-            (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], []) );
+            ( ["7 7 22_000_002_000"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           (* During padding *)
           ( "pvm_proof_3",
-            (["7 7 22_010_000_000"], inputs_for 10, 80, [], [], []) );
+            ( ["7 7 22_010_000_000"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           ( "parallel_games_0",
-            (["4 0 0"; "5 7 11_000_000_001"], inputs_for 10, 80, [], [], []) );
+            ( ["4 0 0"; "5 7 11_000_000_001"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              `Priority_loser ) );
           ( "parallel_games_1",
             ( ["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"],
               inputs_for 10,
               80,
               [],
               [],
-              [] ) );
+              [],
+              `Priority_loser ) );
         ]
     | _ -> assert false
   in
@@ -3019,7 +3116,7 @@ let test_accuser protocols =
     ~challenge_window:10
     ~commitment_period:10
     ~variant:"pvm_proof_2"
-    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [])
+    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [], `Priority_honest)
     protocols
 
 (** Helper to check that the operation whose hash is given is successfully
@@ -3760,9 +3857,9 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             client
     in
     let blocks_to_wait =
-      2 + (2 * commitment_period) + challenge_window - earliness
+      3 + (2 * commitment_period) + challenge_window - earliness
     in
-    repeat blocks_to_wait @@ fun () -> Client.bake_for client
+    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
   in
   let trigger_outbox_message_execution ?expected_l1_error address =
     let outbox_level = 5 in

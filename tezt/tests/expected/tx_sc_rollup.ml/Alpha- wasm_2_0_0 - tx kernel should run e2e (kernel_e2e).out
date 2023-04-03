@@ -142,7 +142,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.00229
-    Expected counter: 14
+    Expected counter: 15
     Gas limit: 9512
     Storage limit: 250 bytes
     Balance updates:

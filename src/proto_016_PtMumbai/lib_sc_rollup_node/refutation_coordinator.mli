@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_coordinator = Refutation_coordinator.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
+(** Component for managing refutation games.
+    This module is implemented as a single worker in the rollup node,
+    which takes care of processing new L1 heads, and coordinating
+    the refutation game players. (See {!Refutation_player}).
+*)
+
+module type S = sig
+  module PVM : Pvm.S
+
+  (** Initiatilize the refuation coordinator. *)
+  val init : Node_context.rw -> unit tzresult Lwt.t
+
+  (** Process a new l1 head. This means that the coordinator will:
+      {ol
+        {li Gather all existing conflicts}
+        {li Launch new refutation players for each conflict that doesn't
+            have a player in this node}
+        {li Kill all players whose conflict has disappeared from L1}
+        {li Make all players play a step in the refutation}
+      }
+  *)
+  val process : Layer1.head -> unit tzresult Lwt.t
+
+  (** Shutdown the refutation coordinator. *)
+  val shutdown : unit -> unit Lwt.t
 end
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+module Make (Interpreter : Interpreter.S) : S

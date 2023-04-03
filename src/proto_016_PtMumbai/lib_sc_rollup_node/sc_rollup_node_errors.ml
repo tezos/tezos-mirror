@@ -55,6 +55,8 @@ type error +=
   | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
   | No_batcher
   | No_publisher
+  | Refutation_player_failed_to_start
+  | No_refutation_coordinator
 
 type error += Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
 
@@ -321,4 +323,26 @@ let () =
     `Permanent
     Data_encoding.unit
     (function No_publisher -> Some () | _ -> None)
-    (fun () -> No_publisher)
+    (fun () -> No_publisher) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_refutation_coordinator"
+    ~title:"No refutation coordinator for this node"
+    ~description:"This node does not have a refutation game coordinator"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This node does not have a refutation game coordinator")
+    `Permanent
+    Data_encoding.unit
+    (function No_refutation_coordinator -> Some () | _ -> None)
+    (fun () -> No_refutation_coordinator) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_refutation_player"
+    ~title:"A refutation player failed to start"
+    ~description:"A refutation player failed to start"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "A refutation player failed to start.")
+    `Permanent
+    Data_encoding.unit
+    (function Refutation_player_failed_to_start -> Some () | _ -> None)
+    (fun () -> Refutation_player_failed_to_start)

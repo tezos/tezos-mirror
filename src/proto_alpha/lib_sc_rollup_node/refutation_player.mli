@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_coordinator = Refutation_coordinator.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
+open Protocol
+open Alpha_context
+
+(** Worker module for a signle refutation game player.
+    The node's refutation coordinator will spawn a new refutation player
+    for each refutation game.
+*)
+module Worker : Worker.T
+
+(** Type for a refutation game player.  *)
+type worker = Worker.infinite Worker.queue Worker.t
+
+module type S = sig
+  (** [init_and_play node_ctxt ~self ~conflict ~game ~level]
+      initializes  a new refutation game player for signer [self].
+      After initizialization, the worker will play the next move
+      depending on the [game] state.
+      If no [game] is passed, the worker will play the opening
+      move for [conflict].
+  *)
+  val init_and_play :
+    Node_context.rw ->
+    self:public_key_hash ->
+    conflict:Sc_rollup.Refutation_storage.conflict ->
+    game:Sc_rollup.Game.t option ->
+    level:int32 ->
+    unit tzresult Lwt.t
+
+  (** [play worker game ~level] makes the [worker] play the next move depending
+      on the [game] state for their conflict.
+  *)
+  val play : worker -> Sc_rollup.Game.t -> level:int32 -> unit Lwt.t
+
+  (** Shutdown a refutaiton game player. *)
+  val shutdown : worker -> unit Lwt.t
+
+  (** [current_games ()] lists the opponents' this node is playing
+      refutation games against, alongside the worker that takes care
+      of each game. *)
+  val current_games : unit -> (public_key_hash * worker) list
 end
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+module Make (Interpreter : Interpreter.S) : S
