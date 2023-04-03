@@ -560,6 +560,21 @@ module type WORKER = sig
   (** The Gossipsub automaton of the worker. *)
   module GS : AUTOMATON
 
+  (** The following type defines the different kinds of messages a peer could
+      receive from or sent to the P2P layer. *)
+  type p2p_message =
+    | Graft of {topic : GS.Topic.t}
+    | Prune of {topic : GS.Topic.t; px : GS.Peer.t Seq.t}
+    | IHave of {topic : GS.Topic.t; message_ids : GS.Message_id.t list}
+    | IWant of {message_ids : GS.Message_id.t list}
+    | Subscribe of {topic : GS.Topic.t}
+    | Unsubscribe of {topic : GS.Topic.t}
+    | Publish of {
+        topic : GS.Topic.t;
+        message_id : GS.Message_id.t;
+        message : GS.Message.t;
+      }
+
   (** [make rng limits parameters] initializes a new Gossipsub automaton with
       the given arguments. Then, it initializes and returns a worker for it. *)
   val make :
@@ -586,4 +601,8 @@ module type WORKER = sig
 
   (** [leave t topics] leaves [topics] even if the worker is running. *)
   val leave : t -> GS.Topic.t list -> unit
+
+  (** [p2p_message t peer message] advertises the worker about the [message]
+      sent by [peer].  *)
+  val p2p_message : t -> GS.Peer.t -> p2p_message -> unit
 end
