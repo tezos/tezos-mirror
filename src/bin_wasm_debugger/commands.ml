@@ -90,7 +90,8 @@ let parse_commands s =
         | None -> Unknown s)
     | ["show"; "status"] -> Show_status
     | ["show"; "durable"; "storage"] -> Show_durable_storage
-    | ["show"; "subkeys"; path] -> Show_subkeys path
+    | ["show"; "subkeys"; path] | ["ls"; path] -> Show_subkeys path
+    | ["show"; "subkeys"] | ["ls"] -> Show_subkeys "/"
     | ["show"; "key"; key] -> Show_key (key, `Hex)
     | ["show"; "key"; key; "as"; kind] -> (
         match printable_value_kind_of_string kind with
