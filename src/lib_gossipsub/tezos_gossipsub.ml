@@ -215,9 +215,11 @@ module Make (C : AUTOMATON_CONFIG) :
 
      - Forall t, Topic.Map.mem t mesh <=> not (Map.mem t fanout)
 
-     - Forall t set, Topic.Map.find t fanout = Some set -> Peer.Set set <> Peer.Set.empty
+     - Forall p c t, Peer.Map.find connections p = Some c && c.expired = Some _ ->
+         Topic.Map.find t mesh = None &&
+         Topic.Map.find t fanout = None
 
-     - Forall t p c, Peer.Map.find connections p = Some c && c.expired = Some _ ->
+     - Forall p t, Peer.Map.find connections p = None ->
          Topic.Map.find t mesh = None &&
          Topic.Map.find t fanout = None
   *)
