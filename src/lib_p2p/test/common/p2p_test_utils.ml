@@ -137,7 +137,7 @@ let glob_port = ref None
 let listen ?port addr =
   let open Lwt_syntax in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
+  let main_socket = Lwt_unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
   (* If [port] is [0], a fresh port is used. *)
   let port_or_gen = Option.value port ~default:0 in
@@ -183,9 +183,18 @@ let run_nodes ~addr ?port client server =
   let* server_node =
     Process.detach ~prefix:"server: " (fun channel ->
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-        let* () = server channel sched main_socket in
-        let*! () = P2p_io_scheduler.shutdown sched in
-        return_unit)
+        Lwt.finalize
+          (fun () ->
+            let* () = server channel sched main_socket in
+            let*! () = P2p_io_scheduler.shutdown sched in
+            return_unit)
+          (fun () ->
+            let*! r = Lwt_utils_unix.safe_close main_socket in
+            match r with
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+                Lwt.return_unit
+            | Ok () -> Lwt.return_unit))
   in
   let* client_node =
     Process.detach ~prefix:"client: " (fun channel ->
@@ -204,7 +213,9 @@ let run_nodes ~addr ?port client server =
   in
   let nodes = [server_node; client_node] in
   Lwt.ignore_result (sync_nodes nodes) ;
-  Process.wait_all nodes
+  let* () = Process.wait_all nodes in
+  let*! _ = Lwt_utils_unix.safe_close main_socket in
+  return_unit
 
 let raw_accept sched main_socket =
   let open Lwt_syntax in
