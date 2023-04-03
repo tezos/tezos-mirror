@@ -582,6 +582,13 @@ module type WORKER = sig
     | Unsubscribe of {topic : GS.Topic.t}
     | Publish of full_message
 
+  (** The different kinds of input events that could be received from the
+      application layer. *)
+  type app_input =
+    | Inject_message of full_message
+    | Join of GS.Topic.t
+    | Leave of GS.Topic.t
+
   (** [make rng limits parameters] initializes a new Gossipsub automaton with
       the given arguments. Then, it initializes and returns a worker for it. *)
   val make :
@@ -599,15 +606,9 @@ module type WORKER = sig
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
   val shutdown : t -> unit
 
-  (** [inject state msg_id msg topic] is used to inject a message [msg] with
-      id [msg_id] and that belongs to [topic] to the network. *)
-  val inject : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
-
-  (** [join t topics] joins [topics] even if the worker is running. *)
-  val join : t -> GS.Topic.t list -> unit
-
-  (** [leave t topics] leaves [topics] even if the worker is running. *)
-  val leave : t -> GS.Topic.t list -> unit
+  (** [app_input state app_input] adds the given application input [app_input]
+      to the worker's input stream. *)
+  val app_input : t -> app_input -> unit
 
   (** [p2p_message t peer message] advertises the worker about the [message]
       sent by [peer].  *)

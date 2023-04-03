@@ -159,18 +159,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let p2p_message t peer p2p_message =
     push (P2P_input (Message {peer; p2p_message})) t
 
-  (** A set of functions that push different kinds of events in the worker's
-      state. *)
-  let inject t message_id message topic =
-    push (App_input (Inject_message {message; message_id; topic})) t
+  let app_input t input = push (App_input input) t
 
   let new_connection t conn = push (P2P_input (New_connection conn)) t
 
   let disconnection t peer = push (P2P_input (Disconnection {peer})) t
-
-  let join t = List.iter (fun topic -> push (App_input (Join topic)) t)
-
-  let leave t = List.iter (fun topic -> push (App_input (Leave topic)) t)
 
   (** This function returns a never-ending loop that periodically pushes
       [Heartbeat] events in the stream.  *)
@@ -203,7 +196,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let t = {t with status} in
         let () = P2P.Connections_handler.on_connection (new_connection t) in
         let () = P2P.Connections_handler.on_diconnection (disconnection t) in
-        join t topics ;
+        List.iter (fun topic -> app_input t (Join topic)) topics ;
         t
     | Running _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5166
