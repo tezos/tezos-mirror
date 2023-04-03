@@ -5168,15 +5168,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "pkh",
-            "in": "path",
-            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -5239,15 +5230,6 @@
             "name": "Smart_rollup_hash",
             "in": "path",
             "description": "Smart_rollup_hash (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "pkh",
-            "in": "path",
-            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
             "required": true,
             "schema": {
               "type": "string"
