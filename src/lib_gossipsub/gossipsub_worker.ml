@@ -67,11 +67,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
      graft, prune, ...). We could reuse them if we move the peer field
      outside. *)
 
-  (** The different kinds of input events that could be received from the P2P
-      layer. *)
   type p2p_input =
     | Message of {peer : Peer.t; p2p_message : p2p_message}
-    | New_connection of P2P.Connections_handler.connection
+    | New_connection of {peer : Peer.t; direct : bool; outbound : bool}
     | Disconnection of {peer : Peer.t}
 
   (** The different kinds of input events that could be received from the
@@ -156,14 +154,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** A helper function that pushes events in the state *)
   let push e t = Stream.push e t.events_stream
 
-  let p2p_message t peer p2p_message =
-    push (P2P_input (Message {peer; p2p_message})) t
-
   let app_input t input = push (App_input input) t
 
-  let new_connection t conn = push (P2P_input (New_connection conn)) t
-
-  let disconnection t peer = push (P2P_input (Disconnection {peer})) t
+  let p2p_input t input = push (P2P_input input) t
 
   (** This function returns a never-ending loop that periodically pushes
       [Heartbeat] events in the stream.  *)
@@ -194,8 +187,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let event_loop_handle = event_loop t in
         let status = Running {heartbeat_handle; event_loop_handle} in
         let t = {t with status} in
-        let () = P2P.Connections_handler.on_connection (new_connection t) in
-        let () = P2P.Connections_handler.on_diconnection (disconnection t) in
         List.iter (fun topic -> app_input t (Join topic)) topics ;
         t
     | Running _ ->

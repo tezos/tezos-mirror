@@ -544,12 +544,6 @@ module type WORKER_CONFIGURATION = sig
           [outbound] to tell whether it is direct and outgoing, or not. *)
       type connection = {peer : GS.Peer.t; direct : bool; outbound : bool}
 
-      (** A callback to run on each new connection. *)
-      val on_connection : (connection -> unit) -> unit
-
-      (** A callback to run on each disconnection. *)
-      val on_diconnection : (GS.Peer.t -> unit) -> unit
-
       (** This function allows disconnecting the given peer. *)
       val disconnect : GS.Peer.t -> unit Monad.t
     end
@@ -582,6 +576,13 @@ module type WORKER = sig
     | Unsubscribe of {topic : GS.Topic.t}
     | Publish of full_message
 
+  (** The different kinds of input events that could be received from the P2P
+      layer. *)
+  type p2p_input =
+    | Message of {peer : GS.Peer.t; p2p_message : p2p_message}
+    | New_connection of {peer : GS.Peer.t; direct : bool; outbound : bool}
+    | Disconnection of {peer : GS.Peer.t}
+
   (** The different kinds of input events that could be received from the
       application layer. *)
   type app_input =
@@ -610,7 +611,7 @@ module type WORKER = sig
       to the worker's input stream. *)
   val app_input : t -> app_input -> unit
 
-  (** [p2p_message t peer message] advertises the worker about the [message]
-      sent by [peer].  *)
-  val p2p_message : t -> GS.Peer.t -> p2p_message -> unit
+  (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
+      worker's input stream. *)
+  val p2p_input : t -> p2p_input -> unit
 end
