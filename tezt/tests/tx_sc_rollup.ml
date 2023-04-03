@@ -311,9 +311,6 @@ let test_tx_kernel_e2e protocol =
       client
   in
   let* () = Client.bake_for_and_wait client in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node sc_rollup_address
-  in
 
   (* Run the rollup node, ensure origination succeeds. *)
   let* genesis_info =
@@ -322,7 +319,7 @@ let test_tx_kernel_e2e protocol =
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level

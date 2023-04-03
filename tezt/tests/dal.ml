@@ -172,12 +172,9 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:bootstrap1_key
   in
-  let* configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node rollup_address
-  in
   (* Argument ~keys:[] allows to bake with all available delegates. *)
   let* () = Client.bake_for_and_wait tezos_client ~keys:[] in
-  f rollup_address sc_rollup_node configuration_filename
+  f rollup_address sc_rollup_node
 
 let with_dal_node tezos_node tezos_client f key =
   let dal_node = Dal_node.create ~node:tezos_node ~client:tezos_client () in
@@ -261,7 +258,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
       @@ fun parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
       ( with_fresh_rollup ~protocol ~pvm_name ~dal_node
-      @@ fun sc_rollup_address sc_rollup_node _filename ->
+      @@ fun sc_rollup_address sc_rollup_node ->
         scenario
           protocol
           parameters
@@ -1544,7 +1541,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
 
@@ -2222,11 +2219,8 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
           ~base_dir:(Client.base_dir l1_client)
           ?default_operator:key_opt
       in
-      let* _config_file =
-        Sc_rollup_node.config_init sc_rollup_node rollup_address
-      in
       (* We start the rollup node and create a client for it. *)
-      let* () = Sc_rollup_node.run sc_rollup_node [] in
+      let* () = Sc_rollup_node.run sc_rollup_node rollup_address [] in
       let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
       return (fresh_dal_node, sc_rollup_node, sc_rollup_client))
     extra_node_operators
@@ -2256,7 +2250,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
   (* Generate new DAL and rollup nodes if requested. *)

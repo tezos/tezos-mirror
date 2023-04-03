@@ -105,14 +105,17 @@ val base_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run ?event_level ?event_sections_levels node arguments ] launches the given
-    smart contract rollup node with the given arguments. [event_level] and
+(** [run ?event_level ?event_sections_levels ?loser_mode node rollup_address arguments ] launches the given
+    smart contract rollup node for the rollup at [rollup_address] with the given extra
+    arguments. [event_level] and
     [event_sections_levels] allow to select which events we want the node to
     emit (see {!Daemon}). *)
 val run :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?loser_mode:string ->
   t ->
+  string ->
   string list ->
   unit Lwt.t
 
@@ -180,4 +183,4 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Stops the rollup node and restart it, connected to another Tezos Layer 1
     node. *)
-val change_node_and_restart : t -> Node.t -> unit Lwt.t
+val change_node_and_restart : t -> string -> Node.t -> unit Lwt.t

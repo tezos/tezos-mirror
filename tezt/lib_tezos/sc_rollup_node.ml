@@ -120,38 +120,35 @@ let spawn_command sc_node args =
   @@ ["--base-dir"; base_dir sc_node]
   @ args
 
+let node_args ?loser_mode sc_node rollup_address =
+  let mode = string_of_mode sc_node.persistent_state.mode in
+  ( mode,
+    ["for"; rollup_address; "with"; "operators"]
+    @ operators_params sc_node
+    @ [
+        "--data-dir";
+        data_dir sc_node;
+        "--rpc-addr";
+        rpc_host sc_node;
+        "--rpc-port";
+        string_of_int @@ rpc_port sc_node;
+      ]
+    @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
+    @
+    match sc_node.persistent_state.dal_node with
+    | None -> []
+    | Some dal_node ->
+        let endpoint =
+          sf
+            "http://%s:%d"
+            (Dal_node.rpc_host dal_node)
+            (Dal_node.rpc_port dal_node)
+        in
+        ["--dal-node"; endpoint] )
+
 let spawn_config_init sc_node ?loser_mode rollup_address =
-  spawn_command sc_node
-  @@ [
-       "init";
-       string_of_mode sc_node.persistent_state.mode;
-       "config";
-       "for";
-       rollup_address;
-       "with";
-       "operators";
-     ]
-  @ operators_params sc_node
-  @ [
-      "--data-dir";
-      data_dir sc_node;
-      "--rpc-addr";
-      rpc_host sc_node;
-      "--rpc-port";
-      string_of_int @@ rpc_port sc_node;
-    ]
-  @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
-  @
-  match sc_node.persistent_state.dal_node with
-  | None -> []
-  | Some dal_node ->
-      let endpoint =
-        sf
-          "http://%s:%d"
-          (Dal_node.rpc_host dal_node)
-          (Dal_node.rpc_port dal_node)
-      in
-      ["--dal-node"; endpoint]
+  let mode, args = node_args ?loser_mode sc_node rollup_address in
+  spawn_command sc_node @@ ["init"; mode; "config"] @ args
 
 let config_init sc_node ?loser_mode rollup_address =
   let process = spawn_config_init sc_node ?loser_mode rollup_address in
@@ -316,19 +313,30 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     arguments
     ~on_terminate
 
-let run ?event_level ?event_sections_levels node arguments =
+let run ?event_level ?event_sections_levels ?loser_mode node rollup_address
+    extra_arguments =
+  let mode, args = node_args ?loser_mode node rollup_address in
   do_runlike_command
     ?event_level
     ?event_sections_levels
     node
-    (["run"; "--data-dir"; node.persistent_state.data_dir] @ arguments)
+    (["run"; mode] @ args @ extra_arguments)
 
-let run ?event_level ?event_sections_levels node arguments =
-  let* () = run ?event_level ?event_sections_levels node arguments in
+let run ?event_level ?event_sections_levels ?loser_mode node rollup_address
+    arguments =
+  let* () =
+    run
+      ?event_level
+      ?event_sections_levels
+      ?loser_mode
+      node
+      rollup_address
+      arguments
+  in
   let* () = wait_for_ready node in
   return ()
 
-let change_node_and_restart sc_rollup_node node =
+let change_node_and_restart sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in
   sc_rollup_node.persistent_state.node <- node ;
-  run sc_rollup_node []
+  run sc_rollup_node rollup_address []

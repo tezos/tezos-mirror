@@ -222,11 +222,8 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") f tezos_node tezos_client
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:bootstrap1_key
   in
-  let* configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node rollup_address
-  in
   let* () = Client.bake_for_and_wait tezos_client in
-  f rollup_address sc_rollup_node configuration_filename
+  f rollup_address sc_rollup_node
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
@@ -275,7 +272,7 @@ let scenario_with_all_nodes ?(tags = ["dac"; "dac_node"; "legacy"])
       with_fresh_rollup
         ~protocol
         ~pvm_name
-        (fun sc_rollup_address sc_rollup_node _configuration_filename ->
+        (fun sc_rollup_address sc_rollup_node ->
           with_legacy_dac_node
             node
             ~sc_rollup_node
@@ -534,7 +531,7 @@ let test_rollup_arith_uses_reveals protocol dac_node sc_rollup_node
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
@@ -606,7 +603,7 @@ let test_reveals_fails_on_wrong_hash _protocol dac_node sc_rollup_node
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   (* Prepare the handler to wait for the rollup node to fail before
      sending the L1 message that will trigger the failure. This
      ensures that the failure handler can access the status code
