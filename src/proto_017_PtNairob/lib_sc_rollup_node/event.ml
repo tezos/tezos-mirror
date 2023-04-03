@@ -26,7 +26,7 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["smart_rollup_node"]
+  let section = [Protocol.name; "smart_rollup_node"]
 
   let starting_node =
     declare_0

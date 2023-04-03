@@ -55,16 +55,3 @@ module Request = struct
     | Publish -> Format.pp_print_string ppf "publish"
     | Cement -> Format.pp_print_string ppf "cement"
 end
-
-module Name = struct
-  (* We only have a single commitment publisher right now *)
-  type t = unit
-
-  let encoding = Data_encoding.unit
-
-  let base = ["sc_rollup_commitment_publisher"]
-
-  let pp _ _ = ()
-
-  let equal () () = true
-end

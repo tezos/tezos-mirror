@@ -32,7 +32,7 @@ type error +=
   | Could_not_encode_raw_data
 
 let () =
-  register_error_kind
+  Sc_rollup_node_errors.register_error_kind
     ~id:"sc_rollup.node.wrong_hash_of_reveal_preimage"
     ~title:"Hash of reveal preimage is not correct"
     ~description:"Hash of reveal preimage is not correct."
@@ -52,7 +52,7 @@ let () =
     (function
       | Wrong_hash {found; expected} -> Some (found, expected) | _ -> None)
     (fun (found, expected) -> Wrong_hash {found; expected}) ;
-  register_error_kind
+  Sc_rollup_node_errors.register_error_kind
     ~id:"sc_rollup.node.could_not_open_reveal_preimage_file"
     ~title:"Could not open reveal preimage file"
     ~description:"Could not open reveal preimage file."
@@ -66,7 +66,7 @@ let () =
     (function
       | Could_not_open_preimage_file filename -> Some filename | _ -> None)
     (fun filename -> Could_not_open_preimage_file filename) ;
-  register_error_kind
+  Sc_rollup_node_errors.register_error_kind
     ~id:"sc_rollup.node.could_not_encode_raw_data"
     ~title:"Could not encode raw data to reveal"
     ~description:"Could not encode raw data to reveal."

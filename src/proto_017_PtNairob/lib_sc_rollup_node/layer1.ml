@@ -36,7 +36,7 @@ open Protocol_client_context
 type error += Cannot_find_block of Block_hash.t
 
 let () =
-  register_error_kind
+  Sc_rollup_node_errors.register_error_kind
     ~id:"sc_rollup.node.cannot_find_block"
     ~title:"Cannot find block from L1"
     ~description:"A block couldn't be found from the L1 node"

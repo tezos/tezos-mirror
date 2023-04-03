@@ -25,7 +25,7 @@
 
 include Internal_event.Simple
 
-let section = ["sc_rollup_node"; "batcher"]
+let section = [Protocol.name; "sc_rollup_node"; "batcher"]
 
 let queue =
   declare_1

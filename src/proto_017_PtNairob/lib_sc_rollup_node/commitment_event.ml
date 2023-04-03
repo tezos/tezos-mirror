@@ -30,7 +30,7 @@ open Publisher_worker_types
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "commitment"]
+  let section = [Protocol.name; "sc_rollup_node"; "commitment"]
 
   let starting =
     declare_0
@@ -156,6 +156,8 @@ let starting = Simple.(emit starting)
 let stopping = Simple.(emit stopping)
 
 open Sc_rollup.Commitment
+
+let section = Simple.section
 
 let emit_commitment_event f commitment_hash
     {predecessor; inbox_level; compressed_state; number_of_ticks} =

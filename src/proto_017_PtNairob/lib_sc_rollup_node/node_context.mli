@@ -422,3 +422,17 @@ val find_confirmed_slots_histories :
 
 val save_confirmed_slots_histories :
   rw -> Block_hash.t -> Dal.Slots_history.History_cache.t -> unit tzresult Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Create a node context which really stores data on disk but does not
+      connect to any layer 1 node. It is meant to be used in unit tests for the
+      rollup node functions. *)
+  val create_node_context :
+    Protocol_client_context.full ->
+    ?constants:Constants.Parametric.t ->
+    data_dir:string ->
+    Sc_rollup.Kind.t ->
+    Store_sigs.rw t tzresult Lwt.t
+end
