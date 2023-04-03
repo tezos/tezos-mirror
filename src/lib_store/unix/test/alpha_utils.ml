@@ -428,7 +428,12 @@ let default_genesis_parameters =
   let open Tezos_protocol_alpha_parameters in
   {
     Default_parameters.(
-      parameters_of_constants {constants_sandbox with consensus_threshold = 0})
+      parameters_of_constants
+        {
+          constants_sandbox with
+          consensus_threshold = 0;
+          proof_of_work_threshold = -1L;
+        })
     with
     bootstrap_accounts = default_accounts;
   }
