@@ -246,7 +246,7 @@ let wait_for_computed_dissection sc_node =
 *)
 let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string")
-    ?(operator = Constant.bootstrap1.alias) tezos_node tezos_client =
+    ?(operator = Constant.bootstrap1.alias) ?data_dir tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup
       ?hooks
@@ -261,6 +261,7 @@ let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
       ~protocol
       mode
       tezos_node
+      ?data_dir
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
   in
@@ -456,19 +457,36 @@ let test_rollup_node_configuration ~kind =
     {
       variant = None;
       tags = ["configuration"];
-      description = "configuration of a smart rollup node specify the rpc port";
+      description = "configuration of a smart rollup node is robust";
     }
     ~kind
-  @@ fun _protocol
-             rollup_node
-             _rollup_client
-             sc_rollup
-             _tezos_node
-             _tezos_client ->
+  @@ fun protocol rollup_node _rollup_client sc_rollup tezos_node tezos_client
+    ->
   let* _filename = Sc_rollup_node.config_init rollup_node sc_rollup in
   let config = Sc_rollup_node.Config_file.read rollup_node in
   let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
-  unit
+  let data_dir = Sc_rollup_node.data_dir rollup_node in
+  (* Run the rollup node to initialize store and context *)
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  let* () = Sc_rollup_node.terminate rollup_node in
+  (* Run a rollup node in the same data_dir, but for a different rollup *)
+  let* other_rollup_node, _rollup_client, other_sc_rollup =
+    setup_rollup ~protocol ~kind tezos_node tezos_client ~data_dir
+  in
+  let expect_failure () =
+    match Sc_rollup_node.process other_rollup_node with
+    | None -> unit
+    | Some p ->
+        Process.check_error
+          ~exit_code:1
+          ~msg:(rex "This rollup node was already set up for rollup")
+          p
+  in
+  let run_promise =
+    let* () = Sc_rollup_node.run other_rollup_node other_sc_rollup [] in
+    Test.fail "Node for other rollup in same dir run without errors"
+  in
+  Lwt.choose [run_promise; expect_failure ()]
 
 (* Launching a rollup node
    -----------------------
