@@ -160,6 +160,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let publish = {GS.sender = None; topic; message_id; message} in
         GS.publish publish gossip_state
         |> handle_full_message ~p2p_msg ~app_msg publish
+    | P2P_input
+        (In_message {peer; p2p_message = Publish {message; topic; message_id}})
+      ->
+        let publish = {GS.sender = Some peer; topic; message_id; message} in
+        GS.publish publish gossip_state
+        |> handle_full_message ~p2p_msg ~app_msg publish
     | P2P_input (In_message m) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
