@@ -462,6 +462,10 @@ module type AUTOMATON = sig
       val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
 
       val shift : t -> t
+
+      module Internal_for_tests : sig
+        val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
+      end
     end
 
     type view = {

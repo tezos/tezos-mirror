@@ -166,4 +166,11 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
           else (SlotMap.remove first_slot cache, drop_old_messages entries)
     in
     {t with cache; messages; last_slot; last_slot_entry = Topic.Map.empty}
+
+  module Internal_for_tests = struct
+    let get_access_counters cache =
+      Message_id.Map.to_seq cache.messages
+      |> Seq.map (fun (message_id, {access_counters; _}) ->
+             (message_id, access_counters))
+  end
 end
