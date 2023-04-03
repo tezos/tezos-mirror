@@ -67,15 +67,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
      graft, prune, ...). We could reuse them if we move the peer field
      outside. *)
 
-  (** The different kinds of events the Gossipsub worker handles. *)
-  type event =
-    | Heartbeat
+  (** The different kinds of input events that could be received from the P2P
+      layer. *)
+  type p2p_input =
+    | Message of {peer : Peer.t; p2p_message : p2p_message}
     | New_connection of P2P.Connections_handler.connection
     | Disconnection of {peer : Peer.t}
-    | Received_message of {peer : Peer.t; p2p_message : p2p_message}
+
+  (** The different kinds of input events that could be received from the
+      application layer. *)
+  type app_input =
     | Inject_message of full_message
     | Join of Topic.t
     | Leave of Topic.t
+
+  (** The different kinds of events the Gossipsub worker handles. *)
+  type event = Heartbeat | P2P_input of p2p_input | App_input of app_input
 
   (** The worker's state is made of its status, the gossipsub automaton's state,
       and a stream of events to process.  *)
@@ -100,7 +107,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle Heartbeat's output *)
         ignore output ;
         gossip_state
-    | New_connection {peer; direct; outbound} ->
+    | P2P_input (New_connection {peer; direct; outbound}) ->
         let gossip_state, output =
           GS.add_peer {direct; outbound; peer} gossip_state
         in
@@ -109,14 +116,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle New_connection's output *)
         ignore output ;
         gossip_state
-    | Disconnection {peer} ->
+    | P2P_input (Disconnection {peer}) ->
         let gossip_state, output = GS.remove_peer {peer} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
 
            Handle disconnection's output *)
         ignore output ;
         gossip_state
-    | Inject_message {message; message_id; topic} ->
+    | App_input (Inject_message {message; message_id; topic}) ->
         let gossip_state, output =
           GS.publish {sender = None; topic; message_id; message} gossip_state
         in
@@ -125,20 +132,20 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle Inject_message's output *)
         ignore output ;
         gossip_state
-    | Received_message m ->
+    | P2P_input (Message m) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
            Handle received p2p messages. *)
-        ignore (Received_message m) ;
+        ignore (Message m) ;
         assert false
-    | Join topic ->
+    | App_input (Join topic) ->
         let gossip_state, output = GS.join {topic} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
 
            Handle Join's output. *)
         ignore output ;
         gossip_state
-    | Leave topic ->
+    | App_input (Leave topic) ->
         let gossip_state, output = GS.leave {topic} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
 
@@ -150,20 +157,20 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let push e t = Stream.push e t.events_stream
 
   let p2p_message t peer p2p_message =
-    push (Received_message {peer; p2p_message}) t
+    push (P2P_input (Message {peer; p2p_message})) t
 
   (** A set of functions that push different kinds of events in the worker's
       state. *)
   let inject t message_id message topic =
-    push (Inject_message {message; message_id; topic}) t
+    push (App_input (Inject_message {message; message_id; topic})) t
 
-  let new_connection t conn = push (New_connection conn) t
+  let new_connection t conn = push (P2P_input (New_connection conn)) t
 
-  let disconnection t peer = push (Disconnection {peer}) t
+  let disconnection t peer = push (P2P_input (Disconnection {peer})) t
 
-  let join t = List.iter (fun topic -> push (Join topic) t)
+  let join t = List.iter (fun topic -> push (App_input (Join topic)) t)
 
-  let leave t = List.iter (fun topic -> push (Leave topic) t)
+  let leave t = List.iter (fun topic -> push (App_input (Leave topic)) t)
 
   (** This function returns a never-ending loop that periodically pushes
       [Heartbeat] events in the stream.  *)
