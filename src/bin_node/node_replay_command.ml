@@ -499,8 +499,11 @@ let process verbosity singleprocess strict blocks data_dir config_file
   in
   let run =
     let open Lwt_result_syntax in
-    let* data_dir, config =
-      Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+    let* config =
+      let* data_dir, config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      return {config with data_dir}
     in
     let operation_metadata_size_limit =
       Option.value
@@ -508,7 +511,7 @@ let process verbosity singleprocess strict blocks data_dir config_file
         ~default:
           config.shell.block_validator_limits.operation_metadata_size_limit
     in
-    let* () = check_data_dir data_dir in
+    let* () = check_data_dir config.data_dir in
     run
       ?verbosity
       ~singleprocess
