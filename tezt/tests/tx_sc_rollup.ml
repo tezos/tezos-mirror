@@ -240,15 +240,17 @@ module Tx_kernel = struct
     @@ [multiaccount_tx_of accounts_ops]
 end
 
-let assert_state_changed sc_rollup_client prev_state_hash =
-  let*! state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
+let assert_state_changed ?block sc_rollup_client prev_state_hash =
+  let*! state_hash =
+    Sc_rollup_client.state_hash ?block ~hooks sc_rollup_client
+  in
   Check.(state_hash <> prev_state_hash)
     Check.string
     ~error_msg:"State hash has not changed (%L <> %R)" ;
   Lwt.return_unit
 
-let assert_ticks_advanced sc_rollup_client prev_ticks =
-  let*! ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+let assert_ticks_advanced ?block sc_rollup_client prev_ticks =
+  let*! ticks = Sc_rollup_client.total_ticks ?block ~hooks sc_rollup_client in
   Check.(ticks > prev_ticks)
     Check.int
     ~error_msg:"Tick counter did not advance (%L > %R)" ;
@@ -282,8 +284,19 @@ let test_deposit ~client ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address
   let* () = assert_state_changed sc_rollup_client prev_state_hash in
   Lwt.return @@ (level + 1)
 
+let rec bake_until cond client sc_rollup_node =
+  let* stop = cond client in
+  if stop then unit
+  else
+    let* () = Client.bake_for_and_wait client in
+    let* current_level = Client.level client in
+    let* _ =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
+    in
+    bake_until cond client sc_rollup_node
+
 let test_tx_kernel_e2e protocol =
-  let commitment_period = 2 and challenge_window = 5 in
+  let commitment_period = 10 and challenge_window = 10 in
   let* node, client = setup_l1 ~commitment_period ~challenge_window protocol in
   let bootstrap1_key = Constant.bootstrap1.alias in
   let sc_rollup_node =
@@ -452,16 +465,34 @@ let test_tx_kernel_e2e protocol =
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node withdrawal_level
   in
-  let* () = assert_state_changed sc_rollup_client prev_state_hash in
-  let* () = assert_ticks_advanced sc_rollup_client prev_ticks in
+
+  let* _, last_lcc_level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+      ~sc_rollup:sc_rollup_address
+      client
+  in
+  let next_lcc_level = last_lcc_level + commitment_period in
+
+  (* Bake until the next commitment is cemented, this commitment
+     will include the withdrawal. *)
+  let* () =
+    bake_until
+      (fun client ->
+        let* _, lcc_level =
+          Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+            ~sc_rollup:sc_rollup_address
+            client
+        in
+        return (lcc_level = next_lcc_level))
+      client
+      sc_rollup_node
+  in
+
+  let block = string_of_int next_lcc_level in
+  let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
+  let* () = assert_ticks_advanced ~block sc_rollup_client prev_ticks in
 
   (* EXECUTE withdrawal *)
-  (* We bake a few more blocks in case the injection of the cementation
-     operation is late *)
-  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
-  let* () =
-    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
-  in
   let*! outbox =
     Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
   in
@@ -501,7 +532,6 @@ let test_tx_kernel_e2e protocol =
   let* () =
     match answer with
     | Some {commitment_hash; proof} ->
-        let* () = Client.bake_for_and_wait client in
         let*! () =
           Client.Sc_rollup.execute_outbox_message
             ~hooks

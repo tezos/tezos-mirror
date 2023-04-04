@@ -130,3 +130,14 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999))
   in
   let* () = Client.bake_for_and_wait client in
   return sc_rollup
+
+let last_cemented_commitment_hash_with_level ~sc_rollup client =
+  let* json =
+    RPC.Client.call client
+    @@ RPC
+       .get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
+         sc_rollup
+  in
+  let hash = JSON.(json |-> "hash" |> as_string) in
+  let level = JSON.(json |-> "level" |> as_int) in
+  return (hash, level)
