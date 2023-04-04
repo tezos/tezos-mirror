@@ -29,6 +29,7 @@ depends: [
   "irmin-pack" { >= "3.6.0" & < "3.7.0" }
   "irmin" { >= "3.6.0" & < "3.7.0" }
   "tezos-dal-016-PtMumbai"
+  "tezos-dal-017-PtNairob"
 ]
 depopts: [
   "tezos-dal-alpha"

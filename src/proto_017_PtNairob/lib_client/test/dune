@@ -1,0 +1,54 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_017_PtNairob_lib_client_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezos-micheline
+  tezos-client-017-PtNairob
+  tezos-protocol-017-PtNairob
+  tezos-base-test-helpers
+  tezos-test-helpers
+  octez-alcotezt
+  qcheck-alcotest)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_micheline
+  -open Tezos_client_017_PtNairob
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_base_test_helpers
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules
+  test_michelson_v1_macros
+  test_client_proto_contracts
+  test_client_proto_context
+  test_proxy))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_017_PtNairob_lib_client_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtezt)
+ (package tezos-client-017-PtNairob)
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

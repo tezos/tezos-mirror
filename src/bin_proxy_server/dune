@@ -109,6 +109,12 @@
   (select void_for_linking-tezos-protocol-plugin-016-PtMumbai from
    (tezos-protocol-plugin-016-PtMumbai -> void_for_linking-tezos-protocol-plugin-016-PtMumbai.empty)
    (-> void_for_linking-tezos-protocol-plugin-016-PtMumbai.empty))
+  (select void_for_linking-tezos-client-017-PtNairob from
+   (tezos-client-017-PtNairob -> void_for_linking-tezos-client-017-PtNairob.empty)
+   (-> void_for_linking-tezos-client-017-PtNairob.empty))
+  (select void_for_linking-tezos-protocol-plugin-017-PtNairob from
+   (tezos-protocol-plugin-017-PtNairob -> void_for_linking-tezos-protocol-plugin-017-PtNairob.empty)
+   (-> void_for_linking-tezos-protocol-plugin-017-PtNairob.empty))
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty))
@@ -158,5 +164,7 @@
    (write-file void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty "")
    (write-file void_for_linking-tezos-client-016-PtMumbai.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-016-PtMumbai.empty "")
+   (write-file void_for_linking-tezos-client-017-PtNairob.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-017-PtNairob.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))

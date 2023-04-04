@@ -1,0 +1,272 @@
+
+trace
+  - CAR (interp) @ location: 25
+    [ (Pair (Pair 127 11) None None None None) ]
+  - CAR (entry) @ location: 25
+    [ (Pair (Pair 127 11) None None None None) ]
+    - log/DUP (exit) @ location: 25
+      [ (Pair 127 11) ]
+  - DUP (entry) @ location: 26
+    [ (Pair 127 11) ]
+    - log/UNPAIR (exit) @ location: 26
+      [ (Pair 127 11)
+        (Pair 127 11) ]
+  - UNPAIR (entry) @ location: 27
+    [ (Pair 127 11)
+      (Pair 127 11) ]
+    - log/ABS (exit) @ location: 27
+      [ 127
+        11
+        (Pair 127 11) ]
+  - ABS (entry) @ location: 28
+    [ 127
+      11
+      (Pair 127 11) ]
+    - log/DIP (exit) @ location: 28
+      [ 127
+        11
+        (Pair 127 11) ]
+  - DIP (entry) @ location: 29
+    [ 127
+      11
+      (Pair 127 11) ]
+    - log/ABS (exit) @ location: 29
+      [ 11
+        (Pair 127 11) ]
+  - ABS (entry) @ location: 31
+    [ 11
+      (Pair 127 11) ]
+    - log/[halt] (exit) @ location: 31
+      [ 11
+        (Pair 127 11) ]
+  - [halt] (entry) @ location: 31
+    [ 11
+      (Pair 127 11) ]
+    - control: KUndip
+    - control: KCons
+    - log/EDIV (exit) @ location: 29
+      [ 127
+        11
+        (Pair 127 11) ]
+  - EDIV (entry) @ location: 32
+    [ 127
+      11
+      (Pair 127 11) ]
+    - log/SWAP (exit) @ location: 32
+      [ (Some (Pair 11 6))
+        (Pair 127 11) ]
+  - SWAP (entry) @ location: 33
+    [ (Some (Pair 11 6))
+      (Pair 127 11) ]
+    - log/DUP (exit) @ location: 33
+      [ (Pair 127 11)
+        (Some (Pair 11 6)) ]
+  - DUP (entry) @ location: 34
+    [ (Pair 127 11)
+      (Some (Pair 11 6)) ]
+    - log/UNPAIR (exit) @ location: 34
+      [ (Pair 127 11)
+        (Pair 127 11)
+        (Some (Pair 11 6)) ]
+  - UNPAIR (entry) @ location: 35
+    [ (Pair 127 11)
+      (Pair 127 11)
+      (Some (Pair 11 6)) ]
+    - log/ABS (exit) @ location: 35
+      [ 127
+        11
+        (Pair 127 11)
+        (Some (Pair 11 6)) ]
+  - ABS (entry) @ location: 36
+    [ 127
+      11
+      (Pair 127 11)
+      (Some (Pair 11 6)) ]
+    - log/EDIV (exit) @ location: 36
+      [ 127
+        11
+        (Pair 127 11)
+        (Some (Pair 11 6)) ]
+  - EDIV (entry) @ location: 37
+    [ 127
+      11
+      (Pair 127 11)
+      (Some (Pair 11 6)) ]
+    - log/SWAP (exit) @ location: 37
+      [ (Some (Pair 11 6))
+        (Pair 127 11)
+        (Some (Pair 11 6)) ]
+  - SWAP (entry) @ location: 38
+    [ (Some (Pair 11 6))
+      (Pair 127 11)
+      (Some (Pair 11 6)) ]
+    - log/DUP (exit) @ location: 38
+      [ (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - DUP (entry) @ location: 39
+    [ (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/UNPAIR (exit) @ location: 39
+      [ (Pair 127 11)
+        (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - UNPAIR (entry) @ location: 40
+    [ (Pair 127 11)
+      (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/DIP (exit) @ location: 40
+      [ 127
+        11
+        (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - DIP (entry) @ location: 41
+    [ 127
+      11
+      (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/ABS (exit) @ location: 41
+      [ 11
+        (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - ABS (entry) @ location: 43
+    [ 11
+      (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/[halt] (exit) @ location: 43
+      [ 11
+        (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - [halt] (entry) @ location: 43
+    [ 11
+      (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - control: KUndip
+    - control: KCons
+    - log/EDIV (exit) @ location: 41
+      [ 127
+        11
+        (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - EDIV (entry) @ location: 44
+    [ 127
+      11
+      (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/SWAP (exit) @ location: 44
+      [ (Some (Pair 11 6))
+        (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - SWAP (entry) @ location: 45
+    [ (Some (Pair 11 6))
+      (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/UNPAIR (exit) @ location: 45
+      [ (Pair 127 11)
+        (Some (Pair 11 6))
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - UNPAIR (entry) @ location: 46
+    [ (Pair 127 11)
+      (Some (Pair 11 6))
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/EDIV (exit) @ location: 46
+      [ 127
+        11
+        (Some (Pair 11 6))
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - EDIV (entry) @ location: 47
+    [ 127
+      11
+      (Some (Pair 11 6))
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/DIP (exit) @ location: 47
+      [ (Some (Pair 11 6))
+        (Some (Pair 11 6))
+        (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - DIP (entry) @ location: 49
+    [ (Some (Pair 11 6))
+      (Some (Pair 11 6))
+      (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/PAIR (exit) @ location: 49
+      [ (Some (Pair 11 6))
+        (Some (Pair 11 6)) ]
+  - PAIR (entry) @ location: 52
+    [ (Some (Pair 11 6))
+      (Some (Pair 11 6)) ]
+    - log/[halt] (exit) @ location: 52
+      [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - [halt] (entry) @ location: 52
+    [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - control: KCons
+    - PUSH (entry) @ location: 49
+      [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+      - log/PUSH (exit) @ location: 49
+        [ (Some (Pair 11 6))
+          (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - PUSH (entry) @ location: 49
+      [ (Some (Pair 11 6))
+        (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+      - log/log/log/DIP (exit) @ location: 49
+        [ (Some (Pair 11 6))
+          (Some (Pair 11 6))
+          (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - log/DIP (exit) @ location: 49
+      [ (Some (Pair 11 6))
+        (Some (Pair 11 6))
+        (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - DIP (entry) @ location: 53
+    [ (Some (Pair 11 6))
+      (Some (Pair 11 6))
+      (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - log/PAIR (exit) @ location: 53
+      [ (Some (Pair 11 6))
+        (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - PAIR (entry) @ location: 55
+    [ (Some (Pair 11 6))
+      (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - log/[halt] (exit) @ location: 55
+      [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - [halt] (entry) @ location: 55
+    [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - control: KUndip
+    - control: KCons
+    - log/PAIR (exit) @ location: 53
+      [ (Some (Pair 11 6))
+        (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - PAIR (entry) @ location: 56
+    [ (Some (Pair 11 6))
+      (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - log/NIL (exit) @ location: 56
+      [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - NIL (entry) @ location: 57
+    [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - log/PAIR (exit) @ location: 57
+      [ {}
+        (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - PAIR (entry) @ location: 59
+    [ {}
+      (Pair (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - log/[halt] (exit) @ location: 59
+      [ (Pair {} (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+  - [halt] (entry) @ location: 24
+    [ (Pair {} (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6)) (Some (Pair 11 6))) ]
+    - control: KNil

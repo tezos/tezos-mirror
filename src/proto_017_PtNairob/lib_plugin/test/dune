@@ -1,0 +1,63 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_017_PtNairob_lib_plugin_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezos-base-test-helpers
+  tezos-base.unix
+  octez-alcotezt
+  tezos-test-helpers
+  qcheck-alcotest
+  tezos-stdlib-unix
+  tezos-micheline
+  tezos-protocol-plugin-017-PtNairob
+  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.parameters
+  tezos-017-PtNairob-test-helpers)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Octez_alcotezt
+  -open Tezos_test_helpers
+  -open Tezos_micheline
+  -open Tezos_protocol_plugin_017_PtNairob
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_protocol_017_PtNairob.Protocol
+  -open Tezos_protocol_017_PtNairob_parameters
+  -open Tezos_017_PtNairob_test_helpers)
+ (modules
+  test_consensus_filter
+  test_filter_state
+  test_plugin
+  test_conflict_handler
+  test_utils
+  generators))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_017_PtNairob_lib_plugin_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtezt)
+ (package tezos-protocol-plugin-017-PtNairob-tests)
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

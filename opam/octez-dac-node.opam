@@ -25,6 +25,7 @@ depends: [
   "tezos-layer2-store"
   "irmin-pack" { >= "3.6.0" & < "3.7.0" }
   "irmin" { >= "3.6.0" & < "3.7.0" }
+  "tezos-dac-017-PtNairob"
 ]
 depopts: [
   "tezos-dac-alpha"

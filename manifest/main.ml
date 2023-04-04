@@ -6466,6 +6466,8 @@ module Protocol = Protocol
 
   let _016_PtMumbai = active (Name.v "PtMumbai" 016)
 
+  let _017_PtNairob = active (Name.v "PtNairob" 017)
+
   let alpha = active Name.alpha
 
   let all = List.rev !all_rev

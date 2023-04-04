@@ -1,0 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_017_PtNairob_mockup_simulator)
+ (public_name tezos-baking-017-PtNairob.mockup-simulator)
+ (libraries
+  tezos-base
+  tezos-protocol-017-PtNairob
+  tezos-client-017-PtNairob
+  tezos-client-commands
+  tezos-baking-017-PtNairob
+  tezos-stdlib-unix
+  tezos-client-base-unix
+  tezos-protocol-017-PtNairob.parameters
+  tezos-mockup
+  tezos-mockup-proxy
+  tezos-mockup-commands
+  tezos-baking-017-PtNairob.tenderbrute)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_protocol_017_PtNairob.Protocol
+  -open Tezos_client_017_PtNairob
+  -open Tezos_client_commands
+  -open Tezos_baking_017_PtNairob
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_017_PtNairob_parameters
+  -open Tenderbrute_017_PtNairob))

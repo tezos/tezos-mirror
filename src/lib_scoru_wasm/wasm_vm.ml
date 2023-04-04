@@ -28,7 +28,7 @@ open Wasm_pvm_state.Internal_state
 
 let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   function
-  | Proto_alpha -> V1
+  | Nairobi | Proto_alpha -> V1
 
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports

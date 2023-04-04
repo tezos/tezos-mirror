@@ -1,0 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_plugin_017_PtNairob)
+ (public_name tezos-protocol-plugin-017-PtNairob)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-017-PtNairob
+  tezos-smart-rollup-017-PtNairob)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_smart_rollup_017_PtNairob)
+ (modules (:standard \ Plugin_registerer)))
+
+(library
+ (name tezos_protocol_plugin_017_PtNairob_registerer)
+ (public_name tezos-protocol-plugin-017-PtNairob-registerer)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-embedded-protocol-017-PtNairob
+  tezos-protocol-plugin-017-PtNairob
+  tezos-shell)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_embedded_protocol_017_PtNairob
+  -open Tezos_protocol_plugin_017_PtNairob
+  -open Tezos_shell)
+ (modules Plugin_registerer))

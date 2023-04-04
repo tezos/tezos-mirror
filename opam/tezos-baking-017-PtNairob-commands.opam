@@ -1,0 +1,30 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
+  "tezos-base"
+  "tezos-protocol-017-PtNairob"
+  "tezos-stdlib-unix"
+  "tezos-protocol-environment"
+  "tezos-shell-services"
+  "tezos-client-base"
+  "tezos-client-017-PtNairob"
+  "tezos-client-commands"
+  "tezos-baking-017-PtNairob"
+  "tezos-rpc"
+  "uri" { >= "3.1.0" }
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: protocol-specific commands for baking"
