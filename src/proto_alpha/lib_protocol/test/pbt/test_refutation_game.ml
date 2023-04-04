@@ -1069,6 +1069,7 @@ module Player_client = struct
     let payloads_histories = Payloads_histories.empty in
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Sc_rollup_helpers.Node_inbox.fill_inbox
+         ~inbox_creation_level:Raw_level.root
          {inbox; history; payloads_histories}
          list_of_messages
 

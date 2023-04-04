@@ -769,8 +769,17 @@ let add_all_messages ~protocol_migration_message ~predecessor_timestamp
     in
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.empty ~capacity
   in
-  (* Add [SOL], possibly [Protocol_migration], and [Info_per_level]. *)
+  (* Add [SOL], [Info_per_level], and possibly [Protocol_migration]. *)
   let* payloads_history, witness = init_witness payloads_history in
+
+  let* payloads_history, witness =
+    add_info_per_level
+      ~predecessor_timestamp
+      ~predecessor
+      payloads_history
+      witness
+  in
+
   let* payloads_history, witness =
     match protocol_migration_message with
     | Some protocol_migration_message ->
@@ -780,14 +789,6 @@ let add_all_messages ~protocol_migration_message ~predecessor_timestamp
         in
         add_message message payloads_history witness
     | None -> return (payloads_history, witness)
-  in
-
-  let* payloads_history, witness =
-    add_info_per_level
-      ~predecessor_timestamp
-      ~predecessor
-      payloads_history
-      witness
   in
 
   let* payloads_history, witness =
@@ -804,30 +805,30 @@ let add_all_messages ~protocol_migration_message ~predecessor_timestamp
   let messages =
     let open Sc_rollup_inbox_message_repr in
     let sol = Internal Start_of_level in
+    let info_per_level =
+      Internal (Info_per_level {predecessor_timestamp; predecessor})
+    in
     let migration =
       Option.fold
         ~none:[]
         ~some:(fun x -> [Internal x])
         protocol_migration_message
     in
-    let info_per_level =
-      Internal (Info_per_level {predecessor_timestamp; predecessor})
-    in
     let eol = Internal End_of_level in
-    [sol] @ migration @ [info_per_level] @ messages @ [eol]
+    [sol] @ [info_per_level] @ migration @ messages @ [eol]
   in
 
   return (payloads_history, history, inbox, witness, messages)
 
 let genesis ~protocol_migration_message ~predecessor_timestamp ~predecessor
     level =
-  (* 1. Add [SOL], [Protocol_migration], and [Info_per_level]. *)
+  (* 1. Add [SOL], [Info_per_level] and [Protocol_migration]. *)
   let witness = init_witness_no_history in
   let witness =
-    add_protocol_internal_message_no_history protocol_migration_message witness
+    add_info_per_level_no_history ~predecessor_timestamp ~predecessor witness
   in
   let witness =
-    add_info_per_level_no_history ~predecessor_timestamp ~predecessor witness
+    add_protocol_internal_message_no_history protocol_migration_message witness
   in
 
   (* 2. Add [EOL]. *)
