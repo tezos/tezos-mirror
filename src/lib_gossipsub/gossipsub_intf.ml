@@ -497,6 +497,11 @@ module type AUTOMATON = sig
     val connections : view -> connection Peer.Map.t
 
     val limits : view -> limits
+
+    (** [has_joined topic view] returns true if and only if the automaton is
+        currently tracking messages for [topic]. That is, the local peer has joined 
+        and hasn't left the [topic]. *)
+    val has_joined : Topic.t -> view -> bool
   end
 end
 
