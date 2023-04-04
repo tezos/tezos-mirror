@@ -22,8 +22,8 @@ mod storage;
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-) -> Queue {
-    let queue = fetch(host, smart_rollup_address);
+) -> Result<Queue, Error> {
+    let queue = fetch(host, smart_rollup_address)?;
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
         debug_msg!(
@@ -34,7 +34,7 @@ pub fn stage_one<Host: Runtime>(
         );
     }
 
-    queue
+    Ok(queue)
 }
 
 pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
@@ -85,7 +85,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let smart_rollup_address = retrieve_smart_rollup_address(host)?;
     genesis_initialisation(host)?;
 
-    let queue = stage_one(host, smart_rollup_address);
+    let queue = stage_one(host, smart_rollup_address)?;
 
     stage_two(host, queue)
 }

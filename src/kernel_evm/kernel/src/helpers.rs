@@ -5,14 +5,6 @@
 use clarity::Address;
 use tezos_ethereum::eth_gen::OwnedHash;
 
-pub fn ensures(cond: bool) -> Option<()> {
-    if cond {
-        Some(())
-    } else {
-        None
-    }
-}
-
 pub fn address_to_hash(address: Address) -> OwnedHash {
     hex::encode(address.as_bytes()).as_bytes().to_vec()
 }
