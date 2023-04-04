@@ -534,26 +534,6 @@ module type WORKER_CONFIGURATION = sig
         stream is empty, the function will wait until some value is pushed. *)
     val pop : 'a t -> 'a Monad.t
   end
-
-  (** The interface for the P2P Network from the worker's point of view. It is
-      made of a [Connections_handler] module. *)
-  module P2P : sig
-    (** Interface for [Connections_handler] module. *)
-    module Connections_handler : sig
-      (** A connection is defined by a [peer] and two flags [direct] and
-          [outbound] to tell whether it is direct and outgoing, or not. *)
-      type connection = {peer : GS.Peer.t; direct : bool; outbound : bool}
-
-      (** A callback to run on each new connection. *)
-      val on_connection : (connection -> unit) -> unit
-
-      (** A callback to run on each disconnection. *)
-      val on_diconnection : (GS.Peer.t -> unit) -> unit
-
-      (** This function allows disconnecting the given peer. *)
-      val disconnect : GS.Peer.t -> unit Monad.t
-    end
-  end
 end
 
 (** The interface of a gossipsub worker. *)
@@ -564,6 +544,13 @@ module type WORKER = sig
   (** The Gossipsub automaton of the worker. *)
   module GS : AUTOMATON
 
+  (** A full message is defined by its content, topic and id. *)
+  type full_message = {
+    message : GS.Message.t;
+    topic : GS.Topic.t;
+    message_id : GS.Message_id.t;
+  }
+
   (** The following type defines the different kinds of messages a peer could
       receive from or sent to the P2P layer. *)
   type p2p_message =
@@ -573,11 +560,32 @@ module type WORKER = sig
     | IWant of {message_ids : GS.Message_id.t list}
     | Subscribe of {topic : GS.Topic.t}
     | Unsubscribe of {topic : GS.Topic.t}
-    | Publish of {
-        topic : GS.Topic.t;
-        message_id : GS.Message_id.t;
-        message : GS.Message.t;
-      }
+    | Publish of full_message
+
+  (** The different kinds of input events that could be received from the P2P
+      layer. *)
+  type p2p_input =
+    | In_message of {from_peer : GS.Peer.t; p2p_message : p2p_message}
+    | New_connection of {peer : GS.Peer.t; direct : bool; outbound : bool}
+    | Disconnection of {peer : GS.Peer.t}
+
+  (** The different kinds of input events that could be received from the
+      application layer. *)
+  type app_input =
+    | Inject_message of full_message
+    | Join of GS.Topic.t
+    | Leave of GS.Topic.t
+
+  (** The different kinds of outputs that could be emitted by the worker for the
+      P2P layer. *)
+  type p2p_output =
+    | Out_message of {to_peer : GS.Peer.t; p2p_message : p2p_message}
+    | Disconnect of {peer : GS.Peer.t}
+    | Kick of {peer : GS.Peer.t}
+
+  (** The application layer will be advertised about full messages it's
+      interested in. *)
+  type app_output = full_message
 
   (** [make rng limits parameters] initializes a new Gossipsub automaton with
       the given arguments. Then, it initializes and returns a worker for it. *)
@@ -596,17 +604,11 @@ module type WORKER = sig
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
   val shutdown : t -> unit
 
-  (** [inject state msg_id msg topic] is used to inject a message [msg] with
-      id [msg_id] and that belongs to [topic] to the network. *)
-  val inject : t -> GS.Message_id.t -> GS.Message.t -> GS.Topic.t -> unit
+  (** [app_input state app_input] adds the given application input [app_input]
+      to the worker's input stream. *)
+  val app_input : t -> app_input -> unit
 
-  (** [join t topics] joins [topics] even if the worker is running. *)
-  val join : t -> GS.Topic.t list -> unit
-
-  (** [leave t topics] leaves [topics] even if the worker is running. *)
-  val leave : t -> GS.Topic.t list -> unit
-
-  (** [p2p_message t peer message] advertises the worker about the [message]
-      sent by [peer].  *)
-  val p2p_message : t -> GS.Peer.t -> p2p_message -> unit
+  (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
+      worker's input stream. *)
+  val p2p_input : t -> p2p_input -> unit
 end

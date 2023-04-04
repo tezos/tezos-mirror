@@ -47,6 +47,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_handle : unit Monad.t;
       }
 
+  type full_message = {
+    message : Message.t;
+    topic : Topic.t;
+    message_id : Message_id.t;
+  }
+
   type p2p_message =
     | Graft of {topic : Topic.t}
     | Prune of {topic : Topic.t; px : Peer.t Seq.t}
@@ -54,30 +60,32 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | IWant of {message_ids : Message_id.t list}
     | Subscribe of {topic : Topic.t}
     | Unsubscribe of {topic : Topic.t}
-    | Publish of {
-        topic : Topic.t;
-        message_id : Message_id.t;
-        message : Message.t;
-      }
+    | Publish of full_message
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
 
      The payloads of the variants about are quite simular to those of GS (types
      graft, prune, ...). We could reuse them if we move the peer field
      outside. *)
 
-  (** The different kinds of events the Gossipsub worker handles. *)
-  type event =
-    | Heartbeat
-    | New_connection of P2P.Connections_handler.connection
+  type p2p_input =
+    | In_message of {from_peer : Peer.t; p2p_message : p2p_message}
+    | New_connection of {peer : Peer.t; direct : bool; outbound : bool}
     | Disconnection of {peer : Peer.t}
-    | Received_message of {peer : Peer.t; p2p_message : p2p_message}
-    | Inject_message of {
-        message : Message.t;
-        message_id : Message_id.t;
-        topic : Topic.t;
-      }
+
+  type app_input =
+    | Inject_message of full_message
     | Join of Topic.t
     | Leave of Topic.t
+
+  type p2p_output =
+    | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
+    | Disconnect of {peer : Peer.t}
+    | Kick of {peer : Peer.t}
+
+  type app_output = full_message
+
+  (** The different kinds of events the Gossipsub worker handles. *)
+  type event = Heartbeat | P2P_input of p2p_input | App_input of app_input
 
   (** The worker's state is made of its status, the gossipsub automaton's state,
       and a stream of events to process.  *)
@@ -102,7 +110,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle Heartbeat's output *)
         ignore output ;
         gossip_state
-    | New_connection {peer; direct; outbound} ->
+    | P2P_input (New_connection {peer; direct; outbound}) ->
         let gossip_state, output =
           GS.add_peer {direct; outbound; peer} gossip_state
         in
@@ -111,14 +119,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle New_connection's output *)
         ignore output ;
         gossip_state
-    | Disconnection {peer} ->
+    | P2P_input (Disconnection {peer}) ->
         let gossip_state, output = GS.remove_peer {peer} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
 
            Handle disconnection's output *)
         ignore output ;
         gossip_state
-    | Inject_message {message; message_id; topic} ->
+    | App_input (Inject_message {message; message_id; topic}) ->
         let gossip_state, output =
           GS.publish {sender = None; topic; message_id; message} gossip_state
         in
@@ -127,20 +135,20 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle Inject_message's output *)
         ignore output ;
         gossip_state
-    | Received_message m ->
+    | P2P_input (In_message m) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
            Handle received p2p messages. *)
-        ignore (Received_message m) ;
+        ignore (In_message m) ;
         assert false
-    | Join topic ->
+    | App_input (Join topic) ->
         let gossip_state, output = GS.join {topic} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
 
            Handle Join's output. *)
         ignore output ;
         gossip_state
-    | Leave topic ->
+    | App_input (Leave topic) ->
         let gossip_state, output = GS.leave {topic} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
 
@@ -151,21 +159,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** A helper function that pushes events in the state *)
   let push e t = Stream.push e t.events_stream
 
-  let p2p_message t peer p2p_message =
-    push (Received_message {peer; p2p_message}) t
+  let app_input t input = push (App_input input) t
 
-  (** A set of functions that push different kinds of events in the worker's
-      state. *)
-  let inject t message_id message topic =
-    push (Inject_message {message; message_id; topic}) t
-
-  let new_connection t conn = push (New_connection conn) t
-
-  let disconnection t peer = push (Disconnection {peer}) t
-
-  let join t = List.iter (fun topic -> push (Join topic) t)
-
-  let leave t = List.iter (fun topic -> push (Leave topic) t)
+  let p2p_input t input = push (P2P_input input) t
 
   (** This function returns a never-ending loop that periodically pushes
       [Heartbeat] events in the stream.  *)
@@ -196,9 +192,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let event_loop_handle = event_loop t in
         let status = Running {heartbeat_handle; event_loop_handle} in
         let t = {t with status} in
-        let () = P2P.Connections_handler.on_connection (new_connection t) in
-        let () = P2P.Connections_handler.on_diconnection (disconnection t) in
-        join t topics ;
+        List.iter (fun topic -> app_input t (Join topic)) topics ;
         t
     | Running _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5166
