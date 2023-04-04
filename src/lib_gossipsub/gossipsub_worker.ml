@@ -98,6 +98,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
+  let message_is_from_network publish = Option.is_some publish.GS.sender
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5327
 
      - Also send the full message to direct peers: filter those that have it (we
@@ -111,14 +113,15 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
      receive IHave from them). *)
   let handle_full_message ~p2p_msg ~app_msg publish = function
     | gstate, GS.Publish_message peers ->
-        let {GS.sender; topic; message_id; message} = publish in
+        let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
         GS.Peer.Set.iter
           (fun to_peer -> p2p_msg @@ Out_message {to_peer; p2p_message})
           peers ;
         let has_joined = GS.Introspection.(has_joined topic @@ view gstate) in
-        if Option.is_some sender && has_joined then app_msg full_message ;
+        if message_is_from_network publish && has_joined then
+          app_msg full_message ;
         gstate
     | gstate, GS.Already_published -> gstate
 
