@@ -379,6 +379,171 @@ module Maintenance = struct
     test_expected_connections ()
 end
 
+module Swap = struct
+  module StringSet = Set.Make (String)
+
+  (* Tests the swap mechanism.
+     - Create the following topology:
+       1b-1a-swaper-2a-2b
+       with all nodes except swaper that has its maintenance and peer discovery
+       disabled.
+     - Check logs for swap request events
+     - Check that the new topology is one of the following:
+       1b-swaper-1a-2a-2b if swaper sent its request to 1a or
+       1b-1a-2a-swaper-2b if swaper sent its request to 2a. *)
+
+  (* NOTE: This test has previously been flaky because of some race conditions that
+     where caused by inconsistencies regarding the way the maintenance was
+     triggered. Please see the following patch that solves the race condition
+     for more details:
+     https://gitlab.com/tezos/tezos/-/commit/9df348f7447df7c89bd1456e8640b7686e51aebe
+
+     More precisely, as the node [swaper] is configured with [Connection = 2],
+     the max number of connexions it accepted was [3]. Thus, during the swap,
+     as a connection is added (before removing the replaced one), the number
+     of connections was equal to [3]. The maintainance was then triggered
+     unexpectedly. This should not occur anymore. *)
+  let test_swap_raw () =
+    let create_node name = Node.create ~name [Disable_p2p_maintenance] in
+    let run_node node =
+      let patch_config =
+        JSON.update
+          "p2p"
+          (JSON.put
+             ( "disable_peer_discovery",
+               JSON.parse ~origin:__LOC__ (Bool.to_string true) ))
+      in
+      let* () = Node.identity_generate node in
+      let* () = Node.config_init node [] in
+      Node.Config_file.update node patch_config ;
+      let* () = Node.run node [] in
+      Node.wait_for_ready node
+    in
+    let filter_get_peer json =
+      let peer = JSON.(json |-> "proposed_peer" |> as_string) in
+      Some peer
+    in
+    let wait_swap_request_received node =
+      let* peer =
+        Node.wait_for node "swap_request_received.v0" filter_get_peer
+      in
+      Lwt.return (node, peer)
+    in
+    let wait_swap_succeeded node =
+      let* () = Node.wait_for node "swap_succeeded.v0" (fun _ -> Some ()) in
+      Lwt.return node
+    in
+    let connect node1 node2 =
+      let addr, port = Node.point node2 in
+      let point = addr ^ ":" ^ Int.to_string port in
+      RPC.(call node1 (put_network_points point))
+    in
+    let get_node_from_id nodes id =
+      Lwt_list.find_s
+        (fun node ->
+          let* node_id = Node.wait_for_identity node in
+          Lwt.return (id = node_id))
+        nodes
+    in
+    let check_conns expected_peers node =
+      let pp_set ppf s =
+        Format.pp_print_seq
+          ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+          Format.pp_print_string
+          ppf
+          (StringSet.to_seq s)
+      in
+      let* conns = RPC.(call node get_network_connections) in
+      let conn_ids =
+        List.map (fun (_, _, id) -> id) conns |> StringSet.of_list
+      in
+      let name = Node.name node in
+      let* expected_ids =
+        Lwt_list.map_p Node.wait_for_identity expected_peers
+      in
+      let expected_ids = StringSet.of_list expected_ids in
+      Log.info
+        "Testing connections for %s to be : [%a]"
+        name
+        pp_set
+        expected_ids ;
+      if not (StringSet.subset expected_ids conn_ids) then
+        Test.fail
+          "Missing connections for node %s (expected: [%a], found: [%a])"
+          name
+          pp_set
+          expected_ids
+          pp_set
+          conn_ids ;
+      unit
+    in
+    let node_1a = create_node "1a" in
+    let node_1b = create_node "1b" in
+    let node_2a = create_node "2a" in
+    let node_2b = create_node "2b" in
+    let swaper = Node.create ~name:"swaper" [Connections 2] in
+    let nodes = [node_1a; node_1b; node_2a; node_2b; swaper] in
+    let swap_request_received =
+      Lwt.pick
+        [wait_swap_request_received node_1a; wait_swap_request_received node_2a]
+    in
+    let swap_ack_received =
+      Node.wait_for swaper "swap_ack_received.v0" filter_get_peer
+    in
+    let swap_succeeded =
+      let* node =
+        Lwt.pick [wait_swap_succeeded node_1a; wait_swap_succeeded node_2a]
+      and* _ = wait_swap_succeeded swaper in
+      Lwt.return node
+    in
+    Node.add_peer swaper node_1a ;
+    Node.add_peer swaper node_2a ;
+    let* () = Lwt_list.iter_p run_node [node_1b; node_1a; node_2a; node_2b] in
+    let* _ = connect node_1a node_1b in
+    let* _ = connect node_2a node_2b in
+    let* () = run_node swaper in
+    let* requested_node =
+      let* requested_node, proposed_peer = swap_request_received in
+      let* proposed_node = get_node_from_id nodes proposed_peer in
+      Log.info
+        "%s node received a swap request with %s proposed"
+        (Node.name requested_node)
+        (Node.name proposed_node) ;
+      Lwt.return requested_node
+    and* () =
+      let* proposed_peer = swap_ack_received in
+      let* proposed_node = get_node_from_id nodes proposed_peer in
+      Log.info
+        "swaper node received a swap ack with %s proposed"
+        (Node.name proposed_node) ;
+      unit
+    and* succeded_requested_node = swap_succeeded in
+    Check.(
+      (Node.name requested_node = Node.name succeded_requested_node) string)
+      ~error_msg:
+        "Expected requested node and succesful node to be the same. But node \
+         %L differs from %R." ;
+    Log.info
+      "swap succeeded between %s and %s"
+      (Node.name swaper)
+      (Node.name succeded_requested_node) ;
+    let swaper_expected_conns, requested_node_expected_conns =
+      if Node.name requested_node = Node.name node_1a then
+        ([node_1a; node_1b], [swaper; node_2a])
+      else ([node_2a; node_2b], [swaper; node_1a])
+    in
+    let* () = check_conns swaper_expected_conns swaper in
+    let* () = check_conns requested_node_expected_conns requested_node in
+    unit
+
+  (* Same as [test_swap_raw] with default parameters. *)
+  let test_swap () =
+    Test.register ~__FILE__ ~title:"p2p-swap" ~tags:["p2p"; "node"; "swap"]
+    @@ fun () -> test_swap_raw ()
+
+  let tests () = test_swap ()
+end
+
 let port_from_peers_file file_name =
   JSON.parse_file file_name |> JSON.geti 0
   |> JSON.get "last_established_connection"
@@ -1175,6 +1340,7 @@ end
 
 let register_protocol_independent () =
   Maintenance.tests () ;
+  Swap.tests () ;
   ACL.tests () ;
   test_advertised_port () ;
   Known_Points_GC.tests () ;
