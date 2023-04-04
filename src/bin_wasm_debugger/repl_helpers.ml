@@ -107,11 +107,12 @@ let print_durable ?(depth = 10) ?(show_values = true) ?(path = []) tree =
          "The path /%s is not available in the durable storage\n%!"
          (String.concat "/" path)
 
-type integer_value_kind = [`I32 | `I64 | `U128 | `U256]
+type integer_value_kind = [`U16 | `I32 | `I64 | `U128 | `U256]
 
 type printable_value_kind = [integer_value_kind | `Hex | `String]
 
 let integer_value_kind_of_string = function
+  | "uint16" | "u16" -> Some `U16
   | "int32" | "i32" -> Some `I32
   | "int64" | "i64" -> Some `I64
   | "uint128" | "u128" -> Some `U128
@@ -119,12 +120,14 @@ let integer_value_kind_of_string = function
   | _ -> None
 
 let integer_value_kind_to_string = function
+  | `U16 -> "u16"
   | `I32 -> "i32"
   | `I64 -> "i64"
   | `U128 -> "u128"
   | `U256 -> "u256"
 
 let value_kind_length = function
+  | `U16 -> 2
   | `I32 -> 4
   | `I64 -> 8
   | `U128 -> 16
