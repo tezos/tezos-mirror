@@ -115,7 +115,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
         GS.Peer.Set.iter
-          (fun peer -> p2p_msg @@ Out_message {peer; p2p_message})
+          (fun to_peer -> p2p_msg @@ Out_message {to_peer; p2p_message})
           peers ;
         let has_joined = GS.Introspection.(has_joined topic @@ view gstate) in
         if Option.is_some sender && has_joined then app_msg full_message ;
@@ -123,8 +123,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | gstate, GS.Already_published -> gstate
 
   (** This is the main function of the worker. It interacts with the Gossipsub
-      automaton given an event. The outcome is a new automaton state and an
-      output to be processed, depending on the kind of input event. *)
+      automaton given an event. The function possibly sends messages to the P2P
+      and application layers via the functions [p2p_msg] and [app_msg] and
+      returns the new automaton's state. *)
   let apply_event ~p2p_msg ~app_msg gossip_state = function
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
@@ -161,9 +162,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.publish publish gossip_state
         |> handle_full_message ~p2p_msg ~app_msg publish
     | P2P_input
-        (In_message {peer; p2p_message = Publish {message; topic; message_id}})
-      ->
-        let publish = {GS.sender = Some peer; topic; message_id; message} in
+        (In_message
+          {from_peer; p2p_message = Publish {message; topic; message_id}}) ->
+        let publish =
+          {GS.sender = Some from_peer; topic; message_id; message}
+        in
         GS.publish publish gossip_state
         |> handle_full_message ~p2p_msg ~app_msg publish
     | P2P_input (In_message m) ->
