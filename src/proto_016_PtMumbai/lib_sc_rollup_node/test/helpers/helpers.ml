@@ -136,11 +136,15 @@ module Make (PVM : Pvm.S) = struct
     let pid = Unix.getpid () in
     let data_dir =
       Filename.(concat @@ get_temp_dir_name ())
-        (Format.sprintf "sc-rollup-node-test-%d-%d" pid !uid)
+        (Format.sprintf "sc-rollup-node-test-%s-%d-%d" Protocol.name pid !uid)
     in
     let base_dir =
       Filename.(concat @@ get_temp_dir_name ())
-        (Format.sprintf "sc-rollup-node-test-base-%d-%d" pid !uid)
+        (Format.sprintf
+           "sc-rollup-node-test-%s-base-%d-%d"
+           Protocol.name
+           pid
+           !uid)
     in
     let filesystem = String.Hashtbl.create 10 in
     let cctxt =
