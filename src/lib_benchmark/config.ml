@@ -291,7 +291,6 @@ let merge_config_files ?(delete_src = false) ~(dst : string) ~(src : string) ()
   if delete_src then Stdlib.Sys.remove src_path
 
 let edit_config ?(input = `Stdin) config_path namespace =
-  let namespace = Namespace.of_string namespace in
   let tmpfile =
     Filename.(concat (get_temp_dir_name ()) "octez-snoop_config_edit")
   in

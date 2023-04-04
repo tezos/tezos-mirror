@@ -75,7 +75,7 @@ module Benchmark_cmd = struct
     let options =
       {
         seed = None;
-        nsamples = 3000;
+        nsamples = 500;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
         config_file = None;
@@ -1218,6 +1218,7 @@ module Config_cmd = struct
       @@ config_file_param () @@ prefix "for" @@ benchmark_param () @@ stop)
 
   let handler_edit (editor, stdin, file, json) config_path namespace () =
+    let namespace = Namespace.of_string namespace in
     let input =
       match (editor, stdin, file, json) with
       | Some e, false, None, None -> `Edit e

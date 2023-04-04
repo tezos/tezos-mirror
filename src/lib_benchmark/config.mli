@@ -78,5 +78,5 @@ val edit_config :
     | `Edit of string > `Edit
     `Stdin ] ->
   string ->
-  string ->
+  Namespace.t ->
   unit
