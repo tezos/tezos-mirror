@@ -12,7 +12,6 @@ use crate::Error;
 use tezos_ethereum::transaction::TransactionHash;
 
 pub struct Transaction {
-    pub level: u32,
     pub tx_hash: TransactionHash,
     pub tx: EthereumTransactionCommon,
 }
@@ -62,11 +61,7 @@ impl InputResult {
             Ok(tx) => tx,
             Err(_) => return InputResult::Unparsable,
         };
-        InputResult::Transaction(Box::new(Transaction {
-            level: input.level,
-            tx_hash,
-            tx,
-        }))
+        InputResult::Transaction(Box::new(Transaction { tx_hash, tx }))
     }
 }
 
