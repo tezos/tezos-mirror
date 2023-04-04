@@ -1,0 +1,87 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/attic/int_publisher.tz --details
+Well typed
+Gas remaining: 1039970.043 units remaining
+{ parameter (option (pair signature int)) ;
+  storage (pair key int) ;
+  code { DUP
+         /* [ pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int ] */ ;
+         DUP
+         /* [ pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int ] */ ;
+         CAR
+         /* [ option (pair signature int) : pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int ] */ ;
+         IF_NONE
+           { PUSH mutez
+                  1000000
+             /* [ mutez : pair (option (pair signature int)) key int
+                : pair (option (pair signature int)) key int ] */ ;
+             AMOUNT
+             /* [ mutez : mutez : pair (option (pair signature int)) key int
+                : pair (option (pair signature int)) key int ] */ ;
+             CMPLE ;
+             IF { FAIL }
+                { /* [ pair (option (pair signature int)) key int
+                     : pair (option (pair signature int)) key int ] */ } ;
+             CDR
+             /* [ pair key int : pair (option (pair signature int)) key int ] */ ;
+             DIP { CDDR }
+             /* [ pair key int : int ] */ }
+           { DUP
+             /* [ pair signature int : pair signature int
+                : pair (option (pair signature int)) key int
+                : pair (option (pair signature int)) key int ] */ ;
+             DIP { SWAP
+                   /* [ pair (option (pair signature int)) key int : pair signature int
+                      : pair (option (pair signature int)) key int ] */ }
+             /* [ pair signature int : pair (option (pair signature int)) key int
+                : pair signature int : pair (option (pair signature int)) key int ] */ ;
+             SWAP
+             /* [ pair (option (pair signature int)) key int : pair signature int
+                : pair signature int : pair (option (pair signature int)) key int ] */ ;
+             CDAR ;
+             DIP { DUP
+                   /* [ pair signature int : pair signature int : pair signature int
+                      : pair (option (pair signature int)) key int ] */ ;
+                   CAR
+                   /* [ signature : pair signature int : pair signature int
+                      : pair (option (pair signature int)) key int ] */ ;
+                   DIP { CDR
+                         /* [ int : pair signature int : pair (option (pair signature int)) key int ] */ ;
+                         PACK
+                         /* [ bytes : pair signature int : pair (option (pair signature int)) key int ] */ ;
+                         BLAKE2B
+                         /* [ bytes : pair signature int : pair (option (pair signature int)) key int ] */ }
+                   /* [ signature : bytes : pair signature int
+                      : pair (option (pair signature int)) key int ] */ }
+             /* [ key : signature : bytes : pair signature int
+                : pair (option (pair signature int)) key int ] */ ;
+             CHECK_SIGNATURE
+             /* [ bool : pair signature int : pair (option (pair signature int)) key int ] */ ;
+             IF { CDR
+                  /* [ int : pair (option (pair signature int)) key int ] */ ;
+                  SWAP
+                  /* [ pair (option (pair signature int)) key int : int ] */ ;
+                  DIP { DUP /* [ int : int ] */ }
+                  /* [ pair (option (pair signature int)) key int : int : int ] */ ;
+                  CDAR ;
+                  PAIR
+                  /* [ pair key int : int ] */ }
+                { DROP
+                  /* [ pair (option (pair signature int)) key int ] */ ;
+                  DUP
+                  /* [ pair (option (pair signature int)) key int
+                     : pair (option (pair signature int)) key int ] */ ;
+                  CDR
+                  /* [ pair key int : pair (option (pair signature int)) key int ] */ ;
+                  DIP { CDDR }
+                  /* [ pair key int : int ] */ } } ;
+         DIP { DROP /* [] */ }
+         /* [ pair key int ] */ ;
+         NIL operation
+         /* [ list operation : pair key int ] */ ;
+         PAIR
+         /* [ pair (list operation) key int ] */ } }

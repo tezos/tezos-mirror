@@ -1,0 +1,217 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/compare.tz --details
+Well typed
+Gas remaining: 1039840.163 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { DROP
+         /* [] */ ;
+         PUSH bool True
+         /* [ bool ] */ ;
+         DUP
+         /* [ bool : bool ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH bool False
+         /* [ bool ] */ ;
+         DUP
+         /* [ bool : bool ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH bool False
+         /* [ bool ] */ ;
+         PUSH bool True
+         /* [ bool : bool ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH bool True
+         /* [ bool ] */ ;
+         PUSH bool False
+         /* [ bool : bool ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH bytes 0xaabbcc
+         /* [ bytes ] */ ;
+         DUP
+         /* [ bytes : bytes ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH bytes 0x
+         /* [ bytes ] */ ;
+         PUSH bytes 0x
+         /* [ bytes : bytes ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH bytes 0x
+         /* [ bytes ] */ ;
+         PUSH bytes 0x01
+         /* [ bytes : bytes ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH bytes 0x01
+         /* [ bytes ] */ ;
+         PUSH bytes 0x02
+         /* [ bytes : bytes ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH bytes 0x02
+         /* [ bytes ] */ ;
+         PUSH bytes 0x01
+         /* [ bytes : bytes ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH int 1
+         /* [ int ] */ ;
+         DUP
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH int 10
+         /* [ int ] */ ;
+         PUSH int 5
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH int -4
+         /* [ int ] */ ;
+         PUSH int 1923
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH nat 1
+         /* [ nat ] */ ;
+         DUP
+         /* [ nat : nat ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH nat 10
+         /* [ nat ] */ ;
+         PUSH nat 5
+         /* [ nat : nat ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH nat 4
+         /* [ nat ] */ ;
+         PUSH nat 1923
+         /* [ nat : nat ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+         /* [ key_hash ] */ ;
+         DUP
+         /* [ key_hash : key_hash ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH key_hash "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
+         /* [ key_hash ] */ ;
+         PUSH key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+         /* [ key_hash : key_hash ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+         /* [ key_hash ] */ ;
+         PUSH key_hash "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
+         /* [ key_hash : key_hash ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH mutez 1
+         /* [ mutez ] */ ;
+         DUP
+         /* [ mutez : mutez ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH mutez 10
+         /* [ mutez ] */ ;
+         PUSH mutez 5
+         /* [ mutez : mutez ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH mutez 4
+         /* [ mutez ] */ ;
+         PUSH mutez 1923
+         /* [ mutez : mutez ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH string "AABBCC"
+         /* [ string ] */ ;
+         DUP
+         /* [ string : string ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH string ""
+         /* [ string ] */ ;
+         PUSH string ""
+         /* [ string : string ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH string ""
+         /* [ string ] */ ;
+         PUSH string "a"
+         /* [ string : string ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH string "a"
+         /* [ string ] */ ;
+         PUSH string "b"
+         /* [ string : string ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH string "b"
+         /* [ string ] */ ;
+         PUSH string "a"
+         /* [ string : string ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         PUSH timestamp "2019-09-16T08:38:05Z"
+         /* [ timestamp ] */ ;
+         DUP
+         /* [ timestamp : timestamp ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH timestamp "2017-09-16T08:38:04Z"
+         /* [ timestamp ] */ ;
+         PUSH timestamp "2019-09-16T08:38:05Z"
+         /* [ timestamp : timestamp ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_GT ;
+         PUSH timestamp "2019-09-16T08:38:05Z"
+         /* [ timestamp ] */ ;
+         PUSH timestamp "2019-09-16T08:38:04Z"
+         /* [ timestamp : timestamp ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

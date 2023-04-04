@@ -1,0 +1,49 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/create_contract.tz on storage None and input Unit --level 1 --trace-stack
+storage
+  (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")
+emitted operations
+  Internal Origination:
+    From: KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
+    Credit: ꜩ0.05
+    Script:
+      { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+      Initial storage: Unit
+    No delegate for this contract
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 12.061)
+    [ (Pair Unit None) ]
+  - location: 8 (just consumed gas: 0.010)
+    [  ]
+  - location: 9 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 10 (just consumed gas: 0.010)
+    [ 50000
+      Unit ]
+  - location: 11 (just consumed gas: 0.010)
+    [ None
+      50000
+      Unit ]
+  - location: 13 (just consumed gas: 0.716)
+    [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b
+      "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm" ]
+  - location: 25 (just consumed gas: 0)
+    [ "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm" ]
+  - location: 27 (just consumed gas: 0.010)
+    [ (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm") ]
+  - location: 28 (just consumed gas: 0.010)
+    [ {}
+      (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm") ]
+  - location: 25 (just consumed gas: 0.025)
+    [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b
+      {}
+      (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm") ]
+  - location: 30 (just consumed gas: 0.010)
+    [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }
+      (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm") ]
+  - location: 31 (just consumed gas: 0.010)
+    [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }
+            (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")) ]
+

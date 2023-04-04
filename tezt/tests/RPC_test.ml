@@ -647,7 +647,7 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
          ()
   in
   let* () =
-    if Protocol.(number protocol > number Mumbai) then
+    if Protocol.(number protocol > number Nairobi) then
       let* _ =
         RPC.Client.call ?endpoint ~hooks client
         @@ RPC.get_chain_block_helper_attestation_rights ()

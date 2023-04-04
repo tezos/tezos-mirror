@@ -1,0 +1,55 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/send_ticket_list_multiple_016.tz --details
+Well typed
+Gas remaining: 1039981.403 units remaining
+{ parameter address ;
+  storage unit ;
+  code { CAR
+         /* [ address ] */ ;
+         CONTRACT (list (ticket string))
+         /* [ option (contract (list (ticket string))) ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez 0
+         /* [ mutez : contract (list (ticket string)) ] */ ;
+         NIL (ticket string)
+         /* [ list (ticket string) : mutez : contract (list (ticket string)) ] */ ;
+         PUSH nat
+              1
+         /* [ nat : list (ticket string) : mutez : contract (list (ticket string)) ] */ ;
+         PUSH string
+              "Ticket"
+         /* [ string : nat : list (ticket string) : mutez
+            : contract (list (ticket string)) ] */ ;
+         TICKET
+         /* [ option (ticket string) : list (ticket string) : mutez
+            : contract (list (ticket string)) ] */ ;
+         ASSERT_SOME ;
+         CONS
+         /* [ list (ticket string) : mutez : contract (list (ticket string)) ] */ ;
+         PUSH nat
+              1
+         /* [ nat : list (ticket string) : mutez : contract (list (ticket string)) ] */ ;
+         PUSH string
+              "Ticket2"
+         /* [ string : nat : list (ticket string) : mutez
+            : contract (list (ticket string)) ] */ ;
+         TICKET
+         /* [ option (ticket string) : list (ticket string) : mutez
+            : contract (list (ticket string)) ] */ ;
+         ASSERT_SOME ;
+         CONS
+         /* [ list (ticket string) : mutez : contract (list (ticket string)) ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation ] */ ;
+         NIL operation
+         /* [ list operation : operation ] */ ;
+         SWAP
+         /* [ operation : list operation ] */ ;
+         CONS
+         /* [ list operation ] */ ;
+         UNIT
+         /* [ unit : list operation ] */ ;
+         SWAP
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

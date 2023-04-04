@@ -237,7 +237,7 @@ module NoUselessRpc = struct
       ]
     in
     let paths =
-      if Protocol.(number protocol > number Mumbai) then
+      if Protocol.(number protocol > number Nairobi) then
         (["helpers"; "attestation_rights"], []) :: paths
       else paths
     in

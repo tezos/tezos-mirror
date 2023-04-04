@@ -181,7 +181,7 @@ let write_parameter_file :
 
 let next_protocol = function
   | Lima -> Some Mumbai
-  | Mumbai -> Some Alpha
+  | Mumbai -> Some Nairobi
   | Nairobi -> Some Alpha
   | Alpha -> None
 
@@ -191,7 +191,7 @@ let previous_protocol = function
   | Mumbai -> Some Lima
   | Lima -> None
 
-let all = [Alpha; Lima; Mumbai]
+let all = [Alpha; Lima; Mumbai; Nairobi]
 
 type supported_protocols =
   | Any_protocol
