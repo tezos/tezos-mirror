@@ -565,7 +565,7 @@ module type WORKER = sig
   (** The different kinds of input events that could be received from the P2P
       layer. *)
   type p2p_input =
-    | In_message of {peer : GS.Peer.t; p2p_message : p2p_message}
+    | In_message of {from_peer : GS.Peer.t; p2p_message : p2p_message}
     | New_connection of {peer : GS.Peer.t; direct : bool; outbound : bool}
     | Disconnection of {peer : GS.Peer.t}
 
@@ -579,7 +579,7 @@ module type WORKER = sig
   (** The different kinds of outputs that could be emitted by the worker for the
       P2P layer. *)
   type p2p_output =
-    | Out_message of {peer : GS.Peer.t; p2p_message : p2p_message}
+    | Out_message of {to_peer : GS.Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : GS.Peer.t}
     | Kick of {peer : GS.Peer.t}
 

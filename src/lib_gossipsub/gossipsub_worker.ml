@@ -68,7 +68,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
      outside. *)
 
   type p2p_input =
-    | In_message of {peer : Peer.t; p2p_message : p2p_message}
+    | In_message of {from_peer : Peer.t; p2p_message : p2p_message}
     | New_connection of {peer : Peer.t; direct : bool; outbound : bool}
     | Disconnection of {peer : Peer.t}
 
@@ -78,7 +78,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Leave of Topic.t
 
   type p2p_output =
-    | Out_message of {peer : Peer.t; p2p_message : p2p_message}
+    | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
 
