@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {2 Unit tests for gossipsub.} *)
+(* Testing
+   -------
+   Component:  Gossipsub
+   Invocation: dune exec test/test_gossipsub.exe -- --file test_unit.ml
+   Subject:    Unit tests for gossipsub
+*)
 
 open Test_gossipsub_shared
 open Gossipsub_intf
@@ -1093,6 +1098,225 @@ let test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters =
       ~__LOC__) ;
   unit
 
+(* Tests that the correct message is returned when a peer asks for a message in our cache.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1025
+*)
+let test_handle_iwant_msg_cached rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test handle IWant for message in cache"
+    ~tags:["gossipsub"; "iwant"; "cache"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(7) in
+  let message = "some message" in
+  let message_id = 3 in
+  (* Place message in cache by publishing. *)
+  let state, _ = GS.publish {sender = None; topic; message; message_id} state in
+  (* Send IWant. *)
+  let _state, On_iwant_messages_to_route {routed_message_ids} =
+    GS.handle_iwant {peer; message_ids = [message_id]} state
+  in
+  (* IWant should return the message in cache. *)
+  match Message_id.Map.find message_id routed_message_ids with
+  | None | Some `Ignored | Some `Not_found | Some `Too_many_requests ->
+      Test.fail ~__LOC__ "Expected IWant to return the message in cache."
+  | Some (`Message msg) ->
+      Check.((msg = message) string ~error_msg:"Expected %R, got %L" ~__LOC__) ;
+      unit
+
+(* Tests that in IWant stops returning message after
+   [history_length] heartbeats as it is shifted out from the cache.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1081
+*)
+let test_handle_iwant_msg_cached_shifted rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test handle IWant message cache shifted"
+    ~tags:["gossipsub"; "iwant"; "cache"; "heartbeat"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits:{limits with max_gossip_retransmission = 100}
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(7) in
+  let message = "some message" in
+  let message_id = 3 in
+  (* Place message in cache by publishing. *)
+  let state, _ = GS.publish {sender = None; topic; message; message_id} state in
+  (* Loop [2 * limits.history_length] times and check that IWant starts returning
+     `Not_found after [history_length] heartbeat ticks. *)
+  let _state =
+    List.init ~when_negative_length:() (2 * limits.history_length) (fun i ->
+        i + 1)
+    |> WithExceptions.Result.get_ok ~loc:__LOC__
+    |> List.fold_left
+         (fun state heartbeat_count ->
+           (* Heartbeat. *)
+           let state, _output = GS.heartbeat state in
+           (* Send IWant. *)
+           let state, On_iwant_messages_to_route {routed_message_ids} =
+             GS.handle_iwant {peer; message_ids = [message_id]} state
+           in
+           match Message_id.Map.find message_id routed_message_ids with
+           | None | Some `Ignored | Some `Too_many_requests ->
+               Test.fail ~__LOC__ "Expected `Message or `Not_found."
+           | Some (`Message _msg) ->
+               if heartbeat_count < limits.history_length then
+                 (* The expected case *)
+                 state
+               else
+                 Test.fail
+                   ~__LOC__
+                   "Expected IWant to return the message in cache at heartbeat \
+                    count %d."
+                   heartbeat_count
+           | Some `Not_found ->
+               if heartbeat_count >= limits.history_length then
+                 (* The expected case *)
+                 state
+               else
+                 Test.fail
+                   ~__LOC__
+                   "Expected IWant to return `Not_found at heartbeat count %d."
+                   heartbeat_count)
+         state
+  in
+  unit
+
+(* Tests that we do not return a message when a peers asks for a message not in our cache.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1146
+*)
+let test_handle_iwant_msg_not_cached rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test handle IWant for message not in cache"
+    ~tags:["gossipsub"; "iwant"; "cache"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(7) in
+  (* Some random message id. *)
+  let message_id = 99 in
+  (* Send IWant. *)
+  let _state, On_iwant_messages_to_route {routed_message_ids} =
+    GS.handle_iwant {peer; message_ids = [message_id]} state
+  in
+  (* IWant should return `Not_found as the message is not in cache. *)
+  match Message_id.Map.find message_id routed_message_ids with
+  | None | Some `Ignored | Some (`Message _) | Some `Too_many_requests ->
+      Test.fail ~__LOC__ "Expected IWant to return `Not_found."
+  | Some `Not_found -> unit
+
+(* Tests that receiving too many IWants from the same peer for the same message
+   results in ignoring the request.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4387
+*)
+let test_ignore_too_many_iwants_from_same_peer_for_same_message rng limits
+    parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Ignore too many IWants from same peer for same message"
+    ~tags:["gossipsub"; "iwant"; "cache"]
+  @@ fun () ->
+  let topic = "topic" in
+  (* Create state with an empty mesh. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers:[]
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Add a peer that is not in the mesh. *)
+  let peer = 99 in
+  let state =
+    add_and_subscribe_peers [topic] [peer] ~to_subscribe:(fun _ -> true) state
+  in
+  (* Add message to cache by publishing. *)
+  let message = "some message" in
+  let message_id = 0 in
+  let state, _ = GS.publish {sender = None; topic; message; message_id} state in
+  (* Send IWant from same peer for same message [(2 * limits.max_gossip_retransmission) + 10] times.
+     Only the first [max_gossip_retransmission] IWant requests should be accepted. *)
+  let _state =
+    List.init
+      ~when_negative_length:()
+      ((2 * limits.max_gossip_retransmission) + 10)
+      (fun i -> i + 1)
+    |> WithExceptions.Result.get_ok ~loc:__LOC__
+    |> List.fold_left
+         (fun state iwant_count ->
+           let state, On_iwant_messages_to_route {routed_message_ids} =
+             GS.handle_iwant {peer; message_ids = [message_id]} state
+           in
+           match Message_id.Map.find message_id routed_message_ids with
+           | None | Some `Not_found | Some `Ignored ->
+               Test.fail
+                 ~__LOC__
+                 "IWant should be either accepted or ignored due to too many \
+                  requests."
+           | Some (`Message _) ->
+               if iwant_count <= limits.max_gossip_retransmission then
+                 (* The expected case. *)
+                 state
+               else
+                 Test.fail
+                   ~__LOC__
+                   "IWant should be ignored at iwant count of %d."
+                   iwant_count
+           | Some `Too_many_requests ->
+               if iwant_count > limits.max_gossip_retransmission then
+                 (* The expected case. *)
+                 state
+               else
+                 Test.fail
+                   ~__LOC__
+                   "IWant should be accepted at iwant count of %d."
+                   iwant_count)
+         state
+  in
+  unit
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test the described test scenario *)
 
@@ -1112,4 +1336,11 @@ let register rng limits parameters =
   test_unsubscribe_backoff rng limits parameters ;
   test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters ;
   test_do_not_remove_too_many_outbound_peers rng limits parameters ;
-  test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters
+  test_add_outbound_peers_if_min_is_not_satisfied rng limits parameters ;
+  test_handle_iwant_msg_cached rng limits parameters ;
+  test_handle_iwant_msg_cached_shifted rng limits parameters ;
+  test_handle_iwant_msg_not_cached rng limits parameters ;
+  test_ignore_too_many_iwants_from_same_peer_for_same_message
+    rng
+    limits
+    parameters
