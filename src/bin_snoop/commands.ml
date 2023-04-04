@@ -1413,6 +1413,10 @@ module Display_info_cmd = struct
   let pp_fancy_benchmark fmt (module B : Benchmark.S) =
     bold_block fmt "Name" Namespace.pp B.name ;
     bold_block fmt "Filename" Format.pp_print_string B.module_filename ;
+    bold_block fmt "Generated code destination" Format.pp_print_string
+    @@ Option.value
+         ~default:"Destination not specified"
+         B.generated_code_destination ;
     bold_block fmt "Info" Format.pp_print_string B.info ;
     bold_block fmt "Tags" pp_tags B.tags ;
     bold_block fmt "Models" (pp_models ()) B.models

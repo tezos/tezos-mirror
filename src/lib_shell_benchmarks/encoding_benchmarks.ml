@@ -27,6 +27,8 @@ open Benchmarks_shell
 
 open Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
+
+  let generated_code_destination = None
 end)
 (* ------------------------------------------------------------------------- *)
 

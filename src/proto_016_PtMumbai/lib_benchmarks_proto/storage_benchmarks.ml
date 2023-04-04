@@ -147,6 +147,8 @@ module List_key_values_benchmark_boilerplate = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let config_encoding =
     let open Data_encoding in
     conv

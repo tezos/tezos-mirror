@@ -263,6 +263,8 @@ let make_benchmark :
 
     let module_filename = __FILE__
 
+    let generated_code_destination = None
+
     let models =
       (* [intercept = true] implies there's a benchmark with [intercept = false].
          No need to register the model twice. *)
@@ -546,6 +548,8 @@ let make_continuation_benchmark :
 
     let module_filename = __FILE__
 
+    let generated_code_destination = None
+
     let tags = tags @ more_tags
 
     let models = Interpreter_model.make_model ?amplification (Cont_name name)
@@ -652,6 +656,8 @@ module Registration_section = struct
       let info = "Benchmarking the cost of an empty loop"
 
       let module_filename = __FILE__
+
+      let generated_code_destination = None
 
       let tags = [Tags.interpreter]
 
@@ -2703,6 +2709,8 @@ module Registration_section = struct
         let info = info
 
         let module_filename = __FILE__
+
+        let generated_code_destination = None
 
         include Default_config
         include Default_boilerplate

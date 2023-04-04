@@ -183,6 +183,8 @@ module List_key_values_benchmark = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let benchmark rng_state {max_size} () =
     let wrap m = m >|= Environment.wrap_tzresult in
     let size =
@@ -222,6 +224,8 @@ module List_key_values_benchmark_intercept = struct
   let name = Namespace.make ns (Namespace.basename name) "intercept"
 
   let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let benchmark _rng_state _config () =
     let ctxt =

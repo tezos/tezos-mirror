@@ -42,6 +42,8 @@ module Timer_latency_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let tags = ["misc"; "builtin"]
 
   let models = [("*", Model.(make ~conv:(fun () -> ()) ~model:Model.zero))]

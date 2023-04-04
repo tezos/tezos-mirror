@@ -59,8 +59,10 @@ module Shared_linear = struct
     Sparse_vec.String.of_list [("bytes", float_of_int bytes)]
 end
 
-module Make (Filename : sig
+module Make (Info : sig
   val file : string
+
+  val generated_code_destination : string option
 end) =
 struct
   (* Generic function to cook benchmarks for fixed-size encodings *)
@@ -84,7 +86,9 @@ struct
 
       let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
-      let module_filename = Filename.file
+      let module_filename = Info.file
+
+      let generated_code_destination = Info.generated_code_destination
 
       let tags = ["encoding"]
 
@@ -113,7 +117,9 @@ struct
 
       let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
-      let module_filename = Filename.file
+      let module_filename = Info.file
+
+      let generated_code_destination = Info.generated_code_destination
 
       let tags = ["encoding"]
 
@@ -143,7 +149,9 @@ struct
 
       let info = Format.asprintf "Benchmarking %a" Namespace.pp name
 
-      let module_filename = Filename.file
+      let module_filename = Info.file
+
+      let generated_code_destination = Info.generated_code_destination
 
       let tags = ["encoding"]
 
@@ -161,7 +169,9 @@ struct
       let info =
         Format.asprintf "Benchmarking %a (intercept case)" Namespace.pp name
 
-      let module_filename = Filename.file
+      let module_filename = Info.file
+
+      let generated_code_destination = Info.generated_code_destination
 
       let tags = ["encoding"]
 

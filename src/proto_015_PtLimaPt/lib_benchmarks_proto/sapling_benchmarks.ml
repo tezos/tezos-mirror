@@ -38,6 +38,8 @@ module Apply_diff_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let generated_code_destination = None
+
   let tags = ["sapling"]
 
   let diff_from_tx (tx : Alpha_context.Sapling.transaction) =

@@ -73,10 +73,6 @@ module Registration = struct
               (destination ^ "_costs_generated.ml"))
           Bench.generated_code_destination
 
-      (* The value will be used later in lib_benchmark/registration.ml for
-         codegen file destination. *)
-      let () = ignore generated_code_destination
-
       let models =
         [(Namespace.(cons name "model" |> to_string), Bench.model ~name)]
 

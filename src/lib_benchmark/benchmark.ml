@@ -37,6 +37,9 @@ module type S = sig
   (** File where the benchmark module is defined *)
   val module_filename : string
 
+  (** Destination of generated code *)
+  val generated_code_destination : string option
+
   (** Tags of the benchmark *)
   val tags : string list
 
