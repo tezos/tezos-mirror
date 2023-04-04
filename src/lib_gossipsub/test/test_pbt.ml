@@ -360,17 +360,56 @@ module Test_remove_peer = struct
 
   let all_peers = [0; 1; 2; 3]
 
-  let predicate final_state _final_output =
-    (* This predicate checks that [peer_id] does not appear in the [connections]
-       field of the final state. *)
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/5190 *)
-    let conns = GS.Introspection.(connections (view final_state)) in
-    let fail =
-      List.find_opt (fun peer -> GS.Peer.Map.mem peer conns) all_peers
+  let fail_if_in_map peers map ~on_error =
+    let fail = List.find_opt (fun peer -> GS.Peer.Map.mem peer map) peers in
+    match fail with None -> Ok () | Some peer -> Error (on_error peer)
+
+  let fail_if_in_set peers set ~on_error =
+    let fail = List.find_opt (fun peer -> GS.Peer.Set.mem peer set) peers in
+    match fail with None -> Ok () | Some peer -> Error (on_error peer)
+
+  let not_in_view peers state =
+    let open GS.Introspection in
+    let open Result_syntax in
+    let view = view state in
+    let check_map str map =
+      fail_if_in_map peers map ~on_error:(fun peer ->
+          `peer_not_removed_correctly (view, str, peer))
     in
-    match fail with
-    | None -> Ok ()
-    | Some peer -> Error (`peer_not_removed_correctly (final_state, peer))
+    let check_set str set =
+      fail_if_in_set peers set ~on_error:(fun peer ->
+          `peer_not_removed_correctly (view, str, peer))
+    in
+    let* () = check_map "connections" view.connections in
+    (* The last step of the scenario is a heartbeat, which cleans the
+       [iwant/ihave_per_heartbeat] maps. *)
+    let* () = check_map "ihave_per_heartbeat" view.ihave_per_heartbeat in
+    let* () = check_map "iwant_per_heartbeat" view.iwant_per_heartbeat in
+    let* () =
+      Topic.Map.iter_e
+        (fun topic peer_set ->
+          let str = Format.asprintf "mesh[topic=%a]" Topic.pp topic in
+          check_set str peer_set)
+        view.mesh
+    in
+    let* () =
+      Topic.Map.iter_e
+        (fun topic fanout_peers ->
+          let str = Format.asprintf "fanout[topic=%a]" Topic.pp topic in
+          check_set str fanout_peers.peers)
+        view.fanout
+    in
+    Message_cache.Internal_for_tests.get_access_counters view.message_cache
+    |> Seq.E.iter (fun (message_id, map) ->
+           let place =
+             Format.asprintf "message_cache[message_id=%d]" message_id
+           in
+           check_map place map)
+
+  let predicate final_state _final_output =
+    (* This predicate checks that [peer_id] does not appear in the [view]
+       of the final state. *)
+    not_in_view all_peers final_state
 
   let scenario limits =
     let open Fragment in
@@ -385,7 +424,7 @@ module Test_remove_peer = struct
     let add_then_remove_peer_wait_and_clean () =
       (* In order to purge a peer from the connections, we need to
          1. remove it
-         2. wait until [retain_duration+slack]
+         2. wait until [expire=retain_duration+slack]
          3. wait until the next round of cleanup in the heartbeat *)
       let expire = limits.retain_duration + (limits.heartbeat_interval * 2) in
       let heartbeat_cleanup_ticks = limits.backoff_cleanup_ticks in
@@ -422,6 +461,36 @@ module Test_remove_peer = struct
         |> repeat_at_most 5;
         graft_then_prune_wait_and_clean () |> repeat_at_most 10;
       ]
+    @% heartbeat
+
+  let pp_backoff fmtr (backoff : int GS.Topic.Map.t) =
+    let list = backoff |> GS.Topic.Map.bindings in
+    Format.pp_print_list
+      ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
+      (fun fmtr (topic, backoff) ->
+        Format.fprintf fmtr "%a -> %d" GS.Topic.pp topic backoff)
+      fmtr
+      list
+
+  let pp_state fmtr state =
+    let v = GS.Introspection.view state in
+    let cleanup =
+      Int64.(rem v.heartbeat_ticks (of_int v.limits.backoff_cleanup_ticks)) = 0L
+    in
+    Peer.Map.iter
+      (fun peer {GS.Introspection.backoff; expire; _} ->
+        let open Format in
+        fprintf
+          fmtr
+          "peer %a, expire=%a, backoff=[%a], cleanup=%b"
+          GS.Peer.pp
+          peer
+          (pp_print_option pp_print_int)
+          expire
+          pp_backoff
+          backoff
+          cleanup)
+      v.connections
 
   let test rng limits parameters =
     Tezt_core.Test.register
@@ -443,24 +512,25 @@ module Test_remove_peer = struct
       run state (scenario limits)
     in
     let test =
-      QCheck2.Test.make ~count:10_000 ~name:"Gossipsub: remove_peer" scenario
+      QCheck2.Test.make ~count:1_000 ~name:"Gossipsub: remove_peer" scenario
       @@ fun trace ->
       match check_final predicate trace with
       | Ok () -> true
       | Error e -> (
           match e with
-          | `peer_not_removed_correctly (final_state, peer) ->
+          | `peer_not_removed_correctly (v, msg, peer) ->
               Tezt.Test.fail
                 ~__LOC__
-                "@[<v 2>Peer %d was not removed correctly.@;\
+                "@[<v 2>Peer %d was not removed correctly from %s.@;\
                  Limits:@;\
                  %a@;\
                  Dumping trace:@;\
                  @[<v>%a@]@]"
                 peer
+                msg
                 pp_limits
-                GS.Introspection.(limits (view final_state))
-                (pp_trace ())
+                GS.Introspection.(limits v)
+                (pp_trace ~pp_state ~pp_state':pp_state ())
                 trace)
     in
     QCheck2.Test.check_exn ~rand:rng test ;

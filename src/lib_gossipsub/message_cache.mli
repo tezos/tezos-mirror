@@ -71,4 +71,8 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
   (** Shift the sliding window by one slot (usually corresponding to one
       heartbeat tick). *)
   val shift : t -> t
+
+  module Internal_for_tests : sig
+    val get_access_counters : t -> (C.Message_id.t * int C.Peer.Map.t) Seq.t
+  end
 end

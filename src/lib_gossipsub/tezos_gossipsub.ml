@@ -987,8 +987,7 @@ module Make (C : AUTOMATON_CONFIG) :
                Check the reasoning *)
             match connection.expire with
             | Some expire
-              when Time.(expire <= current)
-                   && Topic.Map.is_empty connection.backoff ->
+              when Time.(expire <= current) && Topic.Map.is_empty backoff ->
                 None
             | _ -> Some {connection with backoff})
           connections
