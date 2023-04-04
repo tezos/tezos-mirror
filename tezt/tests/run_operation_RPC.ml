@@ -609,12 +609,7 @@ let test_fail_inject_signed_arbitrary_operation =
      let* signature = Client.sign_message client ?branch message ~src in
      let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
      let* head_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
-     let arbitrary =
-       match protocol with
-       | Protocol.Lima -> message
-       | Protocol.Mumbai | Protocol.Nairobi | Protocol.Alpha ->
-           Hex.(of_string message |> show)
-     in
+     let arbitrary = Hex.(of_string message |> show) in
      let (op_json : JSON.u) =
        `O
          [

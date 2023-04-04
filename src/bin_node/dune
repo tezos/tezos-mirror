@@ -114,8 +114,12 @@
   (select void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer from
    (tezos-protocol-plugin-014-PtKathma-registerer -> void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer.empty))
-  tezos-embedded-protocol-015-PtLimaPt
-  tezos-protocol-plugin-015-PtLimaPt-registerer
+  (select void_for_linking-tezos-embedded-protocol-015-PtLimaPt from
+   (tezos-embedded-protocol-015-PtLimaPt -> void_for_linking-tezos-embedded-protocol-015-PtLimaPt.empty)
+   (-> void_for_linking-tezos-embedded-protocol-015-PtLimaPt.empty))
+  (select void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer from
+   (tezos-protocol-plugin-015-PtLimaPt-registerer -> void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer.empty)
+   (-> void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer.empty))
   tezos-embedded-protocol-016-PtMumbai
   tezos-protocol-plugin-016-PtMumbai-registerer
   tezos-embedded-protocol-017-PtNairob
@@ -180,6 +184,8 @@
    (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-015-PtLimaPt.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha-registerer.empty ""))))
 

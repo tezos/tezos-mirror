@@ -7,8 +7,6 @@
   tezos-micheline
   tezos-base
   tezos-store
-  tezos-protocol-015-PtLimaPt
-  tezos-client-015-PtLimaPt
   tezos-protocol-016-PtMumbai
   tezos-client-016-PtMumbai
   tezos-protocol-017-PtNairob

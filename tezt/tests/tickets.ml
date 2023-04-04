@@ -849,13 +849,8 @@ let test_originated_implicit_can_be_equipotent =
   unit
 
 let setup_sc_enabled_node protocol ~parameters_ty =
-  let parameters =
-    match protocol with
-    | Protocol.Alpha | Mumbai | Nairobi -> []
-    | Lima -> [(["sc_rollup_enable"], `Bool true)]
-  in
   let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
+  let* parameter_file = Protocol.write_parameter_file ~base [] in
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
   in

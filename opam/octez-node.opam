@@ -32,8 +32,6 @@ depends: [
   "lwt-exit"
   "uri" { >= "3.1.0" }
   "tezos-embedded-protocol-000-Ps9mPmXa"
-  "tezos-embedded-protocol-015-PtLimaPt"
-  "tezos-protocol-plugin-015-PtLimaPt-registerer"
   "tezos-embedded-protocol-016-PtMumbai"
   "tezos-protocol-plugin-016-PtMumbai-registerer"
   "tezos-embedded-protocol-017-PtNairob"
@@ -67,6 +65,8 @@ depopts: [
   "tezos-protocol-plugin-013-PtJakart-registerer"
   "tezos-embedded-protocol-014-PtKathma"
   "tezos-protocol-plugin-014-PtKathma-registerer"
+  "tezos-embedded-protocol-015-PtLimaPt"
+  "tezos-protocol-plugin-015-PtLimaPt-registerer"
   "tezos-embedded-protocol-alpha"
   "tezos-protocol-plugin-alpha-registerer"
 ]
