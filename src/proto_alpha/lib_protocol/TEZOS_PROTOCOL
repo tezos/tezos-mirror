@@ -270,7 +270,6 @@
         "Contract_services",
         "Delegate_services",
         "Voting_services",
-        "Tx_rollup_services",
         "Dal_services",
         "Alpha_services",
 

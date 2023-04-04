@@ -189,3 +189,5 @@ Internal
 
 - Validate: add preendorsement power and locked round checks during
   block finalization in ``Partial_validation`` mode. (MR :gl:`!7949`)
+
+- Removed obsolete transaction rollup RPC. (MR :gl:`!8167`)
