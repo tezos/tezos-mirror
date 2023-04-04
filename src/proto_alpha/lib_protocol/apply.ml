@@ -1210,15 +1210,6 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
               allocated_destination_contract =
                 payload.allocated_destination_contract;
             } )
-  | Transaction_to_tx_rollup_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
   | Transaction_to_zk_rollup_result payload ->
       let consumed = payload.paid_storage_size_diff in

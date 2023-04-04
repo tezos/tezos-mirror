@@ -554,12 +554,6 @@ let pp_transaction_result ppf = function
       pp_consumed_gas ppf consumed_gas ;
       pp_balance_updates ppf balance_updates ;
       pp_ticket_receipt ppf ticket_receipt
-  | Transaction_to_tx_rollup_result
-      {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
-      pp_consumed_gas ppf consumed_gas ;
-      pp_balance_updates ppf balance_updates ;
-      Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
-      pp_paid_storage_size_diff ppf paid_storage_size_diff
   | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_ticket_receipt ppf ticket_receipt

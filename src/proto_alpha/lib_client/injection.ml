@@ -316,7 +316,6 @@ let estimated_gas_single (type kind)
         match res with
         | Transaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
-            | Transaction_to_tx_rollup_result {consumed_gas; _}
             | Transaction_to_sc_rollup_result {consumed_gas; _}
             | Transaction_to_zk_rollup_result {consumed_gas; _} )
         | Origination_result {consumed_gas; _}
@@ -353,7 +352,6 @@ let estimated_gas_single (type kind)
         match res with
         | ITransaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
-            | Transaction_to_tx_rollup_result {consumed_gas; _}
             | Transaction_to_sc_rollup_result {consumed_gas; _}
             | Transaction_to_zk_rollup_result {consumed_gas; _} )
         | IOrigination_result {consumed_gas; _}
@@ -398,12 +396,6 @@ let estimated_storage_single (type kind) ~origination_size
             Ok paid_storage_size_diff
         | Sc_rollup_originate_result {size; _} -> Ok size
         | Zk_rollup_origination_result {storage_size; _} -> Ok storage_size
-        | Transaction_result (Transaction_to_tx_rollup_result _) ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-               Storage fees for transaction rollup.
-               We need to charge for newly allocated storage (as we do for
-               Michelson’s big map). *)
-            Ok Z.zero
         | Transaction_result (Transaction_to_sc_rollup_result _)
         | Reveal_result _ | Delegation_result _ | Set_deposits_limit_result _
         | Increase_paid_storage_result _ | Dal_publish_slot_header_result _
@@ -437,12 +429,6 @@ let estimated_storage_single (type kind) ~origination_size
             else Ok paid_storage_size_diff
         | IOrigination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
-        | ITransaction_result (Transaction_to_tx_rollup_result _) ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-               Storage fees for transaction rollup.
-               We need to charge for newly allocated storage (as we do for
-               Michelson’s big map). *)
-            Ok Z.zero
         | ITransaction_result
             (Transaction_to_zk_rollup_result {paid_storage_size_diff; _}) ->
             Ok paid_storage_size_diff
@@ -485,8 +471,7 @@ let originated_contracts_single (type kind)
         | Origination_result {originated_contracts; _} ->
             Ok originated_contracts
         | Transaction_result
-            ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _
+            ( Transaction_to_sc_rollup_result _
             | Transaction_to_zk_rollup_result _ )
         | Register_global_constant_result _ | Reveal_result _
         | Delegation_result _ | Set_deposits_limit_result _
@@ -515,8 +500,7 @@ let originated_contracts_single (type kind)
         | IOrigination_result {originated_contracts; _} ->
             Ok originated_contracts
         | ITransaction_result
-            ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _
+            ( Transaction_to_sc_rollup_result _
             | Transaction_to_zk_rollup_result _ )
         | IDelegation_result _ | IEvent_result _ ->
             Ok [])

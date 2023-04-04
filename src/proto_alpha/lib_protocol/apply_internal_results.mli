@@ -88,12 +88,6 @@ type successful_transaction_result =
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
     }
-  | Transaction_to_tx_rollup_result of {
-      ticket_hash : Ticket_hash.t;
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;
       ticket_receipt : Ticket_receipt.t;
