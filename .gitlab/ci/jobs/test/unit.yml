@@ -47,6 +47,12 @@ unit:non-proto-x86_64:
   variables:
     MAKE_TARGETS: test-nonproto-unit
 
+unit:lib-store-unix:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  variables:
+    MAKE_TARGETS: test-lib-store-unit
+
 unit:webassembly-x86_64:
   extends:
   - .unit_test_template_x86_64
