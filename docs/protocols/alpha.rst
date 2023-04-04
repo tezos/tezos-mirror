@@ -61,6 +61,8 @@ Smart Rollups
   The provided ``commitment`` is omitted by the protocol and unchecked with the
   found one. (MR :gl:`!7316`)
 
+- Publishing twice the same commitment is no longer allowed. (MR :gl:`!8269`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
