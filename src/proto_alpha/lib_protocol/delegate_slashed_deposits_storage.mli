@@ -45,6 +45,10 @@ val already_slashed_for_double_endorsing :
   Level_repr.t ->
   bool tzresult Lwt.t
 
+(** The [punishing_amounts] type embeds amounts involved when slashing a
+    delegate for double endorsing or double baking. *)
+type punishing_amounts = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
+
 (** Burn some frozen deposit for a delegate at a given level and
     record in the context that the given delegate has now been slashed
     for double endorsing for the given level.

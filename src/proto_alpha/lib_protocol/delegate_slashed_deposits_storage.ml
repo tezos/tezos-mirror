@@ -37,6 +37,8 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
   | None -> return_false
   | Some slashed -> return slashed.for_double_baking
 
+type punishing_amounts = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
+
 let finish_punish ctxt delegate (level : Level_repr.t) updated_slashed
     punishing_amount =
   let open Lwt_result_syntax in
