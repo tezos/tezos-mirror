@@ -500,9 +500,9 @@ let start_ops_monitor cctxt =
     ~chain:cctxt#chain
     ~applied:true
     ~branch_delayed:true
-    ~branch_refused:true
-    ~refused:true
-    ~outdated:true
+    ~branch_refused:false
+    ~refused:false
+    ~outdated:false
     ()
 
 let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
