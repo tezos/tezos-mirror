@@ -125,6 +125,27 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         gstate
     | gstate, GS.Already_published -> gstate
 
+  (** Handling application events. *)
+  let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
+    | Inject_message {message; message_id; topic} ->
+        let publish = {GS.sender = None; topic; message_id; message} in
+        GS.publish publish gossip_state
+        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
+    | Join topic ->
+        let gossip_state, output = GS.join {topic} gossip_state in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
+
+           Handle Join's output. *)
+        ignore output ;
+        gossip_state
+    | Leave topic ->
+        let gossip_state, output = GS.leave {topic} gossip_state in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
+
+           Handle Leave's output. *)
+        ignore output ;
+        gossip_state
+
   (** This is the main function of the worker. It interacts with the Gossipsub
       automaton given an event. The function possibly sends messages to the P2P
       and application layers via the functions [emit_p2p_msg] and [emit_app_msg]
@@ -174,24 +195,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle received p2p messages. *)
         ignore (In_message m) ;
         assert false
-    | App_input (Inject_message {message; message_id; topic}) ->
-        let publish = {GS.sender = None; topic; message_id; message} in
-        GS.publish publish gossip_state
-        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
-    | App_input (Join topic) ->
-        let gossip_state, output = GS.join {topic} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
-
-           Handle Join's output. *)
-        ignore output ;
-        gossip_state
-    | App_input (Leave topic) ->
-        let gossip_state, output = GS.leave {topic} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
-
-           Handle Leave's output. *)
-        ignore output ;
-        gossip_state
+    | App_input event ->
+        apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state event
 
   (** A helper function that pushes events in the state *)
   let push e t = Stream.push e t.events_stream
