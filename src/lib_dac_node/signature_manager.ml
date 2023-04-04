@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -340,7 +341,8 @@ module Coordinator = struct
         tzfail
         @@ Page_store.Cannot_read_page_from_page_storage
              (Plugin.to_hex root_hash)
-    | Ok false -> tzfail @@ Unknown_root_hash (Plugin.to_hex root_hash)
+    (* Return an HTTP 404 error when hash provided in signature is unknown *)
+    | Ok false -> raise Not_found
     | Ok true ->
         let*? dac_committee = Node_context.get_committee_members ctx in
         let* () =
