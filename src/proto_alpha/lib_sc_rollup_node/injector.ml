@@ -103,7 +103,7 @@ module Parameters :
      {!Injector_sigs.Parameter.batch_must_succeed}. *)
   let batch_must_succeed _ = `At_least_one
 
-  let retry_unsuccessful_operation _node_ctxt (op : Operation.t) status =
+  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->
@@ -131,23 +131,9 @@ module Parameters :
     | Failed error -> (
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
            Think about which operations should be retried and when. *)
-        let is_gas_error =
-          TzTrace.fold
-            (fun found -> function
-              | Environment.Ecoproto_error Gas.Operation_quota_exceeded -> true
-              | _ -> found)
-            false
-            error
-        in
-        if is_gas_error then
-          (* Always retry operations which have gas errors *)
-          return Retry
-        else
-          match op with
-          | Timeout _ | Refute _ | Cement _ | Add_messages _ ->
-              (* Failing timeout and refutation operations can be ignored. *)
-              return Forget
-          | Publish _ -> return (Abort error))
+        match classify_trace error with
+        | Permanent | Outdated -> return Forget
+        | Branch | Temporary -> return Retry)
 end
 
 module Proto_client = struct
