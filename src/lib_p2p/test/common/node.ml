@@ -296,16 +296,16 @@ let select_nth_point n points =
 
 let default_ipv6_addr = Ipaddr.V6.localhost
 
-let gen_points npoints ?port addr =
+let gen_points ?(max_iterations = 1000) npoints ?port addr =
   match port with
   | Some port ->
       let ports = port -- (port + npoints - 1) in
       List.map (fun port -> (addr, port)) ports
   | None ->
       let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-      let rec loop i ports =
+      let rec loop ~iterations i ports =
         if i <= 0 then ports
-        else
+        else if iterations <= max_iterations then
           try
             let main_socket =
               Unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0)
@@ -328,20 +328,28 @@ let gen_points npoints ?port addr =
                 | ADDR_INET (_, port) -> port
               in
               Unix.close main_socket ;
-              loop (i - 1) (port :: ports)
+              if not (List.mem ~equal:Int.equal port ports) then
+                loop ~iterations:(iterations + 1) (i - 1) (port :: ports)
+              else loop ~iterations:(iterations + 1) i ports
             with
             | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
               when port = None ->
                 Unix.close main_socket ;
-                loop i ports
+                loop ~iterations:(iterations + 1) i ports
             | Unix.Unix_error (e, _, _) ->
                 Unix.close main_socket ;
                 Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
           with Unix.Unix_error (e, _, _) ->
             Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
+        else
+          Format.kasprintf
+            Stdlib.failwith
+            "[gen_points] could not generate %d points after %d attempts"
+            npoints
+            iterations
       in
 
-      let ports = loop npoints [] in
+      let ports = loop ~iterations:0 npoints [] in
       List.map (fun port -> (addr, port)) ports
 
 (**Detach one process per id in [points], each with a p2p_pool and a

@@ -59,10 +59,11 @@ val sync : t -> unit tzresult Lwt.t
 val default_ipv6_addr : P2p_addr.t
 
 (** [gen_points npoints ~port addr] generated [npoints] points. If
-    [port] is not specified, it loops and generates points randomly
-    until it finds [npoints] that are not currently used.
-    *)
-val gen_points : int -> ?port:int -> P2p_addr.t -> P2p_point.Id.t list
+    [port] is not specified, it loops (for at most [max_iterations] )
+    and generates points randomly until it finds [npoints] that are
+    not currently used. *)
+val gen_points :
+  ?max_iterations:int -> int -> ?port:int -> P2p_addr.t -> P2p_point.Id.t list
 
 (** [detach_nodes f points] creates a network with one node for each [points].
     [f] is the behavior of each node.
