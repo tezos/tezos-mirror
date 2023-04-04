@@ -161,16 +161,19 @@ module Make (PVM : Pvm.S) = struct
     let ctxt =
       {ctxt with genesis_info = {ctxt.genesis_info with commitment_hash}}
     in
-    return (ctxt, genesis)
+    return (ctxt, genesis, [data_dir; base_dir])
 
   let with_node_context ?constants kind ~boot_sector f =
     let open Lwt_result_syntax in
-    let* node_ctxt, genesis =
+    let* node_ctxt, genesis, dirs_to_clean =
       initialize_node_context ?constants kind ~boot_sector
     in
     Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
     let open Lwt_syntax in
     let* _ = Node_context.close node_ctxt in
+    let* () =
+      List.iter_s Tezos_stdlib_unix.Lwt_utils_unix.remove_dir dirs_to_clean
+    in
     return_unit
 
   let append_l2_block (node_ctxt : _ Node_context.t) messages =
