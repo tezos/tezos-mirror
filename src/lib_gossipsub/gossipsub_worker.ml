@@ -146,6 +146,38 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         ignore output ;
         gossip_state
 
+  (** Handling events received from P2P layer. *)
+  let apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
+    | New_connection {peer; direct; outbound} ->
+        let gossip_state, output =
+          GS.add_peer {direct; outbound; peer} gossip_state
+        in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5160
+
+           Handle New_connection's output *)
+        ignore output ;
+        gossip_state
+    | Disconnection {peer} ->
+        let gossip_state, output = GS.remove_peer {peer} gossip_state in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
+
+           Handle disconnection's output *)
+        ignore output ;
+        gossip_state
+    | In_message {from_peer; p2p_message = Publish {message; topic; message_id}}
+      ->
+        let publish =
+          {GS.sender = Some from_peer; topic; message_id; message}
+        in
+        GS.publish publish gossip_state
+        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
+    | In_message m ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
+
+           Handle received p2p messages. *)
+        ignore (In_message m) ;
+        assert false
+
   (** This is the main function of the worker. It interacts with the Gossipsub
       automaton given an event. The function possibly sends messages to the P2P
       and application layers via the functions [emit_p2p_msg] and [emit_app_msg]
@@ -165,36 +197,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle Heartbeat's output *)
         ignore output ;
         gossip_state
-    | P2P_input (New_connection {peer; direct; outbound}) ->
-        let gossip_state, output =
-          GS.add_peer {direct; outbound; peer} gossip_state
-        in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5160
-
-           Handle New_connection's output *)
-        ignore output ;
-        gossip_state
-    | P2P_input (Disconnection {peer}) ->
-        let gossip_state, output = GS.remove_peer {peer} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
-
-           Handle disconnection's output *)
-        ignore output ;
-        gossip_state
-    | P2P_input
-        (In_message
-          {from_peer; p2p_message = Publish {message; topic; message_id}}) ->
-        let publish =
-          {GS.sender = Some from_peer; topic; message_id; message}
-        in
-        GS.publish publish gossip_state
-        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
-    | P2P_input (In_message m) ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
-
-           Handle received p2p messages. *)
-        ignore (In_message m) ;
-        assert false
+    | P2P_input event ->
+        apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state event
     | App_input event ->
         apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state event
 
