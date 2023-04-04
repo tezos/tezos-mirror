@@ -359,7 +359,7 @@ module Make (C : AUTOMATON_CONFIG) :
       (state, res)
 
     let update_iwant_per_heartbeat ?delta key state =
-      let iwant_per_heartbeat = update ?delta key state.ihave_per_heartbeat in
+      let iwant_per_heartbeat = update ?delta key state.iwant_per_heartbeat in
       let state = {state with iwant_per_heartbeat} in
       (state, ())
 
@@ -541,7 +541,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_too_many_sent_iwant_message count =
       let open Monad.Syntax in
       let*! max_sent_iwant_per_heartbeat in
-      fail_if (count > max_sent_iwant_per_heartbeat)
+      fail_if (count >= max_sent_iwant_per_heartbeat)
       @@ Too_many_sent_iwant_messages
            {count; max = max_sent_iwant_per_heartbeat}
 
