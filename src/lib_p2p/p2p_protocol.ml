@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let id x = x
-
 module Events = P2p_events.P2p_protocol
 
 type ('msg, 'peer, 'conn) config = {
@@ -225,7 +223,7 @@ module Default_answerer = struct
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5187
          Handle silently ignored error cases. *)
       Result.fold
-        ~ok:id
+        ~ok:Fun.id
         ~error:(function
           | `No_swap_candidate source_peer_id ->
               Events.(emit no_swap_candidate) source_peer_id
