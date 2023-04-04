@@ -659,14 +659,14 @@ let prepare_waiting_for_quorum state =
   let consensus_threshold =
     state.global_state.constants.parametric.consensus_threshold
   in
-  let get_consensus_operation_voting_power ~slot =
+  let get_slot_voting_power ~slot =
     match
       SlotMap.find slot state.level_state.delegate_slots.all_delegate_slots
     with
-    | None ->
-        (* cannot happen if the map is correctly populated *)
-        0
-    | Some {endorsing_power; _} -> endorsing_power
+    | Some {endorsing_power; first_slot} when Slot.equal slot first_slot ->
+        Some endorsing_power
+    | Some _ | None (* cannot happen if the map is correctly populated *) ->
+        None
   in
   let latest_proposal = state.level_state.latest_proposal.block in
   (* assert (latest_proposal.block.round = state.round_state.current_round) ; *)
@@ -677,28 +677,28 @@ let prepare_waiting_for_quorum state =
       payload_hash_watched = latest_proposal.payload_hash;
     }
   in
-  (consensus_threshold, get_consensus_operation_voting_power, candidate)
+  (consensus_threshold, get_slot_voting_power, candidate)
 
 let start_waiting_for_preendorsement_quorum state =
-  let consensus_threshold, get_preendorsement_voting_power, candidate =
+  let consensus_threshold, get_slot_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
   Operation_worker.monitor_preendorsement_quorum
     operation_worker
     ~consensus_threshold
-    ~get_preendorsement_voting_power
+    ~get_slot_voting_power
     candidate
 
 let start_waiting_for_endorsement_quorum state =
-  let consensus_threshold, get_endorsement_voting_power, candidate =
+  let consensus_threshold, get_slot_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
   Operation_worker.monitor_endorsement_quorum
     operation_worker
     ~consensus_threshold
-    ~get_endorsement_voting_power
+    ~get_slot_voting_power
     candidate
 
 let compute_round proposal round_durations =

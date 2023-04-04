@@ -159,21 +159,38 @@ type event =
   | Prequorum_reached of candidate * Kind.preendorsement operation list
   | Quorum_reached of candidate * Kind.endorsement operation list
 
+let compare_consensus_contents (op1 : consensus_content)
+    (op2 : consensus_content) =
+  Compare.or_else (Raw_level.compare op1.level op2.level) @@ fun () ->
+  Compare.or_else (Round.compare op1.round op2.round) @@ fun () ->
+  Compare.or_else (Slot.compare op1.slot op2.slot) @@ fun () ->
+  Block_payload_hash.compare op1.block_payload_hash op2.block_payload_hash
+
 module Preendorsement_set = Set.Make (struct
   type t = Kind.preendorsement operation
 
-  let compare = compare
+  let compare
+      ({protocol_data = {contents = Single (Preendorsement op1); _}; shell = _} :
+        t)
+      ({protocol_data = {contents = Single (Preendorsement op2); _}; shell = _} :
+        t) =
+    compare_consensus_contents op1 op2
 end)
 
 module Endorsement_set = Set.Make (struct
   type t = Kind.endorsement operation
 
-  let compare = compare
+  let compare
+      ({protocol_data = {contents = Single (Endorsement op1); _}; shell = _} :
+        t)
+      ({protocol_data = {contents = Single (Endorsement op2); _}; shell = _} :
+        t) =
+    compare_consensus_contents op1 op2
 end)
 
 type pqc_watched = {
   candidate_watched : candidate;
-  get_preendorsement_voting_power : slot:Slot.t -> int;
+  get_slot_voting_power : slot:Slot.t -> int option;
   consensus_threshold : int;
   mutable current_voting_power : int;
   mutable preendorsements_received : Preendorsement_set.t;
@@ -182,7 +199,7 @@ type pqc_watched = {
 
 type qc_watched = {
   candidate_watched : candidate;
-  get_endorsement_voting_power : slot:Slot.t -> int;
+  get_slot_voting_power : slot:Slot.t -> int option;
   consensus_threshold : int;
   mutable current_voting_power : int;
   mutable endorsements_received : Endorsement_set.t;
@@ -284,7 +301,7 @@ let update_monitoring ?(should_lock = true) state ops =
       (Pqc_watch
         ({
            candidate_watched;
-           get_preendorsement_voting_power;
+           get_slot_voting_power;
            consensus_threshold;
            preendorsements_received;
            _;
@@ -308,23 +325,26 @@ let update_monitoring ?(should_lock = true) state ops =
               op
             in
             if is_valid_consensus_content candidate_watched consensus_content
-            then (
-              let op_power =
-                get_preendorsement_voting_power ~slot:consensus_content.slot
-              in
-              proposal_watched.current_voting_power <-
-                proposal_watched.current_voting_power + op_power ;
-              proposal_watched.preendorsements_received <-
-                Preendorsement_set.add
-                  op
-                  proposal_watched.preendorsements_received ;
-              proposal_watched.preendorsements_count <-
-                proposal_watched.preendorsements_count + 1 ;
-              (count + 1, power + op_power))
+            then
+              match get_slot_voting_power ~slot:consensus_content.slot with
+              | Some op_power ->
+                  proposal_watched.preendorsements_received <-
+                    Preendorsement_set.add
+                      op
+                      proposal_watched.preendorsements_received ;
+                  (succ count, power + op_power)
+              | None ->
+                  (* preendorsements that do not use the first slot of a
+                     delegate are not added to the quorum *)
+                  (count, power)
             else (count, power))
           (0, 0)
           preendorsements
       in
+      proposal_watched.current_voting_power <-
+        proposal_watched.current_voting_power + voting_power ;
+      proposal_watched.preendorsements_count <-
+        proposal_watched.preendorsements_count + preendorsements_count ;
       if proposal_watched.current_voting_power >= consensus_threshold then (
         Events.(
           emit
@@ -353,7 +373,7 @@ let update_monitoring ?(should_lock = true) state ops =
       (Qc_watch
         ({
            candidate_watched;
-           get_endorsement_voting_power;
+           get_slot_voting_power;
            consensus_threshold;
            endorsements_received;
            _;
@@ -377,21 +397,26 @@ let update_monitoring ?(should_lock = true) state ops =
               op
             in
             if is_valid_consensus_content candidate_watched consensus_content
-            then (
-              let op_power =
-                get_endorsement_voting_power ~slot:consensus_content.slot
-              in
-              proposal_watched.current_voting_power <-
-                proposal_watched.current_voting_power + op_power ;
-              proposal_watched.endorsements_received <-
-                Endorsement_set.add op proposal_watched.endorsements_received ;
-              proposal_watched.endorsements_count <-
-                proposal_watched.endorsements_count + 1 ;
-              (count + 1, power + op_power))
+            then
+              match get_slot_voting_power ~slot:consensus_content.slot with
+              | Some op_power ->
+                  proposal_watched.endorsements_received <-
+                    Endorsement_set.add
+                      op
+                      proposal_watched.endorsements_received ;
+                  (succ count, power + op_power)
+              | None ->
+                  (* endorsements that do not use the first slot of a delegate
+                     are not added to the quorum *)
+                  (count, power)
             else (count, power))
           (0, 0)
           endorsements
       in
+      proposal_watched.current_voting_power <-
+        proposal_watched.current_voting_power + voting_power ;
+      proposal_watched.endorsements_count <-
+        proposal_watched.endorsements_count + endorsements_count ;
       if proposal_watched.current_voting_power >= consensus_threshold then (
         Events.(
           emit
@@ -429,13 +454,13 @@ let monitor_quorum state new_proposal_watched =
   update_monitoring ~should_lock:false state current_consensus_operations
 
 let monitor_preendorsement_quorum state ~consensus_threshold
-    ~get_preendorsement_voting_power candidate_watched =
+    ~get_slot_voting_power candidate_watched =
   let new_proposal =
     Some
       (Pqc_watch
          {
            candidate_watched;
-           get_preendorsement_voting_power;
+           get_slot_voting_power;
            consensus_threshold;
            current_voting_power = 0;
            preendorsements_received = Preendorsement_set.empty;
@@ -444,14 +469,14 @@ let monitor_preendorsement_quorum state ~consensus_threshold
   in
   monitor_quorum state new_proposal
 
-let monitor_endorsement_quorum state ~consensus_threshold
-    ~get_endorsement_voting_power candidate_watched =
+let monitor_endorsement_quorum state ~consensus_threshold ~get_slot_voting_power
+    candidate_watched =
   let new_proposal =
     Some
       (Qc_watch
          {
            candidate_watched;
-           get_endorsement_voting_power;
+           get_slot_voting_power;
            consensus_threshold;
            current_voting_power = 0;
            endorsements_received = Endorsement_set.empty;
