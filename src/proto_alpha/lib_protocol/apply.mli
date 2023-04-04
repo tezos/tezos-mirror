@@ -38,8 +38,6 @@ open Alpha_context
 type error +=
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
-  | Tx_rollup_feature_disabled
-  | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
   | Empty_transaction of Contract.t
 
