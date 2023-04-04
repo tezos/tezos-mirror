@@ -23,36 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let init ctxt delegate =
-  Storage.Contract.Frozen_deposits.init
-    ctxt
-    (Contract_repr.Implicit delegate)
-    {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
+let zero : Storage.deposits =
+  {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
 
-let allocated = Storage.Contract.Frozen_deposits.mem
-
-let get = Storage.Contract.Frozen_deposits.get
-
-let find = Storage.Contract.Frozen_deposits.find
+let get ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ frozen_deposits_opt =
+    Storage.Contract.Frozen_deposits.find ctxt delegate
+  in
+  Option.value ~default:zero frozen_deposits_opt
 
 let update_balance ctxt delegate f amount =
+  let open Lwt_result_syntax in
   let delegate_contract = Contract_repr.Implicit delegate in
-  get ctxt delegate_contract >>=? fun frozen_deposits ->
-  f frozen_deposits.current_amount amount >>?= fun new_amount ->
-  Storage.Contract.Frozen_deposits.update
-    ctxt
-    delegate_contract
-    {frozen_deposits with current_amount = new_amount}
+  let* frozen_deposits = get ctxt delegate_contract in
+  let*? new_amount = f frozen_deposits.current_amount amount in
+  let*! ctxt =
+    Storage.Contract.Frozen_deposits.add
+      ctxt
+      delegate_contract
+      {frozen_deposits with current_amount = new_amount}
+  in
+  return ctxt
 
 let credit_only_call_from_token ctxt delegate amount =
-  update_balance ctxt delegate Tez_repr.( +? ) amount
+  let open Lwt_result_syntax in
+  let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
+  Stake_storage.add_stake ctxt delegate amount
 
 let spend_only_call_from_token ctxt delegate amount =
-  update_balance ctxt delegate Tez_repr.( -? ) amount
+  let open Lwt_result_syntax in
+  let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
+  Stake_storage.remove_stake ctxt delegate amount
 
 let update_initial_amount ctxt delegate_contract deposits_cap =
-  get ctxt delegate_contract >>=? fun frozen_deposits ->
-  Storage.Contract.Frozen_deposits.update
-    ctxt
-    delegate_contract
-    {frozen_deposits with initial_amount = deposits_cap}
+  let open Lwt_result_syntax in
+  let* frozen_deposits = get ctxt delegate_contract in
+  let*! ctxt =
+    Storage.Contract.Frozen_deposits.add
+      ctxt
+      delegate_contract
+      {frozen_deposits with initial_amount = deposits_cap}
+  in
+  return ctxt

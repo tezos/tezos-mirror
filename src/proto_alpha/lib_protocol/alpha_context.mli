@@ -5245,7 +5245,6 @@ module Token : sig
   type container =
     [ `Contract of Contract.t
     | `Collected_commitments of Blinded_public_key_hash.t
-    | `Delegate_balance of public_key_hash
     | `Frozen_deposits of public_key_hash
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]

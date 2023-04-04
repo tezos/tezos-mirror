@@ -139,7 +139,6 @@
         "Seed_storage",
         "Contract_manager_storage",
         "Delegate_activation_storage",
-        "Frozen_deposits_storage",
         "Sapling_storage",
         "Lazy_storage_diff",
         "Commitment_storage",
@@ -150,6 +149,7 @@
 
         "Contract_delegate_storage",
         "Stake_storage",
+        "Frozen_deposits_storage",
         "Contract_storage",
         "Token",
         "Fees_storage",

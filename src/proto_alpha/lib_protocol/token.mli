@@ -52,10 +52,7 @@
     that can serve as sources and/or sinks.
     For example, an implicit account [d] serving as a delegate has a token holder
     for its own spendable balance, and another token holder for its frozen deposits.
-    Be aware that transferring
-    to/from [`Delegate_balance d] will not update [d]'s stake, while transferring
-    to/from [`Contract (Contract_repr.Implicit d)] will update [d]'s
-    stake. *)
+*)
 
 type container =
   [ `Contract of Contract_repr.t
@@ -63,12 +60,6 @@ type container =
   | `Collected_commitments of Blinded_public_key_hash.t
     (** Pre-funded account waiting for the commited pkh and activation code to
         be revealed to unlock the funds *)
-  | `Delegate_balance of
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4899
-                this constructor is no longer needed, Contract should be used
-                instead. *)
-    Signature.Public_key_hash.t
-    (** Delegate's implicit account spendable balance *)
   | `Frozen_deposits of Signature.Public_key_hash.t
     (** Frozen tokens of a delegate for consensus security deposits *)
   | `Block_fees  (** Current block's fees collection *)
@@ -127,10 +118,7 @@ val allocated :
     carbonated data, and the balance associated to the token holder.
     This function may fail if [allocated ctxt container] returns [false].
     Returns an error with the message "get_balance" if [container] refers to an
-    originated contract that is not allocated.
-    Returns a {!Storage_Error Missing_key} error if [container] is of the form
-    [`Delegate_balance pkh], where [pkh] refers to an implicit contract that is
-    not allocated. *)
+    originated contract that is not allocated. *)
 val balance :
   Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
