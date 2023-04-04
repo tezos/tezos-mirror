@@ -110,7 +110,8 @@ let next_evm_level ~sc_rollup_node ~node ~client =
     (Node.get_level node)
 
 let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
-    ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint =
+    ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint ?data
+    () =
   let* start_level = Client.level client in
   let max_iteration = 10 in
   let tx_hash =
@@ -119,6 +120,8 @@ let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
       ~to_public_key
       ~value
       ~endpoint:evm_proxy_server_endpoint
+      ?data
+      ()
   in
   let next_level =
     let rec go () =
@@ -355,12 +358,7 @@ let test_l2_blocks_progression =
   let* () = check_block_progression ~expected_block_level:2 in
   unit
 
-let test_l2_transfer =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "l2_transfer"]
-    ~title:"Check L2 transfers are applied"
-  @@ fun protocol ->
+let transfer ?data protocol =
   let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
@@ -382,7 +380,9 @@ let test_l2_transfer =
       ~source_private_key:sender.private_key
       ~to_public_key:receiver.address
       ~value
+      ?data
       ~evm_proxy_server_endpoint
+      ()
   in
   let* new_sender_balance = balance sender.address in
   let* new_receiver_balance = balance receiver.address in
@@ -400,6 +400,20 @@ let test_l2_transfer =
       "Unexpected sender nonce after transfer, should be %R, but got %L" ;
   unit
 
+let test_l2_transfer =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_transfer"]
+    ~title:"Check L2 transfers are applied"
+    transfer
+
+let test_chunked_transaction =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_transfer"; "chunked"]
+    ~title:"Check L2 chunked transfers are applied"
+  @@ transfer ~data:("0x" ^ String.make 12_000 'a')
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -407,6 +421,7 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getTransactionCount protocols ;
   test_l2_blocks_progression protocols ;
-  test_l2_transfer protocols
+  test_l2_transfer protocols ;
+  test_chunked_transaction protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

@@ -38,19 +38,21 @@ let balance ~account ~endpoint =
   in
   return @@ Wei.of_eth_int balance
 
-let transaction_send ~source_private_key ~to_public_key ~value ~endpoint =
+let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
+    () =
   spawn_command
-    [
-      "transaction:send";
-      "--pk";
-      source_private_key;
-      "--to";
-      to_public_key;
-      "--value";
-      Wei.to_string value;
-      "--network";
-      endpoint;
-    ]
+    ([
+       "transaction:send";
+       "--pk";
+       source_private_key;
+       "--to";
+       to_public_key;
+       "--value";
+       Wei.to_string value;
+       "--network";
+       endpoint;
+     ]
+    @ match data with Some data -> ["--data"; data] | None -> [])
     JSON.as_string
 
 let get_block ~block_id ~endpoint =
