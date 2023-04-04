@@ -307,6 +307,8 @@ module type AUTOMATON = sig
     | Mesh_full : [`Graft] output
         (** Grafting a peer for a topic whose mesh has already sufficiently many
             peers. *)
+    | Grafting_expiring_peer : [`Graft] output
+        (** Grafting a peer that has been set to be removed. *)
     | No_peer_in_mesh : [`Prune] output
         (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
@@ -364,6 +366,9 @@ module type AUTOMATON = sig
     | Subscribe_to_unknown_peer : [`Subscribe] output
         (** The output returned when we receive a subscribe message from a peer
             we don't know.*)
+    | Subscribe_to_expiring_peer : [`Subscribe] output
+        (** The output returned when we receive a subscribe message from a peer
+            set to be removed. *)
     | Unsubscribed : [`Unsubscribe] output
         (** The output returned once we successfully processed an unsubscribe
             request sent from a peer. *)
@@ -489,7 +494,7 @@ module type AUTOMATON = sig
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
   module Introspection : sig
-    type connection = {
+    type connected_state = {
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
@@ -497,7 +502,9 @@ module type AUTOMATON = sig
       expire : Time.t option;
     }
 
-    type connections := connection Peer.Map.t
+    type connection = Expires of {at : Time.t} | Connected of connected_state
+
+    type peer_info = {connection : connection; score : Score.t}
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -523,7 +530,7 @@ module type AUTOMATON = sig
     type view = {
       limits : limits;
       parameters : parameters;
-      connections : connections;
+      peers_info : peer_info Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
@@ -564,8 +571,6 @@ module type AUTOMATON = sig
 
     (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
     val get_fanout_peers : Topic.t -> view -> Peer.t list
-
-    val connections : view -> connection Peer.Map.t
 
     val limits : view -> limits
 
