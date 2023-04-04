@@ -66,7 +66,13 @@ let wait_for_external_validator_failure node =
   let filter json = JSON.(json |> as_int_opt) in
   Node.wait_for node "proc_status.v0" filter
 
-let kill_process ~pid ~signal = Unix.kill pid (signal_to_int signal)
+let kill_process ~pid ~signal =
+  Log.info
+    "Kill the external validator (pid %d) with signal %a"
+    pid
+    pp_signal
+    signal ;
+  Unix.kill pid (signal_to_int signal)
 
 let test_kill =
   Protocol.register_test
@@ -83,16 +89,13 @@ let test_kill =
   let* () = Client.activate_protocol_and_wait ~protocol client in
   Log.info "Wait for level 1" ;
   let* (_ : int) = Node.wait_for_level node 1 in
-  Log.info
-    "Kill the external validator (pid %d), and then, bake a block"
-    validator_pid ;
   let kill_loop (level, validator_pid) signal =
     (* Starts with a running process. *)
     let wait_for_new_validator_pid = wait_for_external_validator_pid node in
+    let wait_for_failure = wait_for_external_validator_failure node in
     let () = kill_process ~pid:validator_pid ~signal in
     Log.info "External validator was killed by %a" pp_signal signal ;
     Log.info "Baking a block with a dead validator" ;
-    let wait_for_failure = wait_for_external_validator_failure node in
     let* () = Client.bake_for_and_wait client in
     let* (_ : int) = wait_for_failure in
     let* new_validator_pid = wait_for_new_validator_pid in
