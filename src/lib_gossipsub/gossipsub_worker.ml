@@ -111,25 +111,25 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
      - For the peers in `GS.Publish_message peers`, we assume that the set only
      contains the peers in the mesh that don't have the message (we didn't
      receive IHave from them). *)
-  let handle_full_message ~p2p_msg ~app_msg publish = function
+  let handle_full_message ~emit_p2p_msg ~emit_app_msg publish = function
     | gstate, GS.Publish_message peers ->
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
         GS.Peer.Set.iter
-          (fun to_peer -> p2p_msg @@ Out_message {to_peer; p2p_message})
+          (fun to_peer -> emit_p2p_msg @@ Out_message {to_peer; p2p_message})
           peers ;
         let has_joined = GS.Introspection.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
-          app_msg full_message ;
+          emit_app_msg full_message ;
         gstate
     | gstate, GS.Already_published -> gstate
 
   (** This is the main function of the worker. It interacts with the Gossipsub
       automaton given an event. The function possibly sends messages to the P2P
-      and application layers via the functions [p2p_msg] and [app_msg] and
-      returns the new automaton's state. *)
-  let apply_event ~p2p_msg ~app_msg gossip_state = function
+      and application layers via the functions [emit_p2p_msg] and [emit_app_msg]
+      and returns the new automaton's state. *)
+  let apply_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
        Notify the GS worker about the status of messages sent to peers. *)
@@ -163,7 +163,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | App_input (Inject_message {message; message_id; topic}) ->
         let publish = {GS.sender = None; topic; message_id; message} in
         GS.publish publish gossip_state
-        |> handle_full_message ~p2p_msg ~app_msg publish
+        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
     | P2P_input
         (In_message
           {from_peer; p2p_message = Publish {message; topic; message_id}}) ->
@@ -171,7 +171,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           {GS.sender = Some from_peer; topic; message_id; message}
         in
         GS.publish publish gossip_state
-        |> handle_full_message ~p2p_msg ~app_msg publish
+        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
     | P2P_input (In_message m) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
@@ -216,12 +216,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       worker's stream. *)
   let event_loop t =
     let rev_push stream e = Stream.push e stream in
-    let p2p_msg = rev_push t.p2p_output_stream in
-    let app_msg = rev_push t.app_output_stream in
+    let emit_p2p_msg = rev_push t.p2p_output_stream in
+    let emit_app_msg = rev_push t.app_output_stream in
     let rec loop t =
       let open Monad in
       let* event = Stream.pop t.events_stream in
-      let gossip_state = apply_event ~p2p_msg ~app_msg t.gossip_state event in
+      let gossip_state =
+        apply_event ~emit_p2p_msg ~emit_app_msg t.gossip_state event
+      in
       loop {t with gossip_state}
     in
     loop t
