@@ -79,3 +79,17 @@ pub fn read_input<Host: Runtime>(
         None => Ok(InputResult::NoInput),
     }
 }
+
+pub fn read_inbox<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+) -> Result<Vec<Transaction>, Error> {
+    let mut res = Vec::new();
+    loop {
+        match read_input(host, smart_rollup_address)? {
+            InputResult::NoInput => return Ok(res),
+            InputResult::Unparsable => (),
+            InputResult::Transaction(tx) => res.push(*tx),
+        }
+    }
+}
