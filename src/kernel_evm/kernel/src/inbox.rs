@@ -23,12 +23,25 @@ pub enum InputResult {
         tx_hash: TransactionHash,
         num_chunks: u16,
     },
+    TransactionChunk {
+        tx_hash: TransactionHash,
+        i: u16,
+        data: Vec<u8>,
+    },
     Unparsable,
 }
 
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
 
 const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
+
+const TRANSACTION_CHUNK_TAG: u8 = 2;
+
+const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
+	    - 20 // Smart rollup address size
+	    - 1  // Transaction chunk tag
+	    - 2  // Number of chunks (u16)
+	    - 32; // Transaction hash size
 
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
@@ -66,6 +79,23 @@ impl InputResult {
         }
     }
 
+    fn parse_transaction_chunk(bytes: &[u8]) -> Self {
+        // Next 32 bytes is the transaction hash.
+        let (tx_hash, remaining) = bytes.split_at(32);
+        let tx_hash: TransactionHash = match tx_hash.try_into() {
+            Ok(tx_hash) => tx_hash,
+            Err(_) => return InputResult::Unparsable,
+        };
+        // Next 2 bytes is the index.
+        let (i, remaining) = remaining.split_at(2);
+        let i = u16::from_le_bytes(i.try_into().unwrap());
+        Self::TransactionChunk {
+            tx_hash,
+            i,
+            data: remaining.to_vec(),
+        }
+    }
+
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = match bytes.split_first() {
@@ -94,6 +124,7 @@ impl InputResult {
         match *transaction_tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
             NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
+            TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
             _ => InputResult::Unparsable,
         }
     }
@@ -110,6 +141,30 @@ pub fn read_input<Host: Runtime>(
     }
 }
 
+fn handle_transaction_chunk<Host: Runtime>(
+    host: &mut Host,
+    tx_hash: TransactionHash,
+    i: u16,
+    data: Vec<u8>,
+) -> Result<Option<Transaction>, Error> {
+    // Sanity check to verify that the transaction chunk uses the maximum
+    // space capacity allowed.
+    let num_chunks = crate::storage::chunked_transaction_num_chunks(host, &tx_hash)?;
+    if i != num_chunks - 1 && data.len() < MAX_SIZE_PER_CHUNK {
+        crate::storage::remove_chunked_transaction(host, &tx_hash)?;
+        return Ok(None);
+    };
+    // When the transaction is stored in the storage, it returns the full transaction
+    // if `data` was the missing chunk.
+    if let Some(data) = crate::storage::store_transaction_chunk(host, &tx_hash, i, data)?
+    {
+        if let Ok(tx) = EthereumTransactionCommon::from_rlp_bytes(&data) {
+            return Ok(Some(Transaction { tx_hash, tx }));
+        }
+    }
+    Ok(None)
+}
+
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -124,6 +179,11 @@ pub fn read_inbox<Host: Runtime>(
                 tx_hash,
                 num_chunks,
             } => crate::storage::create_chunked_transaction(host, &tx_hash, num_chunks)?,
+            InputResult::TransactionChunk { tx_hash, i, data } => {
+                if let Some(tx) = handle_transaction_chunk(host, tx_hash, i, data)? {
+                    res.push(tx)
+                }
+            }
         }
     }
 }

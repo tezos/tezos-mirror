@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
@@ -374,6 +375,152 @@ fn chunked_transaction_num_chunks_path(
     chunked_transaction_path: &OwnedPath,
 ) -> Result<OwnedPath, Error> {
     concat(chunked_transaction_path, &CHUNKED_TRANSACTION_NUM_CHUNKS).map_err(Error::from)
+}
+
+fn transaction_chunk_path(
+    chunked_transaction_path: &OwnedPath,
+    i: u16,
+) -> Result<OwnedPath, Error> {
+    let raw_i_path: Vec<u8> = format!("/{}", i).into();
+    let i_path = OwnedPath::try_from(raw_i_path)?;
+    concat(chunked_transaction_path, &i_path).map_err(Error::from)
+}
+
+fn is_transaction_complete<Host: Runtime>(
+    host: &mut Host,
+    chunked_transaction_path: &OwnedPath,
+    num_chunks: u16,
+) -> Result<bool, Error> {
+    let n_subkeys = host.store_count_subkeys(chunked_transaction_path)? as u16;
+    // `n_subkeys` includes the key `num_chunks`. The transaction is complete if
+    // number of chunks = num_chunks - 1, the last chunk is not written on disk
+    // and is kept in memory instead.
+    Ok(n_subkeys >= num_chunks)
+}
+
+fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
+    host: &mut Host,
+    chunked_transaction_path: &OwnedPath,
+) -> Result<u16, Error> {
+    let chunked_transaction_num_chunks_path =
+        chunked_transaction_num_chunks_path(chunked_transaction_path)?;
+    let mut buffer = [0u8; 2];
+    store_read_slice(host, &chunked_transaction_num_chunks_path, &mut buffer, 2)?;
+    Ok(u16::from_le_bytes(buffer))
+}
+
+pub fn chunked_transaction_num_chunks<Host: Runtime>(
+    host: &mut Host,
+    tx_hash: &TransactionHash,
+) -> Result<u16, Error> {
+    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
+    chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)
+}
+
+fn store_transaction_chunk_data<Host: Runtime>(
+    host: &mut Host,
+    transaction_chunk_path: &OwnedPath,
+    data: Vec<u8>,
+) -> Result<(), Error> {
+    match host.store_has(transaction_chunk_path)? {
+        Some(ValueType::Value | ValueType::ValueWithSubtree) => Ok(()),
+        _ => {
+            if data.len() > MAX_FILE_CHUNK_SIZE {
+                // It comes from an input so it's maximum 4096 bytes (with the message header).
+                let (data1, data2) = data.split_at(MAX_FILE_CHUNK_SIZE);
+                host.store_write(transaction_chunk_path, data1, 0)?;
+                host.store_write(transaction_chunk_path, data2, MAX_FILE_CHUNK_SIZE)
+            } else {
+                host.store_write(transaction_chunk_path, &data, 0)
+            }?;
+            Ok(())
+        }
+    }
+}
+
+fn read_transaction_chunk_data<Host: Runtime>(
+    host: &mut Host,
+    transaction_chunk_path: &OwnedPath,
+) -> Result<Vec<u8>, Error> {
+    let data_size = host.store_value_size(transaction_chunk_path)?;
+
+    if data_size > MAX_FILE_CHUNK_SIZE {
+        let mut data1 =
+            host.store_read(transaction_chunk_path, 0, MAX_FILE_CHUNK_SIZE)?;
+        let mut data2 = host.store_read(
+            transaction_chunk_path,
+            MAX_FILE_CHUNK_SIZE,
+            MAX_FILE_CHUNK_SIZE,
+        )?;
+        let _ = &mut data1.append(&mut data2);
+        Ok(data1)
+    } else {
+        Ok(host.store_read(transaction_chunk_path, 0, MAX_FILE_CHUNK_SIZE)?)
+    }
+}
+
+fn get_full_transaction<Host: Runtime>(
+    host: &mut Host,
+    chunked_transaction_path: &OwnedPath,
+    num_chunks: u16,
+    missing_data: &[u8],
+) -> Result<Vec<u8>, Error> {
+    let mut buffer = Vec::new();
+    for i in 0..num_chunks {
+        let transaction_chunk_path = transaction_chunk_path(chunked_transaction_path, i)?;
+        // If the transaction is complete and a chunk doesn't exist, it means that it is
+        // the last missing chunk, that was not stored in the storage.
+        match host.store_has(&transaction_chunk_path)? {
+            None => buffer.extend_from_slice(missing_data),
+            Some(_) => {
+                let mut data =
+                    read_transaction_chunk_data(host, &transaction_chunk_path)?;
+                let _ = &mut buffer.append(&mut data);
+            }
+        }
+    }
+    Ok(buffer)
+}
+
+pub fn remove_chunked_transaction_by_path<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+) -> Result<(), Error> {
+    host.store_delete(path).map_err(Error::from)
+}
+
+pub fn remove_chunked_transaction<Host: Runtime>(
+    host: &mut Host,
+    tx_hash: &TransactionHash,
+) -> Result<(), Error> {
+    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
+    remove_chunked_transaction_by_path(host, &chunked_transaction_path)
+}
+
+/// Store the transaction chunk in the storage. Returns the full transaction
+/// if the last chunk to store is the last missing chunk.
+pub fn store_transaction_chunk<Host: Runtime>(
+    host: &mut Host,
+    tx_hash: &TransactionHash,
+    i: u16,
+    data: Vec<u8>,
+) -> Result<Option<Vec<u8>>, Error> {
+    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
+    let num_chunks =
+        chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)?;
+
+    if is_transaction_complete(host, &chunked_transaction_path, num_chunks)? {
+        let data =
+            get_full_transaction(host, &chunked_transaction_path, num_chunks, &data)?;
+        host.store_delete(&chunked_transaction_path)?;
+        Ok(Some(data))
+    } else {
+        let transaction_chunk_path =
+            transaction_chunk_path(&chunked_transaction_path, i)?;
+        store_transaction_chunk_data(host, &transaction_chunk_path, data)?;
+
+        Ok(None)
+    }
 }
 
 pub fn create_chunked_transaction<Host: Runtime>(
