@@ -18,11 +18,28 @@ pub struct Transaction {
 
 pub enum InputResult {
     NoInput,
-    Transaction(Box<Transaction>),
+    SimpleTransaction(Box<Transaction>),
     Unparsable,
 }
 
+const SIMPLE_TRANSACTION_TAG: u8 = 0;
+
 impl InputResult {
+    fn parse_simple_transaction(bytes: &[u8]) -> Self {
+        // Next 32 bytes is the transaction hash.
+        let (tx_hash, remaining) = bytes.split_at(32);
+        let tx_hash: TransactionHash = match tx_hash.try_into() {
+            Ok(tx_hash) => tx_hash,
+            Err(_) => return InputResult::Unparsable,
+        };
+        // Remaining bytes is the rlp encoded transaction.
+        let tx: EthereumTransactionCommon = match remaining.try_into() {
+            Ok(tx) => tx,
+            Err(_) => return InputResult::Unparsable,
+        };
+        InputResult::SimpleTransaction(Box::new(Transaction { tx_hash, tx }))
+    }
+
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = match bytes.split_first() {
@@ -44,18 +61,14 @@ impl InputResult {
                 return InputResult::Unparsable;
             }
         };
-        // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = remaining.split_at(32);
-        let tx_hash: TransactionHash = match tx_hash.try_into() {
-            Ok(tx_hash) => tx_hash,
-            Err(_) => return InputResult::Unparsable,
+        let (transaction_tag, remaining) = match remaining.split_first() {
+            Some(res) => res,
+            None => return InputResult::Unparsable,
         };
-        // Remaining bytes is the rlp encoded transaction.
-        let tx: EthereumTransactionCommon = match remaining.try_into() {
-            Ok(tx) => tx,
-            Err(_) => return InputResult::Unparsable,
-        };
-        InputResult::Transaction(Box::new(Transaction { tx_hash, tx }))
+        match *transaction_tag {
+            SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
+            _ => InputResult::Unparsable,
+        }
     }
 }
 
@@ -79,7 +92,7 @@ pub fn read_inbox<Host: Runtime>(
         match read_input(host, smart_rollup_address)? {
             InputResult::NoInput => return Ok(res),
             InputResult::Unparsable => (),
-            InputResult::Transaction(tx) => res.push(*tx),
+            InputResult::SimpleTransaction(tx) => res.push(*tx),
         }
     }
 }

@@ -195,14 +195,44 @@ module RPC = struct
     let* _answer = call_service ~base batcher_injection () () [tx] in
     return_unit
 
+  (* The hard limit is 4096 but it needs to add the external message tag. *)
+  let max_input_size = 4095
+
+  let smart_rollup_address_size = 20
+
+  type transaction = Simple of string
+
+  let encode_transaction ~smart_rollup_address kind =
+    let data = match kind with Simple data -> "\000" ^ data in
+    smart_rollup_address ^ data
+
+  let make_evm_inbox_transactions tx_raw =
+    let open Lwt_result_syntax in
+    (* Maximum size describes the maximum size of [tx_raw] to fit
+       in a simple transaction. *)
+    let transaction_tag_size = 1 in
+    let maximum_size =
+      max_input_size - smart_rollup_address_size - transaction_tag_size
+      - Ethereum_types.transaction_hash_size
+    in
+    if String.length tx_raw <= maximum_size then
+      (* Simple transaction, fits in a single input. *)
+      let tx_hash = Tx_hash.hash_to_string tx_raw in
+      let tx = Simple (tx_hash ^ tx_raw) in
+      return (tx_hash, [tx])
+    else
+      failwith
+        "Transactions larger than %d bytes are not supported."
+        maximum_size
+
   let inject_raw_transaction base ~smart_rollup_address tx_raw =
     let open Lwt_result_syntax in
-    let tx_hash =
-      Tx_hash.hash_to_string (Ethereum_types.hash_to_string tx_raw)
-    in
     let tx_raw = Ethereum_types.hash_to_bytes tx_raw in
-    let tx = smart_rollup_address ^ tx_hash ^ tx_raw in
-    let* () = inject_raw_transaction base tx in
+    let* tx_hash, messages = make_evm_inbox_transactions tx_raw in
+    let messages =
+      List.map (encode_transaction ~smart_rollup_address) messages
+    in
+    let* () = List.iter_es (inject_raw_transaction base) messages in
     return (Ethereum_types.Hash Hex.(of_string tx_hash |> show))
 
   exception Invalid_block_structure of string
