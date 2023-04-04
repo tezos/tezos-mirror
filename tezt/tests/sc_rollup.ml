@@ -466,6 +466,31 @@ let test_rollup_node_configuration ~kind =
   let config = Sc_rollup_node.Config_file.read rollup_node in
   let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
   let data_dir = Sc_rollup_node.data_dir rollup_node in
+  Log.info "Check that config cannot be overwritten" ;
+  let p = Sc_rollup_node.spawn_config_init rollup_node sc_rollup in
+  let* () =
+    Process.check_error
+      p
+      ~exit_code:1
+      ~msg:(rex "Configuration file \".*\" already exists")
+  in
+  (* Corrupt config file manually *)
+  let config_file = Sc_rollup_node.Config_file.filename rollup_node in
+  let out_chan = open_out config_file in
+  (try
+     output_string out_chan "corrupted" ;
+     close_out out_chan
+   with _ -> close_out out_chan) ;
+  (* Overwrite configuration *)
+  Log.info "Check that config can be overwritten with --force" ;
+  let* (_ : string) =
+    Sc_rollup_node.config_init ~force:true rollup_node sc_rollup
+  in
+  let config = Sc_rollup_node.Config_file.read rollup_node in
+  let rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
+  Check.((rpc_port = Sc_rollup_node.rpc_port rollup_node) int)
+    ~error_msg:"Read %L from overwritten config but expected %R." ;
+  Log.info "Check that rollup node cannot be used for annother rollup" ;
   (* Run the rollup node to initialize store and context *)
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* () = Sc_rollup_node.terminate rollup_node in

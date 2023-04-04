@@ -24,6 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let force_switch =
+  Tezos_clic.switch
+    ~long:"force"
+    ~doc:"Overwrites the configuration file when it exists."
+    ()
+
 let sc_rollup_address_parameter =
   Tezos_clic.parameter (fun _ s ->
       match Protocol.Alpha_context.Sc_rollup.Address.of_b58check_opt s with
@@ -373,7 +379,8 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args8
+    (args9
+       force_switch
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -387,7 +394,8 @@ let config_init_command =
     @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
     @@ seq_of_param @@ sc_rollup_node_operator_param)
-    (fun ( data_dir,
+    (fun ( force,
+           data_dir,
            rpc_addr,
            rpc_port,
            metrics_addr,
@@ -412,7 +420,7 @@ let config_init_command =
           ~sc_rollup_address
           ~sc_rollup_node_operators
       in
-      let* () = Configuration.save ~data_dir config in
+      let* () = Configuration.save ~force ~data_dir config in
       let*! () =
         cctxt#message
           "Smart rollup node configuration written in %s"
