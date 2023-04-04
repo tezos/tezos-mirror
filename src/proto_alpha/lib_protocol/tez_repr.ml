@@ -148,6 +148,15 @@ let ( /? ) tez d =
   if d <= 0L then error (Invalid_divisor (tez, d))
   else ok (Tez_tag (Int64.div t d))
 
+let div2_sub tez =
+  let (Tez_tag t) = tez in
+  let quo = Int64.div t 2L in
+  (* t ≥ 0 ⇒ t / 2 ≥ 0 ⇒ quo ≥ 0 *)
+  (* t ≥ 0 ⇒ t / 2 ≤ t ⇒ t - t / 2 ≥ 0 ⇒ t - quo ≥ 0 *)
+  (Tez_tag quo, Tez_tag (Int64.sub t quo))
+
+let div2 tez = fst (div2_sub tez)
+
 let mul_exn t m =
   match t *? Int64.(of_int m) with
   | Ok v -> v
