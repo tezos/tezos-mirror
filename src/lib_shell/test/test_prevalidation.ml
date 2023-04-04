@@ -527,10 +527,7 @@ let () =
     let state =
       set_bounding_state state (bounding_ophset_before, bounding_outcome)
     in
-    let*! ( state,
-            (_op : Mock_protocol.operation Shell_operation.operation),
-            classification,
-            replacements ) =
+    let*! state, returned_op, classification, replacements =
       P.add_operation state P.default_config op
     in
     (* Check the classification. *)
@@ -575,6 +572,10 @@ let () =
         assert (not (Operation_hash.Set.mem op.hash bounding_ophset)) ;
         assert (List.is_empty replacements) ;
         assert (count = count_before)) ;
+    (* Check that the operation has been correctly updated (or left alone). *)
+    (match proto_outcome with
+    | Proto_success _ | Proto_unchanged -> assert returned_op.signature_checked
+    | _ -> assert (returned_op == op)) ;
     Lwt.return state
   in
   let timestamp : Time.Protocol.t = now () in
