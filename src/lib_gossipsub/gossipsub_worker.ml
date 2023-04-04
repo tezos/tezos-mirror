@@ -160,10 +160,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle disconnection's output *)
         ignore output ;
         gossip_state
-    | App_input (Inject_message {message; message_id; topic}) ->
-        let publish = {GS.sender = None; topic; message_id; message} in
-        GS.publish publish gossip_state
-        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
     | P2P_input
         (In_message
           {from_peer; p2p_message = Publish {message; topic; message_id}}) ->
@@ -178,6 +174,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Handle received p2p messages. *)
         ignore (In_message m) ;
         assert false
+    | App_input (Inject_message {message; message_id; topic}) ->
+        let publish = {GS.sender = None; topic; message_id; message} in
+        GS.publish publish gossip_state
+        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
     | App_input (Join topic) ->
         let gossip_state, output = GS.join {topic} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
