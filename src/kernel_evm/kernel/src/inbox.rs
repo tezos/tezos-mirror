@@ -22,12 +22,6 @@ pub enum InputResult {
     Unparsable,
 }
 
-impl Transaction {
-    pub fn to_raw_transaction(&self) -> EthereumTransactionCommon {
-        self.tx.clone()
-    }
-}
-
 impl InputResult {
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
         let bytes = Message::as_ref(&input);
