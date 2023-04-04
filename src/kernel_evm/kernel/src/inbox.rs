@@ -19,10 +19,16 @@ pub struct Transaction {
 pub enum InputResult {
     NoInput,
     SimpleTransaction(Box<Transaction>),
+    NewChunkedTransaction {
+        tx_hash: TransactionHash,
+        num_chunks: u16,
+    },
     Unparsable,
 }
 
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
+
+const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
 
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
@@ -38,6 +44,26 @@ impl InputResult {
             Err(_) => return InputResult::Unparsable,
         };
         InputResult::SimpleTransaction(Box::new(Transaction { tx_hash, tx }))
+    }
+
+    fn parse_new_chunked_transaction(bytes: &[u8]) -> Self {
+        // Next 32 bytes is the transaction hash.
+        let (tx_hash, remaining) = bytes.split_at(32);
+        let tx_hash: TransactionHash = match tx_hash.try_into() {
+            Ok(tx_hash) => tx_hash,
+            Err(_) => return InputResult::Unparsable,
+        };
+        // Next 2 bytes is the number of chunks.
+        let (num_chunks, remaining) = remaining.split_at(2);
+        let num_chunks = u16::from_le_bytes(num_chunks.try_into().unwrap());
+        if remaining.is_empty() {
+            Self::NewChunkedTransaction {
+                tx_hash,
+                num_chunks,
+            }
+        } else {
+            Self::Unparsable
+        }
     }
 
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
@@ -67,6 +93,7 @@ impl InputResult {
         };
         match *transaction_tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
+            NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
             _ => InputResult::Unparsable,
         }
     }
@@ -93,6 +120,10 @@ pub fn read_inbox<Host: Runtime>(
             InputResult::NoInput => return Ok(res),
             InputResult::Unparsable => (),
             InputResult::SimpleTransaction(tx) => res.push(*tx),
+            InputResult::NewChunkedTransaction {
+                tx_hash,
+                num_chunks,
+            } => crate::storage::create_chunked_transaction(host, &tx_hash, num_chunks)?,
         }
     }
 }
