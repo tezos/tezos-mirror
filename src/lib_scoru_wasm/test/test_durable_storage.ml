@@ -350,7 +350,7 @@ let test_store_get_hash ~version () =
       let* hash = Memory.load_bytes mem dst 32 in
       let durable = Durable.of_storage_exn durable_storage in
       let* hash_expected =
-        Durable.hash_exn ~kind:`Subtree durable Durable.(key_of_string_exn key)
+        Durable.(hash_exn ~kind:Directory durable (key_of_string_exn key))
       in
       let hash_expected = Context_hash.to_string hash_expected in
       assert (hash = hash_expected) ;

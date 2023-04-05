@@ -573,7 +573,7 @@ module Aux = struct
       let*! res =
         let* key = load_key_from_memory key_offset key_length memory in
         let* result =
-          guard (fun () -> Durable.hash_exn ~kind:`Subtree durable key)
+          guard (fun () -> Durable.hash_exn ~kind:Durable.Directory durable key)
         in
         let result =
           Data_encoding.Binary.to_string_exn Context_hash.encoding result

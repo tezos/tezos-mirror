@@ -63,6 +63,15 @@ val of_storage_exn : Tezos_webassembly_interpreter.Durable_storage.t -> t
 
 val to_storage : t -> Tezos_webassembly_interpreter.Durable_storage.t
 
+(** Type describing the behavior of generic functions:
+    - [Value] indicates the operation should work on the value only
+    - [Directory] indicates the operation should work on the value and all
+    subkeys under the given key.
+
+    See [hash], for example.
+*)
+type kind = Value | Directory
+
 (** [key] is the type that indexes [t]. It enforces several constraints:
     - a key's length is bounded.
     - a key is a series of non-empty steps, where
@@ -121,18 +130,18 @@ val subtree_name_at : t -> key -> int -> string Lwt.t
 *)
 val delete : ?edit_readonly:bool -> t -> key -> t Lwt.t
 
-(** [hash ~kind durable key] retrieves the tree hash of the value (if
-    [kind = `Value]) or the subtree ([kind = `Subtree]) at the given
-    [key].  This is not the same as the hash of the value. *)
-val hash : kind:[`Value | `Subtree] -> t -> key -> Context_hash.t option Lwt.t
+(** [hash ~kind durable key] retrieves the tree hash of the value (if [kind =
+    Value]) or the complete directory ([kind = Directory]) at the given [key].
+    This is not the same as the hash of the value. *)
+val hash : kind:kind -> t -> key -> Context_hash.t option Lwt.t
 
-(** [hash_exn ~kind durable key] retrieves the tree hash of the value
-    (if [kind = `Value]) or the subtree ([kind = `Subtree]) at the
-    given [key]. This is not the same as the hash of the value.
+(** [hash_exn ~kind durable key] retrieves the tree hash of the value (if [kind
+    = Value]) or the complete directory ([kind = Directory]) at the given [key].
+    This is not the same as the hash of the value.
 
-    @raise Value_not_found when [key] is not found and [kind = `Subtree]
-    @raise Tree_not_found when [key] is not found and [kind = `Value]. *)
-val hash_exn : kind:[`Value | `Subtree] -> t -> key -> Context_hash.t Lwt.t
+    @raise Value_not_found when [key] is not found and [kind = Value]
+    @raise Tree_not_found when [key] is not found and [kind = Directory]. *)
+val hash_exn : kind:kind -> t -> key -> Context_hash.t Lwt.t
 
 (** [set_value_exn durable key str] installs the value [str] in
     [durable] under [key], replacing any previous contents under this

@@ -101,6 +101,12 @@ end
 module Current : Testable_durable_sig = struct
   include Tezos_scoru_wasm.Durable
 
+  let coerce_kind = function `Value -> Value | `Subtree -> Directory
+
+  let hash ~kind tree key = hash ~kind:(coerce_kind kind) tree key
+
+  let hash_exn ~kind tree key = hash_exn ~kind:(coerce_kind kind) tree key
+
   let find_value tree key =
     let open Lwt_syntax in
     let* cbv = find_value tree key in

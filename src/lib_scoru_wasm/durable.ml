@@ -59,6 +59,8 @@ let of_storage_exn s = Storage.to_tree_exn s
 
 let to_storage d = Storage.of_tree d
 
+type kind = Value | Directory
+
 type key = Writeable of string list | Readonly of string list
 
 (* A key is bounded to 250 bytes, including the implicit '/durable' prefix.
@@ -173,8 +175,8 @@ let hash ~kind tree key =
   let open Lwt.Syntax in
   let key =
     match kind with
-    | `Value -> to_value_key (key_contents key)
-    | `Subtree -> key_contents key
+    | Value -> to_value_key (key_contents key)
+    | Directory -> key_contents key
   in
   let+ opt = T.find_tree tree key in
   Option.map (fun subtree -> T.hash subtree) opt
@@ -185,7 +187,7 @@ let hash_exn ~kind tree key =
   match opt with
   | None ->
       let exn =
-        match kind with `Value -> Value_not_found | `Subtree -> Tree_not_found
+        match kind with Value -> Value_not_found | Directory -> Tree_not_found
       in
       raise exn
   | Some hash -> hash
