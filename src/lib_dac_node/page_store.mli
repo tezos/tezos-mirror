@@ -25,6 +25,8 @@
 (*****************************************************************************)
 
 type error +=
+  | Reveal_data_path_not_a_directory of string
+  | Cannot_create_reveal_data_dir of string
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
   | Incorrect_page_hash of {
@@ -119,3 +121,20 @@ module Internal_for_tests : sig
       with type configuration = R.remote_context * P.t
        and type t = R.remote_context * P.t
 end
+
+(** [ensure_reveal_data_dir_exists reveal_data_dir] checks that the
+      path at [reveal_data_dir] exists and is a directory. If
+      the path does not exist, it is created as a directory.
+      Parent directories are recursively created when they do not
+      exist.
+
+      This function may fail with
+      {ul
+        {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
+          path exists and is not a directory,
+
+        {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
+            creation of the directory fails.}}
+      }
+  *)
+val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t

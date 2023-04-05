@@ -32,9 +32,13 @@ type host_and_port = {host : string; port : int}
 (** Coordinator specific configuration. *)
 module Coordinator : sig
   (** The type of a coordinator specific configuration mode. *)
-  type t
+  type t = {
+    threshold : int;
+    committee_members_addresses :
+      Tezos_crypto.Aggregate_signature.public_key_hash list;
+  }
 
-  (* [committee_members_addresses t] retrieves the addresses of the committee
+  (** [committee_members_addresses t] retrieves the addresses of the committee
      members from the coordinator configuration [t].*)
   val committee_members_addresses :
     t -> Tezos_crypto.Aggregate_signature.public_key_hash list
@@ -43,30 +47,41 @@ end
 (** Committee_member specific configuration. *)
 module Committee_member : sig
   (** The type of a Committee_member specific configuration mode. *)
-  type t
+  type t = {
+    coordinator_rpc_address : string;
+    coordinator_rpc_port : int;
+    address : Tezos_crypto.Aggregate_signature.public_key_hash;
+  }
 end
 
 (** Observer specific configuration. *)
 module Observer : sig
   (** The type of an Observer specific configuration mode. *)
-  type t
+  type t = {coordinator_rpc_address : string; coordinator_rpc_port : int}
 end
 
 (** Legacy specific configuration. *)
 module Legacy : sig
   (** The type of a legacy-specific configuration mode. *)
-  type t
+  type t = {
+    threshold : int;
+    committee_members_addresses :
+      Tezos_crypto.Aggregate_signature.public_key_hash list;
+    dac_cctxt_config : host_and_port option;
+    committee_member_address_opt :
+      Tezos_crypto.Aggregate_signature.public_key_hash option;
+  }
 
-  (* [committee_members_addresses t] retrieves the addresses of the committee
+  (** [committee_members_addresses t] retrieves the addresses of the committee
      members from the legacy configuration [t].*)
   val committee_members_addresses :
     t -> Tezos_crypto.Aggregate_signature.public_key_hash list
 
-  (* [threshold t] retrieves the Data Availability Committee threshold from
+  (** [threshold t] retrieves the Data Availability Committee threshold from
      the legacy configuration [t]. *)
   val threshold : t -> int
 
-  (* [host_and_port t] retrieves the host and port of the node that serves
+  (** [host_and_port t] retrieves the host and port of the node that serves
      as a coordinator for the DAC, if any is specified in the legacy node
      condiguration. *)
   val dac_cctxt_config : t -> host_and_port option
@@ -82,7 +97,7 @@ type mode = private
   | Observer of Observer.t
   | Legacy of Legacy.t
 
-type t = {
+type t = private {
   data_dir : string;  (** The path to the DAC node data directory. *)
   rpc_address : string;  (** The address the DAC node listens to. *)
   rpc_port : int;  (** The port the DAC node listens to. *)
@@ -122,6 +137,11 @@ val make_legacy :
   Tezos_crypto.Aggregate_signature.public_key_hash trace ->
   Tezos_crypto.Aggregate_signature.public_key_hash option ->
   mode
+
+(** [make ~data_dir ~reveal_data_dir rpc_address rpc_port mode] creates a
+    configuration value from the specified parameters. *)
+val make :
+  data_dir:string -> reveal_data_dir:string -> string -> int -> mode -> t
 
 (** [filename config] gets the path to config file *)
 val filename : t -> string

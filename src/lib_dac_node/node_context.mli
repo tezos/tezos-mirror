@@ -24,15 +24,102 @@
 (*****************************************************************************)
 type dac_plugin_module = (module Dac_plugin.T)
 
+(** [Coordinator] defines a partial [Node_context.t] that is available
+    only to [Coordinator] nodes, and functions that can be used to operate
+    on such mode-specific node contexts. *)
+module Coordinator : sig
+  (** The type of a [Coordinator] specific partial [Node_context.t]. *)
+  type t = private {
+    committee_members : Wallet_account.Coordinator.t list;
+        (** The list of [Wallet.Coordinator] values associated with the Data
+            Availability Committee members managed by the [Coordinator] node.
+        *)
+    hash_streamer : Dac_plugin.hash Data_streamer.t;
+        (** The [Dac_plugin.hash Data_streamer.t] that the [Coordinator] node
+            use to advertise root hashes to [Committee_member] and [Observer]
+            nodes. *)
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
+           This could be problematic in case coordinator and member/observer
+           use two different plugins that bind different underlying hashes. *)
+  }
+
+  (** [public_keys_opt t] returns the list of public keys associated with the
+      data availability committee of [t]. *)
+  val public_keys_opt :
+    t -> Tezos_crypto.Aggregate_signature.public_key option list
+end
+
+(** [Committee_member] defines a partial [Node_context.t] that is available
+    only to [Committee_member] nodes, and functions that can be used to operate
+    on such mode specific partial node contexts. *)
+module Committee_member : sig
+  (** The type of a [Committee_member] specific partial [Node_context.t]. *)
+  type t = private {
+    committee_member : Wallet_account.Committee_member.t;
+        (**  The [Wallet_account.Committee_member] wallet associated with the
+             [commitee_member] managed by the DAC node. *)
+    coordinator_cctxt : Dac_node_client.cctxt;
+        (** The [Dac_node_client.cctxt] used by the [Committee_member] node to
+            send requests to a [Coordinator] node. *)
+  }
+
+  (** [secret_key_uri t] returns the secret key URI associated with the
+      committee member managed by the [Committee_member] node.  *)
+  val secret_key_uri : t -> Client_keys.aggregate_sk_uri
+end
+
+(** The type of an [Observer] specific partial [Node_context.t]. *)
+module Observer : sig
+  type t = private {
+    coordinator_cctxt : Dac_node_client.cctxt;
+        (** The [Dac_node_client.cctxt] used by the [Observer] node to
+        send requests to a [Coordinator] node. *)
+  }
+end
+
+(** [Legacy] defines a partial [Node_context.t] that is available only to
+    [Legacy] nodes, and functions that can be used to operate on such
+    mode specific partial node contexts. *)
+module Legacy : sig
+  (** The type of a [Legacy] specific partial [Node_context.t]. *)
+  type t = private {
+    committee_members : Wallet_account.Legacy.t list;
+        (** The list of [Wallet_account.Legacy] values associated with the Data
+            Availability Committee members managed by the [Coordinator] node.
+        *)
+    coordinator_cctxt : Dac_node_client.cctxt option;
+        (** An optional [Dac_node_client.cctxt] option. If defined, it
+            enables a [Legacy] node to act as if it were an [Observer], using
+            the associated [Dac_node_client.cctxt] value to send requests to
+            a [Coordinator] node.  *)
+    hash_streamer : Dac_plugin.hash Data_streamer.t;
+        (** A [Dac_plugin.hash Data_streamer.t] that the [Legacy] node
+            use to advertise root hashes to other nodes *)
+    committee_member_opt : Wallet_account.Legacy.t option;
+        (** The legacy account wallet of the committee member simulated by the
+            legacy DAC node, if any. *)
+  }
+
+  (** [public_keys_opt t] returns the list of optional public keys associated
+      with the committee members of [t]. *)
+  val public_keys_opt :
+    t -> Tezos_crypto.Aggregate_signature.public_key option list
+
+  (** [secret_key_uris_opt] return the list of optional secret key URIs of the
+      committee members of [t]. *)
+  val secret_key_uris_opt : t -> Client_keys.aggregate_sk_uri option list
+end
+
+(** Operating mode specific fraction of a [Node_context.t] *)
+type mode = private
+  | Coordinator of Coordinator.t
+  | Committee_member of Committee_member.t
+  | Observer of Observer.t
+  | Legacy of Legacy.t
+
 (** A [ready_ctx] value contains globally needed information for a running dac
-    node. It is available when the DAC plugin has been loaded. Additionally,
-    it also contains an instance of [Dac_plugin.hash Data_streamer.t] - a
-    component for streaming root hashes, produced during the serialization of
-    dac payload. *)
-type ready_ctxt = {
-  dac_plugin : dac_plugin_module;
-  hash_streamer : Dac_plugin.hash Data_streamer.t;
-}
+    node. It is available when the DAC plugin has been loaded. *)
+type ready_ctxt = {dac_plugin : dac_plugin_module}
 
 (** The status of the dac node. *)
 type status = Ready of ready_ctxt | Starting
@@ -41,16 +128,10 @@ type status = Ready of ready_ctxt | Starting
     fields are available through accessors. *)
 type t
 
-(** [init config cctxt dac_node_cctxt] creates a [t] with a status set to
-    [Starting] using the given dac node configuration [config],
-    tezos node client context [cctxt], and optional client context of
-    another dac node [dac_node_cctxt], which can be used for writting
-    tests with two dac nodes running the legacy mode. *)
-val init :
-  Configuration.t ->
-  Client_context.full ->
-  Dac_node_client.cctxt option ->
-  t tzresult Lwt.t
+(** [init config cctxt] creates a [t] with a status set to
+    [Starting] using the given dac node configuration [config] and
+    tezos node client context [cctxt]. *)
+val init : Configuration.t -> Client_context.full -> t tzresult Lwt.t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
@@ -69,11 +150,12 @@ type error += Node_not_ready
     times, it replaces current values for [ready_ctxt] with new one. *)
 val get_ready : t -> ready_ctxt tzresult
 
-(** [get_config ctxt] returns the dac node configuration. *)
-val get_config : t -> Configuration.t
-
 (** [get_status ctxt] returns the dac node status. *)
 val get_status : t -> status
+
+(** [mode node_ctxt] returns the operating mode specific fraction of a
+    [Node_context.t]. *)
+val mode : t -> mode
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Client_context.full

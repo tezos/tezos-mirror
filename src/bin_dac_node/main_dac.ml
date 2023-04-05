@@ -146,8 +146,8 @@ module Config_init = struct
   let create_configuration ~data_dir ~reveal_data_dir ~rpc_address ~rpc_port
       mode (cctxt : Client_context.full) =
     let open Lwt_result_syntax in
-    let config : Configuration.t =
-      {data_dir; rpc_address; rpc_port; mode; reveal_data_dir}
+    let config =
+      Configuration.make ~data_dir ~reveal_data_dir rpc_address rpc_port mode
     in
     let* () = Configuration.save config in
     let*! _ =
@@ -229,7 +229,7 @@ module Config_init = struct
       ~desc:"Configure DAC node in committee member mode."
       (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
       (prefixes
-         ["configure"; "as"; "commmittee"; "member"; "with"; "coordinator"]
+         ["configure"; "as"; "committee"; "member"; "with"; "coordinator"]
       @@ coordinator_rpc_param
       @@ prefixes ["and"; "signer"]
       @@ tz4_address_param @@ stop)
