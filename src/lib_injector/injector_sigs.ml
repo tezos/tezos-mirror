@@ -56,6 +56,9 @@ type unsuccessful_status =
       (** The operation is skipped because of a previous failing operation in
           the same batch. *)
   | Failed of error trace  (** The operation failed with the provided error. *)
+  | Never_included
+      (** The operation was injected but never included after the injection
+          TTL. *)
 
 type operation_status = Successful | Unsuccessful of unsuccessful_status
 
@@ -297,6 +300,9 @@ module type S = sig
       an operation. Operations whose injection fails a number of times greater
       than this value will be discarded from the queue.
 
+      [injection_ttl] is the number of blocks after which an operation that is
+      injected but never include is retried.
+
       The injector monitors L1 heads to update the statuses of its operations
       accordingly. The argument [reconnection_delay] gives an initial value for
       the delay before attempting a reconnection (see {!Layer_1.init}).
@@ -306,6 +312,7 @@ module type S = sig
     data_dir:string ->
     ?retention_period:int ->
     ?allowed_attempts:int ->
+    ?injection_ttl:int ->
     ?reconnection_delay:float ->
     state ->
     signers:(Signature.public_key_hash * injection_strategy * tag list) list ->

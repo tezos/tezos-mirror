@@ -95,6 +95,9 @@ module Make_table (H : H) : sig
   val iter_es :
     (key -> value -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
 
+  (** Same as {!module-type-H.fold} *)
+  val fold : (key -> value -> 'a -> 'a) -> t -> 'a -> 'a
+
   (** Same as {!module-type-H.length} *)
   val length : t -> int
 

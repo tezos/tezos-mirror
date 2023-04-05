@@ -255,6 +255,9 @@ module Make (Parameters : PARAMETERS) = struct
             information. *)
     allowed_attempts : int;
         (** The number of attempts that will be made to inject an operation. *)
+    injection_ttl : int;
+        (** The number of blocks after which an operation is retried when
+            injected but never included. *)
     mutable last_seen_head : (Block_hash.t * int32) option;
         (** Last L1 head that the injector has seen (used to compute
             reorganizations). *)
@@ -298,7 +301,7 @@ module Make (Parameters : PARAMETERS) = struct
     state.last_seen_head <- Some head
 
   let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
-      ~retention_period ~allowed_attempts ~signer strategy tags =
+      ~retention_period ~allowed_attempts ~injection_ttl ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -391,6 +394,7 @@ module Make (Parameters : PARAMETERS) = struct
         state;
         retention_period;
         allowed_attempts;
+        injection_ttl;
         last_seen_head;
         protocols = head_protocols;
         proto_client;
@@ -710,7 +714,9 @@ module Make (Parameters : PARAMETERS) = struct
               failure := true ;
               let+ () = register_error state op error in
               acc
-          | Successful | Unsuccessful (Backtracked | Skipped | Other_branch) ->
+          | Successful
+          | Unsuccessful (Backtracked | Skipped | Other_branch | Never_included)
+            ->
               (* Not known to be failing *)
               return (op :: acc))
         []
@@ -935,7 +941,8 @@ module Make (Parameters : PARAMETERS) = struct
                   let* () =
                     match status with
                     | Failed error -> register_error state info.op error
-                    | Other_branch | Backtracked | Skipped -> return_unit
+                    | Other_branch | Backtracked | Skipped | Never_included ->
+                        return_unit
                   in
                   match retry with
                   | Retry -> return (included, info.op :: to_retry)
@@ -1028,6 +1035,49 @@ module Make (Parameters : PARAMETERS) = struct
         else return_unit)
       state.included.included_in_blocks
 
+  (** Retry operations that are injected but never included after
+      [state.injection_ttl].  *)
+  let retry_expired_injected_operations state head_level =
+    let open Lwt_result_syntax in
+    let expired =
+      Injected_ophs.fold
+        (fun oph (injection_level, _ops) acc ->
+          if
+            head_level
+            > Int32.add injection_level (Int32.of_int state.injection_ttl)
+          then oph :: acc
+          else acc)
+        state.injected.injected_ophs
+        []
+    in
+    let* expired_infos =
+      List.fold_left_es
+        (fun acc oph ->
+          let+ injected_infos = remove_injected_operation state oph in
+          List.rev_append injected_infos acc)
+        []
+        expired
+    in
+    List.iter_es
+      (fun (info : injected_info) ->
+        let*! () =
+          Event.(emit2 never_included)
+            state
+            info.op.operation
+            state.injection_ttl
+        in
+        let*! retry =
+          Parameters.retry_unsuccessful_operation
+            state.state
+            info.op.operation
+            Never_included
+        in
+        match retry with
+        | Abort err -> fail err
+        | Retry -> add_pending_operation ~retry:true state info.op
+        | Forget -> return_unit)
+      (List.rev expired_infos)
+
   (** [on_new_tezos_head state head] is called when there is a new Tezos
       head. It first reverts any blocks that are in the alternative branch of
       the reorganization and then registers the effect of the new branch (the
@@ -1074,6 +1124,7 @@ module Make (Parameters : PARAMETERS) = struct
         (fun added_block -> register_included_operations state added_block)
         reorg.new_chain
     in
+    let* () = retry_expired_injected_operations state head_level in
     (* Head is already included in the reorganization, so no need to process it
        separately. *)
     let confirmed_level = Int32.sub head_level (Int32.of_int confirmations) in
@@ -1107,6 +1158,7 @@ module Make (Parameters : PARAMETERS) = struct
       state : Parameters.state;
       retention_period : int;
       allowed_attempts : int;
+      injection_ttl : int;
       strategy : injection_strategy;
       tags : Tags.t;
     }
@@ -1165,6 +1217,7 @@ module Make (Parameters : PARAMETERS) = struct
             state;
             retention_period;
             allowed_attempts;
+            injection_ttl;
             strategy;
             tags;
           } =
@@ -1177,6 +1230,7 @@ module Make (Parameters : PARAMETERS) = struct
            state
            ~retention_period
            ~allowed_attempts
+           ~injection_ttl
            ~signer
            strategy
            tags
@@ -1338,10 +1392,12 @@ module Make (Parameters : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 100) ?(reconnection_delay = 2.0) state ~signers =
+      ?(allowed_attempts = 100) ?(injection_ttl = 120)
+      ?(reconnection_delay = 2.0) state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     assert (allowed_attempts >= 0) ;
+    assert (injection_ttl > 0) ;
     let signers_map =
       List.fold_left
         (fun acc (signer, strategy, tags) ->
@@ -1382,6 +1438,7 @@ module Make (Parameters : PARAMETERS) = struct
                 state;
                 retention_period;
                 allowed_attempts;
+                injection_ttl;
                 strategy;
                 tags;
               }

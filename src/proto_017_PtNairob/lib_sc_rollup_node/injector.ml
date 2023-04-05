@@ -134,6 +134,9 @@ module Parameters :
         match classify_trace error with
         | Permanent | Outdated -> return Forget
         | Branch | Temporary -> return Retry)
+    | Never_included ->
+        (* Forget operations that are never included *)
+        return Forget
 end
 
 module Proto_client = struct

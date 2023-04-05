@@ -281,4 +281,13 @@ module Make
           ~msg:"waiting {delay} seconds to trigger injection"
           ~level:Notice
           ("delay", Data_encoding.float)
+
+      let never_included =
+        declare_2
+          ~name:"never_included"
+          ~msg:"{operation} was never included in a block after {ttl} blocks"
+          ~level:Warning
+          ("operation", Operation.encoding)
+          ("ttl", Data_encoding.int31)
+          ~pp1:Operation.pp
     end
