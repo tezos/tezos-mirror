@@ -145,6 +145,8 @@ type error += Block_not_found
 
 type error += Cannot_replay_below_savepoint
 
+type error += Cannot_replay_non_positive_repeat
+
 let () =
   register_error_kind
     ~id:"main.replay.block_not_found"
@@ -187,7 +189,17 @@ let () =
     `Permanent
     Data_encoding.empty
     (function Cannot_replay_below_savepoint -> Some () | _ -> None)
-    (fun () -> Cannot_replay_below_savepoint)
+    (fun () -> Cannot_replay_below_savepoint) ;
+  register_error_kind
+    ~id:"main.replay.cannot_replay_non_positive_repeat"
+    ~title:"Cannot replay: non-strictly positive repeating count requested"
+    ~description:"Repeat parameter must be at least 1."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Repeat parameter must be at least 1.")
+    `Permanent
+    Data_encoding.empty
+    (function Cannot_replay_non_positive_repeat -> Some () | _ -> None)
+    (fun () -> Cannot_replay_non_positive_repeat)
 
 (* Iterator over receipts, that are, list of lists of bytes. The index
    given to [f] corresponds to the dimension [x][y] of the list being
@@ -209,7 +221,7 @@ let receipts_foldi_2 ~when_different_lengths l r acc
   aux acc l r 0 0
 
 let stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
-    ~valid_context_hash ~valid_receipt ~timing =
+    ~valid_context_hash ~valid_receipt ~timings =
   Option.iter_s
     (fun stats_output ->
       let block = `String (Block_services.to_string block) in
@@ -218,7 +230,12 @@ let stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
       let cycle_change = `Bool cycle_change in
       let valid_context_hash = `Bool valid_context_hash in
       let valid_receipt = `Bool valid_receipt in
-      let timing = `Float (Ptime.Span.to_float_s timing) in
+      let timing =
+        `A
+          (List.map
+             (fun timing -> `Float (Ptime.Span.to_float_s timing))
+             timings)
+      in
       let data =
         `O
           [
@@ -238,8 +255,8 @@ let stats_print ~stats_output ~block ~block_hash ~block_level ~cycle_change
       Lwt_io.flush stats_output)
     stats_output
 
-let replay_one_block strict stats_output main_chain_store validator_process
-    block previous_lpbl =
+let replay_one_block strict repeat stats_output main_chain_store
+    validator_process block previous_lpbl =
   let open Lwt_result_syntax in
   let block_name = block in
   let* block_alias =
@@ -294,29 +311,44 @@ let replay_one_block strict stats_output main_chain_store validator_process
     in
     let operations = Store.Block.operations block in
     let header = Store.Block.header block in
-    let start_time = Time.System.now () in
-    let*! () =
-      Event.(emit block_validation_start)
-        ( block_alias,
-          Store.Block.hash block,
-          Store.Block.level block,
-          cycle_change )
+    let run () =
+      let start_time = Time.System.now () in
+      let*! () =
+        Event.(emit block_validation_start)
+          ( block_alias,
+            Store.Block.hash block,
+            Store.Block.level block,
+            cycle_change )
+      in
+      let bv_operations =
+        List.map (List.map Block_validation.mk_operation) operations
+      in
+      let* result =
+        Block_validator_process.apply_block
+          ~simulate:true
+          validator_process
+          main_chain_store
+          ~predecessor
+          header
+          bv_operations
+      in
+      let now = Time.System.now () in
+      let timing = Ptime.diff now start_time in
+      let*! () = Event.(emit block_validation_end) timing in
+      return (timing, result)
     in
-    let bv_operations =
-      List.map (List.map Block_validation.mk_operation) operations
+    let* timings, result =
+      let* timing, result = run () in
+      let* rem =
+        List.init_es
+          (repeat - 1)
+          ~when_negative_length:(TzTrace.make Cannot_replay_non_positive_repeat)
+          (fun _ ->
+            let* timing, _ = run () in
+            return timing)
+      in
+      return (timing :: rem, result)
     in
-    let* result =
-      Block_validator_process.apply_block
-        ~simulate:true
-        validator_process
-        main_chain_store
-        ~predecessor
-        header
-        bv_operations
-    in
-    let now = Time.System.now () in
-    let timing = Ptime.diff now start_time in
-    let*! () = Event.(emit block_validation_end) timing in
     let* () =
       when_
         (not
@@ -429,13 +461,13 @@ let replay_one_block strict stats_output main_chain_store validator_process
         ~block_hash:(Store.Block.hash block)
         ~block_level:(Store.Block.level block)
         ~cycle_change
-        ~timing
+        ~timings
         ~valid_context_hash
         ~valid_receipt
     in
     return_some lpbl
 
-let replay ~internal_events ~singleprocess ~strict ~stats_output
+let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
@@ -528,6 +560,7 @@ let replay ~internal_events ~singleprocess ~strict ~stats_output
             | Block_services.Block b ->
                 replay_one_block
                   strict
+                  repeat
                   stats_output_chan
                   main_chain_store
                   validator_process
@@ -538,6 +571,7 @@ let replay ~internal_events ~singleprocess ~strict ~stats_output
                 else if Int32.compare starts ends = 0 then
                   replay_one_block
                     strict
+                    repeat
                     stats_output_chan
                     main_chain_store
                     validator_process
@@ -548,6 +582,7 @@ let replay ~internal_events ~singleprocess ~strict ~stats_output
                     (fun lafl block ->
                       replay_one_block
                         strict
+                        repeat
                         stats_output_chan
                         main_chain_store
                         validator_process
@@ -571,7 +606,7 @@ let replay ~internal_events ~singleprocess ~strict ~stats_output
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess ~strict ~stats_output
+let run ?verbosity ~singleprocess ~strict ~repeat ~stats_output
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let* () =
@@ -616,6 +651,7 @@ let run ?verbosity ~singleprocess ~strict ~stats_output
                ~internal_events
                ~singleprocess
                ~strict
+               ~repeat
                ~stats_output
                ~operation_metadata_size_limit
                config
@@ -635,7 +671,7 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess strict blocks stats_output data_dir
+let process verbosity singleprocess strict repeat blocks stats_output data_dir
     config_file operation_metadata_size_limit =
   let verbosity =
     let open Internal_event in
@@ -657,10 +693,12 @@ let process verbosity singleprocess strict blocks stats_output data_dir
           config.shell.block_validator_limits.operation_metadata_size_limit
     in
     let* () = check_data_dir config.data_dir in
+    let repeat = match repeat with Some i -> i | None -> 1 in
     run
       ?verbosity
       ~singleprocess
       ~strict
+      ~repeat
       ~stats_output
       ~operation_metadata_size_limit
       config
@@ -731,6 +769,20 @@ module Term = struct
     in
     Arg.(value & flag & info ~doc ["strict"])
 
+  let repeat =
+    let open Cmdliner in
+    let doc = "If set to [n], the block replay is repeated [n] times." in
+    let parse str =
+      match int_of_string_opt str with
+      | Some i when i < 1 -> `Error "\"repeat\" only accepts positive integers"
+      | Some i -> `Ok i
+      | _ -> `Error "failed to parse \"repeat\" parameter"
+    in
+    Arg.(
+      value
+      & opt (some (parse, Format.pp_print_int)) None
+      & info ~doc ["repeat"])
+
   let singleprocess =
     let open Cmdliner in
     let doc =
@@ -757,7 +809,7 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        (const process $ verbosity $ singleprocess $ strict $ blocks
+        (const process $ verbosity $ singleprocess $ strict $ repeat $ blocks
        $ stats_output $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
        $ Shared_arg.Term.operation_metadata_size_limit))
 end
