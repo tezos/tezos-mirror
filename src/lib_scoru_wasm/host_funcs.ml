@@ -436,7 +436,9 @@ module Aux = struct
       let open Lwt_result_syntax in
       let*! res =
         let* key = load_key_from_memory key_offset key_length memory in
-        let+ durable = guard (fun () -> Durable.delete durable key) in
+        let+ durable =
+          guard (fun () -> Durable.delete ~kind:Directory durable key)
+        in
         (durable, 0l)
       in
       extract_error durable res

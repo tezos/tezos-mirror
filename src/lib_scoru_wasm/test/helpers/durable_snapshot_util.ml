@@ -107,6 +107,8 @@ module Current : Testable_durable_sig = struct
 
   let hash_exn ~kind tree key = hash_exn ~kind:(coerce_kind kind) tree key
 
+  let delete = delete ~kind:Directory
+
   let find_value tree key =
     let open Lwt_syntax in
     let* cbv = find_value tree key in

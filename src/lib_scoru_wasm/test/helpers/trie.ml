@@ -25,6 +25,8 @@
 
 type key = string list
 
+type kind = Value | Directory
+
 module Children = Map.Make (String)
 
 type 'a t = {
@@ -44,6 +46,11 @@ let replace_value t new_v =
   match t.value with
   | None -> {t with value = Some new_v; keys_count = t.keys_count + 1}
   | Some _ -> {t with value = Some new_v}
+
+let remove_value t =
+  match t.value with
+  | None -> t
+  | Some _ -> {t with value = None; keys_count = t.keys_count - 1}
 
 let replace_child t step new_c =
   let old_c =
@@ -108,7 +115,7 @@ let subtrees_size key root =
   Option.fold ~none:0 ~some:(fun x -> Children.cardinal x.children)
   @@ lookup key root
 
-let delete ~edit_readonly key root =
+let delete ~edit_readonly kind key root =
   let open Option_syntax in
   let* () = readonly_guard key edit_readonly in
   let is_empty {value; children; _} =
@@ -117,7 +124,10 @@ let delete ~edit_readonly key root =
   (* Return None if tree is not changed in result of deletion *)
   let rec delete_tree_impl t = function
     | [] -> None
-    | [k] -> Some (remove_child t k)
+    | [k] when kind = Directory -> Some (remove_child t k)
+    | [k] when kind = Value ->
+        let* child = Children.find k t.children in
+        Some (remove_value child)
     | k :: rest ->
         let* child = Children.find k t.children in
         let+ new_child = delete_tree_impl child rest in
@@ -144,5 +154,5 @@ let move_tree ~from_key ~to_key root =
     guard_opt ((not (is_key_readonly from_key)) && not (is_key_readonly to_key))
   in
   let* from_t = lookup from_key root in
-  let+ root = delete ~edit_readonly:true from_key root in
+  let+ root = delete ~edit_readonly:true Directory from_key root in
   create_path root (Fun.const from_t) to_key

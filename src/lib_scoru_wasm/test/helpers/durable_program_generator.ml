@@ -81,7 +81,7 @@ let apply_operation_to_trie trie operation =
   | Operation (Move_tree_exn, (from_key, to_key)) ->
       Trie.move_tree ~from_key ~to_key trie
   | Operation (Delete, (edit_readonly, key)) ->
-      Trie.delete ~edit_readonly key trie
+      Trie.delete ~edit_readonly Directory key trie
   | Operation (Write_value_exn, (edit_readonly, key, offset, value)) ->
       let new_value =
         Int.max

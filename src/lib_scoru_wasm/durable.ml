@@ -149,9 +149,11 @@ let list tree key =
   let+ subtrees = T.list tree @@ key_contents key in
   List.map (fun (name, _) -> if name = "@" then "" else name) subtrees
 
-let delete ?(edit_readonly = false) tree key =
+let delete ?(edit_readonly = false) ~kind tree key =
   if not edit_readonly then assert_key_writeable key ;
-  T.remove tree @@ key_contents key
+  match kind with
+  | Value -> T.remove tree @@ to_value_key (key_contents key)
+  | Directory -> T.remove tree @@ key_contents key
 
 let subtree_name_at tree key index =
   let open Lwt.Syntax in
@@ -168,7 +170,7 @@ let move_tree_exn tree from_key to_key =
   assert_key_writeable from_key ;
   assert_key_writeable to_key ;
   let* move_tree = find_tree_exn tree from_key in
-  let* tree = delete tree from_key in
+  let* tree = delete ~kind:Directory tree from_key in
   T.add_tree tree (key_contents to_key) move_tree
 
 let hash ~kind tree key =

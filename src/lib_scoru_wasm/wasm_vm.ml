@@ -81,14 +81,23 @@ let patch_flags_on_eval_successful durable =
   let* has_stuck_flag = has_stuck_flag durable in
   let* durable =
     if has_stuck_flag then
-      Durable.(delete ~edit_readonly:true durable Constants.stuck_flag_key)
+      Durable.(
+        delete
+          ~edit_readonly:true
+          ~kind:Directory
+          durable
+          Constants.stuck_flag_key)
     else Lwt.return durable
   in
   let* has_upgrade_error_flag = has_upgrade_error_flag durable in
   let+ durable =
     if has_upgrade_error_flag then
       Durable.(
-        delete ~edit_readonly:true durable Constants.upgrade_error_flag_key)
+        delete
+          ~edit_readonly:true
+          ~kind:Directory
+          durable
+          Constants.upgrade_error_flag_key)
     else Lwt.return durable
   in
   durable
@@ -356,6 +365,7 @@ let patch_too_many_reboot_flag durable =
   | Yielding ->
       Durable.delete
         ~edit_readonly:true
+        ~kind:Directory
         durable
         Constants.too_many_reboot_flag_key
   | Forcing_yield ->
@@ -376,7 +386,11 @@ let patch_reboot_flag durable =
   let open Lwt_syntax in
   function
   | Reboot ->
-      Durable.delete ~edit_readonly:true durable Constants.reboot_flag_key
+      Durable.delete
+        ~edit_readonly:true
+        ~kind:Directory
+        durable
+        Constants.reboot_flag_key
   | Forcing_yield | Yielding ->
       Durable.(write_value_exn durable Constants.reboot_flag_key 0L "")
   | _ -> return durable
@@ -392,7 +406,11 @@ let patch_reboot_counter durable reboot_counter =
          contents, which is a full chunks. This reduces the size of
          the resulting proof. *)
       let* durable =
-        Durable.delete ~edit_readonly:true durable Constants.reboot_counter_key
+        Durable.delete
+          ~edit_readonly:true
+          ~kind:Directory
+          durable
+          Constants.reboot_counter_key
       in
       Durable.write_value_exn
         ~edit_readonly:true

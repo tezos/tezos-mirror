@@ -122,13 +122,13 @@ val count_subtrees : t -> key -> int Lwt.t
     under [key]. *)
 val subtree_name_at : t -> key -> int -> string Lwt.t
 
-(** [delete ?edit_readonly durable key] deletes the value at and/or
-    subtrees of [key].
+(** [delete ?edit_readonly ~kind durable key] deletes the value of [key] if
+    [kind = `Value], and subtrees and/or values of [key] if [kind = `All].
 
     @raise Readonly_value when [edit_readonly] is not set while trying
     to edit the readonly section.
 *)
-val delete : ?edit_readonly:bool -> t -> key -> t Lwt.t
+val delete : ?edit_readonly:bool -> kind:kind -> t -> key -> t Lwt.t
 
 (** [hash ~kind durable key] retrieves the tree hash of the value (if [kind =
     Value]) or the complete directory ([kind = Directory]) at the given [key].
