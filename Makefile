@@ -229,7 +229,8 @@ test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
-NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
+LIBSTORE_UNIX_DIR := src/lib_store
+NONPROTO_DIRS := $(filter-out ${LIBSTORE_UNIX_DIR}, $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort))
 
 .PHONY: test-proto-unit
 test-proto-unit:
@@ -246,6 +247,13 @@ test-nonproto-unit:
 		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
 		scripts/test_wrapper.sh test-nonproto-unit \
 		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_DIRS)))
+
+.PHONY: test-lib-store-unit
+test-lib-store-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-lib-store-unit \
+		@$(LIBSTORE_UNIX_DIR)/runtest
 
 .PHONY: test-unit
 test-unit: test-nonproto-unit test-proto-unit
