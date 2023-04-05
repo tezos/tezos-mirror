@@ -2810,7 +2810,9 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       gather_dissections ()
     in
     (* Write configuration to be able to change it *)
-    let* _ = Sc_rollup_node.config_init sc_rollup_node sc_rollup_address in
+    let* _ =
+      Sc_rollup_node.config_init ~force:true sc_rollup_node sc_rollup_address
+    in
     if priority = `Priority_honest then
       prioritize_refute_operations sc_rollup_node ;
     let* () =
