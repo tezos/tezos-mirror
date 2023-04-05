@@ -32,7 +32,7 @@ path = "../tezos_smart_rollup_debug"
 default-features = false
 
 [features]
-default = ["std", "alloc", "dlmalloc", "panic-hook-debug", "panic-hook-abort"]
+default = ["std", "alloc", "dlmalloc", "panic-hook-debug", "panic-hook-abort", "panic-hook"]
 std = []
 alloc = []
 panic-hook = ["tezos_smart_rollup_panic_hook"]
