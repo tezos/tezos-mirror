@@ -538,7 +538,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   in
   let workload_data =
     List.map
-      (fun {Measure.workload; measures} ->
+      (fun {Measure.workload; measures; _} ->
         (Bench.workload_to_vector workload, Maths.vector_to_array measures))
       measurement.workload_data
   in

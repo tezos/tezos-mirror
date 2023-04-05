@@ -278,7 +278,7 @@ let workloads_table (type c t) ((module Bench) : (c, t) Benchmark.poly)
   let open Latex_syntax in
   let table = Hashtbl.create 41 in
   List.iter
-    (fun {Measure.workload; measures} ->
+    (fun {Measure.workload; measures; _} ->
       let qties = Hashtbl.find_opt table workload |> Option.value ~default:[] in
       Hashtbl.replace table workload (Maths.vector_to_array measures :: qties))
     workload_data ;
