@@ -203,6 +203,21 @@ let set_value_exn tree ?(edit_readonly = false) key str =
     (Tezos_lazy_containers.Chunked_byte_vector.of_string str)
     tree
 
+let create_value_exn tree ?(edit_readonly = false) key size =
+  let open Lwt.Syntax in
+  let open Tezos_lazy_containers in
+  if not edit_readonly then assert_key_writeable key ;
+  let key = to_value_key @@ key_contents key in
+  let* opt = T.find_tree tree key in
+  let encoding = E.scope key Chunked_byte_vector.encoding in
+  match opt with
+  | None ->
+      let* durable =
+        Runner.encode encoding (Chunked_byte_vector.allocate size) tree
+      in
+      Lwt.return_some durable
+  | Some _subtree -> Lwt.return_none
+
 let write_value_exn tree ?(edit_readonly = false) key offset bytes =
   if not edit_readonly then assert_key_writeable key ;
 

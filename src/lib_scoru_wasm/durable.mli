@@ -148,6 +148,17 @@ val hash_exn : kind:kind -> t -> key -> Context_hash.t Lwt.t
     key without fetching it. *)
 val set_value_exn : t -> ?edit_readonly:bool -> key -> string -> t Lwt.t
 
+(** [create_value_exn ?edit_readonly durable key size] allocates a new value of
+    [size] at the given [key]. Returns [Some durable] if the value didn't exist,
+    and [None] if there was already a value at the given [key]
+
+    @raise Invalid_key if the key is invalid.
+    @raise Readonly_value iff [edit_readonly] is not set to [true]
+    when attempting to write in the [readonly] section.
+*)
+val create_value_exn :
+  t -> ?edit_readonly:bool -> key -> int64 -> t option Lwt.t
+
 (** [write_value_exn ?edit_readonly durable key offset bytes] writes
     [bytes] to [key], starting at the given [offset].
 
