@@ -1985,7 +1985,6 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IEdiv_tez
-        ~intercept_stack:(Alpha_context.Tez.zero, (Alpha_context.Tez.zero, eos))
         ~stack_type:(mutez @$ mutez @$ bot)
         ~kinstr:(IEdiv_tez (dummy_loc, halt))
         ()
@@ -2029,7 +2028,6 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IIs_nat
-        ~intercept_stack:(zero, eos)
         ~stack_type:(int @$ bot)
         ~kinstr:(IIs_nat (dummy_loc, halt))
         ()
@@ -2059,7 +2057,6 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IInt_nat
-        ~intercept_stack:(zero_n, eos)
         ~stack_type:(nat @$ bot)
         ~kinstr:(IInt_nat (dummy_loc, halt))
         ()
