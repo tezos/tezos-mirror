@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -63,12 +64,11 @@ module Coordinator : sig
         * string)
     | Public_key_for_dac_member_not_available of
         Tezos_crypto.Aggregate_signature.public_key_hash
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4997
-     Verify that root hash is one that the coordinator has *)
+    | Unknown_root_hash of string
 
   (** [handle_put_dac_member_signature ctxt cctxt dac_members_pkh dac_member_signature]
       does the following procedure:
+      1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
       1. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
       2. Checks that the dac member has not yet signed. If already signed, then noop
          and return.

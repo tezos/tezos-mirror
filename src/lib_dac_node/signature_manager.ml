@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -173,6 +174,7 @@ module Coordinator = struct
         (Aggregate_signature.public_key * Aggregate_signature.t * string)
     | Public_key_for_dac_member_not_available of
         Aggregate_signature.public_key_hash
+    | Unknown_root_hash of string
 
   let () =
     register_error_kind
@@ -239,7 +241,20 @@ module Coordinator = struct
         | _ -> None)
       (fun hash ->
         Public_key_for_dac_member_not_available
-          (Aggregate_signature.Public_key_hash.of_b58check_exn hash))
+          (Aggregate_signature.Public_key_hash.of_b58check_exn hash)) ;
+    register_error_kind
+      `Permanent
+      ~id:"unknown_root_hash"
+      ~title:"No data associated to the provided root hash"
+      ~description:"There is no data in storage for this root hash"
+      ~pp:(fun ppf hash ->
+        Format.fprintf
+          ppf
+          "There is no data available for the root page hash %s"
+          hash)
+      Data_encoding.(obj1 (req "hash" (string' Plain)))
+      (function Unknown_root_hash hash -> Some hash | _ -> None)
+      (fun hash -> Unknown_root_hash hash)
 
   let verify_signature ((module P) : Dac_plugin.t) pk signature root_hash =
     let root_hash_bytes = Dac_plugin.hash_to_bytes root_hash in
@@ -277,10 +292,9 @@ module Coordinator = struct
     let* signatures, witnesses =
       compute_signatures_with_witnesses rev_indexed_signature
     in
-    let final_signature =
+    match
       Tezos_crypto.Aggregate_signature.aggregate_signature_opt signatures
-    in
-    match final_signature with
+    with
     | None ->
         tzfail
         @@ Cannot_compute_aggregate_signature
@@ -314,42 +328,66 @@ module Coordinator = struct
   let handle_put_dac_member_signature ctx cctxt dac_member_signature =
     let open Lwt_result_syntax in
     let*? dac_plugin = Node_context.get_dac_plugin ctx in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+    let page_store = Node_context.get_page_store ctx in
     let Signature_repr.{signer_pkh; root_hash; signature} =
       dac_member_signature
     in
-    let*? dac_committee = Node_context.get_committee_members ctx in
-    let* () =
-      fail_unless
-        (check_is_dac_member dac_committee signer_pkh)
-        (Public_key_is_non_dac_member signer_pkh)
+    let*! has_payload =
+      Page_store.Filesystem.mem dac_plugin page_store root_hash
     in
-    let* pub_key_opt = Wallet_cctxt_helpers.get_public_key cctxt signer_pkh in
-    let* pub_key =
-      Option.fold_f
-        ~none:(fun () ->
-          tzfail (Public_key_for_dac_member_not_available signer_pkh))
-        ~some:return
-        pub_key_opt
-    in
-    let ro_node_store = Node_context.get_node_store ctx Store_sigs.Read_only in
-    let* dac_member_has_signed =
-      check_dac_member_has_signed dac_plugin ro_node_store root_hash signer_pkh
-    in
-    if dac_member_has_signed then return_unit
-    else
-      let* () = verify_signature dac_plugin pub_key signature root_hash in
-      let rw_node_store =
-        Node_context.get_node_store ctx Store_sigs.Read_write
-      in
-      let* () =
-        add_dac_member_signature dac_plugin rw_node_store dac_member_signature
-      in
-      let* _aggregate_sig =
-        update_aggregate_sig_store
-          dac_plugin
-          rw_node_store
-          dac_committee
-          dac_member_signature.root_hash
-      in
-      return_unit
+    match has_payload with
+    | Error _ ->
+        tzfail
+        @@ Page_store.Cannot_read_page_from_page_storage
+             (Plugin.to_hex root_hash)
+    (* Return an HTTP 404 error when hash provided in signature is unknown *)
+    | Ok false -> raise Not_found
+    | Ok true ->
+        let*? dac_committee = Node_context.get_committee_members ctx in
+        let* () =
+          fail_unless
+            (check_is_dac_member dac_committee signer_pkh)
+            (Public_key_is_non_dac_member signer_pkh)
+        in
+        let* pub_key_opt =
+          Wallet_cctxt_helpers.get_public_key cctxt signer_pkh
+        in
+        let* pub_key =
+          Option.fold_f
+            ~none:(fun () ->
+              tzfail (Public_key_for_dac_member_not_available signer_pkh))
+            ~some:return
+            pub_key_opt
+        in
+        let ro_node_store =
+          Node_context.get_node_store ctx Store_sigs.Read_only
+        in
+        let* dac_member_has_signed =
+          check_dac_member_has_signed
+            dac_plugin
+            ro_node_store
+            root_hash
+            signer_pkh
+        in
+        if dac_member_has_signed then return_unit
+        else
+          let* () = verify_signature dac_plugin pub_key signature root_hash in
+          let rw_node_store =
+            Node_context.get_node_store ctx Store_sigs.Read_write
+          in
+          let* () =
+            add_dac_member_signature
+              dac_plugin
+              rw_node_store
+              dac_member_signature
+          in
+          let* _aggregate_sig =
+            update_aggregate_sig_store
+              dac_plugin
+              rw_node_store
+              dac_committee
+              dac_member_signature.root_hash
+          in
+          return_unit
 end
