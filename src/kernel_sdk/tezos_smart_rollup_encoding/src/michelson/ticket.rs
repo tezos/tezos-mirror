@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -12,7 +13,10 @@ use crate::{
         MichelsonString, MichelsonUnit,
     },
 };
-use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::{
+    cmp::Ordering,
+    fmt::{Display, Formatter, Result as FmtResult},
+};
 use crypto::blake2b::{digest_256, Blake2bError};
 use hex::FromHexError;
 use nom::combinator::map;
@@ -23,21 +27,38 @@ use tezos_data_encoding::{
     enc::{BinError, BinResult, BinWriter},
     encoding::HasEncoding,
     nom::{NomReader, NomResult},
-    types::Zarith,
+    types::{SizedBytes, Zarith},
 };
 use thiserror::Error;
 
 #[cfg(feature = "testing")]
 pub mod testing;
 
+/// The length of a Tezos ticket ID
+pub const TICKET_HASH_SIZE: usize = 32;
+
 /// The hash of a string ticket - identifying a ticket by creator and contents.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TicketHash(Vec<u8>);
+#[derive(Clone, PartialEq, Eq, NomReader, BinWriter, HasEncoding)]
+pub struct TicketHash {
+    inner: SizedBytes<TICKET_HASH_SIZE>,
+}
+
+impl PartialOrd for TicketHash {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner.as_ref().partial_cmp(other.inner.as_ref())
+    }
+}
+
+impl Ord for TicketHash {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.inner.as_ref().cmp(other.inner.as_ref())
+    }
+}
 
 impl Debug for TicketHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TicketId(")?;
-        for &byte in self.0.iter() {
+        for &byte in self.inner.as_ref() {
             write!(f, "{:02x?}", byte)?;
         }
         write!(f, ")")
@@ -46,14 +67,14 @@ impl Debug for TicketHash {
 
 impl Display for TicketHash {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}", hex::encode(&self.0))
+        write!(f, "{}", hex::encode(&self.inner))
     }
 }
 
 #[allow(clippy::from_over_into)]
 impl Into<String> for TicketHash {
     fn into(self) -> String {
-        hex::encode(self.0)
+        hex::encode(self.inner)
     }
 }
 
@@ -61,7 +82,11 @@ impl TryFrom<String> for TicketHash {
     type Error = FromHexError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        hex::decode(value).map(Self)
+        let mut result = Self {
+            inner: SizedBytes([0; TICKET_HASH_SIZE]),
+        };
+        hex::decode_to_slice(value, result.inner.as_mut())?;
+        Ok(result)
     }
 }
 
@@ -142,8 +167,11 @@ impl<Expr: Michelson> Ticket<Expr> {
         self.contents().bin_write(&mut bytes)?;
 
         let digest = digest_256(bytes.as_slice())?;
+        let digest: [u8; TICKET_HASH_SIZE] = digest.try_into().unwrap();
 
-        Ok(TicketHash(digest))
+        Ok(TicketHash {
+            inner: SizedBytes(digest),
+        })
     }
 
     /// The L1 ticketer's address.
