@@ -161,7 +161,7 @@ module Make (Parameters : PARAMETERS) = struct
   module Injected_ophs = Disk_persistence.Make_table (struct
     include Operation_hash.Table
 
-    type value = Inj_operation.Hash.t list
+    type value = int32 * Inj_operation.Hash.t list
 
     let name = "injected_ophs"
 
@@ -169,7 +169,11 @@ module Make (Parameters : PARAMETERS) = struct
 
     let key_of_string = Operation_hash.of_b58check_opt
 
-    let value_encoding = Data_encoding.list Inj_operation.Hash.encoding
+    let value_encoding =
+      let open Data_encoding in
+      obj2
+        (req "injection_level" int32)
+        (req "l1_ops" (list Inj_operation.Hash.encoding))
   end)
 
   (** The part of the state which gathers information about injected
@@ -351,7 +355,8 @@ module Make (Parameters : PARAMETERS) = struct
         ~warn_unreadable
         ~initial_size:n
         ~data_dir
-        ~filter:(List.exists (Injected_operations.mem injected_operations))
+        ~filter:(fun (_, ops) ->
+          List.exists (Injected_operations.mem injected_operations) ops)
     in
     let*! () =
       emit_event_loaded "injected_ophs" @@ Injected_ophs.length injected_ophs
@@ -425,7 +430,7 @@ module Make (Parameters : PARAMETERS) = struct
       Op_queue.replace state.queue op.hash op
 
   (** Mark operations as injected (in [oph]). *)
-  let add_injected_operations state oph operations =
+  let add_injected_operations state oph ~injection_level operations =
     let open Lwt_result_syntax in
     let infos =
       List.map
@@ -437,7 +442,10 @@ module Make (Parameters : PARAMETERS) = struct
         state.injected.injected_operations
         (List.to_seq infos)
     in
-    Injected_ophs.replace state.injected.injected_ophs oph (List.map fst infos)
+    Injected_ophs.replace
+      state.injected.injected_ophs
+      oph
+      (injection_level, List.map fst infos)
 
   (** [add_included_operations state oph l1_block l1_level operations] marks the
     [operations] as included (in the L1 batch [oph]) in the Tezos block
@@ -479,7 +487,7 @@ module Make (Parameters : PARAMETERS) = struct
     | None ->
         (* Nothing removed *)
         return []
-    | Some mophs ->
+    | Some (_level, mophs) ->
         let* () = Injected_ophs.remove state.injected.injected_ophs oph in
         let+ removed =
           List.fold_left_es
@@ -804,6 +812,20 @@ module Make (Parameters : PARAMETERS) = struct
         state
         (List.map (fun o -> o.Inj_operation.operation) operations_to_inject)
     in
+    let* injection_level =
+      match state.last_seen_head with
+      | None ->
+          (* Should not happen as head monitoring fills in values *)
+          let+ header =
+            Tezos_shell_services.Shell_services.Blocks.Header.shell_header
+              state.cctxt
+              ~chain:`Main
+              ~block:(`Head 0)
+              ()
+          in
+          header.level
+      | Some (_hash, level) -> return level
+    in
     match operations_to_inject with
     | [] -> return_unit
     | _ -> (
@@ -833,7 +855,11 @@ module Make (Parameters : PARAMETERS) = struct
                   Op_queue.remove state.queue op.Inj_operation.hash)
                 injected_operations
             in
-            add_injected_operations state oph injected_operations
+            add_injected_operations
+              state
+              oph
+              ~injection_level
+              injected_operations
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
             let*! () =
