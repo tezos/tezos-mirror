@@ -78,7 +78,13 @@ let load : type a. a mode -> string -> a raw_index Lwt.t =
  fun mode path ->
   let open Lwt_syntax in
   let readonly = match mode with Read_only -> true | Read_write -> false in
-  let+ repo = IStore.Repo.v (Irmin_pack.config ~readonly path) in
+  let+ repo =
+    IStore.Repo.v
+      (Irmin_pack.config
+         ~readonly
+         ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+         path)
+  in
   {path; repo}
 
 let close ctxt = IStore.Repo.close ctxt.repo
