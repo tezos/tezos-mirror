@@ -482,13 +482,10 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
     }
   in
   let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_internal_events_with_defaults ()
+    Tezos_base_unix.Internal_event_unix.make_with_defaults ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:log_cfg
-      ~configuration:internal_events
-      ()
+    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
   in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(

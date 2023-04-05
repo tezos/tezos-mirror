@@ -324,13 +324,13 @@ module P2p_net = struct
     Lwt_result.return ()
 end
 
-let lwt_log_sink = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
+let log_cfg = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
 
 let testcase (module T : TEST) =
   let addr = Node.default_ipv6_addr in
   Alcotest_lwt.test_case T.name `Quick (fun _switch () ->
       let open Lwt_syntax in
-      let* () = Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink () in
+      let* () = Tezos_base_unix.Internal_event_unix.init ~log_cfg () in
       Tztest.with_empty_mock_sink (fun () ->
           let* r = T.run ~addr () in
           match r with

@@ -42,7 +42,7 @@ end
    run with [Singleprocess]. *)
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
-let init ?lwt_log_sink ?(configuration = Configuration.lwt_log) () =
+let init ?log_cfg ?(internal_events = Internal_event_config.lwt_log) () =
   let _ =
     (* This is just here to force the linking (and hence
        initialization) of all these modules: *)
@@ -53,9 +53,7 @@ let init ?lwt_log_sink ?(configuration = Configuration.lwt_log) () =
   in
   let open Lwt_result_syntax in
   let*! r =
-    let* () =
-      Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()
-    in
+    let* () = Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:log_cfg () in
     let* () =
       match Sys.(getenv_opt env_var_name) with
       | None -> return_unit
@@ -73,7 +71,7 @@ let init ?lwt_log_sink ?(configuration = Configuration.lwt_log) () =
                 match Uri.scheme uri with
                 | None ->
                     let* cfg = Configuration.of_file (Uri.path uri) in
-                    Configuration.apply cfg
+                    Internal_event_config.apply cfg
                 | Some _ -> Internal_event.All_sinks.activate uri)
               uris
           in
@@ -85,7 +83,7 @@ let init ?lwt_log_sink ?(configuration = Configuration.lwt_log) () =
                    (`O
                      [("variable", `String env_var_name); ("value", `String s)])))
     in
-    Configuration.apply configuration
+    Configuration.apply internal_events
   in
   match r with
   | Ok () -> Lwt.return_unit
@@ -130,8 +128,7 @@ let make_default_internal_events daily_logs_path =
         ();
     ]
 
-let make_internal_events_with_defaults ?internal_events
-    ?enable_default_daily_logs_at () =
+let make_with_defaults ?internal_events ?enable_default_daily_logs_at () =
   let internal_events =
     match (internal_events, enable_default_daily_logs_at) with
     | None, None -> Internal_event_config.lwt_log
@@ -140,12 +137,9 @@ let make_internal_events_with_defaults ?internal_events
   in
   internal_events
 
-let init_internal_events_with_defaults ?internal_events
-    ?enable_default_daily_logs_at ?log_cfg () =
-  let configuration =
-    make_internal_events_with_defaults
-      ?internal_events
-      ?enable_default_daily_logs_at
-      ()
+let init_with_defaults ?internal_events ?enable_default_daily_logs_at ?log_cfg
+    () =
+  let internal_events =
+    make_with_defaults ?internal_events ?enable_default_daily_logs_at ()
   in
-  init ?lwt_log_sink:log_cfg ~configuration ()
+  init ?log_cfg ~internal_events ()

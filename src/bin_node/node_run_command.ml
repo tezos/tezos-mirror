@@ -515,17 +515,14 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     }
   in
   let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_internal_events_with_defaults
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
       ~enable_default_daily_logs_at:
         Filename.Infix.(config.data_dir // "daily_logs")
       ?internal_events:config.internal_events
       ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:log_cfg
-      ~configuration:internal_events
-      ()
+    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
   in
   let external_validator_log_config =
     External_validation.{internal_events; lwt_log_sink_unix = log_cfg}

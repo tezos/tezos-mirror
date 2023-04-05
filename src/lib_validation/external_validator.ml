@@ -257,8 +257,8 @@ let run ~readonly ~using_std_channel input output =
     if using_std_channel then Lwt.return_unit
     else
       Tezos_base_unix.Internal_event_unix.init
-        ~configuration:log_config.internal_events
-        ~lwt_log_sink:log_config.lwt_log_sink_unix
+        ~internal_events:log_config.internal_events
+        ~log_cfg:log_config.lwt_log_sink_unix
         ()
   in
   (* Main loop waiting for request to be processed, forever, until the

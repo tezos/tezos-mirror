@@ -580,13 +580,7 @@ let codegen_check_definitions_cmd files =
 (* Entrypoint *)
 
 (* Activate logging system. *)
-let () =
-  Lwt_main.run
-  @@ Tezos_base_unix.Internal_event_unix.(
-       init
-         ~lwt_log_sink:Lwt_log_sink_unix.default_cfg
-         ~configuration:Configuration.lwt_log)
-       ()
+let () = Lwt_main.run @@ Tezos_base_unix.Internal_event_unix.init ()
 
 let () =
   if Commands.list_solvers then list_solvers Format.std_formatter ;

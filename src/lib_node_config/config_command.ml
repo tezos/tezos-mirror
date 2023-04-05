@@ -29,9 +29,7 @@
 let show (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
-    let*! () =
-      Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults ()
-    in
+    let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
     if not @@ Sys.file_exists args.config_file then
       Format.eprintf
         "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
@@ -46,9 +44,7 @@ let show (args : Shared_arg.t) =
 let reset (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
-    let*! () =
-      Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults ()
-    in
+    let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
     if Sys.file_exists args.config_file then
       Format.eprintf
         "Ignoring previous configuration file: %s.@."
@@ -68,9 +64,7 @@ let reset (args : Shared_arg.t) =
 let init (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
-    let*! () =
-      Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults ()
-    in
+    let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
     if Sys.file_exists args.config_file then
       failwith
         "Pre-existing configuration file at %s, use `reset`."
@@ -101,9 +95,7 @@ let init (args : Shared_arg.t) =
 let update (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
-    let*! () =
-      Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults ()
-    in
+    let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
     if not (Sys.file_exists args.config_file) then
       failwith
         "Missing configuration file at %s. Use `%s config init [options]` to \
@@ -120,9 +112,7 @@ let update (args : Shared_arg.t) =
 let validate (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
-    let*! () =
-      Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults ()
-    in
+    let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
     if not (Sys.file_exists args.config_file) then
       Format.eprintf
         "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
