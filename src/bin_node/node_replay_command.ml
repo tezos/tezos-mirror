@@ -372,8 +372,8 @@ let replay_one_block strict main_chain_store validator_process block =
     | No_metadata_hash _, _ | _, No_metadata_hash _ ->
         (* Nothing to compare *) return_unit
 
-let replay ~singleprocess ~strict ~operation_metadata_size_limit
-    (config : Config_file.t) blocks =
+let replay ~internal_events ~singleprocess ~strict
+    ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
   let context_root = Data_version.context_dir config.data_dir in
@@ -417,11 +417,7 @@ let replay ~singleprocess ~strict ~operation_metadata_size_limit
                process_path = Sys.executable_name;
                sandbox_parameters = None;
                dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
-               log_config =
-                 {
-                   lwt_log_sink_unix = config.log;
-                   internal_events = config.internal_events;
-                 };
+               log_config = {lwt_log_sink_unix = config.log; internal_events};
              })
       in
       let commit_genesis =
@@ -479,10 +475,19 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
     ~filename:(Data_version.lock_file config.data_dir)
   @@ fun () ->
   (* Main loop *)
+  let log_cfg =
+    {
+      config.log with
+      default_level = Option.value verbosity ~default:config.log.default_level;
+    }
+  in
+  let internal_events =
+    Tezos_base_unix.Internal_event_unix.make_internal_events_with_defaults ()
+  in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init_internal_events_with_defaults
-      ?verbosity
-      ~log_cfg:config.log
+    Tezos_base_unix.Internal_event_unix.init
+      ~lwt_log_sink:log_cfg
+      ~configuration:internal_events
       ()
   in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
@@ -491,6 +496,7 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
     @@ let*! res =
          protect (fun () ->
              replay
+               ~internal_events
                ~singleprocess
                ~strict
                ~operation_metadata_size_limit

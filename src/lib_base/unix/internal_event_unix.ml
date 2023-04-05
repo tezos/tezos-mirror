@@ -110,13 +110,7 @@ let close () =
 
 open Filename.Infix
 
-let lwt_log_sink_default_cfg =
-  {
-    Lwt_log_sink_unix.default_cfg with
-    template = "$(date).$(milliseconds): $(message)";
-  }
-
-let make_default_internal_events ~data_dir =
+let make_default_internal_events daily_logs_path =
   (* By default the node has two logs output:
      - on stdout using Lwt_log using the configured verbosity
      - on disk, with a 7 days rotation with an info verbosity level *)
@@ -125,7 +119,7 @@ let make_default_internal_events ~data_dir =
       Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ();
       Uri.make
         ~scheme:"file-descriptor-path"
-        ~path:(data_dir // "daily-logs" // "daily.log")
+        ~path:(daily_logs_path // "daily.log")
         ~query:
           [
             ("create-dirs", ["true"]);
@@ -136,26 +130,22 @@ let make_default_internal_events ~data_dir =
         ();
     ]
 
-let make_internal_events_with_defaults ?internal_events ?verbosity
-    ?(log_cfg = lwt_log_sink_default_cfg) () =
-  let log_cfg =
-    match verbosity with
-    | None -> log_cfg
-    | Some default_level -> {log_cfg with Lwt_log_sink_unix.default_level}
-  in
+let make_internal_events_with_defaults ?internal_events
+    ?enable_default_daily_logs_at () =
   let internal_events =
-    match internal_events with
-    | None -> Internal_event_config.lwt_log
-    | Some (internal_events, data_dir) ->
-        if Internal_event_config.(is_empty internal_events) then
-          make_default_internal_events ~data_dir
-        else internal_events
+    match (internal_events, enable_default_daily_logs_at) with
+    | None, None -> Internal_event_config.lwt_log
+    | None, Some daily_logs_path -> make_default_internal_events daily_logs_path
+    | Some internal_events, _ -> internal_events
   in
-  (log_cfg, internal_events)
+  internal_events
 
-let init_internal_events_with_defaults ?internal_events ?verbosity
-    ?(log_cfg = lwt_log_sink_default_cfg) () =
-  let lwt_log_sink, configuration =
-    make_internal_events_with_defaults ?internal_events ?verbosity ~log_cfg ()
+let init_internal_events_with_defaults ?internal_events
+    ?enable_default_daily_logs_at ?log_cfg () =
+  let configuration =
+    make_internal_events_with_defaults
+      ?internal_events
+      ?enable_default_daily_logs_at
+      ()
   in
-  init ~lwt_log_sink ~configuration ()
+  init ?lwt_log_sink:log_cfg ~configuration ()

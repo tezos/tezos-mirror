@@ -346,7 +346,7 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_config.t;
+  internal_events : Internal_event_config.t option;
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
@@ -405,13 +405,19 @@ let default_rpc =
 
 let default_disable_config_validation = false
 
+let lwt_log_sink_default_cfg =
+  {
+    Lwt_log_sink_unix.default_cfg with
+    template = "$(date).$(milliseconds): $(message)";
+  }
+
 let default_config =
   {
     data_dir = default_data_dir;
     p2p = default_p2p;
     rpc = default_rpc;
-    log = Internal_event_unix.lwt_log_sink_default_cfg;
-    internal_events = Internal_event_config.empty;
+    log = lwt_log_sink_default_cfg;
+    internal_events = None;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
@@ -713,12 +719,11 @@ let encoding =
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
           Lwt_log_sink_unix.cfg_encoding
-          Internal_event_unix.lwt_log_sink_default_cfg)
-       (dft
+          lwt_log_sink_default_cfg)
+       (opt
           "internal-events"
           ~description:"Configuration of the structured logging framework"
-          Internal_event_config.encoding
-          Internal_event_config.empty)
+          Internal_event_config.encoding)
        (dft
           "shell"
           ~description:"Configuration of network parameters"
