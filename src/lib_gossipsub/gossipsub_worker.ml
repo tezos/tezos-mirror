@@ -128,6 +128,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         gstate
     | gstate, GS.Already_published -> gstate
 
+  (** From the worker's perspective, the outcome of joining a new topic from the
+      application layer are:
+      - Sending [Subscribe] messages to connected peers with that topic;
+      - Sending [Graft] messages to the newly construced topic's mesh. *)
+  let handle_join ~emit_p2p_msg topic = function
+    | gstate, GS.Already_joined -> gstate
+    | gstate, Joining_topic {to_graft} ->
+        let filters = View.[Not_expired] in
+        let peers = View.(view gstate |> get_connected_peers ~filters) in
+        (* It's important to send [Subscribe] before [Graft], as the other peer
+           would ignore the [Graft] message if we did not subscribe to the
+           topic first. *)
+        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List peers) ;
+        send_p2p_message ~emit_p2p_msg (Graft {topic}) (Set to_graft) ;
+        gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -135,12 +151,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.publish publish gossip_state
         |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
     | Join topic ->
-        let gossip_state, output = GS.join {topic} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
-
-           Handle Join's output. *)
-        ignore output ;
-        gossip_state
+        GS.join {topic} gossip_state |> handle_join ~emit_p2p_msg topic
     | Leave topic ->
         let gossip_state, output = GS.leave {topic} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
