@@ -501,10 +501,24 @@ module type AUTOMATON = sig
       heartbeat_ticks : int64;
     }
 
+    (** When selecting a set of connected peers, one can specify some criteria
+        to filter the result. *)
+    type connected_peers_filter =
+      | Direct
+      | Not_expired
+      | Subscribed_to of Topic.t
+      | Score_above of {threshold : float}
+
     val view : state -> view
 
-    (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of [topic]. *)
+    (** [get_peers_in_topic_mesh topic state] returns the peers in the mesh of
+        [topic]. *)
     val get_peers_in_topic_mesh : Topic.t -> view -> Peer.t list
+
+    (** [get_connected_peers ?filters view] returns the list of connected peers
+        filtered by the given criteria.  *)
+    val get_connected_peers :
+      ?filters:connected_peers_filter list -> view -> Peer.t list
 
     (** [get_subscribed_topics peer state] returns the set of topics
         that are subscribed by [peer] *)

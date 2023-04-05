@@ -1663,6 +1663,38 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let view state = state
 
+    type connected_peers_filter =
+      | Direct
+      | Not_expired
+      | Subscribed_to of Topic.t
+      | Score_above of {threshold : float}
+    (* Add other cases here if needed. *)
+
+    let connected_peers_filter _peer connection = function
+      | Direct -> connection.direct
+      | Not_expired ->
+          Option.fold
+            ~none:true
+            ~some:(fun expires_at -> Time.(now () < expires_at))
+            connection.expire
+      | Subscribed_to topic -> Topic.Set.mem topic connection.topics
+      | Score_above {threshold} ->
+          Compare.Float.(Score.float connection.score >= threshold)
+
+    let get_connected_peers =
+      let rec filter_rec peer connection = function
+        | [] -> true
+        | filter :: filters ->
+            connected_peers_filter peer connection filter
+            && filter_rec peer connection filters
+      in
+      fun ?(filters = []) view ->
+        Peer.Map.fold
+          (fun peer connection acc ->
+            if filter_rec peer connection filters then peer :: acc else acc)
+          view.connections
+          []
+
     let get_peers_in_topic_mesh topic state =
       match Topic.Map.find topic state.mesh with
       | None -> []
