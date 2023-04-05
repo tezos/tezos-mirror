@@ -62,6 +62,8 @@ module type M = sig
 
   val default_base_dir : string
 
+  val default_daily_logs_path : string option
+
   val default_media_type : Media_type.Command_line.t
 
   val other_registrations :
@@ -413,7 +415,6 @@ let main (module C : M) ~select_commands =
         (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
   warn_if_argv0_name_not_octez () ;
-  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let*! retcode =
     Lwt.catch
       (fun () ->
@@ -432,6 +433,14 @@ let main (module C : M) ~select_commands =
           let parsed_config_file = parsed.Client_config.parsed_config_file
           and parsed_args = parsed.Client_config.parsed_args
           and config_commands = parsed.Client_config.config_commands in
+          let*! () =
+            Tezos_base_unix.Internal_event_unix.init_with_defaults
+              ?enable_default_daily_logs_at:C.default_daily_logs_path
+              ?internal_events:
+                (Option.bind parsed_config_file (fun cf ->
+                     cf.Client_config.Cfg_file.internal_events))
+              ()
+          in
           let base_dir : string =
             match parsed.Client_config.base_dir with
             | Some p -> p

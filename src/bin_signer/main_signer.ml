@@ -379,6 +379,8 @@ module Signer_config = struct
 
   let other_registrations = None
 
+  let default_daily_logs_path = None
+
   let clic_commands ~base_dir ~config_commands:_ ~builtin_commands:_
       ~other_commands ~require_auth =
     commands base_dir require_auth @ other_commands

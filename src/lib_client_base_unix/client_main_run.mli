@@ -52,6 +52,8 @@ sig
        define your own one. *)
     string
 
+  val default_daily_logs_path : string option
+
   val default_media_type : Media_type.Command_line.t
 
   val other_registrations :
