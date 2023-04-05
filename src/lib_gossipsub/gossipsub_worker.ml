@@ -144,6 +144,25 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         send_p2p_message ~emit_p2p_msg (Graft {topic}) (Set to_graft) ;
         gstate
 
+  (** From the worker's perspective, the outcome of leaving a topic by the
+      application layer are:
+      - Sending [Prune] messages to the topic's mesh;
+      - Sending [Unsubscribe] messages to connected peers. *)
+  let handle_leave ~emit_p2p_msg topic = function
+    | gstate, GS.Not_joined -> gstate
+    | gstate, Leaving_topic {to_prune} ->
+        let filters = View.[Not_expired] in
+        let peers = View.(view gstate |> get_connected_peers ~filters) in
+        (* Sending [Prune] before [Unsubscribe] to let full-connection peers
+           clean their mesh before handling [Unsubscribe] message. *)
+        let prune = Prune {topic; px = Seq.empty} in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5350
+
+           Send a list of alternative peers when pruning a link for a topic. *)
+        send_p2p_message ~emit_p2p_msg prune (Set to_prune) ;
+        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List peers) ;
+        gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -153,12 +172,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Join topic ->
         GS.join {topic} gossip_state |> handle_join ~emit_p2p_msg topic
     | Leave topic ->
-        let gossip_state, output = GS.leave {topic} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
-
-           Handle Leave's output. *)
-        ignore output ;
-        gossip_state
+        GS.leave {topic} gossip_state |> handle_leave ~emit_p2p_msg topic
 
   (** Handling messages received from the P2P network. *)
   let apply_p2p_message ~emit_p2p_msg ~emit_app_msg gossip_state from_peer =
