@@ -913,8 +913,8 @@ let bake_levels ?hook n client =
     Then continues baking until the rollup node updates the lpc,
     waiting for the rollup node to catch up to the client's level.
     Returns the level at which the lpc was updated. *)
-let bake_until_lpc_updated ?hook ?(at_least = 0) ~timeout client sc_rollup_node
-    =
+let bake_until_lpc_updated ?hook ?(at_least = 0) ?(timeout = 15.) client
+    sc_rollup_node =
   let event_level = ref None in
   let _ =
     let* lvl =
@@ -1436,7 +1436,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
     Check.int
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
-  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node in
+  let* _level = bake_until_lpc_updated client sc_rollup_node in
   let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1658,7 +1658,7 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
-  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node in
+  let* _level = bake_until_lpc_updated client sc_rollup_node in
   let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1909,7 +1909,7 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
-  let* _ = bake_until_lpc_updated ~timeout:5.0 client sc_rollup_node in
+  let* _ = bake_until_lpc_updated client sc_rollup_node in
   let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -2004,7 +2004,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
       sc_rollup_node
       (init_level + commitment_period)
   in
-  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node in
+  let* _level = bake_until_lpc_updated client sc_rollup_node in
   let* {commitment = _; hash = rollup_node1_stored_hash} =
     get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
@@ -2178,7 +2178,7 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
       (init_level + commitment_period)
   in
   let* commitment_publish_level =
-    bake_until_lpc_updated ~timeout:5. client sc_rollup_node
+    bake_until_lpc_updated client sc_rollup_node
   in
   let* rollup_node1_published_commitment =
     get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
@@ -2229,7 +2229,7 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
     = None)
     (Check.option Check.int)
     ~error_msg:"Rollup node 2 cannot publish commitment without any new block." ;
-  let* _level = bake_until_lpc_updated ~timeout:5. client sc_rollup_node' in
+  let* _level = bake_until_lpc_updated client sc_rollup_node' in
   let* rollup_node2_published_commitment =
     get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
