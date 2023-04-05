@@ -136,6 +136,9 @@ doc_index="docs/index.rst"
 ) > "${doc_index}.tmp"
 mv "${doc_index}.tmp" "$doc_index"
 
+# Replace test invocation headers that mention proto_alpha
+find src/proto_${version}_${short_hash} -type f -path \*/test/\*.ml \
+     -exec sed -i "s@Invocation:\(.*\)/proto_alpha/\(.*\)@Invocation:\1/proto_${version}_${short_hash}/\2@" \{\} \;
 
 # move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
