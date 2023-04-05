@@ -72,6 +72,9 @@ type injector = {
           operation (in addition to the confirmation period). *)
   attempts : int;
       (** The number of attempts that will be made to inject an operation. *)
+  injection_ttl : int;
+      (** The number of blocks after which an operation that is injected but
+          never included is retried. *)
 }
 
 type t = {
