@@ -371,17 +371,6 @@ let commitment_info_first_published_at_level
     (commitment_info : Sc_rollup_client.commitment_info) =
   commitment_info.first_published_at_level
 
-let last_cemented_commitment_hash_with_level ~sc_rollup client =
-  let* json =
-    RPC.Client.call client
-    @@ RPC
-       .get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
-         sc_rollup
-  in
-  let hash = JSON.(json |-> "hash" |> as_string) in
-  let level = JSON.(json |-> "level" |> as_int) in
-  return (hash, level)
-
 let get_staked_on_commitment ~sc_rollup ~staker client =
   let* json =
     RPC.Client.call client

@@ -80,3 +80,6 @@ val originate_sc_rollup :
 (** [default_boot_sector_of k] returns a valid boot sector for a PVM of
     kind [kind]. *)
 val default_boot_sector_of : kind:string -> string
+
+val last_cemented_commitment_hash_with_level :
+  sc_rollup:string -> Client.t -> (string * int) Lwt.t
