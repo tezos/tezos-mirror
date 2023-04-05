@@ -437,10 +437,7 @@ name = "installer_kernel"
 version = "0.1.0"
 dependencies = [
  "blst",
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_encoding",
- "tezos_smart_rollup_entrypoint",
- "tezos_smart_rollup_host",
+ "tezos_smart_rollup",
 ]
 
 [[package]]
@@ -1169,6 +1166,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos_smart_rollup"
+version = "0.1.0"
+dependencies = [
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_smart_rollup_core",
+ "tezos_smart_rollup_debug",
+ "tezos_smart_rollup_encoding",
+ "tezos_smart_rollup_entrypoint",
+ "tezos_smart_rollup_host",
+ "tezos_smart_rollup_mock",
+ "tezos_smart_rollup_storage",
+]
+
+[[package]]
 name = "tezos_smart_rollup_core"
 version = "0.1.0"
 dependencies = [
@@ -1207,6 +1219,7 @@ name = "tezos_smart_rollup_entrypoint"
 version = "0.1.0"
 dependencies = [
  "dlmalloc",
+ "tezos_smart_rollup_core",
  "tezos_smart_rollup_debug",
  "tezos_smart_rollup_host",
  "tezos_smart_rollup_panic_hook",
@@ -1219,6 +1232,7 @@ dependencies = [
  "mockall",
  "tezos_crypto_rs",
  "tezos_smart_rollup_core",
+ "thiserror",
 ]
 
 [[package]]

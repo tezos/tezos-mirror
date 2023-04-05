@@ -20,16 +20,6 @@ pub const PATH_MAX_SIZE: usize = 250 - DURABLE_STORAGE_PREFIX_INNER.len();
 /// The implicit prefix of all durable storage, as slice.
 const DURABLE_STORAGE_PREFIX_INNER: &[u8] = b"/durable";
 
-/// The implicit prefix of all durable storage.
-pub const DURABLE_STORAGE_PREFIX: RefPath =
-    RefPath::assert_from(DURABLE_STORAGE_PREFIX_INNER);
-
-/// The contents of `/kernel/next` must be a path pointing to the kernel to be loaded
-/// on the next *reboot*.
-///
-/// By default, this will point to `/kernel/boot.wasm`.
-pub const PATH_KERNEL_NEXT: RefPath = RefPath::assert_from(b"/kernel/next");
-
 /// The *wasm-encoded* binary blob of either the currently running kernel, or the next
 /// kernel to be rebooted into.
 pub const PATH_KERNEL_BOOT: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");

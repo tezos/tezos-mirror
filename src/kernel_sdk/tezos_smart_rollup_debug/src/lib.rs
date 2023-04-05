@@ -42,7 +42,7 @@ macro_rules! debug_msg {
     ($host: expr, $($args: expr),*) => {
         {
             extern crate alloc;
-            tezos_smart_rollup_debug::debug_str!($host, { &alloc::format!($($args), *) });
+            $crate::debug_str!($host, { &alloc::format!($($args), *) });
         }
     };
 }
@@ -68,7 +68,10 @@ macro_rules! debug_msg {
 #[macro_export]
 macro_rules! debug_str {
     ($host: expr, $msg: expr) => {{
-        use tezos_smart_rollup_host::runtime::Runtime;
+        use $crate::Runtime;
         $host.write_debug($msg);
     }};
 }
+
+#[doc(hidden)]
+pub use tezos_smart_rollup_host::runtime::Runtime;

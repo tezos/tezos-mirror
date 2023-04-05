@@ -1536,6 +1536,7 @@ name = "tezos_smart_rollup_entrypoint"
 version = "0.1.0"
 dependencies = [
  "dlmalloc",
+ "tezos_smart_rollup_core",
  "tezos_smart_rollup_debug",
  "tezos_smart_rollup_host",
  "tezos_smart_rollup_panic_hook",
@@ -1547,6 +1548,7 @@ version = "0.1.0"
 dependencies = [
  "tezos_crypto_rs",
  "tezos_smart_rollup_core",
+ "thiserror",
 ]
 
 [[package]]

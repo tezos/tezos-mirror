@@ -57,10 +57,13 @@ macro_rules! kernel_entry {
         #[no_mangle]
         pub extern "C" fn kernel_run() {
             #[cfg(feature = "panic-hook")]
-            tezos_smart_rollup_entrypoint::set_panic_hook();
-            use tezos_smart_rollup_core::rollup_host::RollupHost;
+            $crate::set_panic_hook();
+            use $crate::RollupHost;
             let mut host = unsafe { RollupHost::new() };
             $kernel_run(&mut host)
         }
     };
 }
+
+#[doc(hidden)]
+pub use tezos_smart_rollup_core::rollup_host::RollupHost;

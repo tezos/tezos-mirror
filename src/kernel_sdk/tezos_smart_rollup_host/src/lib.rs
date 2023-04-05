@@ -14,7 +14,7 @@
 //! without relying on `unsafe` code.
 //!
 //! [smart_rollup_core]: tezos_smart_rollup_core::smart_rollup_core
-#![cfg_attr(not(feature = "testing"), no_std)]
+#![cfg_attr(not(any(feature = "testing", feature = "std")), no_std)]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
@@ -62,6 +62,25 @@ pub enum Error {
     FullOutbox = tezos_smart_rollup_core::FULL_OUTBOX,
     /// Given index is out of bounds
     StoreInvalidSubkeyIndex = tezos_smart_rollup_core::STORE_INVALID_SUBKEY_INDEX,
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::StoreKeyTooLarge => write!(f, "StoreKeyTooLarge"),
+            Self::StoreInvalidKey => write!(f, "StoreInvalidKey"),
+            Self::StoreNotAValue => write!(f, "StoreNotAValue"),
+            Self::StoreInvalidAccess => write!(f, "StoreInvalidAccess"),
+            Self::StoreValueSizeExceeded => write!(f, "StoreValueSizeExceeded"),
+            Self::MemoryInvalidAccess => write!(f, "MemoryInvalidAccess"),
+            Self::InputOutputTooLarge => write!(f, "InputOutputTooLarge"),
+            Self::GenericInvalidAccess => write!(f, "GenericInvalidAccess"),
+            Self::StoreReadonlyValue => write!(f, "StoreReadonlyValue"),
+            Self::StoreNotANode => write!(f, "StoreNotANode"),
+            Self::FullOutbox => write!(f, "FullOutbox"),
+            Self::StoreInvalidSubkeyIndex => write!(f, "StoreInvalidSubkeyIndex"),
+        }
+    }
 }
 
 impl From<i32> for Error {

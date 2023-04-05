@@ -179,7 +179,7 @@ impl MockHost {
     /// Append an internal message to the current inbox.
     pub fn add_transfer(&mut self, payload: impl Michelson, metadata: &TransferMetadata) {
         let destination = metadata.destination.clone().unwrap_or_else(|| {
-            SmartRollupAddress::new(self.state.borrow().get_metadata().address().unwrap())
+            SmartRollupAddress::new(self.state.borrow().get_metadata().address())
         });
 
         let transfer = inbox::Transfer {

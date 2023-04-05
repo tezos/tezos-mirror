@@ -39,6 +39,28 @@ pub enum RuntimeError {
     DecodingError,
 }
 
+// TODO: use `core:error::Error` once `error_in_core` stabilised.
+//       <https://github.com/rust-lang/rust/issues/103765>
+#[cfg(feature = "std")]
+impl std::error::Error for RuntimeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+impl core::fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::PathNotFound => write!(f, "RuntimeError::PathNotFound"),
+            Self::HostErr(e) => e.fmt(f),
+            Self::DecodingError => write!(f, "RuntimeError::DecodingError"),
+            Self::StoreListIndexOutOfBounds => {
+                write!(f, "RuntimeError::StoreListIndexOutOfBounds")
+            }
+        }
+    }
+}
+
 /// Returned by [`Runtime::store_has`] - specifies whether a path has a value or is a prefix.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ValueType {
@@ -117,7 +139,7 @@ pub trait Runtime {
     /// Get the subkey under `prefix` at `index`.
     ///
     /// # Returns
-    /// Returns the subkey as an [Some<OwnedPath>], **excluding** the
+    /// Returns the subkey as a `Some<OwnedPath>`, **excluding** the
     /// `prefix`. Returns none if the index points to the value.
     #[cfg(feature = "alloc")]
     fn store_get_subkey<T: Path>(
