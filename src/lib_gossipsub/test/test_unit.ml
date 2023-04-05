@@ -1317,6 +1317,339 @@ let test_ignore_too_many_iwants_from_same_peer_for_same_message rng limits
   in
   unit
 
+(* Tests that handling an IHave message for a subscribed topic that has not been seen
+   results in requesting the message.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1165
+*)
+let test_handle_ihave_subscribed_and_msg_not_seen rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Handle IHave for subscribed and not seen."
+    ~tags:["gossipsub"; "ihave"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(7) in
+  (* Some unknown message id. *)
+  let message_id = 99 in
+  let _state, output =
+    GS.handle_ihave {peer; topic; message_ids = [message_id]} state
+  in
+  (* IHave should request the message id. *)
+  match output with
+  | Message_requested_message_ids message_ids ->
+      Check.(
+        (message_ids = [message_id])
+          (list int)
+          ~error_msg:"Expected %R, got %L"
+          ~__LOC__) ;
+      unit
+  | Negative_peer_score _ | Too_many_recv_ihave_messages _
+  | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
+      Test.fail ~__LOC__ "Expected to request message."
+
+(* Tests that handling an IHave message for a subscribed topic that has been seen
+   does not result in requesting the message.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1197
+*)
+let test_handle_ihave_subscribed_and_msg_seen rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Handle IHave for subscribed and seen."
+    ~tags:["gossipsub"; "ihave"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(7) in
+  (* Publish to mark message as seen. *)
+  let message = "some message" in
+  let message_id = 0 in
+  let state, _ = GS.publish {sender = None; topic; message_id; message} state in
+  (* Handle IHave for the seen message. *)
+  let _state, output =
+    GS.handle_ihave {peer; topic; message_ids = [message_id]} state
+  in
+  (* IHave should not request any messages. *)
+  match output with
+  | Negative_peer_score _ | Too_many_recv_ihave_messages _
+  | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
+      Test.fail ~__LOC__ "Expected Message_requested_message_ids."
+  | Message_requested_message_ids message_ids ->
+      Check.(
+        (message_ids = []) (list int) ~error_msg:"Expected %R, got %L" ~__LOC__) ;
+      unit
+
+(* Tests that handling an IHave message for an unsubscribed topic is ignored.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1219
+*)
+let test_handle_ihave_not_subscribed rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Handle IHave for unsubscribed."
+    ~tags:["gossipsub"; "ihave"]
+  @@ fun () ->
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(7) in
+  let topic = "some random topic" in
+  let message_id = 0 in
+  (* Handle IHave for an unsubscribed topic. *)
+  let _state, output =
+    GS.handle_ihave {peer; topic; message_ids = [message_id]} state
+  in
+  (* IHave should result in [Message_topic_not_tracked]. *)
+  match output with
+  | Negative_peer_score _ | Too_many_recv_ihave_messages _
+  | Too_many_sent_iwant_messages _ | Message_requested_message_ids _ ->
+      Test.fail ~__LOC__ "Expected Message_requested_message_ids."
+  | Message_topic_not_tracked -> unit
+
+(* Tests that we start ignoring IHaves after receiving more than
+   [max_recv_ihave_per_heartbeat] IHaves per heartbeat.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4439
+*)
+let test_ignore_too_many_ihaves rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Ignore too many IHaves."
+    ~tags:["gossipsub"; "ihave"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let max_recv_ihave_per_heartbeat = 10 in
+  let state =
+    init_state
+      ~rng
+      ~limits:{limits with max_recv_ihave_per_heartbeat}
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Add a peer that is not in the mesh. *)
+  let peer = 99 in
+  let state =
+    add_and_subscribe_peers [topic] [peer] ~to_subscribe:(fun _ -> true) state
+  in
+  (* [2 * max_recv_ihave_per_heartbeat] message ids. *)
+  let message_ids =
+    List.init
+      ~when_negative_length:()
+      ((2 * max_recv_ihave_per_heartbeat) + 1)
+      (fun i -> i)
+    |> WithExceptions.Result.get_ok ~loc:__LOC__
+  in
+  (* Peers sends us [2 * max_recv_ihave_per_heartbeat + 1] IHaves.
+     The IHave should start being ignored with [Too_many_recv_ihave_messages]
+     after [max_recv_ihave_per_heartbeat] *)
+  let state =
+    message_ids
+    |> List.fold_left_i
+         (fun i state message_id ->
+           let state, output =
+             GS.handle_ihave {peer; topic; message_ids = [message_id]} state
+           in
+           let ihave_count = i + 1 in
+           match output with
+           | Negative_peer_score _ | Too_many_sent_iwant_messages _
+           | Message_topic_not_tracked ->
+               Test.fail
+                 ~__LOC__
+                 "Expected [Too_many_recv_ihave_messages] or \
+                  [Message_requested_message_ids]."
+           | Message_requested_message_ids _ ->
+               if ihave_count <= max_recv_ihave_per_heartbeat then
+                 (* Expected case. *)
+                 state
+               else
+                 Test.fail
+                   ~__LOC__
+                   "Expected [Too_many_recv_ihave_messages] at IHave count %d."
+                   ihave_count
+           | Too_many_recv_ihave_messages _ ->
+               if ihave_count > max_recv_ihave_per_heartbeat then
+                 (* Expected case. *)
+                 state
+               else
+                 Test.fail
+                   ~__LOC__
+                   "Expected [Message_requested_message_ids] at IHave count %d."
+                   ihave_count)
+         state
+  in
+  (* After heartbeat the IHave count should have been reset. *)
+  let state, _ = GS.heartbeat state in
+  (* Take [max_recv_ihave_per_heartbeat] message_ids from the second half of the [message_ids]. *)
+  let second_half_ids =
+    List.split_n max_recv_ihave_per_heartbeat message_ids
+    |> fun (_, second_half_ids) ->
+    List.take_n max_recv_ihave_per_heartbeat second_half_ids
+  in
+  (* Resend IHaves for the message ids that were previously ignored with [Too_many_recv_ihave_messages].
+     All the IHaves should result in requesting the message. *)
+  let _state =
+    second_half_ids
+    |> List.fold_left
+         (fun state message_id ->
+           let state, output =
+             GS.handle_ihave {peer; topic; message_ids = [message_id]} state
+           in
+           match output with
+           | Negative_peer_score _ | Too_many_sent_iwant_messages _
+           | Message_topic_not_tracked | Too_many_recv_ihave_messages _ ->
+               Test.fail ~__LOC__ "Expected [Message_requested_message_ids]."
+           | Message_requested_message_ids _ ->
+               (* Expected case *)
+               state)
+         state
+  in
+  unit
+
+(* Tests that only up-to [max_sent_iwant_per_heartbeat] messages are requested per heartbeat per peer.
+
+   Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4513
+*)
+let test_ignore_too_many_messages_in_ihave rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Ignore too many messages in IHave."
+    ~tags:["gossipsub"; "ihave"]
+  @@ fun () ->
+  let assert_requested_message_ids output ~check =
+    match output with
+    | GS.Message_requested_message_ids message_ids ->
+        check message_ids ;
+        ()
+    | Negative_peer_score _ | Too_many_recv_ihave_messages _
+    | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
+        Test.fail ~__LOC__ "Expected to request messages."
+  in
+  let check_message_ids_length ~__LOC__ ids ~expected =
+    Check.(
+      (List.length ids = expected) int ~error_msg:"Expected %R, got %L" ~__LOC__)
+  in
+  let check_subset_message_ids ~__LOC__ ids1 ids2 =
+    (* Check that the elements in [ids1] is a subset of [ids2] *)
+    if
+      Message_id.Set.subset
+        (Message_id.Set.of_list ids1)
+        (Message_id.Set.of_list ids2)
+    then ()
+    else Test.fail ~__LOC__ "Subset check failed."
+  in
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let max_sent_iwant_per_heartbeat = 10 in
+  let state =
+    init_state
+      ~rng
+      ~limits:
+        {
+          limits with
+          max_sent_iwant_per_heartbeat;
+          (* We set [max_recv_ihave_per_heartbeat] high so the IHaves only get ignored
+             due to requesting too many messsages and not due to the number of IHaves. *)
+          max_recv_ihave_per_heartbeat = 999;
+        }
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Add a peer that is not in the mesh. *)
+  let peer = 99 in
+  let state =
+    add_and_subscribe_peers [topic] [peer] ~to_subscribe:(fun _ -> true) state
+  in
+  (* 20 message ids. *)
+  let message_ids =
+    List.init
+      ~when_negative_length:()
+      (2 * max_sent_iwant_per_heartbeat)
+      (fun i -> i)
+    |> WithExceptions.Result.get_ok ~loc:__LOC__
+  in
+  (* Send IHave with message ids 0..7 *)
+  let first_8 = List.take_n 8 message_ids in
+  let state, output =
+    GS.handle_ihave {peer; topic; message_ids = first_8} state
+  in
+  (* All messages should be requested. *)
+  assert_requested_message_ids output ~check:(fun ids ->
+      Check.(
+        (List.sort Message_id.compare ids = List.sort Message_id.compare first_8)
+          (list int)
+          ~error_msg:"Expected %R, got %L"
+          ~__LOC__)) ;
+  (* Send IHave with message ids 0..11 *)
+  let first_12 = List.take_n 12 message_ids in
+  let state, output =
+    GS.handle_ihave {peer; topic; message_ids = first_12} state
+  in
+  (* Since [8 + 2 >= max_sent_iwant_per_heartbeat], only 2 messages should be requested. *)
+  assert_requested_message_ids output ~check:(fun ids ->
+      check_message_ids_length ~__LOC__ ids ~expected:2 ;
+      check_subset_message_ids ~__LOC__ ids first_12) ;
+  (* Send IHave with message ids 0..19 *)
+  let _state, output = GS.handle_ihave {peer; topic; message_ids} state in
+  let () =
+    (* The number of messages requested has already exceeded [max_sent_iwant_per_heartbeat]
+       so the IHave should return [Too_many_sent_iwant_messages]. *)
+    match output with
+    | Too_many_sent_iwant_messages _ ->
+        (* Expected case. *)
+        ()
+    | Message_requested_message_ids _ | Negative_peer_score _
+    | Too_many_recv_ihave_messages _ | Message_topic_not_tracked ->
+        Test.fail ~__LOC__ "Expected [Too_many_sent_iwant_messages]."
+  in
+  (* After heartbeat the count should have been reset. *)
+  let state, _ = GS.heartbeat state in
+  (* IHave should result in requesting the remaining 10 messages. *)
+  let _state, output = GS.handle_ihave {peer; topic; message_ids} state in
+  assert_requested_message_ids output ~check:(fun ids ->
+      check_message_ids_length ~__LOC__ ids ~expected:10 ;
+      check_subset_message_ids ~__LOC__ ids message_ids) ;
+  unit
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test the described test scenario *)
 
@@ -1343,4 +1676,9 @@ let register rng limits parameters =
   test_ignore_too_many_iwants_from_same_peer_for_same_message
     rng
     limits
-    parameters
+    parameters ;
+  test_handle_ihave_subscribed_and_msg_not_seen rng limits parameters ;
+  test_handle_ihave_subscribed_and_msg_seen rng limits parameters ;
+  test_handle_ihave_not_subscribed rng limits parameters ;
+  test_ignore_too_many_ihaves rng limits parameters ;
+  test_ignore_too_many_messages_in_ihave rng limits parameters
