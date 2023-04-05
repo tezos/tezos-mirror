@@ -163,6 +163,17 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List peers) ;
         gstate
 
+  (** When a new peer is connected, the worker will send a [Subscribe] message
+      to that peer for each topic the local peer tracks. *)
+  let handle_new_connection ~emit_p2p_msg peer = function
+    | gstate, GS.Peer_already_known -> gstate
+    | gstate, Peer_added ->
+        let peers = List [peer] in
+        View.(view gstate |> get_our_topics)
+        |> List.iter (fun topic ->
+               send_p2p_message ~emit_p2p_msg (Subscribe {topic}) peers) ;
+        gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -192,14 +203,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | New_connection {peer; direct; outbound} ->
-        let gossip_state, output =
-          GS.add_peer {direct; outbound; peer} gossip_state
-        in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5160
-
-           Handle New_connection's output *)
-        ignore output ;
-        gossip_state
+        GS.add_peer {direct; outbound; peer} gossip_state
+        |> handle_new_connection ~emit_p2p_msg peer
     | Disconnection {peer} ->
         let gossip_state, output = GS.remove_peer {peer} gossip_state in
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
