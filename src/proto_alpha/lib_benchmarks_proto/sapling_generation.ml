@@ -478,7 +478,7 @@ let load ~filename type_transaction =
   else if Sys.is_directory filename then
     let () =
       Format.eprintf
-        "Sapling_generation.load: loading all .sapling files from directory \
+        "Sapling_generation.load: loading all *.sapling files from directory \
          %s@."
         filename
     in
