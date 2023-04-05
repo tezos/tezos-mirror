@@ -41,6 +41,9 @@ let encoding : t Data_encoding.t =
            (req "config" json)
            (req "children" (list (dynamic_size x)))))
 
+let pp ppf t =
+  Data_encoding.Json.pp ppf @@ Data_encoding.Json.construct encoding t
+
 (* [merge_on] is a Json merging method used to update the fields of a Json document with new values.
    [ja] contains the basic structure and types of the document. [ja] and [merge_on ja jb] have the
    same structure/can be destructed using the same [Data_encoding.t]. In practice, we use it to sequentially
@@ -244,6 +247,11 @@ let parse_config (type c t) ?print ((module Bench) : (c, t) Benchmark.poly)
                 json) ;
           config)
 
+let save_config fn config =
+  Out_channel.with_open_text fn (fun oc ->
+      let open Format in
+      fprintf (formatter_of_out_channel oc) "%a@." pp config)
+
 let rec build_branch config name =
   match name with
   | [namespace] -> {namespace; config; children = []}
@@ -252,6 +260,13 @@ let rec build_branch config name =
   | [] -> assert false
 (* This [assert false] is not reachable because this function is not exported and only called on
    the result of Namespace.to_list which is never empty. *)
+
+let build bindings =
+  List.fold_left
+    (fun acc (ns, config) ->
+      merge_config_trees acc (build_branch config (Namespace.to_list ns)))
+    empty
+    bindings
 
 let generate_one (module Bench : Benchmark.S) =
   let config =
