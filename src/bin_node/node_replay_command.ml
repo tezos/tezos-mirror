@@ -29,10 +29,10 @@ module Event = struct
   let section = ["node"; "replay"]
 
   let block_validation_start =
-    declare_3
+    declare_4
       ~section
       ~name:"block_validation_start"
-      ~msg:"replaying block {alias}{hash} ({level})"
+      ~msg:"replaying block {alias}{hash} ({level}, new_cycle:{new_cycle})"
       ~level:Notice
       ~pp1:(fun fmt -> function
         | None -> () | Some alias -> Format.fprintf fmt "%s: " alias)
@@ -41,6 +41,7 @@ module Event = struct
       ("hash", Block_hash.encoding)
       ~pp3:(fun fmt level -> Format.fprintf fmt "%ld" level)
       ("level", Data_encoding.int32)
+      ("new_cycle", Data_encoding.bool)
 
   let block_validation_end =
     declare_1
@@ -206,7 +207,8 @@ let receipts_iteri_2 ~when_different_lengths l r f =
   in
   aux l r 0 0
 
-let replay_one_block strict main_chain_store validator_process block =
+let replay_one_block strict main_chain_store validator_process block
+    previous_lpbl =
   let open Lwt_result_syntax in
   let* block_alias =
     match block with
@@ -242,6 +244,10 @@ let replay_one_block strict main_chain_store validator_process block =
       else Store.Block.resulting_context_hash main_chain_store block
     in
     let* metadata = Store.Block.get_block_metadata main_chain_store block in
+    let lpbl = metadata.last_preserved_block_level in
+    let cycle_change =
+      match previous_lpbl with None -> false | Some i -> i <> lpbl
+    in
     let expected_block_receipt_bytes = Store.Block.block_metadata metadata in
     let expected_operation_receipts =
       let operation_metadata = Store.Block.operations_metadata metadata in
@@ -259,7 +265,10 @@ let replay_one_block strict main_chain_store validator_process block =
     let start_time = Time.System.now () in
     let*! () =
       Event.(emit block_validation_start)
-        (block_alias, Store.Block.hash block, Store.Block.level block)
+        ( block_alias,
+          Store.Block.hash block,
+          Store.Block.level block,
+          cycle_change )
     in
     let bv_operations =
       List.map (List.map Block_validation.mk_operation) operations
@@ -356,22 +365,25 @@ let replay_one_block strict main_chain_store validator_process block =
           in
           return_unit)
     in
-    match (expected_operation_receipts, result.ops_metadata) with
-    | Metadata_hash expected, Metadata_hash result ->
-        receipts_iteri_2
-          ~when_different_lengths:(fun exp got ->
-            let*! () =
-              Event.(strict_emit ~strict unexpected_receipts_layout)
-                ( Store.Block.hash block,
-                  List.(map length exp),
-                  List.(map length got) )
-            in
-            return_unit)
-          expected
-          result
-          check_receipt
-    | No_metadata_hash _, _ | _, No_metadata_hash _ ->
-        (* Nothing to compare *) return_unit
+    let* () =
+      match (expected_operation_receipts, result.ops_metadata) with
+      | Metadata_hash expected, Metadata_hash result ->
+          receipts_iteri_2
+            ~when_different_lengths:(fun exp got ->
+              let*! () =
+                Event.(strict_emit ~strict unexpected_receipts_layout)
+                  ( Store.Block.hash block,
+                    List.(map length exp),
+                    List.(map length got) )
+              in
+              return_unit)
+            expected
+            result
+            check_receipt
+      | No_metadata_hash _, _ | _, No_metadata_hash _ ->
+          (* Nothing to compare *) return_unit
+    in
+    return_some lpbl
 
 let replay ~internal_events ~singleprocess ~strict
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
@@ -445,26 +457,44 @@ let replay ~internal_events ~singleprocess ~strict
   let main_chain_store = Store.main_chain_store store in
   Lwt.finalize
     (fun () ->
-      List.iter_es
-        (function
-          | Block_services.Block b ->
-              replay_one_block strict main_chain_store validator_process b
-          | Range (`Level starts, `Level ends) ->
-              if Int32.compare starts ends > 0 then return_unit
-              else if Int32.compare starts ends = 0 then
+      let* _ =
+        List.fold_left_es
+          (fun last_lafl -> function
+            | Block_services.Block b ->
                 replay_one_block
                   strict
                   main_chain_store
                   validator_process
-                  (`Level starts)
-              else
-                Seq.ES.iter
-                  (replay_one_block strict main_chain_store validator_process)
-                  (Seq.unfold
-                     (fun l ->
-                       if l <= ends then Some (`Level l, Int32.succ l) else None)
-                     starts))
-        blocks)
+                  b
+                  last_lafl
+            | Range (`Level starts, `Level ends) ->
+                if Int32.compare starts ends > 0 then return_none
+                else if Int32.compare starts ends = 0 then
+                  replay_one_block
+                    strict
+                    main_chain_store
+                    validator_process
+                    (`Level starts)
+                    last_lafl
+                else
+                  Seq.ES.fold_left
+                    (fun lafl block ->
+                      replay_one_block
+                        strict
+                        main_chain_store
+                        validator_process
+                        block
+                        lafl)
+                    last_lafl
+                    (Seq.unfold
+                       (fun l ->
+                         if l <= ends then Some (`Level l, Int32.succ l)
+                         else None)
+                       starts))
+          None
+          blocks
+      in
+      return_unit)
     (fun () ->
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
