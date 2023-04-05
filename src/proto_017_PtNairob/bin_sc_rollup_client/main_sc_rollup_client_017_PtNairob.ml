@@ -32,7 +32,15 @@ let main () =
   let cctxt = Configuration.make_unix_client_context configuration in
   Tezos_client_base.Client_keys.register_aggregate_signer
     (module Tezos_signer_backends.Unencrypted.Aggregate) ;
-  Tezos_clic.dispatch (Commands.all ()) cctxt argv
+  let commands =
+    Tezos_clic.add_manual
+      ~executable_name
+      ~global_options:(Configuration.global_options ())
+      (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
+      Format.std_formatter
+      (Commands.all ())
+  in
+  Tezos_clic.dispatch commands cctxt argv
 
 let handle_error = function
   | Ok () -> Stdlib.exit 0
