@@ -271,6 +271,10 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
 
     (* Combinators *)
 
+    let bind_gen m f : t =
+      let* m in
+      f m
+
     let of_input_gen gen f : t =
       let+ x = gen in
       raw_of_list (f x)

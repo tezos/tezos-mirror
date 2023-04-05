@@ -133,6 +133,10 @@ module Fragment : sig
   (** [of_list inputs] injects a deterministic sequence of events as a fragment. *)
   val of_list : input list -> t
 
+  (** [bind_gen gen f] creates a fragment parameterized by a generator [gen]
+      through [f]. *)
+  val bind_gen : 'a M.t -> ('a -> t) -> t
+
   (** [of_input_gen gen f] creates a fragment generated using
       [gen] mapped to an list of {!input} through [f]. *)
   val of_input_gen : 'a M.t -> ('a -> input list) -> t
