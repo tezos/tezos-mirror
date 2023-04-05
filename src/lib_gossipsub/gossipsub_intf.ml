@@ -498,8 +498,6 @@ module type AUTOMATON = sig
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
-      score : Score.t;
-      expire : Time.t option;
     }
 
     type connection = Expires of {at : Time.t} | Connected of connected_state

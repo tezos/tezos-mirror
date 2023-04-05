@@ -168,10 +168,7 @@ module Make (C : AUTOMATON_CONFIG) :
     topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
     direct : bool;
         (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
-    outbound : bool;
-        (** An outbound connection is a connection we initiated. *)
-    score : Score.t;  (** TODO: deprecated in next commit. *)
-    expire : time option;  (** TODO: deprecated in next commit. *)
+    outbound : bool;  (** An outbound connection is a connection we initiated. *)
   }
 
   (** [connection] is either an expiration time or an active {!connection}.
@@ -429,12 +426,12 @@ module Make (C : AUTOMATON_CONFIG) :
        Optimize by having a topic to peers map *)
     let select_peers_info_peers peers_info rng topic ~filter ~max =
       Peer.Map.bindings peers_info
-      |> List.filter_map (fun (peer, peer_info) ->
-             match peer_info.connection with
+      |> List.filter_map (fun (peer, {connection; score}) ->
+             match connection with
              | Expires _ -> None
              | Connected conn ->
                  let topics = conn.topics in
-                 if filter peer conn && Topic.Set.mem topic topics then
+                 if filter peer conn score && Topic.Set.mem topic topics then
                    Some peer
                  else None)
       |> List.shuffle ~rng |> List.take_n max
@@ -870,7 +867,7 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter_by_score score =
             Compare.Float.(score |> Score.float >= publish_threshold)
           in
-          let filter _peer {direct; score; _} =
+          let filter _peer {direct; _} score =
             (not direct) && filter_by_score score
           in
           let* not_direct_peers =
@@ -905,7 +902,7 @@ module Make (C : AUTOMATON_CONFIG) :
          Filter out peers from which we already received the message, or an
          IHave message? *)
       let* direct_peers =
-        let filter _peer {direct; _} = direct in
+        let filter _peer {direct; _} _score = direct in
         select_peers topic ~filter ~max:max_int
       in
       let to_publish = Peer.Set.union peers direct_peers in
@@ -959,7 +956,7 @@ module Make (C : AUTOMATON_CONFIG) :
         else
           let max = max 0 (degree_optimal - valid_fanout_peers_len) in
           let* more_peers =
-            let filter peer {score; direct; _} =
+            let filter peer {direct; _} score =
               let backed_off = exists_backoff topic peer backoff in
               not
                 (direct || backed_off
@@ -1285,11 +1282,11 @@ module Make (C : AUTOMATON_CONFIG) :
             let max = degree_optimal - num_peers in
             (* Filter out our current and direct peers, peers we are backing
                off, and peers with negative score. *)
-            let filter peer connection =
+            let filter peer connection score =
               let in_mesh = Peer.Set.mem peer peers in
               let backed_off = exists_backoff topic peer backoff in
               (not in_mesh) && (not backed_off) && (not connection.direct)
-              && Score.(connection.score >= zero)
+              && Score.(score >= zero)
             in
             select_peers_info_peers peers_info rng topic ~filter ~max
             |> add_to_peers_topic_set to_graft topic
@@ -1319,11 +1316,11 @@ module Make (C : AUTOMATON_CONFIG) :
               let max = degree_out - num_outbound in
               (* Filter out our current and direct peers, peers we are backing
                  off, and peers with negative score *)
-              let filter peer connection =
+              let filter peer connection score =
                 let in_mesh = Peer.Set.mem peer peers in
                 let backed_off = exists_backoff topic peer backoff in
                 (not in_mesh) && (not backed_off) && (not connection.direct)
-                && Score.(connection.score >= zero)
+                && Score.(score >= zero)
                 && has_outbound_connection peer
               in
               select_peers_info_peers peers_info rng topic ~filter ~max
@@ -1467,11 +1464,10 @@ module Make (C : AUTOMATON_CONFIG) :
           let ineed = degree_optimal - num_peers in
           (* Filter our current and direct peers and peers with score above
              the publish threshold *)
-          let filter peer connection =
+          let filter peer connection score =
             let in_fanout = Peer.Set.mem peer peers_to_keep in
             (not in_fanout) && (not connection.direct)
-            && Compare.Float.(
-                 connection.score |> Score.float >= publish_threshold)
+            && Compare.Float.(score |> Score.float >= publish_threshold)
           in
           let new_peers =
             select_peers_info_peers peers_info rng topic ~filter ~max:ineed
@@ -1527,14 +1523,7 @@ module Make (C : AUTOMATON_CONFIG) :
       match Peer.Map.find peer peers_info with
       | None ->
           let connection =
-            Connected
-              {
-                direct;
-                score = Score.zero;
-                topics = Topic.Set.empty;
-                outbound;
-                expire = None;
-              }
+            Connected {direct; topics = Topic.Set.empty; outbound}
           in
           let peer_info = {connection; score = Score.zero} in
           let peers_info = Peer.Map.add peer peer_info peers_info in
@@ -1589,8 +1578,8 @@ module Make (C : AUTOMATON_CONFIG) :
   let select_px_peers state ~peer_to_prune topic ~noPX_peers =
     let do_px = do_px state in
     let peers_to_px = peers_to_px state in
-    let filter peer (conn_state : connected_state) =
-      (not (Peer.equal peer_to_prune peer)) && Score.(conn_state.score >= zero)
+    let filter peer _conn score =
+      (not (Peer.equal peer_to_prune peer)) && Score.(score >= zero)
     in
     if do_px && not (Peer.Set.mem peer_to_prune noPX_peers) then
       select_peers_info_peers
@@ -1619,7 +1608,7 @@ module Make (C : AUTOMATON_CONFIG) :
       else
         (* We collect the peers with a score above [gossip_threshold] that are not
            in the excluded set and are not direct peers. *)
-        let filter peer {direct; score; _} =
+        let filter peer {direct; _} score =
           (not direct)
           && Compare.Float.(
                score |> Score.float >= state.limits.gossip_threshold)
@@ -1767,8 +1756,6 @@ module Make (C : AUTOMATON_CONFIG) :
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
-      score : Score.t;
-      expire : time option;
     }
 
     type nonrec connection = connection =
