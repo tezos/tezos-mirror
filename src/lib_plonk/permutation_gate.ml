@@ -327,7 +327,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
      C(X) := \sum_i delta^{i-1} c_i(X)
      We will perform a single permutation argument for A, B and C. *)
   module Shared_argument = struct
-    let build_batched_wires_values ~delta ~wires:wires_list_map =
+    let build_batched_wires_values ?(batched_keys = String.capitalize_ascii)
+        ~delta ~wires:wires_list_map () =
       (* agg_map = {a -> [] ; b -> [] ; …} *)
       let agg_map =
         SMap.(map (Fun.const []) (List.hd (choose wires_list_map |> snd)))
@@ -342,7 +343,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
                Evaluations.linear_with_powers ws_list delta)
       in
       SMap.map aggreg_wires_list wires_list_map
-      |> SMap.(map (update_keys String.capitalize_ascii))
+      |> SMap.(map (update_keys batched_keys))
 
     (* For each circuit, interpolates the batched wires A, B, C from the
        batched witness *)
@@ -704,8 +705,10 @@ module type S = sig
 
   module Shared_argument : sig
     val build_batched_wires_values :
-      delta:Scalar.t ->
+      ?batched_keys:(string -> string) ->
+      delta:Poly.scalar ->
       wires:Evaluations.t SMap.t list SMap.t ->
+      unit ->
       Evaluations.t SMap.t SMap.t
 
     val batched_wires_poly_of_batched_wires :

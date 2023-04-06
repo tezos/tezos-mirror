@@ -685,6 +685,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         Perm.Shared_argument.build_batched_wires_values
           ~delta:rd.delta
           ~wires:wires_list_map
+          ()
       in
 
       (* The new batched_wires is used for the RC shared perm argument *)
