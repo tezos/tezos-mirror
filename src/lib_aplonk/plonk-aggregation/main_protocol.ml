@@ -36,6 +36,8 @@ module type S = sig
 
   module Perm : Plonk.Permutation_gate.S with module PP := PP
 
+  module RangeCheck : Plonk.Range_check_gate.S with module PP := PP
+
   (** Returns (g, n), where n is the size of the circuit padded to the next
       power of two & g is a primitive n-th root of unity
    *)
@@ -60,6 +62,8 @@ module type S = sig
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
+    beta_rc : scalar;
+    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -75,6 +79,8 @@ module type S = sig
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
+    beta_rc : scalar;
+    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -114,6 +120,8 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
+    beta_rc : scalar;
+    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -127,6 +135,8 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
+    beta_rc : scalar;
+    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -226,6 +236,8 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
         alpha;
         beta = rd.beta_perm;
         gamma = rd.gamma_perm;
+        beta_rc = rd.beta_rc;
+        gamma_rc = rd.gamma_rc;
         delta = rd.delta;
         x;
         r;
@@ -266,6 +278,8 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
         alpha;
         beta = rd.beta_perm;
         gamma = rd.gamma_perm;
+        beta_rc = rd.beta_rc;
+        gamma_rc = rd.gamma_rc;
         delta = rd.delta;
         x;
         r;

@@ -448,7 +448,7 @@ struct
            ~transcript
            ~inputs
            ~proof
-           (v.alpha, v.beta, v.gamma, v.delta, v.x, v.r))
+           (v.alpha, v.beta, v.gamma, v.beta_rc, v.gamma_rc, v.delta, v.x, v.r))
         pp.meta_pps
     in
     main_verif && batch_ok && meta_proofs_ok
