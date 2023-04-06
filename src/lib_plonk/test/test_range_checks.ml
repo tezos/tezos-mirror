@@ -34,7 +34,7 @@ module External (PC : Polynomial_commitment.S) = struct
         ()
     in
     let inputs = General.witness in
-    H.test_circuit ~name:"Range_Checks_single" ~zero_knowledge circuit inputs ;
+    H.test_circuit ~name:"RC_single" ~zero_knowledge circuit inputs ;
     let circuit =
       Plonk.Circuit.make
         ~wires
@@ -43,12 +43,7 @@ module External (PC : Polynomial_commitment.S) = struct
         ~range_checks:([1; 3; 4; 6], 2)
         ()
     in
-    try
-      H.test_circuit
-        ~name:"Range_Checks_single_wrong"
-        ~zero_knowledge
-        circuit
-        inputs
+    try H.test_circuit ~name:"RC_single_wrong" ~zero_knowledge circuit inputs
     with Plonk.Main_protocol.Rest_not_null _ -> ()
 
   (* This test does not work since several proofs are not supported yet *)
@@ -79,7 +74,7 @@ module External (PC : Polynomial_commitment.S) = struct
       SMap.of_list [("circuit1", [witness; witness]); ("circuit2", [witness])]
     in
 
-    H.test_circuits ~name:"Range_Checks_multi" ~zero_knowledge circuits inputs ;
+    H.test_circuits ~name:"RC_multi" ~zero_knowledge circuits inputs ;
 
     let circuit3 =
       Plonk.Circuit.make
@@ -91,18 +86,13 @@ module External (PC : Polynomial_commitment.S) = struct
     in
     let circuits = SMap.add_unique "circuit3" (circuit3, 1) circuits in
     let inputs = SMap.add_unique "circuit3" [witness] inputs in
-    try
-      H.test_circuits
-        ~name:"Range_Checks_multi_wrong"
-        ~zero_knowledge
-        circuits
-        inputs
+    try H.test_circuits ~name:"RC_multi_wrong" ~zero_knowledge circuits inputs
     with Plonk.Main_protocol.Rest_not_null _ -> ()
 
   let tests_quick pc_name =
     [
-      (pc_name ^ ".Range_Checks_single", test_range_checks_single)
-      (* (pc_name ^ ".Range_Checks_multi", test_range_checks_multi); *);
+      (pc_name ^ ".RC_single", test_range_checks_single)
+      (* (pc_name ^ ".RC_multi", test_range_checks_multi); *);
     ]
 end
 
