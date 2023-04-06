@@ -102,11 +102,7 @@ Voting Power
 ------------
 
 When supporting a proposal or casting a Yay, Nay, or Pass ballot, each delegate
-has voting power equal to its *stake*. The stake is always measured in
-**mutez**.
-
-Note that the stake of each delegate is computed at the beginning of each
-period.
+has a voting power equal to its *stake*. More precisely, the voting power of a delegate during a voting period is its :ref:`staking balance <active_stake_alpha>`, measured in *mutez*, sampled at the beginning of the period. (Note that this is opposed to validator selection for consensus, which is based on the active stake, and sampled at some stake snapshot during some previous cycle.)
 
 
 Super-majority and Quorum

@@ -237,6 +237,6 @@ _`Voting period`
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
     the staking balance (in number of mutez) of each delegate_ that owns more
-    than the `minimal stake`_ at that moment. For each delegate_, The voting listings
-    reflects the weight of the vote emitted by the delegate_ when amending the
+    than the `minimal stake`_ at that moment. For each delegate_, the voting listings
+    reflect the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.

@@ -141,14 +141,14 @@ To run a ``rolling`` node you can either use the command line arguments:
 
 .. code-block:: console
 
-   octez-node run --history-mode experimental-rolling
+   octez-node run --history-mode rolling
 
 or use your configuration file as described in :doc:`here <node-configuration>`:
 
 .. code-block:: json
 
    { "shell": {
-       "history_mode": "experimental-rolling"
+       "history_mode": "rolling"
    }}
 
 In ``rolling`` mode, the `caboose` is the genesis at its early state,
