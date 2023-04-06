@@ -502,7 +502,7 @@ module type AUTOMATON = sig
 
     type connection = Expires of {at : Time.t} | Connected of connected_state
 
-    type peer_info = {connection : connection; score : Score.t}
+    type peer_info = {connection : connection}
 
     type peer_score = {score : Score.t}
 
