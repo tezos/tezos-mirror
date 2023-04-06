@@ -4,8 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Defines the *raw* bindings to the **smart_rollup_core** host module.
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(not(any(test, feature = "testing")), no_std)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
