@@ -504,6 +504,8 @@ module type AUTOMATON = sig
 
     type peer_info = {connection : connection; score : Score.t}
 
+    type peer_score = {score : Score.t}
+
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
     module Message_cache : sig
@@ -529,6 +531,7 @@ module type AUTOMATON = sig
       limits : limits;
       parameters : parameters;
       peers_info : peer_info Peer.Map.t;
+      scores : peer_score Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;

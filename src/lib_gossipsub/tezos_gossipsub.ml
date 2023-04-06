@@ -180,10 +180,9 @@ module Make (C : AUTOMATON_CONFIG) :
       }
     | Connected of connected_state
 
-  type peer_info = {
-    connection : connection;
-    score : Score.t;  (** The score associated to this peer. *)
-  }
+  type peer_score = {score : Score.t  (** The score associated to this peer. *)}
+
+  type peer_info = {connection : connection; score : Score.t}
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
 
@@ -196,6 +195,7 @@ module Make (C : AUTOMATON_CONFIG) :
     limits : limits;
     parameters : parameters;
     peers_info : peer_info Peer.Map.t;
+    scores : peer_score Peer.Map.t;
     ihave_per_heartbeat : int Peer.Map.t;
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
@@ -270,6 +270,7 @@ module Make (C : AUTOMATON_CONFIG) :
       limits;
       parameters;
       peers_info = Peer.Map.empty;
+      scores = Peer.Map.empty;
       ihave_per_heartbeat = Peer.Map.empty;
       iwant_per_heartbeat = Peer.Map.empty;
       mesh = Topic.Map.empty;
@@ -340,6 +341,9 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let peers_info state = state.peers_info
 
+    (* TODO remove warning deactivation in next commit *)
+    let scores state = state.scores [@@ocaml.warning "-32"]
+
     let seen_messages state = state.seen_messages
 
     let peer_filter state = state.parameters.peer_filter
@@ -397,6 +401,10 @@ module Make (C : AUTOMATON_CONFIG) :
       ({state with heartbeat_ticks}, ())
 
     let set_peers_info peers_info state = ({state with peers_info}, ())
+
+    (* TODO remove warning deactivation in next commit *)
+    let set_scores scores state = ({state with scores}, ())
+      [@@ocaml.warning "-32"]
 
     let topic_is_tracked topic state =
       let {mesh; _} = state in
@@ -1762,6 +1770,10 @@ module Make (C : AUTOMATON_CONFIG) :
       | Expires of {at : Time.t}
       | Connected of connected_state
 
+    type nonrec peer_score = peer_score = {
+      score : Score.t;  (** The score associated to this peer. *)
+    }
+
     type nonrec peer_info = peer_info = {
       connection : connection;
       score : Score.t;  (** The score associated to this peer. *)
@@ -1778,6 +1790,7 @@ module Make (C : AUTOMATON_CONFIG) :
       limits : limits;
       parameters : parameters;
       peers_info : peer_info Peer.Map.t;
+      scores : peer_score Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
