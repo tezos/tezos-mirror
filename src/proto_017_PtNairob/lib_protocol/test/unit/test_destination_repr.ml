@@ -208,7 +208,7 @@ let tests =
     tztest "Binary Destination_repr to Contract_repr (null address)" `Quick
     @@ test_encode_destination_decode_contract null_address;
     tztest
-      "Binary Contract_repr to Destination_repr (liquidity baking dex)"
+      "Binary Destination_repr to Contract_repr (liquidity baking dex)"
       `Quick
     @@ test_encode_destination_decode_contract liquidity_baking_dex;
     tztest

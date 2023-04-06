@@ -1777,7 +1777,10 @@ let tests =
       test_send_tickets_in_big_map;
     Tztest.tztest "Test modify big-map" `Quick test_modify_big_map;
     Tztest.tztest "Test send drop" `Quick test_send_tickets_in_big_map_and_drop;
-    Tztest.tztest "Test send drop" `Quick test_create_contract_with_ticket;
+    Tztest.tztest
+      "Test create contract with ticket"
+      `Quick
+      test_create_contract_with_ticket;
     Tztest.tztest "Test join" `Quick test_join_tickets;
     Tztest.tztest "Test wallet" `Quick test_ticket_wallet;
     Tztest.tztest "Test ticket storage" `Quick test_ticket_storage;
