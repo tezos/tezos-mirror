@@ -448,21 +448,33 @@ let should_run_store_copy_kernel ~version () =
   let* () = assert_store_value tree "/a/b" (Some "ab") in
   return_ok_unit
 
-let nop_store_get_hash_module =
-  {|
+let nop_module import_name import_params import_results =
+  Format.sprintf
+    {|
 (module
- (import "smart_rollup_core" "__internal_store_get_hash"
-         (func $store_get_hash_key (param i32 i32 i32 i32) (result i32)))
+ (import "smart_rollup_core" "%s"
+         (func $%s (param %s) (result %s)))
  (memory 1)
  (export "mem" (memory 0))
  (func (export "kernel_run")
     (nop)))
   |}
+    import_name
+    import_name
+    (String.concat " " import_params)
+    (String.concat " " import_results)
 
-let try_run_store_get_hash ~version () =
+(* Note that import_name, import_params and import_results could be probably
+   read from the host function definition directly in {Host_funcs}, this would
+   ensure the error does not come from an invalid import type. *)
+let try_availability_above_v1_only ~version import_name import_params
+    import_results () =
   let open Lwt_syntax in
   let* tree =
-    initial_tree ~version ~from_binary:false nop_store_get_hash_module
+    initial_tree
+      ~version
+      ~from_binary:false
+      (nop_module import_name import_params import_results)
   in
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_or_reveal_requested tree in
@@ -475,32 +487,19 @@ let try_run_store_get_hash ~version () =
   assert (predicate state) ;
   Lwt_result_syntax.return_unit
 
-let nop_store_delete_value_module =
-  {|
-(module
- (import "smart_rollup_core" "store_delete_value"
-         (func $store_delete_value_key (param i32 i32) (result i32)))
- (memory 1)
- (export "mem" (memory 0))
- (func (export "kernel_run")
-    (nop)))
-  |}
+let try_run_store_get_hash ~version =
+  try_availability_above_v1_only
+    ~version
+    "__internal_store_get_hash"
+    ["i32"; "i32"; "i32"; "i32"]
+    ["i32"]
 
-let try_run_store_delete_value ~version () =
-  let open Lwt_syntax in
-  let* tree =
-    initial_tree ~version ~from_binary:false nop_store_delete_value_module
-  in
-  let* tree = set_empty_inbox_step 0l tree in
-  let* tree = eval_until_input_or_reveal_requested tree in
-  let* state = Wasm.Internal_for_tests.get_tick_state tree in
-  let predicate state =
-    match version with
-    | Wasm_pvm_state.V0 -> is_stuck state
-    | V1 -> not (is_stuck state)
-  in
-  assert (predicate state) ;
-  Lwt_result_syntax.return_unit
+let try_run_store_delete_value ~version =
+  try_availability_above_v1_only
+    ~version
+    "store_delete_value"
+    ["i32"; "i32"]
+    ["i32"]
 
 let test_modify_read_only_storage_kernel ~version () =
   let open Lwt_syntax in
