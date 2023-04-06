@@ -33,9 +33,9 @@ for more details).
 
 Time-lock encryption allows for encrypting a message so it can be
 decrypted in two ways.
-Either the author of the ciphertext produces a plaintext
+Either the author of the ciphertext provides a plaintext
 (and a proof of correct decryption)
-by providing a secret trapdoor (the factorization of an RSA modulus in our case).
+by providing the information used to generate the timelock.
 Or, a sequential computation can decrypt the ciphertext after a computation
 requiring ``T`` sequential operations (modular squaring in our case),
 for some pre-determined constant ``T``.
@@ -123,16 +123,13 @@ Implementation of the time-lock puzzle
 --------------------------------------
 
 The implementation of the time-lock puzzle
-and proof scheme is located in :src:`src/lib_crypto/timelock.ml`. It is inspired by
-the proof-of-concept shown
-`here <https://gist.github.com/murbard/23a29454a107d03d8a98393b0b98466d>`__.
+and proof scheme is located in :src:`src/lib_crypto/timelock.ml`.
 
-The utility developed by `Completium <https://completium.com>`_ available `here <https://github.com/completium/timelock-utils>`__,
-allows a user to create chests and chest keys to interact with a smart contract.
+To facilitate the use of time-locks,  commands have also been implemented in Octez client to generate a ``chest`` and ``chest_key`` as well as to open and verify them. An additional command ``precompute`` was implemented to fasten the timelock ``chest`` generation.
 
+For more information on the client commands, see :doc:`cli-commands<cli-commands>`.
 
 Example
 -------
 
-The raffle contract on Open Tezos `here <https://opentezos.com/archetype/raffle-example/raffle-contract/>`__
-gives a concrete example of using time-lock.
+A coin flip contract on Tezos source code `here <https://gitlab.com/tezos/tezos/-/tree/master/src/proto_alpha/lib_protocol/contracts/timelock_flip.tz>` gives an example of using time-lock. Beware this contract is for educational purpose only and is not secure.
