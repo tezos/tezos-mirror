@@ -243,7 +243,7 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
+let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.1.0")
 
 let ppx_import = external_lib "ppx_import" V.True
 
@@ -1867,20 +1867,7 @@ let octez_base =
         uri;
       ]
     ~js_compatible:true
-    ~js_of_ocaml:[[S "javascript_files"; S "ptime.js"]]
-    ~dune:
-      Dune.
-        [
-          ocamllex "point_parser";
-          (* ptime is currently sligtly broken and I don't think a fix will land soon.
-             See https://github.com/dbuenzli/ptime/pull/27.
-             Meanwhile, we can just copy the runtime file and let dune knows about it our-selves.
-          *)
-          targets_rule
-            ["ptime.js"]
-            ~action:
-              [S "copy"; S "%{lib:ptime.clock.os:runtime.js}"; S "ptime.js"];
-        ]
+    ~dune:Dune.[ocamllex "point_parser"]
 
 let octez_base_unix =
   public_lib

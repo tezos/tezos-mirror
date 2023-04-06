@@ -21,7 +21,7 @@
   lwt
   ipaddr
   uri)
- (js_of_ocaml (javascript_files ptime.js))
+ (js_of_ocaml)
  (flags
   (:standard)
   -open Tezos_stdlib
@@ -32,7 +32,3 @@
   -open Tezos_event_logging))
 
 (ocamllex point_parser)
-
-(rule
- (targets ptime.js)
- (action (copy %{lib:ptime.clock.os:runtime.js} ptime.js)))
