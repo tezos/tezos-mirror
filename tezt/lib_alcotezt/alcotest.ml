@@ -38,6 +38,7 @@ exception Test_error
 type 'a test = string * 'a test_case list
 
 let run ~__FILE__ library_name tests =
+  let proto_tags = Alcotezt_utils.is_proto_test __FILE__ in
   tests
   |> List.iter @@ fun (test_name, test_cases) ->
      test_cases
@@ -45,6 +46,7 @@ let run ~__FILE__ library_name tests =
         let tags =
           "alcotezt"
           :: (match speed_level with `Quick -> ["quick"] | `Slow -> [])
+          @ proto_tags
         in
         Test.register
           ~__FILE__
