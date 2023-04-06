@@ -292,6 +292,10 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let publish_threshold state = state.limits.publish_threshold
 
+    let do_px state = state.limits.do_px
+
+    let peers_to_px state = state.limits.peers_to_px
+
     let accept_px_threshold state = state.limits.accept_px_threshold
 
     let prune_backoff state = state.limits.prune_backoff
@@ -1509,6 +1513,21 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let remove_peer : remove_peer -> [`Remove_peer] output Monad.t =
    fun {peer} -> Remove_peer.handle peer
+
+  let select_px_peers state ~peer_to_prune topic ~noPX_peers =
+    let do_px = do_px state in
+    let peers_to_px = peers_to_px state in
+    let filter peer connection =
+      (not (Peer.equal peer_to_prune peer)) && Score.(connection.score >= zero)
+    in
+    if do_px && not (Peer.Set.mem peer_to_prune noPX_peers) then
+      select_connections_peers
+        state.connections
+        state.rng
+        topic
+        ~filter
+        ~max:peers_to_px
+    else []
 
   (* Helpers. *)
 

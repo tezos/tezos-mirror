@@ -95,8 +95,12 @@ type ('peer, 'message_id, 'span) limits = {
   publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
+  do_px : bool;  (** The flag controls whether peer exchange (PX) is enabled. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
+  peers_to_px : int;
+      (** The number of peers to include in prune Peer eXchange. (This is called
+          [PrunePeers] in the Go implementation.) *)
   unsubscribe_backoff : 'span;
       (** The duration that prevent reconnections after leaving a topic to our full connections. *)
   graft_flood_backoff : 'span;
@@ -413,6 +417,19 @@ module type AUTOMATON = sig
       topic. *)
   val leave : leave -> [`Leave] monad
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5352
+     Handle the random state explicitly for [select_px_peers]. *)
+
+  (** Select random peers for Peer eXchange. Note that function is
+      deterministic; however, it has side effects in that it updates the
+      [state]'s random state. *)
+  val select_px_peers :
+    state ->
+    peer_to_prune:Peer.t ->
+    Topic.t ->
+    noPX_peers:Peer.Set.t ->
+    Peer.t list
+
   val pp_add_peer : Format.formatter -> add_peer -> unit
 
   val pp_remove_peer : Format.formatter -> remove_peer -> unit
@@ -499,7 +516,7 @@ module type AUTOMATON = sig
     val limits : view -> limits
 
     (** [has_joined topic view] returns true if and only if the automaton is
-        currently tracking messages for [topic]. That is, the local peer has joined 
+        currently tracking messages for [topic]. That is, the local peer has joined
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
   end
