@@ -33,9 +33,9 @@ for more details).
 
 Time-lock encryption allows for encrypting a message so it can be
 decrypted in two ways.
-Either the author of the ciphertext provides a plaintext
+Either the author of the ciphertext produces a plaintext
 (and a proof of correct decryption)
-by providing the information used to generate the timelock.
+by providing the information used to generate the time-lock.
 Or, a sequential computation can decrypt the ciphertext after a computation
 requiring ``T`` sequential operations (modular squaring in our case),
 for some pre-determined constant ``T``.
@@ -105,13 +105,8 @@ and the following opcode:
 or indicates that the ``chest`` or the ``chest_key`` is malicious.
 
 If we open the chest with a correctly generated chest key, the instruction pushes
-``Left bytes`` on top of the stack where the bytes are
-cryptographically guaranteed to be the bytes the chest provider time-locked.
-If the ciphertext does not decrypt under the symmetric key that was time-locked, it pushes on the stack
-``Right False``.
-If the provided symmetric key was not the one time-locked
-(detectable due to the time-lock proof),
-it pushes on the stack ``Right True``.
+``Some bytes`` on top of the stack where the bytes are
+cryptographically guaranteed to be the bytes the chest provider time-locked, otherwise ``None``.
 Note that the implementation uses an authenticated encryption scheme,
 so one can detect if someone provides a wrong key while fooling the time-lock proof.
 This is doable only by someone knowing the factorization of the RSA modulus.
@@ -125,11 +120,11 @@ Implementation of the time-lock puzzle
 The implementation of the time-lock puzzle
 and proof scheme is located in :src:`src/lib_crypto/timelock.ml`.
 
-To facilitate the use of time-locks,  commands have also been implemented in Octez client to generate a ``chest`` and ``chest_key`` as well as to open and verify them. An additional command ``precompute`` was implemented to fasten the timelock ``chest`` generation.
+To facilitate the use of time-locks,  commands have also been implemented in Octez client to generate a ``chest`` and ``chest_key`` as well as to open and verify them. An additional command ``precompute`` was implemented to fasten the time-lock ``chest`` generation.
 
 For more information on the client commands, see :doc:`cli-commands<cli-commands>`.
 
 Example
 -------
 
-A coin flip contract on Tezos source code `here <https://gitlab.com/tezos/tezos/-/tree/master/src/proto_alpha/lib_protocol/contracts/timelock_flip.tz>`__ gives an example of using time-lock. Beware this contract is for educational purpose only and is not secure.
+A coin flip contract on Tezos source code :src:`<src/proto_alpha/lib_protocol/test/integration/michelson/contracts/timelock_flip.tz>` gives an example of using time-lock. Beware, this contract is for educational purpose only, and is not secure.

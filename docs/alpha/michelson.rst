@@ -1170,9 +1170,9 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
 Operations on timelock
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The results can be bytes
-  if the opening is correct, or a boolean indicating whether the chest was incorrect,
-  or its opening was. See :doc:`Timelock <timelock>` for more information.
+- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The
+  result is a byte option depending if the opening is correct or not. See
+  :doc:`Timelock <timelock>` for more information.
 
 ::
 

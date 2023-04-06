@@ -30,6 +30,7 @@ Node
 
 Client
 ------
+- Adding client commands to generate, open and verify a time-lock.
 
 - The ``typecheck script`` command can now be used to typecheck several scripts.
 
@@ -73,3 +74,5 @@ Smart Rollup WASM Debugger
 
 Miscellaneous
 -------------
+
+- Updating and re-enabling the time-lock Michelson commands.
