@@ -282,7 +282,7 @@ let memo_size_eq :
    The result is an equality witness between the types of the two inputs within
    the gas monad (for gas consumption).
 *)
-let rec ty_eq :
+let ty_eq :
     type a ac b bc error_trace.
     error_details:(Script.location, error_trace) error_details ->
     (a, ac) ty ->
@@ -364,23 +364,23 @@ let rec ty_eq :
     | Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = ty_eq ~error_details tal tbl in
+        let+ Eq = help tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | Map_t _, _ -> not_equal ()
     | Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = ty_eq ~error_details tal tbl in
+        let+ Eq = help tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | Big_map_t _, _ -> not_equal ()
     | Set_t (ea, meta1), Set_t (eb, meta2) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = ty_eq ~error_details ea eb in
+        let+ Eq = help ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | Set_t _, _ -> not_equal ()
     | Ticket_t (ea, meta1), Ticket_t (eb, meta2) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = ty_eq ~error_details ea eb in
+        let+ Eq = help ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | Ticket_t _, _ -> not_equal ()
     | Pair_t (tal, tar, meta1, cmp1), Pair_t (tbl, tbr, meta2, cmp2) ->
