@@ -83,7 +83,10 @@ module Error : sig
     | Full_outbox
         (** The outbox is full an cannot accept new messages at this level. Has code `-11`. *)
     | Store_invalid_subkey_index
-        (** Trying to get the nth subkey, where n is too big. *)
+        (** Trying to get the nth subkey, where n is too big. Has code `-12`. *)
+    | Store_value_already_exists
+        (** Trying to create a value at a key that already has an associated
+            value. Has code `-13`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32
@@ -192,6 +195,24 @@ module Aux : sig
       from_key_length:int32 ->
       to_key_offset:int32 ->
       to_key_length:int32 ->
+      (Durable.t * int32) Lwt.t
+
+    (** [store_create ~durable ~memory ~key_offset ~key_length ~size] allocates
+        a new value under the given [key] if it doesn't exist. Returns [0] if
+        the new value has been allocated, and [Error.code
+        Store_value_already_exists] (`-13`) if there was already a value. The
+        function is tick safe: allocating won't write the data itself, hence the
+        [size] is not limited by the maximum size of an IO. It is limited to the
+        maximum size of values, which is 2GB (`Int32.max_int`).
+
+        @since 2.0.0~r1
+    *)
+    val store_create :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      size:int32 ->
       (Durable.t * int32) Lwt.t
 
     val store_value_size :
@@ -345,6 +366,8 @@ module Internal_for_tests : sig
   val store_move : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_value_size : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_create : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_read : Tezos_webassembly_interpreter.Instance.func_inst
 

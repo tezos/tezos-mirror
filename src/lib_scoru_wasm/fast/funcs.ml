@@ -154,6 +154,22 @@ let make ~version ~reveal_builtins ~write_debug state =
         state.durable <- durable ;
         result)
   in
+  let store_create =
+    fn
+      (i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun key_offset key_length size ->
+        with_mem @@ fun memory ->
+        let+ durable, result =
+          Host_funcs.Aux.store_create
+            ~durable:state.durable
+            ~memory
+            ~key_offset
+            ~key_length
+            ~size
+        in
+        state.durable <- durable ;
+        result)
+  in
   let store_read =
     fn
       (i32 @-> i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
@@ -285,6 +301,7 @@ let make ~version ~reveal_builtins ~write_debug state =
         [
           ("__internal_store_get_hash", store_get_hash);
           ("store_delete_value", store_delete_value);
+          ("store_create", store_create);
         ]
   in
   List.map
