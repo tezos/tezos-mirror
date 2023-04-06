@@ -129,6 +129,8 @@ end
 
 val int_parameter : (int, full) Tezos_clic.parameter
 
+val z_parameter : (Z.t, full) Tezos_clic.parameter
+
 val uri_parameter : (Uri.t, full) Tezos_clic.parameter
 
 val string_parameter : (string, full) Tezos_clic.parameter

@@ -40,6 +40,8 @@ type 'a t = {
   dal_cctxt : Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
           the DAL. *)
+  dac_client : Dac_observer_client.t option;
+      (** DAC observer client to optionally pull in preimages *)
   data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)

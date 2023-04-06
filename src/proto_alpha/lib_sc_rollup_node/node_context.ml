@@ -34,6 +34,7 @@ type 'a store = 'a Store.t
 type 'a t = {
   cctxt : Protocol_client_context.full;
   dal_cctxt : Dal_node_client.cctxt option;
+  dac_client : Dac_observer_client.t option;
   data_dir : string;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
@@ -176,10 +177,23 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
       Event.warn_dal_enabled_no_node ()
     else Lwt.return_unit
   in
+  let* dac_client =
+    Option.map_es
+      (fun observer_endpoint ->
+        Dac_observer_client.init
+          {
+            observer_endpoint;
+            reveal_data_dir =
+              Filename.concat data_dir (Sc_rollup.Kind.to_string kind);
+            timeout_seconds = configuration.dac_timeout;
+          })
+      configuration.dac_observer_endpoint
+  in
   return
     {
       cctxt;
       dal_cctxt;
+      dac_client;
       data_dir;
       l1_ctxt;
       rollup_address;
@@ -765,6 +779,7 @@ module Internal_for_tests = struct
       {
         cctxt;
         dal_cctxt = None;
+        dac_client = None;
         data_dir;
         l1_ctxt;
         rollup_address = Sc_rollup.Address.zero;

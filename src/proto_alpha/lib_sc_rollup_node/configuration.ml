@@ -61,6 +61,8 @@ type t = {
   mode : mode;
   loser_mode : Loser_mode.t;
   dal_node_endpoint : Uri.t option;
+  dac_observer_endpoint : Uri.t option;
+  dac_timeout : Z.t option;
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;
@@ -489,6 +491,8 @@ let encoding : t Data_encoding.t =
            mode;
            loser_mode;
            dal_node_endpoint;
+           dac_observer_endpoint;
+           dac_timeout;
            batcher;
            injector_retention_period;
            l2_blocks_cache_size;
@@ -503,6 +507,8 @@ let encoding : t Data_encoding.t =
           mode,
           loser_mode ),
         ( dal_node_endpoint,
+          dac_observer_endpoint,
+          dac_timeout,
           batcher,
           injector_retention_period,
           l2_blocks_cache_size ) ))
@@ -516,6 +522,8 @@ let encoding : t Data_encoding.t =
              mode,
              loser_mode ),
            ( dal_node_endpoint,
+             dac_observer_endpoint,
+             dac_timeout,
              batcher,
              injector_retention_period,
              l2_blocks_cache_size ) ) ->
@@ -535,6 +543,8 @@ let encoding : t Data_encoding.t =
         mode;
         loser_mode;
         dal_node_endpoint;
+        dac_observer_endpoint;
+        dac_timeout;
         batcher;
         injector_retention_period;
         l2_blocks_cache_size;
@@ -577,8 +587,10 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj4
+       (obj6
           (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
+          (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
+          (opt "dac-timeout" Data_encoding.z)
           (dft "batcher" batcher_encoding default_batcher)
           (dft
              "injector_retention_period"

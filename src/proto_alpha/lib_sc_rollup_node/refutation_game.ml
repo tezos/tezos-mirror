@@ -228,7 +228,11 @@ module Make (Interpreter : Interpreter.S) :
       let reveal hash =
         let open Lwt_syntax in
         let* res =
-          Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_kind:PVM.kind ~hash
+          Reveals.get
+            ?dac_client:node_ctxt.dac_client
+            ~data_dir:node_ctxt.data_dir
+            ~pvm_kind:PVM.kind
+            hash
         in
         match res with Ok data -> return @@ Some data | Error _ -> return None
 

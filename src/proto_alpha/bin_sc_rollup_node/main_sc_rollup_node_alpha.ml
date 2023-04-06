@@ -150,6 +150,25 @@ let dal_node_endpoint_arg =
           enabled and used in the rollup.")
     (Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s)))
 
+let dac_observer_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"dac-observer"
+    ~placeholder:"dac-observer-endpoint"
+    ~doc:
+      (Format.sprintf
+         "The address of the DAC observer node from which the smart rollup \
+          node downloads preimages requested through the reveal channel.")
+    (Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s)))
+
+let dac_timeout_arg =
+  Tezos_clic.arg
+    ~long:"dac-timeout"
+    ~placeholder:"seconds"
+    ~doc:
+      "Timeout in seconds for which the DAC observer client will wait for a \
+       preimage"
+    Client_proto_args.z_parameter
+
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
   Tezos_clic.arg
@@ -244,8 +263,9 @@ let make_operators sc_rollup_node_operators =
   make_purpose_map purposed_operators ~default:default_operator
 
 let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
-    ~reconnection_delay ~dal_node_endpoint ~injector_retention_period ~mode
-    ~sc_rollup_address ~sc_rollup_node_operators =
+    ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+    ~injector_retention_period ~mode ~sc_rollup_address
+    ~sc_rollup_node_operators =
   let open Configuration in
   let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
   let config =
@@ -257,6 +277,8 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       reconnection_delay =
         Option.value ~default:default_reconnection_delay reconnection_delay;
       dal_node_endpoint;
+      dac_observer_endpoint;
+      dac_timeout;
       metrics_addr;
       fee_parameters = Operator_purpose_map.empty;
       mode;
@@ -273,8 +295,8 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
 
 let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
     ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-    ~injector_retention_period ~mode ~sc_rollup_address
-    ~sc_rollup_node_operators =
+    ~dac_observer_endpoint ~dac_timeout ~injector_retention_period ~mode
+    ~sc_rollup_address ~sc_rollup_node_operators =
   let open Configuration in
   let new_sc_rollup_node_operators = make_operators sc_rollup_node_operators in
   (* Merge operators *)
@@ -298,6 +320,11 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
         rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
         dal_node_endpoint =
           Option.either dal_node_endpoint configuration.dal_node_endpoint;
+        dac_observer_endpoint =
+          Option.either
+            dac_observer_endpoint
+            configuration.dac_observer_endpoint;
+        dac_timeout = Option.either dac_timeout configuration.dac_timeout;
         reconnection_delay =
           Option.value
             ~default:configuration.reconnection_delay
@@ -313,8 +340,8 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
   Configuration.check_mode configuration
 
 let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
-    ~loser_mode ~reconnection_delay ~dal_node_endpoint
-    ~injector_retention_period ~mode ~sc_rollup_address
+    ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
+    ~dac_timeout ~injector_retention_period ~mode ~sc_rollup_address
     ~sc_rollup_node_operators =
   let open Lwt_result_syntax in
   let config_file = Configuration.config_filename ~data_dir in
@@ -332,6 +359,8 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~loser_mode
         ~reconnection_delay
         ~dal_node_endpoint
+        ~dac_observer_endpoint
+        ~dac_timeout
         ~injector_retention_period
         ~mode
         ~sc_rollup_address
@@ -366,6 +395,8 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~loser_mode
         ~reconnection_delay
         ~dal_node_endpoint
+        ~dac_observer_endpoint
+        ~dac_timeout
         ~injector_retention_period
         ~mode
         ~sc_rollup_address
@@ -379,7 +410,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args9
+    (args11
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -388,6 +419,8 @@ let config_init_command =
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
+       dac_observer_endpoint_arg
+       dac_timeout_arg
        injector_retention_period_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
@@ -402,6 +435,8 @@ let config_init_command =
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
+           dac_observer_endpoint,
+           dac_timeout,
            injector_retention_period )
          mode
          sc_rollup_address
@@ -415,6 +450,8 @@ let config_init_command =
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
+          ~dac_observer_endpoint
+          ~dac_timeout
           ~injector_retention_period
           ~mode
           ~sc_rollup_address
@@ -434,7 +471,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args10
+    (args12
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -444,6 +481,8 @@ let legacy_run_command =
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
+       dac_observer_endpoint_arg
+       dac_timeout_arg
        injector_retention_period_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
@@ -455,6 +494,8 @@ let legacy_run_command =
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
+           dac_observer_endpoint,
+           dac_timeout,
            injector_retention_period )
          cctxt ->
       let* configuration =
@@ -466,6 +507,8 @@ let legacy_run_command =
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
+          ~dac_observer_endpoint
+          ~dac_timeout
           ~injector_retention_period
           ~mode
           ~sc_rollup_address
@@ -481,7 +524,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args8
+    (args10
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -489,6 +532,8 @@ let run_command =
        loser_mode_arg
        reconnection_delay_arg
        dal_node_endpoint_arg
+       dac_observer_endpoint_arg
+       dac_timeout_arg
        injector_retention_period_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
@@ -501,6 +546,8 @@ let run_command =
            loser_mode,
            reconnection_delay,
            dal_node_endpoint,
+           dac_observer_endpoint,
+           dac_timeout,
            injector_retention_period )
          mode
          sc_rollup_address
@@ -515,6 +562,8 @@ let run_command =
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
+          ~dac_observer_endpoint
+          ~dac_timeout
           ~injector_retention_period
           ~mode:(Some mode)
           ~sc_rollup_address:(Some sc_rollup_address)
