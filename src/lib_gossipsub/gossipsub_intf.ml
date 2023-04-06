@@ -520,6 +520,10 @@ module type AUTOMATON = sig
     val get_connected_peers :
       ?filters:connected_peers_filter list -> view -> Peer.t list
 
+    (** [get_our_topics state] returns the set of topics the local peer is
+        subscribed to. *)
+    val get_our_topics : view -> Topic.t list
+
     (** [get_subscribed_topics peer state] returns the set of topics
         that are subscribed by [peer] *)
     val get_subscribed_topics : Peer.t -> view -> Topic.t list
