@@ -102,6 +102,12 @@ module External = struct
     let multi_tests =
       let open Cases.Unit_tests_for_each_selector in
       let open Cases.General in
+      let ql = linear_selector_test 0 in
+      let qr = linear_selector_test 1 in
+      let qd = linear_selector_test 3 in
+      let qe = linear_selector_test 4 in
+      let qlg = next_linear_selector_test 0 in
+      let qrg = next_linear_selector_test 1 in
       let module PIs = struct
         let pi_map =
           SMap.of_list

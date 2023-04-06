@@ -59,16 +59,8 @@ module Circuit : sig
 
   val make_gates :
     ?qc:Scalar.t list ->
-    ?ql:Scalar.t list ->
-    ?qr:Scalar.t list ->
-    ?qo:Scalar.t list ->
-    ?qd:Scalar.t list ->
-    ?qe:Scalar.t list ->
-    ?qlg:Scalar.t list ->
-    ?qrg:Scalar.t list ->
-    ?qog:Scalar.t list ->
-    ?qdg:Scalar.t list ->
-    ?qeg:Scalar.t list ->
+    ?linear:(int * Scalar.t list) list ->
+    ?linear_g:(int * Scalar.t list) list ->
     ?qm:Scalar.t list ->
     ?qx2b:Scalar.t list ->
     ?qx5a:Scalar.t list ->
@@ -126,19 +118,13 @@ end = struct
 
   let get_selectors circuit = SMap.keys circuit.gates
 
-  let make_gates ?(qc = []) ?(ql = []) ?(qr = []) ?(qo = []) ?(qd = [])
-      ?(qe = []) ?(qlg = []) ?(qrg = []) ?(qog = []) ?(qdg = []) ?(qeg = [])
-      ?(qm = []) ?(qx2b = []) ?(qx5a = []) ?(qx5c = []) ?(qecc_ws_add = [])
+  let make_gates ?(qc = []) ?(linear = []) ?(linear_g = []) ?(qm = [])
+      ?(qx2b = []) ?(qx5a = []) ?(qx5c = []) ?(qecc_ws_add = [])
       ?(qecc_ed_add = []) ?(qecc_ed_cond_add = []) ?(qbool = [])
       ?(qcond_swap = []) ?(q_anemoi = []) ?(q_plookup = []) ?(q_table = [])
       ?(precomputed_advice = SMap.empty) () =
     if q_anemoi <> [] && SMap.(is_empty precomputed_advice) then
       failwith "Make_gates : q_anemoi must come with advice selectors." ;
-    let filter = List.filter (fun (_, l) -> l <> []) in
-    let linear = [(0, ql); (1, qr); (2, qo); (3, qd); (4, qe)] |> filter in
-    let linear_g =
-      [(0, qlg); (1, qrg); (2, qog); (3, qdg); (4, qeg)] |> filter
-    in
     (* Filtering and mapping selectors with labels. *)
     let gate_list =
       CS.q_list
