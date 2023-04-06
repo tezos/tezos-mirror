@@ -184,7 +184,7 @@ module Make (C : AUTOMATON_CONFIG) :
   type state = {
     limits : limits;
     parameters : parameters;
-    peers_info : connection Peer.Map.t;
+    connections : connection Peer.Map.t;
     scores : peer_score Peer.Map.t;
     ihave_per_heartbeat : int Peer.Map.t;
     iwant_per_heartbeat : int Peer.Map.t;
@@ -214,15 +214,15 @@ module Make (C : AUTOMATON_CONFIG) :
 
      - Forall t, Topic.Map.mem t mesh <=> not (Map.mem t fanout)
 
-     - Forall p c t, Peer.Map.find peers_info p = Some ({ connection = Expires _}) ->
+     - Forall p c t, Peer.Map.find connections p = Some ({ connection = Expires _}) ->
          Topic.Map.find t mesh = None &&
          Topic.Map.find t fanout = None
 
-     - Forall p t, Peer.Map.find peers_info p = None ->
+     - Forall p t, Peer.Map.find connections p = None ->
          Topic.Map.find t mesh = None &&
          Topic.Map.find t fanout = None
 
-     - Forall p. Peer.Map.mem peers_info p -> Peer.Map.mem scores p
+     - Forall p. Peer.Map.mem connections p -> Peer.Map.mem scores p
   *)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4984
@@ -261,7 +261,7 @@ module Make (C : AUTOMATON_CONFIG) :
     {
       limits;
       parameters;
-      peers_info = Peer.Map.empty;
+      connections = Peer.Map.empty;
       scores = Peer.Map.empty;
       ihave_per_heartbeat = Peer.Map.empty;
       iwant_per_heartbeat = Peer.Map.empty;
@@ -331,7 +331,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let backoff state = state.backoff
 
-    let peers_info state = state.peers_info
+    let connections state = state.connections
 
     let scores state = state.scores
 
@@ -391,7 +391,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let set_heartbeat_ticks heartbeat_ticks state =
       ({state with heartbeat_ticks}, ())
 
-    let set_peers_info peers_info state = ({state with peers_info}, ())
+    let set_connections connections state = ({state with connections}, ())
 
     let set_scores scores state = ({state with scores}, ())
 
@@ -416,8 +416,8 @@ module Make (C : AUTOMATON_CONFIG) :
 
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
        Optimize by having a topic to peers map *)
-    let select_peers_info_peers peers_info scores rng topic ~filter ~max =
-      Peer.Map.bindings peers_info
+    let select_connections_peers connections scores rng topic ~filter ~max =
+      Peer.Map.bindings connections
       |> List.filter_map (fun (peer, connection) ->
              let score = get_scores_score ~default:Score.zero scores peer in
              let topics = connection.topics in
@@ -428,10 +428,10 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let select_peers topic ~filter ~max =
       let open Monad.Syntax in
-      let*! peers_info in
+      let*! connections in
       let*! scores in
       let*! rng in
-      select_peers_info_peers peers_info scores rng topic ~filter ~max
+      select_connections_peers connections scores rng topic ~filter ~max
       |> Peer.Set.of_list |> return
 
     let set_mesh_topic topic peers state =
@@ -687,8 +687,8 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let check_active peer =
       let open Monad.Syntax in
-      let*! peers_info in
-      match Peer.Map.find peer peers_info with
+      let*! connections in
+      match Peer.Map.find peer connections with
       | None -> Unexpected_grafting_peer |> fail
       | Some connection -> pass connection
 
@@ -794,15 +794,15 @@ module Make (C : AUTOMATON_CONFIG) :
   module Subscribe = struct
     let handle topic peer =
       let open Monad.Syntax in
-      let*! peers_info in
-      match Peer.Map.find peer peers_info with
+      let*! connections in
+      match Peer.Map.find peer connections with
       | None -> return Subscribe_to_unknown_peer
       | Some connection ->
           let connection =
             {connection with topics = Topic.Set.add topic connection.topics}
           in
-          let peers_info = Peer.Map.add peer connection peers_info in
-          let* () = set_peers_info peers_info in
+          let connections = Peer.Map.add peer connection connections in
+          let* () = set_connections connections in
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
              rust-libp2p adds the peer to the mesh if needed here. *)
           return Subscribed
@@ -814,15 +814,15 @@ module Make (C : AUTOMATON_CONFIG) :
   module Unsubscribe = struct
     let handle topic peer =
       let open Monad.Syntax in
-      let*! peers_info in
-      match Peer.Map.find peer peers_info with
+      let*! connections in
+      match Peer.Map.find peer connections with
       | None -> return @@ Unsubscribe_from_unknown_peer
       | Some connection ->
           let connection =
             {connection with topics = Topic.Set.remove topic connection.topics}
           in
-          let peers = Peer.Map.add peer connection peers_info in
-          let* () = set_peers_info peers in
+          let peers = Peer.Map.add peer connection connections in
+          let* () = set_connections peers in
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5143
              Remove unsubscribed peers from the mesh. *)
           return Unsubscribed
@@ -906,11 +906,11 @@ module Make (C : AUTOMATON_CONFIG) :
     let init_mesh topic : [`Join] output Monad.t =
       let open Monad.Syntax in
       let*! degree_optimal in
-      let*! peers_info in
+      let*! connections in
       let*! backoff in
       let*! scores in
       let is_valid peer =
-        match Peer.Map.find peer peers_info with
+        match Peer.Map.find peer connections with
         | None ->
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/5005
 
@@ -1121,7 +1121,7 @@ module Make (C : AUTOMATON_CONFIG) :
     *)
     let maintain_mesh =
       let open Monad.Syntax in
-      let*! peers_info in
+      let*! connections in
       let*! scores in
       let*! backoff in
       let*! rng in
@@ -1133,7 +1133,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! degree_out in
 
       let has_outbound_connection =
-        peer_has_outbound_connection peers_info ~default:false
+        peer_has_outbound_connection connections ~default:false
       in
 
       let get_score = get_scores_score scores ~default:Score.zero in
@@ -1269,7 +1269,7 @@ module Make (C : AUTOMATON_CONFIG) :
               (not in_mesh) && (not backed_off) && (not connection.direct)
               && Score.(score >= zero)
             in
-            select_peers_info_peers peers_info scores rng topic ~filter ~max
+            select_connections_peers connections scores rng topic ~filter ~max
             |> add_to_peers_topic_set to_graft topic
           else to_graft
         in
@@ -1304,7 +1304,7 @@ module Make (C : AUTOMATON_CONFIG) :
                 && Score.(score >= zero)
                 && has_outbound_connection peer
               in
-              select_peers_info_peers peers_info scores rng topic ~filter ~max
+              select_connections_peers connections scores rng topic ~filter ~max
               |> add_to_peers_topic_set to_graft topic
             else to_graft
           else to_graft
@@ -1393,7 +1393,7 @@ module Make (C : AUTOMATON_CONFIG) :
     *)
     let maintain_fanout =
       let open Monad.Syntax in
-      let*! peers_info in
+      let*! connections in
       let*! scores in
       let*! rng in
       let*! degree_optimal in
@@ -1415,7 +1415,7 @@ module Make (C : AUTOMATON_CONFIG) :
         let peers_to_keep, peers_to_remove =
           Peer.Set.fold
             (fun peer acc ->
-              match Peer.Map.find peer peers_info with
+              match Peer.Map.find peer connections with
               | None ->
                   (* impossible, given the global invariants on the state *)
                   assert false
@@ -1447,8 +1447,8 @@ module Make (C : AUTOMATON_CONFIG) :
             && Compare.Float.(score |> Score.float >= publish_threshold)
           in
           let new_peers =
-            select_peers_info_peers
-              peers_info
+            select_connections_peers
+              connections
               scores
               rng
               topic
@@ -1502,12 +1502,12 @@ module Make (C : AUTOMATON_CONFIG) :
   module Add_peer = struct
     let handle ~direct ~outbound peer : [`Add_peer] output Monad.t =
       let open Monad.Syntax in
-      let*! peers_info in
+      let*! connections in
       let*! scores in
-      match Peer.Map.find peer peers_info with
+      match Peer.Map.find peer connections with
       | None ->
           let connection = {direct; topics = Topic.Set.empty; outbound} in
-          let peers_info = Peer.Map.add peer connection peers_info in
+          let connections = Peer.Map.add peer connection connections in
           let scores =
             Peer.Map.update
               peer
@@ -1516,7 +1516,7 @@ module Make (C : AUTOMATON_CONFIG) :
                 | Some score -> Some {score with expires = None})
               scores
           in
-          let* () = set_peers_info peers_info in
+          let* () = set_connections connections in
           let* () = set_scores scores in
           return Peer_added
       | Some _ -> return Peer_already_known
@@ -1541,8 +1541,8 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = set_fanout fanout in
       let*! retain_duration in
       let*! scores in
-      let*! peers_info in
-      let* () = Peer.Map.remove peer peers_info |> set_peers_info in
+      let*! connections in
+      let* () = Peer.Map.remove peer connections |> set_connections in
       let* () =
         Peer.Map.update
           peer
@@ -1571,8 +1571,8 @@ module Make (C : AUTOMATON_CONFIG) :
       (not (Peer.equal peer_to_prune peer)) && Score.(score >= zero)
     in
     if do_px && not (Peer.Set.mem peer_to_prune noPX_peers) then
-      select_peers_info_peers
-        state.peers_info
+      select_connections_peers
+        state.connections
         state.scores
         state.rng
         topic
@@ -1608,8 +1608,8 @@ module Make (C : AUTOMATON_CONFIG) :
         (* We first select all peers satisfying the criterion and then we see if
            we have too many. *)
         let peers =
-          select_peers_info_peers
-            state.peers_info
+          select_connections_peers
+            state.connections
             state.scores
             rng
             topic
@@ -1764,7 +1764,7 @@ module Make (C : AUTOMATON_CONFIG) :
     type view = state = {
       limits : limits;
       parameters : parameters;
-      peers_info : connection Peer.Map.t;
+      connections : connection Peer.Map.t;
       scores : peer_score Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
@@ -1804,7 +1804,7 @@ module Make (C : AUTOMATON_CONFIG) :
             let score = get_score ~default:Score.zero peer view in
             if filter_rec peer connection score filters then peer :: acc
             else acc)
-          view.peers_info
+          view.connections
           []
 
     let get_peers_in_topic_mesh topic state =
@@ -1813,7 +1813,7 @@ module Make (C : AUTOMATON_CONFIG) :
       | Some peers -> Peer.Set.elements peers
 
     let get_subscribed_topics peer state =
-      match Peer.Map.find peer state.peers_info with
+      match Peer.Map.find peer state.connections with
       | None -> []
       | Some connection -> Topic.Set.elements connection.topics
 

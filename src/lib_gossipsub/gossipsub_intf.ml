@@ -517,7 +517,7 @@ module type AUTOMATON = sig
     type view = {
       limits : limits;
       parameters : parameters;
-      peers_info : connection Peer.Map.t;
+      connections : connection Peer.Map.t;
       scores : peer_score Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
