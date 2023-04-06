@@ -1,0 +1,119 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{ "Hello" ; " " ; "World" ; "!" }' --level 1 --trace-stack
+storage
+  "Hello World!"
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 11.068)
+    [ (Pair { "Hello" ; " " ; "World" ; "!" } "") ]
+  - location: 8 (just consumed gas: 0.010)
+    [ { "Hello" ; " " ; "World" ; "!" } ]
+  - location: 9 (just consumed gas: 0.010)
+    [ ""
+      { "Hello" ; " " ; "World" ; "!" } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ { "Hello" ; " " ; "World" ; "!" }
+      "" ]
+  - location: 13 (just consumed gas: 0)
+    [ "Hello"
+      "" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ ""
+      "Hello" ]
+  - location: 16 (just consumed gas: 0)
+    [ "Hello" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      "Hello" ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "Hello"
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { "Hello" } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ ""
+      { "Hello" } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "" ; "Hello" } ]
+  - location: 23 (just consumed gas: 0.122)
+    [ "Hello" ]
+  - location: 13 (just consumed gas: 0.015)
+    [ " "
+      "Hello" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ "Hello"
+      " " ]
+  - location: 16 (just consumed gas: 0)
+    [ " " ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      " " ]
+  - location: 20 (just consumed gas: 0.010)
+    [ " "
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { " " } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ "Hello"
+      { " " } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "Hello" ; " " } ]
+  - location: 23 (just consumed gas: 0.123)
+    [ "Hello " ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "World"
+      "Hello " ]
+  - location: 15 (just consumed gas: 0.010)
+    [ "Hello "
+      "World" ]
+  - location: 16 (just consumed gas: 0)
+    [ "World" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      "World" ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "World"
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { "World" } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ "Hello "
+      { "World" } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "Hello " ; "World" } ]
+  - location: 23 (just consumed gas: 0.125)
+    [ "Hello World" ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "!"
+      "Hello World" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ "Hello World"
+      "!" ]
+  - location: 16 (just consumed gas: 0)
+    [ "!" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      "!" ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "!"
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { "!" } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ "Hello World"
+      { "!" } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "Hello World" ; "!" } ]
+  - location: 23 (just consumed gas: 0.126)
+    [ "Hello World!" ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "Hello World!" ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      "Hello World!" ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} "Hello World!") ]
+

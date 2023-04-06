@@ -1,0 +1,11 @@
+
+./octez-codec encode 017-PtNairob.fitness from '{
+  "level": 1,
+  "locked_round": 1,
+  "predecessor_round": 1,
+  "round": 2
+}'
+0000000101000000010000000100000002
+
+./octez-codec decode 017-PtNairob.fitness from 0000000101000000010000000100000002
+{ "level": 1, "locked_round": 1, "predecessor_round": 1, "round": 2 }

@@ -1,0 +1,55 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/tzip4_view.tz --details
+Well typed
+Gas remaining: 1039986.099 units remaining
+{ parameter
+    (or (pair %view_const unit (contract nat))
+        (pair %view_add (pair int int) (contract int))) ;
+  storage unit ;
+  code { CAR
+         /* [ or (pair unit (contract nat)) (pair (pair int int) (contract int)) ] */ ;
+         IF_LEFT
+           { CDR
+             /* [ contract nat ] */ ;
+             AMOUNT
+             /* [ mutez : contract nat ] */ ;
+             PUSH nat 5
+             /* [ nat : mutez : contract nat ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation ] */ ;
+             NIL operation
+             /* [ list operation : operation ] */ ;
+             SWAP
+             /* [ operation : list operation ] */ ;
+             CONS
+             /* [ list operation ] */ ;
+             UNIT
+             /* [ unit : list operation ] */ ;
+             SWAP
+             /* [ list operation : unit ] */ ;
+             PAIR
+             /* [ pair (list operation) unit ] */ }
+           { UNPAIR
+             /* [ pair int int : contract int ] */ ;
+             UNPAIR
+             /* [ int : int : contract int ] */ ;
+             ADD
+             /* [ int : contract int ] */ ;
+             AMOUNT
+             /* [ mutez : int : contract int ] */ ;
+             SWAP
+             /* [ int : mutez : contract int ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation ] */ ;
+             NIL operation
+             /* [ list operation : operation ] */ ;
+             SWAP
+             /* [ operation : list operation ] */ ;
+             CONS
+             /* [ list operation ] */ ;
+             UNIT
+             /* [ unit : list operation ] */ ;
+             SWAP
+             /* [ list operation : unit ] */ ;
+             PAIR
+             /* [ pair (list operation) unit ] */ } } }

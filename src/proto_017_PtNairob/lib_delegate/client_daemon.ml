@@ -66,6 +66,10 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   | Error err ->
       cctxt#error "Unexpected error: %a. Exiting..." pp_print_trace err
 
+let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
+  cctxt#message "Waiting for protocol %s to start..." Protocol.name
+  >>= fun () -> Node_rpc.await_protocol_activation cctxt ~chain ()
+
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
@@ -109,9 +113,7 @@ module Baker = struct
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
-    cctxt#message "Waiting for protocol %s to start..." Protocol.name
-    >>= fun () ->
-    Node_rpc.await_protocol_activation cctxt ~chain () >>=? fun () ->
+    await_protocol_start cctxt ~chain >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
@@ -149,6 +151,7 @@ module Accuser = struct
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
+    await_protocol_start cctxt ~chain >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
@@ -183,9 +186,6 @@ module VDF = struct
         ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
         cctxt
     in
-    let*! () =
-      cctxt#message "Waiting for protocol %s to start..." Protocol.name
-    in
-    let* () = Node_rpc.await_protocol_activation cctxt ~chain () in
+    let* () = await_protocol_start cctxt ~chain in
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end

@@ -1,0 +1,119 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/entrypoints/delegatable_target.tz --details
+Well typed
+Gas remaining: 1039960.927 units remaining
+{ parameter
+    (or (or (key_hash %set_delegate) (unit %remove_delegate)) (or %default string nat)) ;
+  storage (pair key_hash (pair string nat)) ;
+  code { DUP
+         /* [ pair (or (or key_hash unit) (or string nat)) key_hash string nat
+            : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+         CAR
+         /* [ or (or key_hash unit) (or string nat)
+            : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+         IF_LEFT
+           { PUSH mutez
+                  0
+             /* [ mutez : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             AMOUNT
+             /* [ mutez : mutez : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             ASSERT_CMPEQ ;
+             DUUP
+             /* [ pair (or (or key_hash unit) (or string nat)) key_hash string nat
+                : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             CDR
+             /* [ pair key_hash string nat : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             CAR
+             /* [ key_hash : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             IMPLICIT_ACCOUNT
+             /* [ contract unit : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             ADDRESS
+             /* [ address : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             SENDER
+             /* [ address : address : or key_hash unit
+                : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+             IFCMPNEQ
+               { SENDER
+                 /* [ address : or key_hash unit
+                    : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+                 PUSH string
+                      "Only the owner can operate."
+                 /* [ string : address : or key_hash unit
+                    : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+                 PAIR
+                 /* [ pair string address : or key_hash unit
+                    : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
+                 FAILWITH
+                 /* [] */ }
+               { DIP { CDR
+                       /* [ pair key_hash string nat ] */ ;
+                       NIL operation
+                       /* [ list operation : pair key_hash string nat ] */ }
+                 /* [ or key_hash unit : list operation : pair key_hash string nat ] */ ;
+                 IF_LEFT
+                   { SOME
+                     /* [ option key_hash : list operation : pair key_hash string nat ] */ ;
+                     SET_DELEGATE
+                     /* [ operation : list operation : pair key_hash string nat ] */ ;
+                     CONS
+                     /* [ list operation : pair key_hash string nat ] */ ;
+                     PAIR
+                     /* [ pair (list operation) key_hash string nat ] */ }
+                   { DROP
+                     /* [ list operation : pair key_hash string nat ] */ ;
+                     NONE key_hash
+                     /* [ option key_hash : list operation : pair key_hash string nat ] */ ;
+                     SET_DELEGATE
+                     /* [ operation : list operation : pair key_hash string nat ] */ ;
+                     CONS
+                     /* [ list operation : pair key_hash string nat ] */ ;
+                     PAIR
+                     /* [ pair (list operation) key_hash string nat ] */ } } }
+           { DIP { CDR
+                   /* [ pair key_hash string nat ] */ ;
+                   DUP
+                   /* [ pair key_hash string nat : pair key_hash string nat ] */ ;
+                   CDR
+                   /* [ pair string nat : pair key_hash string nat ] */ }
+             /* [ or string nat : pair string nat : pair key_hash string nat ] */ ;
+             PAIR
+             /* [ pair (or string nat) string nat : pair key_hash string nat ] */ ;
+             { UNPAIR
+               /* [ or string nat : pair string nat : pair key_hash string nat ] */ ;
+               IF_LEFT
+                 { DIP { UNPAIR
+                         /* [ string : nat : pair key_hash string nat ] */ ;
+                         DROP
+                         /* [ nat : pair key_hash string nat ] */ }
+                   /* [ string : nat : pair key_hash string nat ] */ }
+                 { DUG 1
+                   /* [ pair string nat : nat : pair key_hash string nat ] */ ;
+                   UNPAIR
+                   /* [ string : nat : nat : pair key_hash string nat ] */ ;
+                   DIP { DROP /* [ nat : pair key_hash string nat ] */ }
+                   /* [ string : nat : pair key_hash string nat ] */ } ;
+               PAIR
+               /* [ pair string nat : pair key_hash string nat ] */ ;
+               NIL operation
+               /* [ list operation : pair string nat : pair key_hash string nat ] */ ;
+               PAIR
+               /* [ pair (list operation) string nat : pair key_hash string nat ] */ } ;
+             SWAP
+             /* [ pair key_hash string nat : pair (list operation) string nat ] */ ;
+             CAR
+             /* [ key_hash : pair (list operation) string nat ] */ ;
+             SWAP
+             /* [ pair (list operation) string nat : key_hash ] */ ;
+             UNPAIR
+             /* [ list operation : pair string nat : key_hash ] */ ;
+             DIP { SWAP /* [ key_hash : pair string nat ] */ ; PAIR /* [ pair key_hash string nat ] */ }
+             /* [ list operation : pair key_hash string nat ] */ ;
+             PAIR
+             /* [ pair (list operation) key_hash string nat ] */ } } }

@@ -288,7 +288,7 @@ let test_multi_protocols =
                    __LOC__))
         in
         let* () =
-          if Protocol.(number proto > number Mumbai) then (
+          if Protocol.(number proto > number Nairobi) then (
             let* proto_attestation_rights =
               RPC.Client.call client
               @@ RPC.get_chain_block_helper_attestation_rights ?block ()

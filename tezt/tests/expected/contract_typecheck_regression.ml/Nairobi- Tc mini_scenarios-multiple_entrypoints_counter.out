@@ -1,0 +1,148 @@
+
+./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/multiple_entrypoints_counter.tz --details
+Well typed
+Gas remaining: 1039930.762 units remaining
+{ parameter unit ;
+  storage (option address) ;
+  code { SENDER
+         /* [ address : pair unit (option address) ] */ ;
+         SELF
+         /* [ contract unit : address : pair unit (option address) ] */ ;
+         ADDRESS
+         /* [ address : address : pair unit (option address) ] */ ;
+         IFCMPEQ
+           { CDR
+             /* [ option address ] */ ;
+             ASSERT_SOME
+             /* [ int : pair (or (or nat nat) unit) int ] */ ;
+             DIP { /* [ pair (or (or nat nat) unit) int ] */ NIL operation /* [ list operation ] */ }
+             /* [] */ ;
+             DUP
+             /* [ address : address : list operation ] */ ;
+             CONTRACT %add
+               unit
+               /* [ int ] */
+             /* [ option (contract unit) : address : list operation ] */ ;
+             ASSERT_NONE ;
+             DUP
+             /* [ address : address : list operation ] */ ;
+             CONTRACT %fact
+               nat
+               /* [ list operation : int ] */
+             /* [ option (contract nat) : address : list operation ] */ ;
+             ASSERT_NONE ;
+             DUP
+             /* [ address : address : list operation ] */ ;
+             CONTRACT %add nat
+             /* [ option (contract nat) : address : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez 0
+             /* [ mutez : contract nat : address : list operation ] */ ;
+             PUSH nat 12
+             /* [ nat : mutez : contract nat : address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : address : list operation ] */ ;
+             SWAP
+             /* [ address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ address : list operation ] */ ;
+             DUP
+             /* [ address : address : list operation ] */ ;
+             CONTRACT unit
+             /* [ option (contract unit) : address : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez 0
+             /* [ mutez : contract unit : address : list operation ] */ ;
+             PUSH unit Unit
+             /* [ unit : mutez : contract unit : address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : address : list operation ] */ ;
+             SWAP
+             /* [ address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ address : list operation ] */ ;
+             DUP
+             /* [ address : address : list operation ] */ ;
+             CONTRACT %sub nat
+             /* [ option (contract nat) : address : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez 0
+             /* [ mutez : contract nat : address : list operation ] */ ;
+             PUSH nat 3
+             /* [ nat : mutez : contract nat : address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : address : list operation ] */ ;
+             SWAP
+             /* [ address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ address : list operation ] */ ;
+             DUP
+             /* [ address : address : list operation ] */ ;
+             CONTRACT %add nat
+             /* [ option (contract nat) : address : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez 0
+             /* [ mutez : contract nat : address : list operation ] */ ;
+             PUSH nat 5
+             /* [ nat : mutez : contract nat : address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : address : list operation ] */ ;
+             SWAP
+             /* [ address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ address : list operation ] */ ;
+             DROP
+             /* [ list operation ] */ ;
+             DIP { NONE address /* [ option address ] */ }
+             /* [ list operation : option address ] */ ;
+             PAIR
+             /* [ pair (list operation) (option address) ] */ }
+           { CAR
+             /* [ unit ] */ ;
+             DUP
+             /* [ unit : unit ] */ ;
+             DIP { DIP { PUSH int 0
+                         /* [ int ] */ ;
+                         PUSH mutez 0
+                         /* [ mutez : int ] */ ;
+                         NONE key_hash
+                         /* [ option key_hash : mutez : int ] */ }
+                   /* [ unit : option key_hash : mutez : int ] */ ;
+                   DROP
+                   /* [ option key_hash : mutez : int ] */ ;
+                   CREATE_CONTRACT
+                     { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
+                       storage int ;
+                       code { AMOUNT ;
+                              PUSH mutez 0 ;
+                              ASSERT_CMPEQ ;
+                              UNPAIR ;
+                              IF_LEFT
+                                { IF_LEFT { ADD } { SWAP ; SUB } }
+                                { DROP ; DROP ; PUSH int 0 } ;
+                              NIL operation ;
+                              PAIR } }
+                   /* [ operation : address ] */ }
+             /* [ unit : operation : address ] */ ;
+             DIP { SELF
+                   /* [ contract unit : operation : address ] */ ;
+                   PUSH mutez 0
+                   /* [ mutez : contract unit : operation : address ] */ }
+             /* [ unit : mutez : contract unit : operation : address ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : operation : address ] */ ;
+             NIL operation
+             /* [ list operation : operation : operation : address ] */ ;
+             SWAP
+             /* [ operation : list operation : operation : address ] */ ;
+             CONS
+             /* [ list operation : operation : address ] */ ;
+             SWAP
+             /* [ operation : list operation : address ] */ ;
+             CONS
+             /* [ list operation : address ] */ ;
+             DIP { SOME /* [ option address ] */ }
+             /* [ list operation : option address ] */ ;
+             PAIR
+             /* [ pair (list operation) (option address) ] */ }
+         /* [ mutez : pair (or (or nat nat) unit) int ] */ } }
