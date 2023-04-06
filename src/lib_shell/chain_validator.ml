@@ -613,6 +613,15 @@ let on_disconnection w peer_id =
       let*! pv in
       match pv with
       | Ok pv ->
+          (* Shutting down the peer validator will indirectly trigger
+             a disconnection. However, the disconnection can be
+             effective only after the peer validator is shutdown (see
+             {!val:Peer_validator.on_close}). This is a defensive
+             mechanism so that if the disconnection takes too much
+             time (even though it is not supposed to happen), the
+             validation is not stuck. In any case, the peer validator
+             is removed from the active peers (see
+             {!val:with_activated_peer_validator}). *)
           let*! () = Peer_validator.shutdown pv in
           return_unit)
 

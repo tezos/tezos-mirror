@@ -451,9 +451,17 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
   | New_branch _ -> on_error_trace err
 
 let on_close w =
-  let open Lwt_syntax in
   let pv = Worker.state w in
-  let* () = Distributed_db.disconnect pv.parameters.chain_db pv.peer_id in
+  (* We request the the P2P layer to disconnect from this peer, but we
+     do not wait for the disconnection to be effective (the underlying
+     socket is closed). This is because the P2P layer does not offer
+     the guarantee that the disconnection will be quick.
+
+     This is not a problem, and allows the reconnection with this peer
+     using a different socket. *)
+  let (_ : unit Lwt.t) =
+    Distributed_db.disconnect pv.parameters.chain_db pv.peer_id
+  in
   pv.parameters.notify_termination () ;
   Lwt.return_unit
 
