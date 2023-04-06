@@ -150,7 +150,10 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   (* Build the permutation such that nj <-> N + i_j for n = [up_bound],
      j < len([rc]), N = [size_domain], i_j = index of the j-th range check in
-     [rc] *)
+     [rc]
+     Note that identities and Z building must consider the polynomials in the
+     order imposed by this permutation, which stands for the order Z_RC — Wire.
+  *)
   let build_permutation ~range_checks:(rc, up_bound) ~size_domain =
     let get_safe l i =
       try size_domain + List.nth l (i / up_bound) with _ -> i
@@ -175,6 +178,15 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       in
       Array.append fst snd
 
+  (* We have to make sure we consider the values we give to Perm functions
+     in the same order as the permutation we build ; the current permutation
+     stands for the order Z_RC — Wire. *)
+  let prefix_for_perm =
+    SMap.Aggregation.update_key_name (fun k ->
+        if k = batched_wire then "2." ^ batched_wire
+        else if k = batched_z_name then "1." ^ k
+        else k)
+
   (* TODO we should be able to aggregate permutation for different range checks
      proofs as we do for wires ; for now & simplicity, we don’t handle several
      proofs in one circuit *)
@@ -191,8 +203,9 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let values =
         SMap.of_list
           [
-            (batched_wire, SMap.find batched_wire batched_values);
-            (batched_z_name, SMap.find batched_z_name batched_values);
+            (prefix_for_perm batched_wire, SMap.find batched_wire batched_values);
+            ( prefix_for_perm batched_z_name,
+              SMap.find batched_z_name batched_values );
           ]
       in
       Perm.f_map_contribution
@@ -205,29 +218,35 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         ()
 
     let prover_identities ?(circuit_prefix = Fun.id) ~beta ~gamma ~domain_size
-        () =
+        () evaluations =
+      let evaluations = SMap.update_keys prefix_for_perm evaluations in
       Perm.prover_identities
         ~external_prefix
         ~circuit_prefix
-        ~wires_names:[batched_z_name; batched_wire]
+        ~wires_names:(List.map prefix_for_perm [batched_wire; batched_z_name])
         ~beta
         ~gamma
         ~n:domain_size
         ()
+        evaluations
 
     let verifier_identities ?(circuit_prefix = Fun.id) ~nb_proofs ~beta ~gamma
-        ~delta ~domain_size ~generator () =
+        ~delta ~domain_size ~generator () x answers =
+      let answers = SMap.(map (update_keys prefix_for_perm)) answers in
+
       Perm.verifier_identities
         ~external_prefix
         ~circuit_prefix
         ~nb_proofs
         ~generator
         ~n:domain_size
-        ~wires_names:[z_name; wire]
+        ~wires_names:(List.map prefix_for_perm [wire; z_name])
         ~beta
         ~gamma
         ~delta
         ()
+        x
+        answers
   end
 
   module RangeChecks = struct

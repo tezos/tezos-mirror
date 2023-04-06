@@ -123,6 +123,13 @@ module StringMap = struct
     (* separator between prefixes & name ; must be only one character *)
     let sep = "~"
 
+    let update_key_name f str =
+      match String.rindex_from_opt str (String.length str - 1) sep.[0] with
+      | None -> f str
+      | Some i ->
+          String.sub str 0 (i + 1)
+          ^ f (String.sub str (i + 1) (String.length str - i - 1))
+
     let padded ~n i =
       let str = string_of_int i in
       let len = String.length (string_of_int (n - 1)) in
@@ -220,6 +227,13 @@ module type S = sig
   module Aggregation : sig
     (* Separator for prefixing *)
     val sep : string
+
+    (* applies the input function on the last part of the input string (parts
+       are delimited by sep).
+       [update_key_name f ("hello" ^ sep ^ "world" ^ sep ^ "!!")]
+       returns ["hello" ^ sep ^ "world" ^ sep ^ (f "!!")]
+    *)
+    val update_key_name : (key -> key) -> key -> key
 
     (* [add_prefix ~n ~i ~shift prefix str] return idx^prefix^sep^str
        idx = [i] + [shift] as a string, eventually padded with '0' before to
