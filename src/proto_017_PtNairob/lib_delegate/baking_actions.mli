@@ -98,7 +98,9 @@ val inject_preendorsements :
 val sign_endorsements :
   state ->
   (consensus_key_and_delegate * consensus_content) list ->
-  (consensus_key_and_delegate * packed_operation) list tzresult Lwt.t
+  (consensus_key_and_delegate * packed_operation * int32 * Round.t) list
+  tzresult
+  Lwt.t
 
 val inject_endorsements :
   state ->
@@ -118,7 +120,7 @@ val get_dal_attestations :
   (consensus_key_and_delegate * Dal.Attestation.operation) list tzresult Lwt.t
 
 val prepare_waiting_for_quorum :
-  state -> int * (slot:Slot.t -> int) * Operation_worker.candidate
+  state -> int * (slot:Slot.t -> int option) * Operation_worker.candidate
 
 val start_waiting_for_preendorsement_quorum : state -> unit Lwt.t
 

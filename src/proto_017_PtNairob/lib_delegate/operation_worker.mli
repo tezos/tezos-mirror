@@ -72,14 +72,14 @@ val get_quorum_event_stream : t -> event Lwt_stream.t
 val monitor_preendorsement_quorum :
   t ->
   consensus_threshold:int ->
-  get_preendorsement_voting_power:(slot:Slot.t -> int) ->
+  get_slot_voting_power:(slot:Slot.t -> int option) ->
   candidate ->
   unit Lwt.t
 
 val monitor_endorsement_quorum :
   t ->
   consensus_threshold:int ->
-  get_endorsement_voting_power:(slot:Slot.t -> int) ->
+  get_slot_voting_power:(slot:Slot.t -> int option) ->
   candidate ->
   unit Lwt.t
 
