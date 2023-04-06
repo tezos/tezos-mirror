@@ -46,7 +46,6 @@ module External (PC : Polynomial_commitment.S) = struct
     try H.test_circuit ~name:"RC_single_wrong" ~zero_knowledge circuit inputs
     with Plonk.Main_protocol.Rest_not_null _ -> ()
 
-  (* This test does not work since several proofs are not supported yet *)
   let test_range_checks_multi ~zero_knowledge () =
     let wires = Array.map Array.to_list General.circuit.wires in
     let gates = SMap.map Array.to_list General.circuit.gates in
@@ -91,8 +90,8 @@ module External (PC : Polynomial_commitment.S) = struct
 
   let tests_quick pc_name =
     [
-      (pc_name ^ ".RC_single", test_range_checks_single)
-      (* (pc_name ^ ".RC_multi", test_range_checks_multi); *);
+      (pc_name ^ ".RC_single", test_range_checks_single);
+      (pc_name ^ ".RC_multi", test_range_checks_multi);
     ]
 end
 

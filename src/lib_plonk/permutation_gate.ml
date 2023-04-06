@@ -482,6 +482,9 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
           f_wires
       in
       batched_witness_polys |> SMap.Aggregation.smap_of_smap_smap
+
+    let merge_batched_values m1 m2 =
+      SMap.mapi (fun k v -> SMap.union_disjoint v (SMap.find k m1)) m2
   end
 
   (* max degree needed is the degree of Perm.b, which is sum of wire’s degree plus z degree *)
@@ -716,6 +719,9 @@ module type S = sig
       f:Poly.t SMap.t list SMap.t * Poly.t SMap.t option list SMap.t ->
       unit ->
       Poly.t SMap.t
+
+    val merge_batched_values :
+      'a SMap.t SMap.t -> 'a SMap.t SMap.t -> 'a SMap.t SMap.t
   end
 end
 

@@ -56,6 +56,8 @@ module StringMap = struct
         (List.map (fun (k, v) -> k ^ ": " ^ show_inner v) (bindings m))
     ^ "\n}"
 
+  let to_pair m = (map fst m, map snd m)
+
   let add_unique k v m =
     if mem k m then
       raise
@@ -185,6 +187,8 @@ module type S = sig
   val keys : 'a t -> string list
 
   val values : 'a t -> 'a list
+
+  val to_pair : ('a * 'b) t -> 'a t * 'b t
 
   (* [add_unique k v map] adds [k -> v] to [map] & throw an error if [k] is
      already in [map]

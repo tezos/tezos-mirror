@@ -95,7 +95,7 @@ module Make (Main : Plonk_for_distribution.Main_protocol.S) : S = struct
         Prover.build_evaluations pp (SMap.union_disjoint all_f_wires f_map)
       in
       let identities =
-        Prover.build_gates_plook_rc_identities
+        Prover.build_gates_plook_rc1_identities
           ~shifts_map
           pp
           {

@@ -422,32 +422,75 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         wires_list_map
       |> SMap.Aggregation.gather_maps ?shifts_map
 
-    let build_f_map_range_checks ?shifts_map pp
-        {beta_rc = beta; gamma_rc = gamma; _} wires_list_map =
+    let build_f_map_rc_1 ?shifts_map pp {delta; _} wires_list_map batched_wires
+        =
+      let rc_map, rc_z_evals =
+        SMap.mapi
+          (fun name w_list ->
+            let circuit_pp = SMap.find name pp.circuits_map in
+            if fst circuit_pp.range_checks = [] then ([], [])
+            else
+              List.map
+                (fun values ->
+                  let rc_z_eval, rc_map =
+                    RangeCheck.f_map_contribution_1
+                      ~range_checks:circuit_pp.range_checks
+                      ~domain:pp.common_pp.domain
+                      ~values
+                  in
+                  let rc_map =
+                    if pp.common_pp.zk then
+                      SMap.map
+                        (fun f ->
+                          fst (Poly.blind ~nb_blinds:3 pp.common_pp.n f))
+                        rc_map
+                    else rc_map
+                  in
+                  (rc_map, rc_z_eval))
+                w_list
+              |> List.split)
+          wires_list_map
+        |> SMap.to_pair
+      in
+      let batched_z_evals =
+        SMap.mapi
+          (fun name z_evals ->
+            if fst (SMap.find name pp.circuits_map).range_checks = [] then
+              SMap.empty
+            else
+              SMap.singleton
+                RangeCheck.batched_z_name
+                (Evaluations.linear_with_powers z_evals delta))
+          rc_z_evals
+      in
+      let batched_values =
+        Perm.Shared_argument.merge_batched_values batched_z_evals batched_wires
+      in
+      (SMap.Aggregation.gather_maps ?shifts_map rc_map, batched_values)
+
+    let build_f_map_rc_2 pp {beta_rc = beta; gamma_rc = gamma; _} batched_values
+        =
       SMap.mapi
-        (fun name w_list ->
+        (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
-          if fst circuit_pp.range_checks = [] then []
+          if fst circuit_pp.range_checks = [] then SMap.empty
           else
-            List.map
-              (fun wires ->
-                let rc_map =
-                  RangeCheck.f_map_contribution
-                    ~permutation:circuit_pp.rc_permutation
-                    ~beta
-                    ~gamma
-                    ~domain:pp.common_pp.domain
-                    ~range_checks:circuit_pp.range_checks
-                    ~values:wires
-                in
-                if pp.common_pp.zk then
-                  SMap.map
-                    (fun f -> fst (Poly.blind ~nb_blinds:3 pp.common_pp.n f))
-                    rc_map
-                else rc_map)
-              w_list)
-        wires_list_map
-      |> SMap.Aggregation.gather_maps ?shifts_map
+            let zs =
+              RangeCheck.f_map_contribution_2
+                ~permutation:circuit_pp.rc_permutation
+                ~beta
+                ~gamma
+                ~domain:pp.common_pp.domain
+                ~values
+            in
+            if pp.common_pp.zk then
+              SMap.map
+                (* 3 blinds because the polynomial is evaluated at x and gx *)
+                  (fun f -> fst (Poly.blind ~nb_blinds:3 pp.common_pp.n f))
+                zs
+            else zs)
+        batched_values
+      |> SMap.Aggregation.smap_of_smap_smap
 
     let format_input_com (inputs_map : circuit_prover_input list SMap.t) =
       SMap.mapi
@@ -483,30 +526,42 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       Evaluations.compute_evaluations_update_map ~evaluations f_map
 
-    let build_perm_identities pp rd =
+    let build_perm_rc2_identities pp rd =
       SMap.mapi
         (fun circuit_name circuit_pp ->
-          let perm_identities =
-            (* Using the batched wires *)
-            let wires_names =
-              List.map
-                String.capitalize_ascii
-                (wire_names @@ Array.length circuit_pp.wires)
-            in
+          (* Using the batched wires *)
+          let wires_names =
+            List.map
+              String.capitalize_ascii
+              (wire_names @@ Array.length circuit_pp.wires)
+          in
+          let circuit_prefix = SMap.Aggregation.add_prefix circuit_name in
+          let perm_id =
             Perm.prover_identities
-              ~circuit_prefix:(SMap.Aggregation.add_prefix circuit_name)
+              ~circuit_prefix
               ~wires_names
               ~beta:rd.beta_perm
               ~gamma:rd.gamma_perm
               ~n:pp.common_pp.n
               ()
           in
-          perm_identities)
+          if fst circuit_pp.range_checks = [] then perm_id
+          else
+            let rc2_ids =
+              RangeCheck.prover_identities_2
+                ~circuit_prefix
+                ~beta:rd.beta_rc
+                ~gamma:rd.gamma_rc
+                ~domain_size:pp.common_pp.n
+                ()
+            in
+
+            merge_prover_identities [perm_id; rc2_ids])
         pp.circuits_map
       |> SMap.values |> merge_prover_identities
 
-    let build_gates_plook_rc_identities ?shifts_map pp
-        {beta_plook; gamma_plook; beta_rc; gamma_rc; _} inputs_map =
+    let build_gates_plook_rc1_identities ?shifts_map pp
+        {beta_plook; gamma_plook; _} inputs_map =
       let identities_map =
         SMap.mapi
           (fun circuit_name inputs_list ->
@@ -561,20 +616,18 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       ~n:pp.common_pp.n
                       ())
             in
-            let rc_identities =
+            let rc1_identities =
               if fst circuit_pp.range_checks = [] then []
               else
                 List.init nb_proofs (fun i ->
-                    RangeCheck.prover_identities
+                    RangeCheck.prover_identities_1
                       ~circuit_prefix
                       ~proof_prefix:(proof_prefix i)
-                      ~beta:beta_rc
-                      ~gamma:gamma_rc
                       ~domain_size:pp.common_pp.n
                       ())
             in
             merge_prover_identities
-              (plookup_identities @ gates_identities @ rc_identities))
+              (rc1_identities @ plookup_identities @ gates_identities))
           inputs_map
       in
       merge_prover_identities (SMap.values identities_map)
@@ -594,29 +647,38 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           ~wires:wires_list_map
       in
 
-      let f_map_contributions =
+      (* The new batched_wires is used for the RC shared perm argument *)
+      let f_map_contributions, batched_wires =
         let f_map_perm = build_f_map_perm pp rd batched_wires in
         let f_map_plook = build_f_map_plook pp rd wires_list_map in
-        let f_map_rc = build_f_map_range_checks pp rd wires_list_map in
-        SMap.union_disjoint_list [f_map_perm; f_map_plook; f_map_rc]
+        let f_map_rc1, batched_values =
+          build_f_map_rc_1 pp rd wires_list_map batched_wires
+        in
+        let f_map_rc2 = build_f_map_rc_2 pp rd batched_values in
+        ( SMap.union_disjoint_list
+            [f_map_perm; f_map_plook; f_map_rc1; f_map_rc2],
+          batched_values )
       in
 
       let input_com_secrets = format_input_com inputs_map in
 
       let identities =
-        let perm_ids = build_perm_identities pp rd in
-        let gates_plook_rc_ids =
-          build_gates_plook_rc_identities pp rd inputs_map
+        let gates_plook_rc1_ids =
+          build_gates_plook_rc1_identities pp rd inputs_map
         in
-        merge_prover_identities [perm_ids; gates_plook_rc_ids]
+        let perm_rc2_ids = build_perm_rc2_identities pp rd in
+        merge_prover_identities [perm_rc2_ids; gates_plook_rc1_ids]
       in
 
       let eval_points =
         pp.common_pp.eval_points @ List.map (Fun.const [X]) input_com_secrets
       in
 
+      (* Here we introduced the use_batched_wires because f_wires does not contain rc stuff, which will be missing if batched wires polys are deduced from f_wires *)
       let batched_wires_polys =
         Perm.Shared_argument.build_batched_witness_polys
+          ~use_batched_wires:
+            (SMap.exists (fun _ c -> fst c.range_checks <> []) pp.circuits_map)
           ~zero_knowledge:pp.common_pp.zk
           ~domain:pp.common_pp.domain
           ~delta:rd.delta
@@ -761,22 +823,31 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       ~proof_prefix:(proof_prefix i)
                       ())
             in
-            let rc_identities =
-              if not circuit_pp.range_checks then []
-              else
+            if not circuit_pp.range_checks then
+              merge_verifier_identities
+                (perm_identities :: (plookup_identities @ gates_identities))
+            else
+              let rc1_identities =
                 List.init nb_proofs (fun i ->
-                    RangeCheck.verifier_identities
+                    RangeCheck.verifier_identities_1
                       ~circuit_prefix
-                      ~beta:rd.beta_rc
-                      ~gamma:rd.gamma_rc
-                      ~domain_size:n
-                      ~generator
-                      ()
-                      ~proof_prefix:(proof_prefix i))
-            in
-            merge_verifier_identities
-              (perm_identities
-              :: (plookup_identities @ gates_identities @ rc_identities)))
+                      ~proof_prefix:(proof_prefix i)
+                      ())
+              in
+              let rc2_identities =
+                RangeCheck.verifier_identities_2
+                  ~circuit_prefix
+                  ~nb_proofs
+                  ~beta:rd.beta_rc
+                  ~gamma:rd.gamma_rc
+                  ~delta:rd.delta
+                  ~domain_size:n
+                  ~generator
+                  ()
+              in
+              merge_verifier_identities
+                (perm_identities :: rc2_identities
+                :: (rc1_identities @ plookup_identities @ gates_identities)))
           public_inputs_map
       in
       merge_verifier_identities (SMap.values identities_map)

@@ -46,10 +46,10 @@ open Identities
 module type S = sig
   module PP : Polynomial_protocol.S
 
+  val batched_z_name : string
+
   val build_permutation :
     range_checks:int list * int -> size_domain:int -> int array
-
-  val common_preprocessing : unit -> 'a SMap.t
 
   val preprocessing :
     permutation:int array ->
@@ -57,29 +57,57 @@ module type S = sig
     domain:Domain.t ->
     Poly.t SMap.t
 
-  val f_map_contribution :
-    permutation:int array ->
-    beta:Scalar.t ->
-    gamma:Scalar.t ->
-    domain:Domain.t ->
+  (* Builds the pure range check proof polynomials *)
+  val f_map_contribution_1 :
     range_checks:int list * int ->
+    domain:Domain.t ->
+    values:Evaluations.t SMap.t ->
+    Evaluations.t * Poly.t SMap.t
+
+  (* Builds the shared permutation proof polynomials for the range check proof polynomials built with f_map_contribution_1
+     [values] must contain the wire polynomial that is being range checked and its range check proof polynomial, each in aggregated version
+  *)
+  val f_map_contribution_2 :
+    permutation:int array ->
+    beta:Poly.scalar ->
+    gamma:Poly.scalar ->
+    domain:Domain.t ->
     values:Evaluations.t SMap.t ->
     Poly.t SMap.t
 
-  val prover_identities :
+  (* Builds the pure range check identities *)
+  val prover_identities_1 :
     ?circuit_prefix:(string -> string) ->
     proof_prefix:(string -> string) ->
+    domain_size:int ->
+    unit ->
+    prover_identities
+
+  (* Builds the permutation identities for the range check polynomials *)
+  val prover_identities_2 :
+    ?circuit_prefix:(string -> string) ->
     beta:Scalar.t ->
     gamma:Scalar.t ->
     domain_size:int ->
     unit ->
     prover_identities
 
-  val verifier_identities :
+  (* Builds the pure range check identities *)
+  val verifier_identities_1 :
     ?circuit_prefix:(string -> string) ->
     proof_prefix:(string -> string) ->
+    unit ->
+    Scalar.t ->
+    Scalar.t SMap.t SMap.t ->
+    Scalar.t SMap.t
+
+  (* Builds the permutation identities for the range check polynomials *)
+  val verifier_identities_2 :
+    ?circuit_prefix:(string -> string) ->
+    nb_proofs:int ->
     beta:Scalar.t ->
     gamma:Scalar.t ->
+    delta:Scalar.t ->
     domain_size:int ->
     generator:Scalar.t ->
     unit ->
@@ -100,6 +128,10 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
   let rc_prefix = "RC_"
 
   let wire = Plompiler.Csir.wire_name 0
+
+  let batched_wire = String.capitalize_ascii wire
+
+  let batched_z_name = "RC_Z_BATCHED"
 
   type public_parameters = Poly.t SMap.t
 
@@ -154,7 +186,15 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
     let preprocessing ~permutation ~domain =
       Perm.preprocessing ~external_prefix ~domain ~permutation ~nb_wires:2 ()
 
-    let f_map_contribution ~permutation ~beta ~gamma ~domain ~values =
+    let f_map_contribution ~permutation ~beta ~gamma ~domain
+        ~values:batched_values =
+      let values =
+        SMap.of_list
+          [
+            (batched_wire, SMap.find batched_wire batched_values);
+            (batched_z_name, SMap.find batched_z_name batched_values);
+          ]
+      in
       Perm.f_map_contribution
         ~external_prefix
         ~permutation
@@ -164,28 +204,29 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         ~domain
         ()
 
-    let prover_identities ~circuit_prefix ~prefix:_ ~beta ~gamma domain_size =
+    let prover_identities ?(circuit_prefix = Fun.id) ~beta ~gamma ~domain_size
+        () =
       Perm.prover_identities
         ~external_prefix
         ~circuit_prefix
-        ~wires_names:[z_name; wire]
+        ~wires_names:[batched_z_name; batched_wire]
         ~beta
         ~gamma
         ~n:domain_size
         ()
 
-    let verifier_identities ~circuit_prefix ~prefix:_ ~beta ~gamma domain_size
-        generator =
+    let verifier_identities ?(circuit_prefix = Fun.id) ~nb_proofs ~beta ~gamma
+        ~delta ~domain_size ~generator () =
       Perm.verifier_identities
         ~external_prefix
         ~circuit_prefix
-        ~nb_proofs:1
+        ~nb_proofs
         ~generator
         ~n:domain_size
         ~wires_names:[z_name; wire]
         ~beta
         ~gamma
-        ~delta:one
+        ~delta
         ()
   end
 
@@ -265,7 +306,8 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let evals, z = compute_Z domain upper_bound k check_indices wire in
       (evals, SMap.of_list [(z_name, z)])
 
-    let prover_identities ~circuit_prefix ~prefix n evaluations =
+    let prover_identities ?(circuit_prefix = Fun.id) ~proof_prefix:prefix
+        ~domain_size:n () evaluations =
       let z_evaluation =
         Evaluations.find_evaluation evaluations (prefix z_name)
       in
@@ -323,7 +365,8 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       SMap.of_list
         [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
 
-    let verifier_identities ~circuit_prefix ~prefix _x answers =
+    let verifier_identities ?(circuit_prefix = Fun.id) ~proof_prefix:prefix ()
+        _x answers =
       let z = get_answer answers X (prefix z_name) in
       let zg = get_answer answers GX (prefix z_name) in
       let lnin1 = get_answer answers X (circuit_prefix lnin1) in
@@ -343,57 +386,17 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let perm = Permutation.preprocessing ~permutation ~domain in
       SMap.union_disjoint rc perm
 
-  let common_preprocessing () = SMap.empty
+  let f_map_contribution_1 = RangeChecks.f_map_contribution
 
-  let f_map_contribution ~permutation ~beta ~gamma ~domain ~range_checks
-      ~(values : Evaluations.t SMap.t) =
-    let values = SMap.singleton wire (SMap.find wire values) in
-    let z_evals, f_rc =
-      RangeChecks.f_map_contribution ~range_checks ~domain ~values
-    in
-    let f_perm =
-      Permutation.f_map_contribution
-        ~permutation
-        ~beta
-        ~gamma
-        ~domain
-        ~values:(SMap.add_unique z_name z_evals values)
-    in
-    SMap.union_disjoint f_rc f_perm
+  let f_map_contribution_2 = Permutation.f_map_contribution
 
-  let prover_identities ?(circuit_prefix = Fun.id) ~proof_prefix ~beta ~gamma
-      ~domain_size () =
-    let rc_ids =
-      RangeChecks.prover_identities
-        ~circuit_prefix
-        ~prefix:proof_prefix
-        domain_size
-    in
-    let perm_ids =
-      Permutation.prover_identities
-        ~circuit_prefix
-        ~prefix:proof_prefix
-        ~beta
-        ~gamma
-        domain_size
-    in
-    Identities.merge_prover_identities [rc_ids; perm_ids]
+  let prover_identities_1 = RangeChecks.prover_identities
 
-  let verifier_identities ?(circuit_prefix = Fun.id) ~proof_prefix ~beta ~gamma
-      ~domain_size ~generator () =
-    let rc_ids =
-      RangeChecks.verifier_identities ~circuit_prefix ~prefix:proof_prefix
-    in
-    let perm_ids =
-      Permutation.verifier_identities
-        ~circuit_prefix
-        ~prefix:proof_prefix
-        ~beta
-        ~gamma
-        domain_size
-        generator
-    in
-    Identities.merge_verifier_identities [rc_ids; perm_ids]
+  let prover_identities_2 = Permutation.prover_identities
+
+  let verifier_identities_1 = RangeChecks.verifier_identities
+
+  let verifier_identities_2 = Permutation.verifier_identities
 end
 
 module Range_check_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

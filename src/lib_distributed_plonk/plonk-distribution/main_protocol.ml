@@ -89,10 +89,26 @@ module type S = sig
       Evaluations.t SMap.t SMap.t ->
       Poly.t SMap.t
 
-    val build_perm_identities :
+    (* builds the range check proof polynomials *)
+    val build_f_map_rc_1 :
+      ?shifts_map:(int * int) SMap.t ->
+      prover_public_parameters ->
+      gate_randomness ->
+      Evaluations.t SMap.t list SMap.t ->
+      Evaluations.t SMap.t SMap.t ->
+      Poly.t SMap.t * Evaluations.t SMap.t SMap.t
+
+    (* builds the range check’s permutation proof polynomials *)
+    val build_f_map_rc_2 :
+      prover_public_parameters ->
+      gate_randomness ->
+      Evaluations.t SMap.t SMap.t ->
+      Poly.t SMap.t
+
+    val build_perm_rc2_identities :
       prover_public_parameters -> gate_randomness -> prover_identities
 
-    val build_gates_plook_rc_identities :
+    val build_gates_plook_rc1_identities :
       ?shifts_map:(int * int) SMap.t ->
       prover_public_parameters ->
       gate_randomness ->
@@ -283,10 +299,15 @@ module Common (PP : Polynomial_protocol.S) = struct
     in
     (* ******************************************* *)
     let f_map_plook = build_f_map_plook ~shifts_map pp rd f_wires_list_map in
-    let f_map_rc =
-      Prover.build_f_map_range_checks ~shifts_map pp rd f_wires_list_map
-    in
-    let f_map = SMap.union_disjoint f_map_plook f_map_rc in
+    (* FIXME https://gitlab.com/nomadic-labs/cryptography/privacy-team/-/issues/222
+       Handle multiproofs
+    *)
+    (* let f_map_rc, batched_wires_map =
+         Prover.build_f_map_range_checks ~shifts_map pp rd f_wires_list_map
+           batched_wires_map
+       in
+       let f_map = SMap.union_disjoint f_map_plook f_map_rc in *)
+    let f_map = f_map_plook in
     (* commit to the plookup polynomials *)
     let cmt, prover_aux =
       (* FIXME: implement Plookup *)
@@ -381,7 +402,7 @@ module Common (PP : Polynomial_protocol.S) = struct
           pp
           (SMap.union_disjoint f_map_perm batched_wires_polys)
       in
-      (build_perm_identities pp randomness) evaluations
+      (build_perm_rc2_identities pp randomness) evaluations
     in
     let cmt = Commitment.commit pp.common_pp.pp_public_parameters f_map_perm in
 
