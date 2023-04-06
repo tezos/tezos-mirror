@@ -7,16 +7,16 @@
 
 members = [
   # Kernel Dev
-  "tezos_smart_rollup_core",
-  "tezos_smart_rollup_host",
-  "tezos_smart_rollup_debug",
-  "tezos_smart_rollup_mock",
-  "tezos_smart_rollup_encoding",
-  "tezos_smart_rollup_storage",
-  "tezos_smart_rollup_panic_hook",
-  "tezos_smart_rollup_entrypoint",
-  "tezos_smart_rollup",
+  "core",
+  "host",
+  "debug",
+  "mock",
+  "encoding",
+  "storage",
+  "panic-hook",
+  "entrypoint",
+  "sdk",
   # UX
-  "installer_kernel",
-  "installer_client"
+  "installer-kernel",
+  "installer-client"
 ]

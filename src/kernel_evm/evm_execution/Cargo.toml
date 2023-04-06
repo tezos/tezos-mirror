@@ -33,23 +33,23 @@ ripemd = { version = "0.1.3", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context", "hmac"] }
 const-decoder = { version = "0.3.0" }
 
-[dependencies.tezos_smart_rollup_core]
-path = "../../kernel_sdk/tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../../kernel_sdk/core"
 
-[dependencies.tezos_smart_rollup_host]
-path = "../../kernel_sdk/tezos_smart_rollup_host"
+[dependencies.tezos-smart-rollup-host]
+path = "../../kernel_sdk/host"
 
-[dependencies.tezos_smart_rollup_debug]
-path = "../../kernel_sdk/tezos_smart_rollup_debug"
+[dependencies.tezos-smart-rollup-debug]
+path = "../../kernel_sdk/debug"
 
-[dependencies.tezos_smart_rollup_storage]
-path = "../../kernel_sdk/tezos_smart_rollup_storage"
+[dependencies.tezos-smart-rollup-storage]
+path = "../../kernel_sdk/storage"
 
-[dependencies.tezos_smart_rollup_encoding]
-path = "../../kernel_sdk/tezos_smart_rollup_encoding"
+[dependencies.tezos-smart-rollup-encoding]
+path = "../../kernel_sdk/encoding"
 
-[dependencies.tezos_smart_rollup_mock]
-path = "../../kernel_sdk/tezos_smart_rollup_mock"
+[dependencies.tezos-smart-rollup-mock]
+path = "../../kernel_sdk/mock"
 
 [features]
 default = ["evm_execution"]

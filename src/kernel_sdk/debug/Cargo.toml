@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-debug"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+default-features = false
+
+[dev-dependencies.tezos-smart-rollup-core]
+path = "../core"
+features = ["testing"]
+
+[features]
+default = ["alloc"]
+alloc = []

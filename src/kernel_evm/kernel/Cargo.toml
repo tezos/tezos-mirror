@@ -11,26 +11,26 @@ edition = '2021'
 [lib]
 crate-type = ["cdylib"]
 
-[dependencies.tezos_smart_rollup_core]
-path = "../../kernel_sdk/tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../../kernel_sdk/core"
 
-[dependencies.tezos_smart_rollup_host]
-path = "../../kernel_sdk/tezos_smart_rollup_host"
+[dependencies.tezos-smart-rollup-host]
+path = "../../kernel_sdk/host"
 
-[dependencies.tezos_smart_rollup_panic_hook]
-path = "../../kernel_sdk/tezos_smart_rollup_panic_hook"
+[dependencies.tezos-smart-rollup-panic-hook]
+path = "../../kernel_sdk/panic-hook"
 
-[dependencies.tezos_smart_rollup_entrypoint]
-path = "../../kernel_sdk/tezos_smart_rollup_entrypoint"
+[dependencies.tezos-smart-rollup-entrypoint]
+path = "../../kernel_sdk/entrypoint"
 
-[dependencies.tezos_smart_rollup_debug]
-path = "../../kernel_sdk/tezos_smart_rollup_debug"
+[dependencies.tezos-smart-rollup-debug]
+path = "../../kernel_sdk/debug"
 
-[dev-dependencies.tezos_smart_rollup_encoding]
-path = "../../kernel_sdk/tezos_smart_rollup_encoding"
+[dev-dependencies.tezos-smart-rollup-encoding]
+path = "../../kernel_sdk/encoding"
 
-[dev-dependencies.tezos_smart_rollup_mock]
-path = "../../kernel_sdk/tezos_smart_rollup_mock"
+[dev-dependencies.tezos-smart-rollup-mock]
+path = "../../kernel_sdk/mock"
 
 [dependencies]
 tezos_ethereum = { path = "../ethereum" }
