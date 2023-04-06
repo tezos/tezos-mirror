@@ -54,6 +54,9 @@ Node
 - **Breaking Change** Removed the ``--network limanet``
   built-in network aliases.
 
+- Fixed a issue that may trigger unknown keys errors while reading the
+  context on a read-only instance.
+
 Client
 ------
 
