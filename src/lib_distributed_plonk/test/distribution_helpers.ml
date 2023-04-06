@@ -84,9 +84,14 @@ module No_public_input_PIs = struct
     : Aplonk.Pi_parameters.CircuitPI)
 end
 
-module DP_Kzg = DP_PlonK (Distributed_prover.Main_Kzg)
-module DP_Pack = DP_PlonK (Distributed_prover.Main_Pack)
-module DP_Meta = DP_aPlonk (No_public_input_PIs)
+module Rollup_example_PIs = struct
+  let get_pi_module _ =
+    (module Aplonk.Pi_parameters.Rollup_example : Aplonk.Pi_parameters.CircuitPI)
+end
+
+module DP_Kzg () = DP_PlonK (Distributed_prover.Main_Kzg)
+module DP_Pack () = DP_PlonK (Distributed_prover.Main_Pack)
+module DP_Meta () = DP_aPlonk (Rollup_example_PIs)
 
 let srs = srs
 

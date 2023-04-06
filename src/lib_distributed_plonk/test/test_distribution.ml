@@ -125,20 +125,11 @@ let test_distribution dp () =
   let verifier_inputs = DP.MP.to_verifier_inputs pp_prover inputs in
   assert (DP.MP.verify pp_verifier ~inputs:verifier_inputs proof)
 
-module Rollup_example_PIs = struct
-  let get_pi_module _ =
-    (module Aplonk.Pi_parameters.Rollup_example : Aplonk.Pi_parameters.CircuitPI)
-end
-
-module DP_Kzg = DP_PlonK (Distributed_prover.Main_Kzg)
-module DP_Pack = DP_PlonK (Distributed_prover.Main_Pack)
-module DP_Meta = DP_aPlonk (Rollup_example_PIs)
-
 let tests =
   List.map
     (fun (name, f) -> Alcotest.test_case name `Quick f)
     [
-      ("test_distribution_kzg", test_distribution (module DP_Kzg));
-      ("test_distribution_kzg_pack", test_distribution (module DP_Pack));
-      ("test_distribution_meta", test_distribution (module DP_Meta));
+      ("test_distribution_kzg", test_distribution (module DP_Kzg ()));
+      ("test_distribution_kzg_pack", test_distribution (module DP_Pack ()));
+      ("test_distribution_meta", test_distribution (module DP_Meta ()));
     ]
