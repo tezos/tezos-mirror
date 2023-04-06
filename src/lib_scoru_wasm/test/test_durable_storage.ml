@@ -317,78 +317,81 @@ let test_store_get_nth_key ~version () =
   assert (truncated_string_at_two = expected_truncated_string_at_two) ;
   Lwt.return_ok ()
 
-let test_store_get_hash ~version () =
+let test_v1_and_above ~version test =
   match version with
   | Wasm_pvm_state.V0 ->
-      (* the [store_get_store_hash] host function is not available before [V1]. *)
+      (* the host function is not available before [V1]. *)
       Lwt.return_ok ()
-  | V1 ->
-      let open Lwt_syntax in
-      let* durable_storage = make_durable [("/foo/bar", "/foobar")] in
-      let src = 20l in
-      let key = "/foo" in
-      let key_len = Int32.of_int @@ String.length key in
-      let dst = Int32.(add src key_len) in
-      let module_reg, module_key, host_funcs_registry =
-        make_module_inst ~version [key] src
-      in
-      let call_host_func values =
-        Eval.invoke
-          ~module_reg
-          ~caller:module_key
-          ~durable:durable_storage
-          host_funcs_registry
-          Host_funcs.Internal_for_tests.store_get_hash
-          values
-      in
-      (* Test valid access *)
-      let values =
-        Values.[Num (I32 src); Num (I32 key_len); Num (I32 dst); Num (I32 32l)]
-      in
-      let* _durable, _result = call_host_func values in
-      let* mem = retrieve_memory module_reg in
-      let* hash = Memory.load_bytes mem dst 32 in
-      let durable = Durable.of_storage_exn durable_storage in
-      let* hash_expected =
-        Durable.(hash_exn ~kind:Directory durable (key_of_string_exn key))
-      in
-      let hash_expected = Context_hash.to_string hash_expected in
-      assert (hash = hash_expected) ;
-      (* Test wrong access for keys *)
-      let values =
-        Values.
-          [
-            (* We allocate 20 pages of 64KiB in [make_module_inst], so this
-               value is out of the bound of the memory. *)
-            Num (I32 Int32.(mul 21l 0x10000l));
-            Num (I32 key_len);
-            Num (I32 dst);
-            Num (I32 32l);
-          ]
-      in
-      let* _durable, result = call_host_func values in
-      assert (
-        result
-        = Values.[Num (I32 (Host_funcs.Error.code Memory_invalid_access))]) ;
-      (* Test wrong access for result *)
-      let values =
-        Values.
-          [
-            Num (I32 20l);
-            Num (I32 key_len);
-            (* We allocate 20 pages of 64KiB in [make_module_inst], so this
-               value is out of the bound of the memory. *)
-            Num (I32 Int32.(mul 21l 0x10000l));
-            Num (I32 32l);
-          ]
-      in
-      let* _durable, result = call_host_func values in
-      assert (
-        result
-        = Values.[Num (I32 (Host_funcs.Error.code Memory_invalid_access))]) ;
-      Lwt.return_ok ()
+  | V1 -> test ~version
 
-let test_store_delete_generic ~kind ~version () =
+let test_store_get_hash ~version =
+  let open Lwt_syntax in
+  let* durable_storage = make_durable [("/foo/bar", "/foobar")] in
+  let src = 20l in
+  let key = "/foo" in
+  let key_len = Int32.of_int @@ String.length key in
+  let dst = Int32.(add src key_len) in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst ~version [key] src
+  in
+  let call_host_func values =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable:durable_storage
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_get_hash
+      values
+  in
+  (* Test valid access *)
+  let values =
+    Values.[Num (I32 src); Num (I32 key_len); Num (I32 dst); Num (I32 32l)]
+  in
+  let* _durable, _result = call_host_func values in
+  let* mem = retrieve_memory module_reg in
+  let* hash = Memory.load_bytes mem dst 32 in
+  let durable = Durable.of_storage_exn durable_storage in
+  let* hash_expected =
+    Durable.(hash_exn ~kind:Directory durable (key_of_string_exn key))
+  in
+  let hash_expected = Context_hash.to_string hash_expected in
+  assert (hash = hash_expected) ;
+  (* Test wrong access for keys *)
+  let values =
+    Values.
+      [
+        (* We allocate 20 pages of 64KiB in [make_module_inst], so this
+           value is out of the bound of the memory. *)
+        Num (I32 Int32.(mul 21l 0x10000l));
+        Num (I32 key_len);
+        Num (I32 dst);
+        Num (I32 32l);
+      ]
+  in
+  let* _durable, result = call_host_func values in
+  assert (
+    result = Values.[Num (I32 (Host_funcs.Error.code Memory_invalid_access))]) ;
+  (* Test wrong access for result *)
+  let values =
+    Values.
+      [
+        Num (I32 20l);
+        Num (I32 key_len);
+        (* We allocate 20 pages of 64KiB in [make_module_inst], so this
+           value is out of the bound of the memory. *)
+        Num (I32 Int32.(mul 21l 0x10000l));
+        Num (I32 32l);
+      ]
+  in
+  let* _durable, result = call_host_func values in
+  assert (
+    result = Values.[Num (I32 (Host_funcs.Error.code Memory_invalid_access))]) ;
+  Lwt.return_ok ()
+
+let test_store_get_hash ~version () =
+  test_v1_and_above ~version test_store_get_hash
+
+let test_store_delete_generic ~kind ~version =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -447,16 +450,13 @@ let test_store_delete_generic ~kind ~version () =
 
 (* Test checking that [store_delete key] deletes the subtree and the value at
    [key] from the durable storage. *)
-let test_store_delete_all = test_store_delete_generic ~kind:Directory
+let test_store_delete_all ~version () =
+  test_store_delete_generic ~kind:Directory ~version
 
 (* Test checking that [store_delete_value key] deletes only the value at [key]
    from the durable storage. *)
 let test_store_delete_value ~version () =
-  match version with
-  | Wasm_pvm_state.V0 ->
-      (* the [store_delete_value] host function is not available before [V1]. *)
-      Lwt.return_ok ()
-  | V1 -> test_store_delete_generic ~kind:Value ~version ()
+  test_v1_and_above ~version (test_store_delete_generic ~kind:Value)
 
 (* Test checking that if [key] has value/subtree, [store_has key] returns
    the correct enum value. *)
