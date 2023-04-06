@@ -605,33 +605,37 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       (external_prefix_fun external_prefix z_name)
       (Permutation_poly.compute_Z permutation domain beta gamma values)
 
-  let cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg ~wires =
+  let cs ?(external_prefix = "") ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta
+      ~x ~z ~zg ~wires () =
     let open L in
-    let* cs_perm_a = Num.custom ~qr:Scalar.(negate one) ~qm:Scalar.(one) z l1 in
-    let wires = List.transpose wires in
-    let nb_wires = List.length wires in
-    assert (Plompiler.Csir.nb_wires_arch = nb_wires) ;
-    let* batched_wires = mapM (fun x -> sum_alpha_i x delta) wires in
-    let* beta_ids =
-      mapM (fun i -> Num.mul ~qm:(get_k i) beta x) @@ List.init nb_wires Fun.id
+    let* perm_a = Num.custom ~qr:Scalar.(negate one) ~qm:Scalar.(one) z l1 in
+    let* perm_b =
+      let* delta_wires =
+        List.mapn (fun i -> sum_alpha_i i delta) wires |> mapM Fun.id
+      in
+      let i = ref 0 in
+      let* left, right =
+        fold2M
+          (fun (left, right) ss dw ->
+            let* betaid = Num.mul ~qm:(get_k !i) beta x in
+            let* bsigma = Num.mul beta ss in
+            let* wid = Num.add_list (to_list [dw; betaid; gamma]) in
+            let* wss = Num.add_list (to_list [dw; bsigma; gamma]) in
+            let* left = Num.mul left wid in
+            let* right = Num.mul right wss in
+            incr i ;
+            ret (left, right))
+          (z, zg)
+          ss_list
+          delta_wires
+      in
+      Num.add ~qr:Scalar.(negate one) left right
     in
-    let* beta_sigmas = mapM (Num.mul beta) ss_list in
-    let* w_ids =
-      map2M
-        (fun w beta_id -> Num.add_list (to_list [w; beta_id; gamma]))
-        batched_wires
-        beta_ids
-    in
-    let* w_sigmas =
-      map2M
-        (fun w beta_sigma -> Num.add_list (to_list [w; beta_sigma; gamma]))
-        batched_wires
-        beta_sigmas
-    in
-    let* left_term = Num.mul_list (to_list (z :: w_ids)) in
-    let* right_term = Num.mul_list (to_list (zg :: w_sigmas)) in
-    let* cs_perm_b = Num.add ~qr:Scalar.(negate one) left_term right_term in
-    ret (cs_perm_a, cs_perm_b)
+    ret
+      [
+        (external_prefix ^ "Perm.a", perm_a);
+        (external_prefix ^ "Perm.b", perm_b);
+      ]
 end
 
 module type S = sig
@@ -694,6 +698,7 @@ module type S = sig
     Poly.t SMap.t
 
   val cs :
+    ?external_prefix:string ->
     sum_alpha_i:(L.scalar L.repr list -> L.scalar L.repr -> L.scalar L.repr L.t) ->
     l1:L.scalar L.repr ->
     ss_list:L.scalar L.repr list ->
@@ -704,7 +709,8 @@ module type S = sig
     z:L.scalar L.repr ->
     zg:L.scalar L.repr ->
     wires:L.scalar L.repr list list ->
-    (L.scalar L.repr * L.scalar L.repr) L.t
+    unit ->
+    (string * L.scalar L.repr) list L.t
 
   module Shared_argument : sig
     val build_batched_wires_values :

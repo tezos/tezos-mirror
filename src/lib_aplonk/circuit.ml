@@ -362,10 +362,11 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         Plonk.List.mapn add_circuits (pi_list :: monomials) |> mapM Fun.id
       in
       (* Using switched wires is enough for adapting the perm identity to the lower number of proof *)
-      let* perm_a, perm_b =
-        (Perm.cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg) ~wires
+      let* perm_ids =
+        (Perm.cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg)
+          ~wires
+          ()
       in
-      let perm_ids = [("Perm.a", perm_a); ("Perm.b", perm_b)] in
       let identities =
         format_arith_ids arith_list @ format_custom_ids custom_ids @ perm_ids
         |> List.sort (fun (s, _) (s', _) -> String.compare s s')
