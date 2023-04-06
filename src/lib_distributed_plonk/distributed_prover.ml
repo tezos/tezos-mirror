@@ -298,7 +298,7 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
     return {perm_and_plook; wires_cm; pp_proof}
 end
 
-module PC_Kzg = Plonk_for_distribution.Kzg_pack.Kzg_pack_impl
+module PC_Kzg = Plonk_for_distribution.Kzg.Kzg_impl
 module PP_Kzg = Plonk_for_distribution.Polynomial_protocol.Make (PC_Kzg)
 module Main_Kzg = Plonk_for_distribution.Main_protocol.Make (PP_Kzg)
 module PC_Pack = Plonk_for_distribution.Kzg_pack.Kzg_pack_impl
