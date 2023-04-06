@@ -23,24 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 
-(**  [Arith_pvm_in_memory]: Arith PVM with an in memory context
-     {!Tezos_context_memory}. *)
-module Arith_pvm_in_memory :
-  Sc_rollup.PVM.S
-    with type context = Context_helpers.In_memory.Tree.t
-     and type state = Context_helpers.In_memory.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t
+(** Worker module for a signle refutation game player.
+    The node's refutation coordinator will spawn a new refutation player
+    for each refutation game.
+*)
+module Worker : Worker.T
 
-(** [Wasm_pvm_in_memory] Wasm PVM with an in memory context
-    {!Tezos_context_memory}. *)
-module Wasm_pvm_in_memory :
-  Sc_rollup.PVM.S
-    with type context = Context_helpers.In_memory.Tree.t
-     and type state = Context_helpers.In_memory.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t
+(** Type for a refutation game player.  *)
+type worker = Worker.infinite Worker.queue Worker.t
+
+module type S = sig
+  (** [init_and_play node_ctxt ~self ~conflict ~game ~level]
+      initializes  a new refutation game player for signer [self].
+      After initizialization, the worker will play the next move
+      depending on the [game] state.
+      If no [game] is passed, the worker will play the opening
+      move for [conflict].
+  *)
+  val init_and_play :
+    Node_context.rw ->
+    self:public_key_hash ->
+    conflict:Sc_rollup.Refutation_storage.conflict ->
+    game:Sc_rollup.Game.t option ->
+    level:int32 ->
+    unit tzresult Lwt.t
+
+  (** [play worker game ~level] makes the [worker] play the next move depending
+      on the [game] state for their conflict.
+  *)
+  val play : worker -> Sc_rollup.Game.t -> level:int32 -> unit Lwt.t
+
+  (** Shutdown a refutaiton game player. *)
+  val shutdown : worker -> unit Lwt.t
+
+  (** [current_games ()] lists the opponents' this node is playing
+      refutation games against, alongside the worker that takes care
+      of each game. *)
+  val current_games : unit -> (public_key_hash * worker) list
+end
+
+module Make (Interpreter : Interpreter.S) : S

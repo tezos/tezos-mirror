@@ -29,7 +29,7 @@ module Make (PVM : Pvm.S) = struct
   module Interpreter = Interpreter.Make (PVM)
   module Commitment = Commitment.Make (PVM)
   module Simulation = Simulation.Make (Interpreter)
-  module Refutation_game = Refutation_game.Make (Interpreter)
+  module Refutation_coordinator = Refutation_coordinator.Make (Interpreter)
   module Batcher = Batcher.Make (Simulation)
   module RPC_server = RPC_server.Make (Simulation) (Batcher)
 end

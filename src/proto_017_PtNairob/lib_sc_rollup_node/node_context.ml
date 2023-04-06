@@ -66,6 +66,8 @@ let is_operator node_ctxt pkh =
 
 let is_accuser {mode; _} = mode = Accuser
 
+let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
+
 let get_fee_parameter node_ctxt purpose =
   Configuration.Operator_purpose_map.find purpose node_ctxt.fee_parameters
   |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())
@@ -115,6 +117,17 @@ let get_last_published_commitment (cctxt : Protocol_client_context.full)
   | Ok None -> return_none
   | Ok (Some (_staked_hash, staked_commitment)) -> return_some staked_commitment
 
+let check_and_set_rollup_address context rollup_address =
+  let open Lwt_result_syntax in
+  let* saved_address = Context.Rollup.get_address context in
+  match saved_address with
+  | None ->
+      (* Address was never saved, we set it permanently. *)
+      Context.Rollup.set_address context rollup_address
+  | Some saved_address ->
+      fail_unless Sc_rollup.Address.(rollup_address = saved_address)
+      @@ Sc_rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
+
 let init (cctxt : Protocol_client_context.full) ~data_dir mode
     Configuration.(
       {
@@ -141,6 +154,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
   let*! context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in
+  let* () = check_and_set_rollup_address context rollup_address in
   let* l1_ctxt =
     Layer1.start ~name:"sc_rollup_node" ~reconnection_delay cctxt
   in

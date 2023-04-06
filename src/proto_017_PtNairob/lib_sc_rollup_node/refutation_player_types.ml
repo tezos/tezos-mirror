@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,31 +22,52 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Protocol
+open Alpha_context
 
-(** This module defines functions that emit the events used by the smart
-    rollup node daemon (see {!Daemon}). *)
+module Request = struct
+  type ('a, 'b) t =
+    | Play : Sc_rollup.Game.t -> (unit, error trace) t
+    | Play_opening :
+        Sc_rollup.Refutation_storage.conflict
+        -> (unit, error trace) t
 
-(** [head_processing hash level ~finalized] emits the event that the
-    block of the given [hash] and at the given [level] is being processed, and
-    whether it is [finalized]. *)
-val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
+  type view = View : _ t -> view
 
-(** [new_head_processed hash level] emits the event that the daemon has finished
-    processing the head of the given [hash] and at the given [level]. *)
-val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
+  let view req = View req
 
-(** [processing_heads_iteration heads] emits the event that the [heads] are
-    going to be processed. *)
-val processing_heads_iteration : Layer1.head list -> unit Lwt.t
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Play"
+          (obj2
+             (req "request" (constant "play"))
+             (req "game" Sc_rollup.Game.encoding))
+          (function View (Play g) -> Some ((), g) | _ -> None)
+          (fun ((), g) -> View (Play g));
+        case
+          (Tag 1)
+          ~title:"Play opening"
+          (obj2
+             (req "request" (constant "play_opening"))
+             (req "conflict" Sc_rollup.Refutation_storage.conflict_encoding))
+          (function View (Play_opening c) -> Some ((), c) | _ -> None)
+          (fun ((), c) -> View (Play_opening c));
+      ]
 
-(** [new_heads_processed heads] emits the event that the [heads] were
-    processed. *)
-val new_heads_processed : Layer1.head list -> unit Lwt.t
-
-(** [included_operation ~finalized op result] emits an event that an operation
-    for the rollup was included in a block (or finalized). *)
-val included_operation :
-  finalized:bool ->
-  'kind Protocol.Alpha_context.manager_operation ->
-  'kind Protocol.Apply_results.manager_operation_result ->
-  unit Lwt.t
+  let pp ppf (View r) =
+    match r with
+    | Play game -> Format.fprintf ppf "Playing game %a" Sc_rollup.Game.pp game
+    | Play_opening conflict ->
+        Format.fprintf
+          ppf
+          "Playing opening move for conflict against staker %a at our \
+           commitment %a"
+          Sc_rollup.Staker.pp
+          conflict.other
+          Sc_rollup.Commitment.pp
+          conflict.our_commitment
+end

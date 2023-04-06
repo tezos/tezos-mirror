@@ -408,8 +408,7 @@ let description_of_mode = function
   | Observer -> "Only follows the chain, reconstructs and interprets inboxes"
   | Accuser ->
       "Only publishes commitments for conflicts and play refutation games"
-  | Batcher ->
-      "Accepts transactions in its queue and batches them on the L1 (TODO)"
+  | Batcher -> "Accepts transactions in its queue and batches them on the L1"
   | Maintenance ->
       "Follows the chain and publishes commitments, cement and refute"
   | Operator -> "Equivalent to maintenance + batcher"
@@ -620,6 +619,8 @@ let check_mode config =
   | Operator -> narrow_purposes [Publish; Cement; Add_messages; Refute]
   | Custom -> return config
 
+let refutation_player_buffer_levels = 5
+
 let loser_warning_message config =
   if config.loser_mode <> Loser_mode.no_failures then
     Format.printf
@@ -630,12 +631,19 @@ This should be used for test only!
 ************ WARNING *************
 |}
 
-let save ~data_dir config =
+let save ~force ~data_dir config =
   loser_warning_message config ;
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct encoding config in
-  let* () = Lwt_utils_unix.create_dir data_dir in
-  Lwt_utils_unix.Json.write_file (config_filename ~data_dir) json
+  let config_file = config_filename ~data_dir in
+  let*! exists = Lwt_unix.file_exists config_file in
+  if exists && not force then
+    failwith
+      "Configuration file %S already exists. Use --force to overwrite."
+      config_file
+  else
+    let*! () = Lwt_utils_unix.create_dir data_dir in
+    Lwt_utils_unix.Json.write_file config_file json
 
 let load ~data_dir =
   let open Lwt_result_syntax in
