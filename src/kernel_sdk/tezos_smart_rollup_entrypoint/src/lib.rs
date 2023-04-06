@@ -30,6 +30,10 @@ pub fn set_panic_hook() {
     std::panic::set_hook(Box::new(tezos_smart_rollup_panic_hook::panic_handler));
 }
 
+/// Dummy panic hook that does nothing.
+#[cfg(not(feature = "panic-hook"))]
+pub fn set_panic_hook() {}
+
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -56,7 +60,6 @@ macro_rules! kernel_entry {
         #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub extern "C" fn kernel_run() {
-            #[cfg(feature = "panic-hook")]
             $crate::set_panic_hook();
             use $crate::RollupHost;
             let mut host = unsafe { RollupHost::new() };
