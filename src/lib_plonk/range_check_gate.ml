@@ -300,19 +300,6 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
           (Too_many_checks
              (Printf.sprintf "%d checks asked, %d checks expected" nb k))
 
-    let compute_pnin1 upper_bound domain domain_size =
-      let x_w i =
-        Poly.of_coefficients
-          [(one, 1); (Scalar.negate (Domain.get domain i), 0)]
-      in
-      let k = domain_size / upper_bound in
-      (* Computes product of (X-ω^(ni + n - 1)) from i = 1 to k *)
-      let rec aux res = function
-        | 0 -> res
-        | i -> aux (Poly.mul res (x_w ((upper_bound * i) - 1))) (i - 1)
-      in
-      aux Poly.one k
-
     let preprocessing ~range_checks:(idx, upper_bound) ~domain =
       if Z.(log2up (of_int upper_bound)) <> Z.(log2 (of_int upper_bound)) then
         failwith "upper_bound must be a power of two." ;
@@ -324,7 +311,11 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
               if i mod upper_bound = upper_bound - 1 then one else zero)
           |> Evaluations.interpolation_fft2 domain
         in
-        let pnin1_poly = compute_pnin1 upper_bound domain domain_size in
+        let pnin1_poly =
+          Evaluations.init domain_size ~degree:domain_size (fun i ->
+              if i mod upper_bound = upper_bound - 1 then zero else one)
+          |> Evaluations.interpolation_fft domain
+        in
         SMap.of_list [(lnin1, lnin1_poly); (pnin1, pnin1_poly)]
 
     let get_checks_from_wire k check_indices wire =
