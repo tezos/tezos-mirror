@@ -489,15 +489,7 @@ module type AUTOMATON = sig
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
   module Introspection : sig
-    type connected_state = {
-      topics : Topic.Set.t;
-      direct : bool;
-      outbound : bool;
-    }
-
-    type connection = Connected of connected_state
-
-    type peer_info = {connection : connection}
+    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
     type peer_score = {score : Score.t; expires : Time.t option}
 
@@ -525,7 +517,7 @@ module type AUTOMATON = sig
     type view = {
       limits : limits;
       parameters : parameters;
-      peers_info : peer_info Peer.Map.t;
+      peers_info : connection Peer.Map.t;
       scores : peer_score Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
@@ -573,8 +565,6 @@ module type AUTOMATON = sig
         currently tracking messages for [topic]. That is, the local peer has joined
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
-
-    val get_peer_info_connection : peer_info -> connection
   end
 end
 
