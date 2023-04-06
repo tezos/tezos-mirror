@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    lib_p2p
-   Invocation:   dune exec src/lib_p2p/test/test_p2p_maintenance.exe
+   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_maintenance
    Subject:      Check maintenance mechanism.
 *)
 
