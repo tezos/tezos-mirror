@@ -576,6 +576,8 @@ module type AUTOMATON = sig
         currently tracking messages for [topic]. That is, the local peer has joined
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
+
+    val get_peer_info_connection : peer_info -> connection
   end
 end
 

@@ -1853,5 +1853,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh
+
+    let get_peer_info_connection peer_info = peer_info.connection
   end
 end

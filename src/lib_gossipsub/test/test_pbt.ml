@@ -495,7 +495,7 @@ module Test_remove_peer = struct
     Peer.Map.iter
       (fun peer peer_info ->
         let expire =
-          match peer_info.GS.Introspection.connection with
+          match GS.Introspection.get_peer_info_connection peer_info with
           | GS.Introspection.Expires {at} -> Some at
           | Connected _ -> None
         in
