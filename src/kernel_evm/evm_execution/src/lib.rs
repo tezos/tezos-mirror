@@ -21,7 +21,6 @@ pub mod basic;
 pub mod block;
 pub mod handler;
 pub mod precompiles;
-pub mod rlp;
 pub mod signatures;
 pub mod storage;
 pub mod transaction;
@@ -543,27 +542,6 @@ mod test {
     }
 
     #[test]
-    fn test_caller_eip1559() {
-        let (_sk, address_from_sk) = signatures::string_to_sk_and_address(
-            "528e3019e0a2c484758852ca0ded3c31e96171c9da4112c178c49d1bd43ee896"
-                .to_string(),
-        );
-        let encoded =
-        "02f87205018459682f008459682f3682520894d0a2dbb5e6f757fd2066a7664f413caac504bc9588016345785d8a000080c001a02bade97eabf34bf84b5e02e342a69eb2ed755fc7c7a7fdbec1bb878b5da2a074a0600035bcf379bc8f0d30d7f85772b81a56acdc5594ce6cdca5169eca9570d169".to_string();
-        let tr = rlp::rlp_decode_eip_1559(encoded);
-        let add = tr.caller();
-
-        let exp: [u8; 20] = hex::decode("8E998A00253Cb1747679AC25e69A8d870B52d889")
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        let expaddress = address::EthereumAddress::from(exp);
-        assert_eq!(expaddress, add);
-        assert_eq!(expaddress, address_from_sk)
-    }
-
-    #[test]
     fn test_signed_classic_transaction() {
         let string_sk =
             "4646464646464646464646464646464646464646464646464646464646464646"
@@ -573,17 +551,6 @@ mod test {
         let expected_transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
 
         let transaction = expected_transaction.sign_transaction(string_sk);
-        assert_eq!(expected_transaction, transaction)
-    }
-    #[test]
-    fn test_signed_eip1559_transaction() {
-        let string_sk =
-            "528e3019e0a2c484758852ca0ded3c31e96171c9da4112c178c49d1bd43ee896"
-                .to_string();
-        let encoded =
-        "02f87205018459682f008459682f3682520894d0a2dbb5e6f757fd2066a7664f413caac504bc9588016345785d8a000080c001a02bade97eabf34bf84b5e02e342a69eb2ed755fc7c7a7fdbec1bb878b5da2a074a0600035bcf379bc8f0d30d7f85772b81a56acdc5594ce6cdca5169eca9570d169".to_string();
-        let expected_transaction = rlp::rlp_decode_eip_1559(encoded);
-        let transaction = expected_transaction.sign_eip1559_transaction(string_sk);
         assert_eq!(expected_transaction, transaction)
     }
 
