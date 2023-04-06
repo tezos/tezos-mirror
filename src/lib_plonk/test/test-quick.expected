@@ -10,6 +10,12 @@ Proof hash: 5cb4e57da10b23c6af14c53c5b29cf8216543f974faacaa5862522ce30f291a7
 Prover_pp hash: 1717289408fdbce340f7d9f9924d0716849e00337fbbaaebb2e25a719689829b
 Verifier_pp hash: e0523930521e5178fb392884cc50c16218f1ab0949fbec80c56d253f3bece197
 
+KZG.basic:
+Proof size: 2.11 KB
+Proof hash: 177928d84155673f874205090d6e140a42e2e2d4d68450dba46866ec40e3ca50
+Prover_pp hash: f126b40c0d8253c5e89f1b33d26f9bea450caa52dcce6d388c8c26ad5cafc9ac
+Verifier_pp hash: 21f84288618259ef6d8c0d86de859e733031d7249524614dd4c6de2237347a5a
+
 KZG+RC_single_valid+RC_single_valid+RC_single_valid_bis:
 Proof size: 5.95 KB
 Proof hash: c573c341717fb43a1a74af2d8e303cf5dc30ad3b9150dbdc49493de1da627f91
@@ -27,6 +33,12 @@ Proof size: 9.23 KB
 Proof hash: e12c836409b82f348a4932e44dd8c9ee56f7c2065a4712b6c83be77102878155
 Prover_pp hash: e79b9a5462d130255b913bd9d1032cb1e04caebd0e2ad8e86469eee55ff6ab69
 Verifier_pp hash: 1d60aab002396b6e08f3b557cab0224e8c110dbc6123ca78465cf88b24bb9d45
+
+KZG_Pack.basic:
+Proof size: 8.47 KB
+Proof hash: d2977a5a4bfcca0e5c0ec13e2f288d1236b45c1727a2a125de1179581f035ad7
+Prover_pp hash: 2af2d3e8bcf24883f29a303fb25ac8b265ac94d623fb1da50c16e8802c876ec5
+Verifier_pp hash: e50093a77a383ecfe38c0ec82b4f42490b70b8adacef62ed0da83a026257433b
 
 KZG_Pack+RC_single_valid+RC_single_valid+RC_single_valid_bis:
 Proof size: 12.38 KB
