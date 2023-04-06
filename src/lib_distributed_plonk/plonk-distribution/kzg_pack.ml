@@ -129,10 +129,6 @@ module Kzg_pack_impl = struct
     in
     let poly_keys_list = List.map get_keys answer_list in
     let worker_message = (r, poly_keys_list) in
-    (* The main thread simulates a worker, since it is the only one who knows
-         the information about t_map, g_map, plook_map. We need to pad a dummy
-         secret and a dummy prover_aux at the end, corresponding to f_map, which
-         the main thread does not have information about. *)
     let main_msg =
       distributed_prove_worker secret_list prover_aux_list worker_message
     in

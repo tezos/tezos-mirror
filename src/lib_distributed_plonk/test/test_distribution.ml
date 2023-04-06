@@ -26,7 +26,7 @@
 open Distributed_plonk_test.Distribution_helpers
 open Distributed_plonk
 
-let test_distribution dp () =
+let test_distribution ?(circuit_builder = Circuit_Builder.base) dp () =
   let module DP = (val dp : DP_for_tests) in
   let module Worker0 = Worker.Make (DP.Worker_Main) in
   let module Worker1 = Worker.Make (DP.Worker_Main) in
@@ -72,7 +72,7 @@ let test_distribution dp () =
           ];
       }
   in
-  let circuit_map, x_map = circuits_inputs nb_proofs circuit_size in
+  let circuit_map, x_map = circuit_builder nb_proofs circuit_size in
   let pp_prover, pp_verifier =
     DP.MP.setup ~zero_knowledge:false circuit_map ~srs
   in
@@ -132,4 +132,8 @@ let tests =
       ("test_distribution_kzg", test_distribution (module DP_Kzg ()));
       ("test_distribution_kzg_pack", test_distribution (module DP_Pack ()));
       ("test_distribution_meta", test_distribution (module DP_Meta ()));
+      ( "test_distribution_RC",
+        test_distribution
+          ~circuit_builder:Circuit_Builder.range_checks
+          (module DP_Pack ()) );
     ]

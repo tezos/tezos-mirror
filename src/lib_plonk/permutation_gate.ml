@@ -47,6 +47,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
     let name prefix i = prefix ^ Csir.string_key_of_int ~nb_digits (i + 1) in
     (name "Si", name "Ss")
 
+  let shared_z_names = [z_name]
+
   (* element preprocessed and known by both prover and verifier *)
   type public_parameters = {
     g_map_perm_PP : Poly.t SMap.t;
@@ -634,6 +636,8 @@ end
 
 module type S = sig
   module PP : Polynomial_protocol.S
+
+  val shared_z_names : string list
 
   val srs_size : zero_knowledge:bool -> n:int -> int
 

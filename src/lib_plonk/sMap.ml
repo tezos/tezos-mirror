@@ -139,6 +139,9 @@ module StringMap = struct
       let prefix = if prefix = "" || no_sep then prefix else prefix ^ sep in
       if n = 1 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
 
+    let build_all_names prefix n name =
+      List.init n (fun i -> add_prefix ~n ~i prefix name)
+
     let prefix_map ?n ?i ?shift prefix str_map =
       fold (fun k -> add (add_prefix ?n ?i ?shift prefix k)) str_map empty
 
@@ -253,6 +256,11 @@ module type S = sig
       string ->
       string ->
       string
+
+    (* [build_all_names prefix n k] build the list of all prefixed [k] with
+       n proofs : [build_all_names "hello" 11 "world"] will return
+       ["hello~00~world" ; "hello~01~world" ; … ; "hello~10~world"] *)
+    val build_all_names : key -> int -> key -> key list
 
     (* adds prefix to each key of str_map ; [i] will be added as a string
        before the prefix

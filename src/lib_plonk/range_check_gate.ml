@@ -48,6 +48,10 @@ module type S = sig
 
   val batched_z_name : string
 
+  val z_names : string list
+
+  val shared_z_names : string list
+
   val build_permutation :
     range_checks:int list * int -> size_domain:int -> int array
 
@@ -132,6 +136,11 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
   let batched_wire = String.capitalize_ascii wire
 
   let batched_z_name = "RC_Z_BATCHED"
+
+  (* Used for distribution *)
+  let z_names = [z_name]
+
+  let shared_z_names = [rc_prefix ^ "Perm_Z"]
 
   type public_parameters = Poly.t SMap.t
 
@@ -247,6 +256,8 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         ()
         x
         answers
+
+    let cs = Perm.cs
   end
 
   module RangeChecks = struct
@@ -396,6 +407,17 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       in
       SMap.of_list
         [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
+
+    let cs ~lnin1 ~pnin1 ~z ~zg =
+      let open Plompiler.LibCircuit in
+      let* one_m_z = Num.custom ~ql:mone ~qc:one z z in
+      let* id_a = Num.mul_list (to_list [z; one_m_z; lnin1]) in
+      let* id_b =
+        let* z_m_2zg = Num.add z ~qr:mtwo zg in
+        let* one_m_z_p_2zg = Num.add one_m_z ~qr:two zg in
+        Num.mul_list (to_list [z_m_2zg; one_m_z_p_2zg; pnin1])
+      in
+      ret (id_a, id_b)
   end
 
   let preprocessing ~permutation ~range_checks ~domain =
@@ -416,6 +438,10 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
   let verifier_identities_1 = RangeChecks.verifier_identities
 
   let verifier_identities_2 = Permutation.verifier_identities
+
+  let cs_1 = RangeChecks.cs
+
+  let cs_2 = Permutation.cs
 end
 
 module Range_check_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

@@ -115,8 +115,12 @@ struct
       let relevant_positions =
         match all_keys with
         | None -> List.init (SMap.cardinal f_map) Fun.id
+        | Some [] -> List.init (SMap.cardinal f_map) Fun.id
         | Some ks ->
-            List.mapi (fun i x -> (i, x)) ks
+            (* Note that in order to get relevant_positions relatively to the map,
+               the keys need to be sorted as they are be in the commitment smap *)
+            let sorted_ks = List.sort String.compare ks in
+            List.mapi (fun i x -> (i, x)) sorted_ks
             |> List.filter_map (fun (i, x) ->
                    Option.map (Fun.const i) (SMap.find_opt x f_map))
       in

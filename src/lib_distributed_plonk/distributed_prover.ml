@@ -59,6 +59,10 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
     let transcript =
       PC.distributed_expand_transcript transcript query_list answers_list
     in
+    (* The main thread simulates a worker, since it is the only one who knows
+       the information about t_map, g_map, plook_map. We need to pad a dummy
+       secret and a dummy prover_aux at the end, corresponding to f_map, which
+       the main thread does not have information about. *)
     let worker_message, state =
       PC.distributed_prove_main1
         pp
@@ -235,7 +239,7 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
     let randomness, transcript = build_gates_randomness transcript in
 
     let f_map_perm, evaluated_perm_ids, (cmt_perm, perm_prover_aux) =
-      shared_perm_argument pp nb_workers randomness inputs replies
+      shared_perm_rc_argument pp nb_workers randomness inputs replies
     in
 
     let cmt_plook =
