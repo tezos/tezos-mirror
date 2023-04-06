@@ -288,7 +288,10 @@ let test_protocol_level_consistency_remove_file history_mode
   return_unit
 
 let make_tests =
-  let history_modes = History_mode.[Rolling (Some {offset = 1}); Archive] in
+  let history_modes =
+    History_mode.
+      [Rolling (Some {offset = 1}); Full (Some {offset = 1}); Archive]
+  in
   let tests =
     Stdlib.List.init 5 (fun i history_mode ->
         ( Format.asprintf
