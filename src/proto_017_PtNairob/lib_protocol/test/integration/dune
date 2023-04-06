@@ -35,8 +35,7 @@
   test_liquidity_baking
   test_storage_functions
   test_storage
-  test_token
-  test_sc_rollup_wasm))
+  test_token))
 
 (executable
  (name main)

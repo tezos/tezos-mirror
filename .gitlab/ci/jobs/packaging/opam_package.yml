@@ -1497,6 +1497,8 @@ opam:tezos-scoru-wasm-helpers:
   variables:
     package: tezos-scoru-wasm-helpers
 
+# Ignoring unreleased package tezos-scoru-wasm-regressions.
+
 # Ignoring unreleased package tezos-scoru-wasm-test.
 
 # Ignoring unreleased package tezos-scoru-wasm-test-helpers.

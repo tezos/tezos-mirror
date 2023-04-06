@@ -41,6 +41,5 @@ let () =
       (Protocol.name ^ ": storage tests", Test_storage_functions.tests);
       (Protocol.name ^ ": token movements", Test_token.tests);
       (Protocol.name ^ ": frozen bonds", Test_frozen_bonds.tests);
-      (Protocol.name ^ ": sc rollup wasm", Test_sc_rollup_wasm.tests);
     ]
   |> Lwt_main.run
