@@ -246,6 +246,7 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_low <= l.degree_optimal) ;
     assert (l.degree_high >= l.degree_optimal) ;
     assert (l.backoff_cleanup_ticks > 0) ;
+    assert (l.score_cleanup_ticks > 0) ;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
        This requirement is not imposed in the spec/Go implementation. Relax this
        requirement or delete the todo. *)
@@ -314,6 +315,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let heartbeat_interval state = state.limits.heartbeat_interval
 
     let backoff_cleanup_ticks state = state.limits.backoff_cleanup_ticks
+
+    let score_cleanup_ticks state = state.limits.score_cleanup_ticks
 
     let degree_low state = state.limits.degree_low
 
@@ -1027,15 +1030,22 @@ module Make (C : AUTOMATON_CONFIG) :
           backoff
         |> set_backoff
 
-    let clear_expired =
+    let clear_expired_scores =
       let open Monad.Syntax in
+      let*! heartbeat_ticks in
+      let*! score_cleanup_ticks in
       let*! scores in
-      let current = Time.now () in
-      Peer.Map.filter
-        (fun _peer {score = _; expires} ->
-          match expires with Some at -> Time.(at > current) | None -> true)
-        scores
-      |> set_scores
+      (* We only clear once every [score_cleanup_ticks] ticks to avoid
+         iterating over the map(s) too much *)
+      if Int64.(rem heartbeat_ticks (of_int score_cleanup_ticks)) <> 0L then
+        return ()
+      else
+        let current = Time.now () in
+        Peer.Map.filter
+          (fun _peer {score = _; expires} ->
+            match expires with Some at -> Time.(at > current) | None -> true)
+          scores
+        |> set_scores
 
     let cleanup =
       let open Monad.Syntax in
@@ -1043,7 +1053,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = clear_backoff in
 
       (* Clean up expired scores *)
-      let* () = clear_expired in
+      let* () = clear_expired_scores in
 
       (* Clean up IHave and IWant counters *)
       let* () = reset_ihave_per_heartbeat in

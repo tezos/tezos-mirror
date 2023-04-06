@@ -126,6 +126,9 @@ type ('peer, 'message_id, 'span) limits = {
   backoff_cleanup_ticks : int;
       (** [backoff_cleanup_ticks] is the number of heartbeat ticks setting the
           frequency at which the backoffs are checked and potentially cleared. *)
+  score_cleanup_ticks : int;
+      (** [score_cleanup_ticks] is the number of heartbeat ticks setting the
+          frequency at which the scores are checked and potentially cleared. *)
   degree_low : int;
       (** [degree_low] sets the lower bound on the number of peers we keep in a
           topic mesh. If we have fewer than [degree_low] peers, the heartbeat will attempt

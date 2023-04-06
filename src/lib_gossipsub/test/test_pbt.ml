@@ -519,7 +519,14 @@ module Test_remove_peer = struct
         and+ backoff_cleanup_ticks =
           M.int_range 1 (limits.backoff_cleanup_ticks * 2)
         in
-        {limits with retain_duration; heartbeat_interval; backoff_cleanup_ticks}
+        let score_cleanup_ticks = backoff_cleanup_ticks in
+        {
+          limits with
+          retain_duration;
+          heartbeat_interval;
+          backoff_cleanup_ticks;
+          score_cleanup_ticks;
+        }
       in
       let state = GS.make rng limits parameters in
       run state (scenario limits)
