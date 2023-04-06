@@ -138,7 +138,6 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully : [`Graft] output
     | Peer_backed_off : [`Graft] output
     | Mesh_full : [`Graft] output
-    | Grafting_expiring_peer : [`Graft] output
     | No_peer_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
@@ -160,7 +159,6 @@ module Make (C : AUTOMATON_CONFIG) :
     | Removing_peer : [`Remove_peer] output
     | Subscribed : [`Subscribe] output
     | Subscribe_to_unknown_peer : [`Subscribe] output
-    | Subscribe_to_expiring_peer : [`Subscribe] output
     | Unsubscribed : [`Unsubscribe] output
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
 
@@ -171,16 +169,12 @@ module Make (C : AUTOMATON_CONFIG) :
     outbound : bool;  (** An outbound connection is a connection we initiated. *)
   }
 
-  (** [connection] is either an expiration time or an active {!connection}.
-      In both cases, we remember the score associated to the peer. *)
-  type connection =
-    | Expires of {
-        at : Time.t;
-            (** The expiring time after having being disconnected from this peer. *)
-      }
-    | Connected of connected_state
+  type connection = Connected of connected_state
 
-  type peer_score = {score : Score.t  (** The score associated to this peer. *)}
+  type peer_score = {
+    score : Score.t;  (** The score associated to this peer. *)
+    expires : Time.t option;  (** The time until which we remember the score. *)
+  }
 
   type peer_info = {connection : connection}
 
@@ -232,7 +226,7 @@ module Make (C : AUTOMATON_CONFIG) :
          Topic.Map.find t mesh = None &&
          Topic.Map.find t fanout = None
 
-     - Forall p. Peer.Map.mem peers_info p <-> Peer.Map.mem scores p
+     - Forall p. Peer.Map.mem peers_info p -> Peer.Map.mem scores p
   *)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4984
@@ -414,7 +408,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let get_scores_score scores ~default peer =
       match Peer.Map.find peer scores with
       | None -> default
-      | Some {score} -> score
+      | Some {score; expires = _} -> score
 
     let get_score ~default peer state =
       get_scores_score state.scores ~default peer
@@ -422,9 +416,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let peer_has_outbound_connection peers ~default peer =
       Peer.Map.find_opt peer peers
       |> Option.map (fun peer_info ->
-             match peer_info.connection with
-             | Expires _ -> default
-             | Connected conn -> conn.outbound)
+             match peer_info.connection with Connected conn -> conn.outbound)
       |> Option.value ~default
 
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
@@ -433,7 +425,6 @@ module Make (C : AUTOMATON_CONFIG) :
       Peer.Map.bindings peers_info
       |> List.filter_map (fun (peer, {connection}) ->
              match connection with
-             | Expires _ -> None
              | Connected conn ->
                  let score = get_scores_score ~default:Score.zero scores peer in
                  let topics = conn.topics in
@@ -546,7 +537,10 @@ module Make (C : AUTOMATON_CONFIG) :
       add_backoff_for_peer delay topic peer backoff |> set_backoff
 
     let add_scores_score peer score scores =
-      Peer.Map.update peer (Option.map (fun _peer_info -> {score})) scores
+      Peer.Map.update
+        peer
+        (Option.map (fun peer_info -> {peer_info with score}))
+        scores
 
     let add_score peer score =
       let open Monad.Syntax in
@@ -704,9 +698,7 @@ module Make (C : AUTOMATON_CONFIG) :
       match Peer.Map.find peer peers_info with
       | None -> Unexpected_grafting_peer |> fail
       | Some peer_info -> (
-          match peer_info.connection with
-          | Expires _ -> Grafting_expiring_peer |> fail
-          | Connected conn -> pass conn)
+          match peer_info.connection with Connected conn -> pass conn)
 
     let check_not_direct connection =
       let open Monad.Syntax in
@@ -815,7 +807,6 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> return Subscribe_to_unknown_peer
       | Some peer_info -> (
           match peer_info.connection with
-          | Expires _ -> return Subscribe_to_expiring_peer
           | Connected conn ->
               let connection =
                 Connected {conn with topics = Topic.Set.add topic conn.topics}
@@ -839,7 +830,6 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> return @@ Unsubscribe_from_unknown_peer
       | Some peer_info -> (
           match peer_info.connection with
-          | Expires _ -> return Unsubscribed
           | Connected conn ->
               let connection =
                 Connected
@@ -1054,29 +1044,20 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let clear_expired =
       let open Monad.Syntax in
-      let*! peers_info in
       let*! scores in
       let current = Time.now () in
-      let peers_info =
-        Peer.Map.filter
-          (fun _peer peer_info ->
-            match peer_info.connection with
-            | Expires {at} -> Time.(at > current)
-            | Connected _ -> true)
-          peers_info
-      in
-      let scores =
-        Peer.Map.filter (fun peer _score -> Peer.Map.mem peer peers_info) scores
-      in
-      let* () = set_peers_info peers_info in
-      set_scores scores
+      Peer.Map.filter
+        (fun _peer {score = _; expires} ->
+          match expires with Some at -> Time.(at > current) | None -> true)
+        scores
+      |> set_scores
 
     let cleanup =
       let open Monad.Syntax in
       (* Clean up expired backoffs *)
       let* () = clear_backoff in
 
-      (* Clean up expired connections *)
+      (* Clean up expired scores *)
       let* () = clear_expired in
 
       (* Clean up IHave and IWant counters *)
@@ -1455,10 +1436,6 @@ module Make (C : AUTOMATON_CONFIG) :
                   assert false
               | Some peer_info -> (
                   match peer_info.connection with
-                  | Expires _ ->
-                      let peers_to_keep, peers_to_remove = acc in
-                      ( Peer.Set.remove peer peers_to_keep,
-                        peer :: peers_to_remove )
                   | Connected conn ->
                       let score =
                         get_scores_score ~default:Score.zero scores peer
@@ -1553,7 +1530,14 @@ module Make (C : AUTOMATON_CONFIG) :
           in
           let peer_info = {connection} in
           let peers_info = Peer.Map.add peer peer_info peers_info in
-          let scores = Peer.Map.add peer {score = Score.zero} scores in
+          let scores =
+            Peer.Map.update
+              peer
+              (function
+                | None -> Some {score = Score.zero; expires = None}
+                | Some score -> Some {score with expires = None})
+              scores
+          in
           let* () = set_peers_info peers_info in
           let* () = set_scores scores in
           return Peer_added
@@ -1577,24 +1561,25 @@ module Make (C : AUTOMATON_CONFIG) :
           fanout
       in
       let* () = set_fanout fanout in
-      let*! peers_info in
       let*! retain_duration in
-      let peers =
+      let*! scores in
+      let*! peers_info in
+      let* () = Peer.Map.remove peer peers_info |> set_peers_info in
+      let* () =
         Peer.Map.update
           peer
           (function
-            | None -> None
-            | Some peer_info -> (
-                match peer_info.connection with
-                | Expires _ -> Some peer_info
-                | Connected _ ->
-                    let now = Time.now () in
-                    let at = Time.add now retain_duration in
-                    let peer_info = {connection = Expires {at}} in
-                    Some peer_info))
-          peers_info
+            | None ->
+                (* This should not happen (global invariant). *)
+                None
+            | Some score ->
+                let now = Time.now () in
+                let at = Time.add now retain_duration in
+                let score = {score with expires = Some at} in
+                Some score)
+          scores
+        |> set_scores
       in
-      let* () = set_peers_info peers in
       Removing_peer |> return
   end
 
@@ -1786,12 +1771,11 @@ module Make (C : AUTOMATON_CONFIG) :
       outbound : bool;
     }
 
-    type nonrec connection = connection =
-      | Expires of {at : Time.t}
-      | Connected of connected_state
+    type nonrec connection = connection = Connected of connected_state
 
     type nonrec peer_score = peer_score = {
       score : Score.t;  (** The score associated to this peer. *)
+      expires : Time.t option;
     }
 
     type nonrec peer_info = peer_info = {connection : connection}
@@ -1823,24 +1807,13 @@ module Make (C : AUTOMATON_CONFIG) :
 
     type connected_peers_filter =
       | Direct
-      | Not_expired
       | Subscribed_to of Topic.t
       | Score_above of {threshold : float}
     (* Add other cases here if needed. *)
 
-    let connected_peers_filter _peer connection score = function
-      | Direct -> (
-          match connection with
-          | Expires _ -> false
-          | Connected state -> state.direct)
-      | Not_expired -> (
-          match connection with
-          | Connected _ -> true
-          | Expires {at} -> Time.(now () < at))
-      | Subscribed_to topic -> (
-          match connection with
-          | Expires _ -> false
-          | Connected state -> Topic.Set.mem topic state.topics)
+    let connected_peers_filter _peer (Connected state) score = function
+      | Direct -> state.direct
+      | Subscribed_to topic -> Topic.Set.mem topic state.topics
       | Score_above {threshold} ->
           Compare.Float.(Score.float score >= threshold)
 
@@ -1870,7 +1843,6 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> []
       | Some peer_info -> (
           match peer_info.connection with
-          | Expires _ -> []
           | Connected conn -> Topic.Set.elements conn.topics)
 
     let get_our_topics state =

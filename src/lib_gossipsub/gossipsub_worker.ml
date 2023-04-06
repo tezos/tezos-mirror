@@ -135,8 +135,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_join ~emit_p2p_msg topic = function
     | gstate, GS.Already_joined -> gstate
     | gstate, Joining_topic {to_graft} ->
-        let filters = View.[Not_expired] in
-        let peers = View.(view gstate |> get_connected_peers ~filters) in
+        let peers = View.(view gstate |> get_connected_peers) in
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
            topic first. *)
@@ -151,8 +150,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_leave ~emit_p2p_msg topic = function
     | gstate, GS.Not_joined -> gstate
     | gstate, Leaving_topic {to_prune} ->
-        let filters = View.[Not_expired] in
-        let peers = View.(view gstate |> get_connected_peers ~filters) in
+        let peers = View.(view gstate |> get_connected_peers) in
         (* Sending [Prune] before [Unsubscribe] to let full-connection peers
            clean their mesh before handling [Unsubscribe] message. *)
         let prune = Prune {topic; px = Seq.empty} in
@@ -188,16 +186,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         ( GS.Peer_filtered | Unknown_topic | Peer_already_in_mesh
         | Grafting_direct_peer | Unexpected_grafting_peer
         | Grafting_peer_with_negative_score | Grafting_successfully
-        | Peer_backed_off | Mesh_full | Grafting_expiring_peer ) ) ->
+        | Peer_backed_off | Mesh_full ) ) ->
         gstate
 
   (** When a [Subscribe] request from a remote peer is received, the worker just
       forwards it to the automaton. There is nothing else to do. *)
   let handle_subscribe = function
-    | ( gstate,
-        (GS.Subscribed | Subscribe_to_unknown_peer | Subscribe_to_expiring_peer)
-      ) ->
-        gstate
+    | gstate, (GS.Subscribed | Subscribe_to_unknown_peer) -> gstate
 
   (** When a [Unsubscribe] request from a remote peer is received, the worker just
       forwards it to the automaton. There is nothing else to do. *)

@@ -494,21 +494,16 @@ module Test_remove_peer = struct
         fprintf fmtr "%a:[%a]" Topic.pp topic pp_backoff backoff)
       v.backoff ;
     Peer.Map.iter
-      (fun peer peer_info ->
-        let expire =
-          match GS.Introspection.get_peer_info_connection peer_info with
-          | GS.Introspection.Expires {at} -> Some at
-          | Connected _ -> None
-        in
+      (fun peer {GS.Introspection.score = _; expires} ->
         fprintf
           fmtr
           "peer %a, expire=%a, cleanup=%b"
           GS.Peer.pp
           peer
           (pp_print_option pp_print_int)
-          expire
+          expires
           cleanup)
-      v.peers_info
+      v.scores
 
   let test rng limits parameters =
     Tezt_core.Test.register

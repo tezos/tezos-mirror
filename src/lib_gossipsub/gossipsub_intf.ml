@@ -307,8 +307,6 @@ module type AUTOMATON = sig
     | Mesh_full : [`Graft] output
         (** Grafting a peer for a topic whose mesh has already sufficiently many
             peers. *)
-    | Grafting_expiring_peer : [`Graft] output
-        (** Grafting a peer that has been set to be removed. *)
     | No_peer_in_mesh : [`Prune] output
         (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
@@ -366,9 +364,6 @@ module type AUTOMATON = sig
     | Subscribe_to_unknown_peer : [`Subscribe] output
         (** The output returned when we receive a subscribe message from a peer
             we don't know.*)
-    | Subscribe_to_expiring_peer : [`Subscribe] output
-        (** The output returned when we receive a subscribe message from a peer
-            set to be removed. *)
     | Unsubscribed : [`Unsubscribe] output
         (** The output returned once we successfully processed an unsubscribe
             request sent from a peer. *)
@@ -500,11 +495,11 @@ module type AUTOMATON = sig
       outbound : bool;
     }
 
-    type connection = Expires of {at : Time.t} | Connected of connected_state
+    type connection = Connected of connected_state
 
     type peer_info = {connection : connection}
 
-    type peer_score = {score : Score.t}
+    type peer_score = {score : Score.t; expires : Time.t option}
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -547,7 +542,6 @@ module type AUTOMATON = sig
         to filter the result. *)
     type connected_peers_filter =
       | Direct
-      | Not_expired
       | Subscribed_to of Topic.t
       | Score_above of {threshold : float}
 
