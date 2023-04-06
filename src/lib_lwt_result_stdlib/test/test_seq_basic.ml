@@ -236,6 +236,7 @@ let seq_es () =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "seq"
     [
       ( "basic",

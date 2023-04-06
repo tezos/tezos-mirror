@@ -464,4 +464,5 @@ let tests =
     Tztest.tztest "wrong_bound_data" `Quick test_wrong_bound_data;
   ]
 
-let () = Alcotest_lwt.run "sapling" [("sapling", tests)] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run ~__FILE__ "sapling" [("sapling", tests)] |> Lwt_main.run

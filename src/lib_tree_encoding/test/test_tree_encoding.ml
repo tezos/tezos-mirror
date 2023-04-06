@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "test lib tree encoding"
     [("Encodings", Test_encoding.tests); ("Proofs", Test_proofs.tests)]
   |> Lwt_main.run

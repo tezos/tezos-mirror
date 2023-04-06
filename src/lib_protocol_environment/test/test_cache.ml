@@ -775,4 +775,5 @@ let tests =
   List.map to_alcotest_lwt qtests
 
 let () =
-  Alcotest_lwt.run "tezos-shell-context" [("cache", tests)] |> Lwt_main.run
+  Alcotest_lwt.run ~__FILE__ "tezos-shell-context" [("cache", tests)]
+  |> Lwt_main.run

@@ -277,4 +277,4 @@ let vectors () =
 
 let basic = [("vectors", `Quick, vectors)]
 
-let () = Alcotest.run "bip39" [("basic", basic)]
+let () = Alcotest.run ~__FILE__ "bip39" [("basic", basic)]

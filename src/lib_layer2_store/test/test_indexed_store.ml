@@ -601,5 +601,6 @@ let () =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "tezos-layer2-store"
     [("indexed-store", List.map QCheck_alcotest.to_alcotest !tests)]

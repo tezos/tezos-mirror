@@ -155,4 +155,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "tezos-benchmark" [("costlang", tests)] |> Lwt_main.run
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("costlang", tests)]
+  |> Lwt_main.run

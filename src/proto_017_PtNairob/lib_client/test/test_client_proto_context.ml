@@ -67,5 +67,6 @@ let tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Client proto context"
     [(Protocol.name ^ ": Encodings", qcheck_wrap tests)]

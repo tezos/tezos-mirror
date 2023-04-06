@@ -131,5 +131,6 @@ let tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "protocol > pbt > tez_repr"
     [(Protocol.name ^ ": Tez_repr", Qcheck2_helpers.qcheck_wrap tests)]

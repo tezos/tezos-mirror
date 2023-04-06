@@ -580,6 +580,7 @@ end
 
 let () =
   Alcotest.run
+    ~__FILE__
     "list-basic"
     [
       ("is_empty", IsEmpty.tests);

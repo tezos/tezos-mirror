@@ -216,6 +216,7 @@ let test_clear_pending =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Requester_PBT"
     [
       ("read", qcheck_wrap [test_read_read_opt; test_read_opt_known]);

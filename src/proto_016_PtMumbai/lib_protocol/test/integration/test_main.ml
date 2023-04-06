@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > integration"
     [
       (Protocol.name ^ ": constants", Test_constants.tests);

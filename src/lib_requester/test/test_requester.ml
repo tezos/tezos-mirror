@@ -628,6 +628,7 @@ let test_full_requester_shutdown _ () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-requester"
     [
       ( "all",

@@ -1602,5 +1602,8 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "lib_delegate" [(Protocol.name ^ ": scenario", tests)]
+  Alcotest_lwt.run
+    ~__FILE__
+    "lib_delegate"
+    [(Protocol.name ^ ": scenario", tests)]
   |> Lwt_main.run

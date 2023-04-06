@@ -191,4 +191,4 @@ let () =
         (P256, "P256");
         (Bls, "Bls");
       ]
-  |> Alcotest.run "tezos-crypto-prop-signature"
+  |> Alcotest.run ~__FILE__ "tezos-crypto-prop-signature"

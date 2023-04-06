@@ -555,6 +555,7 @@ end
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Prevalidator"
     [
       (* Run only those tests with:

@@ -253,6 +253,7 @@ let () =
       handle_branch_pairs
   in
   Alcotest.run
+    ~__FILE__
     "Shell_operation"
     [
       ( "Corner cases",

@@ -325,6 +325,7 @@ let test_wrong_sym_block_caching_time =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Proxy_server_config"
     [
       ( "union_right_bias",

@@ -96,6 +96,7 @@ let test_fill =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "bits"
     [
       ( Protocol.name ^ ": quantity",

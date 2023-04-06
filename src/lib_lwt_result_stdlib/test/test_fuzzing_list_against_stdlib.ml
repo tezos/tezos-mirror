@@ -707,4 +707,4 @@ let all_list : unit Alcotest.test_case list =
     equal;
   ]
 
-let () = Alcotest.run "FuzzRef" [("List", all_list)]
+let () = Alcotest.run ~__FILE__ "FuzzRef" [("List", all_list)]

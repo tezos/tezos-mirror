@@ -254,4 +254,4 @@ let tests =
     ("check size overflow", `Quick, check_overflow);
   ]
 
-let () = Alcotest.run "Lazy structs tests" [("Lazy_vector", tests)]
+let () = Alcotest.run ~__FILE__ "Lazy structs tests" [("Lazy_vector", tests)]

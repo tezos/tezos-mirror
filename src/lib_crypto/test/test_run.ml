@@ -7,6 +7,7 @@ type t = (module T)
 let runtest l =
   let _ =
     Alcotest.run
+      ~__FILE__
       "tezos-crypto"
       (List.fold_left
          (fun acc (e : t) ->

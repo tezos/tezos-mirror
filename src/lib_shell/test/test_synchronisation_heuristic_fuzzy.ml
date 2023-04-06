@@ -236,5 +236,6 @@ let tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "synchronisation heuristic fuzzy"
     [("synchronisation heuristic fuzzy", qcheck_wrap tests)]

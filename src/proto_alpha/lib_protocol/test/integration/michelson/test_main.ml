@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > integration > michelson"
     [
       ( Protocol.name ^ ": global table of constants",

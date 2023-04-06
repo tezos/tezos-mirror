@@ -198,4 +198,5 @@ let tests =
     Alcotest_lwt.test_case "order" `Quick test_order;
   ]
 
-let () = Alcotest_lwt.run "hashtbl" [("hashtbl-lwt", tests)] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run ~__FILE__ "hashtbl" [("hashtbl-lwt", tests)] |> Lwt_main.run

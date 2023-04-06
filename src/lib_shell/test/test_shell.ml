@@ -34,6 +34,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-shell"
     [
       ("synchronisation heuristic sync", Test_synchronisation_heuristic.tests);

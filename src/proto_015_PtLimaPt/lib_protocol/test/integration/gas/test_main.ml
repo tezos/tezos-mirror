@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > integration > gas"
     [
       (Protocol.name ^ ": gas levels", Test_gas_levels.tests);

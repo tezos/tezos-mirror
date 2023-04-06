@@ -66,4 +66,4 @@ let pbkdf2_tests =
     ("Test Case 13", `Quick, pbkdf2_test13);
   ]
 
-let () = Alcotest.run "PBKDF Tests" [("PBKDF2 tests", pbkdf2_tests)]
+let () = Alcotest.run ~__FILE__ "PBKDF Tests" [("PBKDF2 tests", pbkdf2_tests)]

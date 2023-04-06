@@ -111,6 +111,7 @@ let test_check_path_wrong ~count =
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
+    ~__FILE__
     "Merkle list"
     [
       ( Protocol.name ^ ": scons_equiv",

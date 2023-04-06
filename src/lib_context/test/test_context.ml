@@ -696,5 +696,6 @@ module Generic_memory =
 let () =
   Lwt_main.run
     (Alcotest_lwt.run
+       ~__FILE__
        "tezos-context"
        [("context", List.concat [Generic_disk.tests; Generic_memory.tests])])

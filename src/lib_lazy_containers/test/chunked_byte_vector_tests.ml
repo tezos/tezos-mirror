@@ -306,4 +306,5 @@ end)
 
 let tests = List.concat [Mutable_CBV.all_tests; Immutable_CBV.all_tests]
 
-let () = Alcotest.run "Chunked_byte_vector" [("Chunked_byte_vector", tests)]
+let () =
+  Alcotest.run ~__FILE__ "Chunked_byte_vector" [("Chunked_byte_vector", tests)]

@@ -47,10 +47,13 @@ let test_case_sync name speed_level body =
 
 type 'a test = string * 'a test_case list
 
-let run library_name tests =
+let run ~__FILE__ library_name tests =
   (tests
   |> List.iter @@ fun (test_name, test_cases) ->
-     Test.register ~__FILE__:library_name ~title:test_name ~tags:["alcotezt"]
+     Test.register
+       ~__FILE__
+       ~title:(library_name ^ ": " ^ test_name)
+       ~tags:["alcotezt"]
      @@ fun () ->
      test_cases
      |> Lwt_list.iter_s @@ fun (test_case_name, speed_level, body) ->

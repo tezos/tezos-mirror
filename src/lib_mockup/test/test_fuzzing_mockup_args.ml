@@ -52,5 +52,6 @@ let test_prioritize_config_file =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Fuzzing_mockup_args"
     [("Chain_id.choose", qcheck_wrap [test_prioritize_config_file])]

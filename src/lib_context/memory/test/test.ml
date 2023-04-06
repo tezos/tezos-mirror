@@ -114,4 +114,5 @@ let test_hash =
     [100; 200; 255; 256; 257; 300; 1000; 10000]
 
 let () =
-  Lwt_main.run (Alcotest_lwt.run "tezos-context-memory" [("hash", test_hash)])
+  Lwt_main.run
+    (Alcotest_lwt.run ~__FILE__ "tezos-context-memory" [("hash", test_hash)])

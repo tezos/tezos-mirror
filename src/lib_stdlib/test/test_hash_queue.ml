@@ -198,6 +198,7 @@ let test_take_replace_keep_order () =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "stdlib"
     [
       ( "hash_queue",

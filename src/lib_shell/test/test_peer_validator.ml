@@ -168,6 +168,7 @@ let test_validate_new_head_on_lower_fitness () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "Peer_validator"
     [
       ( "Validate_new_head",

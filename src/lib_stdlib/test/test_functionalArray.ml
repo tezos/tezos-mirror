@@ -32,4 +32,4 @@
 
 module Tests = Test_arrays.Make (FunctionalArray)
 
-let () = Alcotest.run "stdlib" [("FunctionalArray", Tests.tests)]
+let () = Alcotest.run ~__FILE__ "stdlib" [("FunctionalArray", Tests.tests)]

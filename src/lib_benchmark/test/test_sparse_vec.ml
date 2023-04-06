@@ -75,4 +75,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "tezos-benchmark" [("sparse_vec", tests)] |> Lwt_main.run
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("sparse_vec", tests)]
+  |> Lwt_main.run

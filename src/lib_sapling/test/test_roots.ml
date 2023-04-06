@@ -28,4 +28,4 @@ let test_add_mem () =
 
 let tests = [("add_mem", `Quick, test_add_mem)]
 
-let () = Alcotest.run "sapling" [("roots", tests)]
+let () = Alcotest.run ~__FILE__ "sapling" [("roots", tests)]

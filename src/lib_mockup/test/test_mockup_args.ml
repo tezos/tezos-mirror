@@ -51,4 +51,4 @@ let tests =
       test_no_config_file_dummy );
   ]
 
-let () = Alcotest.run "tezos-mockup" [("mockup_args", tests)]
+let () = Alcotest.run ~__FILE__ "tezos-mockup" [("mockup_args", tests)]

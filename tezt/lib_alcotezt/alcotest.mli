@@ -69,7 +69,7 @@ type 'a test = string * 'a test_case list
 
     In Tezt, this calls [Test.register] but does not actually run the test suite.
     The name of the test suite is used as the filename for the Tezt test. *)
-val run : string -> unit test list -> return
+val run : __FILE__:string -> string -> unit test list -> return
 
 (** Values that can be tested with {!check}. *)
 type 'a testable = (module Tezt_core.Check.EQUALABLE with type t = 'a)

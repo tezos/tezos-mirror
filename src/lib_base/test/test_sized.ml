@@ -302,5 +302,6 @@ end
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Sized"
     [("SizedSet", SizedSet_test.test); ("SizedMap", SizedMap_test.test)]

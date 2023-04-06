@@ -105,5 +105,6 @@ let tests =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Tick_repr"
     [(Protocol.name ^ ": Tick_repr", Qcheck2_helpers.qcheck_wrap tests)]

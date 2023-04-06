@@ -172,4 +172,4 @@ let all_option : unit Alcotest.test_case list =
     filter_right;
   ]
 
-let () = Alcotest.run "FuzzRef" [("Option", all_option)]
+let () = Alcotest.run ~__FILE__ "FuzzRef" [("Option", all_option)]

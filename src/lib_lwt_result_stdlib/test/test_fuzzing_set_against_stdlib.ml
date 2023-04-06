@@ -141,4 +141,4 @@ let fold =
 
 let all_set : unit Alcotest.test_case list = [iter; fold]
 
-let () = Alcotest.run "FuzzRef" [("Set", all_set)]
+let () = Alcotest.run ~__FILE__ "FuzzRef" [("Set", all_set)]

@@ -500,6 +500,7 @@ let parallel_test =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "test-key-value-store-fuzzy"
     [
       ("sequential", [QCheck_alcotest.to_alcotest sequential_test]);

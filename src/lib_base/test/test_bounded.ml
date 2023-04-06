@@ -419,6 +419,7 @@ let int32_checks =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Bounded"
     [
       ("Int32", int32_checks);

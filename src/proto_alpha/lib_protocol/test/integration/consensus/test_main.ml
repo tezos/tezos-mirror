@@ -32,6 +32,7 @@
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "protocol > integration > consensus"
     [
       (Protocol.name ^ ": endorsement", Test_endorsement.tests);

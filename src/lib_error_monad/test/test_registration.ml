@@ -61,4 +61,7 @@ let tests_extract_infos =
   [Alcotest.test_case "extract-infos" `Quick test_extract_infos]
 
 let () =
-  Alcotest.run "error-registration" [("extract-info", tests_extract_infos)]
+  Alcotest.run
+    ~__FILE__
+    "error-registration"
+    [("extract-info", tests_extract_infos)]

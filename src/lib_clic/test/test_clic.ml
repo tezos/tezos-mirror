@@ -640,6 +640,7 @@ let wrap (n, f) =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "Tezos_clic"
     [
       ( "dispatch",

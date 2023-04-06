@@ -125,4 +125,4 @@ let check () =
 
 let tests = [("Smallint", [Alcotest.test_case "Check_smallint" `Quick check])]
 
-let () = Alcotest.run "WebAssembly reference interpreter tests" tests
+let () = Alcotest.run ~__FILE__ "WebAssembly reference interpreter tests" tests

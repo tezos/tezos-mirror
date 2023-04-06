@@ -53,4 +53,5 @@ let tests : (string * _) list =
 
 let tests = List.map (fun (s, f) -> Alcotest.test_case s `Quick f) tests
 
-let () = Alcotest.run "tezos-lib-shell-services" [("block-services", tests)]
+let () =
+  Alcotest.run ~__FILE__ "tezos-lib-shell-services" [("block-services", tests)]
