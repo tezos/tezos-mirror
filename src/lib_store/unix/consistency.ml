@@ -724,12 +724,27 @@ let fix_checkpoint chain_dir block_store ~head ~savepoint =
   in
   return inferred_checkpoint
 
-let check_block_protocol_hash context_index ~expected block =
+let check_block_protocol_hash block_store context_index ~expected block =
   let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let*! ctxt = Context.checkout_exn context_index (Block_repr.context block) in
-  let*! got = Context.get_protocol ctxt in
-  return Protocol_hash.(got = expected)
+  protect (fun () ->
+      let* resulting_context_hash_opt =
+        Block_store.resulting_context_hash
+          ~fetch_expect_predecessor_context:(fun () ->
+            let* (module Protocol) = Registered_protocol.get_result expected in
+            return
+              (Protocol.expected_context_hash = Predecessor_resulting_context))
+          block_store
+          (Block (Block_repr.hash block, 0))
+      in
+      match resulting_context_hash_opt with
+      | Some ctxt_hash -> (
+          let*! ctxt = Context.checkout context_index ctxt_hash in
+          match ctxt with
+          | Some ctxt ->
+              let*! got = Context.get_protocol ctxt in
+              return Protocol_hash.(got = expected)
+          | None -> return_false)
+      | None -> return_false)
 
 (** Look into the cemented store for the lowest block with an
     associated proto level that is above the savepoint. *)
@@ -964,6 +979,7 @@ let fix_protocol_levels chain_dir block_store context_index genesis
             | Some b ->
                 let* protocol_matches =
                   check_block_protocol_hash
+                    block_store
                     context_index
                     ~expected:proto_info.protocol
                     b
