@@ -74,7 +74,7 @@ module Impl : Pvm.S = struct
       let open Lwt.Syntax in
       let* is_input_required = is_input_state state in
 
-      if is_input_required = No_input_required && step <= max_steps then
+      if is_input_required = No_input_required && step < max_steps then
         let open Lwt.Syntax in
         (* Note: This is not an efficient implementation because the state is
            decoded/encoded to/from the tree at each step but for Arith PVM
