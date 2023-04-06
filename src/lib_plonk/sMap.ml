@@ -145,11 +145,10 @@ module StringMap = struct
     let prefix_map ?n ?i ?shift prefix str_map =
       fold (fun k -> add (add_prefix ?n ?i ?shift prefix k)) str_map empty
 
-    (* This function will merge the maps of the list, by prefixing each key with it’s index in the list, optionnally with a shift, with the index prefix prefixed with zero to we able to handle [n] elements with the same prefix size ; if a [prefix] is given, it will be put before the index.
+    (* This function will merge the maps of the list, by prefixing each key with it’s index in the list, optionnally with a shift, with the index prefix prefixed with zero to we able to handle n elements with the same prefix size (with n either given by [shift] or by the length of [list_map]) ; if a [prefix] is given, it will be put before the index.
        *)
-    let map_of_list_map ?(prefix = "") ?shift ?n list_map =
-      let n = match n with None -> List.length list_map | Some n -> n in
-      let shift = match shift with None -> 0 | Some shift -> shift in
+    let map_of_list_map ?(prefix = "") ?shift list_map =
+      let shift, n = Option.value ~default:(0, List.length list_map) shift in
       List.mapi (fun i m -> prefix_map ~n ~i ~shift prefix m) list_map
       |> union_disjoint_list
 
@@ -160,12 +159,7 @@ module StringMap = struct
     let gather_maps ?(shifts_map = empty) map_list_map =
       mapi
         (fun name list_map ->
-          let shift, n =
-            match find_opt name shifts_map with
-            | None -> (None, None)
-            | Some (shift, n) -> (Some shift, Some n)
-          in
-          map_of_list_map ?shift ?n list_map)
+          map_of_list_map ?shift:(find_opt name shifts_map) list_map)
         map_list_map
       |> smap_of_smap_smap
 
@@ -268,9 +262,6 @@ module type S = sig
        all the keys of [map] with "0006~hello~"
     *)
     val prefix_map : ?n:int -> ?i:int -> ?shift:int -> string -> 'a t -> 'a t
-
-    val map_of_list_map :
-      ?prefix:key -> ?shift:int -> ?n:int -> 'a t list -> 'a t
 
     (* "c1" -> {"a" ; "b"} ; "c2" -> {"a" ; "c"} becomes
        {"c1~a" ; "c1~b" ; "c2~a" ; "c2~c"} with the same values *)
