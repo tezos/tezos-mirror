@@ -393,6 +393,97 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       Evaluations.interpolation_fft2 domain scalar_array_Z
   end
 
+  (* The shared permutation argument consists of leveraging the fact that
+     all proofs of the same circuit type share the same permutation
+     for ensuring the copy-satisfiability.
+     This allows us to run a single permutation argument on a linear
+     combination of the wire polynomials of all same-circuit proofs.
+     Namely, let a_i(X), b_i(X), c_i(X) be the wire polynomials of the
+     i-th proof. Let delta be some scalar sampled after (and based on)
+     a commitment to all a_i, b_i, c_i and consider batched polynomials:
+     A(X) := \sum_i delta^{i-1} a_i(X)
+     B(X) := \sum_i delta^{i-1} b_i(X)
+     C(X) := \sum_i delta^{i-1} c_i(X)
+     We will perform a single permutation argument for A, B and C. *)
+  module Shared_argument = struct
+    let build_batched_wires_values ~delta ~wires:wires_list_map =
+      (* agg_map = {a -> [] ; b -> [] ; …} *)
+      let agg_map =
+        SMap.(map (Fun.const []) (List.hd (choose wires_list_map |> snd)))
+      in
+      (* builds {a -> linear(a in l) ; b -> linear(b in l) ; …} *)
+      let aggreg_wires_list l =
+        List.fold_left
+          (fun acc wires -> (SMap.mapi (fun k v -> SMap.find k wires :: v)) acc)
+          agg_map
+          (List.rev l)
+        |> SMap.map (fun ws_list ->
+               Evaluations.linear_with_powers ws_list delta)
+      in
+      SMap.map aggreg_wires_list wires_list_map
+      |> SMap.(map (update_keys String.capitalize_ascii))
+
+    (* For each circuit, interpolates the batched wires A, B, C from the
+       batched witness *)
+    let batched_wires_poly_of_batched_wires (zk, n, domain) batched_wires
+        (delta, f_blinds) =
+      let batched_polys =
+        SMap.map (fun w -> Evaluations.interpolation_fft domain w) batched_wires
+      in
+      if not zk then batched_polys
+      else
+        (* delta is only used to batched the blinds, the polys are computed
+           from a witness batched with delta already *)
+        let batched_blinds =
+          let f_blinds = List.map (fun b -> Option.get b) f_blinds in
+          SMap.map_list_to_list_map f_blinds
+          |> SMap.map (fun p -> Poly.linear_with_powers p delta)
+        in
+        SMap.mapi
+          (fun name f ->
+            let b = SMap.find name batched_blinds in
+            Poly.(f + mul_xn b n Scalar.(negate one)))
+          batched_polys
+
+    (* compute the batched polynomials A, B, C for the shared-permutation
+       argument; polynomial A (analogously B and C) can be computed by
+       batching polynomials a_i with powers of delta; or alternatively, by
+       applying an IFFT interpolation on the batched witness; we expect
+       the latter to be more efficient if the number of batched proofs
+       is over the threshold of [log2(n)] proofs, where [n] is the domain
+       size: this is because polynomial batching would require about
+       [n * nb_proofs] scalar operations (per polynomial) whereas the IFFT
+       would need [n * log2(n)]; such theoretical threshold has also been
+       empirically sustained with benchmarks *)
+    let build_batched_witness_polys ?(use_batched_wires = false) ~zero_knowledge
+        ~domain ~delta ~batched_wires ~f:(f_wires, f_blinds) () =
+      let n = Domain.length domain in
+      let logn = Z.log2 @@ Z.of_int n in
+      let batched_witness_polys =
+        SMap.mapi
+          (fun name wires_list ->
+            let batched_wires = SMap.find name batched_wires in
+            let f_blinds = SMap.find name f_blinds in
+            if List.compare_length_with wires_list logn > 0 || use_batched_wires
+            then
+              (* we apply an IFFT on the batched witness *)
+              batched_wires_poly_of_batched_wires
+                (zero_knowledge, n, domain)
+                batched_wires
+                (delta, f_blinds)
+            else
+              (* Use capital for the batched wires *)
+              let wires_list =
+                List.map (SMap.update_keys String.capitalize_ascii) wires_list
+              in
+              (* we batched the a_i polynomials (analogously for b_i and c_i) *)
+              SMap.map (fun p -> Poly.linear_with_powers p delta)
+              @@ SMap.map_list_to_list_map wires_list)
+          f_wires
+      in
+      batched_witness_polys |> SMap.Aggregation.smap_of_smap_smap
+  end
+
   (* max degree needed is the degree of Perm.b, which is sum of wire’s degree plus z degree *)
   let polynomials_degree ~nb_wires = nb_wires + 1
 
@@ -585,8 +676,8 @@ module type S = sig
     ?external_prefix:string ->
     permutation:int array ->
     values:Evaluations.t SMap.t ->
-    beta:Poly.scalar ->
-    gamma:Poly.scalar ->
+    beta:Scalar.t ->
+    gamma:Scalar.t ->
     domain:Domain.t ->
     unit ->
     Poly.t SMap.t
@@ -603,6 +694,29 @@ module type S = sig
     zg:L.scalar L.repr ->
     wires:L.scalar L.repr list list ->
     (L.scalar L.repr * L.scalar L.repr) L.t
+
+  module Shared_argument : sig
+    val build_batched_wires_values :
+      delta:Scalar.t ->
+      wires:Evaluations.t SMap.t list SMap.t ->
+      Evaluations.t SMap.t SMap.t
+
+    val batched_wires_poly_of_batched_wires :
+      bool * int * Domain.t ->
+      Evaluations.t SMap.t ->
+      Scalar.t * Poly.t SMap.t option list ->
+      Poly.t SMap.t
+
+    val build_batched_witness_polys :
+      ?use_batched_wires:bool ->
+      zero_knowledge:bool ->
+      domain:Domain.t ->
+      delta:Scalar.t ->
+      batched_wires:Evaluations.t SMap.t SMap.t ->
+      f:Poly.t SMap.t list SMap.t * Poly.t SMap.t option list SMap.t ->
+      unit ->
+      Poly.t SMap.t
+  end
 end
 
 module Permutation_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

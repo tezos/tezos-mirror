@@ -83,17 +83,6 @@ module type S = sig
       Evaluations.t SMap.t list SMap.t ->
       Poly.t SMap.t
 
-    val batched_wires_poly_of_batched_wires :
-      prover_public_parameters ->
-      Evaluations.t SMap.t ->
-      Scalar.t * Poly.t SMap.t option list ->
-      Poly.t SMap.t
-
-    val build_batched_wires_values :
-      gate_randomness ->
-      Evaluations.t SMap.t list SMap.t ->
-      Evaluations.t SMap.t SMap.t
-
     val build_f_map_perm :
       prover_public_parameters ->
       gate_randomness ->
@@ -287,7 +276,11 @@ module Common (PP : Polynomial_protocol.S) = struct
 
   let commit_to_plook_rc pp shifts_map transcript f_wires_list_map =
     let rd, _transcript = build_gates_randomness transcript in
-    let batched_wires_map = build_batched_wires_values rd f_wires_list_map in
+    let batched_wires_map =
+      Perm.Shared_argument.build_batched_wires_values
+        ~delta:rd.delta
+        ~wires:f_wires_list_map
+    in
     (* ******************************************* *)
     let f_map_plook = build_f_map_plook ~shifts_map pp rd f_wires_list_map in
     let f_map_rc =
@@ -339,7 +332,7 @@ module Common (PP : Polynomial_protocol.S) = struct
       SMap.map
         (fun batched_witness ->
           (* we apply an IFFT on the batched witness *)
-          batched_wires_poly_of_batched_wires
+          Perm.Shared_argument.batched_wires_poly_of_batched_wires
             pp
             batched_witness
             (Scalar.zero, []))
@@ -380,7 +373,9 @@ module Common (PP : Polynomial_protocol.S) = struct
     let evaluated_perm_ids =
       let evaluations =
         let batched_wires_polys =
-          build_batched_witness_polys_bis pp batched_wires_map
+          build_batched_witness_polys_bis
+            (pp.common_pp.zk, pp.common_pp.n, pp.common_pp.domain)
+            batched_wires_map
         in
         build_evaluations
           pp
