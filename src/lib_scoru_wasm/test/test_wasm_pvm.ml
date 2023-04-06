@@ -501,6 +501,13 @@ let try_run_store_delete_value ~version =
     ["i32"; "i32"]
     ["i32"]
 
+let try_run_store_create ~version =
+  try_availability_above_v1_only
+    ~version
+    "store_create"
+    ["i32"; "i32"; "i32"]
+    ["i32"]
+
 let test_modify_read_only_storage_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
@@ -1731,6 +1738,7 @@ let tests =
         `Quick,
         try_run_store_get_hash );
       ("Test store_delete_value available", `Quick, try_run_store_delete_value);
+      ("Test store_create available", `Quick, try_run_store_create);
       ( "Test unreachable kernel (tick per tick)",
         `Quick,
         fun ~version ->
