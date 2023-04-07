@@ -99,6 +99,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
+  type collection_kind = List of Peer.t list | Set of Peer.Set.t
+
+  let send_p2p_message ~emit_p2p_msg p2p_message =
+    let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
+    function
+    | List list -> List.iter emit list | Set set -> Peer.Set.iter emit set
+
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
   (** From the worker's perspective, handling a full message consists in:
@@ -114,9 +121,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
-        Peer.Set.iter
-          (fun to_peer -> emit_p2p_msg @@ Out_message {to_peer; p2p_message})
-          to_publish ;
+        send_p2p_message ~emit_p2p_msg p2p_message (Set to_publish) ;
         let has_joined = View.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
           emit_app_msg full_message ;
