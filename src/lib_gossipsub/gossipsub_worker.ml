@@ -174,6 +174,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                send_p2p_message ~emit_p2p_msg (Subscribe {topic}) peers) ;
         gstate
 
+  (** When a peer is disconnected, the worker has nothing to do, as:
+      - It cannot send [Prune] or [Unsubscribe] to the remote peer because the
+        connection is closed;
+      - [Prune] or [Unsubscribe] are already handled when calling
+        {!GS.remove_peer}. *)
+  let handle_disconnection = function gstate, GS.Removing_peer -> gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -206,12 +213,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.add_peer {direct; outbound; peer} gossip_state
         |> handle_new_connection ~emit_p2p_msg peer
     | Disconnection {peer} ->
-        let gossip_state, output = GS.remove_peer {peer} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5161
-
-           Handle disconnection's output *)
-        ignore output ;
-        gossip_state
+        GS.remove_peer {peer} gossip_state |> handle_disconnection
     | In_message {from_peer; p2p_message} ->
         apply_p2p_message
           ~emit_p2p_msg
