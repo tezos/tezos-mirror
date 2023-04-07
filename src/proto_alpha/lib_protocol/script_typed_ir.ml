@@ -1731,6 +1731,62 @@ let meta_compound2 loc ({size = size1} : _ ty_metadata)
     ({size = size2} : _ ty_metadata) : _ ty_metadata tzresult =
   Type_size.compound2 loc size1 size2 >|? fun size -> {size}
 
+let pair_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) pair ty_metadata tzresult =
+  meta_compound2
+
+let or_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) or_ ty_metadata tzresult =
+  meta_compound2
+
+let lambda_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) lambda ty_metadata tzresult =
+  meta_compound2
+
+let option_metadata :
+    Script.location -> 'a ty_metadata -> 'a option ty_metadata tzresult =
+  meta_compound1
+
+let list_metadata :
+    Script.location -> 'a ty_metadata -> 'a Script_list.t ty_metadata tzresult =
+  meta_compound1
+
+let set_metadata :
+    Script.location -> 'a ty_metadata -> 'a set ty_metadata tzresult =
+  meta_compound1
+
+let map_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) map ty_metadata tzresult =
+  meta_compound2
+
+let big_map_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) big_map ty_metadata tzresult =
+  meta_compound2
+
+let contract_metadata :
+    Script.location -> 'a ty_metadata -> 'a typed_contract ty_metadata tzresult
+    =
+  meta_compound1
+
+let ticket_metadata :
+    Script.location -> 'a ty_metadata -> 'a ticket ty_metadata tzresult =
+  meta_compound1
+
 let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
@@ -1822,14 +1878,14 @@ let pair_t :
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) pair ty_ex_c tzresult
     =
  fun loc l r ->
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  pair_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Pair_t (l, r, metadata, cmp))
 
 let pair_3_t loc l m r = pair_t loc m r >>? fun (Ty_ex_c r) -> pair_t loc l r
 
 let comparable_pair_t loc l r =
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  pair_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   Pair_t (l, r, metadata, YesYes)
 
 let comparable_pair_3_t loc l m r =
@@ -1839,22 +1895,22 @@ let or_t :
     type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) or_ ty_ex_c tzresult =
  fun loc l r ->
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Or_t (l, r, metadata, cmp))
 
 let or_bytes_bool_t = Or_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
 
 let comparable_or_t loc l r =
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   Or_t (l, r, metadata, YesYes)
 
 let lambda_t loc l r =
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  lambda_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   Lambda_t (l, r, metadata)
 
 let option_t loc t =
-  meta_compound1 loc (ty_metadata t) >|? fun metadata ->
+  option_metadata loc (ty_metadata t) >|? fun metadata ->
   let cmp = is_comparable t in
   Option_t (t, metadata, cmp)
 
@@ -1891,25 +1947,26 @@ let option_pair_int_nat_t =
       Yes )
 
 let list_t loc t =
-  meta_compound1 loc (ty_metadata t) >|? fun metadata -> List_t (t, metadata)
+  list_metadata loc (ty_metadata t) >|? fun metadata -> List_t (t, metadata)
 
 let operation_t = Operation_t
 
 let list_operation_t = List_t (operation_t, {size = Type_size.two})
 
 let set_t loc t =
-  meta_compound1 loc (ty_metadata t) >|? fun metadata -> Set_t (t, metadata)
+  set_metadata loc (ty_metadata t) >|? fun metadata -> Set_t (t, metadata)
 
 let map_t loc l r =
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  map_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   Map_t (l, r, metadata)
 
 let big_map_t loc l r =
-  meta_compound2 loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  big_map_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   Big_map_t (l, r, metadata)
 
 let contract_t loc t =
-  meta_compound1 loc (ty_metadata t) >|? fun metadata -> Contract_t (t, metadata)
+  contract_metadata loc (ty_metadata t) >|? fun metadata ->
+  Contract_t (t, metadata)
 
 let contract_unit_t = Contract_t (unit_t, {size = Type_size.two})
 
@@ -1931,7 +1988,7 @@ let bls12_381_g2_t = Bls12_381_g2_t
 let bls12_381_fr_t = Bls12_381_fr_t
 
 let ticket_t loc t =
-  meta_compound1 loc (ty_metadata t) >|? fun metadata -> Ticket_t (t, metadata)
+  ticket_metadata loc (ty_metadata t) >|? fun metadata -> Ticket_t (t, metadata)
 
 let chest_key_t = Chest_key_t
 
