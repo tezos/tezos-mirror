@@ -2489,24 +2489,34 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
       (Inconsistent_genesis
          {expected = stored_genesis.block; got = genesis.block})
   in
-  let* main_chain_store =
-    match history_mode with
-    | None -> return main_chain_store
-    | Some history_mode ->
-        let previous_history_mode = Chain.history_mode main_chain_store in
-        let* () =
-          fail_unless
-            (History_mode.equal history_mode previous_history_mode)
-            (Cannot_switch_history_mode
-               {previous_mode = previous_history_mode; next_mode = history_mode})
-        in
-        return main_chain_store
-  in
   global_store.main_chain_store <- Some main_chain_store ;
   return global_store
 
 let main_chain_store store =
   WithExceptions.Option.get ~loc:__LOC__ store.main_chain_store
+
+(* Checks that the history mode stored in the store's configuration
+   file (if any) is consistent with the one given (if any) to
+   initialize the store. *)
+let check_history_mode_consistency chain_dir history_mode =
+  let open Lwt_result_syntax in
+  match history_mode with
+  | None -> (* No hint, no need to check. *) return_unit
+  | Some history_mode ->
+      let chain_config_path = Naming.chain_config_file chain_dir in
+      let*! chain_config_path_exists =
+        Lwt_unix.file_exists (Naming.encoded_file_path chain_config_path)
+      in
+      if chain_config_path_exists then
+        let* chain_config_data = Stored_data.load chain_config_path in
+
+        let*! chain_config = Stored_data.get chain_config_data in
+        let stored_history_mode = chain_config.history_mode in
+        fail_unless
+          (History_mode.equal history_mode stored_history_mode)
+          (Cannot_switch_history_mode
+             {previous_mode = stored_history_mode; next_mode = history_mode})
+      else (* Store is not yet initialized. *) return_unit
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
@@ -2522,6 +2532,8 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_dir = Naming.chain_dir store_dir chain_id in
+  let* () = check_history_mode_consistency chain_dir history_mode in
   let*! context_index, commit_genesis =
     match commit_genesis with
     | Some commit_genesis ->
@@ -2542,7 +2554,6 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
         in
         Lwt.return (context_index, commit_genesis)
   in
-  let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in
   let*! valid_chain_dir_path = Lwt_utils_unix.dir_exists chain_dir_path in
   (* FIXME should be checked with the store's consistency check
