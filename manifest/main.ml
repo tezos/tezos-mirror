@@ -4723,7 +4723,6 @@ end = struct
         only_if N.(number >= 014) @@ fun () ->
         tezt
           [
-            "test_main";
             "generator_descriptors";
             "generators";
             "manager_operation_helpers";

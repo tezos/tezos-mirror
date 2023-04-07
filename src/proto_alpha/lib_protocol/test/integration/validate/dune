@@ -30,7 +30,6 @@
   -open Tezos_base_test_helpers
   -open Tezos_protocol_plugin_alpha)
  (modules
-  test_main
   generator_descriptors
   generators
   manager_operation_helpers

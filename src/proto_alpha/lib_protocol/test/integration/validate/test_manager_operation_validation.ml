@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_manager_operation_validation.ml
     Subject:    Validation of manager operation.
 *)
 
@@ -611,8 +612,15 @@ let tests =
         test_low_gas_limit_no_consumer,
         not_gas_consum,
         mk_default );
-      ("check dal disabled", test_feature_flags, all, mk_flags disabled_dal);
-      ("check toru disabled", test_feature_flags, all, mk_flags disabled_toru);
-      ("check scoru disabled", test_feature_flags, all, mk_flags disabled_scoru);
-      ("check zkru disabled", test_feature_flags, all, mk_flags disabled_zkru);
+      ("dal disabled", test_feature_flags, all, mk_flags disabled_dal);
+      ("toru disabled", test_feature_flags, all, mk_flags disabled_toru);
+      ("scoru disabled", test_feature_flags, all, mk_flags disabled_scoru);
+      ("zkru disabled", test_feature_flags, all, mk_flags disabled_zkru);
     ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [("single manager validation", tests)]
+  |> Lwt_main.run
