@@ -77,11 +77,14 @@ end
 
 type ('peer, 'message_id, 'span) limits = {
   max_recv_ihave_per_heartbeat : int;
-      (** The maximum number of control message [IHave] we can receive
-          from our peers between two heartbeats. *)
+      (** The maximum number of IHave control messages we can receive from a
+          peer between two heartbeats. It is called [MaxIHaveMessages] in the Go
+          implementation. *)
   max_sent_iwant_per_heartbeat : int;
-      (** The maximum number of control messages [IWant] we can sent
-          to our peers between two heartbeats. *)
+      (** The maximum number of IWant control message ids we can send to a peer
+          between two heartbeats. It is also the maximum number of message ids
+          to include in an IHave message. It is called [MaxIHaveLength] in the
+          Go implementation. *)
   max_gossip_retransmission : int;
       (** The maximum number of times the local peer allows a remote peer to
           request the same message id through IWant gossip before the local peer
