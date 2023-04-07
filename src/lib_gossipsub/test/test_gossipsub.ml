@@ -34,6 +34,7 @@ let default_limits =
     max_gossip_retransmission = 3;
     degree_optimal = 6;
     publish_threshold = 0.;
+    gossip_threshold = 0.;
     do_px = true;
     peers_to_px = 16;
     accept_px_threshold = 0.;
@@ -48,6 +49,8 @@ let default_limits =
     degree_high = 12;
     degree_score = 4;
     degree_out = 2;
+    degree_lazy = 6;
+    gossip_factor = 0.25;
     history_length = 5;
     history_gossip_length = 3;
   }

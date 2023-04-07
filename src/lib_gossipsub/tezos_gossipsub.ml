@@ -405,6 +405,8 @@ module Make (C : AUTOMATON_CONFIG) :
       |> Option.map (fun c -> c.outbound)
       |> Option.value ~default
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
+       Optimize by having a topic to peers map *)
     let select_connections_peers connections rng topic ~filter ~max =
       Peer.Map.bindings connections
       |> List.filter_map (fun (peer, connection) ->
@@ -1277,11 +1279,6 @@ module Make (C : AUTOMATON_CONFIG) :
 
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
            Try to improve the mesh with opportunistic grafting *)
-
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5066
-           Prepare gossip messages, that is, IHave control messages
-           referring to recently seen messages, to be sent to a random
-           selection of peers.*)
         (to_graft, to_prune, noPX_peers)
       in
 
@@ -1416,8 +1413,6 @@ module Make (C : AUTOMATON_CONFIG) :
             select_connections_peers connections rng topic ~filter ~max:ineed
           in
           let to_add = (topic, new_peers) :: to_add in
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5066
-             Prepare gossip messages. *)
           (to_add, to_remove)
         else (to_add, to_remove)
       in
@@ -1534,6 +1529,72 @@ module Make (C : AUTOMATON_CONFIG) :
         ~filter
         ~max:peers_to_px
     else []
+
+  let select_gossip_messages state =
+    let rng = state.rng in
+    let select_gossip_for_peer message_ids =
+      (* We shuffle the message ids so that we emit a different set for each
+         peer. *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5396
+         Can this be optimized? *)
+      message_ids |> List.shuffle ~rng
+      |> List.take_n state.limits.max_sent_iwant_per_heartbeat
+    in
+    let select_gossip_for_topic topic excluded_peers =
+      let message_ids =
+        Message_cache.get_message_ids_to_gossip topic state.message_cache
+      in
+      if message_ids = [] then []
+      else
+        (* We collect the peers with a score above [gossip_threshold] that are not
+           in the excluded set and are not direct peers. *)
+        let filter peer {direct; score; _} =
+          (not direct)
+          && Compare.Float.(
+               score |> Score.float >= state.limits.gossip_threshold)
+          && not (Peer.Set.mem peer excluded_peers)
+        in
+
+        (* We first select all peers satisfying the criterion and then we see if
+           we have too many. *)
+        let peers =
+          select_connections_peers
+            state.connections
+            rng
+            topic
+            ~filter
+            ~max:Int.max_int
+        in
+        let num_peers = List.length peers in
+        let target_num =
+          max
+            state.limits.degree_lazy
+            (int_of_float
+               (state.limits.gossip_factor *. float_of_int num_peers))
+        in
+        let selected_peers = List.take_n target_num peers in
+
+        (* Prepare the IHave gossip to the selected peers. *)
+        List.fold_left
+          (fun messages peer ->
+            let message_ids = select_gossip_for_peer message_ids in
+            {peer; topic; message_ids} :: messages)
+          []
+          selected_peers
+    in
+
+    (* Prepare the IHave gossip for each topic in the mesh or fanout maps. Peers
+       in the mesh/fanout are excluded from gossip (because we send full
+       messages to them). *)
+    let add_gossip_for_topic topic peers gossip_msgs =
+      let new_msgs = select_gossip_for_topic topic peers in
+      List.rev_append new_msgs gossip_msgs
+    in
+
+    Topic.Map.fold add_gossip_for_topic state.mesh []
+    |> Topic.Map.fold
+         (fun topic {peers; _} -> add_gossip_for_topic topic peers)
+         state.fanout
 
   (* Helpers. *)
 

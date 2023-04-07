@@ -77,11 +77,14 @@ end
 
 type ('peer, 'message_id, 'span) limits = {
   max_recv_ihave_per_heartbeat : int;
-      (** The maximum number of control message [IHave] we can receive
-          from our peers between two heartbeats. *)
+      (** The maximum number of IHave control messages we can receive from a
+          peer between two heartbeats. It is called [MaxIHaveMessages] in the Go
+          implementation. *)
   max_sent_iwant_per_heartbeat : int;
-      (** The maximum number of control messages [IWant] we can sent
-          to our peers between two heartbeats. *)
+      (** The maximum number of IWant control message ids we can send to a peer
+          between two heartbeats. It is also the maximum number of message ids
+          to include in an IHave message. It is called [MaxIHaveLength] in the
+          Go implementation. *)
   max_gossip_retransmission : int;
       (** The maximum number of times the local peer allows a remote peer to
           request the same message id through IWant gossip before the local peer
@@ -95,6 +98,10 @@ type ('peer, 'message_id, 'span) limits = {
   publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
+  gossip_threshold : float;
+      (** The threshold value (as a score) for a peer to emit/accept gossip: if
+          the remote peer score is below this threshold, the local peer won't
+          emit or accept gossip from the remote peer.  *)
   do_px : bool;  (** The flag controls whether peer exchange (PX) is enabled. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
@@ -141,6 +148,17 @@ type ('peer, 'message_id, 'span) limits = {
           attackers from overwhelming our mesh with incoming connections.
 	        [degree_out] must be set below {degree_low}, and must not exceed
           [degree_optimal / 2]. *)
+  degree_lazy : int;
+      (** [degree_lazy] affects how many peers the local peer will emit gossip
+          to at each heartbeat. The local peer will send gossip to at least
+          [degree_lazy] peers outside its mesh or fanout. The actual number may
+          be more, depending on [gossip_factor] and how many peers the local
+          peer is connected to. *)
+  gossip_factor : float;
+      (** [gossip_factor] affects how many peers the local peer will emit gossip
+          to at each heartbeat. The local peer will send gossip to
+          [gossip_factor] * (total number of non-mesh/non-fanout peers), or
+          [degree_lazy] peers, whichever is greater. *)
   history_length : int;
       (** [history_length] controls the size of the message cache used for
           gossip. The message cache will remember messages for [history_length]
@@ -420,7 +438,8 @@ module type AUTOMATON = sig
   val leave : leave -> [`Leave] monad
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5352
-     Handle the random state explicitly for [select_px_peers]. *)
+     Handle the random state explicitly for [select_px_peers] and
+     [select_gossip_messages]. *)
 
   (** Select random peers for Peer eXchange. Note that function is
       deterministic; however, it has side effects in that it updates the
@@ -431,6 +450,21 @@ module type AUTOMATON = sig
     Topic.t ->
     noPX_peers:Peer.Set.t ->
     Peer.t list
+
+  (** Select the gossip messages to be sent. These are IHave control messages
+      referring to recently seen messages (that is, sent during the last
+      [history_gossip_length] heartbeat ticks), to be sent to a random selection
+      of peers. The message ids for a peer and a topic are also selected at
+      random among the possible ones. At most [max_sent_iwant_per_heartbeat]
+      message ids are sent.
+
+      The local peer will send gossip to at most [gossip_factor] * (total number
+      of non-mesh/non-fanout peers), or [degree_lazy] random peers, whichever is
+      greater.
+
+      Note that function is deterministic; however, it has side effects in that
+      it updates the [state]'s random state.  *)
+  val select_gossip_messages : state -> ihave list
 
   val pp_add_peer : Format.formatter -> add_peer -> unit
 
