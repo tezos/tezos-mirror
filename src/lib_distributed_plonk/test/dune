@@ -1,26 +1,31 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(library
- (name distributed_plonk_test)
- (package octez-distributed-plonk)
+(executable
+ (name main)
  (libraries
   octez-distributed-plonk
   octez-plonk
   octez-plonk.aggregation
   octez-plonk.distribution
-  octez-aplonk))
-
-(executable
- (name main)
- (libraries
-  distributed_plonk_test
-  octez-distributed-plonk
-  octez-plonk.plonk-test
-  qcheck-alcotest)
- (modules main test_distribution))
+  octez-aplonk
+  octez-plonk.plonk-test))
 
 (rule
  (alias runtest)
- (package octez-distributed-plonk)
+ (package octez-plonk)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
+
+(rule
+ (alias runtest_slow)
+ (package octez-plonk)
  (action (run %{exe:main.exe})))
+
+(rule
+ (alias runtest_slow_with_regression)
+ (package octez-plonk)
+ (action
+  (setenv RANDOM_SEED 42
+   (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))

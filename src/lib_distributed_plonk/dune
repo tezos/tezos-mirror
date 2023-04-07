@@ -8,12 +8,18 @@
  (libraries
   octez-aplonk
   octez-plonk.communication
-  octez-plonk)
+  octez-plonk
+  octez-plonk.plonk-test)
  (preprocess (pps ppx_repr))
  (flags
   (:standard)
   -open Plonk)
- (modules distributed_prover filenames master_runner worker))
+ (modules
+  distributed_prover
+  filenames
+  master_runner
+  distribution_helpers
+  worker))
 
 (executable
  (name worker_runner)

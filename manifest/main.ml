@@ -1286,17 +1286,6 @@ let octez_plonk =
       ]
     ~preprocess:[pps ppx_repr]
 
-(* let _octez_plonk_tests = *)
-(*   private_lib *)
-(*     "octez-plonk.plonk-test" *)
-(*     ~path:"src/lib_plonk/test" *)
-(*     ~synopsis:"Test framework for Plonk zero-knowledge proving system test" *)
-(*     ~deps: *)
-(*       [ *)
-(*         octez_plonk; *)
-(*       ] *)
-(*       ~modules:["helpers"; "cases"] *)
-
 let octez_plonk_aggregation =
   public_lib
     "octez-plonk.aggregation"
@@ -1331,17 +1320,6 @@ let octez_plonk_communication =
     ~path:"src/lib_distributed_plonk/communication"
     ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
     ~preprocess:[pps ppx_repr]
-
-let octez_distributed_plonk =
-  public_lib
-    "octez-distributed-plonk"
-    ~internal_name:"distributed_plonk"
-    ~path:"src/lib_distributed_plonk"
-    ~synopsis:"Distributed version of the proving system"
-    ~deps:[octez_aplonk; octez_plonk_communication; octez_plonk |> open_]
-    ~modules:["distributed_prover"; "filenames"; "master_runner"; "worker"]
-    ~preprocess:[pps ppx_repr]
-    ~bisect_ppx:Yes
 
 let octez_plonk_test_helpers =
   public_lib
@@ -1503,9 +1481,33 @@ let _octez_plonk_test_plompiler_main =
                  ]);
         ]
 
-let octez_distributed_plonk_test =
-  private_lib
-    "distributed_plonk_test"
+let octez_distributed_plonk =
+  public_lib
+    "octez-distributed-plonk"
+    ~internal_name:"distributed_plonk"
+    ~path:"src/lib_distributed_plonk"
+    ~synopsis:"Distributed version of the proving system"
+    ~deps:
+      [
+        octez_aplonk;
+        octez_plonk_communication;
+        octez_plonk |> open_;
+        octez_plonk_test_helpers;
+      ]
+    ~modules:
+      [
+        "distributed_prover";
+        "filenames";
+        "master_runner";
+        "distribution_helpers";
+        "worker";
+      ]
+    ~preprocess:[pps ppx_repr]
+    ~bisect_ppx:Yes
+
+let _octez_distributed_plonk_test_main =
+  private_exe
+    "main"
     ~opam:"octez-distributed-plonk"
     ~path:"src/lib_distributed_plonk/test"
     ~deps:
@@ -1515,30 +1517,46 @@ let octez_distributed_plonk_test =
         octez_plonk_aggregation;
         octez_plonk_distribution;
         octez_aplonk;
-      ]
-    ~bisect_ppx:No
-
-let _octez_distributed_plonk_test_main =
-  private_exe
-    "main"
-    ~path:"src/lib_distributed_plonk/test"
-    ~opam:"octez-distributed-plonk"
-    ~bisect_ppx:No
-    ~deps:
-      [
-        octez_distributed_plonk_test;
-        octez_distributed_plonk;
         octez_plonk_test_helpers;
-        qcheck_alcotest;
       ]
-    ~modules:["main"; "test_distribution"]
+    ~bisect_ppx:No
     ~dune:
       Dune.
         [
           alias_rule
             "runtest"
-            ~package:"octez-distributed-plonk"
-            ~action:[S "run"; S "%{exe:main.exe}"];
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" ["-q"];
+                          [S "diff?"; S "test-quick.expected"; S "test.output"];
+                        ]);
+                 ]);
+          alias_rule
+            "runtest_slow"
+            ~package:"octez-plonk"
+            ~action:(run_exe "main" []);
+          alias_rule
+            "runtest_slow_with_regression"
+            ~package:"octez-plonk"
+            ~action:
+              (G
+                 [
+                   setenv
+                     "RANDOM_SEED"
+                     "42"
+                     (progn
+                        [
+                          run_exe "main" [];
+                          [S "diff?"; S "test-slow.expected"; S "test.output"];
+                        ]);
+                 ]);
         ]
 
 let _octez_distributed_plonk_worker_runner =
