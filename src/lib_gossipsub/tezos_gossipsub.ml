@@ -750,9 +750,6 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
       let*? mesh = check_topic_known topic in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5006
-
-         backoff computation. *)
       let mesh = Peer.Set.remove peer mesh in
       let* () = set_mesh_topic topic mesh in
       let* () = add_backoff backoff topic peer in
