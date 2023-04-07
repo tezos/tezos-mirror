@@ -99,6 +99,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
+  type collection_kind = List of Peer.t list | Set of Peer.Set.t
+
+  let send_p2p_message ~emit_p2p_msg p2p_message =
+    let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
+    function
+    | List list -> List.iter emit list | Set set -> Peer.Set.iter emit set
+
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
   (** From the worker's perspective, handling a full message consists in:
@@ -114,14 +121,47 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
-        Peer.Set.iter
-          (fun to_peer -> emit_p2p_msg @@ Out_message {to_peer; p2p_message})
-          to_publish ;
+        send_p2p_message ~emit_p2p_msg p2p_message (Set to_publish) ;
         let has_joined = View.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
           emit_app_msg full_message ;
         gstate
     | gstate, GS.Already_published -> gstate
+
+  (** From the worker's perspective, the outcome of joining a new topic from the
+      application layer are:
+      - Sending [Subscribe] messages to connected peers with that topic;
+      - Sending [Graft] messages to the newly construced topic's mesh. *)
+  let handle_join ~emit_p2p_msg topic = function
+    | gstate, GS.Already_joined -> gstate
+    | gstate, Joining_topic {to_graft} ->
+        let filters = View.[Not_expired] in
+        let peers = View.(view gstate |> get_connected_peers ~filters) in
+        (* It's important to send [Subscribe] before [Graft], as the other peer
+           would ignore the [Graft] message if we did not subscribe to the
+           topic first. *)
+        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List peers) ;
+        send_p2p_message ~emit_p2p_msg (Graft {topic}) (Set to_graft) ;
+        gstate
+
+  (** From the worker's perspective, the outcome of leaving a topic by the
+      application layer are:
+      - Sending [Prune] messages to the topic's mesh;
+      - Sending [Unsubscribe] messages to connected peers. *)
+  let handle_leave ~emit_p2p_msg topic = function
+    | gstate, GS.Not_joined -> gstate
+    | gstate, Leaving_topic {to_prune} ->
+        let filters = View.[Not_expired] in
+        let peers = View.(view gstate |> get_connected_peers ~filters) in
+        (* Sending [Prune] before [Unsubscribe] to let full-connection peers
+           clean their mesh before handling [Unsubscribe] message. *)
+        let prune = Prune {topic; px = Seq.empty} in
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5350
+
+           Send a list of alternative peers when pruning a link for a topic. *)
+        send_p2p_message ~emit_p2p_msg prune (Set to_prune) ;
+        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List peers) ;
+        gstate
 
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
@@ -130,19 +170,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.publish publish gossip_state
         |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
     | Join topic ->
-        let gossip_state, output = GS.join {topic} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
-
-           Handle Join's output. *)
-        ignore output ;
-        gossip_state
+        GS.join {topic} gossip_state |> handle_join ~emit_p2p_msg topic
     | Leave topic ->
-        let gossip_state, output = GS.leave {topic} gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5191
-
-           Handle Leave's output. *)
-        ignore output ;
-        gossip_state
+        GS.leave {topic} gossip_state |> handle_leave ~emit_p2p_msg topic
 
   (** Handling messages received from the P2P network. *)
   let apply_p2p_message ~emit_p2p_msg ~emit_app_msg gossip_state from_peer =
