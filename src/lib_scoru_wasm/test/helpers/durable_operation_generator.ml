@@ -276,8 +276,6 @@ let gen_key ~(key_exists : Probability.t) ~(prefix_exists : Probability.t)
 
 let value_len trie key = Option.value ~default:0 @@ Trie.get_value key trie
 
-let gen_kind = Gen.oneofl [`Value; `Subtree]
-
 let gen_find_value trie : Durable_operation.t Gen.t =
   let open Gen in
   let+ key =
@@ -388,25 +386,23 @@ let gen_subtree_name_at trie =
 
 let gen_hash trie =
   let open Gen in
-  let* key =
+  let+ key =
     gen_key
       ~key_exists:Operation_probabilities.key_exists_in_read_operation
       ~prefix_exists:Operation_probabilities.prefix_exists_in_operation
       trie
   in
-  let+ kind = gen_kind in
-  Operation (Hash, (key, kind))
+  Operation (Hash, key)
 
 let gen_hash_exn trie =
   let open Gen in
-  let* key =
+  let+ key =
     gen_key
       ~key_exists:Operation_probabilities.key_exists_in_read_operation
       ~prefix_exists:Operation_probabilities.prefix_exists_in_operation
       trie
   in
-  let+ kind = gen_kind in
-  Operation (Hash_exn, (key, kind))
+  Operation (Hash_exn, key)
 
 let gen_write_value_exn trie =
   let open Gen in
