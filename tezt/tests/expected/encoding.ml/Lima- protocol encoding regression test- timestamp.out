@@ -1,6 +1,0 @@
-
-./octez-codec encode 015-PtLimaPt.timestamp from '"2020-04-20T16:19:59Z"'
-000000005e9dcbaf
-
-./octez-codec decode 015-PtLimaPt.timestamp from 000000005e9dcbaf
-"2020-04-20T16:19:59Z"

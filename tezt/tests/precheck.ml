@@ -235,34 +235,14 @@ let propagate_precheckable_bad_block =
           ("operations", `A (List.init 4 (fun _ -> `A [])));
         ])
   in
-  let wait_precheck_but_validation_fail node =
-    let got_prechecked = ref false in
-    Lwt.join
-      [
-        (let* () = Node.wait_for node "prechecked_block.v0" (fun _ -> Some ()) in
-         got_prechecked := true ;
-         Lwt.return ());
-        (let* () =
-           Node.wait_for node "validation_failure_after_precheck.v0" (fun _ ->
-               Some ())
-         in
-         if !got_prechecked then Lwt.return ()
-         else Test.fail "The block was not expected to be prechecked");
-      ]
-  in
   (* Wait all nodes to precheck the block but fail on validation *)
   let expect_precheck_failure node =
     Node.wait_for node "precheck_failure.v0" (fun _ -> Some ())
   in
   let precheck_waiter =
-    if Protocol.(protocol <= Lima) then
-      (* On Lima and below: wait all nodes to precheck the block
-         but fail on validation *)
-      Lwt_list.iter_p wait_precheck_but_validation_fail cluster
-    else
-      (* Post Lima: the precheck is not an over-approximation
-         anymore and cannot even be considered precheckable. *)
-      expect_precheck_failure node_client
+    (* Post Lima: the precheck is not an over-approximation
+       anymore and cannot even be considered precheckable. *)
+    expect_precheck_failure node_client
   in
   let p =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client

@@ -6453,7 +6453,7 @@ module Protocol = Protocol
 
   let _014_PtKathma = frozen (Name.v "PtKathma" 014)
 
-  let _015_PtLimaPt = active (Name.v "PtLimaPt" 015)
+  let _015_PtLimaPt = frozen (Name.v "PtLimaPt" 015)
 
   let _016_PtMumbai = active (Name.v "PtMumbai" 016)
 

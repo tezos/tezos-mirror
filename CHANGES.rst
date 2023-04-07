@@ -102,3 +102,5 @@ Smart Rollup client
 
 Miscellaneous
 -------------
+
+- Removed binaries and mempool RPCs of Lima.

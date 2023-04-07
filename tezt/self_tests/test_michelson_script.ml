@@ -32,6 +32,16 @@ let script1 name start = sf "%s_%03d.tz" name (Protocol.number start)
 let script2 name start end_ =
   sf "%s_%03d_%03d.tz" name (Protocol.number start) (Protocol.number end_)
 
+let with_previous_protocol p f =
+  match Protocol.previous_protocol p with
+  | None ->
+      Log.warn
+        "@[Test@ is@ desactivated@ because@ there@ is@ no@ declared@ \
+         predecessor@ for@ %s.@]"
+        (Protocol.name p) ;
+      unit
+  | Some p' -> f p'
+
 let require_previous_protocol p =
   match Protocol.previous_protocol p with
   | Some p' -> p'
@@ -233,7 +243,7 @@ let test_version_range1 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      alpha ~ 016
      prev_proto ~ 015
@@ -275,7 +285,7 @@ let test_version_range2 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -315,7 +325,7 @@ let test_version_range3 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -355,7 +365,7 @@ let test_version_range4 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -430,7 +440,7 @@ let test_version_range6 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -469,7 +479,7 @@ let test_version_range7 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015

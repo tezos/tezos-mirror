@@ -42,7 +42,7 @@ open Sc_rollup_helpers
 
 let default_wasm_pvm_revision = function
   | Protocol.Nairobi | Protocol.Alpha -> "2.0.0-r1"
-  | Protocol.Lima | Protocol.Mumbai -> "2.0.0"
+  | Protocol.Mumbai -> "2.0.0"
 
 let assert_some_client_command cmd ~__LOC__ ?hooks client =
   let*! v_opt = cmd ?hooks client in

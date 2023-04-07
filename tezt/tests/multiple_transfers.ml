@@ -171,7 +171,7 @@ let test_multiple_transfer =
         Tez.of_mutez_int
           (match protocol with
           | Nairobi | Alpha -> 0_000_434
-          | Lima | Mumbai -> 0_000_608)
+          | Mumbai -> 0_000_608)
       else Tez.zero
     in
     Check.(

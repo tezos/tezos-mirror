@@ -84,12 +84,6 @@ let register_protocol_migration_tests () =
     ~loser_protocols:[migrate_from] ;
   Sc_rollup.register_migration ~migrate_from:Protocol.Mumbai ~migrate_to
 
-(* Tests related to one-off protocol migrations used in the past. *)
-let register_older_protocol_migration_tests () =
-  Iticket_migration.register
-    ~migrate_from:Protocol.Lima
-    ~migrate_to:Protocol.Mumbai
-
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.
    As a consequence, all those tests should be registered with [Protocol.all]
@@ -140,7 +134,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Forge.register ~protocols ;
   Fork.register ~protocols ;
   Gas_bound.register ~protocols ;
-  Ghostnet_dictator_migration.register ~protocols ;
   Global_constants.register ~protocols ;
   Large_metadata.register ~protocols ;
   Light.register ~protocols ;
@@ -216,15 +209,12 @@ let register_protocol_specific_because_regression_tests () =
   Snoop_codegen.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Mumbai; Alpha] ;
   Ticket_receipt_and_rpc.register ~protocols:[Mumbai; Alpha] ;
-  Tx_rollup.register ~protocols:[Lima] ;
-  Tx_rollup_l2_node.register ~protocols:[Lima] ;
   Views.register [Mumbai; Alpha] ;
   Zk_rollup.register ~protocols:[Mumbai; Alpha]
 
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
-  register_older_protocol_migration_tests () ;
   register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)

@@ -1,7 +1,0 @@
-
-./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
-  "message": {
-    "batch": "626c6f62"
-  }
-}'
-{ "hash": "[TX_ROLLUP_MESSAGE_HASH]" }
