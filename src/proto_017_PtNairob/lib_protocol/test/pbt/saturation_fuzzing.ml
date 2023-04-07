@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/saturation_fuzzing.exe
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/pbt/main.exe \
+                  -- --file saturation_fuzzing.ml
     Subject:      Operations in Saturation_repr
 *)
 
@@ -191,12 +191,12 @@ let tests_sqrt = [test_sqrt_squared; test_squared_sqrt]
 let () =
   Alcotest.run
     ~__FILE__
-    "protocol > pbt > saturation"
+    Protocol.name
     [
-      (Protocol.name ^ ": add", qcheck_wrap tests_add);
-      (Protocol.name ^ ": mul", qcheck_wrap tests_mul);
-      (Protocol.name ^ ": sub", qcheck_wrap tests_sub);
-      (Protocol.name ^ ": add and sub", qcheck_wrap tests_add_sub);
-      (Protocol.name ^ ": sqrt", qcheck_wrap tests_sqrt);
-      (Protocol.name ^ ": <= and >=", qcheck_wrap tests_boundaries);
+      ("add", qcheck_wrap tests_add);
+      ("mul", qcheck_wrap tests_mul);
+      ("sub", qcheck_wrap tests_sub);
+      ("add and sub", qcheck_wrap tests_add_sub);
+      ("sqrt", qcheck_wrap tests_sqrt);
+      ("<= and >=", qcheck_wrap tests_boundaries);
     ]

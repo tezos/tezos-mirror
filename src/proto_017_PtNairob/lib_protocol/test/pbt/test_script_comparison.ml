@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Script_comparison
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_script_comparison.exe
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/pbt/main.exe \
+                  -- --file test_script_comparison.ml
     Subject:      PBT of the Script_comparable.compare_comparable function.
 *)
 
@@ -344,14 +344,12 @@ let test_pack_unpack =
 let () =
   Alcotest.run
     ~__FILE__
-    "protocol > pbt > script_comparison"
+    Protocol.name
     [
-      ( Protocol.name ^ ": compatible_with_reference",
-        qcheck_wrap [test_compatible_with_reference] );
-      ( Protocol.name ^ ": compatible_with_packing",
-        qcheck_wrap [test_compatible_with_packing] );
-      (Protocol.name ^ ": reflexivity", qcheck_wrap [test_reflexivity]);
-      (Protocol.name ^ ": symmetry", qcheck_wrap [test_symmetry]);
-      (Protocol.name ^ ": transitivity", qcheck_wrap [test_transitivity]);
-      (Protocol.name ^ ": pack_unpack", qcheck_wrap [test_pack_unpack]);
+      ("compatible_with_reference", qcheck_wrap [test_compatible_with_reference]);
+      ("compatible_with_packing", qcheck_wrap [test_compatible_with_packing]);
+      ("reflexivity", qcheck_wrap [test_reflexivity]);
+      ("symmetry", qcheck_wrap [test_symmetry]);
+      ("transitivity", qcheck_wrap [test_transitivity]);
+      ("pack_unpack", qcheck_wrap [test_pack_unpack]);
     ]

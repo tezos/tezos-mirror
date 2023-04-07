@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (gas properties)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe \
+                  -- --file test_gas_properties.ml
     Subject:    Arithmetic properties around gas.
 *)
 
@@ -140,7 +141,4 @@ let tests =
   ]
 
 let () =
-  Alcotest.run
-    ~__FILE__
-    "protocol > pbt > gas"
-    [(Protocol.name ^ ": gas properties", qcheck_wrap tests)]
+  Alcotest.run ~__FILE__ Protocol.name [("gas properties", qcheck_wrap tests)]

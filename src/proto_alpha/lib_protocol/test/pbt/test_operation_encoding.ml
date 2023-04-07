@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_operation_encoding.ml
     Subject:      Encoding for operations
 *)
 
@@ -62,5 +63,5 @@ let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
     ~__FILE__
-    "Operation_encoding"
-    [(Protocol.name ^ ": roundtrip", qcheck_wrap [test_operation])]
+    (Protocol.name ^ ": Operation_encoding")
+    [(": roundtrip", qcheck_wrap [test_operation])]

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_bitset.ml
     Subject:      Bitset structure
 *)
 
@@ -95,9 +96,9 @@ let test_fill =
 let () =
   Alcotest.run
     ~__FILE__
-    "bits"
+    Protocol.name
     [
-      ( Protocol.name ^ ": quantity",
+      ( "quantity",
         qcheck_wrap
           [
             QCheck2.Test.make

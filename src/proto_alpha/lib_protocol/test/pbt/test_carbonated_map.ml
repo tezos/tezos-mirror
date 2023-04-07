@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_carbonated_map.ml
     Subject:      Operations in Carbonated_map
 *)
 
@@ -544,7 +545,4 @@ let tests ~rand = qcheck_wrap ~rand qcheck_tests @ unit_tests
 let () =
   (* Ensure deterministic results. *)
   let rand = Random.State.make [|0x1337533D; 71287309; 397060904|] in
-  Alcotest.run
-    ~__FILE__
-    "protocol > pbt > carbonated map"
-    [(Protocol.name ^ ": Carbonated map", tests ~rand)]
+  Alcotest.run ~__FILE__ Protocol.name [("Carbonated map", tests ~rand)]

@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_tez_repr.exe
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/pbt/main.exe \
+                  -- --file test_tez_repr.ml
     Subject:      Operations in Tez_repr
 *)
 
@@ -133,5 +133,5 @@ let tests =
 let () =
   Alcotest.run
     ~__FILE__
-    "protocol > pbt > tez_repr"
-    [(Protocol.name ^ ": Tez_repr", Qcheck2_helpers.qcheck_wrap tests)]
+    Protocol.name
+    [("Tez_repr", Qcheck2_helpers.qcheck_wrap tests)]
