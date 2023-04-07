@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Dal_node Slot_frame_encoding
-    Invocation: dune exec src/proto_alpha/lib_dal/test/main.exe
+    Invocation: dune exec src/proto_alpha/lib_dal/test/main.exe \
+                  -- --file test_dal_slot_frame_encoding.ml
     Subject:    Tests for the SCORU storage module
 *)
 
@@ -414,10 +415,6 @@ let tests =
 let () =
   Alcotest_lwt.run
     ~__FILE__
-    "protocol > unit"
-    [
-      Test_helpers.Unit_test.spec
-        (Protocol.name ^ ": Slot_framing_protocol.ml")
-        tests;
-    ]
+    Protocol.name
+    [Test_helpers.Unit_test.spec "Slot_framing_protocol.ml" tests]
   |> Lwt_main.run
