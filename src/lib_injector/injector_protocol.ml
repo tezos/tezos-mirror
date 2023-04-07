@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) Nomadic Labs, <contact@nomadic-labs.com>                    *)
+(* Copyright (c) Functori, <contact@functori.com>                            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,8 +26,21 @@
 
 open Injector_sigs
 
-module Make (P : PARAMETERS) :
-  S
-    with type state := P.state
-     and type tag := P.Tag.t
-     and type operation := P.Operation.t
+exception Protocol_not_found
+
+module Make (Parameters : PARAMETERS) = struct
+  type proto_client =
+    (module PROTOCOL_CLIENT
+       with type state = Parameters.state
+        and type operation = Parameters.Operation.t)
+
+  let proto_clients : proto_client Protocol_hash.Table.t =
+    Protocol_hash.Table.create 7
+
+  let register protocol proto_client =
+    Protocol_hash.Table.replace proto_clients protocol proto_client
+
+  let proto_client_for_protocol protocol =
+    WithExceptions.Option.to_exn ~none:Protocol_not_found
+    @@ Protocol_hash.Table.find proto_clients protocol
+end

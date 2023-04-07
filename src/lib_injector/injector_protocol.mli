@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) Nomadic Labs, <contact@nomadic-labs.com>                    *)
+(* Copyright (c) Functori, <contact@functori.com>                            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,8 +26,22 @@
 
 open Injector_sigs
 
-module Make (P : PARAMETERS) :
-  S
-    with type state := P.state
-     and type tag := P.Tag.t
-     and type operation := P.Operation.t
+exception Protocol_not_found
+
+module Make (Parameters : PARAMETERS) : sig
+  type proto_client =
+    (module PROTOCOL_CLIENT
+       with type operation = Parameters.Operation.t
+        and type state = Parameters.state)
+
+  (** Register a protocol client for a specific protocol to be used by the
+      injector. *)
+  val register : Protocol_hash.t -> proto_client -> unit
+
+  (** Return the protocol client for a given protocol.
+
+      @raise Protocol_not_found if the protocol is not known by the injector. In
+        this case the injector will not be able to inject operations in blocks
+        of this protocol.  *)
+  val proto_client_for_protocol : Protocol_hash.t -> proto_client
+end

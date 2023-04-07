@@ -32,6 +32,16 @@ module Block_cache =
   Aches_lwt.Lache.Make_result
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
+module Int_cache =
+  Aches_lwt.Lache.Make_result
+    (Aches.Rache.Transfer
+       (Aches.Rache.LRU)
+       (struct
+         include Int
+
+         let hash x = x
+       end))
+
 (* This is the Tenderbake finality for blocks. *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2815
    Centralize this and maybe make it configurable. *)
@@ -53,17 +63,27 @@ let injector_context (cctxt : #Client_context.full) : Client_context.full =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
-module Make
-    (Parameters : PARAMETERS)
-    (Proto_client : PROTOCOL_CLIENT
-                      with type state := Parameters.state
-                       and type operation := Parameters.Operation.t) =
-struct
+module Make (Parameters : PARAMETERS) = struct
   module Tags = Injector_tags.Make (Parameters.Tag)
   module Tags_table = Hashtbl.Make (Parameters.Tag)
   module POperation = Parameters.Operation
   module Inj_operation = Injector_operation.Make (POperation)
   module Request = Request (Inj_operation)
+  module Inj_proto = Injector_protocol.Make (Parameters)
+
+  module type PROTOCOL_CLIENT =
+    PROTOCOL_CLIENT
+      with type state = Parameters.state
+       and type operation = Parameters.Operation.t
+
+  type proto_client = (module PROTOCOL_CLIENT)
+
+  (** Wrapper for unsigned operation with the protocol code to sign it. *)
+  module type Proto_unsigned_op = sig
+    module Proto_client : PROTOCOL_CLIENT
+
+    val value : Proto_client.unsigned_operation
+  end
 
   type injected_info = {
     op : Inj_operation.t;
@@ -200,6 +220,11 @@ struct
     included_in_blocks : Included_in_blocks.t;
   }
 
+  type protocols = Tezos_shell_services.Chain_services.Blocks.protocols = {
+    current_protocol : Protocol_hash.t;
+    next_protocol : Protocol_hash.t;
+  }
+
   (** The internal state of each injector worker.  *)
   type state = {
     cctxt : Client_context.full;
@@ -227,6 +252,13 @@ struct
     mutable last_seen_head : (Block_hash.t * int32) option;
         (** Last L1 head that the injector has seen (used to compute
             reorganizations). *)
+    mutable protocols : protocols;
+        (** The protocols of the head of the L1 chain. This information is used
+            to know with which protocol one should perform the
+            simulation/injection. NOTE: this value is updated before
+            [last_seen_head]. *)
+    mutable proto_client : proto_client;
+        (** The protocol client that should be used to simulate operations. *)
   }
 
   module Event = struct
@@ -259,8 +291,8 @@ struct
     in
     state.last_seen_head <- Some head
 
-  let init_injector cctxt l1_ctxt ~data_dir state ~retention_period ~signer
-      strategy tags =
+  let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
+      ~retention_period ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -335,6 +367,9 @@ struct
       @@ Included_in_blocks.length included_in_blocks
     in
     let*! last_seen_head = read_last_head ~data_dir ~warn in
+    let proto_client =
+      Inj_proto.proto_client_for_protocol head_protocols.next_protocol
+    in
     return
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
@@ -349,6 +384,8 @@ struct
         state;
         retention_period;
         last_seen_head;
+        protocols = head_protocols;
+        proto_client;
       }
 
   (** We consider an operation to already exist in the injector if either:
@@ -554,6 +591,7 @@ struct
     in
     let*! () = Event.(emit2 simulating_operations) state op_operations force in
     let fee_parameter = fee_parameter_of_operations state.state operations in
+    let module Proto_client = (val state.proto_client) in
     let*! simulation_result =
       Proto_client.simulate_operations
         state.cctxt
@@ -599,12 +637,20 @@ struct
             operations
             operations_statuses
         in
-        return (results, unsigned_operation)
+        let module Unsigned_op = struct
+          module Proto_client = Proto_client
 
-  let inject_on_node state ~nb unsigned_op =
+          let value = unsigned_operation
+        end in
+        return (results, (module Unsigned_op : Proto_unsigned_op))
+
+  let inject_on_node state ~nb (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in
     let* signed_op_bytes =
-      Proto_client.sign_operation state.cctxt state.signer.sk unsigned_op
+      Unsigned_op.Proto_client.sign_operation
+        state.cctxt
+        state.signer.sk
+        Unsigned_op.value
     in
     Tezos_shell_services.Shell_services.Injection.operation
       state.cctxt
@@ -671,7 +717,8 @@ struct
 
   (** Returns the (upper bound on) the size of an L1 batch of operations composed
     of the manager operations [ops]. *)
-  let size_l1_batch ops =
+  let size_l1_batch state ops =
+    let module Proto_client = (val state.proto_client) in
     let size_shell_header =
       (* Size of branch field *)
       Block_hash.size
@@ -697,7 +744,7 @@ struct
         Op_queue.fold
           (fun _oph op ops ->
             let new_ops = op :: ops in
-            let new_size = size_l1_batch new_ops in
+            let new_size = size_l1_batch state new_ops in
             if new_size > size_limit then raise (Reached_limit ops) ;
             new_ops)
           state.queue
@@ -729,12 +776,14 @@ struct
         in
         `Ignored operations_to_drop
 
-  (** [inject_pending_operations_for ~size_limit state pending] injects
-    operations from the pending queue [pending], whose total size does
+  (** [inject_pending_operations state ~size_limit ()] injects
+    operations from the pending queue [state.pending], whose total size does
     not exceed [size_limit]. Upon successful injection, the
     operations are removed from the queue and marked as injected. *)
-  let inject_pending_operations
-      ?(size_limit = Proto_client.max_operation_data_length) state =
+  let inject_pending_operations state
+      ?(size_limit =
+        let module Proto_client = (val state.proto_client) in
+        Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
     (* Retrieve and remove operations from pending *)
     let operations_to_inject = get_operations_from_queue ~size_limit state in
@@ -789,6 +838,21 @@ struct
             in
             return_unit)
 
+  (** Retrieve protocols of a block with a small cache. *)
+  let protocols_of_block =
+    let protos_cache = Block_cache.create 32 in
+    fun state block_hash ->
+      Block_cache.bind_or_put
+        protos_cache
+        block_hash
+        (fun block_hash ->
+          Tezos_shell_services.Shell_services.Blocks.protocols
+            state.cctxt
+            ~chain:state.cctxt#chain
+            ~block:(`Hash (block_hash, 0))
+            ())
+        Lwt.return
+
   (** [register_included_operation state block level op] marks the manager
       operations contained in the L1 batch [op] as being included in the [block]
       of level [level], by moving the successful ones from the "injected" state
@@ -802,6 +866,11 @@ struct
         (* No operations injected by us *)
         return_unit
     | _ ->
+        let* block_proto = protocols_of_block state block in
+        (* Protocol client for the block in which the operation is included. *)
+        let module Proto_client =
+          (val Inj_proto.proto_client_for_protocol block_proto.current_protocol)
+        in
         let* included, to_retry =
           List.fold_left_es
             (fun (included, to_retry) (info : injected_info) ->
@@ -843,6 +912,7 @@ struct
   let manager_operations_hashes_of_block =
     let blocks_ops_cache = Block_cache.create 32 in
     fun state block_hash ->
+      let module Proto_client = (val state.proto_client) in
       Block_cache.bind_or_put
         blocks_ops_cache
         block_hash
@@ -973,7 +1043,7 @@ struct
 
   (* The request {Request.Inject} triggers an injection of the operations
      the pending queue. *)
-  let on_inject state = inject_pending_operations state
+  let on_inject state = inject_pending_operations state ()
 
   module Types = struct
     type nonrec state = state
@@ -981,6 +1051,7 @@ struct
     type parameters = {
       cctxt : Client_context.full;
       l1_ctxt : Layer_1.t;
+      head_protocols : protocols;
       data_dir : string;
       state : Parameters.state;
       retention_period : int;
@@ -1034,11 +1105,21 @@ struct
 
     let on_launch _w signer
         Types.
-          {cctxt; l1_ctxt; data_dir; state; retention_period; strategy; tags} =
+          {
+            cctxt;
+            l1_ctxt;
+            head_protocols;
+            data_dir;
+            state;
+            retention_period;
+            strategy;
+            tags;
+          } =
       trace (Step_failed "initialization")
       @@ init_injector
            cctxt
            l1_ctxt
+           ~head_protocols
            ~data_dir
            state
            ~retention_period
@@ -1089,6 +1170,7 @@ struct
     match state.strategy with
     | `Each_block -> f ()
     | `Delay_block delay_factor ->
+        let module Proto_client = (val state.proto_client) in
         let time_until_next_block =
           Proto_client.time_until_next_block state.state header
           |> Ptime.Span.to_float_s
@@ -1129,31 +1211,75 @@ struct
         return_unit)
       workers
 
-  let rec monitor_l1_chain l1_ctxt =
-    let open Lwt_syntax in
-    let* res =
+  let protocols_of_head cctxt =
+    Tezos_shell_services.Shell_services.Blocks.protocols
+      cctxt
+      ~chain:cctxt#chain
+      ~block:(`Head 0)
+      ()
+
+  let update_protocol ~next_protocol =
+    let workers = Worker.list table in
+    List.iter
+      (fun (_signer, w) ->
+        let state = Worker.state w in
+        let protocols =
+          {current_protocol = state.protocols.next_protocol; next_protocol}
+        in
+        state.protocols <- protocols)
+      workers
+
+  (** Retrieve next protocol of a block with a small cache from protocol levels
+      to protocol hashes. *)
+  let next_protocol_of_block =
+    let proto_levels_cache = Int_cache.create 7 in
+    fun (cctxt : Client_context.full)
+        (block_hash, (block_header : Block_header.t)) ->
+      let open Lwt_result_syntax in
+      let proto_level = block_header.shell.proto_level in
+      Int_cache.bind_or_put
+        proto_levels_cache
+        proto_level
+        (fun _proto_level ->
+          let+ protos =
+            Tezos_shell_services.Shell_services.Blocks.protocols
+              cctxt
+              ~chain:cctxt#chain
+              ~block:(`Hash (block_hash, 0))
+              ()
+          in
+          protos.next_protocol)
+        Lwt.return
+
+  let rec monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
+    let open Lwt_result_syntax in
+    let*! res =
       Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
       let head = (head_hash, header.shell.level) in
+      let* next_protocol =
+        next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)
+      in
+      update_protocol ~next_protocol ;
       (* Notify all workers of a new Tezos head *)
-      let* () = notify_new_tezos_head head in
-      return_ok ()
+      let*! () = notify_new_tezos_head head in
+      return_unit
     in
     (* Ignore errors *)
-    let* () =
+    let*! () =
       match res with
       | Error error -> Internal_event.Simple.emit Event.monitoring_error error
-      | Ok () -> return_unit
+      | Ok () -> Lwt.return_unit
     in
-    monitor_l1_chain l1_ctxt
+    monitor_l1_chain cctxt l1_ctxt
 
-  let rec async_monitor_l1_chain l1_ctxt =
+  let rec async_monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
     Lwt.dont_wait
-      (fun () -> monitor_l1_chain l1_ctxt)
+      (fun () -> monitor_l1_chain cctxt l1_ctxt)
       (fun exn ->
         Format.eprintf
           "Warning: Error in async monitoring (%s), restarting"
           (Printexc.to_string exn) ;
-        async_monitor_l1_chain l1_ctxt)
+        async_monitor_l1_chain cctxt l1_ctxt)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
@@ -1185,6 +1311,7 @@ struct
         signers
     in
     let* l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
+    let* head_protocols = protocols_of_head cctxt in
     let* () =
       Signature.Public_key_hash.Map.iter_es
         (fun signer (strategy, tags) ->
@@ -1195,6 +1322,7 @@ struct
               {
                 cctxt = (cctxt :> Client_context.full);
                 l1_ctxt;
+                head_protocols;
                 data_dir;
                 state;
                 retention_period;
@@ -1206,7 +1334,7 @@ struct
           ignore worker)
         signers_map
     in
-    async_monitor_l1_chain l1_ctxt ;
+    async_monitor_l1_chain cctxt l1_ctxt ;
     return_unit
 
   let worker_of_signer signer_pkh =
@@ -1267,4 +1395,6 @@ struct
     List.find_map
       (fun (_signer, w) -> op_status_in_worker (Worker.state w) l1_hash)
       workers
+
+  let register_proto_client = Inj_proto.register
 end
