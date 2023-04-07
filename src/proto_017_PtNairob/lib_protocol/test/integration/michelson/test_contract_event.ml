@@ -29,8 +29,8 @@ open Alpha_context
 (** Testing
     -------
     Component:  Protocol (event logging)
-    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson && \
-                dune exec ./main.exe -- test '^event logging$'
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_contract_event.ml
     Subject:  This module tests that the event logs can be written to the receipt
               in correct order and expected format.
 *)
@@ -134,3 +134,7 @@ let tests =
       `Quick
       contract_test;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("event logging", tests)]
+  |> Lwt_main.run

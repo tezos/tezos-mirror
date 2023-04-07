@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (temporary big maps)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_temp_big_maps.ml
     Subject:    On temporary big maps.
 *)
 
@@ -96,3 +97,7 @@ let tests =
                (test_temp_big_maps_contract param_left param_right))
            param_right_values)
        param_left_values)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("temp big maps", tests)]
+  |> Lwt_main.run

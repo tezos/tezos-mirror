@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Migration (patched scripts)
-    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson
-                  dune exec ./main.exe -- test "^patched contracts$"
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_patched_contracts.ml
     Subject:      Migration
 *)
 
@@ -216,3 +216,7 @@ let tests =
       let module Test = Legacy_patch_test (Patches) in
       List.concat_map Test.tests Patches.patches)
     test_modules
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("patched contracts", tests)]
+  |> Lwt_main.run

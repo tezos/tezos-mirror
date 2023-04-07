@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (Michelson)
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_lazy_storage_diff.ml
+    Subject:    Test lazy storage
+*)
+
 open Protocol
 
 (** Generation of input data *)
@@ -138,3 +146,7 @@ let tests =
     Tztest.tztest "conversion roundtrip" `Slow (on_diffs conversion_roundtrip);
     Tztest.tztest "encoding roundtrip" `Slow (on_diffs encoding_roundtrip);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("lazy storage diff", tests)]
+  |> Lwt_main.run

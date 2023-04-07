@@ -29,7 +29,8 @@ open Transfers
 (** Testing
     -------
     Component:  Protocol (global table of constants)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_global_constants_storage.ml
     Subject:  This module tests that the global table of constants
               can be written to and read from across blocks.
 *)
@@ -129,3 +130,10 @@ let tests =
       `Quick
       test_no_double_register;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [("global table of constants", tests)]
+  |> Lwt_main.run

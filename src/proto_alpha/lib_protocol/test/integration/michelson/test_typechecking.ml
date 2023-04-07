@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_typechecking.ml
     Subject:      Type-checking
 *)
 
@@ -872,59 +873,63 @@ let test_contract_failure path =
 
 let tests =
   [
-    Tztest.tztest "test unparse view" `Quick test_unparse_view;
+    Tztest.tztest "unparse view" `Quick test_unparse_view;
     Tztest.tztest
-      "test typecheck stack overflow error"
+      "typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Tztest.tztest "test comb type parsing" `Quick test_parse_comb_type;
-    Tztest.tztest "test comb type unparsing" `Quick test_unparse_comb_type;
+    Tztest.tztest "comb type parsing" `Quick test_parse_comb_type;
+    Tztest.tztest "comb type unparsing" `Quick test_unparse_comb_type;
     Tztest.tztest
-      "test comb comparable type unparsing"
+      "comb comparable type unparsing"
       `Quick
       test_unparse_comb_comparable_type;
-    Tztest.tztest "test comb data parsing" `Quick test_parse_comb_data;
-    Tztest.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
-    Tztest.tztest "test optimal comb data unparsing" `Quick test_optimal_comb;
-    Tztest.tztest "test parse address" `Quick test_parse_address;
+    Tztest.tztest "comb data parsing" `Quick test_parse_comb_data;
+    Tztest.tztest "comb data unparsing" `Quick test_unparse_comb_data;
+    Tztest.tztest "optimal comb data unparsing" `Quick test_optimal_comb;
+    Tztest.tztest "parse address" `Quick test_parse_address;
     Tztest.tztest
-      "test unpackability of the contract type"
+      "unpackability of the contract type"
       `Quick
       test_contract_not_packable;
     Tztest.tztest
-      "test forbidden SELF in view"
+      "forbidden SELF in view"
       `Quick
       (test_forbidden_op_in_view "SELF");
     Tztest.tztest
-      "test forbidden SET_DELEGATE in view"
+      "forbidden SET_DELEGATE in view"
       `Quick
       (test_forbidden_op_in_view "SET_DELEGATE");
     Tztest.tztest
-      "test forbidden TRANSFER_TOKENS in view"
+      "forbidden TRANSFER_TOKENS in view"
       `Quick
       (test_forbidden_op_in_view "TRANSFER_TOKENS");
     Tztest.tztest
-      "test forbidden CREATE_CONTRACT in view"
+      "forbidden CREATE_CONTRACT in view"
       `Quick
       (test_forbidden_op_in_view "CREATE_CONTRACT");
     Tztest.tztest
-      "test parse contract data for rollup"
+      "parse contract data for rollup"
       `Quick
       test_parse_contract_data_for_unit_rollup;
     Tztest.tztest
-      "test parse contract data for rollup with entrypoint invalid type"
+      "parse contract data for rollup with entrypoint invalid type"
       `Quick
       test_parse_contract_data_for_rollup_with_invalid_type;
     Tztest.tztest
-      "test lambda_rec instruction"
+      "lambda_rec instruction"
       `Quick
       (test_contract_success (path // "contracts/rec_fact.tz"));
     Tztest.tztest
-      "test lambda_rec instruction with apply"
+      "lambda_rec instruction with apply"
       `Quick
       (test_contract_success (path // "contracts/rec_fact_apply.tz"));
     Tztest.tztest
-      "test lambda_rec with type error"
+      "lambda_rec with type error"
       `Quick
       (test_contract_failure (path // "contracts/fail_rec.tz"));
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("typechecking", tests)]
+  |> Lwt_main.run

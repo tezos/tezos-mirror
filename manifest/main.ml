@@ -4623,7 +4623,6 @@ end = struct
       let _integration_michelson =
         let modules =
           [
-            ("test_main", true);
             ("test_annotations", true);
             ("test_block_time_instructions", true);
             ("test_contract_event", true);

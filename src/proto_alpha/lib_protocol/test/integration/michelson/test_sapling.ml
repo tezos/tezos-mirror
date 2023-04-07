@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Sapling)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_sapling.ml
     Subject:    On the privacy-preserving library Sapling
 *)
 
@@ -1180,38 +1181,32 @@ let tests =
       `Quick
       Raw_context_tests.list_insertion_test;
     Tztest.tztest "root" `Quick Raw_context_tests.root_test;
+    Tztest.tztest "get_memo_size" `Quick Raw_context_tests.test_get_memo_size;
+    Tztest.tztest "verify_memo" `Quick Alpha_context_tests.test_verify_memo;
+    Tztest.tztest "bench_phases" `Slow Alpha_context_tests.test_bench_phases;
     Tztest.tztest
-      "test_get_memo_size"
-      `Quick
-      Raw_context_tests.test_get_memo_size;
-    Tztest.tztest "test_verify_memo" `Quick Alpha_context_tests.test_verify_memo;
-    Tztest.tztest
-      "test_bench_phases"
-      `Slow
-      Alpha_context_tests.test_bench_phases;
-    Tztest.tztest
-      "test_bench_phases_legacy"
+      "bench_phases_legacy"
       `Quick
       Alpha_context_tests.test_bench_phases_legacy;
     Tztest.tztest
-      "test_bench_fold_over_same_token"
+      "bench_fold_over_same_token"
       `Slow
       Alpha_context_tests.test_bench_fold_over_same_token;
     Tztest.tztest
-      "test_double_spend_same_input"
+      "double_spend_same_input"
       `Quick
       Alpha_context_tests.test_double_spend_same_input;
     Tztest.tztest
-      "test_verifyupdate_one_transaction"
+      "verifyupdate_one_transaction"
       `Quick
       Alpha_context_tests.test_verifyupdate_one_transaction;
     Tztest.tztest
-      "test_verifyupdate_two_transactions"
+      "verifyupdate_two_transactions"
       `Quick
       Alpha_context_tests.test_verifyupdate_two_transactions;
-    Tztest.tztest "test_shielded_tez" `Quick Interpreter_tests.test_shielded_tez;
+    Tztest.tztest "shielded_tez" `Quick Interpreter_tests.test_shielded_tez;
     Tztest.tztest
-      "test use state from other contract and transact"
+      "use state from other contract and transact"
       `Quick
       Interpreter_tests.test_use_state_from_other_contract_and_transact;
     Tztest.tztest
@@ -1219,10 +1214,13 @@ let tests =
       `Quick
       Interpreter_tests.test_push_sapling_state_should_be_forbidden;
     Tztest.tztest
-      "test_transac_and_block"
+      "transac_and_block"
       `Quick
       Interpreter_tests.test_transac_and_block;
-    Tztest.tztest "test_drop" `Quick Interpreter_tests.test_drop;
-    Tztest.tztest "test_double" `Quick Interpreter_tests.test_double;
-    Tztest.tztest "test_state_as_arg" `Quick Interpreter_tests.test_state_as_arg;
+    Tztest.tztest "drop" `Quick Interpreter_tests.test_drop;
+    Tztest.tztest "double" `Quick Interpreter_tests.test_double;
+    Tztest.tztest "state_as_arg" `Quick Interpreter_tests.test_state_as_arg;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sapling", tests)] |> Lwt_main.run

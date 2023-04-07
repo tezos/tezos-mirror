@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component: Protocol (Ticket_balance_key)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_balance.ml
     Subject: Ticket balance key hashing
 *)
 
@@ -1732,34 +1733,35 @@ let test_storage_for_create_and_remove_tickets () =
 
 let tests =
   [
-    Tztest.tztest "Test add strict" `Quick test_add_strict;
-    Tztest.tztest "Test add and remove" `Quick test_add_remove;
-    Tztest.tztest "Test add to big-map" `Quick test_add_to_big_map;
-    Tztest.tztest "Test swap big-map" `Quick test_swap_big_map;
-    Tztest.tztest "Test send ticket" `Quick test_send_tickets;
+    Tztest.tztest "add strict" `Quick test_add_strict;
+    Tztest.tztest "dd and remove" `Quick test_add_remove;
+    Tztest.tztest "add to big-map" `Quick test_add_to_big_map;
+    Tztest.tztest "swap big-map" `Quick test_swap_big_map;
+    Tztest.tztest "send ticket" `Quick test_send_tickets;
     Tztest.tztest
-      "Test send ticket to implicit"
+      "send ticket to implicit"
       `Quick
       test_send_tickets_to_implicit_account;
     Tztest.tztest
-      "Test send and store tickets with amount 0"
+      "send and store tickets with amount 0"
       `Quick
       test_send_and_store_zero_amount_tickets;
+    Tztest.tztest "send tickets in big-map" `Quick test_send_tickets_in_big_map;
+    Tztest.tztest "modify big-map" `Quick test_modify_big_map;
+    Tztest.tztest "send drop" `Quick test_send_tickets_in_big_map_and_drop;
     Tztest.tztest
-      "Test send tickets in big-map"
-      `Quick
-      test_send_tickets_in_big_map;
-    Tztest.tztest "Test modify big-map" `Quick test_modify_big_map;
-    Tztest.tztest "Test send drop" `Quick test_send_tickets_in_big_map_and_drop;
-    Tztest.tztest
-      "Test create contract with ticket"
+      "create contract with ticket"
       `Quick
       test_create_contract_with_ticket;
-    Tztest.tztest "Test join" `Quick test_join_tickets;
-    Tztest.tztest "Test wallet" `Quick test_ticket_wallet;
-    Tztest.tztest "Test ticket storage" `Quick test_ticket_storage;
+    Tztest.tztest "join" `Quick test_join_tickets;
+    Tztest.tztest "wallet" `Quick test_ticket_wallet;
+    Tztest.tztest "ticket storage" `Quick test_ticket_storage;
     Tztest.tztest
-      "Test storage for create and remove tickets"
+      "storage for create and remove tickets"
       `Quick
       test_storage_for_create_and_remove_tickets;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket balance", tests)]
+  |> Lwt_main.run

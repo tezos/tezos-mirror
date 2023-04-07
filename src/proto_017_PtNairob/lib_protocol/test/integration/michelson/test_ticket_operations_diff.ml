@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^ticket operations diff"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_operations_diff.ml
     Subject:    Ticket scanner tests
 *)
 
@@ -1271,72 +1270,73 @@ let test_fail_on_zero_amount_tickets () =
 let tests =
   [
     Tztest.tztest
-      "Test operations that do not involve tickets"
+      "operations that do not involve tickets"
       `Quick
       test_non_ticket_operations;
     Tztest.tztest
-      "Test transfer to non-ticket contract"
+      "transfer to non-ticket contract"
       `Quick
       test_transfer_to_non_ticket_contract;
     Tztest.tztest
-      "Test transfer empty ticket list"
+      "transfer empty ticket list"
       `Quick
       test_transfer_empty_ticket_list;
-    Tztest.tztest "Test transfer one ticket" `Quick test_transfer_one_ticket;
+    Tztest.tztest "transfer one ticket" `Quick test_transfer_one_ticket;
     Tztest.tztest
-      "Test transfer multiple tickets"
+      "transfer multiple tickets"
       `Quick
       test_transfer_multiple_tickets;
     Tztest.tztest
-      "Test transfer different tickets"
+      "transfer different tickets"
       `Quick
       test_transfer_different_tickets;
     Tztest.tztest
-      "Test transfer to two contracts with different tickets"
+      "transfer to two contracts with different tickets"
       `Quick
       test_transfer_to_two_contracts_with_different_tickets;
     Tztest.tztest
-      "Test originate contract that does not contain tickets"
+      "originate contract that does not contain tickets"
       `Quick
       test_originate_non_ticket_contract;
     Tztest.tztest
-      "Test originate with empty ticket list"
+      "originate with empty ticket list"
       `Quick
       test_originate_with_empty_tickets_list;
     Tztest.tztest
-      "Test originate with one ticket"
+      "originate with one ticket"
       `Quick
       test_originate_with_one_ticket;
     Tztest.tztest
-      "Test originate with multiple tickets"
+      "originate with multiple tickets"
       `Quick
       test_originate_with_multiple_tickets;
     Tztest.tztest
-      "Test originate with different tickets"
+      "originate with different tickets"
       `Quick
       test_originate_with_different_tickets;
     Tztest.tztest
-      "Test originate two contracts with different tickets"
+      "originate two contracts with different tickets"
       `Quick
       test_originate_two_contracts_with_different_tickets;
+    Tztest.tztest "originate and transfer" `Quick test_originate_and_transfer;
     Tztest.tztest
-      "Test originate and transfer"
-      `Quick
-      test_originate_and_transfer;
-    Tztest.tztest
-      "Test originate big-map with tickets"
+      "originate big-map with tickets"
       `Quick
       test_originate_big_map_with_tickets;
     Tztest.tztest
-      "Test transfer big-map with tickets"
+      "transfer big-map with tickets"
       `Quick
       test_transfer_big_map_with_tickets;
     Tztest.tztest
-      "Test transfer fails on multiple zero tickets"
+      "transfer fails on multiple zero tickets"
       `Quick
       test_transfer_fails_on_multiple_zero_tickets;
     Tztest.tztest
-      "Test fail in zero-amount tickets"
+      "fail in zero-amount tickets"
       `Quick
       test_fail_on_zero_amount_tickets;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket operations diff", tests)]
+  |> Lwt_main.run

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (cache)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_script_cache.ml
     Subject:    These unit tests check basic behavior of script cache
 *)
 
@@ -434,3 +435,7 @@ let tests =
       test_size_limit_is_in_constants_repr;
     tztest "entries show LRU behavior" `Quick test_entries_shows_lru;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("script cache", tests)]
+  |> Lwt_main.run

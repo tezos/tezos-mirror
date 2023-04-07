@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (script typed IR size)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^script typed ir size$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_script_typed_ir_size.ml
     Subject:    Script_typed_ir computes good approximation of values' sizes
 *)
 
@@ -1042,9 +1041,13 @@ let check_micheline_sizes () =
 let tests =
   let open Tztest in
   [
-    tztest "check value size" `Quick check_value_size;
-    tztest "check ty size" `Quick check_ty_size;
-    tztest "check kinstr size" `Quick check_kinstr_size;
-    tztest "check witness sizes" `Quick check_witness_sizes;
-    tztest "check micheline sizes" `Quick check_micheline_sizes;
+    tztest "value size" `Quick check_value_size;
+    tztest "ty size" `Quick check_ty_size;
+    tztest "kinstr size" `Quick check_kinstr_size;
+    tztest "witness sizes" `Quick check_witness_sizes;
+    tztest "micheline sizes" `Quick check_micheline_sizes;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("script typed ir size", tests)]
+  |> Lwt_main.run

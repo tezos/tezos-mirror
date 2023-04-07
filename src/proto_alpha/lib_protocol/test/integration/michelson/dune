@@ -35,7 +35,6 @@
   -open Tezos_benchmark_type_inference_alpha
   -open Tezos_protocol_plugin_alpha)
  (modules
-  test_main
   test_annotations
   test_block_time_instructions
   test_contract_event
