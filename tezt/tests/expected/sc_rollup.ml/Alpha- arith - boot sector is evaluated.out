@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate smart rollup from bootstrap1 of kind arith of type string with kernel '10 10 10 + +' --burn-cap 9999999
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind arith of type string with kernel '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1920.554 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -32,8 +32,9 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ1.638
         storage fees ........................... +ꜩ1.638
 
+Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 
-./octez-client --wait none originate smart rollup from bootstrap2 of kind arith of type string with kernel 31 --burn-cap 9999999
+./octez-client --wait none originate smart rollup rollup2 from bootstrap2 of kind arith of type string with kernel 31 --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1920.223 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -66,6 +67,7 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ1.638
         storage fees ........................... +ꜩ1.638
 
+Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup2"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
 { "level": 2,
