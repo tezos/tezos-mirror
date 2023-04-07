@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_sc_rollup.ml
     Subject:      Test smart contract rollup
 *)
 
@@ -3228,13 +3229,13 @@ let tests =
       `Quick
       test_inbox_max_number_of_messages_per_level;
     Tztest.tztest
-      "Test that a player can't timeout another player before timeout period \
-       and related timeout value."
+      "a player can't timeout another player before timeout period and related \
+       timeout value."
       `Quick
       test_timeout;
     Tztest.tztest
-      "Test that a player cannot play more than max_number_of_parallel_games \
-       games in parallel."
+      "a player cannot play more than max_number_of_parallel_games games in \
+       parallel."
       `Quick
       test_number_of_parallel_games_bounded;
     Tztest.tztest
@@ -3254,7 +3255,7 @@ let tests =
       `Quick
       test_refute_invalid_metadata;
     Tztest.tztest
-      "Test that SOL/Info_per_level/EOL are added in the inbox"
+      "SOL/Info_per_level/EOL are added in the inbox"
       `Quick
       test_automatically_added_internal_messages;
     Tztest.tztest
@@ -3289,3 +3290,7 @@ let tests =
       `Quick
       test_start_game_on_cemented_commitment;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup", tests)]
+  |> Lwt_main.run

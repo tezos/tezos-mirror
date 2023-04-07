@@ -4685,7 +4685,6 @@ end = struct
       let _integration_operations =
         let modules =
           [
-            ("test_main", true);
             ("test_activation", true);
             ("test_combined_operations", true);
             ("test_failing_noop", true);

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (activation)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_activation.ml
     Subject:    The activation operation creates an implicit contract from a
                 registered commitment present in the context. It is
                 parametrized by a public key hash (pkh) and a secret.
@@ -571,3 +572,7 @@ let tests =
       `Quick
       test_invalid_transfer_from_unactivated_account;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("activation", tests)]
+  |> Lwt_main.run

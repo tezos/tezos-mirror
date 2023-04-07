@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (increase_paid_storage)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_paid_storage_increase.ml
     Subject:    On increasing a paid amount of contract storage.
 *)
 
@@ -243,3 +244,7 @@ let tests =
     Tztest.tztest "no contract to bump its paid storage" `Quick test_no_contract;
     Tztest.tztest "effectiveness" `Quick test_effectiveness;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("paid storage increase", tests)]
+  |> Lwt_main.run

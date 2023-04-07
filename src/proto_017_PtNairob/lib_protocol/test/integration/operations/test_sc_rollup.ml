@@ -27,9 +27,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^sc rollup$"
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_sc_rollup.ml
     Subject:      Test smart contract rollup
 *)
 
@@ -3488,13 +3487,13 @@ let tests =
       `Quick
       test_inbox_max_number_of_messages_per_level;
     Tztest.tztest
-      "Test that a player can't timeout another player before timeout period \
-       and related timeout value."
+      "a player can't timeout another player before timeout period and related \
+       timeout value."
       `Quick
       test_timeout;
     Tztest.tztest
-      "Test that a player cannot play more than max_number_of_parallel_games \
-       games in parallel."
+      "a player cannot play more than max_number_of_parallel_games games in \
+       parallel."
       `Quick
       test_number_of_parallel_games_bounded;
     Tztest.tztest
@@ -3518,17 +3517,17 @@ let tests =
       `Quick
       test_refute_invalid_reveal;
     Tztest.tztest
-      "Test that SOL/Info_per_level/EOL are added in the inbox"
+      "SOL/Info_per_level/EOL are added in the inbox"
       `Quick
       test_automatically_added_internal_messages;
     Tztest.tztest
       "0-tick commitments are forbidden"
       `Quick
       test_zero_tick_commitment_fails;
-    Tztest.tztest "check the curfew functionality" `Quick test_curfew;
+    Tztest.tztest "the curfew functionality" `Quick test_curfew;
     Tztest.tztest
-      "check that a commitment can be published after the inbox_level + \
-       challenge window is passed."
+      "a commitment can be published after the inbox_level + challenge window \
+       is passed."
       `Quick
       test_curfew_period_is_started_only_after_first_publication;
     Tztest.tztest
@@ -3553,3 +3552,7 @@ let tests =
       `Quick
       test_start_game_on_cemented_commitment;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup", tests)]
+  |> Lwt_main.run

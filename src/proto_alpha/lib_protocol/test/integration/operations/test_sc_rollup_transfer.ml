@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Sc rollup L1/L2 communication
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_sc_rollup_transfer.ml
     Subject:    Test transfers from Michelson to smart contract rollups
 *)
 
@@ -426,3 +427,7 @@ let tests =
       `Quick
       test_transfer_non_zero_amount_ticket;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup transfer", tests)]
+  |> Lwt_main.run
