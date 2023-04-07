@@ -314,4 +314,13 @@ mod tests {
         }];
         assert_eq!(transactions, expected_transactions);
     }
+
+    #[test]
+    fn parse_unparsable_transaction() {
+        let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
+        assert_eq!(
+            InputResult::parse(message, ZERO_SMART_ROLLUP_ADDRESS),
+            InputResult::Unparsable
+        )
+    }
 }
