@@ -28,7 +28,6 @@ let ns = Interpreter_model.ns
 
 let fv = Interpreter_model.fv
 
-module Timelock_samplers = Tezos_crypto.Timelock
 open Protocol
 
 (* ------------------------------------------------------------------------- *)
@@ -3135,6 +3134,8 @@ module Registration_section = struct
   end
 
   module Timelock = struct
+    module Timelock_samplers = Tezos_crypto.Timelock
+
     let name = Interpreter_workload.N_IOpen_chest
 
     let stack_type =
