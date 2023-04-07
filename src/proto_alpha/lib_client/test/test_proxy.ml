@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe \
+                  -- --file test_proxy.ml
     Subject:      Test of --mode proxy and tezos-proxy-server heuristic
 *)
 
@@ -85,5 +86,5 @@ let test_split_key =
 let () =
   Alcotest.run
     ~__FILE__
-    "tezos-lib-client-proxy"
-    [(Protocol.name ^ ": proxy", Qcheck2_helpers.qcheck_wrap [test_split_key])]
+    Protocol.name
+    [("proxy", Qcheck2_helpers.qcheck_wrap [test_split_key])]
