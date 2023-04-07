@@ -27,3 +27,21 @@
   octez-distributed-plonk
   octez-plonk.distribution)
  (modules worker_runner))
+
+(executable
+ (name distribution)
+ (libraries
+  octez-distributed-plonk)
+ (flags
+  (:standard)
+  -open Distributed_plonk)
+ (modules distribution))
+
+(executable
+ (name distribution_meta)
+ (libraries
+  octez-distributed-plonk)
+ (flags
+  (:standard)
+  -open Distributed_plonk)
+ (modules distribution_meta))

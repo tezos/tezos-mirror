@@ -1614,6 +1614,24 @@ let _octez_aplonk_test_main =
                  ]);
         ]
 
+let _octez_distributed_plonk_executable =
+  private_exe
+    "distribution"
+    ~path:"src/lib_distributed_plonk"
+    ~opam:"octez-distributed-plonk"
+    ~bisect_ppx:No
+    ~deps:[octez_distributed_plonk |> open_]
+    ~modules:["distribution"]
+
+let _octez_distributed_plonk_executable_meta =
+  private_exe
+    "distribution_meta"
+    ~path:"src/lib_distributed_plonk"
+    ~opam:"octez-distributed-plonk"
+    ~bisect_ppx:No
+    ~deps:[octez_distributed_plonk |> open_]
+    ~modules:["distribution_meta"]
+
 let _octez_aplonk_test_helpers_bench =
   private_exe
     "bench"

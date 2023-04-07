@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Distributed_plonk_test.Distribution_helpers
-open Distributed_plonk
+open Distribution_helpers
 
 module DP = DP_Pack ()
 

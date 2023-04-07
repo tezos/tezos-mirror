@@ -1,8 +1,8 @@
-open Distributed_plonk_test.Distribution_helpers
+open Distribution_helpers
 
 module DP = DP_Meta ()
 
-module Runner = Distributed_plonk.Master_runner.Make (DP.D)
+module Runner = Master_runner.Make (DP.D)
 
 open Helpers (DP)
 
