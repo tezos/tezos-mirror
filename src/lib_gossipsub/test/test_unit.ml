@@ -446,7 +446,7 @@ let test_publish_without_flood_publishing rng limits parameters =
     match output with
     | Already_published ->
         Test.fail ~__LOC__ "Message shouldn't already be published."
-    | Publish_message peers -> peers
+    | Publish_message {to_publish} -> to_publish
   in
   (* Should return [degree_optimal] peers to publish to. *)
   Check.(
@@ -501,7 +501,7 @@ let test_fanout rng limits parameters =
     match output with
     | Already_published ->
         Test.fail ~__LOC__ "Message shouldn't already be published."
-    | Publish_message peers -> peers
+    | Publish_message {to_publish} -> to_publish
   in
   (* Fanout should contain [degree_optimal] peers. *)
   assert_fanout_size ~__LOC__ ~topic ~expected_size:limits.degree_optimal state ;
