@@ -69,6 +69,8 @@ Baker
 - Consensus operations with identical consensus-related contents but different
   ``branch`` fields are counted only once in the (pre)quorums. (MR :gl: `!8175`)
 
+- Improved efficiency to solve the anti spam proof of work challenge.
+
 Accuser
 -------
 
