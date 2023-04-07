@@ -1731,6 +1731,57 @@ let meta_compound2 loc ({size = size1} : _ ty_metadata)
     ({size = size2} : _ ty_metadata) : _ ty_metadata tzresult =
   Type_size.compound2 loc size1 size2 >|? fun size -> {size}
 
+let unit_metadata : unit ty_metadata = meta_basic
+
+let never_metadata : never ty_metadata = meta_basic
+
+let int_metadata : z num ty_metadata = meta_basic
+
+let nat_metadata : n num ty_metadata = meta_basic
+
+let signature_metadata : signature ty_metadata = meta_basic
+
+let string_metadata : Script_string.t ty_metadata = meta_basic
+
+let bytes_metadata : bytes ty_metadata = meta_basic
+
+let mutez_metadata : Tez.t ty_metadata = meta_basic
+
+let bool_metadata : bool ty_metadata = meta_basic
+
+let key_hash_metadata : public_key_hash ty_metadata = meta_basic
+
+let key_metadata : public_key ty_metadata = meta_basic
+
+let timestamp_metadata : Script_timestamp.t ty_metadata = meta_basic
+
+let chain_id_metadata : Script_chain_id.t ty_metadata = meta_basic
+
+let address_metadata : address ty_metadata = meta_basic
+
+let tx_rollup_l2_address_metadata : tx_rollup_l2_address ty_metadata =
+  meta_basic
+
+let sapling_transaction_metadata : Sapling.transaction ty_metadata = meta_basic
+
+let sapling_transaction_deprecated_metadata :
+    Sapling.Legacy.transaction ty_metadata =
+  meta_basic
+
+let sapling_state_metadata : Sapling.state ty_metadata = meta_basic
+
+let operation_metadata : operation ty_metadata = meta_basic
+
+let bls12_381_g1_metadata : Script_bls.G1.t ty_metadata = meta_basic
+
+let bls12_381_g2_metadata : Script_bls.G2.t ty_metadata = meta_basic
+
+let bls12_381_fr_metadata : Script_bls.Fr.t ty_metadata = meta_basic
+
+let chest_metadata : Script_timelock.chest ty_metadata = meta_basic
+
+let chest_key_metadata : Script_timelock.chest_key ty_metadata = meta_basic
+
 let pair_metadata :
     Script.location ->
     'a ty_metadata ->
@@ -1788,10 +1839,21 @@ let ticket_metadata :
   meta_compound1
 
 let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
-  | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
-  | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
-  | Tx_rollup_l2_address_t ->
-      meta_basic
+  | Unit_t -> unit_metadata
+  | Never_t -> never_metadata
+  | Int_t -> int_metadata
+  | Nat_t -> nat_metadata
+  | Signature_t -> signature_metadata
+  | String_t -> string_metadata
+  | Bytes_t -> bytes_metadata
+  | Mutez_t -> mutez_metadata
+  | Bool_t -> bool_metadata
+  | Key_hash_t -> key_hash_metadata
+  | Key_t -> key_metadata
+  | Timestamp_t -> timestamp_metadata
+  | Chain_id_t -> chain_id_metadata
+  | Address_t -> address_metadata
+  | Tx_rollup_l2_address_t -> tx_rollup_l2_address_metadata
   | Pair_t (_, _, meta, _) -> meta
   | Or_t (_, _, meta, _) -> meta
   | Option_t (_, meta, _) -> meta
@@ -1802,10 +1864,16 @@ let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Big_map_t (_, _, meta) -> meta
   | Ticket_t (_, meta) -> meta
   | Contract_t (_, meta) -> meta
-  | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
-  | Sapling_state_t _ | Operation_t | Bls12_381_g1_t | Bls12_381_g2_t
-  | Bls12_381_fr_t | Chest_t | Chest_key_t ->
-      meta_basic
+  | Sapling_transaction_t _ -> sapling_transaction_metadata
+  | Sapling_transaction_deprecated_t _ ->
+      sapling_transaction_deprecated_metadata
+  | Sapling_state_t _ -> sapling_state_metadata
+  | Operation_t -> operation_metadata
+  | Bls12_381_g1_t -> bls12_381_g1_metadata
+  | Bls12_381_g2_t -> bls12_381_g2_metadata
+  | Bls12_381_fr_t -> bls12_381_fr_metadata
+  | Chest_t -> chest_metadata
+  | Chest_key_t -> chest_key_metadata
 
 let ty_size t = (ty_metadata t).size
 
