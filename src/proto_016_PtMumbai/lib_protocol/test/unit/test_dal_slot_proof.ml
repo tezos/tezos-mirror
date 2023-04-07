@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (dal slot proof)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_dal_slot_proof.ml
     Subject:    These unit tests check proof-related functions of Dal slots.
 *)
 
@@ -438,3 +439,7 @@ let tests =
     let dal_parameters = constants_test.dal
   end) in
   Test.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("dal slot proof", tests)]
+  |> Lwt_main.run

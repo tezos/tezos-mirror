@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_receipt.ml
     Subject:    Test receipt endocings.
 *)
 
@@ -99,3 +100,7 @@ let test_encodings () =
   test_encodings Sc_rollup_refutation_rewards
 
 let tests = Tztest.[tztest "receipt - encoding" `Quick test_encodings]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("receipt encodings", tests)]
+  |> Lwt_main.run

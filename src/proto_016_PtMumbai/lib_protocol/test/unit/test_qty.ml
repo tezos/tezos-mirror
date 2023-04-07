@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (quantities)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_qty.ml
     Subject:    On tez quantities.
 *)
 
@@ -157,3 +158,6 @@ let wrap (n, f) =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let tests = List.map wrap tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("qty", tests)] |> Lwt_main.run

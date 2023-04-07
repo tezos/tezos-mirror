@@ -43,7 +43,6 @@
   -open Tezos_crypto_dal
   -open Tezos_webassembly_interpreter_extra)
  (modules
-  test_main
   test_bond_id_repr
   test_consensus_key
   test_contract_repr

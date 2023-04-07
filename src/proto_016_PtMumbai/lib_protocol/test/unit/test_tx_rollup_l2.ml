@@ -28,7 +28,8 @@
 (** Testing
     -------
     Component:  Protocol (tx rollup l2)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_tx_rollup_l2.ml
     Subject:    test the layer-2 implementation of transaction rollup
 *)
 
@@ -560,12 +561,7 @@ module Test_batch_encodings = struct
     return_unit
 
   let tests =
-    [
-      tztest
-        "test layer-2 transaction encoding size"
-        `Quick
-        test_l2_transaction_size;
-    ]
+    [tztest "layer-2 transaction encoding size" `Quick test_l2_transaction_size]
 end
 
 let tests =
@@ -573,3 +569,7 @@ let tests =
   @ Test_Address_index.tests @ Test_Ticket_index.tests
   @ Test_Address_medata.tests @ Test_Ticket_ledger.tests
   @ Test_batch_encodings.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("tx rollup l2", tests)]
+  |> Lwt_main.run

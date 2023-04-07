@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Local context storages by functors
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test local_contexts
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/unit/main.exe \
+                  -- --file test_local_contexts.ml
     Dependencies: helpers/block.ml
     Subject:      Tests for local contexts
 
@@ -132,3 +133,7 @@ let tests =
       `Quick
       test_local_remove_existing;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("local contexts", tests)]
+  |> Lwt_main.run

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Rollup Management Protocol)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_management_protocol.ml
     Subject:    Sanity checks for the Rollup Management Protocol module.
 *)
 
@@ -355,3 +356,10 @@ let tests =
       `Quick
       test_encode_decode_outbox_message;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [("sc rollup management protocol", tests)]
+  |> Lwt_main.run

@@ -29,7 +29,8 @@ open Alpha_context
 (** Testing
     -------
     Component:    Alpha_context
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_alpha_context.ml
     Dependencies: helpers/block.ml
     Subject:      To test the modules (including the top-level)
                   in alpha_context.ml as individual units, particularly
@@ -284,3 +285,7 @@ let tests =
       `Quick
       Test_Big_map.test_list_key_values_parameters;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("alpha context", tests)]
+  |> Lwt_main.run

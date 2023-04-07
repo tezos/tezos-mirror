@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (saturated arithmetic)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] saturation arithmetic$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/unit/main.exe \
+                  -- --file test_saturation.ml
     Subject:    The gas is represented using saturated arithmetic.
                 These unit tests check that saturated arithmetic operations
                 are correctly implemented.
@@ -234,3 +234,7 @@ let tests =
       `Quick
       (encoding Saturation_repr.n_encoding);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("saturation arithmetic", tests)]
+  |> Lwt_main.run

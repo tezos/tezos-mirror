@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Operation_repr
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_operation_repr.ml
     Dependencies: --
     Subject:      To test the modules (including the top-level)
                   in operation_repr.ml as individual units, particularly
@@ -182,3 +183,7 @@ let tests =
       `Quick
       Test_operation_repr.test_multiple_non_manager;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Operation_repr.ml", tests)]
+  |> Lwt_main.run

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Global table of constants
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_global_constants_storage.ml
     Dependencies: contract_hash.ml
     Subject:      Test the global table of constants
 *)
@@ -410,3 +411,7 @@ let tests =
     test_expand_is_idempotent;
     test_fold_does_not_stack_overflow;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Global constants storage", tests)]
+  |> Lwt_main.run
