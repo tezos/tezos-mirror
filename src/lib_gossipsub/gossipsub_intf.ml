@@ -438,7 +438,8 @@ module type AUTOMATON = sig
   val leave : leave -> [`Leave] monad
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5352
-     Handle the random state explicitly for [select_px_peers]. *)
+     Handle the random state explicitly for [select_px_peers] and
+     [select_gossip_messages]. *)
 
   (** Select random peers for Peer eXchange. Note that function is
       deterministic; however, it has side effects in that it updates the
@@ -449,6 +450,21 @@ module type AUTOMATON = sig
     Topic.t ->
     noPX_peers:Peer.Set.t ->
     Peer.t list
+
+  (** Select the gossip messages to be sent. These are IHave control messages
+      referring to recently seen messages (that is, sent during the last
+      [history_gossip_length] heartbeat ticks), to be sent to a random selection
+      of peers. The message ids for a peer and a topic are also selected at
+      random among the possible ones. At most [max_sent_iwant_per_heartbeat]
+      message ids are sent.
+
+      The local peer will send gossip to at most [gossip_factor] * (total number
+      of non-mesh/non-fanout peers), or [degree_lazy] random peers, whichever is
+      greater.
+
+      Note that function is deterministic; however, it has side effects in that
+      it updates the [state]'s random state.  *)
+  val select_gossip_messages : state -> ihave list
 
   val pp_add_peer : Format.formatter -> add_peer -> unit
 
