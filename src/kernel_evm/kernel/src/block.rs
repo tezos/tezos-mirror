@@ -8,6 +8,7 @@ use crate::helpers::address_to_hash;
 use crate::inbox::Transaction;
 use crate::storage;
 use evm_execution::address::EthereumAddress;
+use evm_execution::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -16,8 +17,7 @@ use primitive_types::U256;
 use tezos_ethereum::account::Account;
 use tezos_ethereum::eth_gen::{BlockHash, L2Level, OwnedHash, BLOCK_HASH_SIZE};
 use tezos_ethereum::transaction::{
-    RawTransaction, TransactionHash, TransactionReceipt, TransactionStatus,
-    TransactionType,
+    TransactionHash, TransactionReceipt, TransactionStatus, TransactionType,
 };
 
 use tezos_ethereum::wei::Wei;
@@ -53,7 +53,7 @@ pub struct ValidTransaction {
     pub sender_nonce: U256,
     pub sender_balance: Wei,
     pub tx_hash: TransactionHash,
-    pub transaction: RawTransaction,
+    pub transaction: EthereumTransactionCommon,
 }
 
 impl L2Block {
@@ -97,7 +97,9 @@ impl L2Block {
     }
 }
 
-fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedPath, EthereumAddress), Error> {
+fn get_tx_sender(
+    tx: &EthereumTransactionCommon,
+) -> Result<(OwnedPath, EthereumAddress), Error> {
     let address = tx.caller();
     // We reencode in hexadecimal, since the accounts hash are encoded in
     // hexadecimal in the storage.
@@ -106,7 +108,9 @@ fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedPath, EthereumAddress), Er
     Ok((path, address))
 }
 
-fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, EthereumAddress), Error> {
+fn get_tx_receiver(
+    tx: &EthereumTransactionCommon,
+) -> Result<(OwnedPath, EthereumAddress), Error> {
     let hash = address_to_hash(tx.to);
     let path = storage::account_path(&hash)?;
     Ok((path, tx.to))

@@ -9,12 +9,12 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::Error;
 
-use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
+use tezos_ethereum::transaction::TransactionHash;
 
 pub struct Transaction {
     pub level: u32,
     pub tx_hash: TransactionHash,
-    pub tx: RawTransaction,
+    pub tx: EthereumTransactionCommon,
 }
 
 pub enum InputResult {
@@ -24,7 +24,7 @@ pub enum InputResult {
 }
 
 impl Transaction {
-    pub fn to_raw_transaction(&self) -> RawTransaction {
+    pub fn to_raw_transaction(&self) -> EthereumTransactionCommon {
         self.tx.clone()
     }
 }

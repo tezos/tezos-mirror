@@ -3,16 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 use evm_execution::address::EthereumAddress;
-use evm_execution::signatures::EthereumTransactionCommon;
 use primitive_types::U256;
 
 use crate::eth_gen::{BlockHash, L2Level, OwnedHash};
 
 pub const TRANSACTION_HASH_SIZE: usize = 32;
 pub type TransactionHash = [u8; TRANSACTION_HASH_SIZE];
-
-pub type RawTransaction = EthereumTransactionCommon;
-pub type RawTransactions = Vec<RawTransaction>;
 
 pub enum TransactionType {
     Legacy,
