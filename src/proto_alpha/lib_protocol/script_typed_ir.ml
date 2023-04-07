@@ -260,12 +260,6 @@ module type TYPE_SIZE = sig
 
   val one : _ t
 
-  val two : _ t
-
-  val three : _ t
-
-  val four : (_, _) pair option t
-
   val compound1 : Script.location -> _ t -> _ t tzresult
 
   val compound2 : Script.location -> _ t -> _ t -> _ t tzresult
@@ -284,12 +278,6 @@ module Type_size : TYPE_SIZE = struct
   let to_int = Saturation_repr.mul_safe_of_int_exn
 
   let one = 1
-
-  let two = 2
-
-  let three = 3
-
-  let four = 4
 
   let check_eq :
       type a b error_trace.
@@ -1915,6 +1903,16 @@ let is_comparable : type v c. (v, c) ty -> c dbool = function
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
+let assert_ok1 f x =
+  match f Micheline.dummy_location x with
+  | Ok res -> res
+  | Error _ -> assert false
+
+let assert_ok2 f x y =
+  match f Micheline.dummy_location x y with
+  | Ok res -> res
+  | Error _ -> assert false
+
 let unit_t = Unit_t
 
 let int_t = Int_t
@@ -1967,7 +1965,12 @@ let or_t :
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Or_t (l, r, metadata, cmp))
 
-let or_bytes_bool_t = Or_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
+let or_bytes_bool_t =
+  Or_t
+    ( bytes_t,
+      bool_t,
+      assert_ok2 or_metadata bytes_metadata bool_metadata,
+      YesYes )
 
 let comparable_or_t loc l r =
   or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
@@ -1982,44 +1985,44 @@ let option_t loc t =
   let cmp = is_comparable t in
   Option_t (t, metadata, cmp)
 
-let option_mutez_t = Option_t (mutez_t, {size = Type_size.two}, Yes)
+let option_mutez_t =
+  Option_t (mutez_t, assert_ok1 option_metadata mutez_metadata, Yes)
 
-let option_string_t = Option_t (string_t, {size = Type_size.two}, Yes)
+let option_string_t =
+  Option_t (string_t, assert_ok1 option_metadata string_metadata, Yes)
 
-let option_bytes_t = Option_t (bytes_t, {size = Type_size.two}, Yes)
+let option_bytes_t =
+  Option_t (bytes_t, assert_ok1 option_metadata bytes_metadata, Yes)
 
-let option_nat_t = Option_t (nat_t, {size = Type_size.two}, Yes)
+let option_nat_t = Option_t (nat_t, assert_ok1 option_metadata nat_metadata, Yes)
 
 let option_pair_nat_nat_t =
-  Option_t
-    ( Pair_t (nat_t, nat_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata nat_metadata nat_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (nat_t, nat_t, pmetadata, YesYes), ometadata, Yes)
 
 let option_pair_nat_mutez_t =
-  Option_t
-    ( Pair_t (nat_t, mutez_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata nat_metadata mutez_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (nat_t, mutez_t, pmetadata, YesYes), ometadata, Yes)
 
 let option_pair_mutez_mutez_t =
-  Option_t
-    ( Pair_t (mutez_t, mutez_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata mutez_metadata mutez_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (mutez_t, mutez_t, pmetadata, YesYes), ometadata, Yes)
 
 let option_pair_int_nat_t =
-  Option_t
-    ( Pair_t (int_t, nat_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata int_metadata nat_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (int_t, nat_t, pmetadata, YesYes), ometadata, Yes)
 
 let list_t loc t =
   list_metadata loc (ty_metadata t) >|? fun metadata -> List_t (t, metadata)
 
 let operation_t = Operation_t
 
-let list_operation_t = List_t (operation_t, {size = Type_size.two})
+let list_operation_t =
+  List_t (operation_t, assert_ok1 list_metadata operation_metadata)
 
 let set_t loc t =
   set_metadata loc (ty_metadata t) >|? fun metadata -> Set_t (t, metadata)
@@ -2036,14 +2039,15 @@ let contract_t loc t =
   contract_metadata loc (ty_metadata t) >|? fun metadata ->
   Contract_t (t, metadata)
 
-let contract_unit_t = Contract_t (unit_t, {size = Type_size.two})
+let contract_unit_t =
+  Contract_t (unit_t, assert_ok1 contract_metadata unit_metadata)
 
-let sapling_transaction_t ~memo_metadata = Sapling_transaction_t memo_metadata
+let sapling_transaction_t ~memo_size = Sapling_transaction_t memo_size
 
-let sapling_transaction_deprecated_t ~memo_metadata =
-  Sapling_transaction_deprecated_t memo_metadata
+let sapling_transaction_deprecated_t ~memo_size =
+  Sapling_transaction_deprecated_t memo_size
 
-let sapling_state_t ~memo_metadata = Sapling_state_t memo_metadata
+let sapling_state_t ~memo_size = Sapling_state_t memo_size
 
 let chain_id_t = Chain_id_t
 
