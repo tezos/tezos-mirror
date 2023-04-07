@@ -2657,15 +2657,20 @@ let commands_rw () =
     command
       ~group
       ~desc:"Originate a new smart rollup."
-      (args7
+      (args8
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          fee_parameter_args
          storage_limit_arg
-         counter_arg)
-      (prefixes ["originate"; "smart"; "rollup"; "from"]
+         counter_arg
+         (Client_keys.force_switch ()))
+      (prefixes ["originate"; "smart"; "rollup"]
+      @@ SoruAlias.fresh_alias_param
+           ~name:"alias"
+           ~desc:"name of the new smart rollup"
+      @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the account originating the smart rollup."
@@ -2693,7 +2698,9 @@ let commands_rw () =
              simulation,
              fee_parameter,
              storage_limit,
-             counter )
+             counter,
+             force )
+           alias
            source
            kind
            parameters_ty
@@ -2705,7 +2712,7 @@ let commands_rw () =
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
         let* boot_sector = boot_sector pvm in
-        let* _res =
+        let* _, _, res =
           sc_rollup_originate
             cctxt
             ~chain:cctxt#chain
@@ -2726,7 +2733,26 @@ let commands_rw () =
             ~parameters_ty
             ()
         in
-        return_unit);
+        match res with
+        | Apply_results.Manager_operation_result
+            {
+              operation_result =
+                Apply_operation_result.Applied
+                  (Apply_results.Sc_rollup_originate_result
+                    {address = rollup_address; _});
+              _;
+            } ->
+            let* alias = SoruAlias.of_fresh cctxt force alias in
+            let* () = SoruAlias.add ~force cctxt alias rollup_address in
+            let*! () =
+              cctxt#message
+                {|Smart rollup %a memorized as "%s"|}
+                Sc_rollup.Address.pp
+                rollup_address
+                alias
+            in
+            return_unit
+        | _ -> return_unit);
     command
       ~group
       ~desc:"Send one or more messages to a smart rollup."
