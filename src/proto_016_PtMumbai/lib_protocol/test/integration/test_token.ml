@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe \
+                -- --file test_token.ml
     Subject:    Token movements in the protocol.
 *)
 
@@ -752,3 +753,7 @@ let tests =
         `Quick
         test_transfer_n_with_non_empty_source;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("token movements", tests)]
+  |> Lwt_main.run

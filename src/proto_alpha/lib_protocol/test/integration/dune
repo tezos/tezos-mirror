@@ -29,7 +29,6 @@
   -open Tezos_alpha_test_helpers
   -open Tezos_base_test_helpers)
  (modules
-  test_main
   test_constants
   test_frozen_bonds
   test_liquidity_baking

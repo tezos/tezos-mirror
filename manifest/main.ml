@@ -4755,7 +4755,6 @@ end = struct
       let _integration =
         let modules =
           [
-            ("test_main", true);
             ("test_constants", true);
             ("test_frozen_bonds", true);
             ("test_liquidity_baking", true);

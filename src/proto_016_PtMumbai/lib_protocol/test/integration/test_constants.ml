@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:  Protocol (baking)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe \
+                 -- --file test_constants.ml
     Subject:    the consistency of parametric constants
  *)
 
@@ -213,3 +214,7 @@ let tests =
       `Quick
       liquidity_baking_subsidy_param;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("constants", tests)]
+  |> Lwt_main.run

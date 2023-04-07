@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (token)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "^frozen bonds"
+                src/proto_017_PtNairob/lib_protocol/test/integration/main.exe \
+                -- --file test_frozen_bonds.ml
     Subject:    Frozen bonds applicable to contracts and part of their stake.
 *)
 
@@ -673,27 +673,31 @@ let tests =
       tztest "frozen bonds - delegated balance" `Quick test_delegated_balance;
       tztest "frozen bonds - test rpcs" `Quick test_rpcs;
       tztest
-        "test: delegate, freeze, unfreeze, undelegate"
+        "delegate, freeze, unfreeze, undelegate"
         `Quick
         test_delegate_freeze_unfreeze_undelegate;
       tztest
-        "test: delegate, freeze, undelegate, unfreeze"
+        "delegate, freeze, undelegate, unfreeze"
         `Quick
         test_delegate_freeze_undelegate_unfreeze;
       tztest
-        "test: delegate, double freeze, undelegate, unfreeze"
+        "delegate, double freeze, undelegate, unfreeze"
         `Quick
         test_delegate_double_freeze_undelegate_unfreeze;
       tztest
-        "test: delegate, freeze, redelegate, unfreeze"
+        "delegate, freeze, redelegate, unfreeze"
         `Quick
         test_delegate_freeze_redelegate_unfreeze;
       tztest
-        "test: delegate, freeze, unfreeze, freeze, redelegate"
+        "delegate, freeze, unfreeze, freeze, redelegate"
         `Quick
         test_delegate_freeze_unfreeze_freeze_redelegate;
       tztest
-        "test: delegate, freeze, slash, undelegate"
+        "delegate, freeze, slash, undelegate"
         `Quick
         test_delegate_freeze_slash_undelegate;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("frozen bonds", tests)]
+  |> Lwt_main.run

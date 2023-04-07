@@ -27,8 +27,8 @@
     -------
     Component:  Context Storage
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "storage tests"
+                src/proto_017_PtNairob/lib_protocol/test/integration/main.exe \
+                -- --file test_storage_functions.ml
     Subject:    Test storage functions.
  *)
 
@@ -175,3 +175,7 @@ let tests =
       test_fold_keys_unaccounted;
     Tztest.tztest "length test" `Quick test_length;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("storage tests", tests)]
+  |> Lwt_main.run
