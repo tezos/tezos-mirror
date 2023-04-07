@@ -169,12 +169,19 @@ impl EthereumTransactionCommon {
         verify(&mes, &sig, &pk)
     }
 
+    /// Unserialize bytes as a RLP encoded legacy transaction.
+    pub fn from_rlp_bytes(
+        bytes: &[u8],
+    ) -> Result<EthereumTransactionCommon, DecoderError> {
+        let decoder = Rlp::new(bytes);
+        EthereumTransactionCommon::decode(&decoder)
+    }
+
     /// Unserialize an hex string as a RLP encoded legacy transaction.
     pub fn from_rlp(e: String) -> Result<EthereumTransactionCommon, DecoderError> {
         let tx =
             hex::decode(e).or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
-        let decoder = Rlp::new(&tx);
-        EthereumTransactionCommon::decode(&decoder)
+        Self::from_rlp_bytes(&tx)
     }
 }
 
@@ -182,6 +189,14 @@ impl From<String> for EthereumTransactionCommon {
     /// Decode a transaction in hex format. Unsafe, to be used only in tests : panics when fails
     fn from(e: String) -> Self {
         EthereumTransactionCommon::from_rlp(e).unwrap()
+    }
+}
+
+impl TryFrom<&[u8]> for EthereumTransactionCommon {
+    type Error = DecoderError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        Self::from_rlp_bytes(bytes)
     }
 }
 
