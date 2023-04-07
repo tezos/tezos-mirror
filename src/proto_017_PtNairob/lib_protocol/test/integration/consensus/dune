@@ -28,7 +28,6 @@
   -open Tezos_protocol_017_PtNairob_parameters
   -open Tezos_protocol_plugin_017_PtNairob)
  (modules
-  test_main
   test_baking
   test_consensus_key
   test_deactivation

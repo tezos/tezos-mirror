@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (double baking)
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_double_baking.ml
     Subject:      A double baking evidence operation may be injected when it has
                   been observed that a baker baked two different blocks at the
                   same level and same round.
@@ -461,3 +462,7 @@ let tests =
       `Quick
       test_valid_double_endorsing_followed_by_double_baking;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("double baking", tests)]
+  |> Lwt_main.run

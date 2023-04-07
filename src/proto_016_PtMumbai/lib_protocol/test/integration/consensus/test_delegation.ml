@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (delegation)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_delegation.ml
     Subject:    - Properties on bootstrap contracts (self-delegation,
                 cannot delete/change their delegate (as opposed to contracts
                 not-being-delegate which can do these), bootstrap manager
@@ -1612,3 +1613,7 @@ let tests_delegate_registration =
 (******************************************************************************)
 
 let tests = tests_bootstrap_contracts @ tests_delegate_registration
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("delegation", tests)]
+  |> Lwt_main.run

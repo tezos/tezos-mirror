@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (frozen_deposits)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_frozen_deposits.ml
     Subject:    consistency of frozen deposits and the [set_deposits_limit] operation
  *)
 
@@ -651,7 +652,7 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
 let tests =
   Tztest.
     [
-      tztest "test invariants" `Quick test_invariants;
+      tztest "invariants" `Quick test_invariants;
       tztest "set deposits limit to 0%" `Quick (test_set_limit 0);
       tztest "set deposits limit to 5%" `Quick (test_set_limit 5);
       tztest "unset deposits limit" `Quick test_unset_limit;
@@ -672,15 +673,19 @@ let tests =
         `Quick
         test_frozen_deposits_with_delegation;
       tztest
-        "test frozen deposits with overdelegation"
+        "frozen deposits with overdelegation"
         `Quick
         test_frozen_deposits_with_overdelegation;
       tztest
-        "test set limit with overdelegation"
+        "set limit with overdelegation"
         `Quick
         test_set_limit_with_overdelegation;
       tztest
-        "test error is thrown when the frozen window is smaller"
+        "error is thrown when the frozen window is smaller"
         `Quick
         test_error_is_thrown_when_smaller_upper_bound_for_frozen_window;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("frozen deposits", tests)]
+  |> Lwt_main.run

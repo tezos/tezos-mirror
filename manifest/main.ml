@@ -4574,7 +4574,6 @@ end = struct
       let _integration_consensus =
         tezt
           [
-            "test_main";
             "test_baking";
             "test_consensus_key";
             "test_deactivation";
