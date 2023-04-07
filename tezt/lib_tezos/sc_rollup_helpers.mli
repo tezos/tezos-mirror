@@ -70,6 +70,7 @@ val setup_l1 :
 val originate_sc_rollup :
   ?hooks:Process_hooks.t ->
   ?burn_cap:Tez.t ->
+  ?alias:string ->
   ?src:string ->
   kind:string ->
   ?parameters_ty:string ->

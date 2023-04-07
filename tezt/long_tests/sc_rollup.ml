@@ -114,11 +114,19 @@ let send_message client msg =
   Client.bake_for_and_wait client
 
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
-    ~boot_sector client =
+    ?(alias = "rollup") ?(src = "bootstrap1") ?(kind = "arith")
+    ?(parameters_ty = "string") ~boot_sector client =
   let* sc_rollup =
     Client.Sc_rollup.(
-      originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
+      originate
+        ~hooks
+        ~burn_cap
+        ~alias
+        ~src
+        ~kind
+        ~parameters_ty
+        ~boot_sector
+        client)
   in
   let* () = Client.bake_for_and_wait client in
   return sc_rollup
@@ -145,11 +153,19 @@ let with_fresh_rollup ~protocol ?kind ~boot_sector f tezos_node tezos_client
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
-    ~boot_sector client =
+    ?(alias = "rollup") ?(src = "bootstrap1") ?(kind = "arith")
+    ?(parameters_ty = "string") ~boot_sector client =
   let* sc_rollup =
     Client.Sc_rollup.(
-      originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
+      originate
+        ~hooks
+        ~burn_cap
+        ~alias
+        ~src
+        ~kind
+        ~parameters_ty
+        ~boot_sector
+        client)
   in
   let* () = Client.bake_for_and_wait client in
   return sc_rollup

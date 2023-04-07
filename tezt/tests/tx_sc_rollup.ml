@@ -317,6 +317,7 @@ let test_tx_kernel_e2e protocol =
   let* sc_rollup_address =
     Client.Sc_rollup.originate
       ~burn_cap:Tez.(of_int 9999999)
+      ~alias:"rollup"
       ~src:bootstrap1_key
       ~kind:"wasm_2_0_0"
       ~boot_sector

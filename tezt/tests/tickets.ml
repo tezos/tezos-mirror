@@ -861,6 +861,7 @@ let setup_sc_enabled_node protocol ~parameters_ty =
     Client.Sc_rollup.(
       originate
         ~burn_cap:(Tez.of_int 2)
+        ~alias:"rollup"
         ~src:Constant.bootstrap1.alias
         ~kind:"wasm_2_0_0"
         ~parameters_ty

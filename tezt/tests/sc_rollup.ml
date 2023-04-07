@@ -189,8 +189,10 @@ let sc_rollup_node_rpc sc_node service =
 type test = {variant : string option; tags : string list; description : string}
 
 let originate_sc_rollups ~kind n client =
-  fold n String_set.empty (fun _i addrs ->
-      let* addr = originate_sc_rollup ~kind client in
+  fold n String_set.empty (fun i addrs ->
+      let* addr =
+        originate_sc_rollup ~alias:("rollup" ^ string_of_int i) ~kind client
+      in
       return (String_set.add addr addrs))
 
 let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
@@ -244,7 +246,7 @@ let wait_for_computed_dissection sc_node =
 
    A rollup node has a configuration file that must be initialized.
 *)
-let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
+let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string")
     ?(operator = Constant.bootstrap1.alias) ?data_dir tezos_node tezos_client =
   let* sc_rollup =
@@ -253,6 +255,7 @@ let setup_rollup ~protocol ~kind ?hooks ?(mode = Sc_rollup_node.Operator)
       ~kind
       ?boot_sector
       ~parameters_ty
+      ?alias
       ~src:operator
       tezos_client
   in
@@ -485,7 +488,13 @@ let test_rollup_node_configuration ~kind =
   let* () = Sc_rollup_node.terminate rollup_node in
   (* Run a rollup node in the same data_dir, but for a different rollup *)
   let* other_rollup_node, _rollup_client, other_sc_rollup =
-    setup_rollup ~protocol ~kind tezos_node tezos_client ~data_dir
+    setup_rollup
+      ~alias:"rollup2"
+      ~protocol
+      ~kind
+      tezos_node
+      tezos_client
+      ~data_dir
   in
   let expect_failure () =
     match Sc_rollup_node.process other_rollup_node with
@@ -2433,6 +2442,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   @@ fun sc_rollup1 _tezos_node tezos_client ->
   let* sc_rollup2 =
     originate_sc_rollup
+      ~alias:"rollup2"
       ~hooks
       ~kind
       ~boot_sector:boot_sector2

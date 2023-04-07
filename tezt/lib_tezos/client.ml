@@ -2212,7 +2212,7 @@ let show_voting_period ?endpoint client =
   | Some period -> return period
 
 module Sc_rollup = struct
-  let spawn_originate ?hooks ?(wait = "none") ?burn_cap ~src ~kind
+  let spawn_originate ?hooks ?(wait = "none") ?burn_cap ~alias ~src ~kind
       ~parameters_ty ~boot_sector client =
     spawn_command
       ?hooks
@@ -2222,6 +2222,7 @@ module Sc_rollup = struct
           "originate";
           "smart";
           "rollup";
+          alias;
           "from";
           src;
           "of";
@@ -2241,13 +2242,14 @@ module Sc_rollup = struct
     | None -> Test.fail "Cannot extract rollup address from receipt."
     | Some x -> return x
 
-  let originate ?hooks ?wait ?burn_cap ~src ~kind ~parameters_ty ~boot_sector
-      client =
+  let originate ?hooks ?wait ?burn_cap ~alias ~src ~kind ~parameters_ty
+      ~boot_sector client =
     let process =
       spawn_originate
         ?hooks
         ?wait
         ?burn_cap
+        ~alias
         ~src
         ~kind
         ~boot_sector

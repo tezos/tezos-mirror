@@ -23,12 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let originate_new_rollup ?(boot_sector = Constant.wasm_echo_kernel_boot_sector)
+let originate_new_rollup ?(alias = "rollup")
+    ?(boot_sector = Constant.wasm_echo_kernel_boot_sector)
     ?(parameters_ty = "bytes") ~src client =
   let* rollup =
     Client.Sc_rollup.originate
       client
       ~wait:"0"
+      ~alias
       ~src
       ~kind:"wasm_2_0_0"
       ~parameters_ty
