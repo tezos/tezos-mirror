@@ -95,6 +95,15 @@ let of_b58check s =
 
 let encoding =
   let open Data_encoding in
+  let case = function
+    | Tag tag ->
+        (* The tag was used by old variant. It have been removed in
+           protocol proposal O, it can be unblocked in the future. *)
+        let tx_rollup_address_reserved_tag = 2 in
+        assert (Compare.Int.(tag <> tx_rollup_address_reserved_tag)) ;
+        case (Tag tag)
+    | _ as c -> case c
+  in
   def
     "transaction_destination"
     ~title:"A destination of a transaction"
@@ -111,8 +120,6 @@ let encoding =
                (function Contract x -> Some x | _ -> None)
                (fun x -> Contract x)
             @ [
-                (* Case with tag 2 used to be tx rollup
-                   address. should not be used to not confuse ux. *)
                 case
                   (Tag 3)
                   (Fixed.add_padding Sc_rollup_repr.Address.encoding 1)

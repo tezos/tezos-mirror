@@ -198,13 +198,6 @@
         "Script_timestamp",
         "Script_bytes",
 
-        "Tx_rollup_l2_storage_sig",
-        "Tx_rollup_l2_context_sig",
-        "Tx_rollup_l2_context",
-        "Tx_rollup_l2_batch",
-        "Tx_rollup_l2_apply",
-        "Tx_rollup_l2_verifier",
-
         "Local_gas_counter",
         "Script_tc_errors",
         "Gas_monad",
@@ -241,7 +234,6 @@
         "Ticket_balance_key",
         "Ticket_lazy_storage_diff",
 
-        "Tx_rollup_parameters",
         "Zk_rollup_parameters",
 
         "Ticket_token_map",

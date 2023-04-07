@@ -209,12 +209,6 @@
   Script_string
   Script_timestamp
   Script_bytes
-  Tx_rollup_l2_storage_sig
-  Tx_rollup_l2_context_sig
-  Tx_rollup_l2_context
-  Tx_rollup_l2_batch
-  Tx_rollup_l2_apply
-  Tx_rollup_l2_verifier
   Local_gas_counter
   Script_tc_errors
   Gas_monad
@@ -250,7 +244,6 @@
   Ticket_scanner
   Ticket_balance_key
   Ticket_lazy_storage_diff
-  Tx_rollup_parameters
   Zk_rollup_parameters
   Ticket_token_map
   Ticket_operations_diff
@@ -495,12 +488,6 @@
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
   script_bytes.ml script_bytes.mli
-  tx_rollup_l2_storage_sig.ml
-  tx_rollup_l2_context_sig.ml
-  tx_rollup_l2_context.ml
-  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
-  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
-  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
   local_gas_counter.ml local_gas_counter.mli
   script_tc_errors.ml
   gas_monad.ml gas_monad.mli
@@ -536,7 +523,6 @@
   ticket_scanner.ml ticket_scanner.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
-  tx_rollup_parameters.ml tx_rollup_parameters.mli
   zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
@@ -761,12 +747,6 @@
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
   script_bytes.ml script_bytes.mli
-  tx_rollup_l2_storage_sig.ml
-  tx_rollup_l2_context_sig.ml
-  tx_rollup_l2_context.ml
-  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
-  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
-  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
   local_gas_counter.ml local_gas_counter.mli
   script_tc_errors.ml
   gas_monad.ml gas_monad.mli
@@ -802,7 +782,6 @@
   ticket_scanner.ml ticket_scanner.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
-  tx_rollup_parameters.ml tx_rollup_parameters.mli
   zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
@@ -1032,12 +1011,6 @@
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
   script_bytes.ml script_bytes.mli
-  tx_rollup_l2_storage_sig.ml
-  tx_rollup_l2_context_sig.ml
-  tx_rollup_l2_context.ml
-  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
-  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
-  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
   local_gas_counter.ml local_gas_counter.mli
   script_tc_errors.ml
   gas_monad.ml gas_monad.mli
@@ -1073,7 +1046,6 @@
   ticket_scanner.ml ticket_scanner.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
-  tx_rollup_parameters.ml tx_rollup_parameters.mli
   zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli

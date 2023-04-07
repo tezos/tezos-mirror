@@ -143,12 +143,6 @@ type successful_transaction_result =
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
     }
-  | Transaction_to_tx_rollup_result of {
-      ticket_hash : Ticket_hash.t;
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;
       ticket_receipt : Ticket_receipt.t;
@@ -230,6 +224,15 @@ module Internal_operation = struct
         -> 'kind case
 
   let transaction_contract_variant_cases =
+    let case = function
+      | Tag tag ->
+          (* The tag was used by old variant. It have been removed in
+             protocol proposal O, it can be unblocked in the future. *)
+          let to_tx_rollup_reserved_tag = 1 in
+          assert (Compare.Int.(tag <> to_tx_rollup_reserved_tag)) ;
+          case (Tag tag)
+      | _ as c -> case c
+    in
     union
       [
         case
@@ -289,39 +292,6 @@ module Internal_operation = struct
                 storage_size;
                 paid_storage_size_diff;
                 allocated_destination_contract;
-              });
-        case
-          ~title:"To_tx_rollup"
-          (Tag 1)
-          (obj4
-             (dft "balance_updates" Receipt.balance_updates_encoding [])
-             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-             (req "ticket_hash" Ticket_hash.encoding)
-             (req "paid_storage_size_diff" n))
-          (function
-            | Transaction_to_tx_rollup_result
-                {
-                  balance_updates;
-                  consumed_gas;
-                  ticket_hash;
-                  paid_storage_size_diff;
-                } ->
-                Some
-                  ( balance_updates,
-                    consumed_gas,
-                    ticket_hash,
-                    paid_storage_size_diff )
-            | _ -> None)
-          (fun ( balance_updates,
-                 consumed_gas,
-                 ticket_hash,
-                 paid_storage_size_diff ) ->
-            Transaction_to_tx_rollup_result
-              {
-                balance_updates;
-                consumed_gas;
-                ticket_hash;
-                paid_storage_size_diff;
               });
         case
           ~title:"To_smart_rollup"

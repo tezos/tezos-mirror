@@ -37,8 +37,6 @@ type error +=
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
   | Non_empty_transaction_from of Destination.t
-  | Tx_rollup_feature_disabled
-  | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
@@ -152,31 +150,6 @@ let () =
     Data_encoding.(obj1 (req "source" Destination.encoding))
     (function Non_empty_transaction_from c -> Some c | _ -> None)
     (fun c -> Non_empty_transaction_from c) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"operation.tx_rollup_is_disabled"
-    ~title:"Tx rollup is disabled"
-    ~description:"Cannot originate a tx rollup as it is disabled."
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Cannot apply a tx rollup operation as it is disabled.")
-    Data_encoding.unit
-    (function Tx_rollup_feature_disabled -> Some () | _ -> None)
-    (fun () -> Tx_rollup_feature_disabled) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"operation.tx_rollup_invalid_transaction_ticket_amount"
-    ~title:"Amount of transferred ticket is too high"
-    ~description:
-      "The ticket amount of a rollup transaction must fit in a signed 64-bit \
-       integer."
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Amount of transferred ticket is too high.")
-    Data_encoding.unit
-    (function
-      | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
-    (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
 
   let description = "Smart rollups are disabled." in
   register_error_kind
@@ -1237,15 +1210,6 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
               allocated_destination_contract =
                 payload.allocated_destination_contract;
             } )
-  | Transaction_to_tx_rollup_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
   | Transaction_to_zk_rollup_result payload ->
       let consumed = payload.paid_storage_size_diff in
