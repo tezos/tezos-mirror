@@ -405,6 +405,8 @@ module Make (C : AUTOMATON_CONFIG) :
       |> Option.map (fun c -> c.outbound)
       |> Option.value ~default
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
+       Optimize by having a topic to peers map *)
     let select_connections_peers connections rng topic ~filter ~max =
       Peer.Map.bindings connections
       |> List.filter_map (fun (peer, connection) ->
