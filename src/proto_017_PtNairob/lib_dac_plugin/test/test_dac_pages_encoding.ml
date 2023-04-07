@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Dal_node Slot_frame_encoding
-    Invocation: dune exec src/proto_alpha/lib_dac_plugin/test/main.exe \
-      -- test "^\[Unit\] Dac_pages_encoding.ml$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_dac_plugin/test/main.exe \
+                  -- --file test_dac_pages_encoding.ml
     Subject:    Tests for the SCORU storage module
 *)
 
@@ -711,10 +711,6 @@ let tests =
 let () =
   Alcotest_lwt.run
     ~__FILE__
-    "protocol > unit"
-    [
-      Test_helpers.Unit_test.spec
-        (Protocol.name ^ ": Dac_pages_encoding.ml")
-        tests;
-    ]
+    Protocol.name
+    [Test_helpers.Unit_test.spec "Dac_pages_encoding.ml" tests]
   |> Lwt_main.run
