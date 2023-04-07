@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use evm_execution::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -57,7 +58,7 @@ impl InputResult {
             Err(_) => return InputResult::Unparsable,
         };
         // Remaining bytes is the rlp encoded transaction.
-        let tx = match RawTransaction::decode_from_rlp(remaining) {
+        let tx: EthereumTransactionCommon = match remaining.try_into() {
             Ok(tx) => tx,
             Err(_) => return InputResult::Unparsable,
         };

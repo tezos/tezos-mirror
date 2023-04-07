@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use clarity::Address;
+use evm_execution::address::EthereumAddress;
 use tezos_ethereum::eth_gen::OwnedHash;
 
-pub fn address_to_hash(address: Address) -> OwnedHash {
-    hex::encode(address.as_bytes()).as_bytes().to_vec()
+pub fn address_to_hash(address: EthereumAddress) -> OwnedHash {
+    let str: String = address.into();
+    str.as_bytes().to_vec()
 }

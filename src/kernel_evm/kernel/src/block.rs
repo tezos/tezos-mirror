@@ -7,25 +7,20 @@ use crate::error::{Error, TransferError};
 use crate::helpers::address_to_hash;
 use crate::inbox::Transaction;
 use crate::storage;
+use evm_execution::address::EthereumAddress;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::{
-    Address, BlockHash, L2Level, OwnedHash, Quantity, BLOCK_HASH_SIZE,
-};
+use tezos_ethereum::eth_gen::{BlockHash, L2Level, OwnedHash, BLOCK_HASH_SIZE};
 use tezos_ethereum::transaction::{
     RawTransaction, TransactionHash, TransactionReceipt, TransactionStatus,
     TransactionType,
 };
 
 use tezos_ethereum::wei::Wei;
-
-// Used by Transaction.nonce.to_u64, the trait must be in scope for the function
-// to be available
-use num_traits::ToPrimitive;
 
 pub struct L2Block {
     // This choice of a L2 block representation is totally
@@ -34,35 +29,35 @@ pub struct L2Block {
     pub number: L2Level,
     pub hash: BlockHash,
     pub parent_hash: BlockHash,
-    pub nonce: Quantity,
+    pub nonce: U256,
     pub sha3_uncles: OwnedHash,
     pub logs_bloom: Option<OwnedHash>,
     pub transactions_root: OwnedHash,
     pub state_root: OwnedHash,
     pub receipts_root: OwnedHash,
     pub miner: OwnedHash,
-    pub difficulty: Quantity,
-    pub total_difficulty: Quantity,
+    pub difficulty: U256,
+    pub total_difficulty: U256,
     pub extra_data: OwnedHash,
-    pub size: Quantity,
-    pub gas_limit: Quantity,
-    pub gas_used: Quantity,
-    pub timestamp: Quantity,
+    pub size: U256,
+    pub gas_limit: U256,
+    pub gas_used: U256,
+    pub timestamp: U256,
     pub transactions: Vec<TransactionHash>,
     pub uncles: Vec<OwnedHash>,
 }
 
 pub struct ValidTransaction {
-    pub sender_address: Address,
+    pub sender_address: EthereumAddress,
     pub sender_path: OwnedPath,
-    pub sender_nonce: u64,
+    pub sender_nonce: U256,
     pub sender_balance: Wei,
     pub tx_hash: TransactionHash,
     pub transaction: RawTransaction,
 }
 
 impl L2Block {
-    const DUMMY_QUANTITY: Quantity = 0;
+    const DUMMY_QUANTITY: U256 = U256::zero();
     const DUMMY_HASH: &str = "0000000000000000000000000000000000000000";
 
     fn dummy_hash() -> OwnedHash {
@@ -102,23 +97,19 @@ impl L2Block {
     }
 }
 
-fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
-    let address = tx
-        .sender()
-        .map_err(|_| Error::Transfer(TransferError::InvalidSignature))?;
+fn get_tx_sender(tx: &RawTransaction) -> Result<(OwnedPath, EthereumAddress), Error> {
+    let address = tx.caller();
     // We reencode in hexadecimal, since the accounts hash are encoded in
     // hexadecimal in the storage.
     let hash = address_to_hash(address);
-    let address: Address = address.into();
     let path = storage::account_path(&hash)?;
     Ok((path, address))
 }
 
-fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, Address), Error> {
+fn get_tx_receiver(tx: &RawTransaction) -> Result<(OwnedPath, EthereumAddress), Error> {
     let hash = address_to_hash(tx.to);
-    let address: Address = tx.to.into();
     let path = storage::account_path(&hash)?;
-    Ok((path, address))
+    Ok((path, tx.to))
 }
 
 // A transaction is valid if the signature is valid, its nonce is valid and it
@@ -131,12 +122,13 @@ fn validate_transaction<Host: Runtime>(
     let (sender_path, sender_address) = get_tx_sender(&tx)?;
     let sender_balance =
         storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
-    let sender_nonce = storage::read_account_nonce(host, &sender_path).unwrap_or(0u64);
-    let nonce = tx.nonce.to_u64().expect("The nonce can actually be contained into an `u64` and can be safely converted. Temporary code");
+    let sender_nonce =
+        storage::read_account_nonce(host, &sender_path).unwrap_or(U256::zero());
+    let nonce: U256 = tx.nonce.into();
     // For now, we consider there's no gas to pay
     let gas = Wei::zero();
 
-    if !tx.is_valid() {
+    if !tx.clone().verify_signature() {
         Err(Error::Transfer(TransferError::InvalidSignature))
     } else if sender_nonce != nonce {
         Err(Error::Transfer(TransferError::InvalidNonce))
@@ -160,8 +152,8 @@ fn update_account<Host: Runtime>(
     host: &mut Host,
     account_path: &OwnedPath,
     balance: Wei,
-    nonce: Option<u64>, // if none is given, only the balance is updated. This
-                        // avoids updating the storage with the same value.
+    nonce: Option<U256>, // if none is given, only the balance is updated. This
+                         // avoids updating the storage with the same value.
 ) -> Result<(), Error> {
     if storage::has_account(host, account_path)? {
         storage::store_balance(host, account_path, balance)?;
@@ -180,7 +172,7 @@ fn make_receipt(
     tx: &ValidTransaction,
     status: TransactionStatus,
     index: u32,
-    to: Address,
+    to: EthereumAddress,
 ) -> TransactionReceipt {
     TransactionReceipt {
         hash: tx.tx_hash,
@@ -206,7 +198,7 @@ fn apply_transaction<Host: Runtime>(
     index: u32,
 ) -> Result<TransactionReceipt, Error> {
     let tx = &transaction.transaction;
-    let value = Wei::from_little_endian(&tx.value.to_le_bytes());
+    let value: U256 = tx.value.value.into();
     let gas = Wei::zero();
 
     // First pay for the gas
@@ -222,7 +214,7 @@ fn apply_transaction<Host: Runtime>(
         host,
         &transaction.sender_path,
         src_balance,
-        Some(transaction.sender_nonce + 1),
+        Some(transaction.sender_nonce + U256::one()),
     )?;
 
     let (dst_path, dst_address) = get_tx_receiver(tx)?;

@@ -17,7 +17,7 @@ use tezos_ethereum::transaction::{
 };
 use tezos_ethereum::wei::Wei;
 
-use primitive_types::U256;
+use primitive_types::{H160, U256};
 
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
@@ -140,11 +140,9 @@ pub fn has_account<Host: Runtime>(
 pub fn read_account_nonce<Host: Runtime>(
     host: &mut Host,
     account_path: &OwnedPath,
-) -> Result<u64, Error> {
+) -> Result<U256, Error> {
     let path = concat(account_path, &EVM_ACCOUNT_NONCE)?;
-    let mut buffer = [0_u8; 8];
-    store_read_slice(host, &path, &mut buffer, 8)?;
-    Ok(u64::from_le_bytes(buffer))
+    read_u256(host, &path)
 }
 
 pub fn read_account_balance<Host: Runtime>(
@@ -183,11 +181,10 @@ pub fn read_account<Host: Runtime>(
 pub fn store_nonce<Host: Runtime>(
     host: &mut Host,
     account_path: &OwnedPath,
-    nonce: u64,
+    nonce: U256,
 ) -> Result<(), Error> {
     let path = concat(account_path, &EVM_ACCOUNT_NONCE)?;
-    host.store_write(&path, &nonce.to_le_bytes(), 0)
-        .map_err(Error::from)
+    write_u256(host, &path, nonce)
 }
 
 pub fn store_balance<Host: Runtime>(
@@ -334,7 +331,8 @@ pub fn store_transaction_receipt<Host: Runtime>(
     )?;
     // From
     let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
-    host.store_write(&from_path, &receipt.from, 0)?;
+    let from: H160 = receipt.from.into();
+    host.store_write(&from_path, from.as_bytes(), 0)?;
     // Type
     let type_path = concat(receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
     host.store_write(&type_path, (&receipt.type_).into(), 0)?;
@@ -342,9 +340,10 @@ pub fn store_transaction_receipt<Host: Runtime>(
     let status_path = concat(receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
     host.store_write(&status_path, (&receipt.status).into(), 0)?;
     // To
-    if let Some(to) = &receipt.to {
+    if let Some(to) = receipt.to {
+        let to: H160 = to.into();
         let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
-        host.store_write(&to_path, to, 0)?;
+        host.store_write(&to_path, to.as_bytes(), 0)?;
     };
 
     Ok(())
