@@ -94,3 +94,19 @@ module EpoxyEntity = struct
 end
 
 module EpoxyAlias = Client_aliases.Alias (EpoxyEntity)
+
+module SoruEntity = struct
+  include Sc_rollup.Address
+
+  let of_source s =
+    let open Lwt_result_syntax in
+    match of_b58check_opt s with
+    | Some address -> return address
+    | None -> tzfail @@ error_of_fmt "bad smart rollup notation"
+
+  let to_source s = return (to_b58check s)
+
+  let name = "smart rollup"
+end
+
+module SoruAlias = Client_aliases.Alias (SoruEntity)
