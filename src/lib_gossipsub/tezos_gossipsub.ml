@@ -142,7 +142,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
-    | Publish_message : Peer.Set.t -> [`Publish] output
+    | Publish_message : {to_publish : Peer.Set.t} -> [`Publish] output
     | Already_published : [`Publish] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
@@ -851,11 +851,20 @@ module Make (C : AUTOMATON_CONFIG) :
           sender
       in
       let* () = put_in_seen_messages message_id in
+
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
 
          Filter out peers from which we already received the message, or an
          IHave message? *)
-      Publish_message peers |> return
+      let* direct_peers =
+        let filter _peer {direct; _} = direct in
+        select_peers topic ~filter ~max:max_int
+      in
+      let to_publish = Peer.Set.union peers direct_peers in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5010
+
+         Have a dedicated structure for direct peers? *)
+      Publish_message {to_publish} |> return
   end
 
   let publish : publish -> [`Publish] output Monad.t =

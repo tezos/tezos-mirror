@@ -305,9 +305,11 @@ module type AUTOMATON = sig
     | PX : Peer.Set.t -> [`Prune] output
         (** The given peer has been pruned for the given topic. The given set of
             peers alternatives in {!prune} for that topic is returned. *)
-    | Publish_message : Peer.Set.t -> [`Publish] output
-        (** If the peer is subscribed to the topic, returns the set of peers in the topic's mesh.
-            Otherwise, it will return the set of peers in the topic's fanout.*)
+    | Publish_message : {to_publish : Peer.Set.t} -> [`Publish] output
+        (** [to_publish] contains:
+            - Direct peers for the message's topic;
+            - The peers in the topic's mesh, if the peer is subscribed to the
+              topic. Otherwise, the peers in the topic's fanout. *)
     | Already_published : [`Publish] output
         (** Attempting to publish a message that has already been published. *)
     | Already_joined : [`Join] output

@@ -32,6 +32,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   Gossipsub_intf.WORKER with module GS = C.GS = struct
   open C
   module GS = GS
+  module View = GS.Introspection
   module Topic = GS.Topic
   module Peer = GS.Peer
   module Message_id = GS.Message_id
@@ -100,26 +101,23 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5327
+  (** From the worker's perspective, handling a full message consists in:
+      - Sending it to peers returned in [to_publish] field of
+      [GS.Publish_message] output);
+      - Notifying the application layer if it is a network message it is
+      interesed in.
 
-     - Also send the full message to direct peers: filter those that have it (we
-     received IHave from them)
-
-     - Should we send IHave to some metadata only connections? If yes, filter
-     those that have it (we received IHave from them)
-
-     - For the peers in `GS.Publish_message peers`, we assume that the set only
-     contains the peers in the mesh that don't have the message (we didn't
-     receive IHave from them). *)
+      Note that it's the responsability of the automaton modules to filter out
+      peers based on various criteria (bad score, connection expired, ...). *)
   let handle_full_message ~emit_p2p_msg ~emit_app_msg publish = function
-    | gstate, GS.Publish_message peers ->
+    | gstate, GS.Publish_message {to_publish} ->
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
-        GS.Peer.Set.iter
+        Peer.Set.iter
           (fun to_peer -> emit_p2p_msg @@ Out_message {to_peer; p2p_message})
-          peers ;
-        let has_joined = GS.Introspection.(has_joined topic @@ view gstate) in
+          to_publish ;
+        let has_joined = View.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
           emit_app_msg full_message ;
         gstate
