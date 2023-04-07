@@ -98,6 +98,10 @@ type ('peer, 'message_id, 'span) limits = {
   publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
+  gossip_threshold : float;
+      (** The threshold value (as a score) for a peer to emit/accept gossip: if
+          the remote peer score is below this threshold, the local peer won't
+          emit or accept gossip from the remote peer.  *)
   do_px : bool;  (** The flag controls whether peer exchange (PX) is enabled. *)
   accept_px_threshold : float;
       (** The threshold value (as a score) from which we accept peer exchanges. *)
@@ -144,6 +148,17 @@ type ('peer, 'message_id, 'span) limits = {
           attackers from overwhelming our mesh with incoming connections.
 	        [degree_out] must be set below {degree_low}, and must not exceed
           [degree_optimal / 2]. *)
+  degree_lazy : int;
+      (** [degree_lazy] affects how many peers the local peer will emit gossip
+          to at each heartbeat. The local peer will send gossip to at least
+          [degree_lazy] peers outside its mesh or fanout. The actual number may
+          be more, depending on [gossip_factor] and how many peers the local
+          peer is connected to. *)
+  gossip_factor : float;
+      (** [gossip_factor] affects how many peers the local peer will emit gossip
+          to at each heartbeat. The local peer will send gossip to
+          [gossip_factor] * (total number of non-mesh/non-fanout peers), or
+          [degree_lazy] peers, whichever is greater. *)
   history_length : int;
       (** [history_length] controls the size of the message cache used for
           gossip. The message cache will remember messages for [history_length]

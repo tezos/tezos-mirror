@@ -105,6 +105,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     max_gossip_retransmission;
     degree_optimal;
     publish_threshold;
+    gossip_threshold;
     do_px;
     peers_to_px;
     accept_px_threshold;
@@ -119,6 +120,8 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     degree_high;
     degree_score;
     degree_out;
+    degree_lazy;
+    gossip_factor;
     history_length;
     history_gossip_length;
   } =
@@ -132,6 +135,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      max_gossip_retransmission = %d;@;\
      degree_optimal = %d;@;\
      publish_threshold = %f;@;\
+     gossip_threshold = %f;@;\
      do_px = %b;@;\
      peers_to_px = %d;@;\
      accept_px_threshold = %f;@;\
@@ -146,6 +150,8 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      degree_high = %d;@;\
      degree_score = %d;@;\
      degree_out = %d;@;\
+     degree_lazy = %d;@;\
+     gossip_factor = %f;@;\
      history_length = %d;@;\
      history_gossip_length = %d }@]"
     max_recv_ihave_per_heartbeat
@@ -153,6 +159,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     max_gossip_retransmission
     degree_optimal
     publish_threshold
+    gossip_threshold
     do_px
     peers_to_px
     accept_px_threshold
@@ -173,5 +180,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     degree_high
     degree_score
     degree_out
+    degree_lazy
+    gossip_factor
     history_length
     history_gossip_length
