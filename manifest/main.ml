@@ -4606,7 +4606,7 @@ end = struct
       in
       let _integration_gas =
         tezt
-          ["test_main"; "test_gas_costs"; "test_gas_levels"]
+          ["test_gas_costs"; "test_gas_levels"]
           ~path:(path // "lib_protocol/test/integration/gas")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true

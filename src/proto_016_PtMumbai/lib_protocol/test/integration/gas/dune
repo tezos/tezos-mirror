@@ -22,7 +22,7 @@
   -open Tezos_protocol_016_PtMumbai
   -open Tezos_016_PtMumbai_test_helpers
   -open Tezos_base_test_helpers)
- (modules test_main test_gas_costs test_gas_levels))
+ (modules test_gas_costs test_gas_levels))
 
 (executable
  (name main)
