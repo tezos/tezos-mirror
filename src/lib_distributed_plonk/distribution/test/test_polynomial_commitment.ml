@@ -26,8 +26,7 @@
 open Plonk.Bls
 open Plonk.Utils
 
-module External (PC : Plonk_for_distribution.Kzg.PC_for_distribution_sig) =
-struct
+module External (PC : Distribution.Kzg.PC_for_distribution_sig) = struct
   module SMap = Plonk.SMap
 
   let generate_random_poly degree =
@@ -180,8 +179,8 @@ struct
     assert (not @@ prove_and_verify_instance ~wrong_transcript:true instance)
 end
 
-module KZG_Tests = External (Plonk_for_distribution.Kzg.Kzg_impl)
-module KZG_Pack_Tests = External (Plonk_for_distribution.Kzg_pack.Kzg_pack_impl)
+module KZG_Tests = External (Distribution.Kzg.Kzg_impl)
+module KZG_Pack_Tests = External (Distribution.Kzg_pack.Kzg_pack_impl)
 
 let tests =
   List.map

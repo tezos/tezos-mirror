@@ -1346,8 +1346,8 @@ let octez_aplonk =
 let octez_plonk_distribution =
   public_lib
     "octez-plonk.distribution"
-    ~internal_name:"plonk_for_distribution"
-    ~path:"src/lib_distributed_plonk/plonk-distribution"
+    ~internal_name:"distribution"
+    ~path:"src/lib_distributed_plonk/distribution"
     ~deps:[octez_plonk; octez_plonk_aggregation]
     ~preprocess:[pps ppx_repr]
 
@@ -1395,6 +1395,15 @@ let _octez_plonk_test_helpers_main =
         qcheck_alcotest;
         octez_bls12_381_polynomial |> open_;
       ]
+
+let _octez_plonk_distribution_test =
+  private_exe
+    "main"
+    ~path:"src/lib_distributed_plonk/distribution/test"
+    ~opam:"octez-plonk"
+    ~deps:[octez_plonk_aggregation; octez_plonk_test_helpers]
+    ~modules:["main"; "test_polynomial_commitment"]
+    ~dune:(make_plonk_runtest_invocation ~package:"octez-plonk")
 
 let _octez_plonk_test_helpers_bench =
   private_exe
