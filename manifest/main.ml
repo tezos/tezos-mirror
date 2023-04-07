@@ -1259,6 +1259,7 @@ let octez_plompiler =
         octez_mec;
       ]
     ~preprocess:[staged_pps [ppx_repr; ppx_deriving_show]]
+
 (* Deactivating z3 tests. z3 is not installed in the CI *)
 (* ~dune: *)
 (*   Dune. *)
@@ -1268,6 +1269,43 @@ let octez_plompiler =
 (*         ~deps_dune:[S "z3/run_z3_tests.sh"; [S "glob_files"; S "z3/*.z3"]] *)
 (*         ~action:[S "chdir"; S "z3"; [S "run"; S "sh"; S "run_z3_tests.sh"]]; *)
 (*     ] *)
+
+(* Tests of this form are run in multiple PlonK-related packages. *)
+let make_plonk_runtest_invocation ~package =
+  Dune.
+    [
+      alias_rule
+        "runtest"
+        ~package
+        ~action:
+          (G
+             [
+               setenv
+                 "RANDOM_SEED"
+                 "42"
+                 (progn
+                    [
+                      run_exe "main" ["-q"];
+                      [S "diff?"; S "test-quick.expected"; S "test.output"];
+                    ]);
+             ]);
+      alias_rule "runtest_slow" ~package ~action:(run_exe "main" []);
+      alias_rule
+        "runtest_slow_with_regression"
+        ~package
+        ~action:
+          (G
+             [
+               setenv
+                 "RANDOM_SEED"
+                 "42"
+                 (progn
+                    [
+                      run_exe "main" [];
+                      [S "diff?"; S "test-slow.expected"; S "test.output"];
+                    ]);
+             ]);
+    ]
 
 let octez_plonk =
   public_lib
@@ -1329,44 +1367,7 @@ let octez_plonk_test_helpers =
     ~deps:[octez_plonk; octez_plonk_aggregation; octez_plonk_distribution]
     ~modules:["helpers"; "cases"]
     ~preprocess:[pps ppx_repr]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest"
-            ~package:"octez-plonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" ["-q"];
-                          [S "diff?"; S "test-quick.expected"; S "test.output"];
-                        ]);
-                 ]);
-          alias_rule
-            "runtest_slow"
-            ~package:"octez-plonk"
-            ~action:(run_exe "main" []);
-          alias_rule
-            "runtest_slow_with_regression"
-            ~package:"octez-plonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" [];
-                          [S "diff?"; S "test-slow.expected"; S "test.output"];
-                        ]);
-                 ]);
-        ]
+    ~dune:(make_plonk_runtest_invocation ~package:"octez-plonk")
 
 let _octez_plonk_test_helpers_main =
   private_exe
@@ -1442,44 +1443,7 @@ let _octez_plonk_test_plompiler_main =
       ]
     ~bisect_ppx:No
     ~deps:[octez_plonk_test_helpers]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest"
-            ~package:"octez-plonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" ["-q"];
-                          [S "diff?"; S "test-quick.expected"; S "test.output"];
-                        ]);
-                 ]);
-          alias_rule
-            "runtest_slow"
-            ~package:"octez-plonk"
-            ~action:(run_exe "main" []);
-          alias_rule
-            "runtest_slow_with_regression"
-            ~package:"octez-plonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" [];
-                          [S "diff?"; S "test-slow.expected"; S "test.output"];
-                        ]);
-                 ]);
-        ]
+    ~dune:(make_plonk_runtest_invocation ~package:"octez-plonk")
 
 let octez_distributed_plonk =
   public_lib
@@ -1520,44 +1484,7 @@ let _octez_distributed_plonk_test_main =
         octez_plonk_test_helpers;
       ]
     ~bisect_ppx:No
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest"
-            ~package:"octez-plonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" ["-q"];
-                          [S "diff?"; S "test-quick.expected"; S "test.output"];
-                        ]);
-                 ]);
-          alias_rule
-            "runtest_slow"
-            ~package:"octez-plonk"
-            ~action:(run_exe "main" []);
-          alias_rule
-            "runtest_slow_with_regression"
-            ~package:"octez-plonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" [];
-                          [S "diff?"; S "test-slow.expected"; S "test.output"];
-                        ]);
-                 ]);
-        ]
+    ~dune:(make_plonk_runtest_invocation ~package:"octez-distributed-plonk")
 
 let _octez_distributed_plonk_worker_runner =
   private_exe
@@ -1575,44 +1502,7 @@ let _octez_aplonk_test_main =
     ~opam:"octez-aplonk"
     ~deps:[octez_plonk_test_helpers; octez_aplonk]
     ~modules:["main"; "test_aplonk"; "test_main_protocol"]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest"
-            ~package:"octez-aplonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" ["-q"];
-                          [S "diff?"; S "test-quick.expected"; S "test.output"];
-                        ]);
-                 ]);
-          alias_rule
-            "runtest_slow"
-            ~package:"octez-aplonk"
-            ~action:(run_exe "main" []);
-          alias_rule
-            "runtest_slow_with_regression"
-            ~package:"octez-aplonk"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" [];
-                          [S "diff?"; S "test-slow.expected"; S "test.output"];
-                        ]);
-                 ]);
-        ]
+    ~dune:(make_plonk_runtest_invocation ~package:"octez-aplonk")
 
 let _octez_distributed_plonk_executable =
   private_exe
@@ -1655,44 +1545,7 @@ let _octez_epoxy_tx_tests =
     ~path:"src/lib_epoxy_tx/test"
     ~opam:"octez-epoxy-tx"
     ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest"
-            ~package:"octez-epoxy-tx"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" ["-q"];
-                          [S "diff?"; S "test-quick.expected"; S "test.output"];
-                        ]);
-                 ]);
-          alias_rule
-            "runtest_slow"
-            ~package:"octez-epoxy-tx"
-            ~action:(run_exe "main" []);
-          alias_rule
-            "runtest_slow_with_regression"
-            ~package:"octez-epoxy-tx"
-            ~action:
-              (G
-                 [
-                   setenv
-                     "RANDOM_SEED"
-                     "42"
-                     (progn
-                        [
-                          run_exe "main" [];
-                          [S "diff?"; S "test-slow.expected"; S "test.output"];
-                        ]);
-                 ]);
-        ]
+    ~dune:(make_plonk_runtest_invocation ~package:"octez-epoxy-tx")
 
 let octez_crypto_dal =
   public_lib
