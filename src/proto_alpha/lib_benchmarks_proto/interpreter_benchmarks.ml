@@ -188,19 +188,16 @@ let benchmark_from_kinstr_and_stack :
            bef_top
            bef
     in
-    let stack_top, stack =
-      match result with
-      | Ok (stack_top, stack, _, _) -> (stack_top, stack)
-      | Error _ -> assert false
-    in
-    let size_after =
-      Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
-    in
-    let size_before =
-      Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
-    in
+    Option.map (fun (stack_top, stack, _, _) ->
+        let size_after =
+          Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
+        in
+        let size_before =
+          Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
+        in
 
-    size_after - size_before
+        size_after - size_before)
+    @@ Result.to_option result
   in
 
   match stack_kinstr with
