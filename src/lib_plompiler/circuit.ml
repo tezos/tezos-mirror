@@ -258,22 +258,18 @@ let with_label ~label m s =
 let add_solver : solver:Solver.solver_desc -> unit repr t =
  fun ~solver s -> ({s with solver = Solver.append_solver solver s.solver}, Unit)
 
-let default_solver ?(to_solve = C) g =
+let default_solver ?(to_solve = W 2) g =
   let c = g.(0) in
   let get_sel = CS.(get_sel c.sels) in
+  let linear =
+    Array.init Csir.nb_wires_arch (fun i ->
+        get_sel @@ Csir.linear_selector_name i)
+  in
   Arith
     {
-      a = c.wires.(0);
-      b = c.wires.(1);
-      c = c.wires.(2);
-      d = c.wires.(3);
-      e = c.wires.(4);
+      wires = Array.map (fun i -> R i) c.wires;
+      linear;
       qc = get_sel "qc";
-      ql = get_sel "ql";
-      qr = get_sel "qr";
-      qo = get_sel "qo";
-      qd = get_sel "qd";
-      qe = get_sel "qe";
       qm = get_sel "qm";
       qx5a = get_sel "qx5a";
       qx2b = get_sel "qx2b";
@@ -530,7 +526,7 @@ module Num = struct
     let gate =
       [|CS.new_constraint ~a:l ~b:r ~c:0 ~qc:mone ~qm:one "assert_nonzero"|]
     in
-    let solver = default_solver gate ~to_solve:B in
+    let solver = default_solver gate ~to_solve:(W 1) in
     append gate ~solver
 
   let is_zero (Scalar l) =
@@ -670,7 +666,7 @@ module Num = struct
              "div";
          |]
        in
-       let solver = default_solver gate ~to_solve:B in
+       let solver = default_solver gate ~to_solve:(W 1) in
        (* r * o - l = 0  <=> o = l / r *)
        append gate ~solver >* ret @@ Scalar o
 

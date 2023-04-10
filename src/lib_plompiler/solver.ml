@@ -28,21 +28,15 @@ module CS = Csir.CS
 module VS = Linear_algebra.Make_VectorSpace (S)
 module Tables = Csir.Tables
 
-type wire = A | B | C | D | E [@@deriving repr]
+type wire = W of int [@@deriving repr] [@@ocaml.unboxed]
+
+type row = R of int [@@deriving repr] [@@ocaml.unboxed]
 
 type 'a tagged = Input of 'a | Output of 'a [@@deriving repr]
 
 type arith_desc = {
-  a : int;
-  b : int;
-  c : int;
-  d : int;
-  e : int;
-  ql : S.t;
-  qr : S.t;
-  qo : S.t;
-  qd : S.t;
-  qe : S.t;
+  wires : row array;
+  linear : S.t array;
   qm : S.t;
   qc : S.t;
   qx5a : S.t;
@@ -256,48 +250,33 @@ let from_tagged = function Input i -> Some i | Output _ -> None
 let solve_one trace solver =
   (match solver with
   | Skip -> ()
-  | Arith {a; b; c; d; e; ql; qr; qo; qd; qe; qm; qc; qx5a; qx2b; to_solve; _}
-    -> (
+  | Arith {wires; linear; qm; qc; qx5a; qx2b; to_solve} -> (
       (* A gate with degree strictly greater than 1 must be used on an input wire.
          This is to avoid having several solutions for the same equation.
       *)
       match to_solve with
-      | C ->
-          let av = trace.(a) in
-          let bv = trace.(b) in
-          let dv = trace.(d) in
-          let ev = trace.(e) in
-          trace.(c) <-
+      | W i ->
+          assert (i <> 0 || S.is_zero qx5a) ;
+          assert (i <> 1 || S.is_zero qx2b) ;
+          let vs = Array.map (fun (R i) -> trace.(i)) wires in
+          let qs = Array.copy linear in
+          let qi = linear.(i) in
+          (* We ignore the i-th term, as we are solving for it *)
+          qs.(i) <- S.zero ;
+          let sum = Array.map2 S.mul qs vs |> Array.fold_left S.add qc in
+          let (R a_row) = wires.(0) in
+          let (R b_row) = wires.(1) in
+          let av = trace.(a_row) in
+          let bv = trace.(b_row) in
+          let m_pair = match i with 0 -> bv | 1 -> av | _ -> S.zero in
+          let (R i_row) = wires.(i) in
+          trace.(i_row) <-
             S.(
-              ((ql * av) + (qr * bv) + (qd * dv) + (qe * ev)
-              + (qm * av * bv)
+              (sum
+              + (if i >= 2 then qm * av * bv else S.zero)
               + (qx5a * pow av (Z.of_int 5))
-              + (qx2b * (bv * bv))
-              + qc)
-              / negate qo)
-      | A ->
-          assert (S.is_zero qx5a) ;
-          assert (S.is_zero qx2b) ;
-          let cv = trace.(c) in
-          let bv = trace.(b) in
-          let dv = trace.(d) in
-          let ev = trace.(e) in
-          trace.(a) <-
-            S.(
-              negate ((qr * bv) + (qo * cv) + (qd * dv) + (qe * ev) + qc)
-              / (ql + (bv * qm)))
-      | B ->
-          assert (S.is_zero qx5a) ;
-          assert (S.is_zero qx2b) ;
-          let cv = trace.(c) in
-          let av = trace.(a) in
-          let dv = trace.(d) in
-          let ev = trace.(e) in
-          trace.(b) <-
-            S.(
-              negate ((ql * av) + (qo * cv) + (qd * dv) + (qe * ev) + qc)
-              / (qr + (av * qm)))
-      | D | E -> raise @@ Failure "Solving for wires D or E is not allowed")
+              + (qx2b * (bv * bv)))
+              / negate (qi + (m_pair * qm))))
   | Pow5 {a; c} -> trace.(c) <- S.pow trace.(a) (Z.of_int 5)
   | Lookup {a; b; c; d; e; table} ->
       let tbl = Tables.find table Csir.table_registry in
