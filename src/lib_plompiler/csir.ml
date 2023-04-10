@@ -247,10 +247,10 @@ module CS = struct
 
   type t = gate list [@@deriving repr]
 
-  let new_constraint ~a ~b ~c ?(d = 0) ?(e = 0) ?qc ?(linear = [])
-      ?(linear_g = []) ?qm ?qx2b ?qx5a ?qx5c ?qecc_ws_add ?qecc_ed_add
-      ?qecc_ed_cond_add ?qbool ?qcond_swap ?q_anemoi ?q_plookup ?q_table
-      ?(precomputed_advice = []) ?(labels = []) label =
+  let new_constraint ~wires ?qc ?(linear = []) ?(linear_g = []) ?qm ?qx2b ?qx5a
+      ?qx5c ?qecc_ws_add ?qecc_ed_add ?qecc_ed_cond_add ?qbool ?qcond_swap
+      ?q_anemoi ?q_plookup ?q_table ?(precomputed_advice = []) ?(labels = [])
+      label =
     let sels =
       List.filter_map
         (fun (l, x) -> Option.bind x (fun c -> Some (l, c)))
@@ -272,7 +272,10 @@ module CS = struct
            ~q_table
            ())
     in
-    let wires = [|a; b; c; d; e|] in
+    let wires =
+      let pad_length = nb_wires_arch - List.length wires in
+      wires @ List.init pad_length (Fun.const 0) |> Array.of_list
+    in
     {wires; sels; precomputed_advice; label = label :: labels}
 
   let get_sel sels s =
