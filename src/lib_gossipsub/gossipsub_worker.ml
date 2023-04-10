@@ -181,6 +181,26 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         {!GS.remove_peer}. *)
   let handle_disconnection = function gstate, GS.Removing_peer -> gstate
 
+  (** When a [Graft] request from a remote peer is received, the worker just
+      forwards it to the automaton. There is nothing else to do. *)
+  let handle_graft = function
+    | ( gstate,
+        ( GS.Peer_filtered | Unknown_topic | Peer_already_in_mesh
+        | Grafting_direct_peer | Unexpected_grafting_peer
+        | Grafting_peer_with_negative_score | Grafting_successfully
+        | Peer_backed_off | Mesh_full ) ) ->
+        gstate
+
+  (** When a [Subscribe] request from a remote peer is received, the worker just
+      forwards it to the automaton. There is nothing else to do. *)
+  let handle_subscribe = function
+    | gstate, (GS.Subscribed | Subscribe_to_unknown_peer) -> gstate
+
+  (** When a [Unsubscribe] request from a remote peer is received, the worker just
+      forwards it to the automaton. There is nothing else to do. *)
+  let handle_unsubscribe = function
+    | gstate, (GS.Unsubscribed | Unsubscribe_from_unknown_peer) -> gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -201,6 +221,15 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         in
         GS.publish publish gossip_state
         |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
+    | Graft {topic} ->
+        let graft : GS.graft = {peer = from_peer; topic} in
+        GS.handle_graft graft gossip_state |> handle_graft
+    | Subscribe {topic} ->
+        let subscribe : GS.subscribe = {peer = from_peer; topic} in
+        GS.handle_subscribe subscribe gossip_state |> handle_subscribe
+    | Unsubscribe {topic} ->
+        let unsubscribe : GS.unsubscribe = {peer = from_peer; topic} in
+        GS.handle_unsubscribe unsubscribe gossip_state |> handle_unsubscribe
     | _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
