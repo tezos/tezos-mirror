@@ -337,11 +337,9 @@ module CS = struct
     @ List.filter (fun (s, _) -> List.mem s next_constr_selectors) prev_sels
 
   let wires_of_constr_i gate i =
-    let a_selectors = selectors_with_tags [Wire 0] in
-    let b_selectors = selectors_with_tags [Wire 1] in
-    let c_selectors = selectors_with_tags [Wire 2] in
-    let d_selectors = selectors_with_tags [Wire 3] in
-    let e_selectors = selectors_with_tags [Wire 4] in
+    let selectors =
+      Array.init nb_wires_arch (fun i -> selectors_with_tags [Wire i])
+    in
     let intersect names = List.exists (fun (s, _q) -> List.mem s names) in
     let sels = used_selectors gate i in
     (* We treat qecc_ed_cond_add exceptionally until we have a better interface
@@ -349,18 +347,20 @@ module CS = struct
     let relax =
       List.map fst sels = ["qecc_ed_cond_add"] && gate.(i).sels = []
     in
-    let a_selectors = if relax then [] else a_selectors in
-    let b_selectors = if relax then [] else b_selectors in
-    let c_selectors = if relax then [] else c_selectors in
+    if relax then (
+      selectors.(0) <- [] ;
+      selectors.(1) <- [] ;
+      selectors.(2) <- []) ;
     (* We treat q_anemoi exceptionally until we have a better interface
        on unused wires *)
     let relax = List.map fst sels = ["q_anemoi"] && gate.(i).sels = [] in
-    let a_selectors = if relax then [] else a_selectors in
-    let b_selectors = if relax then [] else b_selectors in
-    let c_selectors = if relax then [] else c_selectors in
+    if relax then (
+      selectors.(0) <- [] ;
+      selectors.(1) <- [] ;
+      selectors.(2) <- []) ;
     List.map2
       (fun wsels w -> if intersect wsels sels then w else -1)
-      [a_selectors; b_selectors; c_selectors; d_selectors; e_selectors]
+      (Array.to_list selectors)
       (gate.(i).wires |> Array.to_list)
 
   let gate_wires gate =
