@@ -294,20 +294,8 @@ end = struct
           (* Retrieving its values as well as the next constraint's values *)
           let j = (i + 1) mod nb_cs in
           let ci, cj = (gate.(i), gate.(j)) in
-          let a, b, c, d, e =
-            ( trace.(ci.wires.(0)),
-              trace.(ci.wires.(1)),
-              trace.(ci.wires.(2)),
-              trace.(ci.wires.(3)),
-              trace.(ci.wires.(4)) )
-          in
-          let ag, bg, cg, dg, eg =
-            ( trace.(cj.wires.(0)),
-              trace.(cj.wires.(1)),
-              trace.(cj.wires.(2)),
-              trace.(cj.wires.(3)),
-              trace.(cj.wires.(4)) )
-          in
+          let wires = Array.map (fun w -> trace.(w)) ci.wires in
+          let wires_g = Array.map (fun w -> trace.(w)) cj.wires in
           (* Folding on selectors *)
           List.fold_left
             (fun id_map (s_name, q) ->
@@ -315,7 +303,7 @@ end = struct
               | "q_plookup" -> id_map
               | "q_table" ->
                   (* We assume there can be only one lookup per gate *)
-                  let entry : Table.entry = [|a; b; c; d; e|] in
+                  let entry : Table.entry = wires in
                   let sub_table = List.nth tables (Scalar.to_z q |> Z.to_int) in
                   let b = Table.mem entry sub_table in
                   let id = [|(if b then Scalar.zero else Scalar.one)|] in
@@ -324,8 +312,6 @@ end = struct
                   (* Retrieving the selector's identity name and equations *)
                   let s_id_name, _ = Custom_gates.get_ids s_name in
                   let s_ids = SMap.find s_id_name id_map in
-                  let wires = [|a; b; c; d; e|] in
-                  let wires_g = [|ag; bg; cg; dg; eg|] in
                   let precomputed_advice = SMap.of_list ci.precomputed_advice in
                   (* Updating the identities with the equations' output *)
                   List.iteri
