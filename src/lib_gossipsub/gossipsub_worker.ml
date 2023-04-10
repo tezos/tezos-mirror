@@ -99,12 +99,17 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
-  type collection_kind = List of Peer.t list | Set of Peer.Set.t
+  type collection_kind =
+    | List of Peer.t list
+    | Set of Peer.Set.t
+    | Elt of Peer.t
 
   let send_p2p_message ~emit_p2p_msg p2p_message =
     let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
     function
-    | List list -> List.iter emit list | Set set -> Peer.Set.iter emit set
+    | List list -> List.iter emit list
+    | Set set -> Peer.Set.iter emit set
+    | Elt peer -> emit peer
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
@@ -166,10 +171,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_new_connection ~emit_p2p_msg peer = function
     | gstate, GS.Peer_already_known -> gstate
     | gstate, Peer_added ->
-        let peers = List [peer] in
         View.(view gstate |> get_our_topics)
         |> List.iter (fun topic ->
-               send_p2p_message ~emit_p2p_msg (Subscribe {topic}) peers) ;
+               send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (Elt peer)) ;
         gstate
 
   (** When a peer is disconnected, the worker has nothing to do, as:
