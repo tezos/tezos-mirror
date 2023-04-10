@@ -88,6 +88,7 @@ end = struct
        [|0; 1; 0; 1|] ;
        [|0; 1; 1; 1|] ;
        [|0; 0; 0; 0|] ;
+       ...
        [|0; 0; 0; 0|] ;
      ]
   *)
@@ -142,15 +143,15 @@ end = struct
 end
 
 let table_or =
+  assert (nb_wires_arch >= 3) ;
   Table.of_list
-    Scalar.
-      [
-        [|zero; zero; one; one|];
-        [|zero; one; zero; one|];
-        [|zero; one; one; one|];
-        [|zero; zero; zero; zero|];
-        [|zero; zero; zero; zero|];
-      ]
+  @@ Scalar.
+       [
+         [|zero; zero; one; one|];
+         [|zero; one; zero; one|];
+         [|zero; one; one; one|];
+       ]
+  @ List.init (nb_wires_arch - 3) (Fun.const Scalar.[|zero; zero; zero; zero|])
 
 module Tables = Map.Make (String)
 
