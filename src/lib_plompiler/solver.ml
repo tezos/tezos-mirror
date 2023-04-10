@@ -49,15 +49,7 @@ type pow5_desc = {a : int; c : int} [@@deriving repr]
 
 type wires_desc = int array [@@deriving repr]
 
-type lookup_desc = {
-  a : int tagged;
-  b : int tagged;
-  c : int tagged;
-  d : int tagged;
-  e : int tagged;
-  table : string;
-}
-[@@deriving repr]
+type lookup_desc = {wires : int tagged array; table : string} [@@deriving repr]
 
 type ws_desc = {x1 : int; y1 : int; x2 : int; y2 : int; x3 : int; y3 : int}
 [@@deriving repr]
@@ -277,19 +269,13 @@ let solve_one trace solver =
               + (qx2b * (bv * bv)))
               / negate (qi + (m_pair * qm))))
   | Pow5 {a; c} -> trace.(c) <- S.pow trace.(a) (Z.of_int 5)
-  | Lookup {a; b; c; d; e; table} ->
+  | Lookup {wires; table} ->
       let tbl = Tables.find table Csir.table_registry in
-      let wa, wb, wc, wd, we = Utils.map5 untag (a, b, c, d, e) in
-      let a, b, c, d, e = Utils.map5 from_tagged (a, b, c, d, e) in
-      let a, b, c, d, e =
-        Utils.map5 (Option.map (fun i -> trace.(i))) (a, b, c, d, e)
-      in
-      let entry = Option.get Csir.Table.(find [|a; b; c; d; e|] tbl) in
-      trace.(wa) <- entry.(0) ;
-      trace.(wb) <- entry.(1) ;
-      trace.(wc) <- entry.(2) ;
-      trace.(wd) <- entry.(3) ;
-      trace.(we) <- entry.(4)
+      let values = Array.map untag wires in
+      let wires = Array.map from_tagged wires in
+      let wires = Array.map (Option.map (fun i -> trace.(i))) wires in
+      let entry = Option.get Csir.Table.(find wires tbl) in
+      Array.iteri (fun i v -> trace.(v) <- entry.(i)) values
   | IsZero wires ->
       let av = trace.(wires.(0)) in
       trace.(wires.(2)) <- S.(if av = zero then one else zero) ;

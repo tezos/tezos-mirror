@@ -50,14 +50,7 @@ type pow5_desc = {a : int; c : int}
 
 type wires_desc = int array
 
-type lookup_desc = {
-  a : int tagged;
-  b : int tagged;
-  c : int tagged;
-  d : int tagged;
-  e : int tagged;
-  table : string;
-}
+type lookup_desc = {wires : int tagged array; table : string}
 
 type swap_desc = {b : int; x : int; y : int; u : int; v : int}
 

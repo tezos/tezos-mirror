@@ -315,7 +315,8 @@ let append_lookup :
         ({s with tables}, i)
   in
   let s, index = use_table s table in
-  let solver = Lookup {a; b; c; d; e; table} in
+  let wires = [|a; b; c; d; e|] in
+  let solver = Lookup {wires; table} in
   let a, b, c, d, e = Utils.map5 untag (a, b, c, d, e) in
   let cstr =
     CS.new_constraint
