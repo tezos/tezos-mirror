@@ -291,15 +291,8 @@ let append : CS.gate -> ?solver:Solver.solver_desc -> unit repr t =
   ({s with cs; solver}, Unit)
 
 let append_lookup :
-    a:int tagged ->
-    b:int tagged ->
-    c:int tagged ->
-    ?d:int tagged ->
-    ?e:int tagged ->
-    table:string ->
-    string ->
-    unit repr t =
- fun ~a ~b ~c ?(d = Input 0) ?(e = Input 0) ~table label s ->
+    wires:int tagged list -> table:string -> string -> unit repr t =
+ fun ~wires ~table label s ->
   let rec find_index : 'a list -> int -> 'a -> int option =
    fun l i y ->
     match l with
@@ -315,7 +308,10 @@ let append_lookup :
         ({s with tables}, i)
   in
   let s, index = use_table s table in
-  let wires = [|a; b; c; d; e|] in
+  let wires =
+    let pad_length = Csir.nb_wires_arch - List.length wires in
+    wires @ List.init pad_length (Fun.const @@ Input 0) |> Array.of_list
+  in
   let solver = Lookup {wires; table} in
   let wires = Array.map untag wires in
   let cstr =
@@ -760,12 +756,7 @@ module Bool = struct
 
   let bor_lookup (Bool l) (Bool r) =
     let* (Bool o) = fresh Dummy.bool in
-    append_lookup
-      ~a:(Input l)
-      ~b:(Input r)
-      ~c:(Output o)
-      ~table:"or"
-      "bor lookup"
+    append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
     >* ret @@ Bool o
 
   let swap : type a. bool repr -> a repr -> a repr -> (a * a) repr t =
