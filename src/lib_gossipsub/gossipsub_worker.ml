@@ -203,6 +203,24 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_unsubscribe = function
     | gstate, (GS.Unsubscribed | Unsubscribe_from_unknown_peer) -> gstate
 
+  (** When an [IHave] control message from a remote peer is received, the
+      automaton checks whether it is interested is some full messages whose ids
+      are given. If so, the worker requests them from the remote peer via an
+      [IWant] message. *)
+  let handle_ihave ~emit_p2p_msg ({peer; _} : GS.ihave) = function
+    | gstate, GS.Message_requested_message_ids message_ids ->
+        if not (List.is_empty message_ids) then
+          send_p2p_message ~emit_p2p_msg (IWant {message_ids}) (Elt peer) ;
+        gstate
+    | ( gstate,
+        ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
+        | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ) ) ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5424
+
+           Penalize peers with negative score or non expected behaviour
+           (revisit all the outputs in different apply event functions). *)
+        gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -232,6 +250,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Unsubscribe {topic} ->
         let unsubscribe : GS.unsubscribe = {peer = from_peer; topic} in
         GS.handle_unsubscribe unsubscribe gossip_state |> handle_unsubscribe
+    | IHave {topic; message_ids} ->
+        (* The automaton should guarantee that the list is not empty. *)
+        let ihave : GS.ihave = {peer = from_peer; topic; message_ids} in
+        GS.handle_ihave ihave gossip_state |> handle_ihave ~emit_p2p_msg ihave
     | _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
