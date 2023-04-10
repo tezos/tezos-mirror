@@ -88,13 +88,24 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
       | {expected_commitment = true; _} -> Some (fst (Proto_Nonce.generate ()))
       | {expected_commitment = false; _} -> None))
   >>=? fun seed_nonce_hash ->
-  let contents =
-    Block.Forge.contents
-      ?seed_nonce_hash
-      ~payload_hash:Block_payload_hash.zero
-      ~payload_round
-      ()
+  let shell : Block_header.shell_header =
+    {
+      predecessor = predecessor.hash;
+      proto_level = predecessor.header.shell.proto_level;
+      validation_passes = predecessor.header.shell.validation_passes;
+      fitness = predecessor.header.shell.fitness;
+      timestamp;
+      level = predecessor.header.shell.level;
+      context = Context_hash.zero;
+      operations_hash = Operation_list_list_hash.zero;
+    }
   in
+  Block.Forge.contents
+    ?seed_nonce_hash
+    ~payload_hash:Block_payload_hash.zero
+    ~payload_round
+    shell
+  >>=? fun contents ->
   let mode =
     if mempool_mode then
       Partial_construction {predecessor_hash = predecessor.hash; timestamp}
@@ -106,20 +117,7 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
         {predecessor_hash = predecessor.hash; timestamp; block_header_data}
   in
   let header =
-    {
-      Block_header.shell =
-        {
-          predecessor = predecessor.hash;
-          proto_level = predecessor.header.shell.proto_level;
-          validation_passes = predecessor.header.shell.validation_passes;
-          fitness = predecessor.header.shell.fitness;
-          timestamp;
-          level = predecessor.header.shell.level;
-          context = Context_hash.zero;
-          operations_hash = Operation_list_list_hash.zero;
-        };
-      protocol_data = {contents; signature = Signature.zero};
-    }
+    {Block_header.shell; protocol_data = {contents; signature = Signature.zero}}
   in
   begin_validation_and_application
     predecessor.context
