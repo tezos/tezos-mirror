@@ -221,6 +221,34 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            (revisit all the outputs in different apply event functions). *)
         gstate
 
+  (** When an [IWant] control message from a remote peer is received, the
+      automaton checks which full messages it can send back (based on message
+      availability and on the number of received requests). Selected messages,
+      if any, are transmitted to the remote peer via [Publish]. *)
+  let handle_iwant ~emit_p2p_msg ({peer; _} : GS.iwant) = function
+    | gstate, GS.On_iwant_messages_to_route {routed_message_ids} ->
+        Message_id.Map.iter
+          (fun message_id status ->
+            match status with
+            | `Message message ->
+                let topic = Message_id.get_topic message_id in
+                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
+
+                   Don't provide a topic when it can be inferred (e.g. from
+                   Message_id.t). This also applies for Publish and IHave. *)
+                let full_message = {message; topic; message_id} in
+                let p2p_message = Publish full_message in
+                send_p2p_message ~emit_p2p_msg p2p_message (Elt peer)
+            | _ -> ())
+          routed_message_ids ;
+        gstate
+    | gstate, GS.Iwant_from_peer_with_low_score _ ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5424
+
+           Penalize peers with negative score or non expected behaviour
+           (revisit all the outputs in different apply event functions). *)
+        gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -254,7 +282,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* The automaton should guarantee that the list is not empty. *)
         let ihave : GS.ihave = {peer = from_peer; topic; message_ids} in
         GS.handle_ihave ihave gossip_state |> handle_ihave ~emit_p2p_msg ihave
-    | _ ->
+    | IWant {message_ids} ->
+        (* The automaton should guarantee that the list is not empty. *)
+        let iwant : GS.iwant = {peer = from_peer; message_ids} in
+        GS.handle_iwant iwant gossip_state |> handle_iwant ~emit_p2p_msg iwant
+    | Prune _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
            Handle received p2p messages. *)
