@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Key-value store
-   Invocation:   dune exec src/lib_store_common/unix/test/test_key_value_store_fuzzy.exe
+   Invocation:   dune exec src/lib_stdlib_unix/test/main.exe \
+                  -- --file test_key_value_store_fuzzy.ml
    Subject:      Test the key-value store
 *)
 
