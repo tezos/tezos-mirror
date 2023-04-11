@@ -172,11 +172,11 @@ module Make (C : AUTOMATON_CONFIG) :
   type peer_status =
     | Connected
     | Disconnected of {
-        expires : Time.t;  (** The time until which we remember the score. *)
+        expires : Time.t;  (** The time after which the score can be cleared. *)
       }
 
   type peer_score = {
-    score : Score.t;  (** The score associated to this peer. *)
+    score : Score.t;  (** The score associated to a peer. *)
     peer_status : peer_status;
   }
 
@@ -191,7 +191,14 @@ module Make (C : AUTOMATON_CONFIG) :
     limits : limits;
     parameters : parameters;
     connections : connection Peer.Map.t;
+        (** [connections] is the set of active connections. A connection is added
+            through the `Add_peer` message and removed through the `Remove_peer`
+            message. *)
     scores : peer_score Peer.Map.t;
+        (** The scores are used to drive peer selection mechanisms. Scores are kept
+            for at least [retain_duration] after a connection is removed, hence they
+            can't be stored in {!connections}. Any peer having an active connection
+            is associated to a score. *)
     ihave_per_heartbeat : int Peer.Map.t;
     iwant_per_heartbeat : int Peer.Map.t;
     mesh : Peer.Set.t Topic.Map.t;
@@ -208,7 +215,10 @@ module Make (C : AUTOMATON_CONFIG) :
             these peers. In contrast to the mesh, the fanout map contains topics
             the local peer has not joined. *)
     backoff : time Peer.Map.t Topic.Map.t;
-        (** The backoff times associated to a topic and a peer. *)
+        (** The backoff times associated to a topic and a peer. When a backoff is
+             set, we refuse any `graft` from this peer. As a consequence, if a
+             backoff is set for a peer and a topic, this peer is not expected
+             to be in the mesh of the given topic.  *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5302
        Introduce TTL to [seen_messages]. *)
     seen_messages : Message_id.Set.t;
