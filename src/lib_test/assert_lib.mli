@@ -56,18 +56,3 @@ module Crypto : sig
   val equal_block_descriptor :
     (int32 * Tezos_crypto.Hashed.Block_hash.t) Tezos_test_helpers.Assert.check2
 end
-
-(** Module concerning assertions about raw trees i.e. values of type
-    [[< `Tree of 'a Tezos_base.TzPervasives.String.Map.t | `Value of bytes] as 'a] *)
-module Raw_Tree : sig
-  (** [equal loc msg rt0 rt1] checks that the raw tree [rt0] and [rt1] are equal.
-      Will fail with the message [msg] displaying the location [loc] otherwise *)
-  val equal :
-    ?loc:string ->
-    ?msg:string ->
-    ([< `Tree of 'a Tezos_base.TzPervasives.String.Map.t | `Value of bytes]
-     as
-     'a) ->
-    'a ->
-    unit
-end

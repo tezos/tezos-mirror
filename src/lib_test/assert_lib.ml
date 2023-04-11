@@ -94,23 +94,3 @@ module Crypto = struct
     in
     Assert.equal ?loc ?msg ~pp ~eq bd1 bd2
 end
-
-module Raw_Tree = struct
-  let equal ?loc ?msg r1 r2 =
-    let rec aux r1 r2 =
-      match (r1, r2) with
-      | `Value v1, `Value v2 ->
-          Assert.Bytes.equal ?loc ?msg v1 v2 ;
-          true
-      | `Tree t1, `Tree t2 ->
-          if not (Tezos_base.TzPervasives.String.Map.equal aux t1 t2) then
-            Assert.String.fail "<tree>" "<tree>" ?msg ?loc
-          else true
-      | `Tree _, `Value v ->
-          Assert.String.fail ?loc ?msg "<tree>" (Bytes.to_string v)
-      | `Value v, `Tree _ ->
-          Assert.String.fail ?loc ?msg (Bytes.to_string v) "<tree>"
-    in
-    let _b : bool = aux r1 r2 in
-    ()
-end

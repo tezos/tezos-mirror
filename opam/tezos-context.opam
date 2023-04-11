@@ -21,7 +21,6 @@ depends: [
   "tezt" { with-test & >= "3.0.0" }
   "octez-alcotezt" {with-test}
   "tezos-test-helpers" {with-test}
-  "tezos-test-helpers-extra" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
 ]
 build: [

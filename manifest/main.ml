@@ -2632,7 +2632,6 @@ let _octez_context_tests =
         octez_context_encoding;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
-        octez_test_helpers_extra;
         qcheck_alcotest;
         alcotezt;
       ]
