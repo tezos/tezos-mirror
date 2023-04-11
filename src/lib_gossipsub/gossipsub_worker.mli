@@ -25,4 +25,4 @@
 (*****************************************************************************)
 
 module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
-  Gossipsub_intf.WORKER with module GS = C.GS
+  Gossipsub_intf.WORKER with module GS = C.GS and type 'a monad = 'a C.Monad.t
