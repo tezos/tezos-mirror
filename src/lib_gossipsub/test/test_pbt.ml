@@ -380,7 +380,14 @@ module Test_remove_peer = struct
       fail_if_in_set peers set ~on_error:(fun peer ->
           `peer_not_removed_correctly (view, str, peer))
     in
-    let* () = check_map "connections" view.connections in
+    let* () = check_map "peers_info" view.peers_info in
+    let* () =
+      Topic.Map.iter_e
+        (fun topic backoff ->
+          let str = Format.asprintf "backoff[topic=%a]" Topic.pp topic in
+          check_map str backoff)
+        view.backoff
+    in
     (* The last step of the scenario is a heartbeat, which cleans the
        [iwant/ihave_per_heartbeat] maps. *)
     let* () = check_map "ihave_per_heartbeat" view.ihave_per_heartbeat in
@@ -433,11 +440,13 @@ module Test_remove_peer = struct
       @% repeat heartbeat_cleanup_ticks heartbeat
     in
     let graft_then_prune_wait_and_clean () =
-      (* A pruned peer will stay in the connection table until the
+      (* A pruned peer will stay in the backoff table until the
          end of the backoff specified in the Prune message.
-         After pruning, we wait for [backoff] ticks then force
+         After pruning, we wait for [backoff + slack] ticks then force
          triggering a cleanup of the backoffs in the heartbeat. *)
-      let backoff = Basic_fragments.prune_backoff in
+      let backoff =
+        Basic_fragments.prune_backoff + (limits.heartbeat_interval * 2)
+      in
       let heartbeat_cleanup_ticks = limits.backoff_cleanup_ticks in
       graft_then_prune ~gen_peer ~gen_topic
       @% repeat backoff tick
@@ -463,34 +472,42 @@ module Test_remove_peer = struct
       ]
     @% heartbeat
 
-  let pp_backoff fmtr (backoff : int GS.Topic.Map.t) =
-    let list = backoff |> GS.Topic.Map.bindings in
+  let pp_backoff fmtr (backoff : int GS.Peer.Map.t) =
+    let list = backoff |> GS.Peer.Map.bindings in
     Format.pp_print_list
       ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
       (fun fmtr (topic, backoff) ->
-        Format.fprintf fmtr "%a -> %d" GS.Topic.pp topic backoff)
+        Format.fprintf fmtr "peer %a -> %d," GS.Peer.pp topic backoff)
       fmtr
       list
 
   let pp_state fmtr state =
+    let open Format in
     let v = GS.Introspection.view state in
     let cleanup =
       Int64.(rem v.heartbeat_ticks (of_int v.limits.backoff_cleanup_ticks)) = 0L
     in
+    if cleanup then fprintf fmtr "heartbeat.clean;" ;
+    Topic.Map.iter
+      (fun topic backoff ->
+        fprintf fmtr "%a:[%a]" Topic.pp topic pp_backoff backoff)
+      v.backoff ;
     Peer.Map.iter
-      (fun peer {GS.Introspection.backoff; expire; _} ->
-        let open Format in
+      (fun peer peer_info ->
+        let expire =
+          match GS.Introspection.get_peer_info_connection peer_info with
+          | GS.Introspection.Expires {at} -> Some at
+          | Connected _ -> None
+        in
         fprintf
           fmtr
-          "peer %a, expire=%a, backoff=[%a], cleanup=%b"
+          "peer %a, expire=%a, cleanup=%b"
           GS.Peer.pp
           peer
           (pp_print_option pp_print_int)
           expire
-          pp_backoff
-          backoff
           cleanup)
-      v.connections
+      v.peers_info
 
   let test rng limits parameters =
     Tezt_core.Test.register

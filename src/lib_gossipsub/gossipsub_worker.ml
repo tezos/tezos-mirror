@@ -188,13 +188,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         ( GS.Peer_filtered | Unknown_topic | Peer_already_in_mesh
         | Grafting_direct_peer | Unexpected_grafting_peer
         | Grafting_peer_with_negative_score | Grafting_successfully
-        | Peer_backed_off | Mesh_full ) ) ->
+        | Peer_backed_off | Mesh_full | Grafting_expiring_peer ) ) ->
         gstate
 
   (** When a [Subscribe] request from a remote peer is received, the worker just
       forwards it to the automaton. There is nothing else to do. *)
   let handle_subscribe = function
-    | gstate, (GS.Subscribed | Subscribe_to_unknown_peer) -> gstate
+    | ( gstate,
+        (GS.Subscribed | Subscribe_to_unknown_peer | Subscribe_to_expiring_peer)
+      ) ->
+        gstate
 
   (** When a [Unsubscribe] request from a remote peer is received, the worker just
       forwards it to the automaton. There is nothing else to do. *)
