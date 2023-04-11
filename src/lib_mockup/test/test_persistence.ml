@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Persistence library
-    Invocation:   dune exec src/lib_mockup/test/main.exe
+    Invocation:   dune exec src/lib_mockup/test/main.exe \
+                  -- --file test_persistence.ml
     Subject:      Unit tests of the Persistence library
 *)
 

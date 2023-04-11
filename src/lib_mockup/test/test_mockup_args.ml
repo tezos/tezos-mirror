@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Mockup args library
-    Invocation:   dune exec src/lib_mockup/test/main.exe
+    Invocation:   dune exec src/lib_mockup/test/main.exe \
+                  -- --file test_mockup_args.ml
     Subject:      Unit tests of the Mockup args library
 *)
 
