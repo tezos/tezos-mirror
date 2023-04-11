@@ -519,7 +519,7 @@ opam:tezos-base-test-helpers:
 opam:tezos-clic:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-clic
 
@@ -1606,13 +1606,6 @@ opam:tezos-test-helpers:
     - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-test-helpers
-
-opam:tezos-test-helpers-extra:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_6
-  variables:
-    package: tezos-test-helpers-extra
 
 # Ignoring unreleased package tezos-tooling.
 

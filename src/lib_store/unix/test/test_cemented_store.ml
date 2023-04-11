@@ -23,7 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert_lib = Lib_test_extra.Assert_lib
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe
+    Subject: Store tests ( block cementing )
+*)
+
 open Test_utils
 
 let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store

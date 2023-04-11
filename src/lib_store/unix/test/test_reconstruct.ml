@@ -24,7 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert_lib = Lib_test_extra.Assert_lib
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe
+    Subject: Store tests ( reconstruct )
+*)
+
 open Test_utils
 
 (* Export mode used to export snapshot. Tar is seleceted by

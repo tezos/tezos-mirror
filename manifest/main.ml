@@ -2164,22 +2164,6 @@ let octez_shell_services =
     ~linkall:true
     ~js_compatible:true
 
-let octez_test_helpers_extra =
-  public_lib
-    "tezos-test-helpers-extra"
-    ~path:"src/lib_test"
-    ~internal_name:"lib_test_extra"
-    ~synopsis:"Test helpers dependent on tezos-base"
-    ~deps:[octez_base; octez_crypto; octez_test_helpers]
-    ~dune:
-      Dune.
-        [
-          (* This rule is necessary for `make lint-tests-pkg`, without it dune
-             complains that the alias is empty. *)
-          alias_rule "runtest_js_base" ~action:(S "progn");
-        ]
-    ~modules:["assert_lib"]
-
 let _octez_shell_services_tests =
   tezt
     ["test_block_services"]
@@ -6495,6 +6479,8 @@ let _octez_store_tests =
       "test_protocol_store";
       "test_store";
       "test_testchain";
+      "test_utils";
+      "assert_lib";
     ]
     ~path:"src/lib_store/unix/test"
     ~with_macos_security_framework:true
@@ -6519,7 +6505,6 @@ let _octez_store_tests =
         Protocol.(plugin_exn alpha) |> open_;
         alcotest_lwt;
         octez_test_helpers |> open_;
-        octez_test_helpers_extra;
       ]
     ~alias:""
     ~dune:

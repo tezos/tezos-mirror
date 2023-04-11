@@ -10,7 +10,9 @@
   test_block_store
   test_protocol_store
   test_store
-  test_testchain)
+  test_testchain
+  test_utils
+  assert_lib)
  (libraries
   tezos-base
   tezos-crypto
@@ -29,8 +31,7 @@
   tezos-protocol-alpha.parameters
   tezos-protocol-plugin-alpha
   alcotest-lwt
-  tezos-test-helpers
-  tezos-test-helpers-extra)
+  tezos-test-helpers)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))

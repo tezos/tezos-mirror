@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 module Assert = Assert
-module Assert_lib = Lib_test_extra.Assert_lib
 open Alcotest_lwt
 open Filename.Infix
 
