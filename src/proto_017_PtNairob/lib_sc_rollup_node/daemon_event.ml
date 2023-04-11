@@ -111,6 +111,25 @@ module Simple = struct
       ~level:Debug
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
+
+  let error =
+    declare_1
+      ~section
+      ~name:"sc_rollup_daemon_error"
+      ~msg:"Fatal daemon error: {error}"
+      ~level:Fatal
+      ("error", trace_encoding)
+      ~pp1:pp_print_trace
+
+  let degraded_mode =
+    declare_0
+      ~section
+      ~name:"sc_rollup_daemon_degraded_mode"
+      ~msg:
+        "Entering degraded mode: only playing refutation game to defend \
+         commitments."
+      ~level:Error
+      ()
 end
 
 let head_processing hash level ~finalized =
@@ -158,3 +177,7 @@ let included_operation (type kind) ~finalized
             | Skipped _ -> (`Skipped, None)
           in
           Simple.(emit included_failed_operation) (operation, status, errors))
+
+let error e = Simple.(emit error) e
+
+let degraded_mode () = Simple.(emit degraded_mode) ()

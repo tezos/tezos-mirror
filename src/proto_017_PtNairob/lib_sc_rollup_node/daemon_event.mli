@@ -50,3 +50,10 @@ val included_operation :
   'kind Protocol.Alpha_context.manager_operation ->
   'kind Protocol.Apply_results.manager_operation_result ->
   unit Lwt.t
+
+(** Emit a fatal error for the daemon. *)
+val error : tztrace -> unit Lwt.t
+
+(** Emit an event for when the node enters the degraded mode to only play
+    refutations. *)
+val degraded_mode : unit -> unit Lwt.t
