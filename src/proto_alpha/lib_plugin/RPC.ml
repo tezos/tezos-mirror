@@ -2216,8 +2216,8 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(
-          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
-          /: Sc_rollup.Staker.rpc_arg / "timeout")
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg_staker1
+          / "staker2" /: Sc_rollup.Staker.rpc_arg_staker2 / "timeout")
 
     let timeout_reached =
       let output = Data_encoding.option Sc_rollup.Game.game_result_encoding in
@@ -2227,8 +2227,8 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(
-          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
-          /: Sc_rollup.Staker.rpc_arg / "timeout_reached")
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg_staker1
+          / "staker2" /: Sc_rollup.Staker.rpc_arg_staker2 / "timeout_reached")
 
     let can_be_cemented =
       let output = Data_encoding.bool in

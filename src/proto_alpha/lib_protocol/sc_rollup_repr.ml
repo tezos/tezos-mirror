@@ -132,7 +132,15 @@ let in_memory_size (_ : t) =
   let open Cache_memory_helpers in
   h1w +! string_size_gen Address.size
 
-module Staker = Signature.Public_key_hash
+module Staker = struct
+  include Signature.Public_key_hash
+
+  let rpc_arg_staker1 =
+    RPC_arg.like rpc_arg ?descr:(RPC_arg.descr rpc_arg).descr "staker1_pkh"
+
+  let rpc_arg_staker2 =
+    RPC_arg.like rpc_arg ?descr:(RPC_arg.descr rpc_arg).descr "staker2_pkh"
+end
 
 module Index = struct
   type t = Address.t

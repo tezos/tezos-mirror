@@ -3222,6 +3222,10 @@ module Sc_rollup : sig
   module Staker : sig
     include S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
 
+    val rpc_arg_staker1 : t RPC_arg.t
+
+    val rpc_arg_staker2 : t RPC_arg.t
+
     module Index : sig
       type t = private Z.t
 

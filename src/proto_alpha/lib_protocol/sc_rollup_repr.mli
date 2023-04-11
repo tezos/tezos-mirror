@@ -98,8 +98,18 @@ val pp : Format.formatter -> t -> unit
 val in_memory_size : t -> Cache_memory_helpers.sint
 
 (** A [Staker] is an implicit account, identified by its public key hash. *)
-module Staker :
-  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+module Staker : sig
+  include S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
+  (** Classic RPC argument with name ["pkh"]. *)
+  val rpc_arg : t RPC_arg.t
+
+  (** RPC argument with name ["staker1_pkh"]. *)
+  val rpc_arg_staker1 : t RPC_arg.t
+
+  (** RPC argument with name ["staker2_pkh"]. *)
+  val rpc_arg_staker2 : t RPC_arg.t
+end
 
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t

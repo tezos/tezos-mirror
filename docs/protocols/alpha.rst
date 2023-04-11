@@ -123,6 +123,10 @@ RPC Changes
 - Deprecate ``endorsing_rights`` in favour of ``attestation_rights``. (MR
   :gl:`!8096`)
 
+- Split duplicated argument ``pkh`` in RPC ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout``
+  and ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout_reached`` into ``/staker1/<staker1_pkh>/staker2/<staker2_pkh>``.
+  This changes the RPC description but not its use. (MR :gl:`!8339`)
+
 Operation receipts
 ------------------
 
