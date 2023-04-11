@@ -4074,7 +4074,7 @@ let octez_dac_node_lib =
 
 let _octez_dac_node_lib_tests =
   tezt
-    ["test_main"; "test_data_streamer"]
+    ["test_data_streamer"]
     ~path:"src/lib_dac_node/test"
     ~opam:"tezos-dac-node-lib-test"
     ~synopsis:"Test for dac node lib"

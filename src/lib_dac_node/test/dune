@@ -26,7 +26,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_dac_node_lib
   -open Octez_alcotezt)
- (modules test_main test_data_streamer))
+ (modules test_data_streamer))
 
 (executable
  (name main)
