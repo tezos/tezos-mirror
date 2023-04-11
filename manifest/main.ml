@@ -6582,7 +6582,6 @@ let _octez_shell_tests =
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
       "test_protocol_validator";
-      "test_shell";
       "test_shell_operation";
       "test_synchronisation_heuristic";
       "test_synchronisation_heuristic_fuzzy";

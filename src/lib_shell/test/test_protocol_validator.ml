@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell
-    Invocation:   dune exec src/lib_shell/test/main.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_protocol_validator.ml
     Subject:      Unit tests for protocol_validator. Currently only tests that
                   events are emitted.
 *)
@@ -182,3 +183,7 @@ let tests =
       `Quick
       (wrap test_fetching_protocol);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-shell" [("test validator", tests)]
+  |> Lwt_main.run
