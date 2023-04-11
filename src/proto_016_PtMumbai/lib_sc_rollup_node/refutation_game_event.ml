@@ -128,7 +128,7 @@ module Simple = struct
         ~section
         ~name:"request_failed"
         ~msg:"request {view} failed ({worker_status}): {errors}"
-        ~level:Debug
+        ~level:Notice
         ("view", Request.encoding)
         ~pp1:Request.pp
         ("worker_status", Worker_types.request_status_encoding)
