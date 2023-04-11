@@ -461,6 +461,14 @@ let set_staker_commitment ctxt rollup staker_index inbox_level commitment_hash =
   let* ctxt, size_diff_commitment_stakers, _stakers =
     Commitment_stakers.add ctxt rollup commitment_hash staker_index
   in
+  let* () =
+    (* Publishing the same commitment is not an issue. However, this causes
+       a bad UX as operators can publish twice by mistake and pay twice
+       the fees. *)
+    fail_when
+      Compare.Int.(size_diff_commitment_stakers = 0)
+      (Sc_rollup_double_publish commitment_hash)
+  in
   return (ctxt, size_diff_stakers + size_diff_commitment_stakers)
 
 (** [assert_staker_dont_double_stake ctxt rollup staker_index commitments]

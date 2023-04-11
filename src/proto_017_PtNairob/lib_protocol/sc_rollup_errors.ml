@@ -96,6 +96,8 @@ type error +=
     }
   | (* `Temporary *)
       Sc_rollup_no_commitment_to_cement of Raw_level_repr.t
+  | (* `Permanent *)
+      Sc_rollup_double_publish of Sc_rollup_commitment_repr.Hash.t
 
 let () =
   register_error_kind
@@ -660,4 +662,21 @@ let () =
     (function
       | Sc_rollup_no_commitment_to_cement inbox_level -> Some inbox_level
       | _ -> None)
-    (fun inbox_level -> Sc_rollup_no_commitment_to_cement inbox_level)
+    (fun inbox_level -> Sc_rollup_no_commitment_to_cement inbox_level) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_double_publish"
+    ~title:"The commitment was published twice by the operator"
+    ~pp:(fun ppf commitment_hash ->
+      Format.fprintf
+        ppf
+        "The operator publishing %a already published this commitment."
+        Sc_rollup_commitment_repr.Hash.pp
+        commitment_hash)
+    ~description
+    Data_encoding.(
+      obj1 (req "commitment_hash" Sc_rollup_commitment_repr.Hash.encoding))
+    (function
+      | Sc_rollup_double_publish commitment_hash -> Some commitment_hash
+      | _ -> None)
+    (fun commitment_hash -> Sc_rollup_double_publish commitment_hash)
