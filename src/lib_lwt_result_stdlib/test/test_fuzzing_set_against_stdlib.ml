@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Stdlib
-   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe \
+                  -- --file test_fuzzing_set_against_stdlib.ml
    Subject:      Test fuzzing set against stdlib
 *)
 
