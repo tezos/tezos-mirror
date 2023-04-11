@@ -52,13 +52,10 @@ let test_input_com () =
   let w = S.zero in
   let circuit = build_circuit w w w w w () in
 
-  let {cs; solver; input_com_sizes; _} = get_cs ~optimize:true circuit in
-  let _, public_input_size = get_inputs circuit in
-  assert (input_com_sizes = [1; 2]) ;
-  assert (public_input_size = 1) ;
-  let plonk_circuit =
-    Plonk.Circuit.to_plonk ~public_input_size ~input_com_sizes cs
-  in
+  let cs = get_cs ~optimize:true circuit in
+  assert (cs.input_com_sizes = [1; 2]) ;
+  assert (cs.public_input_size = 1) ;
+  let plonk_circuit = Plonk.Circuit.to_plonk cs in
   let cname = "" in
   let circuits_map = Plonk.SMap.singleton cname (plonk_circuit, 1) in
   let zero_knowledge = false in
@@ -67,8 +64,8 @@ let test_input_com () =
   in
   let x1, x2, x3, x4 = (S.random (), S.random (), S.random (), S.random ()) in
   let y = hash [|x1; x2; x3; x4|] in
-  let private_inputs = Solver.solve solver [|y; x1; x2; x3; x4|] in
-  assert (CS.sat cs [] private_inputs) ;
+  let private_inputs = Solver.solve cs.solver [|y; x1; x2; x3; x4|] in
+  assert (CS.sat cs.cs [] private_inputs) ;
   let input_com_y = Main.input_commit pp_prv [|y|] in
   let input_com_x1x2 = Main.input_commit ~shift:1 pp_prv [|x1; x2|] in
   let public = [|x3|] in

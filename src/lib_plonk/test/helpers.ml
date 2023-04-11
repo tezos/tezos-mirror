@@ -446,14 +446,12 @@ module Plompiler_Helpers = struct
       E2.tests
     in
     let run_one_test (circuit, info) (result, _) =
-      let LibCircuit.{cs; tables; solver; _} =
-        LibCircuit.(get_cs (circuit ()))
-      in
-      let initial, public_input_size = LibCircuit.(get_inputs (circuit ())) in
+      let cs = LibCircuit.(get_cs (circuit ())) in
+      let initial, _ = LibCircuit.(get_inputs (circuit ())) in
       if info.flamegraph then
-        Plompiler.Utils.dump_label_traces (info.name ^ "_flamegraph") cs ;
+        Plompiler.Utils.dump_label_traces (info.name ^ "_flamegraph") cs.cs ;
       let pi =
-        try Solver.solve solver initial |> fun x -> Some x with _ -> None
+        try Solver.solve cs.solver initial |> fun x -> Some x with _ -> None
       in
       match pi with
       | None -> assert (not info.valid)
@@ -467,27 +465,26 @@ module Plompiler_Helpers = struct
                   ","
                   (List.map S.string_of_scalar (Array.to_list private_inputs))) ;
              Printf.printf "CS:\n%s\n" (CS.to_string cs) ; *)
-          if not info.valid then assert (not @@ CS.sat cs tables private_inputs)
+          if not info.valid then
+            assert (not @@ CS.sat cs.cs cs.tables private_inputs)
           else (
             Printf.fprintf
               !output_buffer
               "%s:\nConstraints: %d\n\n"
               info.name
-              Array.(concat cs |> length) ;
+              Array.(concat cs.cs |> length) ;
 
-            assert (CS.sat cs tables private_inputs) ;
+            assert (CS.sat cs.cs cs.tables private_inputs) ;
             let cs, private_inputs =
               if optimize then (
-                let LibCircuit.{cs; solver; _} =
-                  LibCircuit.(get_cs ~optimize (circuit ()))
-                in
+                let cs = LibCircuit.(get_cs ~optimize (circuit ())) in
                 Printf.fprintf
                   !output_buffer
                   "%s_optimized:\nConstraints: %d\n\n"
                   info.name
-                  Array.(concat cs |> length) ;
-                let private_inputs = Solver.solve solver initial in
-                assert (CS.sat cs tables private_inputs) ;
+                  Array.(concat cs.cs |> length) ;
+                let private_inputs = Solver.solve cs.solver initial in
+                assert (CS.sat cs.cs cs.tables private_inputs) ;
 
                 (cs, private_inputs))
               else (cs, private_inputs)
@@ -495,7 +492,7 @@ module Plompiler_Helpers = struct
             if info.flamegraph then
               Plompiler.Utils.dump_label_traces
                 (info.name ^ "_opt_flamegraph")
-                cs ;
+                cs.cs ;
             let res = LibResult.get_result (result ()) in
             let serialized_res = LibResult.serialize res in
             let out_size = Array.length serialized_res in
@@ -512,7 +509,7 @@ module Plompiler_Helpers = struct
             | Some plonk ->
                 let module Main = (val plonk : Plonk.Main_protocol.S) in
                 let open Make (Main) in
-                let circuit = CS.to_plonk ~public_input_size ~tables cs in
+                let circuit = CS.to_plonk cs in
                 test_circuit
                   ~name:info.name
                   ~zero_knowledge:false

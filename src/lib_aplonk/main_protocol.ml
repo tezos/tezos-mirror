@@ -53,10 +53,6 @@ struct
 
   type circuit_map = Main_Pack.circuit_map
 
-  let public_input_size circuit_name gates =
-    let module PI = (val PIs.get_pi_module circuit_name) in
-    Aggreg_circuit.meta_public_input_size gates + PI.nb_outer
-
   (* Type of prover public params for meta-verification of a base circuit:
       - meta_pp           : meta-verification prover PP of this base circuit
       - meta_solver       : Plompiler solver for this meta-verification circuit
@@ -246,11 +242,9 @@ struct
     (* Plompiler.Utils.dump_label_traces
        ("../../../../flamegraph/flamegraph" ^ "_" ^ Int.to_string nb_proofs)
        cs.cs; *)
-    let public_input_size = public_input_size circuit_name circuit.gates in
+    let public_input_size = cs.public_input_size in
     let input_com_sizes = cs.input_com_sizes in
-    let circuit_aggreg =
-      Plonk.Circuit.to_plonk ~public_input_size ~input_com_sizes cs.cs
-    in
+    let circuit_aggreg = Plonk.Circuit.to_plonk cs in
     let agg_circuit_map =
       SMap.singleton ("meta_" ^ circuit_name) (circuit_aggreg, 1)
     in

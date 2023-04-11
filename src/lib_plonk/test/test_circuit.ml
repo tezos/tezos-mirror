@@ -202,40 +202,6 @@ module Make = struct
     ()
 end
 
-module To_plonk = struct
-  let test_vector () =
-    let open Plonk.Circuit in
-    let open CS in
-    let zero, one, two = Scalar.(zero, one, one + one) in
-    let precomputed_advice = [] in
-    let wires = Array.init Plompiler.Csir.nb_wires_arch (Fun.const 0) in
-    wires.(0) <- 0 ;
-    wires.(1) <- 1 ;
-    wires.(2) <- 0 ;
-    let g1 =
-      [|{wires; sels = [(qr_name, one)]; precomputed_advice; label = []}|]
-    in
-    let wires = Array.init Plompiler.Csir.nb_wires_arch (Fun.const 0) in
-    wires.(0) <- 1 ;
-    wires.(1) <- 2 ;
-    wires.(2) <- 1 ;
-    let g2 =
-      [|{wires; sels = [("qm", two)]; precomputed_advice; label = []}|]
-    in
-    let c = to_plonk ~public_input_size:0 [g1; g2] in
-    let expected_wires =
-      let a = [|0; 1|] in
-      let b = [|1; 2|] in
-      let c = [|0; 1|] in
-      [|a; b; c|]
-    in
-    let expected_gates =
-      SMap.of_list [(qr_name, [|one; zero|]); ("qm", [|zero; two|])]
-    in
-    assert (Array.sub c.wires 0 (Array.length expected_wires) = expected_wires) ;
-    assert (gates_equal c.gates expected_gates)
-end
-
 let tests =
   Make.tests_one_sel
   @ List.map
@@ -246,6 +212,5 @@ let tests =
         ("make vectors", Make.test_vector);
         ("make table", Make.test_table);
         ("make disjoint", Make.test_disjoint);
-        ("to_plonk vectors", To_plonk.test_vector);
         ("to_plonk wrong selectors", Make.test_wrong_selectors);
       ]

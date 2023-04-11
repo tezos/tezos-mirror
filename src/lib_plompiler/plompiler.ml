@@ -46,6 +46,7 @@ module LibCircuit : sig
     nvars : int;
     free_wires : int list;
     cs : Csir.CS.t;
+    public_input_size : int;
     input_com_sizes : int list;
     tables : Csir.Table.t list;
     solver : Solver.t;

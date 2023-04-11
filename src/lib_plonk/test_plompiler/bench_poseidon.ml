@@ -60,14 +60,14 @@ let benchmark () =
   let y = repeated_hash nb_hashes_per_circuit x in
   let circuit = build_poseidon_circuit ~nb_hashes_per_circuit x y () in
 
-  let {cs; solver; _} = get_cs ~optimize:true circuit in
-  let initial, public_input_size = get_inputs circuit in
-  let private_inputs = Solver.solve solver initial in
+  let cs = get_cs ~optimize:true circuit in
+  let initial, _ = get_inputs circuit in
+  let private_inputs = Solver.solve cs.solver initial in
 
-  assert (CS.sat cs [] private_inputs) ;
+  assert (CS.sat cs.cs [] private_inputs) ;
 
   let inputs = Main.{witness = private_inputs; input_commitments = []} in
-  let plonk_circuit = Plonk.Circuit.to_plonk ~public_input_size cs in
+  let plonk_circuit = Plonk.Circuit.to_plonk cs in
   let cname = "" in
   let replicate x = List.init nb_proofs (Fun.const x) in
   let circuits_map = Plonk.SMap.singleton cname (plonk_circuit, nb_proofs) in
@@ -77,7 +77,7 @@ let benchmark () =
   Printf.printf
     "\nIterated Poseidon circuit of %d hashes\n"
     nb_hashes_per_circuit ;
-  Printf.printf "Constraints per circuit: %d\n" Array.(concat cs |> length) ;
+  Printf.printf "Constraints per circuit: %d\n" Array.(concat cs.cs |> length) ;
   Printf.printf "Number of proofs: %d\n" nb_proofs ;
   Printf.printf
     "Total number of Poseidon hashes involved: %d\n"

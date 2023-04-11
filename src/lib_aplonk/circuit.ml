@@ -451,12 +451,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       equal sum_id ids_batch
   end
 
-  (* number of public inputs in the verification circuit added by meta; circuit
-        public inputs will be considered later (when their amount is known)
-        The 10 public_inputs are : fiat shamir randomness (alpha, beta, gamma,
-     beta_rc, gamma_rc, delta, x, r), ids_batch & compressed_switch *)
-  let meta_public_input_size gates = 10 + nb_batch gates
-
   let verify_batch r batch batches t_answers =
     let init_sum =
       List.map (SMap.map @@ Fun.const Scalar.zero) (List.tl batch)

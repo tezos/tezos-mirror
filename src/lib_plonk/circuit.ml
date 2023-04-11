@@ -96,12 +96,7 @@ module Circuit : sig
   val sat : CS.t -> Table.t list -> Scalar.t array -> bool
 
   val to_plonk :
-    public_input_size:int ->
-    ?input_com_sizes:int list ->
-    ?tables:Table.t list ->
-    ?range_checks:(int * int) list SMap.t ->
-    CS.t ->
-    t
+    ?range_checks:(int * int) list SMap.t -> Plompiler.LibCircuit.cs_result -> t
 end = struct
   type t = {
     wires : int array array;
@@ -378,11 +373,11 @@ end = struct
       true
     with Constraint_not_satisfied _ -> false
 
-  let to_plonk ~public_input_size ?(input_com_sizes = []) ?(tables = [])
-      ?(range_checks = SMap.empty) cs =
+  let to_plonk ?(range_checks = SMap.empty)
+      (cs : Plompiler.LibCircuit.cs_result) =
     let open CS in
-    let cs = List.rev Array.(to_list @@ concat cs) in
-    assert (cs <> []) ;
+    let constraints = List.rev Array.(to_list @@ concat cs.cs) in
+    assert (constraints <> []) ;
     let add_wires ws wires =
       if Array.length wires = 0 then Array.map (fun w -> [w]) ws
       else Array.map2 (fun w l -> w :: l) ws wires
@@ -423,16 +418,16 @@ end = struct
         let advice_map = add_selectors precomputed_advice advice_map pad in
         (acc_wires, selectors_map, advice_map, pad + 1))
       SMap.([||], empty, empty, 0)
-      cs
+      constraints
     |> fun (wires, selectors, advice, _) ->
     let gates = SMap.union_disjoint selectors advice in
-    let tables = List.map Table.to_list tables in
+    let tables = List.map Table.to_list cs.tables in
     make
       ~wires
       ~gates
       ~range_checks
-      ~public_input_size
-      ~input_com_sizes
+      ~public_input_size:cs.public_input_size
+      ~input_com_sizes:cs.input_com_sizes
       ~tables
       ()
 end
