@@ -26,7 +26,8 @@
 (** Testing
     _______
     Component: lib_version
-    Invocation: dune exec src/lib_version/test/main.exe
+    Invocation: dune exec src/lib_version/test/main.exe \
+                  -- --file test_parser.ml
     Subject: Test versions parser
  *)
 
