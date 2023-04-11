@@ -263,10 +263,12 @@ end = struct
       raise (Invalid_argument "Make Circuit: table(s) given with no lookups.") ;
     let gates =
       (* Define ql if undefined as it is the gate taking the public input in. *)
+      let ql_name = Plompiler.Csir.linear_selector_name 0 in
       if
         List.fold_left ( + ) public_input_size input_com_sizes > 0
-        && (not @@ SMap.mem "ql" gates)
-      then SMap.add "ql" (Array.init circuit_size (fun _ -> Scalar.zero)) gates
+        && (not @@ SMap.mem ql_name gates)
+      then
+        SMap.add ql_name (Array.init circuit_size (fun _ -> Scalar.zero)) gates
       else gates
     in
     {

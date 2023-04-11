@@ -25,15 +25,18 @@
 
 let nb_wires_arch = 5
 
-let wire_name i = "w_" ^ string_of_int i
+let string_key_of_int ~nb_digits i =
+  let s = string_of_int i in
+  Format.sprintf "w%s" @@ String.make (nb_digits - String.length s) '0' ^ s
 
-let linear_selector_name = function
-  | 0 -> "ql"
-  | 1 -> "qr"
-  | 2 -> "qo"
-  | 3 -> "qd"
-  | 4 -> "qe"
-  | n -> "q_w" ^ string_of_int n
+let wire_name i =
+  if i < 0 || i >= nb_wires_arch then
+    raise @@ Failure "wire_name: i must be in the range [0, nb_wires_arch)" ;
+  string_key_of_int
+    ~nb_digits:(String.length @@ string_of_int (nb_wires_arch - 1))
+    i
+
+let linear_selector_name i = "q_" ^ wire_name i
 
 let add_next_wire_suffix s = s ^ "g"
 
@@ -324,12 +327,13 @@ module CS = struct
 
   let boolean_raw_constr constr =
     let module SMap = Map.Make (String) in
+    let ql_name = linear_selector_name 0 in
     if
       (* We do equality through maps as a way to sort the list *)
       SMap.equal
         Scalar.equal
         (SMap.of_seq @@ List.to_seq constr.sels)
-        (SMap.of_seq @@ List.to_seq [("qm", Scalar.one); ("ql", Scalar.mone)])
+        (SMap.of_seq @@ List.to_seq [("qm", Scalar.one); (ql_name, Scalar.mone)])
       && constr.wires.(0) = constr.wires.(1)
     then Some constr.wires.(0)
     else None
