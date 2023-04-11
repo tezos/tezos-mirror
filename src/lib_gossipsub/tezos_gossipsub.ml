@@ -1581,12 +1581,17 @@ module Make (C : AUTOMATON_CONFIG) :
                 (* This should not happen (global invariant). *)
                 None
             | Some score ->
-                let now = Time.now () in
-                let at = Time.add now retain_duration in
-                let score =
-                  {score with peer_status = Disconnected {expires = at}}
-                in
-                Some score)
+                if Score.(score.score > zero) then
+                  (* We only retain non-positive scores to
+                     dissuade attacks on the score function. *)
+                  None
+                else
+                  let now = Time.now () in
+                  let at = Time.add now retain_duration in
+                  let score =
+                    {score with peer_status = Disconnected {expires = at}}
+                  in
+                  Some score)
           scores
         |> set_scores
       in
