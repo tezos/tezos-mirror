@@ -3,17 +3,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+use evm_execution::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::Error;
 
-use tezos_ethereum::transaction::{RawTransaction, TransactionHash};
+use tezos_ethereum::transaction::TransactionHash;
 
 pub struct Transaction {
     pub level: u32,
     pub tx_hash: TransactionHash,
-    pub tx: RawTransaction,
+    pub tx: EthereumTransactionCommon,
 }
 
 pub enum InputResult {
@@ -23,7 +24,7 @@ pub enum InputResult {
 }
 
 impl Transaction {
-    pub fn to_raw_transaction(&self) -> RawTransaction {
+    pub fn to_raw_transaction(&self) -> EthereumTransactionCommon {
         self.tx.clone()
     }
 }
@@ -57,7 +58,7 @@ impl InputResult {
             Err(_) => return InputResult::Unparsable,
         };
         // Remaining bytes is the rlp encoded transaction.
-        let tx = match RawTransaction::decode_from_rlp(remaining) {
+        let tx: EthereumTransactionCommon = match remaining.try_into() {
             Ok(tx) => tx,
             Err(_) => return InputResult::Unparsable,
         };

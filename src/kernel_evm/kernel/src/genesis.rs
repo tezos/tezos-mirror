@@ -6,11 +6,10 @@ use crate::error::Error;
 use crate::storage;
 use crate::storage::receipt_path;
 use crate::L2Block;
+use evm_execution::address::EthereumAddress;
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::Address;
 use tezos_ethereum::eth_gen::L2Level;
-use tezos_ethereum::eth_gen::ADDRESS_SIZE;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_ethereum::transaction::TransactionStatus;
@@ -27,7 +26,7 @@ struct MintAccount {
     eth_amount: u64,
 }
 
-const GENESIS_ADDRESSS: &str = "0000000000000000000000000000000000000000";
+const GENESIS_ADDRESSS: [u8; 20] = [0; 20];
 
 const GENESIS_LEVEL: L2Level = 0;
 
@@ -99,19 +98,18 @@ fn bootstrap_genesis_accounts<Host: Runtime>(
     collect_mint_transactions(transactions_hashes)
 }
 
-fn craft_mint_address(genesis_mint_address: &str) -> Option<Address> {
-    let mut mint_address: Address = Default::default();
-    let encoded_genesis_mint_address = hex::decode(genesis_mint_address).ok()?;
-    mint_address.copy_from_slice(&encoded_genesis_mint_address[0..ADDRESS_SIZE]);
-    Some(mint_address)
+fn craft_mint_address(genesis_mint_address: &str) -> Option<EthereumAddress> {
+    let encoded_genesis_mint_address: Vec<u8> = hex::decode(genesis_mint_address).ok()?;
+    let encoded_genesis_mint_address: [u8; 20] =
+        encoded_genesis_mint_address.try_into().ok()?;
+    Some(encoded_genesis_mint_address.into())
 }
 
 fn store_genesis_receipts<Host: Runtime>(
     host: &mut Host,
     genesis_block: L2Block,
 ) -> Result<(), Error> {
-    let mut genesis_address: Address = Default::default();
-    genesis_address.copy_from_slice(&GENESIS_ADDRESSS.as_bytes()[0..ADDRESS_SIZE]);
+    let genesis_address: EthereumAddress = GENESIS_ADDRESSS.into();
 
     for (i, hash) in genesis_block.transactions.iter().enumerate() {
         let mint_account = &MINT_ACCOUNTS[i];

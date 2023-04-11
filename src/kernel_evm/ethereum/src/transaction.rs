@@ -2,16 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use clarity::Transaction as EthTransaction;
+use evm_execution::address::EthereumAddress;
 use primitive_types::U256;
 
-use crate::eth_gen::{Address, BlockHash, L2Level, OwnedHash};
+use crate::eth_gen::{BlockHash, L2Level, OwnedHash};
 
 pub const TRANSACTION_HASH_SIZE: usize = 32;
 pub type TransactionHash = [u8; TRANSACTION_HASH_SIZE];
-
-pub type RawTransaction = EthTransaction;
-pub type RawTransactions = Vec<RawTransaction>;
 
 pub enum TransactionType {
     Legacy,
@@ -36,9 +33,9 @@ pub struct TransactionReceipt {
     /// Block number where this transaction was in.
     pub block_number: L2Level,
     /// Address of the sender.
-    pub from: Address,
+    pub from: EthereumAddress,
     /// Address of the receiver. null when its a contract creation transaction.
-    pub to: Option<Address>,
+    pub to: Option<EthereumAddress>,
     /// The total amount of gas used when this transaction was executed in the block
     pub cumulative_gas_used: U256,
     /// The sum of the base fee and tip paid per unit of gas.
