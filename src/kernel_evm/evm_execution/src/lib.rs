@@ -100,6 +100,7 @@ where
     let mut handler = handler::EvmHandler::<'_, Host>::new(
         host,
         evm_account_storage,
+        caller,
         block,
         &config,
         precompiles,
