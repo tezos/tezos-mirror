@@ -2453,21 +2453,12 @@ let test_reveals_fails_on_wrong_hash =
   let () = output_string cout "Some data that is not related to the hash" in
   let () = close_out cout in
 
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-  (* Prepare the handler to wait for the rollup node to fail before
-     sending the L1 message that will trigger the failure. This
-     ensures that the failure handler can access the status code
-     of the rollup node even after it has terminated. *)
-  let expect_failure =
-    let node_process = Option.get @@ Sc_rollup_node.process sc_rollup_node in
-    Process.check_error
-      ~exit_code:1
-      ~msg:
-        (rex
-           "The hash of reveal preimage is \\w+ while a value of \\w+ is \
-            expected")
-      node_process
+  let error_promise =
+    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_daemon_error.v0" (fun e ->
+        let id = JSON.(e |=> 0 |-> "id" |> as_string) in
+        if id =~ rex "wrong_hash_of_reveal_preimage" then Some () else None)
   in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* () = send_text_messages client [hash.message] in
   let should_not_sync =
     let* _level =
@@ -2478,7 +2469,7 @@ let test_reveals_fails_on_wrong_hash =
     in
     Test.fail "The rollup node processed the incorrect reveal without failing"
   in
-  Lwt.choose [expect_failure; should_not_sync]
+  Lwt.choose [error_promise; should_not_sync]
 
 let test_reveals_4k =
   let kind = "arith" in
@@ -2535,17 +2526,12 @@ let test_reveals_above_4k =
   let cout = open_out filename in
   let () = output_string cout data in
   let () = close_out cout in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-  let expect_failure =
-    let node_process = Option.get @@ Sc_rollup_node.process sc_rollup_node in
-    Process.check_error
-      ~exit_code:1
-      ~msg:
-        (rex
-           "Could not encode raw data to reveal with the expected protocol \
-            encoding")
-      node_process
+  let error_promise =
+    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_daemon_error.v0" (fun e ->
+        let id = JSON.(e |=> 0 |-> "id" |> as_string) in
+        if id =~ rex "could_not_encode_raw_data" then Some () else None)
   in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* () = send_text_messages client [hash.message] in
   let should_not_sync =
     let* _level =
@@ -2556,7 +2542,7 @@ let test_reveals_above_4k =
     in
     Test.fail "The rollup node processed the incorrect reveal without failing"
   in
-  Lwt.choose [expect_failure; should_not_sync]
+  Lwt.choose [error_promise; should_not_sync]
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4147
 
@@ -2724,6 +2710,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       empty_levels,
       stop_loser_at,
       reset_honest_on,
+      bad_reveal_at,
       (priority : [`Priority_honest | `Priority_loser | `No_priority]) ) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
@@ -2901,6 +2888,12 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
 
   let hook i =
     let level = after_inputs_level + i in
+    let* () =
+      if List.mem level bad_reveal_at then
+        let hash = reveal_hash ~protocol ~kind "Missing data" in
+        send_text_messages ~src:Constant.bootstrap3.alias client [hash.message]
+      else unit
+    in
     stop_losers level
   in
   let keep_going client =
@@ -3004,31 +2997,39 @@ let test_refutation protocols ~kind =
              index of the failing tick during the processing of this
              message. *)
           ( "inbox_proof_at_genesis",
-            (["3 0 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+            (["3 0 0"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
           ( "pvm_proof_at_genesis",
-            (["3 0 1"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+            (["3 0 1"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
           ( "inbox_proof",
-            (["5 0 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+            (["5 0 0"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
           ( "inbox_proof_with_new_content",
-            (["5 0 0"], inputs_for 30, 80, [], [], [], `Priority_honest) );
+            (["5 0 0"], inputs_for 30, 80, [], [], [], [], `Priority_honest) );
           (* In "inbox_proof_with_new_content" we add messages after the commitment
              period so the current inbox is not equal to the inbox snapshot-ted at the
              game creation. *)
           ( "inbox_proof_one_empty_level",
-            (["6 0 0"], inputs_for 10, 80, [2], [], [], `Priority_honest) );
+            (["6 0 0"], inputs_for 10, 80, [2], [], [], [], `Priority_honest) );
           ( "inbox_proof_many_empty_levels",
-            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], [], [], `Priority_honest)
-          );
+            ( ["9 0 0"],
+              inputs_for 10,
+              80,
+              [2; 3; 4],
+              [],
+              [],
+              [],
+              `Priority_honest ) );
           ( "pvm_proof_0",
-            (["5 2 1"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+            (["5 2 1"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
           ( "pvm_proof_1",
-            (["7 2 0"], inputs_for 10, 80, [], [], [], `Priority_honest) );
+            (["7 2 0"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
           ( "pvm_proof_2",
-            (["7 2 5"], inputs_for 7, 80, [], [], [], `Priority_honest) );
+            (["7 2 5"], inputs_for 7, 80, [], [], [], [], `Priority_honest) );
           ( "pvm_proof_3",
-            (["9 2 5"], inputs_for 7, 80, [4; 5], [], [], `Priority_honest) );
+            (["9 2 5"], inputs_for 7, 80, [4; 5], [], [], [], `Priority_honest)
+          );
           ( "timeout",
-            (["5 2 1"], inputs_for 10, 80, [], [35], [], `Priority_honest) );
+            (["5 2 1"], inputs_for 10, 80, [], [35], [], [], `Priority_honest)
+          );
           ( "reset_honest_during_game",
             ( ["5 2 1"],
               inputs_for 10,
@@ -3036,14 +3037,37 @@ let test_refutation protocols ~kind =
               [],
               [],
               [("sc_rollup_node_conflict_detected.v0", 2)],
+              [],
               `Priority_honest ) );
+          ( "degraded_new",
+            ( ["7 2 5"],
+              inputs_for 7,
+              80,
+              [],
+              [],
+              [],
+              [
+                14
+                (* Commitment for inbox 7 will be made at level 12 and published
+                   at level 14 *);
+              ],
+              `Priority_honest ) );
+          ( "degraded_ongoing",
+            (["7 2 5"], inputs_for 7, 80, [], [], [], [21], `Priority_honest) );
           ( "parallel_games_0",
-            (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], [], [], `Priority_honest)
-          );
+            ( ["3 0 0"; "3 0 1"],
+              inputs_for 10,
+              80,
+              [],
+              [],
+              [],
+              [],
+              `Priority_honest ) );
           ( "parallel_games_1",
             ( ["3 0 0"; "3 0 1"; "3 0 0"],
               inputs_for 10,
               200,
+              [],
               [],
               [],
               [],
@@ -3053,10 +3077,10 @@ let test_refutation protocols ~kind =
         [
           (* First message of an inbox (level 3) *)
           ( "inbox_proof_0",
-            (["3 0 0"], inputs_for 10, 80, [], [], [], `Priority_loser) );
+            (["3 0 0"], inputs_for 10, 80, [], [], [], [], `Priority_loser) );
           (* Fourth message of an inbox (level 3) *)
           ( "inbox_proof_1",
-            (["3 4 0"], inputs_for 10, 80, [], [], [], `Priority_loser) );
+            (["3 4 0"], inputs_for 10, 80, [], [], [], [], `Priority_loser) );
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
           ( "pvm_proof_0",
@@ -3066,11 +3090,13 @@ let test_refutation protocols ~kind =
               [],
               [],
               [],
+              [],
               `Priority_loser ) );
           ( "pvm_proof_1",
             ( ["7 7 11_000_001_000"],
               inputs_for 10,
               80,
+              [],
               [],
               [],
               [],
@@ -3083,12 +3109,14 @@ let test_refutation protocols ~kind =
               [],
               [],
               [],
+              [],
               `Priority_loser ) );
           (* During padding *)
           ( "pvm_proof_3",
             ( ["7 7 22_010_000_000"],
               inputs_for 10,
               80,
+              [],
               [],
               [],
               [],
@@ -3100,11 +3128,13 @@ let test_refutation protocols ~kind =
               [],
               [],
               [],
+              [],
               `Priority_loser ) );
           ( "parallel_games_1",
             ( ["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"],
               inputs_for 10,
               80,
+              [],
               [],
               [],
               [],
@@ -3132,7 +3162,7 @@ let test_accuser protocols =
     ~challenge_window:10
     ~commitment_period:10
     ~variant:"pvm_proof_2"
-    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [], `Priority_honest)
+    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [], [], `Priority_honest)
     protocols
 
 (** Helper to check that the operation whose hash is given is successfully
