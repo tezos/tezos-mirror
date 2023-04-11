@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_scoru_wasm_regressions)
+ (package tezos-scoru-wasm-regressions)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-scoru-wasm
+  tezos-scoru-wasm-helpers
+  tezos-test-helpers
+  tezos-protocol-alpha
+  tezt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_scoru_wasm
+  -open Tezt
+  -open Tezt.Base))
