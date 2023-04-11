@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Stdlib
+    Invocation:   dune exec src/lib_stdlib/test-unix/main.exe \
+                  -- --file test_hash_queue_lwt.ml
+    Subject:      Hash_queue
+*)
+
 module String = struct
   include String
 

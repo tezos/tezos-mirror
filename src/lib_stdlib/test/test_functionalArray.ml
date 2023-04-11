@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune exec src/lib_stdlib/test/main.exe
+    Invocation:   dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_functionalArray.ml
     Subject:      Functional arrays
  *)
 

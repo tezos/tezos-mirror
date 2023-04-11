@@ -28,7 +28,8 @@ open Utils.Infix
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune exec src/lib_stdlib/test/main.exe
+    Invocation:   dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_bits.ml
     Subject:      On fast numbits implementation
  *)
 
