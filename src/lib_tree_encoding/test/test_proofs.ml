@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Tree_encoding
-    Invocation:   dune exec src/lib_tree_encoding/test/main.exe
+    Invocation:   dune exec src/lib_tree_encoding/test/main.exe \
+                  -- --file test_proofs.ml
     Subject:      Proof-related tests for the tree-encoding library
 *)
 
@@ -230,3 +231,7 @@ let tests =
     tztest "Decode, set, and move subtree" `Quick test_move_and_read_subtrees;
     tztest "Copy subtrees" `Quick test_copy_subtrees;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib tree encoding" [("Proofs", tests)]
+  |> Lwt_main.run

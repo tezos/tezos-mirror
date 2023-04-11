@@ -2590,7 +2590,7 @@ let octez_context_disk =
 
 let _tree_encoding_tests =
   tezt
-    ["test_tree_encoding"; "test_proofs"; "test_encoding"]
+    ["test_proofs"; "test_encoding"]
     ~path:"src/lib_tree_encoding/test"
     ~opam:"tezos-tree-encoding-test"
     ~synopsis:"Tests for the tree encoding library"

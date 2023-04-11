@@ -24,7 +24,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_tree_encoding test_proofs test_encoding))
+ (modules test_proofs test_encoding))
 
 (executable
  (name main)
