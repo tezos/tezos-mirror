@@ -39,14 +39,24 @@ type error +=
       on_l1 : Sc_rollup.Commitment.Hash.t;
     }
   | Unreliable_tezos_node_returning_inconsistent_game
+  | Wrong_initial_pvm_state of {
+      initial_state_hash : Sc_rollup.State_hash.t;
+      expected_state_hash : Sc_rollup.State_hash.t;
+    }
   | Inconsistent_inbox of {
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
+    }
+  | Unexpected_rollup of {
+      rollup_address : Sc_rollup.Address.t;
+      saved_address : Sc_rollup.Address.t;
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
   | No_batcher
   | No_publisher
+  | Refutation_player_failed_to_start
+  | No_refutation_coordinator
 
 type error += Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
 
@@ -93,16 +103,19 @@ let () =
     (fun (inbox_level, ours, on_l1) ->
       Disagree_with_cemented {inbox_level; ours; on_l1}) ;
 
+  let description =
+    "Internal error: The game invariant states that the dissection from the \
+     opponent must contain a tick we disagree with. If the retrieved game does \
+     not respect this, we cannot trust the Tezos node we are connected to and \
+     prefer to stop here."
+  in
   register_error_kind
     `Permanent
     ~id:"internal.unreliable_tezos_node"
     ~title:"Internal error: Tezos node seems unreliable"
-    ~description:
-      "Internal error: The game invariant states that the dissection from the \
-       opponent must contain a tick we disagree with. If the retrieved game \
-       does not respect this, we cannot trust the Tezos node we are connected \
-       to and prefer to stop here."
-    ~pp:(fun _ppf () -> ())
+    ~description
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Unreliable Tezos node. %s" description)
     Data_encoding.unit
     (function
       | Unreliable_tezos_node_returning_inconsistent_game -> Some () | _ -> None)
@@ -155,6 +168,31 @@ let () =
       Missing_mode_operators {mode; missing_operators}) ;
 
   register_error_kind
+    ~id:"sc_rollup.node.Wrong_initial_pvm_state"
+    ~title:"Initial state produced by PVM is incorrect"
+    ~description:"Initial state produced by PVM is incorrect."
+    ~pp:(fun ppf (actual, expected) ->
+      Format.fprintf
+        ppf
+        "The initial state hash produced by the PVM %a is not consistent\n\
+        \     with the one expected by the Layer 1 PVM implementation %a"
+        Sc_rollup.State_hash.pp
+        actual
+        Sc_rollup.State_hash.pp
+        expected)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "initial_state_hash" Sc_rollup.State_hash.encoding)
+        (req "expected_state_hash" Sc_rollup.State_hash.encoding))
+    (function
+      | Wrong_initial_pvm_state {initial_state_hash; expected_state_hash} ->
+          Some (initial_state_hash, expected_state_hash)
+      | _ -> None)
+    (fun (initial_state_hash, expected_state_hash) ->
+      Wrong_initial_pvm_state {initial_state_hash; expected_state_hash}) ;
+
+  register_error_kind
     ~id:"internal.inconsistent_inbox"
     ~title:"Internal error: Rollup node has an inconsistent inbox"
     ~description:
@@ -176,6 +214,31 @@ let () =
       | Inconsistent_inbox {layer1_inbox; inbox} -> Some (layer1_inbox, inbox)
       | _ -> None)
     (fun (layer1_inbox, inbox) -> Inconsistent_inbox {layer1_inbox; inbox}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.unexpected_rollup"
+    ~title:"Unexpected rollup for rollup node"
+    ~description:"This rollup node is already set up for another rollup."
+    ~pp:(fun ppf (rollup_address, saved_address) ->
+      Format.fprintf
+        ppf
+        "This rollup node was already set up for rollup %a, it cannot be run \
+         for a different rollup %a."
+        Sc_rollup.Address.pp
+        saved_address
+        Sc_rollup.Address.pp
+        rollup_address)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "rollup_address" Sc_rollup.Address.encoding)
+        (req "saved_address" Sc_rollup.Address.encoding))
+    (function
+      | Unexpected_rollup {rollup_address; saved_address} ->
+          Some (rollup_address, saved_address)
+      | _ -> None)
+    (fun (rollup_address, saved_address) ->
+      Unexpected_rollup {rollup_address; saved_address}) ;
 
   register_error_kind
     `Permanent
@@ -260,4 +323,26 @@ let () =
     `Permanent
     Data_encoding.unit
     (function No_publisher -> Some () | _ -> None)
-    (fun () -> No_publisher)
+    (fun () -> No_publisher) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_refutation_coordinator"
+    ~title:"No refutation coordinator for this node"
+    ~description:"This node does not have a refutation game coordinator"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This node does not have a refutation game coordinator")
+    `Permanent
+    Data_encoding.unit
+    (function No_refutation_coordinator -> Some () | _ -> None)
+    (fun () -> No_refutation_coordinator) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_refutation_player"
+    ~title:"A refutation player failed to start"
+    ~description:"A refutation player failed to start"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "A refutation player failed to start.")
+    `Permanent
+    Data_encoding.unit
+    (function Refutation_player_failed_to_start -> Some () | _ -> None)
+    (fun () -> Refutation_player_failed_to_start)

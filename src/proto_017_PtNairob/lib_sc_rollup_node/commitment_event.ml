@@ -71,7 +71,18 @@ module Simple = struct
       ~msg:
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
-      ~level:Notice
+      ~level:Debug
+      ("hash", Sc_rollup.Commitment.Hash.encoding)
+      ("level", Raw_level.encoding)
+
+  let last_published_commitment_updated =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_lpc_updated"
+      ~msg:
+        "Last published commitment was updated to hash {hash} at inbox level \
+         {level}"
+      ~level:Debug
       ("hash", Sc_rollup.Commitment.Hash.encoding)
       ("level", Raw_level.encoding)
 
@@ -181,6 +192,9 @@ let commitment_stored = emit_commitment_event Simple.commitment_stored
 
 let last_cemented_commitment_updated head level =
   Simple.(emit last_cemented_commitment_updated (head, level))
+
+let last_published_commitment_updated head level =
+  Simple.(emit last_published_commitment_updated (head, level))
 
 let compute_commitment level = Simple.(emit compute_commitment level)
 

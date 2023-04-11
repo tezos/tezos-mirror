@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines functions that emit the events used by the smart
-    rollup node daemon (see {!Daemon}). *)
+(** Component for managing refutation games.
+    This module is implemented as a single worker in the rollup node,
+    which takes care of processing new L1 heads, and coordinating
+    the refutation game players. (See {!Refutation_player}).
+*)
 
-(** [head_processing hash level ~finalized] emits the event that the
-    block of the given [hash] and at the given [level] is being processed, and
-    whether it is [finalized]. *)
-val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
+module type S = sig
+  module PVM : Pvm.S
 
-(** [new_head_processed hash level] emits the event that the daemon has finished
-    processing the head of the given [hash] and at the given [level]. *)
-val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
+  (** Initiatilize the refuation coordinator. *)
+  val init : Node_context.rw -> unit tzresult Lwt.t
 
-(** [processing_heads_iteration heads] emits the event that the [heads] are
-    going to be processed. *)
-val processing_heads_iteration : Layer1.head list -> unit Lwt.t
+  (** Process a new l1 head. This means that the coordinator will:
+      {ol
+        {li Gather all existing conflicts}
+        {li Launch new refutation players for each conflict that doesn't
+            have a player in this node}
+        {li Kill all players whose conflict has disappeared from L1}
+        {li Make all players play a step in the refutation}
+      }
+  *)
+  val process : Layer1.head -> unit tzresult Lwt.t
 
-(** [new_heads_processed heads] emits the event that the [heads] were
-    processed. *)
-val new_heads_processed : Layer1.head list -> unit Lwt.t
+  (** Shutdown the refutation coordinator. *)
+  val shutdown : unit -> unit Lwt.t
+end
 
-(** [included_operation ~finalized op result] emits an event that an operation
-    for the rollup was included in a block (or finalized). *)
-val included_operation :
-  finalized:bool ->
-  'kind Protocol.Alpha_context.manager_operation ->
-  'kind Protocol.Apply_results.manager_operation_result ->
-  unit Lwt.t
+module Make (Interpreter : Interpreter.S) : S

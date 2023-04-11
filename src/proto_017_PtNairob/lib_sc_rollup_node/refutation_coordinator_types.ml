@@ -23,24 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+module Request = struct
+  type ('a, 'b) t = Process : Layer1.head -> (unit, error trace) t
 
-module Arith_pvm_in_memory :
-  Sc_rollup.PVM.S
-    with type context = Context_helpers.In_memory.Tree.t
-     and type state = Context_helpers.In_memory.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.ArithPVM.Make (Context_helpers.In_memory)
+  type view = View : _ t -> view
 
-module Wasm_pvm_in_memory :
-  Sc_rollup.PVM.S
-    with type context = Context_helpers.In_memory.Tree.t
-     and type state = Context_helpers.In_memory.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.Wasm_2_0_0PVM.Make
-    (Environment.Wasm_2_0_0.Make)
-    (Context_helpers.In_memory)
+  let view req = View req
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Process"
+          (obj2
+             (req "request" (constant "process"))
+             (req "block" Layer1.head_encoding))
+          (function View (Process b) -> Some ((), b))
+          (fun ((), b) -> View (Process b));
+      ]
+
+  let pp ppf (View r) =
+    match r with
+    | Process {Layer1.hash; level} ->
+        Format.fprintf
+          ppf
+          "Processing new L1 head %a at level %ld"
+          Block_hash.pp
+          hash
+          level
+end

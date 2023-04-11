@@ -200,3 +200,33 @@ module PVMState = struct
     let+ tree = IStore.Tree.add_tree ctxt.tree key state in
     {ctxt with tree}
 end
+
+module Rollup = struct
+  let path = ["rollup_address"]
+
+  let set_address (index : _ index) addr =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    let info () =
+      let date =
+        Time.(System.now () |> System.to_protocol |> Protocol.to_seconds)
+      in
+      IStore.Info.v date
+    in
+    let value =
+      Data_encoding.Binary.to_bytes_exn Sc_rollup.Address.encoding addr
+    in
+    let*! store = IStore.main index.repo in
+    let*! () = IStore.set_exn ~info store path value in
+    return_unit
+
+  let get_address (index : _ index) =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    let*! store = IStore.main index.repo in
+    let*! value = IStore.find store path in
+    return
+    @@ Option.map
+         (Data_encoding.Binary.of_bytes_exn Sc_rollup.Address.encoding)
+         value
+end

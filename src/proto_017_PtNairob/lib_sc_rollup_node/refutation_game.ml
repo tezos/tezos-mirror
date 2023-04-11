@@ -49,7 +49,18 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val process : Layer1.head -> Node_context.rw -> unit tzresult Lwt.t
+  val play_opening_move :
+    [< `Read | `Write > `Read] Node_context.t ->
+    public_key_hash ->
+    Sc_rollup.Refutation_storage.conflict ->
+    (unit, tztrace) result Lwt.t
+
+  val play :
+    Node_context.rw ->
+    self:public_key_hash ->
+    Sc_rollup.Game.t ->
+    public_key_hash ->
+    (unit, tztrace) result Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) :
@@ -303,37 +314,65 @@ module Make (Interpreter : Interpreter.S) :
     in
     if Result.is_ok res then return proof else assert false
 
-  let new_dissection ~default_number_of_sections node_ctxt last_level ok
-      our_view =
+  type pvm_intermediate_state =
+    | Hash of PVM.hash
+    | Evaluated of Interpreter.Accounted_pvm.eval_state
+
+  let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level
+      ok our_view =
     let open Lwt_result_syntax in
-    let state_hash_from_tick tick =
-      let* r = Interpreter.state_of_tick node_ctxt tick last_level in
-      return (Option.map snd r)
+    let state_of_tick ?start_state tick =
+      Interpreter.state_of_tick node_ctxt ?start_state tick last_level
     in
-    let start_hash, start_tick = ok in
+    let state_hash_of_eval_state Interpreter.Accounted_pvm.{state_hash; _} =
+      state_hash
+    in
+    let start_hash, start_tick, start_state =
+      match ok with
+      | Hash hash, tick -> (hash, tick, None)
+      | Evaluated ({state_hash; _} as state), tick ->
+          (state_hash, tick, Some state)
+    in
     let start_chunk =
       Sc_rollup.Dissection_chunk.
         {state_hash = Some start_hash; tick = start_tick}
     in
-    let start_hash, start_tick = our_view in
-    let our_stop_chunk =
-      Sc_rollup.Dissection_chunk.{state_hash = start_hash; tick = start_tick}
+    let our_state, our_tick = our_view in
+    let our_state_hash =
+      Option.map
+        (fun Interpreter.Accounted_pvm.{state_hash; _} -> state_hash)
+        our_state
     in
-    Game_helpers.make_dissection
-      ~state_hash_from_tick
-      ~start_chunk
-      ~our_stop_chunk
-    @@ PVM.new_dissection
-         ~start_chunk
-         ~our_stop_chunk
-         ~default_number_of_sections
+    let our_stop_chunk =
+      Sc_rollup.Dissection_chunk.{state_hash = our_state_hash; tick = our_tick}
+    in
+    let* dissection =
+      Game_helpers.make_dissection
+        ~state_of_tick
+        ~state_hash_of_eval_state
+        ?start_state
+        ~start_chunk
+        ~our_stop_chunk
+      @@ PVM.new_dissection
+           ~start_chunk
+           ~our_stop_chunk
+           ~default_number_of_sections
+    in
+    let*! () =
+      Refutation_game_event.computed_dissection
+        ~opponent
+        ~start_tick
+        ~end_tick:our_tick
+        dissection
+    in
+    return dissection
 
   (** [generate_from_dissection ~default_number_of_sections node_ctxt game
       dissection] traverses the current [dissection] and returns a move which
       performs a new dissection of the execution trace or provides a refutation
       proof to serve as the next move of the [game]. *)
-  let generate_next_dissection ~default_number_of_sections node_ctxt game
-      dissection =
+  let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
+      game dissection =
     let open Lwt_result_syntax in
     let rec traverse ok = function
       | [] ->
@@ -346,35 +385,44 @@ module Make (Interpreter : Interpreter.S) :
             .Unreliable_tezos_node_returning_inconsistent_game
       | Sc_rollup.Dissection_chunk.{state_hash = their_hash; tick} :: dissection
         -> (
-          let open Lwt_result_syntax in
+          let start_state =
+            match ok with
+            | Hash _, _ -> None
+            | Evaluated ok_state, _ -> Some ok_state
+          in
           let* our =
-            Interpreter.state_of_tick node_ctxt tick game.inbox_level
+            Interpreter.state_of_tick
+              node_ctxt
+              ?start_state
+              tick
+              game.inbox_level
           in
           match (their_hash, our) with
           | None, None ->
               (* This case is absurd since: [None] can only occur at the
                  end and the two players disagree about the end. *)
               assert false
-          | Some _, None | None, Some _ ->
-              return (ok, (Option.map snd our, tick))
-          | Some their_hash, Some (_, our_hash) ->
+          | Some _, None | None, Some _ -> return (ok, (our, tick))
+          | Some their_hash, Some ({state_hash = our_hash; _} as our_state) ->
               if Sc_rollup.State_hash.equal our_hash their_hash then
-                traverse (their_hash, tick) dissection
-              else return (ok, (Some our_hash, tick)))
+                traverse (Evaluated our_state, tick) dissection
+              else return (ok, (our, tick)))
     in
     match dissection with
     | Sc_rollup.Dissection_chunk.{state_hash = Some hash; tick} :: dissection ->
-        let* ok, ko = traverse (hash, tick) dissection in
-        let choice = snd ok in
+        let* ok, ko = traverse (Hash hash, tick) dissection in
         let* dissection =
           new_dissection
+            ~opponent
             ~default_number_of_sections
             node_ctxt
             game.inbox_level
             ok
             ko
         in
-        let chosen_section_len = Sc_rollup.Tick.distance (snd ko) choice in
+        let _, choice = ok in
+        let _, ko_tick = ko in
+        let chosen_section_len = Sc_rollup.Tick.distance ko_tick choice in
         return (choice, chosen_section_len, dissection)
     | [] | {state_hash = None; _} :: _ ->
         (*
@@ -386,7 +434,7 @@ module Make (Interpreter : Interpreter.S) :
           Sc_rollup_node_errors
           .Unreliable_tezos_node_returning_inconsistent_game
 
-  let next_move node_ctxt game =
+  let next_move node_ctxt ~opponent game =
     let open Lwt_result_syntax in
     let final_move start_tick =
       let* start_state =
@@ -397,7 +445,7 @@ module Make (Interpreter : Interpreter.S) :
           tzfail
             Sc_rollup_node_errors
             .Unreliable_tezos_node_returning_inconsistent_game
-      | Some (start_state, _start_hash) ->
+      | Some {state = start_state; _} ->
           let* proof = generate_proof node_ctxt game start_state in
           let*? pvm_step =
             Sc_rollup.Proof.serialize_pvm_step ~pvm:(module PVM) proof.pvm_step
@@ -414,6 +462,7 @@ module Make (Interpreter : Interpreter.S) :
           generate_next_dissection
             ~default_number_of_sections
             node_ctxt
+            ~opponent
             game
             dissection
         in
@@ -425,7 +474,7 @@ module Make (Interpreter : Interpreter.S) :
 
   let play_next_move node_ctxt game self opponent =
     let open Lwt_result_syntax in
-    let* refutation = next_move node_ctxt game in
+    let* refutation = next_move node_ctxt ~opponent game in
     inject_next_move node_ctxt self ~refutation ~opponent
 
   let play_timeout (node_ctxt : _ Node_context.t) self stakers =
@@ -458,28 +507,21 @@ module Make (Interpreter : Interpreter.S) :
         if is_it_me then return_none else return (Some loser)
     | _ -> return_none
 
-  let play head_block node_ctxt self game staker1 staker2 =
+  let play node_ctxt ~self game opponent =
     let open Lwt_result_syntax in
-    let index = Sc_rollup.Game.Index.make staker1 staker2 in
+    let index = Sc_rollup.Game.Index.make self opponent in
+    let head_block = `Head 0 in
     match turn ~self game index with
     | Our_turn {opponent} -> play_next_move node_ctxt game self opponent
     | Their_turn -> (
         let* timeout_reached =
-          timeout_reached ~self head_block node_ctxt staker1 staker2
+          timeout_reached ~self head_block node_ctxt self opponent
         in
         match timeout_reached with
         | Some opponent ->
             let*! () = Refutation_game_event.timeout_detected opponent in
             play_timeout node_ctxt self index
         | None -> return_unit)
-
-  let ongoing_games head_block node_ctxt self =
-    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    Plugin.RPC.Sc_rollup.ongoing_refutation_games
-      cctxt
-      (cctxt#chain, head_block)
-      rollup_address
-      self
 
   let play_opening_move node_ctxt self conflict =
     let open Lwt_syntax in
@@ -493,43 +535,4 @@ module Make (Interpreter : Interpreter.S) :
     in
     let refutation = Start {player_commitment_hash; opponent_commitment_hash} in
     inject_next_move node_ctxt self ~refutation ~opponent:conflict.other
-
-  let start_game_if_conflict head_block node_ctxt self =
-    let open Lwt_result_syntax in
-    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    let* conflicts =
-      Plugin.RPC.Sc_rollup.conflicts
-        cctxt
-        (cctxt#chain, head_block)
-        rollup_address
-        self
-    in
-    let*! res = List.iter_es (play_opening_move node_ctxt self) conflicts in
-    match res with
-    | Ok r -> return r
-    | Error
-        [
-          Environment.Ecoproto_error
-            Sc_rollup_errors.Sc_rollup_game_already_started;
-        ] ->
-        (* The game may already be starting in the meantime. So we
-           ignore this error. *)
-        return_unit
-    | Error errs -> Lwt.return (Error errs)
-
-  let process Layer1.{hash; _} node_ctxt =
-    let head_block = `Hash (hash, 0) in
-    let open Lwt_result_syntax in
-    let refute_signer = Node_context.get_operator node_ctxt Refute in
-    match refute_signer with
-    | None ->
-        (* Not injecting refutations, don't play refutation games *)
-        return_unit
-    | Some self ->
-        let* () = start_game_if_conflict head_block node_ctxt self in
-        let* res = ongoing_games head_block node_ctxt self in
-        List.iter_es
-          (fun (game, staker1, staker2) ->
-            play head_block node_ctxt self game staker1 staker2)
-          res
 end
