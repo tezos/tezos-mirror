@@ -677,6 +677,7 @@ module type WORKER = sig
     | Out_message of {to_peer : GS.Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : GS.Peer.t}
     | Kick of {peer : GS.Peer.t}
+    | Connect of {peer : GS.Peer.t}
 
   (** The application layer will be advertised about full messages it's
       interested in. *)

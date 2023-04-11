@@ -82,6 +82,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
+    | Connect of {peer : Peer.t}
 
   type app_output = full_message
 
