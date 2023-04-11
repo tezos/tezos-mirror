@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune exec src/lib_requester/test/main.exe
+    Invocation:   dune exec src/lib_requester/test/main.exe \
+                  -- --file test_fuzzing_requester.ml
     Subject:      Relations between functions of [Requester]'s API
 *)
 

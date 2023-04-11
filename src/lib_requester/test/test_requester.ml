@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune exec src/lib_requester/test/main.exe
+    Invocation:   dune exec src/lib_requester/test/main.exe \
+                  -- --file test_requester.ml
     Subject:      Basic behaviors of the API for generic resource
                   fetching/requesting service. Instantiating the [Requester]
                   functor with simple mocks.
