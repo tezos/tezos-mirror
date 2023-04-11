@@ -551,7 +551,9 @@ let perform_benchmark (type c t) (options : options)
               ~buffer
               ~index
           in
-          let allocated_words = Option.map (fun f -> f ()) measure_allocation in
+          let allocated_words =
+            Option.bind measure_allocation (fun f -> f ())
+          in
           {workload; measures; allocated_words} :: workload_data
         in
         match benchmark_fun () with
