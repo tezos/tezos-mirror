@@ -90,7 +90,13 @@ module Automaton_config :
   module Subconfig = struct
     module Peer = Int_iterable
     module Topic = String_iterable
-    module Message_id = Int_iterable
+
+    module Message_id = struct
+      include Int_iterable
+
+      let get_topic i = string_of_int (i mod 10)
+    end
+
     module Message = String_iterable
   end
 end
