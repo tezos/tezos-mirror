@@ -52,7 +52,6 @@ let () =
       (Protocol.name ^ ": ticket accounting", Test_ticket_accounting.tests);
       (Protocol.name ^ ": ticket balance", Test_ticket_balance.tests);
       (Protocol.name ^ ": ticket manager", Test_ticket_manager.tests);
-      (Protocol.name ^ ": timelock", Test_timelock.tests);
       (Protocol.name ^ ": typechecking", Test_typechecking.tests);
       (Protocol.name ^ ": script cache", Test_script_cache.tests);
       ( Protocol.name ^ ": block time instructions",

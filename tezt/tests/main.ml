@@ -184,7 +184,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Testnet_dictator.register ~protocols ;
   Transfer.register ~protocols ;
   Tickets.register ~protocols ;
-  Timelock.register ~protocols ;
   Tzip4_view.register ~protocols ;
   Used_paid_storage_spaces.register ~protocols ;
   Vdf_test.register ~protocols
@@ -209,6 +208,8 @@ let register_protocol_specific_because_regression_tests () =
   Snoop_codegen.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Mumbai; Alpha] ;
   Ticket_receipt_and_rpc.register ~protocols:[Mumbai; Alpha] ;
+  Timelock.register ~protocols:[Alpha] ;
+  Timelock_disabled.register ~protocols:[Mumbai] ;
   Views.register [Mumbai; Alpha] ;
   Zk_rollup.register ~protocols:[Mumbai; Alpha]
 

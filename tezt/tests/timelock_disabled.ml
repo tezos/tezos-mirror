@@ -23,36 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Intfs = S
+(* Testing
+   -------
+   Component:    Client commands
+   Invocation:   dune exec tezt/tests/main.exe -- --file timelock_disabled.ml
+   Subject:      Tests checking contracts with timelock cannot be originated
+*)
 
-module Hashed = struct
-  module Block_hash = Block_hash
-  module Block_metadata_hash = Block_metadata_hash
-  module Chain_id = Chain_id
-  module Context_hash = Context_hash
-  module Operation_hash = Operation_hash
-  module Operation_list_hash = Operation_list_hash
-  module Operation_list_list_hash = Operation_list_list_hash
-  module Operation_metadata_hash = Operation_metadata_hash
-  module Operation_metadata_list_hash = Operation_metadata_list_hash
-  module Operation_metadata_list_list_hash = Operation_metadata_list_list_hash
-  module Protocol_hash = Protocol_hash
-end
+let test_contract_not_originable ~protocol () =
+  let* client = Client.init_mockup ~protocol () in
+  let _alias, result =
+    Client.spawn_originate_contract_at
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~burn_cap:(Tez.of_int 1)
+      ~init:"0xaa"
+      client
+      ["ill_typed"; "timelock"]
+      protocol
+  in
+  let msg =
+    rex
+      "Origination of contracts containing time lock related instructions is \
+       disabled in the client because of a vulnerability."
+  in
+  Process.check_error ~exit_code:1 ~msg result
 
-module Signature = struct
-  module Bls = Bls
-  module Ed25519 = Ed25519
-  module P256 = P256
-  module Secp256k1 = Secp256k1
-  include Signature
-end
-
-module Aggregate_signature = Aggregate_signature
-module Base58 = Base58
-module Blake2B = Blake2B
-module Crypto_box = Crypto_box
-module Hacl = Hacl
-module Helpers = Helpers
-module Rand = Rand
-module Timelock_legacy = Timelock_legacy
-module Timelock = Timelock
+let register ~protocols =
+  List.iter
+    (fun (title, test_function) ->
+      Protocol.register_test
+        ~__FILE__
+        ~title
+        ~tags:["client"; "michelson"; "timelock"]
+        (fun protocol -> test_function ~protocol ())
+        protocols)
+    [
+      ( "Check a contract containing timelock operations is forbidden",
+        test_contract_not_originable );
+    ]

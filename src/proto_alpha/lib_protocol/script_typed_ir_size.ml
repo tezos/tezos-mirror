@@ -247,7 +247,7 @@ let chest_key_size _ =
   (*
      type chest_key = {
        unlocked_value : unlocked_value;
-       proof : time_lock_proof
+       proof : timelock_proof
      }
   *)
   let unlocked_value_size = 256 in

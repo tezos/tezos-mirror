@@ -46,7 +46,7 @@ let test_protocols =
     let s = string_of_int i in
     let proto =
       {
-        Protocol.expected_env = V8;
+        Protocol.expected_env = V9;
         components = [{name = s; interface = None; implementation = s}];
       }
     in

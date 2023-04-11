@@ -71,7 +71,7 @@ let test_ill_typecheck script error_pattern =
   |> Process.check_error ~msg:error_pattern
 
 let test_legacy_typecheck protocols =
-  [("timelock", Protocol.From_protocol 015)]
+  [("timelock", Protocol.Until_protocol 016)]
   |> List.iter @@ fun (script, supports) ->
      ( Protocol.register_test
          ~__FILE__
@@ -82,15 +82,20 @@ let test_legacy_typecheck protocols =
               script)
          ~tags:["client"; "script"; "michelson"; "typechecking"]
      @@ fun protocol ->
-       let* client = Client.init_mockup ~protocol () in
-       let script_path =
-         Michelson_script.(find ["ill_typed"; script] protocol |> path)
-       in
-       let* () =
-         Client.spawn_typecheck_script ~script:script_path ~legacy:false client
-         |> Process.check_error ~msg:(rex "Use of deprecated instruction")
-       in
-       Client.typecheck_script ~script:script_path ~legacy:true client )
+       if protocol = Protocol.Alpha then Lwt.return ()
+       else
+         let* client = Client.init_mockup ~protocol () in
+         let script_path =
+           Michelson_script.(find ["ill_typed"; script] protocol |> path)
+         in
+         let* () =
+           Client.spawn_typecheck_script
+             ~script:script_path
+             ~legacy:false
+             client
+           |> Process.check_error ~msg:(rex "Use of deprecated instruction")
+         in
+         Client.typecheck_script ~script:script_path ~legacy:true client )
        protocols
 
 let register ~protocols =

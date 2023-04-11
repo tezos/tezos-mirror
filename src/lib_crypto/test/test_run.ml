@@ -29,5 +29,6 @@ runtest
     (module Test_signature);
     (module Test_signature_encodings);
     (module Test_timelock);
+    (module Test_timelock_legacy);
     (module Test_context_hash);
   ]
