@@ -12,6 +12,8 @@ fmt:
 build:
   stage: build
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
+  tags:
+    - amd64
   before_script:
     - sudo apt update
   script:
@@ -30,6 +32,7 @@ server_docker:
   image: docker
   tags:
     - devops
+    - amd64
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build -t ${CI_REGISTRY_IMAGE}/server:${CI_COMMIT_REF_SLUG} -f Dockerfile.server .
@@ -49,6 +52,7 @@ archiver_docker:
   image: docker
   tags:
     - devops
+    - amd64
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build -t ${CI_REGISTRY_IMAGE}/archiver:${CI_COMMIT_REF_SLUG} -f Dockerfile.archiver .
