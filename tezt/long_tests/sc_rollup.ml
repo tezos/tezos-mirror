@@ -113,28 +113,14 @@ let send_message client msg =
   in
   Client.bake_for_and_wait client
 
-let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(alias = "rollup") ?(src = "bootstrap1") ?(kind = "arith")
-    ?(parameters_ty = "string") ~boot_sector client =
+let with_fresh_rollup ~protocol ?(kind = "arith") ~boot_sector f tezos_node
+    tezos_client operator =
   let* sc_rollup =
-    Client.Sc_rollup.(
-      originate
-        ~hooks
-        ~burn_cap
-        ~alias
-        ~src
-        ~kind
-        ~parameters_ty
-        ~boot_sector
-        client)
-  in
-  let* () = Client.bake_for_and_wait client in
-  return sc_rollup
-
-let with_fresh_rollup ~protocol ?kind ~boot_sector f tezos_node tezos_client
-    operator =
-  let* sc_rollup =
-    originate_sc_rollup ?kind ~boot_sector ~src:operator tezos_client
+    Sc_rollup_helpers.originate_sc_rollup
+      ~kind
+      ~boot_sector
+      ~src:operator
+      tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -148,27 +134,6 @@ let with_fresh_rollup ~protocol ?kind ~boot_sector f tezos_node tezos_client
     Sc_rollup_node.config_init sc_rollup_node sc_rollup
   in
   f sc_rollup sc_rollup_node configuration_filename
-
-(** This helper injects an SC rollup origination via octez-client. Then it
-    bakes to include the origination in a block. It returns the address of the
-    originated rollup *)
-let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(alias = "rollup") ?(src = "bootstrap1") ?(kind = "arith")
-    ?(parameters_ty = "string") ~boot_sector client =
-  let* sc_rollup =
-    Client.Sc_rollup.(
-      originate
-        ~hooks
-        ~burn_cap
-        ~alias
-        ~src
-        ~kind
-        ~parameters_ty
-        ~boot_sector
-        client)
-  in
-  let* () = Client.bake_for_and_wait client in
-  return sc_rollup
 
 let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     ~internal ~kind =
