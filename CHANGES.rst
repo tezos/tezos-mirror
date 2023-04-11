@@ -69,6 +69,29 @@ Node
 Client
 ------
 
+- **Breaking Changes**: an alias must be provided when originating a
+  smart rollup. That alias can be used in other smart rollup commands
+  instead of the address. This is similar to what is done for smart
+  contract.
+
+  Smart rollup origination command::
+    ./octez-client originate smart rollup <alias> from <source contract> of kind <smart rollup kind> of type <michelson type> with kernel <kernel>
+
+  Other example command::
+    ./octez-client recover bond of <implicit contrat> for smart rollup <alias or address> from <source contract>
+
+- Similarly to smart contract, the client now has functions to manage the set of known smart rollups::
+
+    ./octez-client remember smart rollup <alias> <smart rollup address>
+
+    ./octez-client forget smart rollup <alias>
+
+    ./octez-client forget all smart rollups
+
+    ./octez-client show known smart rollup <alias>
+
+    ./octez-client list smart rollups
+
 Baker
 -----
 
