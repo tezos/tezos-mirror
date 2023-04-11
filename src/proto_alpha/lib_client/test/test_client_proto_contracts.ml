@@ -73,9 +73,9 @@ let test_find_destination _ =
   in
   let w = new mock_wallet wallet_json in
   let test msg key exp_source =
-    Client_proto_contracts.ContractAlias.find_destination w key
+    Client_proto_contracts.Contract_alias.find_destination w key
     >>=? fun contract ->
-    Client_proto_contracts.RawContractAlias.to_source contract
+    Client_proto_contracts.Raw_contract_alias.to_source contract
     >>=? fun source ->
     (* Alcotest equality assertion *)
     Alcotest.(check string msg source exp_source) ;
