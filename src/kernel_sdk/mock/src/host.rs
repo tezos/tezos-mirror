@@ -152,32 +152,6 @@ unsafe impl SmartRollupCore for MockHost {
             .unwrap_or_else(|e| e.code() as i64)
     }
 
-    unsafe fn store_get_nth_key(
-        &self,
-        path: *const u8,
-        len: usize,
-        index: i64,
-        dst: *mut u8,
-        max_size: usize,
-    ) -> i32 {
-        let path = from_raw_parts(path, len);
-
-        let subkey = self.state.borrow().handle_store_get_nth_key(path, index);
-
-        match subkey {
-            Ok(subkey) => {
-                let subkey = subkey.as_bytes().to_vec();
-                let copy_len = usize::min(max_size, subkey.len());
-
-                let slice = from_raw_parts_mut(dst, copy_len);
-                slice.copy_from_slice(&subkey[..copy_len]);
-
-                copy_len.try_into().unwrap()
-            }
-            Err(e) => e.code(),
-        }
-    }
-
     unsafe fn store_move(
         &self,
         from_path: *const u8,

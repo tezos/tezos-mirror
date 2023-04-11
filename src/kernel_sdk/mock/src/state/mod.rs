@@ -226,26 +226,6 @@ impl HostState {
             .ok_or(Error::StoreNotANode)
     }
 
-    pub(crate) fn handle_store_get_nth_key(
-        &self,
-        prefix: &[u8],
-        index: i64,
-    ) -> Result<String, Error> {
-        let prefix = validate_path(prefix)?;
-        self.store
-            .node_from_path(&prefix)
-            .and_then(|n| n.inner.keys().nth(index as usize))
-            .ok_or(Error::StoreInvalidSubkeyIndex)
-            .cloned()
-            .map(|n| {
-                if n == store::VALUE_NAME {
-                    String::new()
-                } else {
-                    n
-                }
-            })
-    }
-
     pub(crate) fn handle_store_move(
         &mut self,
         from_path: &[u8],
@@ -510,64 +490,6 @@ mod tests {
             .unwrap();
         let with_value = state.handle_store_list_size(prefix.as_bytes()).unwrap();
         assert_eq!(11, with_value, "Expected 10 subkeys of prefix, plus value");
-    }
-
-    #[test]
-    fn store_get_nth_key() {
-        // Arrange
-        let mut state = HostState::default();
-        let prefix = "/a/long/prefix";
-
-        for i in 0..10 {
-            // subkey of prefix
-            let subkey = format!("{}/{}", prefix, i);
-            // not subkey as not a sub-path
-            let almost_subkey = format!("{}{}", prefix, i);
-            // completely different prefix
-            let not_subkey = format!("/different/prefix/{}", i);
-
-            state.handle_store_write(subkey.as_bytes(), 0, &[]).unwrap();
-            state
-                .handle_store_write(almost_subkey.as_bytes(), 0, &[])
-                .unwrap();
-            state
-                .handle_store_write(not_subkey.as_bytes(), 0, &[])
-                .unwrap();
-        }
-
-        // Act
-        let mut results = Vec::new();
-        for i in 0..10 {
-            results.push(
-                state
-                    .handle_store_get_nth_key(prefix.as_bytes(), i)
-                    .expect("Subkey exists"),
-            );
-        }
-        results.sort();
-
-        // Assert
-        let expected = (0..10).map(|i| i.to_string()).collect::<Vec<_>>();
-        assert_eq!(results, expected, "Expected stable store_get_nth_key");
-    }
-
-    #[test]
-    fn store_get_nth_key_value() {
-        // Arrange
-        let mut state = HostState::default();
-        let prefix = "/hello".as_bytes();
-
-        state.handle_store_write(prefix, 0, &[]).unwrap();
-
-        // Act
-        let result = state.handle_store_get_nth_key(prefix, 0).unwrap();
-
-        // Assert
-        assert_eq!(
-            result,
-            "".to_string(),
-            "Value should return empty string as subkey"
-        );
     }
 
     #[test]

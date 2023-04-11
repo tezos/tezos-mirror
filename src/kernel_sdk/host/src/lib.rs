@@ -60,8 +60,6 @@ pub enum Error {
     StoreNotANode = tezos_smart_rollup_core::STORE_NOT_A_NODE,
     /// The outbox is full
     FullOutbox = tezos_smart_rollup_core::FULL_OUTBOX,
-    /// Given index is out of bounds
-    StoreInvalidSubkeyIndex = tezos_smart_rollup_core::STORE_INVALID_SUBKEY_INDEX,
 }
 
 impl core::fmt::Display for Error {
@@ -78,7 +76,6 @@ impl core::fmt::Display for Error {
             Self::StoreReadonlyValue => write!(f, "StoreReadonlyValue"),
             Self::StoreNotANode => write!(f, "StoreNotANode"),
             Self::FullOutbox => write!(f, "FullOutbox"),
-            Self::StoreInvalidSubkeyIndex => write!(f, "StoreInvalidSubkeyIndex"),
         }
     }
 }
@@ -99,9 +96,6 @@ impl From<i32> for Error {
             tezos_smart_rollup_core::STORE_READONLY_VALUE => Self::StoreReadonlyValue,
             tezos_smart_rollup_core::STORE_NOT_A_NODE => Self::StoreNotANode,
             tezos_smart_rollup_core::FULL_OUTBOX => Self::FullOutbox,
-            tezos_smart_rollup_core::STORE_INVALID_SUBKEY_INDEX => {
-                Self::StoreInvalidSubkeyIndex
-            }
             _ => Error::GenericInvalidAccess,
         }
     }
