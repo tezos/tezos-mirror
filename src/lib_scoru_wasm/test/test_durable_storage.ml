@@ -350,7 +350,7 @@ let test_store_get_hash ~version () =
       let* hash = Memory.load_bytes mem dst 32 in
       let durable = Durable.of_storage_exn durable_storage in
       let* hash_expected =
-        Durable.hash_exn ~kind:`Subtree durable Durable.(key_of_string_exn key)
+        Durable.(hash_exn ~kind:Directory durable (key_of_string_exn key))
       in
       let hash_expected = Context_hash.to_string hash_expected in
       assert (hash = hash_expected) ;
@@ -388,9 +388,7 @@ let test_store_get_hash ~version () =
         = Values.[Num (I32 (Host_funcs.Error.code Memory_invalid_access))]) ;
       Lwt.return_ok ()
 
-(* Test checking that [store_delete key] deletes the subtree at [key] from the
-   durable storage. *)
-let test_store_delete ~version () =
+let test_store_delete_generic ~kind ~version () =
   let open Lwt_syntax in
   (*
   Store the following tree:
@@ -398,8 +396,9 @@ let test_store_delete ~version () =
     /durable/a/short/path/one/_ = "..."
     /durable/a/long/path/_ = "..."
 
-  We expect that deleting "/a/short/path" is leaves only "/durable/a/long/path".
-  *)
+  We expect that deleting "/a/short/path" leaves only "/durable/a/long/path"
+  if [kind = Directory], or both "/durable/a/long/path" and "/a/short/path/one"'s
+  value if [kind = Value] *)
   let* durable =
     make_durable
       [
@@ -413,6 +412,11 @@ let test_store_delete ~version () =
   let module_reg, module_key, host_funcs_registry =
     make_module_inst ~version [key] src
   in
+  let store_delete =
+    match kind with
+    | Durable.Directory -> Host_funcs.Internal_for_tests.store_delete
+    | Value -> Host_funcs.Internal_for_tests.store_delete_value
+  in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
@@ -422,7 +426,7 @@ let test_store_delete ~version () =
       ~caller:module_key
       ~durable
       host_funcs_registry
-      Host_funcs.Internal_for_tests.store_delete
+      store_delete
       values
   in
   assert (result = [Values.(Num (I32 0l))]) ;
@@ -434,12 +438,25 @@ let test_store_delete ~version () =
   let* count =
     Durable.count_subtrees durable @@ Durable.key_of_string_exn key
   in
-  assert (count = 0) ;
+  assert (count = if kind = Value then 1 else 0) ;
   let* value_opt =
     Durable.find_value durable @@ Durable.key_of_string_exn "/a/long/path"
   in
   assert (Option.is_some value_opt) ;
   Lwt.return_ok ()
+
+(* Test checking that [store_delete key] deletes the subtree and the value at
+   [key] from the durable storage. *)
+let test_store_delete_all = test_store_delete_generic ~kind:Directory
+
+(* Test checking that [store_delete_value key] deletes only the value at [key]
+   from the durable storage. *)
+let test_store_delete_value ~version () =
+  match version with
+  | Wasm_pvm_state.V0 ->
+      (* the [store_delete_value] host function is not available before [V1]. *)
+      Lwt.return_ok ()
+  | V1 -> test_store_delete_generic ~kind:Value ~version ()
 
 (* Test checking that if [key] has value/subtree, [store_has key] returns
    the correct enum value. *)
@@ -1101,7 +1118,7 @@ let tests =
       ("store_has key too long key", `Quick, test_store_has_key_too_long);
       ("store_list_size counts subtrees", `Quick, test_store_list_size);
       ("store_get_nth_key produces subtrees", `Quick, test_store_get_nth_key);
-      ("store_delete removes subtree", `Quick, test_store_delete);
+      ("store_delete removes subtree and value", `Quick, test_store_delete_all);
       ("store_copy", `Quick, test_store_copy);
       ("store_copy missing node", `Quick, test_store_copy_missing_path);
       ("store_move", `Quick, test_store_move);
@@ -1111,6 +1128,7 @@ let tests =
       ("store_write", `Quick, test_store_write);
       ("store_value_size", `Quick, test_store_value_size);
       ("store_get_hash", `Quick, test_store_get_hash);
+      ("store_delete_value removes only value", `Quick, test_store_delete_value);
     ]
   @ [
       tztest "Durable: find value" `Quick test_durable_find_value;

@@ -36,6 +36,8 @@
 
 type key = string list
 
+type kind = Value | Directory
+
 module Children : Map.S with type key = string
 
 (* Support subtree sizes in order to generate keys evenly *)
@@ -61,4 +63,4 @@ val copy_tree :
 
 val move_tree : from_key:key -> to_key:key -> 'a t -> 'a t option
 
-val delete : edit_readonly:bool -> key -> 'a t -> 'a t option
+val delete : edit_readonly:bool -> kind -> key -> 'a t -> 'a t option

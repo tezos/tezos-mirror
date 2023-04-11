@@ -170,7 +170,8 @@ module Aux = struct
       key_length:int32 ->
       int32 Lwt.t
 
-    val store_delete :
+    val generic_store_delete :
+      kind:Durable.kind ->
       durable:Durable.t ->
       memory:memory ->
       key_offset:int32 ->
@@ -432,11 +433,11 @@ module Aux = struct
       in
       extract_error_code res
 
-    let store_delete ~durable ~memory ~key_offset ~key_length =
+    let generic_store_delete ~kind ~durable ~memory ~key_offset ~key_length =
       let open Lwt_result_syntax in
       let*! res =
         let* key = load_key_from_memory key_offset key_length memory in
-        let+ durable = guard (fun () -> Durable.delete durable key) in
+        let+ durable = guard (fun () -> Durable.delete ~kind durable key) in
         (durable, 0l)
       in
       extract_error durable res
@@ -573,7 +574,7 @@ module Aux = struct
       let*! res =
         let* key = load_key_from_memory key_offset key_length memory in
         let* result =
-          guard (fun () -> Durable.hash_exn ~kind:`Subtree durable key)
+          guard (fun () -> Durable.hash_exn ~kind:Directory durable key)
         in
         let result =
           Data_encoding.Binary.to_string_exn Context_hash.encoding result
@@ -779,21 +780,12 @@ let store_has =
           (durable, [value r], store_has_ticks key_length r)
       | _ -> raise Bad_input)
 
-let store_delete_name = "tezos_store_delete"
-
-let store_delete_type =
-  let input_types =
-    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
-  in
-  let output_types = Vector.of_list [Types.NumType I32Type] in
-  Types.FuncType (input_types, output_types)
-
 let store_delete_ticks key_size result =
   Tick_model.(
     with_error result (fun () -> read_key_in_memory key_size + tree_deletion)
     |> to_z)
 
-let store_delete =
+let generic_store_delete ~kind =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
       match inputs with
@@ -801,7 +793,8 @@ let store_delete =
           let open Lwt.Syntax in
           let* memory = retrieve_memory memories in
           let+ durable, code =
-            Aux.store_delete
+            Aux.generic_store_delete
+              ~kind
               ~durable:(Durable.of_storage_exn durable)
               ~memory
               ~key_offset
@@ -811,6 +804,23 @@ let store_delete =
             [value code],
             store_delete_ticks key_length code )
       | _ -> raise Bad_input)
+
+let store_delete_name = "tezos_store_delete"
+
+let store_delete_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Vector.of_list [Types.NumType I32Type] in
+  Types.FuncType (input_types, output_types)
+
+let store_delete = generic_store_delete ~kind:Durable.Directory
+
+let store_delete_value_name = "tezos_store_delete_value"
+
+let store_delete_value_type = store_delete_type
+
+let store_delete_value = generic_store_delete ~kind:Durable.Value
 
 let store_value_size_name = "tezos_store_value_size"
 
@@ -1230,6 +1240,12 @@ let lookup_opt ~version name =
         (ExternFunc (HostFunc (store_get_nth_key_type, store_get_nth_key_name)))
   | "store_delete" ->
       Some (ExternFunc (HostFunc (store_delete_type, store_delete_name)))
+  | "store_delete_value" ->
+      if version = Wasm_pvm_state.V0 then None
+      else
+        Some
+          (ExternFunc
+             (HostFunc (store_delete_value_type, store_delete_value_name)))
   | "store_copy" ->
       Some (ExternFunc (HostFunc (store_copy_type, store_copy_name)))
   | "store_move" ->
@@ -1295,6 +1311,9 @@ let registry_V1 ~write_debug =
     |> with_host_function
          ~global_name:store_get_hash_name
          ~implem:store_get_hash
+    |> with_host_function
+         ~global_name:store_delete_value_name
+         ~implem:store_delete_value
     |> construct)
 
 let registry_V1_noop = registry_V1 ~write_debug:Noop
@@ -1320,6 +1339,9 @@ module Internal_for_tests = struct
   let store_has = Func.HostFunc (store_has_type, store_has_name)
 
   let store_delete = Func.HostFunc (store_delete_type, store_delete_name)
+
+  let store_delete_value =
+    Func.HostFunc (store_delete_value_type, store_delete_value_name)
 
   let store_copy = Func.HostFunc (store_copy_type, store_copy_name)
 

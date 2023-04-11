@@ -56,9 +56,9 @@ type _ operation_kind =
   (* key, idx*)
   | Substree_name_at : (key * int) operation_kind
   (* key *)
-  | Hash : (key * [`Value | `Subtree]) operation_kind
+  | Hash : key operation_kind
   (* key *)
-  | Hash_exn : (key * [`Value | `Subtree]) operation_kind
+  | Hash_exn : key operation_kind
   (* edit_readonly, key, offset, value *)
   | Write_value_exn : (bool * key * int64 * string) operation_kind
   (* key, offset, len *)
@@ -146,22 +146,15 @@ let pp fmt (x : t) =
         Substree_name_at
         (key_to_str key)
         idx
-  | Operation (Hash, (key, kind)) ->
+  | Operation (Hash, key) ->
+      Format.fprintf fmt "%a(key: %s)" pp_operation_kind Hash (key_to_str key)
+  | Operation (Hash_exn, key) ->
       Format.fprintf
         fmt
-        "%a(key: %s, kind: %s)"
-        pp_operation_kind
-        Hash
-        (key_to_str key)
-        (kind_to_str kind)
-  | Operation (Hash_exn, (key, kind)) ->
-      Format.fprintf
-        fmt
-        "%a(key: %s, kind: %s)"
+        "%a(key: %s)"
         pp_operation_kind
         Hash_exn
         (key_to_str key)
-        (kind_to_str kind)
   | Operation (Write_value_exn, (edit_readonly, key, offset, _value)) ->
       Format.fprintf
         fmt
