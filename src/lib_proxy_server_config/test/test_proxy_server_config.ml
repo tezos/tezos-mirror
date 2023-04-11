@@ -27,7 +27,8 @@
 
     -------
     Component:    Client
-    Invocation:   dune exec src/lib_proxy_server_config/test/main.exe
+    Invocation:   dune exec src/lib_proxy_server_config/test/main.exe \
+                   -- --file test_proxy_server_config.ml
     Description:  Test various functions and types regarding the configuration
                   of [tezos-proxy-server]
 *)
