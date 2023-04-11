@@ -47,32 +47,7 @@ module Make (C : AUTOMATON_CONFIG) :
   module Message = C.Subconfig.Message
   module Span = C.Span
   module Time = C.Time
-
-  (** This module allows to compute a score for each peers. *)
-  module Score : SCORE = struct
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
-
-       This is incomplete *)
-    type t = {behaviour_penalty : int}
-
-    let zero = {behaviour_penalty = 0}
-
-    let float {behaviour_penalty} = -behaviour_penalty |> float_of_int
-
-    let penalty {behaviour_penalty} penalty =
-      {behaviour_penalty = behaviour_penalty + penalty}
-
-    let compare s1 s2 =
-      let f1 = float s1 in
-      let f2 = float s2 in
-      Float.compare f1 f2
-
-    include Compare.Make (struct
-      type nonrec t = t
-
-      let compare = compare
-    end)
-  end
+  module Score = Peers_score
 
   type message = Message.t
 

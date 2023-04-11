@@ -59,27 +59,31 @@ module type AUTOMATON_SUBCONFIG = sig
   module Message : PRINTABLE
 end
 
+module type SPAN = PRINTABLE
+
+module type TIME = sig
+  include Compare.S
+
+  include PRINTABLE with type t := t
+
+  type span
+
+  val now : unit -> t
+
+  val add : t -> span -> t
+
+  val sub : t -> span -> t
+
+  (** [mul_span s n] returns [n * s]. *)
+  val mul_span : span -> int -> span
+end
+
 module type AUTOMATON_CONFIG = sig
   module Subconfig : AUTOMATON_SUBCONFIG
 
-  module Span : PRINTABLE
+  module Span : SPAN
 
-  module Time : sig
-    include Compare.S
-
-    include PRINTABLE with type t := t
-
-    type span = Span.t
-
-    val now : unit -> t
-
-    val add : t -> span -> t
-
-    val sub : t -> span -> t
-
-    (** [mul_span s n] returns [n * s]. *)
-    val mul_span : span -> int -> span
-  end
+  module Time : TIME with type span = Span.t
 end
 
 type ('peer, 'message_id, 'span) limits = {
