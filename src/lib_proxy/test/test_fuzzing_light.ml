@@ -27,7 +27,8 @@
 
     -------
     Component:    Client
-    Invocation:   dune exec src/lib_proxy/test/main.exe
+    Invocation:   dune exec src/lib_proxy/test/main.exe \
+                  -- --file test_fuzzing_light.ml
     Dependencies: src/lib_proxy/test/light_lib.ml
                   src/lib_proxy/test/test_light.ml
     Description:  Most generators in this module are recursive / nested, hence
