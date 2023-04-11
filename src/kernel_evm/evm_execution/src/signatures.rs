@@ -359,7 +359,16 @@ mod test {
         assert_eq!(H256::zero(), decoded_transaction.s, "testing s");
         assert_eq!(expected_transaction, decoded_transaction)
     }
+    #[test]
+    fn test_decoding_leading0_signature() {
+        // decoding of a transaction where r or s had some leading 0, which where deleted
+        let signed_tx = "f888018506fc23ac00831000009412f142944da31ab85458787aaecaf5e34128619d80a40b7d796e0000000000000000000000000000000000000000000000000000000000000000269f75b1bc94b868a5a047470eae6008602e414d1471c2bbd14b37ffe56b1a85c9a001d9d58bb23af2090742aab9824c916fdc021a91f3e8d36571a5fc55547bc596";
 
+        let tx = hex::decode(signed_tx).unwrap();
+        let decoder = Rlp::new(&tx);
+        let decoded = EthereumTransactionCommon::decode(&decoder);
+        assert!(decoded.is_ok(), "testing the decoding went ok");
+    }
     #[test]
     fn test_encoding_eip155_unsigned() {
         // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md

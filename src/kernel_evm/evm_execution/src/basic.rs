@@ -362,8 +362,15 @@ impl From<H256> for String {
 
 impl Decodable for H256 {
     fn decode(decoder: &Rlp<'_>) -> Result<H256, DecoderError> {
-        if decoder.data()?.len() == 32 {
+        let length = decoder.data()?.len();
+        if length == 32 {
             Ok(H256::from(decoder.data()?))
+        } else if length < 32 && length > 0 {
+            // there were missing 0 that encoding deleted
+            let missing = 32 - length;
+            let mut full = [0u8; 32];
+            full[missing..].copy_from_slice(decoder.data()?);
+            Ok(H256::from(full))
         } else if decoder.data()?.is_empty() {
             // considering the case empty allows to decode unsigned transactions
             Ok(H256::zero())
@@ -383,5 +390,59 @@ impl Encodable for H256 {
             // which is not such a big deal as H256 is used for hashed values
             s.append_empty_data();
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// used in test to decode a string and get the size of the decoded input,
+    /// before determining the H256 value
+    fn decode(str: &str) -> (Result<H256, DecoderError>, usize) {
+        let hash = hex::decode(str).unwrap();
+        let decoder = Rlp::new(&hash);
+        let decoded = H256::decode(&decoder);
+        assert!(decoded.is_ok(), "hash should be decoded ok");
+        let length = decoder.data().unwrap().len();
+        (decoded, length)
+    }
+
+    #[test]
+    fn test_decode_h256_l0() {
+        // rlp encoding of empty is the byte 80
+        let (decoded, length) = decode("80");
+        assert_eq!(0, length);
+        assert_eq!(
+            H256::zero(),
+            decoded.unwrap(),
+            "empty hash should be decoded as 0x0...0"
+        );
+    }
+
+    #[test]
+    fn test_decode_h256_l32() {
+        // rlp encoding of hex string of 32 bytes
+        let (decoded, length) =
+            decode("a03232323232323232323232323232323232323232323232323232323232323232");
+        assert_eq!(32, length);
+        assert_eq!(
+            "3232323232323232323232323232323232323232323232323232323232323232",
+            String::from(decoded.unwrap()),
+            "32 hash should be decoded as 0x32...32"
+        );
+    }
+
+    #[test]
+    fn test_decode_h256_l31() {
+        // rlp encoding of hex string of 31 bytes
+        let (decoded, length) =
+            decode("9f31313131313131313131313131313131313131313131313131313131313131");
+        assert_eq!(31, length);
+        assert_eq!(
+            "0031313131313131313131313131313131313131313131313131313131313131",
+            String::from(decoded.unwrap()),
+            "31 hash should be decoded as 0x0031..31"
+        );
     }
 }
