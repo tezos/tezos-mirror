@@ -169,9 +169,15 @@ module Make (C : AUTOMATON_CONFIG) :
     outbound : bool;  (** An outbound connection is a connection we initiated. *)
   }
 
+  type peer_status =
+    | Connected
+    | Disconnected of {
+        expires : Time.t;  (** The time until which we remember the score. *)
+      }
+
   type peer_score = {
     score : Score.t;  (** The score associated to this peer. *)
-    expires : Time.t option;  (** The time until which we remember the score. *)
+    peer_status : peer_status;
   }
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
@@ -223,6 +229,8 @@ module Make (C : AUTOMATON_CONFIG) :
          Topic.Map.find t fanout = None
 
      - Forall p. Peer.Map.mem connections p -> Peer.Map.mem scores p
+
+     - Forall p, Peer.Map.mem connections p <-> Peer.Map.find scores p = Some {peer_status = Connected; _}
   *)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4984
@@ -407,7 +415,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let get_scores_score scores ~default peer =
       match Peer.Map.find peer scores with
       | None -> default
-      | Some {score; expires = _} -> score
+      | Some {score; peer_status = _} -> score
 
     let get_score ~default peer state =
       get_scores_score state.scores ~default peer
@@ -1042,8 +1050,10 @@ module Make (C : AUTOMATON_CONFIG) :
       else
         let current = Time.now () in
         Peer.Map.filter
-          (fun _peer {score = _; expires} ->
-            match expires with Some at -> Time.(at > current) | None -> true)
+          (fun _peer {score = _; peer_status} ->
+            match peer_status with
+            | Disconnected {expires = at} -> Time.(at > current)
+            | Connected -> true)
           scores
         |> set_scores
 
@@ -1522,8 +1532,8 @@ module Make (C : AUTOMATON_CONFIG) :
             Peer.Map.update
               peer
               (function
-                | None -> Some {score = Score.zero; expires = None}
-                | Some score -> Some {score with expires = None})
+                | None -> Some {score = Score.zero; peer_status = Connected}
+                | Some score -> Some {score with peer_status = Connected})
               scores
           in
           let* () = set_connections connections in
@@ -1563,7 +1573,9 @@ module Make (C : AUTOMATON_CONFIG) :
             | Some score ->
                 let now = Time.now () in
                 let at = Time.add now retain_duration in
-                let score = {score with expires = Some at} in
+                let score =
+                  {score with peer_status = Disconnected {expires = at}}
+                in
                 Some score)
           scores
         |> set_scores
@@ -1759,9 +1771,13 @@ module Make (C : AUTOMATON_CONFIG) :
       outbound : bool;
     }
 
+    type nonrec peer_status = peer_status =
+      | Connected
+      | Disconnected of {expires : Time.t}
+
     type nonrec peer_score = peer_score = {
-      score : Score.t;  (** The score associated to this peer. *)
-      expires : Time.t option;
+      score : Score.t;
+      peer_status : peer_status;
     }
 
     type nonrec fanout_peers = fanout_peers = {

@@ -494,7 +494,9 @@ module type AUTOMATON = sig
   module Introspection : sig
     type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
-    type peer_score = {score : Score.t; expires : Time.t option}
+    type peer_status = Connected | Disconnected of {expires : Time.t}
+
+    type peer_score = {score : Score.t; peer_status : peer_status}
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
