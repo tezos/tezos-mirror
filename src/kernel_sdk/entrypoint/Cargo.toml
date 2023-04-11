@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_smart_rollup_entrypoint"
+name = "tezos-smart-rollup-entrypoint"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,28 +14,28 @@ crate-type = ["rlib"]
 [dependencies]
 dlmalloc = { version = "0.2.3", features = ["global"], optional = true}
 
-[dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
 default-features = false
 
-[dependencies.tezos_smart_rollup_panic_hook]
-path = "../tezos_smart_rollup_panic_hook"
+[dependencies.tezos-smart-rollup-panic-hook]
+path = "../panic-hook"
 default-features = false
 optional = true
 
-[dependencies.tezos_smart_rollup_host]
-path = "../tezos_smart_rollup_host"
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
 default-features = false
 
-[dependencies.tezos_smart_rollup_debug]
-path = "../tezos_smart_rollup_debug"
+[dependencies.tezos-smart-rollup-debug]
+path = "../debug"
 default-features = false
 
 [features]
 default = ["std", "alloc", "dlmalloc", "panic-hook-debug", "panic-hook-abort", "panic-hook"]
 std = []
 alloc = []
-panic-hook = ["tezos_smart_rollup_panic_hook"]
-panic-hook-debug = ["panic-hook", "tezos_smart_rollup_panic_hook/debug", "tezos_smart_rollup_debug/default"]
-panic-hook-abort = ["panic-hook", "tezos_smart_rollup_panic_hook/abort"]
+panic-hook = ["tezos-smart-rollup-panic-hook"]
+panic-hook-debug = ["panic-hook", "tezos-smart-rollup-panic-hook/debug", "tezos-smart-rollup-debug/default"]
+panic-hook-abort = ["panic-hook", "tezos-smart-rollup-panic-hook/abort"]
 testing = []

@@ -433,11 +433,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "installer_kernel"
+name = "installer-kernel"
 version = "0.1.0"
 dependencies = [
  "blst",
- "tezos_smart_rollup",
+ "tezos-smart-rollup",
 ]
 
 [[package]]
@@ -1109,6 +1109,119 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95059e91184749cb66be6dc994f67f182b6d897cb3df74a5bf66b5e709295fd8"
 
 [[package]]
+name = "tezos-smart-rollup"
+version = "0.1.0"
+dependencies = [
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-entrypoint",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
+ "tezos-smart-rollup-storage",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+]
+
+[[package]]
+name = "tezos-smart-rollup-core"
+version = "0.1.0"
+dependencies = [
+ "mockall",
+]
+
+[[package]]
+name = "tezos-smart-rollup-debug"
+version = "0.1.0"
+dependencies = [
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-host",
+]
+
+[[package]]
+name = "tezos-smart-rollup-encoding"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "nom",
+ "num-bigint",
+ "num-traits",
+ "proptest",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_data_encoding_derive",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "tezos-smart-rollup-entrypoint"
+version = "0.1.0"
+dependencies = [
+ "dlmalloc",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-panic-hook",
+]
+
+[[package]]
+name = "tezos-smart-rollup-host"
+version = "0.1.0"
+dependencies = [
+ "mockall",
+ "tezos-smart-rollup-core",
+ "tezos_crypto_rs",
+ "thiserror",
+]
+
+[[package]]
+name = "tezos-smart-rollup-installer"
+version = "0.1.0"
+dependencies = [
+ "blst",
+ "clap",
+ "hex",
+ "tezos-smart-rollup-encoding",
+ "thiserror",
+ "wasm-gen",
+]
+
+[[package]]
+name = "tezos-smart-rollup-mock"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-host",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+]
+
+[[package]]
+name = "tezos-smart-rollup-panic-hook"
+version = "0.1.0"
+dependencies = [
+ "tezos-smart-rollup-core",
+]
+
+[[package]]
+name = "tezos-smart-rollup-storage"
+version = "0.1.0"
+dependencies = [
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
+ "thiserror",
+]
+
+[[package]]
 name = "tezos_crypto_rs"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1163,119 +1276,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tezos_smart_rollup"
-version = "0.1.0"
-dependencies = [
- "tezos_crypto_rs",
- "tezos_data_encoding",
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_debug",
- "tezos_smart_rollup_encoding",
- "tezos_smart_rollup_entrypoint",
- "tezos_smart_rollup_host",
- "tezos_smart_rollup_mock",
- "tezos_smart_rollup_storage",
-]
-
-[[package]]
-name = "tezos_smart_rollup_core"
-version = "0.1.0"
-dependencies = [
- "mockall",
-]
-
-[[package]]
-name = "tezos_smart_rollup_debug"
-version = "0.1.0"
-dependencies = [
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_host",
-]
-
-[[package]]
-name = "tezos_smart_rollup_encoding"
-version = "0.1.0"
-dependencies = [
- "hex",
- "nom",
- "num-bigint",
- "num-traits",
- "proptest",
- "tezos_crypto_rs",
- "tezos_data_encoding",
- "tezos_data_encoding_derive",
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_host",
- "tezos_smart_rollup_mock",
- "thiserror",
- "time",
-]
-
-[[package]]
-name = "tezos_smart_rollup_entrypoint"
-version = "0.1.0"
-dependencies = [
- "dlmalloc",
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_debug",
- "tezos_smart_rollup_host",
- "tezos_smart_rollup_panic_hook",
-]
-
-[[package]]
-name = "tezos_smart_rollup_host"
-version = "0.1.0"
-dependencies = [
- "mockall",
- "tezos_crypto_rs",
- "tezos_smart_rollup_core",
- "thiserror",
-]
-
-[[package]]
-name = "tezos_smart_rollup_installer"
-version = "0.1.0"
-dependencies = [
- "blst",
- "clap",
- "hex",
- "tezos_smart_rollup_encoding",
- "thiserror",
- "wasm-gen",
-]
-
-[[package]]
-name = "tezos_smart_rollup_mock"
-version = "0.1.0"
-dependencies = [
- "hex",
- "tezos_crypto_rs",
- "tezos_data_encoding",
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_encoding",
- "tezos_smart_rollup_host",
-]
-
-[[package]]
-name = "tezos_smart_rollup_panic_hook"
-version = "0.1.0"
-dependencies = [
- "tezos_smart_rollup_core",
-]
-
-[[package]]
-name = "tezos_smart_rollup_storage"
-version = "0.1.0"
-dependencies = [
- "tezos_smart_rollup_core",
- "tezos_smart_rollup_debug",
- "tezos_smart_rollup_encoding",
- "tezos_smart_rollup_host",
- "tezos_smart_rollup_mock",
- "thiserror",
 ]
 
 [[package]]

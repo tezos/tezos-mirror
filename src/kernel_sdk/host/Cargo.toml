@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_smart_rollup_host"
+name = "tezos-smart-rollup-host"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
 
 [dependencies.tezos_crypto_rs]
 version = "0.4"
@@ -22,8 +22,8 @@ optional = true
 [dev-dependencies]
 mockall = "0.11.0"
 
-[dev-dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
+[dev-dependencies.tezos-smart-rollup-core]
+path = "../core"
 features = ["testing"]
 
 [features]

@@ -67,13 +67,13 @@ rust-version = "1.66"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tezos_smart_rollup = { git = "https://gitlab.com/tezos/tezos.git" }
+tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git" }
 tezos_data_encoding = "0.4"
 tezos_crypto_rs = { version = "0.4", default-features = false }
 nom = "6"
 
 [dev-dependencies]
-tezos_smart_rollup = { git = "https://gitlab.com/tezos/tezos.git", features = ["testing"] }
+tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git", features = ["testing"] }
 ```
 
 Note that the `cdylib` crate type is required to enable compilation to wasm.

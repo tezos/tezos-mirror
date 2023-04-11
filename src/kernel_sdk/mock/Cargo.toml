@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_smart_rollup_mock"
+name = "tezos-smart-rollup-mock"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,18 +12,18 @@ hex = "0.4"
 tezos_crypto_rs = { version = "0.4", default-features = false }
 tezos_data_encoding = "0.4"
 
-[dependencies.tezos_smart_rollup_encoding]
-path = "../tezos_smart_rollup_encoding"
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
 default-features = false
 
-[dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
 default-features = false
 
-[dependencies.tezos_smart_rollup_host]
-path = "../tezos_smart_rollup_host"
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
 default-features = false
 
-[dev-dependencies.tezos_smart_rollup_host]
-path = "../tezos_smart_rollup_host"
+[dev-dependencies.tezos-smart-rollup-host]
+path = "../host"
 features = ["default"]

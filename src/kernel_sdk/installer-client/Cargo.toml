@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_smart_rollup_installer"
+name = "tezos-smart-rollup-installer"
 version = "0.1.0"
 edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -21,8 +21,8 @@ path = "src/main.rs"
 version = "0.3.10"
 features = ["portable"]
 
-[dependencies.tezos_smart_rollup_encoding]
-path = "../tezos_smart_rollup_encoding"
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
 
 [dependencies.clap]
 version = "4.1"

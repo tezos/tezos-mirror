@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_smart_rollup_encoding"
+name = "tezos-smart-rollup-encoding"
 version = "0.1.0"
 edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -25,16 +25,16 @@ proptest = { version = "1.0", optional = true }
 hex = { version = "0.4.3", optional = true }
 thiserror = { version = "1.0", optional = true }
 
-[dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
 default-features = false
 
-[dependencies.tezos_smart_rollup_host]
-path = "../tezos_smart_rollup_host"
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
 default-features = false
 
-[dev-dependencies.tezos_smart_rollup_mock]
-path = "../tezos_smart_rollup_mock"
+[dev-dependencies.tezos-smart-rollup-mock]
+path = "../mock"
 
 [features]
 default = ["alloc", "tezos-encoding"]

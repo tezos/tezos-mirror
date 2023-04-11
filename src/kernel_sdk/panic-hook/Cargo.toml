@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_smart_rollup_panic_hook"
+name = "tezos-smart-rollup-panic-hook"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies.tezos_smart_rollup_core]
-path = "../tezos_smart_rollup_core"
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
 
 [features]
 default = ["abort", "debug"]

@@ -26,12 +26,12 @@ check:
 	@cargo check --target wasm32-unknown-unknown
 
 build: check installer.wasm
-	@cargo build -p tezos_smart_rollup_installer \
+	@cargo build -p tezos-smart-rollup-installer \
 		--release \
                 $(NATIVE_OPT)
 
 installer.wasm:
-	@cargo build -p installer_kernel \
+	@cargo build -p installer-kernel \
 		--target wasm32-unknown-unknown \
 		--release \
 		--no-default-features \
