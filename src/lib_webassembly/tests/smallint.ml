@@ -1,7 +1,8 @@
 (* Testing
    -------
    Component:    WebAssembly
-   Invocation:   dune exec src/lib_webassembly/tests/main.exe
+   Invocation:   dune exec src/lib_webassembly/tests/main.exe \
+                  -- --file smallint.ml
    Subject:      Test small ints
 *)
 
