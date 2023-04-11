@@ -12,9 +12,15 @@ fmt:
 build:
   stage: build
   image: ocaml/opam:ubuntu-22.04-ocaml-4.14
+  parallel:
+    matrix:
+      - ARCH: ["amd64", "arm64"]
   tags:
-    - amd64
+    - ${ARCH}
   variables:
+    # Build blst used by ocaml-bls12-381 without ADX to support old CPU
+    # architectures.
+    # See https://gitlab.com/tezos/tezos/-/issues/1788
     BLST_PORTABLE: "yes"
   before_script:
     - sudo apt update
@@ -22,46 +28,37 @@ build:
     - OPAMJOBS=`nproc` opam-2.1 install --deps-only -y ./teztale-full.opam
     - dune build
   artifacts:
-    name: binaries
+    name: binaries-${ARCH}
     expire_in: 1 week
     paths:
       - archiver/main.exe
       - server/main.exe
 
-server_docker:
+docker:
   stage: docker
-  needs: ["build"]
   image: docker
+  parallel:
+    matrix:
+      - ARCH: ["amd64", "arm64"]
+        TARGET: ["server", "archiver"]
+  needs:
+    - job: "build"
+      artifacts: false
+      # actualy sure we want artifacts but only the one of our arch so we download them in the script
   tags:
     - devops
-    - amd64
+    - ${ARCH}
+  before_script:
+    - apk --no-cache add curl
   script:
+    - echo ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/download\?job=build%20%5B${ARCH}%5D\&job_token=${CI_JOB_TOKEN}
+    - curl -L -o artifacts.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/download\?job=build:%20%5B${ARCH}%5D\&job_token=${CI_JOB_TOKEN} && unzip artifacts.zip && rm artifacts.zip
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t ${CI_REGISTRY_IMAGE}/server:${CI_COMMIT_REF_SLUG} -f Dockerfile.server .
-    - docker push ${CI_REGISTRY_IMAGE}/server:${CI_COMMIT_REF_SLUG}
+    - docker build -t ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${CI_COMMIT_REF_SLUG} -f Dockerfile.${TARGET} .
+    - docker push ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${CI_COMMIT_REF_SLUG}
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: never
-    - if: $CI_REGISTRY_IMAGE
-      when: manual
-      allow_failure: true
-
-archiver_docker:
-  stage: docker
-  needs: ["build"]
-  image: docker
-  tags:
-    - devops
-    - amd64
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t ${CI_REGISTRY_IMAGE}/archiver:${CI_COMMIT_REF_SLUG} -f Dockerfile.archiver .
-    - docker push ${CI_REGISTRY_IMAGE}/archiver:${CI_COMMIT_REF_SLUG}
-  rules:
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
-    - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: never
     - if: $CI_REGISTRY_IMAGE
