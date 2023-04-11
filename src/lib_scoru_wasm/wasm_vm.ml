@@ -73,7 +73,22 @@ let get_wasm_version {durable; _} =
   let+ bytes = Tezos_lazy_containers.Chunked_byte_vector.to_bytes cbv in
   Data_encoding.Binary.of_bytes_exn Wasm_pvm_state.version_encoding bytes
 
-let stack_size_limit = function Wasm_pvm_state.V0 -> 300 | V1 -> 2048
+let stack_size_limit = function Wasm_pvm_state.V0 -> 300 | V1 -> 60_000
+(* The limit 60_000 has been chosen such that the simplest WASM program
+   consisting in trying to recursively call 60,000 times the same function
+   results in Wasmer raising a runtime error.
+
+   (module
+     (memory 1)
+     (export "mem" (memory 0))
+     (func $aux (param $n i32)
+       (i32.ne (local.get $n) (i32.const 0))
+       (if (then (call $aux (i32.sub (local.get $n) (i32.const 1))))))
+     (func (export "kernel_run")
+       (call $aux (i32.const 66_000))))
+
+   As a result, the key idea is that any program executing with Wasmer without
+   an error could be executing by the WASM PVM. *)
 
 let patch_flags_on_eval_successful durable =
   let open Lwt_syntax in
