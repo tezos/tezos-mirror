@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Context
+   Invocation:   dune exec src/lib_context/test/main.exe \
+                  -- --file test_merkle_proof.ml
+   Subject:      Test merkle proof.
+*)
+
 open Tezos_context_disk
 open Context.Proof
 open Qcheck2_helpers
