@@ -196,11 +196,13 @@ type ('peer, 'message_id) parameters = {
 module type SCORE = sig
   include Compare.S
 
+  type time
+
   val float : t -> float
 
-  val zero : t
-
   val penalty : t -> int -> t
+
+  val expires : t -> time option
 end
 
 module type AUTOMATON = sig
@@ -228,7 +230,7 @@ module type AUTOMATON = sig
   module Span : PRINTABLE
 
   (** Module for peers scores *)
-  module Score : SCORE
+  module Score : SCORE with type time = Time.t
 
   type message = Message.t
 
@@ -525,10 +527,6 @@ module type AUTOMATON = sig
   module Introspection : sig
     type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
-    type peer_status = Connected | Disconnected of {expires : Time.t}
-
-    type peer_score = {score : Score.t; peer_status : peer_status}
-
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
     module Message_cache : sig
@@ -554,7 +552,7 @@ module type AUTOMATON = sig
       limits : limits;
       parameters : parameters;
       connections : connection Peer.Map.t;
-      scores : peer_score Peer.Map.t;
+      scores : Score.t Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
