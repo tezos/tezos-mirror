@@ -302,7 +302,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5\"\nlet name = Tezos_protocol_environment_017_PtNairob.Name.name\ninclude Tezos_raw_protocol_017_PtNairob\ninclude Tezos_raw_protocol_017_PtNairob.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf\"\nlet name = Tezos_protocol_environment_017_PtNairob.Name.name\ninclude Tezos_raw_protocol_017_PtNairob\ninclude Tezos_raw_protocol_017_PtNairob.Main\n")))
 
 (rule
  (targets tezos_protocol_017_PtNairob.ml)

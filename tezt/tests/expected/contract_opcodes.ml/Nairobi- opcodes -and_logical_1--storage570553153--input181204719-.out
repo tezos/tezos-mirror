@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/and_logical_1.tz on storage False and input '(Pair True False)' --level 1 --trace-stack
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/and_logical_1.tz on storage False and input '(Pair True False)' --level 1 --trace-stack
 storage
   False
 emitted operations

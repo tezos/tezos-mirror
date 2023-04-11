@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/view_registers_callers.tz --details
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/view_registers_callers.tz --details
 Well typed
 Gas remaining: 1039990.957 units remaining
 { parameter unit ;
