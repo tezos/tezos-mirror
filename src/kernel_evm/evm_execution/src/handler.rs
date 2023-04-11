@@ -149,6 +149,8 @@ pub struct EvmHandler<'a, Host: Runtime> {
     host: &'a mut Host,
     /// The ethereum accounts storage
     evm_account_storage: &'a mut EthereumAccountStorage,
+    /// The original caller initiating the toplevel transaction
+    origin: H160,
     /// The constants for the current block
     pub block: &'a BlockConstants,
     /// The precompiled functions
@@ -165,6 +167,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     pub fn new(
         host: &'a mut Host,
         evm_account_storage: &'a mut EthereumAccountStorage,
+        origin: H160,
         block: &'a BlockConstants,
         config: &'a Config,
         precompiles: &'a dyn PrecompileSet<Host>,
@@ -173,6 +176,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         Self {
             host,
             evm_account_storage,
+            origin,
             block,
             config,
             precompiles,
@@ -765,7 +769,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn gas_left(&self) -> U256 {
-        todo!("To be done when we do gas and transactions. No milestone or issue yet")
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5321
+        // Use the gasometer to find amount of gas left for current execution
+        U256::zero() // STUB
     }
 
     fn gas_price(&self) -> U256 {
@@ -773,7 +779,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn origin(&self) -> H160 {
-        todo!("Milestone: https://gitlab.com/tezos/tezos/-/milestones/115")
+        self.origin
     }
 
     fn block_hash(&self, number: U256) -> H256 {
@@ -814,7 +820,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn deleted(&self, address: H160) -> bool {
-        todo!("https://gitlab.com/tezos/tezos/-/milestones/109")
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5321
+        // If a contract suicides it gets deleted. Keep track of those deletionsin the handler
+        false // STUB
     }
 
     fn is_cold(&self, address: H160, index: Option<H256>) -> bool {
@@ -847,7 +855,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
-        todo!("https://gitlab.com/tezos/tezos/-/milestones/109")
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5321
+        // Contract suicide will mark a contract for deletion.
+        Ok(()) // STUB
     }
 
     fn create(
@@ -975,17 +985,25 @@ mod test {
         let config = Config::london();
         let gas_limit = 1000_u64;
 
+        // This is a randomly generated address. It has been used for testing legacy address
+        // generation with zero nonce using Ethereum. To replicate (with new address):
+        // - generate a fresh Ethereum account (on Rinkeby or other test net)
+        // - make sure it has eth (transfer from faucet)
+        // - check nonce is zero (or bump nonce accordingly below)
+        // - create a new contract. Any contract will do.
+        // - check address of new contract - it is `expected_result` below.
+        let caller: H160 =
+            H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
             gas_limit,
         );
-
-        let caller: H160 =
-            H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
         let result = handler.create_address(CreateScheme::Legacy { caller });
 
@@ -1003,18 +1021,19 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller: H160 =
+            H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
             gas_limit,
         );
 
-        let caller: H160 =
-            H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
         let code_hash: H256 = CODE_HASH_DEFAULT;
         let salt: H256 = H256::zero();
 
@@ -1038,18 +1057,19 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller: H160 =
+            H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
             gas_limit,
         );
 
-        let caller: H160 =
-            H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
         let code_hash: H256 = CODE_HASH_DEFAULT;
         let salt: H256 = H256::from_str(
             "0000000000000000000000000000000000000000000000000000000000000001",
@@ -1069,17 +1089,22 @@ mod test {
     }
 
     #[test]
-    fn contract_call_produces_correct_output() {
+    fn origin_instruction_returns_origin_address() {
         let mut mock_runtime = MockHost::default();
         let block = block::BlockConstants::first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller = H160::from_low_u64_be(28349_u64);
+
+        // We use an origin distinct from caller for testing purposes
+        let origin = H160::from_low_u64_be(117_u64);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            origin,
             &block,
             &config,
             &precompiles,
@@ -1087,7 +1112,70 @@ mod test {
         );
 
         let address = H160::from_low_u64_be(213_u64);
+        let input = vec![0_u8];
+        let gas_limit: Option<u64> = None;
+        let is_static = false;
+        let transaction_context = TransactionContext::new(caller, address, U256::zero());
+        let transfer: Option<Transfer> = None;
+        let code: Vec<u8> = vec![
+            Opcode::ORIGIN.as_u8(), // Push the 32(!) byte origin on to stack (this is "the value")
+            Opcode::PUSH1.as_u8(), // Push a zero valued word onto stack (this is "the address")
+            0_u8,
+            Opcode::MSTORE.as_u8(), // Store "the value" at "the address"
+            Opcode::PUSH1.as_u8(),  // Push value 2 onto stack - this is "number of bytes"
+            32_u8,
+            Opcode::PUSH1.as_u8(), // Push value 0 onto stack - this is "the address" again
+            0_u8,
+            Opcode::RETURN.as_u8(), // Return "number of bytes" at "the address" in the RETURNBUFFER
+        ];
+
+        set_code(&mut handler, &address, code);
+
+        let result = handler.execute_call(
+            address,
+            transfer,
+            input,
+            gas_limit,
+            is_static,
+            transaction_context,
+        );
+
+        match result {
+            Ok(result) => {
+                let expected_result = (
+                    ExitReason::Succeed(ExitSucceed::Returned),
+                    H256::from(origin).0.to_vec(),
+                );
+                assert_eq!(result, expected_result);
+                assert_eq!(handler.gas_used(), 17);
+            }
+            Err(err) => {
+                panic!("Expected Ok, but got {:?}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn contract_call_produces_correct_output() {
+        let mut mock_runtime = MockHost::default();
+        let block = block::BlockConstants::first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::london();
+        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(28349_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            gas_limit,
+        );
+
+        let address = H160::from_low_u64_be(213_u64);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
         let is_static = false;
@@ -1177,10 +1265,12 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller = H160::from_low_u64_be(2340);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
@@ -1192,7 +1282,6 @@ mod test {
         input_value.to_big_endian(&mut input);
 
         let address = H160::from_low_u64_be(118);
-        let caller = H160::from_low_u64_be(2340);
         let gas_limit: Option<u64> = None;
         let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
@@ -1279,10 +1368,12 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller = H160::from_low_u64_be(8213);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
@@ -1294,7 +1385,6 @@ mod test {
         input_value.to_big_endian(&mut input);
 
         let address = H160::from_low_u64_be(12389);
-        let caller = H160::from_low_u64_be(8213);
         let gas_limit: Option<u64> = None;
         let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
@@ -1373,10 +1463,12 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 100000_u64;
+        let caller = H160::from_low_u64_be(444);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
@@ -1384,7 +1476,6 @@ mod test {
         );
 
         let address = H160::from_low_u64_be(312);
-        let caller = H160::from_low_u64_be(444);
         let input: Vec<u8> = vec![0_u8];
         let gas_limit: Option<u64> = None;
         let is_static = false;
@@ -1447,17 +1538,18 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 100000_u64;
+        let caller = H160::from_low_u64_be(117);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
             gas_limit,
         );
 
-        let caller = H160::from_low_u64_be(117);
         let gas_limit: Option<u64> = None;
         let value = U256::zero();
         let create_scheme = CreateScheme::Legacy { caller };
@@ -1493,10 +1585,12 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller = H160::from_low_u64_be(118);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
@@ -1504,7 +1598,6 @@ mod test {
         );
 
         let address = H160::from_low_u64_be(117);
-        let caller = H160::from_low_u64_be(118);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
         let is_static = false;
@@ -1558,10 +1651,12 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 50_u64;
+        let caller = H160::from_low_u64_be(118_u64);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
@@ -1569,7 +1664,6 @@ mod test {
         );
 
         let address = H160::from_low_u64_be(117_u64);
-        let caller = H160::from_low_u64_be(118_u64);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
         let is_static = false;
@@ -1627,10 +1721,12 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
         let gas_limit = 1000_u64;
+        let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
@@ -1638,7 +1734,6 @@ mod test {
         );
 
         let address = H160::from_low_u64_be(210_u64);
-        let caller = H160::from_low_u64_be(523_u64);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
         let is_static = false;

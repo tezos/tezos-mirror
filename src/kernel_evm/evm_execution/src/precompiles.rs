@@ -195,6 +195,7 @@ mod tests {
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
+            caller,
             &block,
             &config,
             &precompiles,
