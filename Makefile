@@ -268,6 +268,13 @@ test-unit-alpha:
 test-js:
 	@dune build --error-reporting=twice @runtest_js
 
+# separate job to use tezt with js. Eventually should be merged with
+# the job about (test-js) . For the moment this is not run in the CI
+# TODO: https://gitlab.com/tezos/tezos/-/issues/5377
+.PHONY: tezt-js
+tezt-js:
+	@dune build --error-reporting=twice @runtezt_js
+
 .PHONY: build-tezt
 build-tezt:
 	@dune build tezt

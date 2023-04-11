@@ -88,6 +88,9 @@ val of_pp : (Format.formatter -> 'a -> return) -> 'a testable
 (** [equal t] is [t]'s equality. *)
 val equal : 'a testable -> 'a -> 'a -> bool
 
+(** The [unit] testable type. *)
+val unit : unit testable
+
 (** The [string] testable type. *)
 val string : string testable
 

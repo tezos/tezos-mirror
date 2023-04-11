@@ -3,79 +3,72 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm))))
 
-(executables
- (names test_hacl test_prop_hacl_hash test_prop_signature_pk)
- (modes native js)
+(library
+ (name src_lib_hacl_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-stdlib
   tezos-error-monad
+  tezos-lwt-result-stdlib
   zarith
   zarith_stubs_js
   data-encoding
   tezos-hacl
   qcheck-alcotest
+  octez-alcotezt
   tezos-test-helpers)
  (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_stdlib
   -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_lwt_result_stdlib
   -open Data_encoding
   -open Tezos_hacl
+  -open Octez_alcotezt
   -open Tezos_test_helpers)
- (modules (:standard \ test)))
-
-(rule
- (alias runtest)
- (package tezos-hacl)
- (action (run %{dep:./test_hacl.exe})))
-
-(rule
- (alias runtest)
- (package tezos-hacl)
- (action (run %{dep:./test_prop_hacl_hash.exe})))
-
-(rule
- (alias runtest)
- (package tezos-hacl)
- (action (run %{dep:./test_prop_signature_pk.exe})))
-
-(rule
- (alias runtest_js)
- (package tezos-hacl)
- (action (run node %{dep:./test_hacl.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-hacl)
- (action (run node %{dep:./test_prop_hacl_hash.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-hacl)
- (action (run node %{dep:./test_prop_signature_pk.bc.js})))
+ (modules
+  test_prop_signature_pk
+  test_hacl
+  test_prop_hacl_hash
+  test
+  vectors_p256
+  vectors_ed25519))
 
 (executable
- (name test)
- (modes native js)
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
  (libraries
-  tezos-stdlib
-  tezos-error-monad
-  zarith
-  zarith_stubs_js
-  data-encoding
-  tezos-hacl
-  qcheck-alcotest
-  tezos-test-helpers)
- (js_of_ocaml)
- (flags
-  (:standard)
-  -open Tezos_test_helpers)
- (modules test))
+  src_lib_hacl_test_tezt_lib
+  tezt)
+ (modules main))
 
-(rule (alias runtest) (package tezos-hacl) (action (run %{dep:./test.exe})))
+(rule (alias runtezt) (package tezos-hacl) (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest_js)
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_hacl_test_tezt_lib
+  tezt.js)
+ (js_of_ocaml)
+ (modules main_js))
+
+(rule
+ (alias runtezt_js)
  (package tezos-hacl)
- (action (run node %{dep:./test.bc.js})))
+ (action (run node %{dep:./main_js.bc.js})))
+
+(rule
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

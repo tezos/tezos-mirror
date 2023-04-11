@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_hacl/runtest
+    Invocation:   dune exec src/lib_hacl/test/main.exe
     Subject:      Checking all of the HACL* primitives used in lib_crypto:
                   hashing, HMAC, NaCl, Ed25519, and P-256.
 *)
@@ -131,13 +131,9 @@ let test_sha256_seq () =
       of_hex "ddabe6c4552e944d927bd0b03dd5ab95ecdfa5a135b6c3b60416dbde57b38416"
     in
     let st = init () in
-    Printf.printf "Init done\n" ;
     update st msg ;
     update st randmsg ;
-    print_endline "Update done." ;
     let d = finish st in
-    Printf.printf "Digest size %d\n" (Bytes.length d) ;
-    print_endline "Finish done." ;
     Alcotest.(check bytes "sha256_seq" bothresp d)
   in
   one_update () ;
@@ -505,4 +501,4 @@ let tests =
     ("p256", p256);
   ]
 
-let () = Alcotest.run "tezos-crypto" tests
+let () = Alcotest.run ~__FILE__ "tezos-crypto" tests

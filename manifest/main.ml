@@ -784,42 +784,30 @@ let _octez_hacl_gen =
          ])
 
 let _octez_hacl_tests =
-  tests
-    ["test_hacl"; "test_prop_hacl_hash"; "test_prop_signature_pk"]
+  tezt
+    [
+      "test_prop_signature_pk";
+      "test_hacl";
+      "test_prop_hacl_hash";
+      "test";
+      "vectors_p256";
+      "vectors_ed25519";
+    ]
     ~path:"src/lib_hacl/test"
     ~opam:"tezos-hacl"
     ~deps:
       [
         octez_stdlib |> open_;
         octez_error_monad |> open_ ~m:"TzLwtreslib";
+        octez_lwt_result_stdlib |> open_;
         zarith;
         zarith_stubs_js;
         data_encoding |> open_;
         octez_hacl |> open_;
         qcheck_alcotest;
+        alcotezt;
         octez_test_helpers |> open_;
       ]
-    ~all_modules_except:["test"]
-    ~modes:[Native; JS]
-    ~js_compatible:true
-
-let _octez_hacl_tests_1 =
-  test
-    "test"
-    ~path:"src/lib_hacl/test"
-    ~opam:"tezos-hacl"
-    ~deps:
-      [
-        octez_stdlib;
-        octez_error_monad;
-        zarith;
-        zarith_stubs_js;
-        data_encoding;
-        octez_hacl;
-        qcheck_alcotest;
-        octez_test_helpers |> open_;
-      ]
-    ~modules:["test"]
     ~modes:[Native; JS]
     ~js_compatible:true
 
