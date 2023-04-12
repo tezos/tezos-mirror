@@ -124,6 +124,14 @@ module Simple = struct
         "Warning: DAL is enabled in the protocol but no DAL node was provided \
          for the rollup node."
       ()
+
+  let acquiring_lock =
+    declare_0
+      ~section
+      ~name:"acquiring_lock"
+      ~level:Notice
+      ~msg:"Acquiring lock on data directory."
+      ()
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -157,3 +165,5 @@ let kernel_debug_dont_wait msg =
   Simple.(emit__dont_wait__use_with_care kernel_debug) msg
 
 let warn_dal_enabled_no_node () = Simple.(emit warn_dal_enabled_no_node) ()
+
+let acquiring_lock () = Simple.(emit acquiring_lock) ()
