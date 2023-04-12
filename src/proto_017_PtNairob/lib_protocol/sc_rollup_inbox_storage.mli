@@ -52,12 +52,11 @@ val add_deposit :
 val init_inbox :
   predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-(** Adds the [Protocol_migration] in the in-memory inbox level witness. *)
-val add_protocol_migration : Raw_context.t -> Raw_context.t
-
-(** Adds the [Info_per_level] in the in-memory inbox level witness. *)
-val add_info_per_level :
-  predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t
+(** Adds the [Info_per_level] in the in-memory inbox level witness. If
+    the current level is the first level of the current protocol then
+    also add [Migration] message.  *)
+val add_level_info :
+  predecessor:Block_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [finalize_inbox_level ctxt] ends the internal representation for the block.
 *)

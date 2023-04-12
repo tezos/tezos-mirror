@@ -59,7 +59,7 @@ let invoice_contract ctxt ~address ~amount_mutez =
   See !3730 for an example.
 *)
 
-let patch_script (address, hash, patched_code) ctxt =
+let patch_script ctxt (address, hash, patched_code) =
   Contract_repr.of_b58check address >>?= fun contract ->
   Storage.Contract.Code.find ctxt contract >>=? fun (ctxt, code_opt) ->
   Logging.log Notice "Patching %s... " address ;
@@ -164,17 +164,16 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
   (* Please update [next_protocol] and [previous_protocol] in
      [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
       (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
-         if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
+         if that is done, do not set Storage.Tenderbake.First_level_of_protocol.
+         /!\ this storage is also use to add the smart rollup
+             inbox migration message. see `sc_rollup_inbox_storage`. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       Storage.Legacy.Grand_parent_branch.remove ctxt >>= fun ctxt ->
-      (* This needs to be kept in the migration code for every
-         protocol, except Genesis. *)
-      let ctxt = Sc_rollup_inbox_storage.add_protocol_migration ctxt in
       return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
-  List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
+  List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates

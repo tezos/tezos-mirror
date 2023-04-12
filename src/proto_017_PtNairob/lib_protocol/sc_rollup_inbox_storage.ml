@@ -122,16 +122,8 @@ let finalize_inbox_level ctxt =
   in
   Store.Inbox.update ctxt inbox
 
-let add_protocol_migration ctxt =
-  let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
-  let witness =
-    Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload_no_history
-      witness
-      Raw_context.protocol_migration_serialized_message
-  in
-  Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
-
-let add_info_per_level ~predecessor ctxt =
+let add_level_info ~predecessor ctxt =
+  let open Lwt_result_syntax in
   let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
   let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
   let witness =
@@ -139,6 +131,20 @@ let add_info_per_level ~predecessor ctxt =
       ~predecessor_timestamp
       ~predecessor
       witness
+  in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let+ first_level = Storage.Tenderbake.First_level_of_protocol.get ctxt in
+  let is_first_level_of_protocol =
+    (* first_level is set at the last block of a protocol, when mig is
+       run. *)
+    Int32.equal (Raw_level_repr.diff current_level first_level) 1l
+  in
+  let witness =
+    if is_first_level_of_protocol then
+      Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload_no_history
+        witness
+        Raw_context.protocol_migration_serialized_message
+    else witness
   in
   Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
 

@@ -3318,12 +3318,12 @@ module Baking_rights = struct
       ()
 end
 
-module Endorsing_rights = struct
+module Attestation_rights = struct
   type delegate_rights = {
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.Public_key_hash.t;
     first_slot : Slot.t;
-    endorsing_power : int;
+    attestation_power : int;
   }
 
   type t = {
@@ -3332,20 +3332,22 @@ module Endorsing_rights = struct
     estimated_time : Time.t option;
   }
 
-  let delegate_rights_encoding =
+  let delegate_rights_encoding use_endorsement =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; first_slot; endorsing_power} ->
-        (delegate, first_slot, endorsing_power, consensus_key))
-      (fun (delegate, first_slot, endorsing_power, consensus_key) ->
-        {delegate; first_slot; endorsing_power; consensus_key})
+      (fun {delegate; consensus_key; first_slot; attestation_power} ->
+        (delegate, first_slot, attestation_power, consensus_key))
+      (fun (delegate, first_slot, attestation_power, consensus_key) ->
+        {delegate; first_slot; attestation_power; consensus_key})
       (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
-         (req "endorsing_power" uint16)
+         (req
+            (if use_endorsement then "endorsing_power" else "attestation_power")
+            uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
-  let encoding =
+  let encoding ~use_endorsement =
     let open Data_encoding in
     conv
       (fun {level; delegates_rights; estimated_time} ->
@@ -3354,22 +3356,24 @@ module Endorsing_rights = struct
         {level; delegates_rights; estimated_time})
       (obj3
          (req "level" Raw_level.encoding)
-         (req "delegates" (list delegate_rights_encoding))
+         (req "delegates" (list (delegate_rights_encoding use_endorsement)))
          (opt "estimated_time" Timestamp.encoding))
 
   module S = struct
     open Data_encoding
 
-    let path = RPC_path.(path / "endorsing_rights")
+    let attestation_path = RPC_path.(path / "attestation_rights")
 
-    type endorsing_rights_query = {
+    let endorsing_path = RPC_path.(path / "endorsing_rights")
+
+    type attestation_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
       delegates : Signature.Public_key_hash.t list;
       consensus_keys : Signature.Public_key_hash.t list;
     }
 
-    let endorsing_rights_query =
+    let attestation_rights_query =
       let open RPC_query in
       query (fun levels cycle delegates consensus_keys ->
           {levels; cycle; delegates; consensus_keys})
@@ -3381,10 +3385,36 @@ module Endorsing_rights = struct
              t.consensus_keys)
       |> seal
 
+    let attestation_rights =
+      RPC_service.get_service
+        ~description:
+          "Retrieves the delegates allowed to attest a block.\n\
+           By default, it gives the attestation power for delegates that have \
+           at least one attestation slot for the next block.\n\
+           Parameters `level` and `cycle` can be used to specify the (valid) \
+           level(s) in the past or future at which the attestation rights have \
+           to be returned. Parameter `delegate` can be used to restrict the \
+           results to the given delegates.\n\
+           Parameter `consensus_key` can be used to restrict the results to \
+           the given consensus_keys. \n\
+           Returns the smallest attestation slots and the attestation power. \
+           Also returns the minimal timestamp that corresponds to attestation \
+           at the given level. The timestamps are omitted for levels in the \
+           past, and are only estimates for levels higher that the next \
+           block's, based on the hypothesis that all predecessor blocks were \
+           baked at the first round."
+        ~query:attestation_rights_query
+        ~output:(list (encoding ~use_endorsement:false))
+        attestation_path
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5156
+       endorsing_rights RPC should be removed once the depreciation period
+       will be over *)
     let endorsing_rights =
       RPC_service.get_service
         ~description:
-          "Retrieves the delegates allowed to endorse a block.\n\
+          "Deprecated: use `attestation_rights` instead.\n\
+           Retrieves the delegates allowed to endorse a block.\n\
            By default, it gives the endorsing power for delegates that have at \
            least one endorsing slot for the next block.\n\
            Parameters `level` and `cycle` can be used to specify the (valid) \
@@ -3399,12 +3429,12 @@ module Endorsing_rights = struct
            are only estimates for levels higher that the next block's, based \
            on the hypothesis that all predecessor blocks were baked at the \
            first round."
-        ~query:endorsing_rights_query
-        ~output:(list encoding)
-        path
+        ~query:attestation_rights_query
+        ~output:(list (encoding ~use_endorsement:true))
+        endorsing_path
   end
 
-  let endorsing_rights_at_level ctxt level =
+  let attestation_rights_at_level ctxt level =
     Baking.endorsing_rights_by_first_slot ctxt level >>=? fun (ctxt, rights) ->
     Round.get ctxt >>=? fun current_round ->
     let current_level = Level.current ctxt in
@@ -3426,9 +3456,9 @@ module Endorsing_rights = struct
                  consensus_pk = _;
                  consensus_pkh = consensus_key;
                },
-               endorsing_power )
+               attestation_power )
              acc ->
-          {delegate; consensus_key; first_slot; endorsing_power} :: acc)
+          {delegate; consensus_key; first_slot; attestation_power} :: acc)
         rights
         []
     in
@@ -3436,46 +3466,46 @@ module Endorsing_rights = struct
     return
       (ctxt, {level = level.level; delegates_rights = rights; estimated_time})
 
+  let get_attestation_rights ctxt (q : S.attestation_rights_query) =
+    let cycles = match q.cycle with None -> [] | Some cycle -> [cycle] in
+    let levels =
+      requested_levels ~default_level:(Level.current ctxt) ctxt cycles q.levels
+    in
+    List.fold_left_map_es attestation_rights_at_level ctxt levels
+    >|=? fun (_ctxt, rights_per_level) ->
+    let rights_per_level =
+      match (q.consensus_keys, q.delegates) with
+      | [], [] -> rights_per_level
+      | _, _ ->
+          let is_requested p =
+            List.exists
+              (Signature.Public_key_hash.equal p.consensus_key)
+              q.consensus_keys
+            || List.exists
+                 (Signature.Public_key_hash.equal p.delegate)
+                 q.delegates
+          in
+          List.filter_map
+            (fun rights_at_level ->
+              match
+                List.filter is_requested rights_at_level.delegates_rights
+              with
+              | [] -> None
+              | delegates_rights -> Some {rights_at_level with delegates_rights})
+            rights_per_level
+    in
+    rights_per_level
+
   let register () =
+    Registration.register0 ~chunked:true S.attestation_rights (fun ctxt q () ->
+        get_attestation_rights ctxt q) ;
     Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
-        let cycles = match q.cycle with None -> [] | Some cycle -> [cycle] in
-        let levels =
-          requested_levels
-            ~default_level:(Level.current ctxt)
-            ctxt
-            cycles
-            q.levels
-        in
-        List.fold_left_map_es endorsing_rights_at_level ctxt levels
-        >|=? fun (_ctxt, rights_per_level) ->
-        let rights_per_level =
-          match (q.consensus_keys, q.delegates) with
-          | [], [] -> rights_per_level
-          | _, _ ->
-              let is_requested p =
-                List.exists
-                  (Signature.Public_key_hash.equal p.consensus_key)
-                  q.consensus_keys
-                || List.exists
-                     (Signature.Public_key_hash.equal p.delegate)
-                     q.delegates
-              in
-              List.filter_map
-                (fun rights_at_level ->
-                  match
-                    List.filter is_requested rights_at_level.delegates_rights
-                  with
-                  | [] -> None
-                  | delegates_rights ->
-                      Some {rights_at_level with delegates_rights})
-                rights_per_level
-        in
-        rights_per_level)
+        get_attestation_rights ctxt q)
 
   let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(consensus_keys = [])
       block =
     RPC_context.make_call0
-      S.endorsing_rights
+      S.attestation_rights
       ctxt
       block
       {levels; cycle; delegates; consensus_keys}
@@ -3654,7 +3684,7 @@ let register () =
   Contract.register () ;
   Big_map.register () ;
   Baking_rights.register () ;
-  Endorsing_rights.register () ;
+  Attestation_rights.register () ;
   Validators.register () ;
   Sc_rollup.register () ;
   Dal.register () ;

@@ -2121,12 +2121,12 @@ let rec parse_data :
   (* Lists *)
   | List_t (t, _ty_name), Seq (_loc, items) ->
       traced
-      @@ List.fold_right_es
-           (fun v (rest, ctxt) ->
+      @@ List.fold_left_es
+           (fun (rest, ctxt) v ->
              non_terminal_recursion ctxt t v >|=? fun (v, ctxt) ->
              (Script_list.cons v rest, ctxt))
-           items
            (Script_list.empty, ctxt)
+           (List.rev items)
   | List_t _, expr ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Tickets *)

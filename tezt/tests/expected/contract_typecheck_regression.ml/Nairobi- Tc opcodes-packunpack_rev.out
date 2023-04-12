@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/packunpack_rev.tz --details
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/packunpack_rev.tz --details
 Well typed
 Gas remaining: 1039888.774 units remaining
 { parameter (pair int nat string bytes mutez bool key_hash timestamp address) ;
