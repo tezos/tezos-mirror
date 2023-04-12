@@ -575,8 +575,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let add_score peer score =
       let open Monad.Syntax in
       let*! scores in
-      let peers = add_scores_score peer score scores in
-      set_scores peers
+      let scores = add_scores_score peer score scores in
+      set_scores scores
 
     let check_score peer threshold ~on_failure =
       let open Monad.Syntax in
