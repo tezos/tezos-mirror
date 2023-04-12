@@ -97,8 +97,44 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Fixed inverted logic for playing a timeout move in a refutation game (MR
+  :gl:`!7929`).
+
+- Stopped the node when the operator deposit is slashed (MR :gl:`!7579`).
+
+- Improved computations of refutation games’ dissections (MRs :gl:`!6948`,
+  :gl:`!7751`, :gl:`!8059`, :gl:`!8382`).
+
+- Improved WASM runtime performances (MR :gl:`!8252`).
+
+- Made the Fast Execution aware of the newly introduced WASM PVM versionning
+  (MR :gl:`!8079`).
+
+- Fixed UX issues related to the rollup node configuration (MRs :gl:`!8148`,
+  :gl:`!8254`, :gl:`!8156`).
+
+- Quality of life improvements in the Layer 1 injector (MRs :gl:`!7579`, :gl:`!7673`, :gl:`!7675`, :gl:`!7685`, :gl:`!7681`, :gl:`!7846`, :gl:`!8106`).
+
+- Fixed logs for kernel debug messages (MR :gl:`!7773`).
+
 Smart Rollup client
 -------------------
+
+- Fixed a JSON decoding error for the command ``get proof for message ...`` (MR
+  :gl:`!8000`).
+
+Smart Rollup WASM Debugger
+--------------------------
+
+- Let the user select the initial version of the WASM PVM (MR :gl:`!8078`).
+
+- Added commands to decode the contents of the memory and the durable storage
+  (MRs :gl:`!7464`, :gl:`!7709`, :gl:`!8303`).
+
+- Added the ``bench`` command (MR :gl:`!7551`).
+
+- Added commands to inspect the structure of the durable storage (MRs
+  :gl:`!7707`, :gl:`!8304`).
 
 Miscellaneous
 -------------
