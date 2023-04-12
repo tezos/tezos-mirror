@@ -168,31 +168,39 @@ fn apply_transaction<Host: Runtime>(
     let value: U256 = transaction.tx.value;
     let (dst_path, dst_address) = get_tx_receiver(&transaction.tx)?;
 
-    let (src_balance, status) = if sender_balance < value {
-        (sender_balance, TransactionStatus::Failure)
+    if sender_balance < value
+        || sender_nonce != transaction.tx.nonce
+        || !transaction.tx.clone().verify_signature()
+    {
+        Ok(make_receipt(
+            block,
+            transaction,
+            TransactionStatus::Failure,
+            index,
+            sender_address,
+            dst_address,
+        ))
     } else {
-        (sender_balance - value, TransactionStatus::Success)
-    };
-    update_account(
-        host,
-        &sender_path,
-        src_balance,
-        Some(sender_nonce + U256::one()),
-    )?;
+        update_account(
+            host,
+            &sender_path,
+            sender_balance - value,
+            Some(sender_nonce + U256::one()),
+        )?;
 
-    if status == TransactionStatus::Success {
         let dst_balance = storage::read_account_balance(host, &dst_path)
             .unwrap_or_else(|_| Wei::zero());
         update_account(host, &dst_path, dst_balance + value, None)?;
-    };
-    Ok(make_receipt(
-        block,
-        transaction,
-        status,
-        index,
-        sender_address,
-        dst_address,
-    ))
+
+        Ok(make_receipt(
+            block,
+            transaction,
+            TransactionStatus::Success,
+            index,
+            sender_address,
+            dst_address,
+        ))
+    }
 }
 
 // This function is only available in nightly, hence the need for redefinition
