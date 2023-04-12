@@ -10,7 +10,7 @@ programming languages.
 
 The REST API served by the Octez node on the RPC port is described by the union of several OpenAPI specifications:
 
-- ``rpc-openapi.json``, containing the protocol-independent (or "shell") RPCs
+- ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs
 - For each protocol in use:
 
   + ``$PROTOCOL-openapi.json`` (served under the prefix: ``/chains/<chain-id>/blocks/<block-id>``)
@@ -49,6 +49,8 @@ The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - `rpc-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+
+- `rpc-openapi-beta.json (version 17.0~beta1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi-rc.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
