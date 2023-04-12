@@ -47,8 +47,7 @@ val process_head :
   (Sc_rollup.Inbox.Hash.t
   * Sc_rollup.Inbox.t
   * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-  * Sc_rollup.Inbox_message.t list
-  * Context.rw)
+  * Sc_rollup.Inbox_message.t list)
   tzresult
   Lwt.t
 
@@ -96,8 +95,7 @@ module Internal_for_tests : sig
     (Sc_rollup.Inbox.Hash.t
     * Sc_rollup.Inbox.t
     * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-    * Sc_rollup.Inbox_message.t list
-    * Context.rw)
+    * Sc_rollup.Inbox_message.t list)
     tzresult
     Lwt.t
 end
