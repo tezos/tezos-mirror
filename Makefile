@@ -262,11 +262,13 @@ test-unit: test-nonproto-unit test-proto-unit
 test-unit-alpha:
 	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
-# TODO: https://gitlab.com/tezos/tezos/-/issues/3018
-# Disable verbose once the log file bug in Alcotest is fixed.
+# TODO: https://gitlab.com/tezos/tezos/-/issues/5377
+# Running the runtest/runtezt targets in parallel causes a hang. Until we find the cause,
+# we run the targets sequentially.
 .PHONY: test-js
 test-js:
 	@dune build --error-reporting=twice @runtest_js
+	@dune build --error-reporting=twice @runtezt_js
 
 # separate job to use tezt with js. Eventually should be merged with
 # the job about (test-js) . For the moment this is not run in the CI
