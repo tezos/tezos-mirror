@@ -118,11 +118,12 @@ module Make (C : AUTOMATON_CONFIG) :
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
   type _ output =
-    | Negative_peer_score : Score.t -> [`IHave] output
+    | Ihave_from_negative_score_peer : Score.t -> [`IHave] output
     | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
     | Message_topic_not_tracked : [`IHave] output
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+    | Iwant_from_negative_score_peer : Score.t -> [`IWant] output
     | On_iwant_messages_to_route : {
         routed_message_ids :
           [`Ignored | `Not_found | `Too_many_requests | `Message of message]
@@ -565,7 +566,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let _check_peer_score peer =
       let open Monad.Syntax in
       let*! peer_score = get_score ~default:Score.zero peer in
-      fail_if Score.(peer_score < zero) @@ Negative_peer_score peer_score
+      fail_if Score.(peer_score < zero)
+      @@ Ihave_from_negative_score_peer peer_score
   end
 
   include Helpers

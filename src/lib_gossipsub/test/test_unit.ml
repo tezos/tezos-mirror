@@ -101,6 +101,12 @@ let assert_mesh_size ~__LOC__ ~topic ~expected_size state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
+let assert_iwant_output_success ~__LOC__ output =
+  match output with
+  | GS.On_iwant_messages_to_route {routed_message_ids} -> routed_message_ids
+  | Iwant_from_negative_score_peer _ ->
+      Test.fail ~__LOC__ "Expected IWant to succeed."
+
 let many_peers limits = (4 * limits.degree_optimal) + 1
 
 let make_peers ~number =
@@ -1127,8 +1133,11 @@ let test_handle_iwant_msg_cached rng limits parameters =
   (* Place message in cache by publishing. *)
   let state, _ = GS.publish {sender = None; topic; message; message_id} state in
   (* Send IWant. *)
-  let _state, On_iwant_messages_to_route {routed_message_ids} =
+  let _state, output =
     GS.handle_iwant {peer; message_ids = [message_id]} state
+  in
+  let routed_message_ids =
+    assert_iwant_output_success ~__LOC__ output
   in
   (* IWant should return the message in cache. *)
   match Message_id.Map.find message_id routed_message_ids with
@@ -1178,8 +1187,11 @@ let test_handle_iwant_msg_cached_shifted rng limits parameters =
            (* Heartbeat. *)
            let state, _output = GS.heartbeat state in
            (* Send IWant. *)
-           let state, On_iwant_messages_to_route {routed_message_ids} =
+           let state, output =
              GS.handle_iwant {peer; message_ids = [message_id]} state
+           in
+           let routed_message_ids =
+             assert_iwant_output_success ~__LOC__ output
            in
            match Message_id.Map.find message_id routed_message_ids with
            | None | Some `Ignored | Some `Too_many_requests ->
@@ -1234,9 +1246,10 @@ let test_handle_iwant_msg_not_cached rng limits parameters =
   (* Some random message id. *)
   let message_id = 99 in
   (* Send IWant. *)
-  let _state, On_iwant_messages_to_route {routed_message_ids} =
+  let _state, output =
     GS.handle_iwant {peer; message_ids = [message_id]} state
   in
+  let routed_message_ids = assert_iwant_output_success ~__LOC__ output in
   (* IWant should return `Not_found as the message is not in cache. *)
   match Message_id.Map.find message_id routed_message_ids with
   | None | Some `Ignored | Some (`Message _) | Some `Too_many_requests ->
@@ -1286,8 +1299,11 @@ let test_ignore_too_many_iwants_from_same_peer_for_same_message rng limits
     |> WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.fold_left
          (fun state iwant_count ->
-           let state, On_iwant_messages_to_route {routed_message_ids} =
+           let state, output =
              GS.handle_iwant {peer; message_ids = [message_id]} state
+           in
+           let routed_message_ids =
+             assert_iwant_output_success ~__LOC__ output
            in
            match Message_id.Map.find message_id routed_message_ids with
            | None | Some `Not_found | Some `Ignored ->
@@ -1356,7 +1372,7 @@ let test_handle_ihave_subscribed_and_msg_not_seen rng limits parameters =
           ~error_msg:"Expected %R, got %L"
           ~__LOC__) ;
       unit
-  | Negative_peer_score _ | Too_many_recv_ihave_messages _
+  | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
   | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
       Test.fail ~__LOC__ "Expected to request message."
 
@@ -1395,7 +1411,7 @@ let test_handle_ihave_subscribed_and_msg_seen rng limits parameters =
   in
   (* IHave should not request any messages. *)
   match output with
-  | Negative_peer_score _ | Too_many_recv_ihave_messages _
+  | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
   | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
       Test.fail ~__LOC__ "Expected Message_requested_message_ids."
   | Message_requested_message_ids message_ids ->
@@ -1434,7 +1450,7 @@ let test_handle_ihave_not_subscribed rng limits parameters =
   in
   (* IHave should result in [Message_topic_not_tracked]. *)
   match output with
-  | Negative_peer_score _ | Too_many_recv_ihave_messages _
+  | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
   | Too_many_sent_iwant_messages _ | Message_requested_message_ids _ ->
       Test.fail ~__LOC__ "Expected Message_requested_message_ids."
   | Message_topic_not_tracked -> unit
@@ -1488,7 +1504,7 @@ let test_ignore_too_many_ihaves rng limits parameters =
            in
            let ihave_count = i + 1 in
            match output with
-           | Negative_peer_score _ | Too_many_sent_iwant_messages _
+           | Ihave_from_negative_score_peer _ | Too_many_sent_iwant_messages _
            | Message_topic_not_tracked ->
                Test.fail
                  ~__LOC__
@@ -1532,7 +1548,7 @@ let test_ignore_too_many_ihaves rng limits parameters =
              GS.handle_ihave {peer; topic; message_ids = [message_id]} state
            in
            match output with
-           | Negative_peer_score _ | Too_many_sent_iwant_messages _
+           | Ihave_from_negative_score_peer _ | Too_many_sent_iwant_messages _
            | Message_topic_not_tracked | Too_many_recv_ihave_messages _ ->
                Test.fail ~__LOC__ "Expected [Message_requested_message_ids]."
            | Message_requested_message_ids _ ->
@@ -1557,7 +1573,7 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
     | GS.Message_requested_message_ids message_ids ->
         check message_ids ;
         ()
-    | Negative_peer_score _ | Too_many_recv_ihave_messages _
+    | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
     | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
         Test.fail ~__LOC__ "Expected to request messages."
   in
@@ -1637,7 +1653,7 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
     | Too_many_sent_iwant_messages _ ->
         (* Expected case. *)
         ()
-    | Message_requested_message_ids _ | Negative_peer_score _
+    | Message_requested_message_ids _ | Ihave_from_negative_score_peer _
     | Too_many_recv_ihave_messages _ | Message_topic_not_tracked ->
         Test.fail ~__LOC__ "Expected [Too_many_sent_iwant_messages]."
   in
