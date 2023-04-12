@@ -47,7 +47,14 @@ module type AUTOMATON_SUBCONFIG = sig
 
   module Topic : ITERABLE
 
-  module Message_id : ITERABLE
+  module Message_id : sig
+    include ITERABLE
+
+    (** [get_topic id] returns/computes a message's topic from the given message
+        id. Message ids should be defined so that this function can be
+        implemented. *)
+    val get_topic : t -> Topic.t
+  end
 
   module Message : PRINTABLE
 end
@@ -200,7 +207,12 @@ module type AUTOMATON = sig
   module Topic : ITERABLE
 
   (** Module for message_id *)
-  module Message_id : ITERABLE
+  module Message_id : sig
+    include ITERABLE
+
+    (** Computes the topic of the given message id. *)
+    val get_topic : t -> Topic.t
+  end
 
   (** Module for message *)
   module Message : PRINTABLE

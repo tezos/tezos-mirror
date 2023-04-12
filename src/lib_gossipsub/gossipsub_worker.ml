@@ -99,12 +99,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
-  type collection_kind = List of Peer.t list | Set of Peer.Set.t
-
   let send_p2p_message ~emit_p2p_msg p2p_message =
     let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
-    function
-    | List list -> List.iter emit list | Set set -> Peer.Set.iter emit set
+    Seq.iter emit
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
@@ -121,7 +118,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
-        send_p2p_message ~emit_p2p_msg p2p_message (Set to_publish) ;
+        send_p2p_message ~emit_p2p_msg p2p_message (Peer.Set.to_seq to_publish) ;
         let has_joined = View.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
           emit_app_msg full_message ;
@@ -139,8 +136,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
            topic first. *)
-        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List peers) ;
-        send_p2p_message ~emit_p2p_msg (Graft {topic}) (Set to_graft) ;
+        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List.to_seq peers) ;
+        send_p2p_message
+          ~emit_p2p_msg
+          (Graft {topic})
+          (Peer.Set.to_seq to_graft) ;
         gstate
 
   (** From the worker's perspective, the outcome of leaving a topic by the
@@ -157,8 +157,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5350
 
            Send a list of alternative peers when pruning a link for a topic. *)
-        send_p2p_message ~emit_p2p_msg prune (Set to_prune) ;
-        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List peers) ;
+        send_p2p_message ~emit_p2p_msg prune (Peer.Set.to_seq to_prune) ;
+        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List.to_seq peers) ;
         gstate
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
@@ -166,10 +166,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_new_connection ~emit_p2p_msg peer = function
     | gstate, GS.Peer_already_known -> gstate
     | gstate, Peer_added ->
-        let peers = List [peer] in
         View.(view gstate |> get_our_topics)
         |> List.iter (fun topic ->
-               send_p2p_message ~emit_p2p_msg (Subscribe {topic}) peers) ;
+               send_p2p_message
+                 ~emit_p2p_msg
+                 (Subscribe {topic})
+                 (Seq.return peer)) ;
         gstate
 
   (** When a peer is disconnected, the worker has nothing to do, as:
@@ -198,6 +200,52 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       forwards it to the automaton. There is nothing else to do. *)
   let handle_unsubscribe = function
     | gstate, (GS.Unsubscribed | Unsubscribe_from_unknown_peer) -> gstate
+
+  (** When an [IHave] control message from a remote peer is received, the
+      automaton checks whether it is interested is some full messages whose ids
+      are given. If so, the worker requests them from the remote peer via an
+      [IWant] message. *)
+  let handle_ihave ~emit_p2p_msg ({peer; _} : GS.ihave) = function
+    | gstate, GS.Message_requested_message_ids message_ids ->
+        if not (List.is_empty message_ids) then
+          send_p2p_message ~emit_p2p_msg (IWant {message_ids}) (Seq.return peer) ;
+        gstate
+    | ( gstate,
+        ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
+        | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ) ) ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5424
+
+           Penalize peers with negative score or non expected behaviour
+           (revisit all the outputs in different apply event functions). *)
+        gstate
+
+  (** When an [IWant] control message from a remote peer is received, the
+      automaton checks which full messages it can send back (based on message
+      availability and on the number of received requests). Selected messages,
+      if any, are transmitted to the remote peer via [Publish]. *)
+  let handle_iwant ~emit_p2p_msg ({peer; _} : GS.iwant) = function
+    | gstate, GS.On_iwant_messages_to_route {routed_message_ids} ->
+        Message_id.Map.iter
+          (fun message_id status ->
+            match status with
+            | `Message message ->
+                let topic = Message_id.get_topic message_id in
+                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
+
+                   Don't provide a topic when it can be inferred (e.g. from
+                   Message_id.t). This also applies for Publish and IHave. *)
+                let full_message = {message; topic; message_id} in
+                let p2p_message = Publish full_message in
+                send_p2p_message ~emit_p2p_msg p2p_message (Seq.return peer)
+            | _ -> ())
+          routed_message_ids ;
+        gstate
+    | gstate, GS.Iwant_from_peer_with_low_score _ ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5424
+
+           Penalize peers with negative score or non expected behaviour
+           (revisit all the outputs in different apply event functions). *)
+        gstate
 
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
@@ -228,7 +276,15 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Unsubscribe {topic} ->
         let unsubscribe : GS.unsubscribe = {peer = from_peer; topic} in
         GS.handle_unsubscribe unsubscribe gossip_state |> handle_unsubscribe
-    | _ ->
+    | IHave {topic; message_ids} ->
+        (* The automaton should guarantee that the list is not empty. *)
+        let ihave : GS.ihave = {peer = from_peer; topic; message_ids} in
+        GS.handle_ihave ihave gossip_state |> handle_ihave ~emit_p2p_msg ihave
+    | IWant {message_ids} ->
+        (* The automaton should guarantee that the list is not empty. *)
+        let iwant : GS.iwant = {peer = from_peer; message_ids} in
+        GS.handle_iwant iwant gossip_state |> handle_iwant ~emit_p2p_msg iwant
+    | Prune _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
 
            Handle received p2p messages. *)
