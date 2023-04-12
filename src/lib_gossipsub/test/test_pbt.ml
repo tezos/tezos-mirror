@@ -618,10 +618,10 @@ module Test_peers_below_degree_high = struct
     | Graft _ -> (
         match o' with
         | Peer_filtered | Unknown_topic | Unexpected_grafting_peer
-        | Grafting_peer_with_negative_score ->
+        | Grafting_peer_with_negative_score | Peer_backed_off ->
             fail (`unexpected_output o)
-        | Peer_backed_off | Grafting_direct_peer | Peer_already_in_mesh
-        | Grafting_successfully ->
+        | Grafting_direct_peer | Peer_already_in_mesh | Grafting_successfully
+        | Mesh_full ->
             return_unit
         | _ -> return_unit)
     | Heartbeat -> (
