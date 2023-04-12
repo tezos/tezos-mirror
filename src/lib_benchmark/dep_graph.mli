@@ -92,7 +92,7 @@ module Graph : sig
   val warn_ambiguities : providers_map -> unit
 
   type result = {
-    (* Graph without ambiguities.  The ambiguities are resolved by heuristics *)
+    (* Graph without ambiguities. The ambiguities are resolved by heuristics *)
     resolved : t;
     (* Graph with possible ambiguity *)
     with_ambiguities : t;
@@ -108,10 +108,6 @@ module Graph : sig
 
   (** Dependency topological iteration *)
   val iter : (Solver.Solved.t -> unit) -> t -> unit
-
-  (** [dependency graph fvs] returns the list of benchmarks required to
-      infer the free variables [fvs] in the dependency order *)
-  val dependencies : t -> Free_variable.Set.t -> Solver.Solved.t list
 
   (** Visualize the graph using Graphviz *)
   val save_graphviz : t -> string -> unit
