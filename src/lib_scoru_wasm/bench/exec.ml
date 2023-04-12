@@ -82,6 +82,7 @@ let execute_on_state ~reveal_builtins phase state =
       Wasm_vm.compute_step_many_until
         ~reveal_builtins
         ~max_steps:Int64.max_int
+        ~write_debug:Wasm_utils.write_debug_on_stdout
         (should_continue phase)
         state
 
