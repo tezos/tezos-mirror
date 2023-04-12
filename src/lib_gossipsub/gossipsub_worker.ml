@@ -112,15 +112,12 @@ struct
     app_output_stream : app_output Stream.t;
   }
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5419
-
-     Rename emit_p2p_msg to emit_p2p_output for consistency. *)
-  let send_p2p_output ~emit_p2p_msg ~mk_output =
-    let emit to_peer = emit_p2p_msg @@ mk_output to_peer in
+  let send_p2p_output ~emit_p2p_output ~mk_output =
+    let emit to_peer = emit_p2p_output @@ mk_output to_peer in
     Seq.iter emit
 
-  let send_p2p_message ~emit_p2p_msg p2p_message =
-    send_p2p_output ~emit_p2p_msg ~mk_output:(fun to_peer ->
+  let send_p2p_message ~emit_p2p_output p2p_message =
+    send_p2p_output ~emit_p2p_output ~mk_output:(fun to_peer ->
         Out_message {to_peer; p2p_message})
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
@@ -133,15 +130,18 @@ struct
 
       Note that it's the responsability of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
-  let handle_full_message ~emit_p2p_msg ~emit_app_msg publish = function
+  let handle_full_message ~emit_p2p_output ~emit_app_output publish = function
     | gstate, GS.Publish_message {to_publish} ->
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
-        send_p2p_message ~emit_p2p_msg p2p_message (Peer.Set.to_seq to_publish) ;
+        send_p2p_message
+          ~emit_p2p_output
+          p2p_message
+          (Peer.Set.to_seq to_publish) ;
         let has_joined = View.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
-          emit_app_msg full_message ;
+          emit_app_output full_message ;
         gstate
     | gstate, GS.Already_published -> gstate
 
@@ -149,16 +149,19 @@ struct
       application layer are:
       - Sending [Subscribe] messages to connected peers with that topic;
       - Sending [Graft] messages to the newly construced topic's mesh. *)
-  let handle_join ~emit_p2p_msg topic = function
+  let handle_join ~emit_p2p_output topic = function
     | gstate, GS.Already_joined -> gstate
     | gstate, Joining_topic {to_graft} ->
         let peers = View.(view gstate |> get_connected_peers) in
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
            topic first. *)
-        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List.to_seq peers) ;
         send_p2p_message
-          ~emit_p2p_msg
+          ~emit_p2p_output
+          (Subscribe {topic})
+          (List.to_seq peers) ;
+        send_p2p_message
+          ~emit_p2p_output
           (Graft {topic})
           (Peer.Set.to_seq to_graft) ;
         gstate
@@ -167,7 +170,7 @@ struct
       application layer are:
       - Sending [Prune] messages to the topic's mesh;
       - Sending [Unsubscribe] messages to connected peers. *)
-  let handle_leave ~emit_p2p_msg topic = function
+  let handle_leave ~emit_p2p_output topic = function
     | gstate, GS.Not_joined -> gstate
     | gstate, Leaving_topic {to_prune} ->
         let peers = View.(view gstate |> get_connected_peers) in
@@ -177,19 +180,22 @@ struct
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5350
 
            Send a list of alternative peers when pruning a link for a topic. *)
-        send_p2p_message ~emit_p2p_msg prune (Peer.Set.to_seq to_prune) ;
-        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List.to_seq peers) ;
+        send_p2p_message ~emit_p2p_output prune (Peer.Set.to_seq to_prune) ;
+        send_p2p_message
+          ~emit_p2p_output
+          (Unsubscribe {topic})
+          (List.to_seq peers) ;
         gstate
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
       to that peer for each topic the local peer tracks. *)
-  let handle_new_connection ~emit_p2p_msg peer = function
+  let handle_new_connection ~emit_p2p_output peer = function
     | gstate, GS.Peer_already_known -> gstate
     | gstate, Peer_added ->
         View.(view gstate |> get_our_topics)
         |> List.iter (fun topic ->
                send_p2p_message
-                 ~emit_p2p_msg
+                 ~emit_p2p_output
                  (Subscribe {topic})
                  (Seq.return peer)) ;
         gstate
@@ -225,10 +231,13 @@ struct
       automaton checks whether it is interested is some full messages whose ids
       are given. If so, the worker requests them from the remote peer via an
       [IWant] message. *)
-  let handle_ihave ~emit_p2p_msg ({peer; _} : GS.ihave) = function
+  let handle_ihave ~emit_p2p_output ({peer; _} : GS.ihave) = function
     | gstate, GS.Message_requested_message_ids message_ids ->
         if not (List.is_empty message_ids) then
-          send_p2p_message ~emit_p2p_msg (IWant {message_ids}) (Seq.return peer) ;
+          send_p2p_message
+            ~emit_p2p_output
+            (IWant {message_ids})
+            (Seq.return peer) ;
         gstate
     | ( gstate,
         ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
@@ -243,7 +252,7 @@ struct
       automaton checks which full messages it can send back (based on message
       availability and on the number of received requests). Selected messages,
       if any, are transmitted to the remote peer via [Publish]. *)
-  let handle_iwant ~emit_p2p_msg ({peer; _} : GS.iwant) = function
+  let handle_iwant ~emit_p2p_output ({peer; _} : GS.iwant) = function
     | gstate, GS.On_iwant_messages_to_route {routed_message_ids} ->
         Message_id.Map.iter
           (fun message_id status ->
@@ -256,7 +265,7 @@ struct
                    Message_id.t). This also applies for Publish and IHave. *)
                 let full_message = {message; topic; message_id} in
                 let p2p_message = Publish full_message in
-                send_p2p_message ~emit_p2p_msg p2p_message (Seq.return peer)
+                send_p2p_message ~emit_p2p_output p2p_message (Seq.return peer)
             | _ -> ())
           routed_message_ids ;
         gstate
@@ -271,11 +280,11 @@ struct
       automaton removes that peer from the given topic's mesh. It also filters
       the given collection of alternative peers to connect to. The worker then
       asks the P2P part to connect to those peeers. *)
-  let handle_prune ~emit_p2p_msg = function
+  let handle_prune ~emit_p2p_output = function
     | gstate, (GS.No_peer_in_mesh | Ignore_PX_score_too_low _ | No_PX) -> gstate
     | gstate, GS.PX peers ->
         send_p2p_output
-          ~emit_p2p_msg
+          ~emit_p2p_output
           ~mk_output:(fun to_peer -> Connect {peer = to_peer})
           (Peer.Set.to_seq peers) ;
         gstate
@@ -291,7 +300,7 @@ struct
   (** On a [Heartbeat] events, the worker sends graft and prune messages
       following the automaton's output. It also sends [IHave] messages (computed
       by the automaton as well). *)
-  let handle_heartheat ~emit_p2p_msg = function
+  let handle_heartheat ~emit_p2p_output = function
     | gstate, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let iter pmap mk_msg =
           Peer.Map.iter
@@ -299,7 +308,7 @@ struct
               Topic.Set.iter
                 (fun topic ->
                   send_p2p_message
-                    ~emit_p2p_msg
+                    ~emit_p2p_output
                     (mk_msg peer topic)
                     (Seq.return peer))
                 topicset)
@@ -319,31 +328,31 @@ struct
         |> List.iter (fun GS.{peer; topic; message_ids} ->
                if not (List.is_empty message_ids) then
                  send_p2p_message
-                   ~emit_p2p_msg
+                   ~emit_p2p_output
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
         gstate
 
   (** Handling application events. *)
-  let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
+  let apply_app_event ~emit_p2p_output ~emit_app_output gossip_state = function
     | Inject_message {message; message_id; topic} ->
         let publish = {GS.sender = None; topic; message_id; message} in
         GS.publish publish gossip_state
-        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
+        |> handle_full_message ~emit_p2p_output ~emit_app_output publish
     | Join topic ->
-        GS.join {topic} gossip_state |> handle_join ~emit_p2p_msg topic
+        GS.join {topic} gossip_state |> handle_join ~emit_p2p_output topic
     | Leave topic ->
-        GS.leave {topic} gossip_state |> handle_leave ~emit_p2p_msg topic
+        GS.leave {topic} gossip_state |> handle_leave ~emit_p2p_output topic
 
   (** Handling messages received from the P2P network. *)
-  let apply_p2p_message ~emit_p2p_msg ~emit_app_msg gossip_state from_peer =
-    function
+  let apply_p2p_message ~emit_p2p_output ~emit_app_output gossip_state from_peer
+      = function
     | Publish {message; topic; message_id} ->
         let publish =
           {GS.sender = Some from_peer; topic; message_id; message}
         in
         GS.publish publish gossip_state
-        |> handle_full_message ~emit_p2p_msg ~emit_app_msg publish
+        |> handle_full_message ~emit_p2p_output ~emit_app_output publish
     | Graft {topic} ->
         let graft : GS.graft = {peer = from_peer; topic} in
         GS.handle_graft graft gossip_state |> handle_graft
@@ -356,36 +365,38 @@ struct
     | IHave {topic; message_ids} ->
         (* The automaton should guarantee that the list is not empty. *)
         let ihave : GS.ihave = {peer = from_peer; topic; message_ids} in
-        GS.handle_ihave ihave gossip_state |> handle_ihave ~emit_p2p_msg ihave
+        GS.handle_ihave ihave gossip_state
+        |> handle_ihave ~emit_p2p_output ihave
     | IWant {message_ids} ->
         (* The automaton should guarantee that the list is not empty. *)
         let iwant : GS.iwant = {peer = from_peer; message_ids} in
-        GS.handle_iwant iwant gossip_state |> handle_iwant ~emit_p2p_msg iwant
+        GS.handle_iwant iwant gossip_state
+        |> handle_iwant ~emit_p2p_output iwant
     | Prune {topic; px} ->
         let backoff = View.((view gossip_state).limits.prune_backoff) in
         let prune : GS.prune = {peer = from_peer; topic; px; backoff} in
-        GS.handle_prune prune gossip_state |> handle_prune ~emit_p2p_msg
+        GS.handle_prune prune gossip_state |> handle_prune ~emit_p2p_output
 
   (** Handling events received from P2P layer. *)
-  let apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
+  let apply_p2p_event ~emit_p2p_output ~emit_app_output gossip_state = function
     | New_connection {peer; direct; outbound} ->
         GS.add_peer {direct; outbound; peer} gossip_state
-        |> handle_new_connection ~emit_p2p_msg peer
+        |> handle_new_connection ~emit_p2p_output peer
     | Disconnection {peer} ->
         GS.remove_peer {peer} gossip_state |> handle_disconnection
     | In_message {from_peer; p2p_message} ->
         apply_p2p_message
-          ~emit_p2p_msg
-          ~emit_app_msg
+          ~emit_p2p_output
+          ~emit_app_output
           gossip_state
           from_peer
           p2p_message
 
   (** This is the main function of the worker. It interacts with the Gossipsub
       automaton given an event. The function possibly sends messages to the P2P
-      and application layers via the functions [emit_p2p_msg] and [emit_app_msg]
+      and application layers via the functions [emit_p2p_output] and [emit_app_output]
       and returns the new automaton's state. *)
-  let apply_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
+  let apply_event ~emit_p2p_output ~emit_app_output gossip_state = function
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
        Notify the GS worker about the status of messages sent to peers. *)
@@ -394,11 +405,11 @@ struct
 
            Do we want to detect cases where two successive [Heartbeat] events
            would be handled (e.g. because the first one is late)? *)
-        GS.heartbeat gossip_state |> handle_heartheat ~emit_p2p_msg
+        GS.heartbeat gossip_state |> handle_heartheat ~emit_p2p_output
     | P2P_input event ->
-        apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state event
+        apply_p2p_event ~emit_p2p_output ~emit_app_output gossip_state event
     | App_input event ->
-        apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state event
+        apply_app_event ~emit_p2p_output ~emit_app_output gossip_state event
 
   (** A helper function that pushes events in the state *)
   let push e t = Stream.push e t.events_stream
@@ -438,13 +449,14 @@ struct
     let open Monad in
     let shutdown = ref false in
     let rev_push stream e = Stream.push e stream in
-    let emit_p2p_msg = rev_push t.p2p_output_stream in
-    let emit_app_msg = rev_push t.app_output_stream in
+    let emit_p2p_output = rev_push t.p2p_output_stream in
+    let emit_app_output = rev_push t.app_output_stream in
     let events_stream = t.events_stream in
     let rec loop gossip_state =
       let* event = Stream.pop events_stream in
       if !shutdown then return ()
-      else loop @@ apply_event ~emit_p2p_msg ~emit_app_msg gossip_state event
+      else
+        loop @@ apply_event ~emit_p2p_output ~emit_app_output gossip_state event
     in
     let promise = loop t.gossip_state in
     let schedule_cancellation () =
