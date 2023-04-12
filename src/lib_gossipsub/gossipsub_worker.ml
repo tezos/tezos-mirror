@@ -82,6 +82,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
+    | Connect of {peer : Peer.t}
 
   type app_output = full_message
 
@@ -99,9 +100,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
-  let send_p2p_message ~emit_p2p_msg p2p_message =
-    let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5419
+
+     Rename emit_p2p_msg to emit_p2p_output for consistency. *)
+  let send_p2p_output ~emit_p2p_msg ~mk_output =
+    let emit to_peer = emit_p2p_msg @@ mk_output to_peer in
     Seq.iter emit
+
+  let send_p2p_message ~emit_p2p_msg p2p_message =
+    send_p2p_output ~emit_p2p_msg ~mk_output:(fun to_peer ->
+        Out_message {to_peer; p2p_message})
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
@@ -247,6 +255,27 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            (revisit all the outputs in different apply event functions). *)
         gstate
 
+  (** When a [Prune] control message from a remote peer is received, the
+      automaton removes that peer from the given topic's mesh. It also filters
+      the given collection of alternative peers to connect to. The worker then
+      asks the P2P part to connect to those peeers. *)
+  let handle_prune ~emit_p2p_msg = function
+    | gstate, (GS.No_peer_in_mesh | Ignore_PX_score_too_low _ | No_PX) -> gstate
+    | gstate, GS.PX peers ->
+        send_p2p_output
+          ~emit_p2p_msg
+          ~mk_output:(fun to_peer -> Connect {peer = to_peer})
+          (Peer.Set.to_seq peers) ;
+        gstate
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5425
+
+     The automaton doesn't filter out the alternative peers we are already
+     connected to. *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5426
+
+     The automaton doesn't filter out the alternative peers we are already
+     connected to. *)
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -284,11 +313,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* The automaton should guarantee that the list is not empty. *)
         let iwant : GS.iwant = {peer = from_peer; message_ids} in
         GS.handle_iwant iwant gossip_state |> handle_iwant ~emit_p2p_msg iwant
-    | Prune _ ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5164
-
-           Handle received p2p messages. *)
-        assert false
+    | Prune {topic; px} ->
+        let backoff = View.((view gossip_state).limits.prune_backoff) in
+        let prune : GS.prune = {peer = from_peer; topic; px; backoff} in
+        GS.handle_prune prune gossip_state |> handle_prune ~emit_p2p_msg
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
