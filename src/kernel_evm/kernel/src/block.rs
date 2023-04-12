@@ -242,3 +242,80 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::blueprint::Blueprint;
+    use crate::genesis;
+    use crate::inbox::Transaction;
+    use crate::storage::read_transaction_receipt_status;
+    use primitive_types::H256;
+    use tezos_ethereum::address::EthereumAddress;
+    use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_mock::MockHost;
+
+    fn string_to_h256_unsafe(s: &str) -> H256 {
+        let mut v: [u8; 32] = [0; 32];
+        hex::decode_to_slice(s, &mut v).expect("Could not parse to 256 hex value.");
+        H256::from(v)
+    }
+
+    fn dummy_eth_transaction() -> EthereumTransactionCommon {
+        let nonce = U256::from(0);
+        let gas_price = U256::from(40000000000u64);
+        let gas_limit = U256::from(21000);
+        let to =
+            EthereumAddress::from("423163e58aabec5daa3dd1130b759d24bef0f6ea".to_string());
+        let value = U256::from(5000000000000000u64);
+        let data: Vec<u8> = hex::decode("deace8f5000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000041bca408a6b4029b42883aeb2c25087cab76cb58000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002357a49c7d75f600000000000000000000000000000000000000000000000000000000640b5549000000000000000000000000710bda329b2a6224e4b44833de30f38e7f81d5640000000000000000000000000000000000000000000000000000000000000000").unwrap();
+        let v = U256::from(37);
+        let r = string_to_h256_unsafe(
+            "25dd6c973368c45ddfc17f5148e3f468a2e3f2c51920cbe9556a64942b0ab2eb",
+        );
+        let s = string_to_h256_unsafe(
+            "31da07ce40c24b0a01f46fb2abc028b5ccd70dbd1cb330725323edc49a2a9558",
+        );
+        EthereumTransactionCommon {
+            chain_id: U256::one(),
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
+            value,
+            data,
+            v,
+            r,
+            s,
+        }
+    }
+
+    #[test]
+    // Test if the invalid transactions are producing receipts with invalid status
+    fn test_invalid_transactions_receipt_status() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+
+        let invalid_tx = Transaction {
+            tx_hash,
+            tx: dummy_eth_transaction(),
+        };
+
+        let transactions: Vec<Transaction> = vec![invalid_tx];
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+        };
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        match read_transaction_receipt_status(&mut host, &tx_hash) {
+            Ok(TransactionStatus::Failure) => (),
+            Ok(TransactionStatus::Success) => {
+                panic!("The receipt should have a failing status.")
+            }
+            Err(_) => panic!("Reading the receipt failed."),
+        }
+    }
+}
