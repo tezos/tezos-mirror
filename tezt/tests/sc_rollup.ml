@@ -189,11 +189,10 @@ let sc_rollup_node_rpc sc_node service =
 type test = {variant : string option; tags : string list; description : string}
 
 let originate_sc_rollups ~kind n client =
-  fold n String_set.empty (fun i addrs ->
-      let* addr =
-        originate_sc_rollup ~alias:("rollup" ^ string_of_int i) ~kind client
-      in
-      return (String_set.add addr addrs))
+  fold n String_map.empty (fun i addrs ->
+      let alias = "rollup" ^ string_of_int i in
+      let* addr = originate_sc_rollup ~alias ~kind client in
+      return (String_map.add alias addr addrs))
 
 let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
   let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
@@ -1129,7 +1128,12 @@ let test_rollup_list ~kind =
     | [] -> ()
   in
   let* scoru_addresses = originate_sc_rollups ~kind 10 client in
-  let* () = Client.bake_for_and_wait client in
+  let scoru_addresses =
+    String_map.fold
+      (fun _alias addr addrs -> String_set.add addr addrs)
+      scoru_addresses
+      String_set.empty
+  in
   let* rollups =
     RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
   in
@@ -1140,6 +1144,63 @@ let test_rollup_list ~kind =
     (rollups = scoru_addresses)
       (comparable_module (module String_set))
       ~error_msg:"%L %R") ;
+  unit
+
+let test_rollup_client_wallet ~kind =
+  register_test
+    ~__FILE__
+    ~tags:["sc_rollup"; "wallet"; "client"]
+    ~title:"test the client wallet for smart rollup"
+  @@ fun protocol ->
+  let* _node, client = setup_l1 protocol in
+  let* expected_alias_addresses = originate_sc_rollups ~kind 10 client in
+  let*! found_alias_addresses =
+    Client.Sc_rollup.list_known_smart_rollups client
+  in
+  let found_alias_addresses =
+    List.fold_left
+      (fun addrs (alias, addr) -> String_map.add alias addr addrs)
+      String_map.empty
+      found_alias_addresses
+  in
+  String_map.iter
+    (fun alias addr ->
+      if not (String_map.mem alias found_alias_addresses) then
+        Test.fail "alias %s does not exist in the wallet." alias
+      else
+        let found_addr = String_map.find alias found_alias_addresses in
+        Check.((found_addr = addr) string ~error_msg:"%L %R"))
+    expected_alias_addresses ;
+  let*? process = Client.Sc_rollup.forget_all_smart_rollups client in
+  let* output_err =
+    Process.check_and_read_stderr ~expect_failure:true process
+  in
+  Check.(
+    (output_err =~ rex ".*this can only be used with option --force.*")
+      ~error_msg:"Expected output %L to match expression %R.") ;
+  let*! () = Client.Sc_rollup.forget_all_smart_rollups ~force:true client in
+  let*! found_alias_addresses =
+    Client.Sc_rollup.list_known_smart_rollups client
+  in
+  Check.(
+    (found_alias_addresses = [])
+      (list (tuple2 string string))
+      ~error_msg:"Expected output %L to be empty.") ;
+  let expected_address = String_map.find "rollup1" expected_alias_addresses in
+  let alias = "my_rollup" in
+  let*! () =
+    Client.Sc_rollup.remember_smart_rollup
+      client
+      ~alias
+      ~address:expected_address
+  in
+  let*! found_address =
+    Client.Sc_rollup.show_known_smart_rollup ~alias client
+  in
+  Check.(
+    (String.trim found_address = expected_address)
+      string
+      ~error_msg:"Expected address %L to be %R.") ;
   unit
 
 (* Make sure the rollup node boots into the initial state.
@@ -4908,6 +4969,7 @@ let register ~protocols =
      the tezt will not test for PVM kind specific featued. *)
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
+  test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_generate_keys protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_list_keys protocols ~kind:"wasm_2_0_0" ;
