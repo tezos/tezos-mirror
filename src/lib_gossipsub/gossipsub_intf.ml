@@ -59,7 +59,11 @@ module type AUTOMATON_SUBCONFIG = sig
   module Message : PRINTABLE
 end
 
-module type SPAN = PRINTABLE
+module type SPAN = sig
+  include PRINTABLE
+
+  val zero : t
+end
 
 module type TIME = sig
   include Compare.S

@@ -50,6 +50,8 @@ module Automaton_config :
   module Span = struct
     type t = int
 
+    let zero = 0
+
     let pp = Format.pp_print_int
   end
 
