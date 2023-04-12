@@ -3,13 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Queue;
-use crate::error::{Error, TransferError};
+use crate::error::Error;
 use crate::helpers::address_to_hash;
 use crate::inbox::Transaction;
 use crate::storage;
 use tezos_ethereum::address::EthereumAddress;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
-use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -45,15 +44,6 @@ pub struct L2Block {
     pub timestamp: U256,
     pub transactions: Vec<TransactionHash>,
     pub uncles: Vec<OwnedHash>,
-}
-
-pub struct ValidTransaction {
-    pub sender_address: EthereumAddress,
-    pub sender_path: OwnedPath,
-    pub sender_nonce: U256,
-    pub sender_balance: Wei,
-    pub tx_hash: TransactionHash,
-    pub transaction: EthereumTransactionCommon,
 }
 
 impl L2Block {
@@ -116,40 +106,6 @@ fn get_tx_receiver(
     Ok((path, tx.to))
 }
 
-// A transaction is valid if the signature is valid, its nonce is valid and it
-// can pay for the gas
-fn validate_transaction<Host: Runtime>(
-    host: &mut Host,
-    transaction: Transaction,
-) -> Result<ValidTransaction, Error> {
-    let tx = transaction.tx;
-    let (sender_path, sender_address) = get_tx_sender(&tx)?;
-    let sender_balance =
-        storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
-    let sender_nonce =
-        storage::read_account_nonce(host, &sender_path).unwrap_or(U256::zero());
-    let nonce: U256 = tx.nonce;
-    // For now, we consider there's no gas to pay
-    let gas = Wei::zero();
-
-    if !tx.clone().verify_signature() {
-        Err(Error::Transfer(TransferError::InvalidSignature))
-    } else if sender_nonce != nonce {
-        Err(Error::Transfer(TransferError::InvalidNonce))
-    } else if sender_balance < gas {
-        Err(Error::Transfer(TransferError::NotEnoughBalance))
-    } else {
-        Ok(ValidTransaction {
-            sender_address,
-            sender_path,
-            sender_nonce,
-            sender_balance,
-            tx_hash: transaction.tx_hash,
-            transaction: tx,
-        })
-    }
-}
-
 // Update an account with the given balance and nonce (if one is given), and
 // initialize it if it doesn't already appear in the storage.
 fn update_account<Host: Runtime>(
@@ -173,9 +129,10 @@ fn update_account<Host: Runtime>(
 
 fn make_receipt(
     block: &L2Block,
-    tx: &ValidTransaction,
+    tx: &Transaction,
     status: TransactionStatus,
     index: u32,
+    sender: EthereumAddress,
     to: EthereumAddress,
 ) -> TransactionReceipt {
     TransactionReceipt {
@@ -183,7 +140,7 @@ fn make_receipt(
         index,
         block_hash: block.hash,
         block_number: block.number,
-        from: tx.sender_address,
+        from: sender,
         to: Some(to),
         cumulative_gas_used: U256::zero(),
         effective_gas_price: U256::zero(),
@@ -198,15 +155,19 @@ fn make_receipt(
 fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
-    transaction: &ValidTransaction,
+    transaction: &Transaction,
     index: u32,
 ) -> Result<TransactionReceipt, Error> {
-    let tx = &transaction.transaction;
-    let value: U256 = tx.value;
-    let gas = Wei::zero();
+    let (sender_path, sender_address) = get_tx_sender(&transaction.tx)?;
+    let sender_balance =
+        storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
+    let sender_nonce =
+        storage::read_account_nonce(host, &sender_path).unwrap_or(U256::zero());
+    let value: U256 = transaction.tx.value;
+    let (dst_path, dst_address) = get_tx_receiver(&transaction.tx)?;
 
     // First pay for the gas
-    let src_balance_without_gas = transaction.sender_balance - gas;
+    let src_balance_without_gas = sender_balance - transaction.tx.gas_price;
     // The gas is paid even if there's not enough balance for the total
     // transaction
     let (src_balance, status) = if src_balance_without_gas < value {
@@ -216,32 +177,24 @@ fn apply_transaction<Host: Runtime>(
     };
     update_account(
         host,
-        &transaction.sender_path,
+        &sender_path,
         src_balance,
-        Some(transaction.sender_nonce + U256::one()),
+        Some(sender_nonce + U256::one()),
     )?;
 
-    let (dst_path, dst_address) = get_tx_receiver(tx)?;
     if status == TransactionStatus::Success {
         let dst_balance = storage::read_account_balance(host, &dst_path)
             .unwrap_or_else(|_| Wei::zero());
         update_account(host, &dst_path, dst_balance + value, None)?;
     };
-    Ok(make_receipt(block, transaction, status, index, dst_address))
-}
-
-fn validate<Host: Runtime>(
-    host: &mut Host,
-    transactions: Vec<Transaction>,
-) -> Result<Vec<ValidTransaction>, Error> {
-    let mut validated_transactions = Vec::new();
-    for transaction in transactions {
-        match validate_transaction(host, transaction) {
-            Ok(valid_transaction) => validated_transactions.push(valid_transaction),
-            Err(e) => return Err(e),
-        }
-    }
-    Ok(validated_transactions)
+    Ok(make_receipt(
+        block,
+        transaction,
+        status,
+        index,
+        sender_address,
+        dst_address,
+    ))
 }
 
 // This function is only available in nightly, hence the need for redefinition
@@ -259,7 +212,7 @@ fn try_collect<T, E>(vec: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
 fn apply_transactions<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
-    transactions: &[ValidTransaction],
+    transactions: &[Transaction],
 ) -> Result<Vec<TransactionReceipt>, Error> {
     try_collect(
         transactions
@@ -276,16 +229,10 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         let next_level = current_level + 1;
         let transaction_hashes =
             proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
-
-        match validate(host, proposal.transactions) {
-            Ok(transactions) => {
-                let valid_block = L2Block::new(next_level, transaction_hashes);
-                storage::store_current_block(host, &valid_block)?;
-                let receipts = apply_transactions(host, &valid_block, &transactions)?;
-                storage::store_transaction_receipts(host, &receipts)?;
-            }
-            Err(e) => debug_msg!(host, "Blueprint is invalid: {:?}\n", e),
-        }
+        let valid_block = L2Block::new(next_level, transaction_hashes);
+        storage::store_current_block(host, &valid_block)?;
+        let receipts = apply_transactions(host, &valid_block, &proposal.transactions)?;
+        storage::store_transaction_receipts(host, &receipts)?;
     }
     Ok(())
 }
