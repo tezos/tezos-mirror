@@ -2,4 +2,7 @@ ocaml-check:
   extends:
     - .build
   needs: [trigger]
-  script: dune build ${COVERAGE_OPTIONS} @check
+  script:
+    - dune build @check
+    - git apply src/bin_tps_evaluation/lift_limits.patch
+    - dune build @check src/bin_tps_evaluation
