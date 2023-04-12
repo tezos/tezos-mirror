@@ -63,6 +63,8 @@ type 'a t = {
   loser_mode : Loser_mode.t;
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
+  lockfile : Lwt_unix.file_descr;
+      (** A lock file acquired when the node starts. *)
   store : 'a store;  (** The store for the persistent storage. *)
   context : 'a Context.index;
       (** The persistent context for the rollup node. *)

@@ -46,6 +46,7 @@ type 'a t = {
   fee_parameters : Configuration.fee_parameters;
   protocol_constants : Constants.t;
   loser_mode : Loser_mode.t;
+  lockfile : Lwt_unix.file_descr;
   store : 'a store;
   context : 'a Context.index;
   lcc : ('a, lcc) Reference.t;
@@ -128,6 +129,38 @@ let check_and_set_rollup_address context rollup_address =
       fail_unless Sc_rollup.Address.(rollup_address = saved_address)
       @@ Sc_rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
 
+let lock ~data_dir =
+  let lockfile_path = Filename.concat data_dir "lock" in
+  let lock_aux ~data_dir =
+    let open Lwt_result_syntax in
+    let*! () = Event.acquiring_lock () in
+    let*! () = Lwt_utils_unix.create_dir data_dir in
+    let* lockfile =
+      protect @@ fun () ->
+      Lwt_unix.openfile
+        lockfile_path
+        [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+        0o644
+      |> Lwt_result.ok
+    in
+    let* () =
+      protect ~on_error:(fun err ->
+          let*! () = Lwt_unix.close lockfile in
+          fail err)
+      @@ fun () ->
+      let*! () = Lwt_unix.lockf lockfile Unix.F_LOCK 0 in
+      return_unit
+    in
+    return lockfile
+  in
+  trace (Sc_rollup_node_errors.Could_not_acquire_lock lockfile_path)
+  @@ lock_aux ~data_dir
+
+let unlock {lockfile; _} =
+  Lwt.finalize
+    (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
+    (fun () -> Lwt_unix.close lockfile)
+
 let init (cctxt : Protocol_client_context.full) ~data_dir mode
     Configuration.(
       {
@@ -142,6 +175,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
         _;
       } as configuration) =
   let open Lwt_result_syntax in
+  let* lockfile = lock ~data_dir in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in
@@ -194,11 +228,12 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
       fee_parameters;
       protocol_constants;
       loser_mode;
+      lockfile;
       store;
       context;
     }
 
-let close {cctxt; store; context; l1_ctxt; _} =
+let close ({cctxt; store; context; l1_ctxt; _} as node_ctxt) =
   let open Lwt_result_syntax in
   let message = cctxt#message in
   let*! () = message "Shutting down L1@." in
@@ -207,6 +242,8 @@ let close {cctxt; store; context; l1_ctxt; _} =
   let*! () = Context.close context in
   let*! () = message "Closing store@." in
   let* () = Store.close store in
+  let*! () = message "Releasing lock@." in
+  let*! () = unlock node_ctxt in
   return_unit
 
 let checkout_context node_ctxt block_hash =
@@ -758,6 +795,7 @@ module Internal_for_tests = struct
       |> Data_encoding.Binary.to_bytes_exn Constants_repr.encoding
       |> Data_encoding.Binary.of_bytes_exn Constants.encoding
     in
+    let* lockfile = lock ~data_dir in
     let* store =
       Store.load
         Read_write
@@ -794,6 +832,7 @@ module Internal_for_tests = struct
         fee_parameters = Configuration.default_fee_parameters;
         protocol_constants;
         loser_mode = Loser_mode.no_failures;
+        lockfile;
         store;
         context;
       }

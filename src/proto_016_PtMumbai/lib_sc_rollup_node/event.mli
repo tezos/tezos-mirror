@@ -75,3 +75,7 @@ val kernel_debug_dont_wait : string -> unit
 (** [warn_dal_enabled_no_node ()] emits a warning for when DAL is enabled in the
     protocol but the rollup node has no DAL node. *)
 val warn_dal_enabled_no_node : unit -> unit Lwt.t
+
+(** [acquiring_lock ()] emits an event to indicate that the node is attempting
+    to acquire a lock on the data directory. *)
+val acquiring_lock : unit -> unit Lwt.t
