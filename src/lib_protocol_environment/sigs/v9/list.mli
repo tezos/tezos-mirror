@@ -969,13 +969,6 @@ val fold_left_i_es :
   'b list ->
   ('a, 'trace) result Lwt.t
 
-(** This function is not tail-recursive *)
-val fold_right_es :
-  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
-  'a list ->
-  'b ->
-  ('b, 'trace) result Lwt.t
-
 (** {3 Double-traversal variants}
 
     As mentioned above, there are no [_p] and [_ep] double-traversors. Use
