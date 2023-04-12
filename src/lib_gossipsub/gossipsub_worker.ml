@@ -99,9 +99,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
-  let send_p2p_message ~emit_p2p_msg p2p_message =
-    let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5419
+
+     Rename emit_p2p_msg to emit_p2p_output for consistency. *)
+  let send_p2p_output ~emit_p2p_msg ~mk_output =
+    let emit to_peer = emit_p2p_msg @@ mk_output to_peer in
     Seq.iter emit
+
+  let send_p2p_message ~emit_p2p_msg p2p_message =
+    send_p2p_output ~emit_p2p_msg ~mk_output:(fun to_peer ->
+        Out_message {to_peer; p2p_message})
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
