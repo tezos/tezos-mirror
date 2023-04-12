@@ -50,19 +50,27 @@ const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
 	    - 2  // Number of chunks (u16)
 	    - 32; // Transaction hash size
 
+macro_rules! parsable {
+    ($expr : expr) => {
+        match $expr {
+            Some(x) => x,
+            None => return InputResult::Unparsable,
+        }
+    };
+}
+
 impl InputResult {
+    fn split_at(bytes: &[u8], len: usize) -> Option<(&[u8], &[u8])> {
+        let left = bytes.get(0..len)?;
+        let right = bytes.get(len..)?;
+        Some((left, right))
+    }
+
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = bytes.split_at(32);
-        let tx_hash: TransactionHash = match tx_hash.try_into() {
-            Ok(tx_hash) => tx_hash,
-            Err(_) => return InputResult::Unparsable,
-        };
-        // Remaining bytes is the rlp encoded transaction.
-        let tx: EthereumTransactionCommon = match remaining.try_into() {
-            Ok(tx) => tx,
-            Err(_) => return InputResult::Unparsable,
-        };
+        let (tx_hash, remaining) = parsable!(Self::split_at(bytes, 32));
+        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok()); // Remaining bytes is the rlp encoded transaction.
+        let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
         InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
             tx_hash,
             tx,
@@ -71,13 +79,10 @@ impl InputResult {
 
     fn parse_new_chunked_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = bytes.split_at(32);
-        let tx_hash: TransactionHash = match tx_hash.try_into() {
-            Ok(tx_hash) => tx_hash,
-            Err(_) => return InputResult::Unparsable,
-        };
+        let (tx_hash, remaining) = parsable!(Self::split_at(bytes, 32));
+        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
         // Next 2 bytes is the number of chunks.
-        let (num_chunks, remaining) = remaining.split_at(2);
+        let (num_chunks, remaining) = parsable!(Self::split_at(remaining, 2));
         let num_chunks = u16::from_le_bytes(num_chunks.try_into().unwrap());
         if remaining.is_empty() {
             Self::Input(Input::NewChunkedTransaction {
@@ -91,13 +96,10 @@ impl InputResult {
 
     fn parse_transaction_chunk(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = bytes.split_at(32);
-        let tx_hash: TransactionHash = match tx_hash.try_into() {
-            Ok(tx_hash) => tx_hash,
-            Err(_) => return InputResult::Unparsable,
-        };
+        let (tx_hash, remaining) = parsable!(Self::split_at(bytes, 32));
+        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
         // Next 2 bytes is the index.
-        let (i, remaining) = remaining.split_at(2);
+        let (i, remaining) = parsable!(Self::split_at(remaining, 2));
         let i = u16::from_le_bytes(i.try_into().unwrap());
         Self::Input(Input::TransactionChunk {
             tx_hash,
@@ -108,10 +110,7 @@ impl InputResult {
 
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
         let bytes = Message::as_ref(&input);
-        let (input_tag, remaining) = match bytes.split_first() {
-            Some(res) => res,
-            None => return InputResult::Unparsable,
-        };
+        let (input_tag, remaining) = parsable!(bytes.split_first());
         // External messages starts with the tag 1, they are the only
         // messages we consider.
         if *input_tag != 1 {
@@ -119,7 +118,8 @@ impl InputResult {
         };
         // Next 20 bytes is the targeted smart rollup address.
         let remaining = {
-            let (target_smart_rollup_address, remaining) = remaining.split_at(20);
+            let (target_smart_rollup_address, remaining) =
+                parsable!(Self::split_at(remaining, 20));
 
             if target_smart_rollup_address == smart_rollup_address {
                 remaining
@@ -127,10 +127,7 @@ impl InputResult {
                 return InputResult::Unparsable;
             }
         };
-        let (transaction_tag, remaining) = match remaining.split_first() {
-            Some(res) => res,
-            None => return InputResult::Unparsable,
-        };
+        let (transaction_tag, remaining) = parsable!(remaining.split_first());
         match *transaction_tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
             NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
@@ -313,5 +310,14 @@ mod tests {
             tx,
         }];
         assert_eq!(transactions, expected_transactions);
+    }
+
+    #[test]
+    fn parse_unparsable_transaction() {
+        let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
+        assert_eq!(
+            InputResult::parse(message, ZERO_SMART_ROLLUP_ADDRESS),
+            InputResult::Unparsable
+        )
     }
 }
