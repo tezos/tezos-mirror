@@ -118,11 +118,20 @@ module Make (C : AUTOMATON_CONFIG) :
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
   type _ output =
-    | Negative_peer_score : Score.t -> [`IHave] output
+    | Ihave_from_peer_with_low_score : {
+        score : Score.t;
+        threshold : float;
+      }
+        -> [`IHave] output
     | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
     | Message_topic_not_tracked : [`IHave] output
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+    | Iwant_from_peer_with_low_score : {
+        score : Score.t;
+        threshold : float;
+      }
+        -> [`IWant] output
     | On_iwant_messages_to_route : {
         routed_message_ids :
           [`Ignored | `Not_found | `Too_many_requests | `Message of message]
@@ -346,6 +355,8 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let max_gossip_retransmission state = state.limits.max_gossip_retransmission
 
+    let gossip_threshold state = state.limits.gossip_threshold
+
     let mesh state = state.mesh
 
     let fanout state = state.fanout
@@ -562,10 +573,10 @@ module Make (C : AUTOMATON_CONFIG) :
       let peers = add_scores_score peer score scores in
       set_scores peers
 
-    let _check_peer_score peer =
+    let check_score peer threshold ~on_failure =
       let open Monad.Syntax in
-      let*! peer_score = get_score ~default:Score.zero peer in
-      fail_if Score.(peer_score < zero) @@ Negative_peer_score peer_score
+      let*! score = get_score ~default:Score.zero peer in
+      fail_if Compare.Float.(Score.float score < threshold) @@ on_failure score
   end
 
   include Helpers
@@ -624,10 +635,11 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let handle peer topic message_ids : [`IHave] output Monad.t =
       let open Monad.Syntax in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5009
-
-         Score check is missing.
-      *)
+      let*! gossip_threshold in
+      let*? () =
+        check_score peer gossip_threshold ~on_failure:(fun score ->
+            Ihave_from_peer_with_low_score {score; threshold = gossip_threshold})
+      in
       let* count_ihave_received = update_and_get_ihave_per_heartbeat peer in
       let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_recv_ihave_message count_ihave_received in
@@ -655,10 +667,11 @@ module Make (C : AUTOMATON_CONFIG) :
   module IWant = struct
     let handle peer message_ids : [`IWant] output Monad.t =
       let open Monad.Syntax in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5008
-
-         Score check is missing.
-      *)
+      let*! gossip_threshold in
+      let*? () =
+        check_score peer gossip_threshold ~on_failure:(fun score ->
+            Iwant_from_peer_with_low_score {score; threshold = gossip_threshold})
+      in
       let routed_message_ids = Message_id.Map.empty in
       let*! message_cache in
       let*! peer_filter in
