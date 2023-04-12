@@ -37,7 +37,7 @@ module Chunk : sig
   (** Copy the contents of a chunk into a fresh [bytes]. *)
   val to_bytes : t -> bytes
 
-  (** Size of a chunk in bytes - with 12 bits of address space the chunk is 4KiB *)
+  (** Size of a chunk in bytes - with 9 bits of address space the chunk is 512B *)
   val size : int64
 
   (** [num_needed len] Computes the number of chunks needed to cover [len]. *)
