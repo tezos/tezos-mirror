@@ -846,6 +846,32 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {topic; peer} -> Subscribe.handle topic peer
 
   module Unsubscribe = struct
+    let remove_peer_from_mesh topic peer =
+      let open Monad.Syntax in
+      let*! mesh in
+      let mesh =
+        Topic.Map.update
+          topic
+          (Option.map (fun peers -> Peer.Set.remove peer peers))
+          mesh
+      in
+      set_mesh mesh
+
+    let remove_peer_from_fanout topic peer =
+      let open Monad.Syntax in
+      let*! fanout in
+      let fanout =
+        Topic.Map.update
+          topic
+          (Option.map (fun fanout_peers ->
+               {
+                 fanout_peers with
+                 peers = Peer.Set.remove peer fanout_peers.peers;
+               }))
+          fanout
+      in
+      set_fanout fanout
+
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
@@ -857,8 +883,12 @@ module Make (C : AUTOMATON_CONFIG) :
           in
           let peers = Peer.Map.add peer connection connections in
           let* () = set_connections peers in
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5143
-             Remove unsubscribed peers from the mesh. *)
+          (* Remove the peer from mesh as done in the rust implementation
+             but not go implementation. *)
+          let* () = remove_peer_from_mesh topic peer in
+          (* Remove the peer from fanout. This is not done in go/rust implementation but
+             we do it here as it is more natural and consistent with the above mesh cleaning. *)
+          let* () = remove_peer_from_fanout topic peer in
           return Unsubscribed
   end
 
@@ -1283,7 +1313,8 @@ module Make (C : AUTOMATON_CONFIG) :
          in this topic. [to_prune], [to_graft], [noPX_peers] are the peers to be
          pruned, grafted, and those for which no peer exchange should be done
          performed, accumulated from the maintenance for other mesh topics. *)
-      let maintain_topic_mesh topic peers (to_graft, to_prune, noPX_peers) =
+      let maintain_topic_mesh topic peers
+          (`To_prune to_prune, `To_graft to_graft, noPX_peers) =
         let to_prune, peers, noPX_peers =
           (* Drop all peers with negative score, without PX *)
           Peer.Set.fold
@@ -1355,15 +1386,15 @@ module Make (C : AUTOMATON_CONFIG) :
 
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
            Try to improve the mesh with opportunistic grafting *)
-        (to_graft, to_prune, noPX_peers)
+        (`To_prune to_prune, `To_graft to_graft, noPX_peers)
       in
 
       let*! mesh in
-      let to_graft, to_prune, noPX_peers =
+      let `To_prune to_prune, `To_graft to_graft, noPX_peers =
         Topic.Map.fold
           maintain_topic_mesh
           mesh
-          (Peer.Map.empty, Peer.Map.empty, Peer.Set.empty)
+          (`To_prune Peer.Map.empty, `To_graft Peer.Map.empty, Peer.Set.empty)
       in
 
       (* Update backoff for pruned peers. *)
