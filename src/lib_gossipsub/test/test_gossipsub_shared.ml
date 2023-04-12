@@ -116,6 +116,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     fanout_ttl;
     heartbeat_interval;
     backoff_cleanup_ticks;
+    score_cleanup_ticks;
     degree_low;
     degree_high;
     degree_score;
@@ -146,6 +147,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      fanout_ttl = %a;@;\
      heartbeat_interval = %a;@;\
      backoff_cleanup_ticks = %d;@;\
+     score_cleanup_ticks = %d;@;\
      degree_low = %d;@;\
      degree_high = %d;@;\
      degree_score = %d;@;\
@@ -176,6 +178,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     GS.Span.pp
     heartbeat_interval
     backoff_cleanup_ticks
+    score_cleanup_ticks
     degree_low
     degree_high
     degree_score

@@ -380,7 +380,8 @@ module Test_remove_peer = struct
       fail_if_in_set peers set ~on_error:(fun peer ->
           `peer_not_removed_correctly (view, str, peer))
     in
-    let* () = check_map "peers_info" view.peers_info in
+    let* () = check_map "connections" view.connections in
+    let* () = check_map "scores" view.scores in
     let* () =
       Topic.Map.iter_e
         (fun topic backoff ->
@@ -493,11 +494,11 @@ module Test_remove_peer = struct
         fprintf fmtr "%a:[%a]" Topic.pp topic pp_backoff backoff)
       v.backoff ;
     Peer.Map.iter
-      (fun peer peer_info ->
-        let expire =
-          match GS.Introspection.get_peer_info_connection peer_info with
-          | GS.Introspection.Expires {at} -> Some at
-          | Connected _ -> None
+      (fun peer {GS.Introspection.score = _; peer_status} ->
+        let expires =
+          match peer_status with
+          | GS.Introspection.Connected -> None
+          | GS.Introspection.Disconnected {expires} -> Some expires
         in
         fprintf
           fmtr
@@ -505,9 +506,9 @@ module Test_remove_peer = struct
           GS.Peer.pp
           peer
           (pp_print_option pp_print_int)
-          expire
+          expires
           cleanup)
-      v.peers_info
+      v.scores
 
   let test rng limits parameters =
     Tezt_core.Test.register
@@ -523,7 +524,14 @@ module Test_remove_peer = struct
         and+ backoff_cleanup_ticks =
           M.int_range 1 (limits.backoff_cleanup_ticks * 2)
         in
-        {limits with retain_duration; heartbeat_interval; backoff_cleanup_ticks}
+        let score_cleanup_ticks = backoff_cleanup_ticks in
+        {
+          limits with
+          retain_duration;
+          heartbeat_interval;
+          backoff_cleanup_ticks;
+          score_cleanup_ticks;
+        }
       in
       let state = GS.make rng limits parameters in
       run state (scenario limits)

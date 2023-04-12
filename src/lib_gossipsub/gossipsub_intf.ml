@@ -126,6 +126,9 @@ type ('peer, 'message_id, 'span) limits = {
   backoff_cleanup_ticks : int;
       (** [backoff_cleanup_ticks] is the number of heartbeat ticks setting the
           frequency at which the backoffs are checked and potentially cleared. *)
+  score_cleanup_ticks : int;
+      (** [score_cleanup_ticks] is the number of heartbeat ticks setting the
+          frequency at which the scores are checked and potentially cleared. *)
   degree_low : int;
       (** [degree_low] sets the lower bound on the number of peers we keep in a
           topic mesh. If we have fewer than [degree_low] peers, the heartbeat will attempt
@@ -307,8 +310,6 @@ module type AUTOMATON = sig
     | Mesh_full : [`Graft] output
         (** Grafting a peer for a topic whose mesh has already sufficiently many
             peers. *)
-    | Grafting_expiring_peer : [`Graft] output
-        (** Grafting a peer that has been set to be removed. *)
     | No_peer_in_mesh : [`Prune] output
         (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
@@ -366,9 +367,6 @@ module type AUTOMATON = sig
     | Subscribe_to_unknown_peer : [`Subscribe] output
         (** The output returned when we receive a subscribe message from a peer
             we don't know.*)
-    | Subscribe_to_expiring_peer : [`Subscribe] output
-        (** The output returned when we receive a subscribe message from a peer
-            set to be removed. *)
     | Unsubscribed : [`Unsubscribe] output
         (** The output returned once we successfully processed an unsubscribe
             request sent from a peer. *)
@@ -494,15 +492,11 @@ module type AUTOMATON = sig
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
   module Introspection : sig
-    type connected_state = {
-      topics : Topic.Set.t;
-      direct : bool;
-      outbound : bool;
-    }
+    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
-    type connection = Expires of {at : Time.t} | Connected of connected_state
+    type peer_status = Connected | Disconnected of {expires : Time.t}
 
-    type peer_info = {connection : connection; score : Score.t}
+    type peer_score = {score : Score.t; peer_status : peer_status}
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -528,7 +522,8 @@ module type AUTOMATON = sig
     type view = {
       limits : limits;
       parameters : parameters;
-      peers_info : peer_info Peer.Map.t;
+      connections : connection Peer.Map.t;
+      scores : peer_score Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
@@ -544,7 +539,6 @@ module type AUTOMATON = sig
         to filter the result. *)
     type connected_peers_filter =
       | Direct
-      | Not_expired
       | Subscribed_to of Topic.t
       | Score_above of {threshold : float}
 
@@ -576,8 +570,6 @@ module type AUTOMATON = sig
         currently tracking messages for [topic]. That is, the local peer has joined
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
-
-    val get_peer_info_connection : peer_info -> connection
   end
 end
 

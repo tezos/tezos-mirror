@@ -45,6 +45,7 @@ let default_limits =
     fanout_ttl = 60;
     heartbeat_interval = 1;
     backoff_cleanup_ticks = 15;
+    score_cleanup_ticks = 1;
     degree_low = 5;
     degree_high = 12;
     degree_score = 4;
