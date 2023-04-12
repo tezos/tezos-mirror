@@ -104,7 +104,7 @@ let assert_mesh_size ~__LOC__ ~topic ~expected_size state =
 let assert_iwant_output_success ~__LOC__ output =
   match output with
   | GS.On_iwant_messages_to_route {routed_message_ids} -> routed_message_ids
-  | Iwant_from_negative_score_peer _ ->
+  | Iwant_from_peer_with_low_score _ ->
       Test.fail ~__LOC__ "Expected IWant to succeed."
 
 let many_peers limits = (4 * limits.degree_optimal) + 1
@@ -1136,9 +1136,7 @@ let test_handle_iwant_msg_cached rng limits parameters =
   let _state, output =
     GS.handle_iwant {peer; message_ids = [message_id]} state
   in
-  let routed_message_ids =
-    assert_iwant_output_success ~__LOC__ output
-  in
+  let routed_message_ids = assert_iwant_output_success ~__LOC__ output in
   (* IWant should return the message in cache. *)
   match Message_id.Map.find message_id routed_message_ids with
   | None | Some `Ignored | Some `Not_found | Some `Too_many_requests ->
@@ -1372,7 +1370,7 @@ let test_handle_ihave_subscribed_and_msg_not_seen rng limits parameters =
           ~error_msg:"Expected %R, got %L"
           ~__LOC__) ;
       unit
-  | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
+  | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
   | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
       Test.fail ~__LOC__ "Expected to request message."
 
@@ -1411,7 +1409,7 @@ let test_handle_ihave_subscribed_and_msg_seen rng limits parameters =
   in
   (* IHave should not request any messages. *)
   match output with
-  | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
+  | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
   | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
       Test.fail ~__LOC__ "Expected Message_requested_message_ids."
   | Message_requested_message_ids message_ids ->
@@ -1450,7 +1448,7 @@ let test_handle_ihave_not_subscribed rng limits parameters =
   in
   (* IHave should result in [Message_topic_not_tracked]. *)
   match output with
-  | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
+  | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
   | Too_many_sent_iwant_messages _ | Message_requested_message_ids _ ->
       Test.fail ~__LOC__ "Expected Message_requested_message_ids."
   | Message_topic_not_tracked -> unit
@@ -1504,7 +1502,7 @@ let test_ignore_too_many_ihaves rng limits parameters =
            in
            let ihave_count = i + 1 in
            match output with
-           | Ihave_from_negative_score_peer _ | Too_many_sent_iwant_messages _
+           | Ihave_from_peer_with_low_score _ | Too_many_sent_iwant_messages _
            | Message_topic_not_tracked ->
                Test.fail
                  ~__LOC__
@@ -1548,7 +1546,7 @@ let test_ignore_too_many_ihaves rng limits parameters =
              GS.handle_ihave {peer; topic; message_ids = [message_id]} state
            in
            match output with
-           | Ihave_from_negative_score_peer _ | Too_many_sent_iwant_messages _
+           | Ihave_from_peer_with_low_score _ | Too_many_sent_iwant_messages _
            | Message_topic_not_tracked | Too_many_recv_ihave_messages _ ->
                Test.fail ~__LOC__ "Expected [Message_requested_message_ids]."
            | Message_requested_message_ids _ ->
@@ -1573,7 +1571,7 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
     | GS.Message_requested_message_ids message_ids ->
         check message_ids ;
         ()
-    | Ihave_from_negative_score_peer _ | Too_many_recv_ihave_messages _
+    | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
     | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
         Test.fail ~__LOC__ "Expected to request messages."
   in
@@ -1653,7 +1651,7 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
     | Too_many_sent_iwant_messages _ ->
         (* Expected case. *)
         ()
-    | Message_requested_message_ids _ | Ihave_from_negative_score_peer _
+    | Message_requested_message_ids _ | Ihave_from_peer_with_low_score _
     | Too_many_recv_ihave_messages _ | Message_topic_not_tracked ->
         Test.fail ~__LOC__ "Expected [Too_many_sent_iwant_messages]."
   in

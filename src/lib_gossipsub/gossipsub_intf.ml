@@ -264,8 +264,12 @@ module type AUTOMATON = sig
 
   (** Output produced by one of the actions below. *)
   type _ output =
-    | Ihave_from_negative_score_peer : Score.t -> [`IHave] output
-        (** The peer who sent an IHave message has a negative score. *)
+    | Ihave_from_peer_with_low_score : {
+        score : Score.t;
+        threshold : float;
+      }
+        -> [`IHave] output
+        (** The peer who sent an IHave message has a [score] below [threshold]. *)
     | Too_many_recv_ihave_messages : {count : int; max : int} -> [`IHave] output
         (** The peer sent us more than [max] IHave messages within two
             successive heartbeat calls. *)
@@ -278,8 +282,12 @@ module type AUTOMATON = sig
         (** The messages ids we want to request from the peer which sent us an
             IHave message. The implementation honors the
             [max_sent_iwant_per_heartbeat] limit. *)
-    | Iwant_from_negative_score_peer : Score.t -> [`IWant] output
-        (** The peer who sent an IWant message has a negative score. *)
+    | Iwant_from_peer_with_low_score : {
+        score : Score.t;
+        threshold : float;
+      }
+        -> [`IWant] output
+        (** The peer who sent an IWant message has a [score] below [threshold]. *)
     | On_iwant_messages_to_route : {
         routed_message_ids :
           [`Ignored | `Not_found | `Too_many_requests | `Message of message]
