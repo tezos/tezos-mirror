@@ -273,6 +273,13 @@ impl Encodable for EthereumTransactionCommon {
     }
 }
 
+#[allow(clippy::from_over_into)]
+impl Into<Vec<u8>> for EthereumTransactionCommon {
+    fn into(self) -> Vec<u8> {
+        self.rlp_bytes().to_vec()
+    }
+}
+
 // cargo test ethereum::signatures::test --features testing
 #[cfg(test)]
 mod test {

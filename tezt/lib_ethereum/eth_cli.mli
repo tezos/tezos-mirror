@@ -36,6 +36,8 @@ val transaction_send :
   to_public_key:string ->
   value:Wei.t ->
   endpoint:string ->
+  ?data:string ->
+  unit ->
   string Lwt.t
 
 (** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a

@@ -32,6 +32,9 @@ path = "../../kernel_sdk/encoding"
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"
 
+[dev-dependencies.tezos_data_encoding]
+tezos_data_encoding = "0.4"
+
 [dependencies]
 tezos_ethereum = { path = "../ethereum" }
 primitive-types = { version = "0.11.1", default-features = false }
