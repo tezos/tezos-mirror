@@ -1283,7 +1283,7 @@ module Make (C : AUTOMATON_CONFIG) :
          in this topic. [to_prune], [to_graft], [noPX_peers] are the peers to be
          pruned, grafted, and those for which no peer exchange should be done
          performed, accumulated from the maintenance for other mesh topics. *)
-      let maintain_topic_mesh topic peers (to_prune, to_graft, noPX_peers) =
+      let maintain_topic_mesh topic peers (to_graft, to_prune, noPX_peers) =
         let to_prune, peers, noPX_peers =
           (* Drop all peers with negative score, without PX *)
           Peer.Set.fold
