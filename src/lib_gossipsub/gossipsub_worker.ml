@@ -99,17 +99,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
   }
 
-  type collection_kind =
-    | List of Peer.t list
-    | Set of Peer.Set.t
-    | Elt of Peer.t
-
   let send_p2p_message ~emit_p2p_msg p2p_message =
     let emit to_peer = emit_p2p_msg @@ Out_message {to_peer; p2p_message} in
-    function
-    | List list -> List.iter emit list
-    | Set set -> Peer.Set.iter emit set
-    | Elt peer -> emit peer
+    Seq.iter emit
 
   let message_is_from_network publish = Option.is_some publish.GS.sender
 
@@ -126,7 +118,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let {GS.sender = _; topic; message_id; message} = publish in
         let full_message = {message; topic; message_id} in
         let p2p_message = Publish full_message in
-        send_p2p_message ~emit_p2p_msg p2p_message (Set to_publish) ;
+        send_p2p_message ~emit_p2p_msg p2p_message (Peer.Set.to_seq to_publish) ;
         let has_joined = View.(has_joined topic @@ view gstate) in
         if message_is_from_network publish && has_joined then
           emit_app_msg full_message ;
@@ -144,8 +136,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
            topic first. *)
-        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List peers) ;
-        send_p2p_message ~emit_p2p_msg (Graft {topic}) (Set to_graft) ;
+        send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (List.to_seq peers) ;
+        send_p2p_message
+          ~emit_p2p_msg
+          (Graft {topic})
+          (Peer.Set.to_seq to_graft) ;
         gstate
 
   (** From the worker's perspective, the outcome of leaving a topic by the
@@ -162,8 +157,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5350
 
            Send a list of alternative peers when pruning a link for a topic. *)
-        send_p2p_message ~emit_p2p_msg prune (Set to_prune) ;
-        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List peers) ;
+        send_p2p_message ~emit_p2p_msg prune (Peer.Set.to_seq to_prune) ;
+        send_p2p_message ~emit_p2p_msg (Unsubscribe {topic}) (List.to_seq peers) ;
         gstate
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
@@ -173,7 +168,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | gstate, Peer_added ->
         View.(view gstate |> get_our_topics)
         |> List.iter (fun topic ->
-               send_p2p_message ~emit_p2p_msg (Subscribe {topic}) (Elt peer)) ;
+               send_p2p_message
+                 ~emit_p2p_msg
+                 (Subscribe {topic})
+                 (Seq.return peer)) ;
         gstate
 
   (** When a peer is disconnected, the worker has nothing to do, as:
@@ -210,7 +208,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_ihave ~emit_p2p_msg ({peer; _} : GS.ihave) = function
     | gstate, GS.Message_requested_message_ids message_ids ->
         if not (List.is_empty message_ids) then
-          send_p2p_message ~emit_p2p_msg (IWant {message_ids}) (Elt peer) ;
+          send_p2p_message ~emit_p2p_msg (IWant {message_ids}) (Seq.return peer) ;
         gstate
     | ( gstate,
         ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
@@ -238,7 +236,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    Message_id.t). This also applies for Publish and IHave. *)
                 let full_message = {message; topic; message_id} in
                 let p2p_message = Publish full_message in
-                send_p2p_message ~emit_p2p_msg p2p_message (Elt peer)
+                send_p2p_message ~emit_p2p_msg p2p_message (Seq.return peer)
             | _ -> ())
           routed_message_ids ;
         gstate
