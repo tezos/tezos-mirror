@@ -82,7 +82,7 @@ voting operations:
 
 - The ``Ballot`` operation enables delegates to participate in the
   Exploration and Promotion periods. Delegates use this operation to
-  vote for (``Yay``), against (``Nay``), or to side with the majority
+  vote for (``Yea``), against (``Nay``), or to side with the majority
   (``Pass``), when examining a protocol amendment proposal.
 
 Further details on each operation's implementation and semantics are
