@@ -122,6 +122,14 @@ let pp_per_topic_score_parameters =
         "time_in_mesh_quantum"
         (fun l -> l.time_in_mesh_quantum)
         Fmt.float;
+      Fmt.Dump.field
+        "first_message_deliveries_weight"
+        (fun l -> l.first_message_deliveries_weight)
+        Fmt.float;
+      Fmt.Dump.field
+        "first_message_deliveries_cap"
+        (fun l -> l.first_message_deliveries_cap)
+        Fmt.int;
     ]
 
 let pp_topic_score_parameters fmtr tsp =

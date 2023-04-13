@@ -236,7 +236,9 @@ module Make (C : AUTOMATON_CONFIG) :
   let check_per_topic_score_parameters tsp =
     assert (tsp.time_in_mesh_weight >= 0.0) ;
     assert (tsp.time_in_mesh_cap >= 0.0) ;
-    assert (tsp.time_in_mesh_quantum > 0.0)
+    assert (tsp.time_in_mesh_quantum > 0.0) ;
+    assert (tsp.first_message_deliveries_weight >= 0.0) ;
+    assert (tsp.first_message_deliveries_cap >= 0)
 
   let check_score_parameters (sp : _ score_parameters) =
     (match sp.topics with
@@ -951,7 +953,18 @@ module Make (C : AUTOMATON_CONFIG) :
           ~some:(fun peer -> Peer.Set.remove peer peers)
           sender
       in
+
       let* () = put_in_seen_messages message_id in
+
+      let* () =
+        match sender with
+        | None ->
+            (* Message is not from network. *)
+            return ()
+        | Some sender ->
+            update_score sender (fun stats ->
+                Score.first_message_delivered stats topic)
+      in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
 

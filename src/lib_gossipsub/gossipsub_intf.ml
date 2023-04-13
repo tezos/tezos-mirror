@@ -94,15 +94,24 @@ module type AUTOMATON_CONFIG = sig
   module Time : TIME with type span = Span.t
 end
 
+(* TODO https://gitlab.com/tezos/tezos/-/issues/5462
+   Score decay is left to be implemented, and the associated
+   parameters added here. *)
+
 type per_topic_score_parameters = {
   time_in_mesh_weight : float;
-      (** The weight of the score associated to the time spent in the mesh. *)
+      (** P1: The weight of the score associated to the time spent in the mesh. *)
   time_in_mesh_cap : float;
-      (** The maximum value considered for the score associated to the time spent
+      (** P1: The maximum value considered for the score associated to the time spent
           by a peer in the mesh. *)
   time_in_mesh_quantum : float;
-      (** The score associated to the time spent [t] in the mesh is
+      (** P1: The score associated to the time spent [t] in the mesh is
           [(min t time_in_mesh_cap) / time_in_mesh_quantum]. *)
+  first_message_deliveries_weight : float;
+      (** P2: The weight of the score associated to the number of first message deliveries. *)
+  first_message_deliveries_cap : int;
+      (** P2: The maximum value considered during score computation for the number of
+          first message deliveries. *)
 }
 
 type 'topic topic_score_parameters =
@@ -236,6 +245,21 @@ type ('peer, 'message_id) parameters = {
     'peer -> [`IHave of 'message_id | `IWant of 'message_id | `Graft] -> bool;
 }
 
+(** The [SCORE] module type describes primitives used to update the scores
+    associated to each peer. Score computation is described in more details in
+    {{: https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md#peer-scoring }the specification}.
+
+    The score associated to a peer is a weighted sum of various counters, some
+    of which are indexed by topics. Each captures a certain aspect of what a
+    well-behaving peer should do. A short description follows, keeping the
+    naming P1, P2, ... used in the specification.
+
+    - P1: For each topic, we measure how long a peer has spent in the mesh for that topic. The longest, the better.
+    - P2: For each topic, we measure how many times the peer was the first among all peers to send us a message on that topic.
+    - P7: When a peer is pruned from the mesh for a topic, we install a backoff that
+      prevents that peer from regrafting too soon. If the peer does not respect this backoff,
+      it is penalized.
+*)
 module type SCORE = sig
   (** The type of peer scoring statistics. *)
   type t
@@ -276,6 +300,10 @@ module type SCORE = sig
   (** [prune ps topic] allows to measure the time spent by the peer in the mesh.
       It is to be called upon pruning a peer from [topic]. *)
   val prune : t -> topic -> t
+
+  (** [first_message_delivered ps topic] increments the counter related to
+      first message deliveries on [topic] by the associated peer. *)
+  val first_message_delivered : t -> topic -> t
 
   (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
       if the score expired. Refreshing a [ps] allows to update time-dependent spects
