@@ -677,51 +677,6 @@ module Tenderbake : sig
        and type t := Raw_context.t
 end
 
-module Tx_rollup : sig
-  (** [State] stores the state of a transaction rollup. *)
-  module State :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Tx_rollup_repr.t
-       and type value = Tx_rollup_state_repr.t
-       and type t := Raw_context.t
-
-  (** The representation of an inbox. See {!Tx_rollup_inbox_repr.t}
-     for a description of the actual content. *)
-  module Inbox :
-    Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Tx_rollup_repr.t
-       and type key = Tx_rollup_level_repr.t
-       and type value = Tx_rollup_inbox_repr.t
-
-  (** A carbonated storage of the set of withdrawals revealed of those
-      potentially associated to each message of an inbox. The key is the message
-      number, which is sequentially assigned from 0. *)
-  module Revealed_withdrawals :
-    Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Tx_rollup_repr.t
-       and type key = Tx_rollup_level_repr.t
-       and type value = Bitset.t
-
-  (** A rollup can have at most one commitment per rollup level. Some
-      metadata are saved in addition to the commitment itself. See
-     {!Tx_rollup_commitment_repr.Submitted_commitment.t} for the exact
-     content. *)
-  module Commitment :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Tx_rollup_level_repr.t
-       and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
-       and type t := Raw_context.t * Tx_rollup_repr.t
-
-  (** This stores information about which contracts have bonds
-     for each rollup, and how many commitments those bonds
-     stake. *)
-  module Commitment_bond :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Signature.public_key_hash
-       and type value = int
-       and type t := Raw_context.t * Tx_rollup_repr.t
-end
-
 module Sc_rollup : sig
   (** Smart contract rollup.
 
