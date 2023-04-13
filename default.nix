@@ -73,6 +73,7 @@ in
         "CoreFoundation"
         "IOKit"
         "AppKit"
+        "Security"
       ]
     );
 
