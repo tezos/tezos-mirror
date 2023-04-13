@@ -2,6 +2,8 @@ octez-baker.html
 octez-accuser.html
 octez-endorser.html
 octez-client.html
+octez-smart-rollup-client.html
+octez-smart-rollup-node.html
 /api/octez-snoop.html
 /api/octez-codec.html
 /api/octez-admin-client.html
