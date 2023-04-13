@@ -40,9 +40,7 @@ exception Error of error list
 
 let rec listen ?port addr =
   let open Lwt_syntax in
-  let tentative_port =
-    match port with None -> 49152 + Random.int 16384 | Some port -> port
-  in
+  let tentative_port = match port with None -> 0 | Some port -> port in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
   let main_socket = Lwt_unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
