@@ -3,23 +3,6 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
-(executable
- (name test_js)
- (modes js)
- (libraries
-  tezos-sapling
-  tezos-hacl)
- (js_of_ocaml)
- (link_flags
-  (:standard)
-  (-linkall))
- (modules test_js))
-
-(rule
- (alias runtest_js)
- (package tezos-sapling)
- (action (run node %{dep:./test_js.bc.js})))
-
 (library
  (name src_lib_sapling_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
@@ -53,6 +36,23 @@
   test_sapling
   keys
   example))
+
+(executable
+ (name test_js)
+ (modes js)
+ (libraries
+  tezos-sapling
+  tezos-hacl)
+ (js_of_ocaml)
+ (link_flags
+  (:standard)
+  (-linkall))
+ (modules test_js))
+
+(rule
+ (alias runtest_js)
+ (package tezos-sapling)
+ (action (run node %{dep:./test_js.bc.js})))
 
 (executable
  (name main)

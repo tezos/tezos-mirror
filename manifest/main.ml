@@ -4905,22 +4905,25 @@ end = struct
              can be run either with [dune build @runtezt],
              with [dune exec src/proto_alpha/lib_protocol/test/regression/main.exe],
              or with [dune exec tezt/tests/main.exe -- -f test_logging.ml]. *)
-          tezt
-            ["test_logging"]
-            ~path:(path // "lib_protocol/test/regression")
-            ~with_macos_security_framework:true
-            ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-            ~deps:
-              [
-                octez_base |> open_ ~m:"TzPervasives";
-                tezt_tezos |> open_;
-                main |> open_;
-                client |> if_some |> open_;
-                plugin |> if_some |> open_;
-                test_helpers |> if_some |> open_;
-                octez_micheline |> open_;
-              ]
-            ~dep_globs:["contracts/*.tz"; "expected/test_logging.ml/*.out"]
+          let _ =
+            tezt
+              ["test_logging"]
+              ~path:(path // "lib_protocol/test/regression")
+              ~with_macos_security_framework:true
+              ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+              ~deps:
+                [
+                  octez_base |> open_ ~m:"TzPervasives";
+                  tezt_tezos |> open_;
+                  main |> open_;
+                  client |> if_some |> open_;
+                  plugin |> if_some |> open_;
+                  test_helpers |> if_some |> open_;
+                  octez_micheline |> open_;
+                ]
+              ~dep_globs:["contracts/*.tz"; "expected/test_logging.ml/*.out"]
+          in
+          ()
       in
       ()
 
