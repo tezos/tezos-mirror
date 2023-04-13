@@ -2351,9 +2351,7 @@ end
 
 (** This module re-exports definitions from {!Bond_id_repr}. *)
 module Bond_id : sig
-  type t =
-    | Tx_rollup_bond_id of Tx_rollup.t
-    | Sc_rollup_bond_id of Smart_rollup.Address.t
+  type t = Sc_rollup_bond_id of Smart_rollup.Address.t
 
   val pp : Format.formatter -> t -> unit
 

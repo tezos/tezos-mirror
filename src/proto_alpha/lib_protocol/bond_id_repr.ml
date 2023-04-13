@@ -23,45 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
-  | Tx_rollup_bond_id of Tx_rollup_repr.t
-  | Sc_rollup_bond_id of Sc_rollup_repr.t
+type t = Sc_rollup_bond_id of Sc_rollup_repr.t
 
 include Compare.Make (struct
   type nonrec t = t
 
   let compare id1 id2 =
     match (id1, id2) with
-    | Tx_rollup_bond_id id1, Tx_rollup_bond_id id2 ->
-        Tx_rollup_repr.compare id1 id2
     | Sc_rollup_bond_id id1, Sc_rollup_bond_id id2 ->
         Sc_rollup_repr.Address.compare id1 id2
-    | Tx_rollup_bond_id _, Sc_rollup_bond_id _ -> -1
-    | Sc_rollup_bond_id _, Tx_rollup_bond_id _ -> 1
 end)
 
 let encoding =
   let open Data_encoding in
+  let case = function
+    | Tag tag ->
+        (* The tag was used by old variant. It have been removed in
+             protocol proposal O, it can be unblocked in the future. *)
+        let to_tx_rollup_reserved_tag = 0 in
+        assert (Compare.Int.(tag <> to_tx_rollup_reserved_tag)) ;
+        case (Tag tag)
+    | _ as c -> case c
+  in
   def "bond_id"
   @@ union
        [
          case
-           (Tag 0)
-           ~title:"Tx_rollup_bond_id"
-           (obj1 (req "tx_rollup" Tx_rollup_repr.encoding))
-           (function Tx_rollup_bond_id id -> Some id | _ -> None)
-           (fun id -> Tx_rollup_bond_id id);
-         case
            (Tag 1)
            ~title:"Smart_rollup_bond_id"
            (obj1 (req "smart_rollup" Sc_rollup_repr.encoding))
-           (function Sc_rollup_bond_id id -> Some id | _ -> None)
+           (function Sc_rollup_bond_id id -> Some id)
            (fun id -> Sc_rollup_bond_id id);
        ]
 
-let pp ppf = function
-  | Tx_rollup_bond_id id -> Tx_rollup_repr.pp ppf id
-  | Sc_rollup_bond_id id -> Sc_rollup_repr.pp ppf id
+let pp ppf = function Sc_rollup_bond_id id -> Sc_rollup_repr.pp ppf id
 
 let destruct id =
   (* String.starts_with from the stdlib 4.14, with [unsafe_get] replaced by
@@ -76,18 +71,13 @@ let destruct id =
     in
     Compare.Int.(len_s >= len_pre) && aux 0
   in
-  if starts_with ~prefix:Tx_rollup_prefixes.rollup_address.prefix id then
-    match Tx_rollup_repr.of_b58check_opt id with
-    | Some id -> Result.ok (Tx_rollup_bond_id id)
-    | None -> Result.error "Cannot parse transaction rollup id"
-  else if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
+  if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
     match Sc_rollup_repr.Address.of_b58check_opt id with
     | Some id -> Result.ok (Sc_rollup_bond_id id)
     | None -> Result.error "Cannot parse smart rollup id"
   else Result.error "Cannot parse rollup id"
 
 let construct = function
-  | Tx_rollup_bond_id id -> Tx_rollup_repr.to_b58check id
   | Sc_rollup_bond_id id -> Sc_rollup_repr.Address.to_b58check id
 
 let rpc_arg =

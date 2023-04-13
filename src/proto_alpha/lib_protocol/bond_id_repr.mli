@@ -25,9 +25,7 @@
 
 (** This module defines identifiers for frozen bonds. *)
 
-type t =
-  | Tx_rollup_bond_id of Tx_rollup_repr.t
-  | Sc_rollup_bond_id of Sc_rollup_repr.t
+type t = Sc_rollup_bond_id of Sc_rollup_repr.t
 
 val pp : Format.formatter -> t -> unit
 
