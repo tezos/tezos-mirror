@@ -380,60 +380,6 @@ module Contract = struct
   end
 end
 
-module Tx_rollup_level = Tx_rollup_level_repr
-module Tx_rollup_commitment_hash = Tx_rollup_commitment_repr.Hash
-module Tx_rollup_message_result_hash = Tx_rollup_message_result_hash_repr
-
-module Tx_rollup = struct
-  include Tx_rollup_repr
-  include Tx_rollup_storage
-  module Internal_for_tests = Tx_rollup_repr
-end
-
-module Tx_rollup_state = struct
-  include Tx_rollup_state_repr
-  include Tx_rollup_state_storage
-
-  module Internal_for_tests = struct
-    include Tx_rollup_state_repr
-    include Tx_rollup_state_repr.Internal_for_tests
-  end
-end
-
-module Tx_rollup_withdraw = Tx_rollup_withdraw_repr
-module Tx_rollup_withdraw_list_hash = Tx_rollup_withdraw_list_hash_repr
-module Tx_rollup_message_result = Tx_rollup_message_result_repr
-
-module Tx_rollup_reveal = struct
-  include Tx_rollup_reveal_repr
-  include Tx_rollup_reveal_storage
-end
-
-module Tx_rollup_message = struct
-  include Tx_rollup_message_repr
-
-  let make_message msg = (msg, size msg)
-
-  let make_batch string = make_message @@ Batch string
-
-  let make_deposit sender destination ticket_hash amount =
-    make_message @@ Deposit {sender; destination; ticket_hash; amount}
-end
-
-module Tx_rollup_message_hash = Tx_rollup_message_hash_repr
-
-module Tx_rollup_inbox = struct
-  include Tx_rollup_inbox_repr
-  include Tx_rollup_inbox_storage
-end
-
-module Tx_rollup_commitment = struct
-  include Tx_rollup_commitment_repr
-  include Tx_rollup_commitment_storage
-end
-
-module Tx_rollup_hash = Tx_rollup_hash_builder
-module Tx_rollup_errors = Tx_rollup_errors_repr
 module Global_constants_storage = Global_constants_storage
 
 module Big_map = struct
