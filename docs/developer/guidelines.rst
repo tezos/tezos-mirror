@@ -592,6 +592,16 @@ In Octez, there is also ``Compare.List_length_with`` which provides infix
 operators to compare the length of a list to a constant directly. The same
 example can be written ``Compare.List_length_with.(xs > k)``.
 
+.. _linting-list-length-empty:
+
+Comparing the length of a list with zero
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A common special case of the former consists in testing if a list is
+empty. While ``List.compare_length_with xs 0 = 0`` or
+``Compare.List_length_with.(xs = 0)`` test this property in constant
+time, pattern-matching on ``xs`` or calling ``List.is_empty xs``
+should generally be preferred for readability.
 
 .. _linting-folding-over-a-promise:
 
