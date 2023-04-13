@@ -19,7 +19,6 @@ pub mod account_storage;
 pub mod block;
 pub mod handler;
 pub mod precompiles;
-pub mod signatures;
 pub mod storage;
 pub mod transaction;
 
@@ -122,7 +121,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::signatures::EthereumTransactionCommon;
     use super::*;
     use account_storage::{
         account_path, init_account_storage as init_evm_account_storage,
@@ -134,6 +132,7 @@ mod test {
     use primitive_types::H160;
     use std::str::FromStr;
     use tezos_ethereum::address::EthereumAddress;
+    use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_smart_rollup_mock::MockHost;
 
     // The compiled initialization code for the Ethereum demo contract given
@@ -474,7 +473,7 @@ mod test {
     #[test]
     //this is based on https://eips.ethereum.org/EIPS/eip-155
     fn test_signatures() {
-        let (sk, _address) = signatures::string_to_sk_and_address(
+        let (sk, _address) = tezos_ethereum::signatures::string_to_sk_and_address(
             "4646464646464646464646464646464646464646464646464646464646464646"
                 .to_string(),
         );
@@ -514,7 +513,8 @@ mod test {
             ),
         ];
         test_list.iter().fold((), |_, (s, ea)| {
-            let (_, a) = signatures::string_to_sk_and_address(s.to_string());
+            let (_, a) =
+                tezos_ethereum::signatures::string_to_sk_and_address(s.to_string());
             let value: [u8; 20] = hex::decode(ea).unwrap().try_into().unwrap();
             let ea = EthereumAddress::from(value);
             assert_eq!(a, ea);
@@ -523,7 +523,7 @@ mod test {
 
     #[test]
     fn test_caller_classic() {
-        let (_sk, address_from_sk) = signatures::string_to_sk_and_address(
+        let (_sk, address_from_sk) = tezos_ethereum::signatures::string_to_sk_and_address(
             "4646464646464646464646464646464646464646464646464646464646464646"
                 .to_string(),
         );

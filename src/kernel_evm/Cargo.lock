@@ -1518,6 +1518,7 @@ name = "tezos_ethereum"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "libsecp256k1",
  "primitive-types",
  "rlp",
  "sha3",

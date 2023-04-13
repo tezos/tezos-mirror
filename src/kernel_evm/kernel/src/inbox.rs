@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use evm_execution::signatures::EthereumTransactionCommon;
+use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
 
