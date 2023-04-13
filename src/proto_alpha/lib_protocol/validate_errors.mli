@@ -190,7 +190,6 @@ module Manager : sig
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
-    | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
     | Sc_rollup_arith_pvm_disabled
     | Zk_rollup_feature_disabled

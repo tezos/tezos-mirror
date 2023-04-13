@@ -43,13 +43,21 @@ type balance =
   | Initial_commitments
   | Minted
   | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
-  | Tx_rollup_rejection_punishments
-  | Tx_rollup_rejection_rewards
   | Sc_rollup_refutation_punishments
   | Sc_rollup_refutation_rewards
 
 let balance_encoding =
   let open Data_encoding in
+  let case = function
+    | Tag tag ->
+        (* The tag was used by old variant. It have been removed in
+           protocol proposal O, it can be unblocked in the future. *)
+        let tx_rollup_reserved_tag = [22; 23] in
+        assert (
+          not @@ List.exists (Compare.Int.equal tag) tx_rollup_reserved_tag) ;
+        case (Tag tag)
+    | _ as c -> case c
+  in
   def "operation_metadata.alpha.balance"
   @@ union
        [
@@ -209,23 +217,6 @@ let balance_encoding =
            (function Frozen_bonds (c, r) -> Some ((), (), c, r) | _ -> None)
            (fun ((), (), c, r) -> Frozen_bonds (c, r));
          case
-           (Tag 22)
-           ~title:"Tx_rollup_rejection_rewards"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "tx_rollup_rejection_rewards")))
-           (function Tx_rollup_rejection_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Tx_rollup_rejection_rewards);
-         case
-           (Tag 23)
-           ~title:"Tx_rollup_rejection_punishments"
-           (obj2
-              (req "kind" (constant "burned"))
-              (req "category" (constant "tx_rollup_rejection_punishments")))
-           (function
-             | Tx_rollup_rejection_punishments -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Tx_rollup_rejection_punishments);
-         case
            (Tag 24)
            ~title:"Smart_rollup_refutation_punishments"
            (obj2
@@ -284,10 +275,8 @@ let compare_balance ba bb =
         | Initial_commitments -> 15
         | Minted -> 16
         | Frozen_bonds _ -> 17
-        | Tx_rollup_rejection_punishments -> 18
-        | Tx_rollup_rejection_rewards -> 19
-        | Sc_rollup_refutation_punishments -> 20
-        | Sc_rollup_refutation_rewards -> 21
+        | Sc_rollup_refutation_punishments -> 18
+        | Sc_rollup_refutation_rewards -> 19
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)

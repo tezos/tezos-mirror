@@ -2039,8 +2039,6 @@ module Receipt : sig
     | Initial_commitments
     | Minted
     | Frozen_bonds of Contract.t * Bond_id.t
-    | Tx_rollup_rejection_punishments
-    | Tx_rollup_rejection_rewards
     | Sc_rollup_refutation_punishments
     | Sc_rollup_refutation_rewards
 
@@ -4773,7 +4771,6 @@ module Token : sig
     | `Baking_bonuses
     | `Minted
     | `Liquidity_baking_subsidies
-    | `Tx_rollup_rejection_rewards
     | `Sc_rollup_refutation_rewards
     | container ]
 
@@ -4782,7 +4779,6 @@ module Token : sig
     | `Double_signing_punishments
     | `Lost_endorsing_rewards of public_key_hash * bool * bool
     | `Burned
-    | `Tx_rollup_rejection_punishments
     | `Sc_rollup_refutation_punishments
     | container ]
 

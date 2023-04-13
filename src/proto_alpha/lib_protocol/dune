@@ -43,7 +43,6 @@
   Contract_hash
   Blinded_public_key_hash
   Block_payload_hash
-  Tx_rollup_prefixes
   Sc_rollup_reveal_hash
   Merkle_list
   Bitset
@@ -101,23 +100,7 @@
   Skip_list_costs
   Sc_rollup_costs
   Sc_rollup_game_repr
-  Tx_rollup_level_repr
-  Tx_rollup_l2_proof
   Tx_rollup_l2_address
-  Tx_rollup_l2_qty
-  Tx_rollup_l2_context_hash
-  Tx_rollup_repr
-  Tx_rollup_withdraw_repr
-  Tx_rollup_withdraw_list_hash_repr
-  Tx_rollup_reveal_repr
-  Tx_rollup_message_repr
-  Tx_rollup_message_hash_repr
-  Tx_rollup_inbox_repr
-  Tx_rollup_message_result_repr
-  Tx_rollup_message_result_hash_repr
-  Tx_rollup_commitment_repr
-  Tx_rollup_errors_repr
-  Tx_rollup_state_repr
   Dal_errors_repr
   Dal_operations_repr
   Zk_rollup_scalar
@@ -314,7 +297,6 @@
   contract_hash.ml contract_hash.mli
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
-  tx_rollup_prefixes.ml tx_rollup_prefixes.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
   merkle_list.ml merkle_list.mli
   bitset.ml bitset.mli
@@ -374,24 +356,7 @@
   skip_list_costs.ml skip_list_costs.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  tx_rollup_level_repr.ml tx_rollup_level_repr.mli
-  tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
-  tx_rollup_l2_qty.ml tx_rollup_l2_qty.mli
-  tx_rollup_l2_context_hash.ml tx_rollup_l2_context_hash.mli
-  tx_rollup_repr.ml tx_rollup_repr.mli
-  tx_rollup_withdraw_repr.ml tx_rollup_withdraw_repr.mli
-  tx_rollup_withdraw_list_hash_repr.ml tx_rollup_withdraw_list_hash_repr.mli
-  tx_rollup_reveal_repr.ml tx_rollup_reveal_repr.mli
-  tx_rollup_message_repr.ml tx_rollup_message_repr.mli
-  tx_rollup_message_hash_repr.ml tx_rollup_message_hash_repr.mli
-  tx_rollup_inbox_repr.ml tx_rollup_inbox_repr.mli
-  tx_rollup_message_result_repr.ml tx_rollup_message_result_repr.mli
-  tx_rollup_message_result_hash_repr.ml
-  tx_rollup_message_result_hash_repr.mli
-  tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
-  tx_rollup_errors_repr.ml
-  tx_rollup_state_repr.ml tx_rollup_state_repr.mli
   dal_errors_repr.ml
   dal_operations_repr.ml dal_operations_repr.mli
   zk_rollup_scalar.ml zk_rollup_scalar.mli
@@ -591,7 +556,6 @@
   contract_hash.ml contract_hash.mli
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
-  tx_rollup_prefixes.ml tx_rollup_prefixes.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
   merkle_list.ml merkle_list.mli
   bitset.ml bitset.mli
@@ -651,24 +615,7 @@
   skip_list_costs.ml skip_list_costs.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  tx_rollup_level_repr.ml tx_rollup_level_repr.mli
-  tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
-  tx_rollup_l2_qty.ml tx_rollup_l2_qty.mli
-  tx_rollup_l2_context_hash.ml tx_rollup_l2_context_hash.mli
-  tx_rollup_repr.ml tx_rollup_repr.mli
-  tx_rollup_withdraw_repr.ml tx_rollup_withdraw_repr.mli
-  tx_rollup_withdraw_list_hash_repr.ml tx_rollup_withdraw_list_hash_repr.mli
-  tx_rollup_reveal_repr.ml tx_rollup_reveal_repr.mli
-  tx_rollup_message_repr.ml tx_rollup_message_repr.mli
-  tx_rollup_message_hash_repr.ml tx_rollup_message_hash_repr.mli
-  tx_rollup_inbox_repr.ml tx_rollup_inbox_repr.mli
-  tx_rollup_message_result_repr.ml tx_rollup_message_result_repr.mli
-  tx_rollup_message_result_hash_repr.ml
-  tx_rollup_message_result_hash_repr.mli
-  tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
-  tx_rollup_errors_repr.ml
-  tx_rollup_state_repr.ml tx_rollup_state_repr.mli
   dal_errors_repr.ml
   dal_operations_repr.ml dal_operations_repr.mli
   zk_rollup_scalar.ml zk_rollup_scalar.mli
@@ -852,7 +799,6 @@
   contract_hash.ml contract_hash.mli
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
-  tx_rollup_prefixes.ml tx_rollup_prefixes.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
   merkle_list.ml merkle_list.mli
   bitset.ml bitset.mli
@@ -912,24 +858,7 @@
   skip_list_costs.ml skip_list_costs.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  tx_rollup_level_repr.ml tx_rollup_level_repr.mli
-  tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
-  tx_rollup_l2_qty.ml tx_rollup_l2_qty.mli
-  tx_rollup_l2_context_hash.ml tx_rollup_l2_context_hash.mli
-  tx_rollup_repr.ml tx_rollup_repr.mli
-  tx_rollup_withdraw_repr.ml tx_rollup_withdraw_repr.mli
-  tx_rollup_withdraw_list_hash_repr.ml tx_rollup_withdraw_list_hash_repr.mli
-  tx_rollup_reveal_repr.ml tx_rollup_reveal_repr.mli
-  tx_rollup_message_repr.ml tx_rollup_message_repr.mli
-  tx_rollup_message_hash_repr.ml tx_rollup_message_hash_repr.mli
-  tx_rollup_inbox_repr.ml tx_rollup_inbox_repr.mli
-  tx_rollup_message_result_repr.ml tx_rollup_message_result_repr.mli
-  tx_rollup_message_result_hash_repr.ml
-  tx_rollup_message_result_hash_repr.mli
-  tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
-  tx_rollup_errors_repr.ml
-  tx_rollup_state_repr.ml tx_rollup_state_repr.mli
   dal_errors_repr.ml
   dal_operations_repr.ml dal_operations_repr.mli
   zk_rollup_scalar.ml zk_rollup_scalar.mli

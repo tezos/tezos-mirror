@@ -43,7 +43,7 @@
     The part of slashed amounts that goes to the author of the denunciation are
     not directly distributed to him. Tokens are transferred to a burning sink,
     then minted from an infinite source ( see `Double_signing_punishments,
-    `Tx_rollup_rejection_rewards and `Sc_rollup_refutation_rewards ).
+    and `Sc_rollup_refutation_rewards ).
     Again, this is an ANTI-PATTERN that should not be mimicked.
 *)
 
@@ -82,8 +82,6 @@ type infinite_source =
   | `Baking_bonuses  (** Consensus baking variable bonus *)
   | `Minted  (** Generic source for test purpose *)
   | `Liquidity_baking_subsidies  (** Subsidy for liquidity-baking contract *)
-  | `Tx_rollup_rejection_rewards
-    (** Tx_rollup rejection rewards (slashing redistribution) *)
   | `Sc_rollup_refutation_rewards
     (** Sc_rollup refutation rewards (slashing redistribution) *) ]
 
@@ -96,8 +94,6 @@ type infinite_sink =
   | `Double_signing_punishments  (** Consensus slashing *)
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
     (** Consensus rewards not distributed because the participation of the delegate was too low. *)
-  | `Tx_rollup_rejection_punishments
-    (** Transactional rollups rejection slashing *)
   | `Sc_rollup_refutation_punishments  (** Smart rollups refutation slashing *)
   | `Burned  (** Generic sink mainly for test purpose *) ]
 

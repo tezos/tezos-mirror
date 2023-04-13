@@ -379,8 +379,6 @@ let pp_balance_updates ppf balance_updates =
                 contract
                 Bond_id.pp
                 bond_id
-          | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
-          | Tx_rollup_rejection_punishments -> "tx rollup rejection punishments"
           | Sc_rollup_refutation_punishments ->
               "smart rollup refutation punishments"
           | Sc_rollup_refutation_rewards -> "smart rollup refutation rewards"
