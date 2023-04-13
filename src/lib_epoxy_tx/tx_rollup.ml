@@ -980,8 +980,9 @@ module P = struct
       match (arg, opts) with
       | Some v, _ -> Bounded.make ~unsafe ~bound v
       | None, Some opts ->
-          assert (List.compare_length_with opts 0 > 0) ;
-          let i = random_int (List.length opts) in
+          let len_opts = List.length opts in
+          assert (len_opts > 0) ;
+          let i = random_int len_opts in
           Bounded.make ~unsafe ~bound @@ List.nth opts i
       | _ -> Bounded.random ~maxv bound
     in
