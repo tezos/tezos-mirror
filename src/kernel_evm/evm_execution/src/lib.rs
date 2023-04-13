@@ -16,8 +16,6 @@ use tezos_smart_rollup_storage::StorageError;
 use thiserror::Error;
 
 pub mod account_storage;
-pub mod address;
-pub mod basic;
 pub mod block;
 pub mod handler;
 pub mod precompiles;
@@ -67,7 +65,7 @@ pub enum EthereumError {
     /// A contract call transferred too much gas to sub-context or contract
     /// call itself got too much gas
     #[error("Gas limit overflow: {0}")]
-    GasLimitOverflow(basic::U256),
+    GasLimitOverflow(tezos_ethereum::basic::U256),
 }
 
 impl From<ExitError> for EthereumError {
@@ -135,6 +133,7 @@ mod test {
     use host::runtime::Runtime;
     use primitive_types::H160;
     use std::str::FromStr;
+    use tezos_ethereum::address::EthereumAddress;
     use tezos_smart_rollup_mock::MockHost;
 
     // The compiled initialization code for the Ethereum demo contract given
@@ -517,7 +516,7 @@ mod test {
         test_list.iter().fold((), |_, (s, ea)| {
             let (_, a) = signatures::string_to_sk_and_address(s.to_string());
             let value: [u8; 20] = hex::decode(ea).unwrap().try_into().unwrap();
-            let ea = address::EthereumAddress::from(value);
+            let ea = EthereumAddress::from(value);
             assert_eq!(a, ea);
         })
     }
@@ -537,7 +536,7 @@ mod test {
                 .unwrap()
                 .try_into()
                 .unwrap();
-        let expected_address = address::EthereumAddress::from(expected_address_string);
+        let expected_address = EthereumAddress::from(expected_address_string);
         assert_eq!(expected_address, address);
         assert_eq!(expected_address, address_from_sk)
     }

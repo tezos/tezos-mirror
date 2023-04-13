@@ -429,6 +429,7 @@ dependencies = [
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
+ "tezos_ethereum",
  "thiserror",
 ]
 
@@ -1516,8 +1517,12 @@ dependencies = [
 name = "tezos_ethereum"
 version = "0.1.0"
 dependencies = [
- "evm-execution",
+ "hex",
  "primitive-types",
+ "rlp",
+ "sha3",
+ "tezos-smart-rollup-encoding",
+ "tezos_crypto_rs",
 ]
 
 [[package]]

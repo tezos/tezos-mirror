@@ -8,10 +8,10 @@
 //! When then kernel "sees" an EOL from the PVM, it finalizes the current block
 //! and starts creating the next one.
 
-use super::basic::{GasLimit, GasPrice, Wei};
 use super::storage::blocks::get_current_number_n_timestamp;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
+use tezos_ethereum::basic::{GasLimit, GasPrice, Wei};
 /// All data for an Ethereum block.
 ///
 /// This data does not change for the duration of the block. All balues are

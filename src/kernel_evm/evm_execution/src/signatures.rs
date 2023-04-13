@@ -9,8 +9,6 @@
 //! We need to sign and write Ethereum specific values such
 //! as addresses and values.
 
-use crate::address::EthereumAddress;
-use crate::basic::{GasLimit, GasPrice, Wei, H256, U256};
 use libsecp256k1::{
     curve::Scalar, recover, sign, verify, Message, PublicKey, RecoveryId, SecretKey,
     Signature,
@@ -18,6 +16,8 @@ use libsecp256k1::{
 use primitive_types::H256 as PTH256;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use sha3::{Digest, Keccak256};
+use tezos_ethereum::address::EthereumAddress;
+use tezos_ethereum::basic::{GasLimit, GasPrice, Wei, H256, U256};
 
 /// produces address from a secret key
 pub fn string_to_sk_and_address(s: String) -> (SecretKey, EthereumAddress) {
