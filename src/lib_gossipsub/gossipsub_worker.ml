@@ -504,8 +504,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     {
       gossip_state = GS.make rng limits parameters;
       status = Starting;
-      events_stream = Stream.empty;
-      p2p_output_stream = Stream.empty;
-      app_output_stream = Stream.empty;
+      events_stream = Stream.empty ();
+      p2p_output_stream = Stream.empty ();
+      app_output_stream = Stream.empty ();
     }
 end

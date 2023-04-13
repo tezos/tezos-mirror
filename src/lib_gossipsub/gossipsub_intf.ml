@@ -620,7 +620,7 @@ module type WORKER_CONFIGURATION = sig
     type 'a t
 
     (** Create a new empty stream. *)
-    val empty : 'a t
+    val empty : unit -> 'a t
 
     (** Push the given value into the stream. *)
     val push : 'a -> 'a t -> unit
