@@ -592,30 +592,8 @@ let sc_rollup_commands () =
     (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
     [config_init_command; run_command; legacy_run_command; dump_metrics]
 
-let rpc_timeout ~timeout ?canceler f ctxt =
-  let canceler = Option.value_f ~default:Lwt_canceler.create canceler in
-  let request = Error_monad.protect ~canceler (fun () -> f ctxt) in
-  let alarm =
-    Tezos_stdlib_unix.Systime_os.sleep (Ptime.Span.of_int_s timeout)
-  in
-  Error_monad.with_timeout ~canceler alarm (fun _ -> request)
-
-let check_network ctxt =
-  let open Lwt_result_syntax in
-  let*! r = rpc_timeout ~timeout:10 Version_services.version ctxt in
-  match r with
-  | Ok {network_version; _}
-    when String.has_prefix
-           ~prefix:"TEZOS_MAINNET"
-           (network_version.chain_name :> string) ->
-      failwith
-        "This rollup node is not suitable to use on mainnet. Consider using a \
-         version from a more recent release of Octez."
-  | Ok _ | Error _ -> return_unit
-
-let select_commands ctxt _ =
-  let open Lwt_result_syntax in
-  let+ () = check_network ctxt in
-  sc_rollup_commands () @ Client_helpers_commands.commands ()
+let select_commands _ctxt _ =
+  Lwt_result_syntax.return
+    (sc_rollup_commands () @ Client_helpers_commands.commands ())
 
 let () = Client_main_run.run (module Daemon_config) ~select_commands
