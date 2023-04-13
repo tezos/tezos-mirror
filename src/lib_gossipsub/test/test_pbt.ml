@@ -46,17 +46,17 @@ module Basic_fragments = struct
 
   let add_then_remove_peer ~gen_peer : t =
     of_input_gen (add_peer ~gen_peer) @@ fun ap ->
-    [Add_peer ap; Remove_peer {peer = ap.peer}]
+    [I.add_peer ap; I.remove_peer {peer = ap.peer}]
 
   let join_then_leave_topic ~gen_topic : t =
     of_input_gen (join ~gen_topic) @@ fun jp ->
-    [Join jp; Leave {topic = jp.topic}]
+    [I.join jp; I.leave {topic = jp.topic}]
 
   let graft_then_prune ~gen_peer ~gen_topic : t =
     of_input_gen (graft ~gen_peer ~gen_topic) @@ fun g ->
     [
-      Graft g;
-      Prune
+      I.graft g;
+      I.prune
         {
           peer = g.peer;
           topic = g.topic;
@@ -65,7 +65,7 @@ module Basic_fragments = struct
         };
     ]
 
-  let heartbeat : t = of_list [Heartbeat]
+  let heartbeat : t = of_list [I.heartbeat]
 
   (* This creates a list of [count] [add_peer;graft] with distinct peers
      such that exactly [count_outbound] of them are [outbound] peers. *)
@@ -82,7 +82,7 @@ module Basic_fragments = struct
       |> M.flatten_l
     in
     of_input_gen many_peer_gens @@ fun peers ->
-    List.map (fun ap -> [Add_peer ap; Graft {topic; peer = ap.peer}]) peers
+    List.map (fun ap -> [I.add_peer ap; I.graft {topic; peer = ap.peer}]) peers
     |> List.flatten
 end
 
@@ -432,7 +432,7 @@ module Test_remove_peer = struct
            in
            check_map place map)
 
-  let predicate final_state _final_output =
+  let predicate (Transition {state' = final_state; _}) =
     (* This predicate checks that [peer_id] does not appear in the [view]
        of the final state. *)
     not_in_view all_peers final_state
@@ -481,11 +481,11 @@ module Test_remove_peer = struct
         repeat_at_most 100 tick;
         of_input_gen
           (ihave ~gen_peer ~gen_topic ~gen_message_id ~gen_msg_count)
-          (fun ihave -> [Ihave ihave])
+          (fun ihave -> [I.ihave ihave])
         |> repeat_at_most 5;
         of_input_gen
           (iwant ~gen_peer ~gen_message_id ~gen_msg_count)
-          (fun iwant -> [Iwant iwant])
+          (fun iwant -> [I.iwant iwant])
         |> repeat_at_most 5;
         graft_then_prune_wait_and_clean () |> repeat_at_most 10;
       ]
@@ -611,21 +611,20 @@ module Test_peers_below_degree_high = struct
       fmtr
       v
 
-  let predicate degree_high ({t; i; s; s'; o} : transition) () =
+  let predicate degree_high
+      (Transition {time; input; state; state'; output} : transition) () =
     let open Result_syntax in
-    let (O o') = o in
-    match i with
+    match input with
     | Graft _ -> (
-        match o' with
+        match output with
         | Peer_filtered | Unknown_topic | Unexpected_grafting_peer
         | Grafting_peer_with_negative_score | Peer_backed_off ->
-            fail (`unexpected_output o)
+            fail (`unexpected_output (O output))
         | Grafting_direct_peer | Peer_already_in_mesh | Grafting_successfully
         | Mesh_full ->
-            return_unit
-        | _ -> return_unit)
+            return_unit)
     | Heartbeat -> (
-        match o' with
+        match output with
         | Heartbeat {to_prune; _} ->
             let open GS.Introspection in
             let previous_state_has_enough_peers_in_mesh s =
@@ -665,12 +664,11 @@ module Test_peers_below_degree_high = struct
                   | Some set -> GS.Peer.Set.cardinal set
                 in
                 if card <> target then
-                  fail (`too_many_peers (t, card, target, degree_high))
+                  fail (`too_many_peers (time, card, target, degree_high))
                 else return_unit
             in
-            let* () = previous_state_has_enough_peers_in_mesh s in
-            pruned_enough_peers s'
-        | _ -> fail (`unexpected_output o))
+            let* () = previous_state_has_enough_peers_in_mesh state in
+            pruned_enough_peers state')
     | _ -> return_unit
 
   let scenario limits =
@@ -686,7 +684,7 @@ module Test_peers_below_degree_high = struct
        let* peer_count = M.int_range count_outbound (count_outbound * 2) in
        return (count_outbound, peer_count))
     @@ fun (count_outbound, peer_count) ->
-    of_list [Join {topic}]
+    of_list [I.join {topic}]
     @% add_distinct_peers_and_graft peer_count count_outbound topic
     @% heartbeat
 
