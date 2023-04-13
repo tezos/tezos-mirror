@@ -11,3 +11,4 @@ misc_checks:
     - . $HOME/.venv/bin/activate
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci lint-misc-check
+    - scripts/check_wasm_pvm_regressions.sh check
