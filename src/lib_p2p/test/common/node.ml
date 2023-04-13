@@ -313,10 +313,6 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
 
 let default_ipv6_addr = Ipaddr.V6.localhost
 
-let gen_points_interval npoints port addr =
-  let ports = port -- (port + npoints - 1) in
-  List.map (fun port -> (addr, port)) ports
-
 let gen_points npoints addr =
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
   let rec loop i ports =

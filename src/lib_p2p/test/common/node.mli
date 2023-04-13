@@ -58,10 +58,6 @@ val sync : t -> unit tzresult Lwt.t
 
 val default_ipv6_addr : P2p_addr.t
 
-(** [gen_points_interval npoints ~port addr] generates [npoints] points
-    using the given [addr] for the interval of ports [port -- port + npoints - 1]. *)
-val gen_points_interval : int -> int -> P2p_addr.t -> P2p_point.Id.t list
-
 (** [gen_points npoints addr] generates [npoints] points using the given
     [addr] and an unused port given by the operating system by binding a
     fresh socket to the port [0].
