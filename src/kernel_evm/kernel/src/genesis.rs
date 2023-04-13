@@ -132,7 +132,7 @@ fn store_genesis_receipts<Host: Runtime>(
             status: TransactionStatus::Success,
         };
 
-        let receipt_path = receipt_path(&receipt)?;
+        let receipt_path = receipt_path(&receipt.hash)?;
         storage::store_transaction_receipt(&receipt_path, host, &receipt)?;
     }
 
