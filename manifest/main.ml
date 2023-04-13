@@ -157,8 +157,6 @@ let hacl_star =
 
 let hacl_star_raw = external_lib ~js_compatible:true "hacl-star-raw" V.True
 
-let hacl_x25519 = external_lib "hacl_x25519" V.True
-
 let hashcons = external_lib "hashcons" V.True
 
 let hex = external_lib ~js_compatible:true "hex" V.(at_least "1.3.0")
@@ -357,6 +355,8 @@ module Conflicts = struct
      dependency for Octez. Version 0.5.0 is known to be bugged and
      this release was disabled. *)
   let checkseum = external_lib "checkseum" V.(exactly "0.5.0")
+
+  let hacl_x25519 = external_lib "hacl_x25519" V.True
 end
 
 (* DEVELOPMENT-ONLY DEPENDENCIES *)
@@ -707,7 +707,7 @@ let octez_hacl =
           G (Dune.of_atom_list (js_generated :: js_helper :: js_stubs));
         ];
       ]
-    ~conflicts:[hacl_x25519]
+    ~conflicts:[Conflicts.hacl_x25519]
     ~dune:
       Dune.
         [
