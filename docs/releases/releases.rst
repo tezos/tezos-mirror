@@ -22,7 +22,7 @@ adopted.
 
 Starting with version 7.0, releases are named using a
 ``<major>.<minor>`` numbering scheme. There are also release candidates
-suffixed by ``~rc<N>``.
+suffixed by ``~rc<N>``, and beta versions suffixed by ``~beta<N>``.
 
 - **The major version number is incremented when a new release branch is
   created from master.** Such branches thus include many new
@@ -45,6 +45,9 @@ suffixed by ``~rc<N>``.
   which case they are actually released (losing their ``~rc<N>``
   suffix), or a new release candidate is published with an increment
   of ``N``. Usually, only major releases have release candidates.
+
+- Beta versions are early pre-versions of a major release. Unlike release candidates, these are not believed to be ready, but contain main features of the next major release which are "stable enough" for public testing, including public test networks.
+  It is not recommended to use them on Tezos Mainnet.
 
 Releases are available in several forms:
 
