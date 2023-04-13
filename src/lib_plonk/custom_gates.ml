@@ -335,8 +335,9 @@ module Aggregator = struct
       in
       (* Creating tmp buffers for prover identities *)
       let nb_min_buffers =
-        if List.compare_length_with gates 0 = 0 then 0
-        else max 1 (get_nb_buffers (List.hd gates))
+        match gates with
+        | [] -> 0
+        | hd_gates :: _ -> max 1 (get_nb_buffers hd_gates)
       in
       tmp_buffers :=
         Array.init nb_min_buffers (fun _ -> Evaluations.create size_eval) ;

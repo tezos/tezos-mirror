@@ -533,55 +533,56 @@ let commands () =
            expr_strings
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        if List.compare_length_with expr_strings 0 = 0 then
-          let*! () =
-            cctxt#warning "No scripts were specified on the command line"
-          in
-          return_unit
-        else
-          let* hash_name_rows =
-            List.mapi_ep
-              (fun i (src, expr_string) ->
-                let program =
-                  Michelson_v1_parser.parse_toplevel ~check expr_string
+        match expr_strings with
+        | [] ->
+            let*! () =
+              cctxt#warning "No scripts were specified on the command line"
+            in
+            return_unit
+        | _ :: _ ->
+            let* hash_name_rows =
+              List.mapi_ep
+                (fun i (src, expr_string) ->
+                  let program =
+                    Michelson_v1_parser.parse_toplevel ~check expr_string
+                  in
+                  let*? program = Micheline_parser.no_parsing_error program in
+                  let code = program.expanded in
+                  let bytes =
+                    Data_encoding.Binary.to_bytes_exn
+                      Alpha_context.Script.expr_encoding
+                      code
+                  in
+                  let hash =
+                    Format.asprintf
+                      "%a"
+                      Script_expr_hash.pp
+                      (Script_expr_hash.hash_bytes [bytes])
+                  in
+                  let name =
+                    Option.value
+                      src
+                      ~default:("Literal script " ^ string_of_int (i + 1))
+                  in
+                  return (hash, name))
+                expr_strings
+            in
+            Tezos_clic_unix.Scriptable.output
+              scriptable
+              ~for_human:(fun () ->
+                let*! () =
+                  List.iter_s
+                    (fun (hash, name) ->
+                      if display_names then cctxt#answer "%s\t%s" hash name
+                      else cctxt#answer "%s" hash)
+                    hash_name_rows
                 in
-                let*? program = Micheline_parser.no_parsing_error program in
-                let code = program.expanded in
-                let bytes =
-                  Data_encoding.Binary.to_bytes_exn
-                    Alpha_context.Script.expr_encoding
-                    code
-                in
-                let hash =
-                  Format.asprintf
-                    "%a"
-                    Script_expr_hash.pp
-                    (Script_expr_hash.hash_bytes [bytes])
-                in
-                let name =
-                  Option.value
-                    src
-                    ~default:("Literal script " ^ string_of_int (i + 1))
-                in
-                return (hash, name))
-              expr_strings
-          in
-          Tezos_clic_unix.Scriptable.output
-            scriptable
-            ~for_human:(fun () ->
-              let*! () =
-                List.iter_s
+                return_unit)
+              ~for_script:(fun () ->
+                List.map
                   (fun (hash, name) ->
-                    if display_names then cctxt#answer "%s\t%s" hash name
-                    else cctxt#answer "%s" hash)
-                  hash_name_rows
-              in
-              return_unit)
-            ~for_script:(fun () ->
-              List.map
-                (fun (hash, name) ->
-                  if display_names then [hash; name] else [hash])
-                hash_name_rows));
+                    if display_names then [hash; name] else [hash])
+                  hash_name_rows));
     command
       ~group
       ~desc:

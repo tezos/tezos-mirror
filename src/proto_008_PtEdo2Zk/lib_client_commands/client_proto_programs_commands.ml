@@ -447,49 +447,50 @@ let commands () =
       (fun (check, display_names, scriptable)
            expr_strings
            (cctxt : Protocol_client_context.full) ->
-        if List.compare_length_with expr_strings 0 = 0 then
-          cctxt#warning "No scripts were specified on the command line" >|= ok
-        else
-          List.mapi_ep
-            (fun i (src, expr_string) ->
-              let program =
-                Michelson_v1_parser.parse_toplevel ~check expr_string
-              in
-              Micheline_parser.no_parsing_error program >>?= fun program ->
-              let code = program.expanded in
-              let bytes =
-                Data_encoding.Binary.to_bytes_exn
-                  Alpha_context.Script.expr_encoding
-                  code
-              in
-              let hash =
-                Format.asprintf
-                  "%a"
-                  Script_expr_hash.pp
-                  (Script_expr_hash.hash_bytes [bytes])
-              in
-              let name =
-                Option.value
-                  src
-                  ~default:("Literal script " ^ string_of_int (i + 1))
-              in
-              return (hash, name))
-            expr_strings
-          >>=? fun hash_name_rows ->
-          Tezos_clic_unix.Scriptable.output
-            scriptable
-            ~for_human:(fun () ->
-              List.iter_s
-                (fun (hash, name) ->
-                  if display_names then cctxt#answer "%s\t%s" hash name
-                  else cctxt#answer "%s" hash)
-                hash_name_rows
-              >|= ok)
-            ~for_script:(fun () ->
-              List.map
-                (fun (hash, name) ->
-                  if display_names then [hash; name] else [hash])
-                hash_name_rows));
+        match expr_strings with
+        | [] ->
+            cctxt#warning "No scripts were specified on the command line" >|= ok
+        | _ :: _ ->
+            List.mapi_ep
+              (fun i (src, expr_string) ->
+                let program =
+                  Michelson_v1_parser.parse_toplevel ~check expr_string
+                in
+                Micheline_parser.no_parsing_error program >>?= fun program ->
+                let code = program.expanded in
+                let bytes =
+                  Data_encoding.Binary.to_bytes_exn
+                    Alpha_context.Script.expr_encoding
+                    code
+                in
+                let hash =
+                  Format.asprintf
+                    "%a"
+                    Script_expr_hash.pp
+                    (Script_expr_hash.hash_bytes [bytes])
+                in
+                let name =
+                  Option.value
+                    src
+                    ~default:("Literal script " ^ string_of_int (i + 1))
+                in
+                return (hash, name))
+              expr_strings
+            >>=? fun hash_name_rows ->
+            Tezos_clic_unix.Scriptable.output
+              scriptable
+              ~for_human:(fun () ->
+                List.iter_s
+                  (fun (hash, name) ->
+                    if display_names then cctxt#answer "%s\t%s" hash name
+                    else cctxt#answer "%s" hash)
+                  hash_name_rows
+                >|= ok)
+              ~for_script:(fun () ->
+                List.map
+                  (fun (hash, name) ->
+                    if display_names then [hash; name] else [hash])
+                  hash_name_rows));
     command
       ~group
       ~desc:

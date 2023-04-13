@@ -502,44 +502,45 @@ module Evaluations_impl = struct
       |> List.filter (fun (eval, _, _) -> not (is_zero eval))
     in
 
-    if List.compare_length_with list_eval_coeff_composition 0 = 0 then (
-      let length_result =
-        List.fold_left min Int.max_int @@ List.map length evaluations
-      in
-      let res = allocate_for_res res length_result in
-      constant res add_constant ;
-      let degree_result = if Fr.is_zero add_constant then -1 else 0 in
-      (degree_result, res))
-    else
-      let length_result =
-        List.fold_left min Int.max_int
-        @@ List.map
-             (fun (eval, _, _) -> length eval)
-             list_eval_coeff_composition
-      in
-      let degree_result =
-        List.fold_left max 0
-        @@ List.map
-             (fun (eval, _, _) -> degree eval)
-             list_eval_coeff_composition
-      in
-      (* TODO: check relation between length_result and degree_result? *)
-      let nb_evals = List.length list_eval_coeff_composition in
-      let array_eval_coeff_composition =
-        List.map
-          (fun (eval, linear_coeff, composition) ->
-            (snd eval, length eval, linear_coeff, composition))
-          list_eval_coeff_composition
-        |> Array.of_list
-      in
-      let res = allocate_for_res res length_result in
-      Stubs.linear_arrays
-        res
-        array_eval_coeff_composition
-        add_constant
-        length_result
-        nb_evals ;
-      (degree_result, res)
+    match list_eval_coeff_composition with
+    | [] ->
+        let length_result =
+          List.fold_left min Int.max_int @@ List.map length evaluations
+        in
+        let res = allocate_for_res res length_result in
+        constant res add_constant ;
+        let degree_result = if Fr.is_zero add_constant then -1 else 0 in
+        (degree_result, res)
+    | _ :: _ ->
+        let length_result =
+          List.fold_left min Int.max_int
+          @@ List.map
+               (fun (eval, _, _) -> length eval)
+               list_eval_coeff_composition
+        in
+        let degree_result =
+          List.fold_left max 0
+          @@ List.map
+               (fun (eval, _, _) -> degree eval)
+               list_eval_coeff_composition
+        in
+        (* TODO: check relation between length_result and degree_result? *)
+        let nb_evals = List.length list_eval_coeff_composition in
+        let array_eval_coeff_composition =
+          List.map
+            (fun (eval, linear_coeff, composition) ->
+              (snd eval, length eval, linear_coeff, composition))
+            list_eval_coeff_composition
+          |> Array.of_list
+        in
+        let res = allocate_for_res res length_result in
+        Stubs.linear_arrays
+          res
+          array_eval_coeff_composition
+          add_constant
+          length_result
+          nb_evals ;
+        (degree_result, res)
 
   (* Adds 2 evaluations *)
   let add ?res e1 e2 =
