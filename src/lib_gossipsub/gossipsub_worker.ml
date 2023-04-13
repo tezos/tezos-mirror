@@ -523,4 +523,64 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let p2p_output_stream t = t.p2p_output_stream
 
   let app_output_stream t = t.app_output_stream
+
+  let pp_list pp_elt =
+    Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt
+
+  let pp_full_message fmt {message; message_id; topic} =
+    Format.fprintf
+      fmt
+      "Publish{message=%a, message_id=%a, topic=%a}"
+      Message.pp
+      message
+      Message_id.pp
+      message_id
+      Topic.pp
+      topic
+
+  let pp_p2p_message fmt = function
+    | Graft {topic} -> Format.fprintf fmt "Graft{topic=%a}" Topic.pp topic
+    | Prune {topic; px} ->
+        Format.fprintf
+          fmt
+          "Prune{topic=%a, px=%a}"
+          Topic.pp
+          topic
+          (pp_list Peer.pp)
+          (List.of_seq px)
+    | IHave {topic; message_ids} ->
+        Format.fprintf
+          fmt
+          "IHave{topic=%a, message_ids=%a}"
+          Topic.pp
+          topic
+          (pp_list Message_id.pp)
+          message_ids
+    | IWant {message_ids} ->
+        Format.fprintf
+          fmt
+          "IWant{message_ids=%a}"
+          (pp_list Message_id.pp)
+          message_ids
+    | Subscribe {topic} ->
+        Format.fprintf fmt "Subscribe{topic=%a}" Topic.pp topic
+    | Unsubscribe {topic} ->
+        Format.fprintf fmt "Unsubscribe{topic=%a}" Topic.pp topic
+    | Publish full_message -> pp_full_message fmt full_message
+
+  let pp_p2p_output fmt = function
+    | Disconnect {peer} ->
+        Format.fprintf fmt "Disconnect{topic=%a}" Peer.pp peer
+    | Kick {peer} -> Format.fprintf fmt "Kick{topic=%a}" Peer.pp peer
+    | Connect {peer} -> Format.fprintf fmt "Connect{topic=%a}" Peer.pp peer
+    | Out_message {to_peer; p2p_message} ->
+        Format.fprintf
+          fmt
+          "Out_message{peer=%a, p2p_message=%a}"
+          Peer.pp
+          to_peer
+          pp_p2p_message
+          p2p_message
+
+  let pp_app_output = pp_full_message
 end
