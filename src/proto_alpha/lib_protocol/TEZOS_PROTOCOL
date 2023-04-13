@@ -179,11 +179,6 @@
 
         "Global_constants_costs",
         "Global_constants_storage",
-        "Tx_rollup_state_storage",
-        "Tx_rollup_reveal_storage",
-        "Tx_rollup_inbox_storage",
-        "Tx_rollup_commitment_storage",
-        "Tx_rollup_storage",
         "Sc_rollup_staker_index_storage",
         "Sc_rollup_commitment_storage",
         "Sc_rollup_outbox_storage",

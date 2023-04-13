@@ -193,11 +193,6 @@
   Sapling_validator
   Global_constants_costs
   Global_constants_storage
-  Tx_rollup_state_storage
-  Tx_rollup_reveal_storage
-  Tx_rollup_inbox_storage
-  Tx_rollup_commitment_storage
-  Tx_rollup_storage
   Sc_rollup_staker_index_storage
   Sc_rollup_commitment_storage
   Sc_rollup_outbox_storage
@@ -476,11 +471,6 @@
   sapling_validator.ml
   global_constants_costs.ml global_constants_costs.mli
   global_constants_storage.ml global_constants_storage.mli
-  tx_rollup_state_storage.ml tx_rollup_state_storage.mli
-  tx_rollup_reveal_storage.ml tx_rollup_reveal_storage.mli
-  tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
-  tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
-  tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
@@ -760,11 +750,6 @@
   sapling_validator.ml
   global_constants_costs.ml global_constants_costs.mli
   global_constants_storage.ml global_constants_storage.mli
-  tx_rollup_state_storage.ml tx_rollup_state_storage.mli
-  tx_rollup_reveal_storage.ml tx_rollup_reveal_storage.mli
-  tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
-  tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
-  tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
@@ -1028,11 +1013,6 @@
   sapling_validator.ml
   global_constants_costs.ml global_constants_costs.mli
   global_constants_storage.ml global_constants_storage.mli
-  tx_rollup_state_storage.ml tx_rollup_state_storage.mli
-  tx_rollup_reveal_storage.ml tx_rollup_reveal_storage.mli
-  tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
-  tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
-  tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
