@@ -249,6 +249,13 @@ module Aux : sig
       key_length:int32 ->
       (Durable.t * int64) Lwt.t
 
+    (** The current implementation of [store_get_nth_key] is not deterministic,
+        and should not be used in kernel development. It cannot be removed from
+        the PVM for backward compatibility reason, but it should not be used in
+        any new kernel development.
+
+        See issue https://gitlab.com/tezos/tezos/-/issues/5301
+    *)
     val store_get_nth_key :
       durable:Durable.t ->
       memory:memory ->
