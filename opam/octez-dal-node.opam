@@ -34,6 +34,9 @@ depends: [
 depopts: [
   "tezos-dal-alpha"
 ]
+conflicts: [
+  "checkseum" { = "0.5.0" }
+]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
