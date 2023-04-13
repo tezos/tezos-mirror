@@ -193,3 +193,46 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     gossip_factor
     history_length
     history_gossip_length
+
+(** Instantiate the worker functor *)
+module Worker_config = struct
+  module GS = GS
+
+  module Monad = struct
+    type 'a t = 'a Lwt.t
+
+    let ( let* ) = Lwt.bind
+
+    let return = Lwt.return
+
+    let sleep i = Lwt_unix.sleep @@ float_of_int i
+  end
+
+  module Stream = struct
+    type 'a pending = {promise : 'a Lwt.t; resolver : 'a Lwt.u}
+
+    type 'a t = {elements : 'a Queue.t; mutable pending : 'a pending option}
+
+    let empty () = {elements = Queue.create (); pending = None}
+
+    let push e t =
+      match t.pending with
+      | None -> Queue.push e t.elements
+      | Some {resolver; _} ->
+          t.pending <- None ;
+          Lwt.wakeup resolver e
+
+    let pop t =
+      if not @@ Queue.is_empty t.elements then
+        Monad.return @@ Queue.pop t.elements
+      else
+        match t.pending with
+        | Some {promise; _} -> promise
+        | None ->
+            let promise, resolver = Lwt.task () in
+            t.pending <- Some {promise; resolver} ;
+            promise
+  end
+end
+
+module Worker = Tezos_gossipsub.Worker (Worker_config)
