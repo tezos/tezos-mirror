@@ -636,6 +636,8 @@ module type WORKER = sig
   (** The state of a gossipsub worker. *)
   type t
 
+  type 'a monad
+
   (** The Gossipsub automaton of the worker. *)
   module GS : AUTOMATON
 
@@ -698,7 +700,7 @@ module type WORKER = sig
   val start : heartbeat_span:GS.Span.t -> GS.Topic.t list -> t -> t
 
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
-  val shutdown : t -> unit
+  val shutdown : t -> unit monad
 
   (** [app_input state app_input] adds the given application input [app_input]
       to the worker's input stream. *)
