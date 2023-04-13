@@ -33,3 +33,9 @@ module Make (C : Gossipsub_intf.AUTOMATON_CONFIG) :
      and module Topic = C.Subconfig.Topic
      and module Message_id = C.Subconfig.Message_id
      and module Message = C.Subconfig.Message
+
+module Worker (C : Gossipsub_intf.WORKER_CONFIGURATION) :
+  Gossipsub_intf.WORKER
+    with module GS = C.GS
+     and module Monad = C.Monad
+     and module Stream = C.Stream
