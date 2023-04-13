@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Queue;
-use crate::error::Error;
+use crate::error::{Error, TransferError};
 use crate::helpers::address_to_hash;
 use crate::inbox::Transaction;
 use crate::storage;
@@ -90,7 +90,9 @@ impl L2Block {
 fn get_tx_sender(
     tx: &EthereumTransactionCommon,
 ) -> Result<(OwnedPath, EthereumAddress), Error> {
-    let address = tx.caller();
+    let address = tx
+        .caller()
+        .or(Err(Error::Transfer(TransferError::InvalidSignature)))?;
     // We reencode in hexadecimal, since the accounts hash are encoded in
     // hexadecimal in the storage.
     let hash = address_to_hash(address);
@@ -170,7 +172,7 @@ fn apply_transaction<Host: Runtime>(
 
     if sender_balance < value
         || sender_nonce != transaction.tx.nonce
-        || !transaction.tx.clone().verify_signature()
+        || transaction.tx.clone().verify_signature().is_err()
     {
         Ok(make_receipt(
             block,

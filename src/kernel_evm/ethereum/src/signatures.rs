@@ -9,7 +9,10 @@
 //! We need to sign and write Ethereum specific values such
 //! as addresses and values.
 
+use std::array::TryFromSliceError;
+
 use crate::address::EthereumAddress;
+use hex::FromHexError;
 use libsecp256k1::{
     curve::Scalar, recover, sign, verify, Message, PublicKey, RecoveryId, SecretKey,
     Signature,
@@ -17,16 +20,50 @@ use libsecp256k1::{
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use sha3::{Digest, Keccak256};
+use thiserror::Error;
 
+#[derive(Error, Debug, PartialEq)]
+pub enum TransactionError {
+    #[error("Error reading a hex string")]
+    HexError(#[from] FromHexError),
+
+    #[error("Error decoding RLP encoded byte array")]
+    DecoderError(#[from] DecoderError),
+
+    #[error("Error extracting a slice")]
+    SlicingError(),
+
+    #[error("Error manipulating ECDSA key")]
+    ECDSAError(),
+
+    #[error("Error recomputing parity of signature")]
+    Parity(),
+}
+
+impl From<libsecp256k1::Error> for TransactionError {
+    fn from(_: libsecp256k1::Error) -> Self {
+        Self::ECDSAError()
+    }
+}
+
+impl From<TryFromSliceError> for TransactionError {
+    fn from(_: TryFromSliceError) -> Self {
+        Self::SlicingError()
+    }
+}
 /// produces address from a secret key
-pub fn string_to_sk_and_address(s: String) -> (SecretKey, EthereumAddress) {
-    let data: [u8; 32] = hex::decode(s).unwrap().try_into().unwrap();
-    let sk = SecretKey::parse(&data).unwrap();
+pub fn string_to_sk_and_address(
+    s: String,
+) -> Result<(SecretKey, EthereumAddress), TransactionError> {
+    let mut data: [u8; 32] = [0u8; 32];
+    let () = hex::decode_to_slice(s, &mut data)?;
+    let sk = SecretKey::parse(&data)?;
     let pk = PublicKey::from_secret_key(&sk);
     let serialised = &pk.serialize()[1..];
     let kec = Keccak256::digest(serialised);
-    let value: [u8; 20] = kec.as_slice()[12..].try_into().unwrap();
-    (sk, EthereumAddress::from(value))
+    let mut value: [u8; 20] = [0u8; 20];
+    value.copy_from_slice(&kec[12..]);
+    Ok((sk, EthereumAddress::from(value)))
 }
 
 /// the type of a transaction
@@ -96,7 +133,7 @@ impl EthereumTransactionCommon {
     }
 
     /// Extracts the signature from an EthereumTransactionCommon
-    pub fn signature(&self) -> (Signature, RecoveryId) {
+    pub fn signature(&self) -> Result<(Signature, RecoveryId), TransactionError> {
         // copy r to Scalar
         let r: H256 = self.r;
         let r1: [u8; 32] = r.into();
@@ -108,36 +145,31 @@ impl EthereumTransactionCommon {
         let mut s = Scalar([0; 8]);
         let _ = s.set_b32(&s1);
         // recompute parity from v and chain_id
-        let ri = self.v - (self.chain_id * U256::from(2) + U256::from(35));
-        if let Ok(ri) = RecoveryId::parse(ri.byte(0)) {
-            (Signature { r, s }, ri)
-        } else {
-            panic!(
-                "could not recompute parity from v={}, chain_id={}",
-                self.v, self.chain_id
-            )
-        }
+        let ri_val =
+            U256::checked_sub(self.v, self.chain_id * U256::from(2) + U256::from(35))
+                .ok_or(TransactionError::Parity());
+        let ri = RecoveryId::parse(ri_val?.byte(0))?;
+        Ok((Signature { r, s }, ri))
     }
     /// Find the caller address from r and s of the common data
     /// for an Ethereum transaction, ie, what address is associated
     /// with the signature of the message.
     /// TODO <https://gitlab.com/tezos/tezos/-/milestones/115>
-    pub fn caller(&self) -> EthereumAddress {
+    pub fn caller(&self) -> Result<EthereumAddress, TransactionError> {
         let mes = self.message();
-        let (sig, ri) = self.signature();
-        let pk = recover(&mes, &sig, &ri).expect("Recover public key");
+        let (sig, ri) = self.signature()?;
+        let pk = recover(&mes, &sig, &ri)?;
         let serialised = &pk.serialize()[1..];
         let kec = Keccak256::digest(serialised);
-        let value: [u8; 20] = kec.as_slice()[12..]
-            .try_into()
-            .expect("Hash is 32 bytes, so [12..] should be 20 bytes long");
-        EthereumAddress::from(value)
-    }
+        let value: [u8; 20] = kec.as_slice()[12..].try_into()?;
 
+        Ok(EthereumAddress::from(value))
+    }
     ///produce a signed EthereumTransactionCommon. If the initial one was signed
     ///  you should get the same thing.
-    pub fn sign_transaction(&self, string_sk: String) -> Self {
-        let sk = SecretKey::parse_slice(&hex::decode(string_sk).unwrap()).unwrap();
+    pub fn sign_transaction(&self, string_sk: String) -> Result<Self, TransactionError> {
+        let hex: &[u8] = &hex::decode(string_sk)?;
+        let sk = SecretKey::parse_slice(hex)?;
         let mes = self.message();
         let (sig, ri) = sign(&mes, &sk);
         let Signature { r, s } = sig;
@@ -149,20 +181,20 @@ impl EthereumTransactionCommon {
         } else {
             U256::from(parity) + U256::from(2) * self.chain_id + U256::from(35)
         };
-        EthereumTransactionCommon {
+        Ok(EthereumTransactionCommon {
             v,
             r,
             s,
             ..self.clone()
-        }
+        })
     }
 
     /// verifies the signature
-    pub fn verify_signature(self) -> bool {
+    pub fn verify_signature(self) -> Result<bool, TransactionError> {
         let mes = self.message();
-        let (sig, ri) = self.signature();
-        let pk = recover(&mes, &sig, &ri).unwrap();
-        verify(&mes, &sig, &pk)
+        let (sig, ri) = self.signature()?;
+        let pk = recover(&mes, &sig, &ri)?;
+        Ok(verify(&mes, &sig, &pk))
     }
 
     /// Unserialize bytes as a RLP encoded legacy transaction.
@@ -376,11 +408,12 @@ mod test {
         let (_sk, address_from_sk) = string_to_sk_and_address(
             "4646464646464646464646464646464646464646464646464646464646464646"
                 .to_string(),
-        );
+        )
+        .unwrap();
         let encoded =
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
         let transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
-        let address = transaction.caller();
+        let address = transaction.caller().unwrap();
         let expected_address_string: [u8; 20] =
             hex::decode("9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F")
                 .unwrap()
@@ -875,7 +908,7 @@ mod test {
         // assert
         assert_eq!(
             EthereumAddress::from("d9e5c94a12f78a96640757ac97ba0c257e8aa262".to_string()),
-            transaction.caller(),
+            transaction.caller().unwrap(),
             "test field from"
         )
     }
@@ -909,10 +942,12 @@ mod test {
             s: H256::zero(),
         };
 
-        let signed = transaction.sign_transaction(
-            "cb9db6b5878db2fa20586e23b7f7b51c22a7c6ed0530daafc2615b116f170cd3"
-                .to_string(),
-        );
+        let signed = transaction
+            .sign_transaction(
+                "cb9db6b5878db2fa20586e23b7f7b51c22a7c6ed0530daafc2615b116f170cd3"
+                    .to_string(),
+            )
+            .unwrap();
 
         let v = U256::from(38);
         let r = string_to_h256_unsafe(
@@ -931,7 +966,7 @@ mod test {
     fn test_caller_classic_with_chain_id() {
         let sk = "9bfc9fbe6296c8fef8eb8d6ce2ed5f772a011898c6cabe32d35e7c3e419efb1b"
             .to_string();
-        let (_sk, address) = string_to_sk_and_address(sk.clone());
+        let (_sk, address) = string_to_sk_and_address(sk.clone()).unwrap();
         // Check that the derived address is the expected one.
         let expected_address_string: [u8; 20] =
             hex::decode(b"6471A723296395CF1Dcc568941AFFd7A390f94CE")
@@ -944,12 +979,12 @@ mod test {
         // Check that the derived sender address is the expected one.
         let encoded = "f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156".to_string();
         let transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
-        let address = transaction.caller();
+        let address = transaction.caller().unwrap();
         assert_eq!(expected_address, address);
 
         // Check that signing the signed transaction returns the same transaction.
         let signed_transaction = transaction.sign_transaction(sk);
-        assert_eq!(transaction, signed_transaction)
+        assert_eq!(transaction, signed_transaction.unwrap())
     }
 
     #[test]
@@ -981,7 +1016,7 @@ mod test {
 
         assert_eq!(
             EthereumAddress::from("9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f".to_string()),
-            transaction.caller()
+            transaction.caller().unwrap()
         )
     }
 
@@ -1011,7 +1046,7 @@ mod test {
         };
         assert_eq!(
             EthereumAddress::from("af1276cbb260bb13deddb4209ae99ae6e497f446".to_string()),
-            transaction.caller(),
+            transaction.caller().unwrap(),
             "checking caller"
         )
     }
@@ -1072,10 +1107,12 @@ mod test {
         };
 
         // act
-        let signed = transaction.sign_transaction(
-            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
-                .to_string(),
-        );
+        let signed = transaction
+            .sign_transaction(
+                "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                    .to_string(),
+            )
+            .unwrap();
 
         let v = U256::from(37);
         let r = string_to_h256_unsafe(
@@ -1120,10 +1157,12 @@ mod test {
             "67CBE9D8997F761AECB703304B3800CCF555C9F3DC64214B297FB1966A3B6D83",
         );
 
-        let signed = transaction.sign_transaction(
-            "4646464646464646464646464646464646464646464646464646464646464646"
-                .to_string(),
-        );
+        let signed = transaction
+            .sign_transaction(
+                "4646464646464646464646464646464646464646464646464646464646464646"
+                    .to_string(),
+            )
+            .unwrap();
 
         assert_eq!(v, signed.v, "checking v");
         assert_eq!(r, signed.r, "checking r");
@@ -1141,5 +1180,112 @@ mod test {
             let encoded = e.rlp_bytes();
             assert_eq!(hex::encode(&encoded), *str);
         });
+    }
+
+    #[test]
+    fn test_decoding_not_eip_155_fails_gracefully() {
+        // decoding of a transaction that is not eip 155, ie v = 28 / 27
+        // initial transaction:
+        // {
+        //     "nonce": "0x0",
+        //     "gasPrice": "0x10000000000",
+        //     "gasLimit": "0x25000",
+        //     "value": "0x0",
+        //     "data": "0x608060405234801561001057600080fd5b50602a600081905550610150806100286000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c63430008120033",
+        //     "chainId": 0
+        // }
+        // private key: 0xe75f4c63daecfbb5be03f65940257f5b15e440e6cf26faa126ce68741d5d0f78
+        // caller address: 0x3dbeca6e9a6f0677e3c7b5946fc8adbb1b071e0a
+        let signed_tx = "f901cc8086010000000000830250008080b90178608060405234801561001057600080fd5b50602a600081905550610150806100286000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c634300081200331ca06d851632958801b6919ba534b4b1feb1bdfaabd0d42890bce200a11ac735d58da0219b058d7169d7a4839c5cdd555b0820b545797365287a81ba409419912de7b1";
+        let r = string_to_h256_unsafe(
+            "6d851632958801b6919ba534b4b1feb1bdfaabd0d42890bce200a11ac735d58d",
+        );
+        let s = string_to_h256_unsafe(
+            "219b058d7169d7a4839c5cdd555b0820b545797365287a81ba409419912de7b1",
+        );
+
+        let tx = hex::decode(signed_tx).unwrap();
+        let decoder = Rlp::new(&tx);
+        let decoded = EthereumTransactionCommon::decode(&decoder);
+        assert!(decoded.is_ok(), "testing the decoding went ok");
+        let decoded_transaction = decoded.unwrap();
+        assert_eq!(U256::from(28), decoded_transaction.v, "testing v");
+        assert_eq!(r, decoded_transaction.r, "testing r");
+        assert_eq!(s, decoded_transaction.s, "testing s");
+        assert!(
+            decoded_transaction.signature().is_err(),
+            "testing signature"
+        );
+        assert!(decoded_transaction.caller().is_err(), "testing caller");
+    }
+
+    #[test]
+    fn test_signature_unsigned_fails_gracefully() {
+        // most data is not relevant here, the point is to test failure mode of signature verification
+        let transaction = EthereumTransactionCommon {
+            chain_id: U256::one(),
+            nonce: U256::from(9),
+            gas_price: U256::from(20000000000u64),
+            gas_limit: U256::from(21000),
+            to: EthereumAddress::from(
+                "3535353535353535353535353535353535353535".to_string(),
+            ),
+            value: U256::from(1000000000000000000u64),
+            data: vec![],
+            v: U256::one(), // parity is not consistent with a signed transaction
+            r: H256::zero(),
+            s: H256::zero(),
+        };
+
+        assert!(transaction.signature().is_err(), "testing invalid parity");
+    }
+    #[test]
+    fn test_signature_invalid_signature_fails_gracefully() {
+        // most data is not relevant here, the point is to test failure mode of signature verification
+        let transaction = EthereumTransactionCommon {
+            chain_id: U256::one(),
+            nonce: U256::from(9),
+            gas_price: U256::from(20000000000u64),
+            gas_limit: U256::from(21000),
+            to: EthereumAddress::from(
+                "3535353535353535353535353535353535353535".to_string(),
+            ),
+            value: U256::from(1000000000000000000u64),
+            data: vec![],
+            v: U256::from(38), // parity is consistent with a signed transaction
+            r: H256::zero(),   // signature value is wrong
+            s: H256::zero(),
+        };
+        assert!(
+            transaction.signature().is_ok(),
+            "testing signature is well formed"
+        );
+        assert!(
+            transaction.caller().is_err(),
+            "testing caller fails, because signature is useless"
+        );
+    }
+
+    #[test]
+    fn test_signature_invalid_parity_fails_gracefully() {
+        // most data is not relevant here, the point is to test failure mode of signature verification
+        let transaction = EthereumTransactionCommon {
+            chain_id: U256::one(),
+            nonce: U256::from(9),
+            gas_price: U256::from(20000000000u64),
+            gas_limit: U256::from(21000),
+            to: EthereumAddress::from(
+                "3535353535353535353535353535353535353535".to_string(),
+            ),
+            value: U256::from(1000000000000000000u64),
+            data: vec![],
+            v: U256::from(150), // parity value is not consistent with chain_id
+            r: H256::zero(),
+            s: H256::zero(),
+        };
+        assert!(
+            transaction.signature().is_err(),
+            "testing parity is invalid"
+        );
     }
 }
