@@ -170,42 +170,44 @@ module Make (Interpreter : Interpreter.S) :
 
   let generate_proof node_ctxt game start_state =
     let open Lwt_result_syntax in
-    (* NOTE: [snapshot_level] and [snapshot_hash] below refer to the level
-       before the refutation game starts. In fact, snapshotting of inbox and Dal
-       slots histories at [game.start_level] takes the state of the skip list
-       at [pred game.start_level]. *)
+    let snapshot = game.inbox_snapshot in
+    (* NOTE: [snapshot_level_int32] below refers to the level of the snapshotted
+       inbox (from the skip list) which also matches [game.start_level - 1]. *)
     let snapshot_level_int32 =
-      Int32.pred Raw_level.(to_int32 game.start_level)
+      Raw_level.to_int32 (Sc_rollup.Inbox.Skip_list.content snapshot).level
     in
-    let* snapshot_hash =
-      Node_context.hash_of_level node_ctxt snapshot_level_int32
+    let get_snapshot_head () =
+      let+ hash = Node_context.hash_of_level node_ctxt snapshot_level_int32 in
+      Layer1.{hash; level = snapshot_level_int32}
     in
-    let snapshot_head =
-      Layer1.{hash = snapshot_hash; level = snapshot_level_int32}
+    let* context =
+      let* start_hash =
+        Node_context.hash_of_level
+          node_ctxt
+          (Raw_level.to_int32 game.inbox_level)
+      in
+      let+ context = Node_context.checkout_context node_ctxt start_hash in
+      Context.index context
     in
-    let* snapshot_inbox = Node_context.inbox_of_head node_ctxt snapshot_head in
-    let* snapshot_ctxt =
-      Node_context.checkout_context node_ctxt snapshot_hash
-    in
-    let snapshot_ctxt_index = Context.index snapshot_ctxt in
-    let snapshot = Sc_rollup.Inbox.take_snapshot snapshot_inbox in
     let* dal_slots_history =
       if Node_context.dal_supported node_ctxt then
+        let* snapshot_head = get_snapshot_head () in
         Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
       else return Dal.Slots_history.genesis
     in
     let* dal_slots_history_cache =
       if Node_context.dal_supported node_ctxt then
+        let* snapshot_head = get_snapshot_head () in
         Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
       else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
     in
-    (* We fetch the value of protocol constants at block snapshot_hash
+    (* We fetch the value of protocol constants at block snapshot level
        where the game started. *)
     let* parametric_constants =
       let cctxt = node_ctxt.cctxt in
       Protocol.Constants_services.parametric
         cctxt
-        (cctxt#chain, `Hash (snapshot_hash, 0))
+        (cctxt#chain, `Level snapshot_level_int32)
     in
     let dal_l1_parameters = parametric_constants.dal in
     let dal_parameters = dal_l1_parameters.cryptobox_parameters in
@@ -221,7 +223,7 @@ module Make (Interpreter : Interpreter.S) :
     let module P = struct
       include PVM
 
-      let context = snapshot_ctxt_index
+      let context = context
 
       let state = start_state
 
@@ -293,9 +295,7 @@ module Make (Interpreter : Interpreter.S) :
     end in
     let metadata = Node_context.metadata node_ctxt in
     let* proof =
-      trace
-        (Sc_rollup_node_errors.Cannot_produce_proof
-           (snapshot_inbox, game.inbox_level))
+      trace (Sc_rollup_node_errors.Cannot_produce_proof game)
       @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in
