@@ -154,8 +154,6 @@
   Storage
   Ticket_hash_builder
   Constants_storage
-  Tx_rollup_gas
-  Tx_rollup_hash_builder
   Level_storage
   Nonce_storage
   Seed_storage
@@ -431,8 +429,6 @@
   storage.ml storage.mli
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
-  tx_rollup_gas.ml tx_rollup_gas.mli
-  tx_rollup_hash_builder.ml
   level_storage.ml level_storage.mli
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
@@ -710,8 +706,6 @@
   storage.ml storage.mli
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
-  tx_rollup_gas.ml tx_rollup_gas.mli
-  tx_rollup_hash_builder.ml
   level_storage.ml level_storage.mli
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
@@ -973,8 +967,6 @@
   storage.ml storage.mli
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
-  tx_rollup_gas.ml tx_rollup_gas.mli
-  tx_rollup_hash_builder.ml
   level_storage.ml level_storage.mli
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli

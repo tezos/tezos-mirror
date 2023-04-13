@@ -134,8 +134,6 @@
 
         "Ticket_hash_builder",
         "Constants_storage",
-        "Tx_rollup_gas",
-        "Tx_rollup_hash_builder",
         "Level_storage",
         "Nonce_storage",
         "Seed_storage",
