@@ -707,4 +707,12 @@ module type WORKER = sig
   (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
       worker's input stream. *)
   val p2p_input : t -> p2p_input -> unit
+
+  (** [p2p_output_stream t] returns the output stream containing data for the
+      P2P layer. *)
+  val p2p_output_stream : t -> p2p_output Stream.t
+
+  (** [app_output_stream t] returns the output stream containing data for the
+      application layer. *)
+  val app_output_stream : t -> app_output Stream.t
 end

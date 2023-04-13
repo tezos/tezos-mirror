@@ -508,4 +508,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       p2p_output_stream = Stream.empty ();
       app_output_stream = Stream.empty ();
     }
+
+  let p2p_output_stream t = t.p2p_output_stream
+
+  let app_output_stream t = t.app_output_stream
 end
