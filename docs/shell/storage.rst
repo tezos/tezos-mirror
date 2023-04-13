@@ -70,7 +70,9 @@ metadata kept (see details at :ref:`History_mode_additional_cycles`).
 Older metadata is pruned.
 
 Starting with Octez v15, the store also triggers *context pruning* when a cycle is completed, after finishing the store trimming and cementing.
-Thus, when pruning a block, its metadata and its context (ledger state associated to that block) are pruned as well.
+Thus, whenever pruning the metadata of a block, its context (ledger state associated to that block) is pruned as well.
+
+For the operational details of pruning, see :ref:`first_pruning`.
 
 Other features
 **************
