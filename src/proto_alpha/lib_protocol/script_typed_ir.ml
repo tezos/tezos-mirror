@@ -260,12 +260,6 @@ module type TYPE_SIZE = sig
 
   val one : _ t
 
-  val two : _ t
-
-  val three : _ t
-
-  val four : (_, _) pair option t
-
   val compound1 : Script.location -> _ t -> _ t tzresult
 
   val compound2 : Script.location -> _ t -> _ t -> _ t tzresult
@@ -284,12 +278,6 @@ module Type_size : TYPE_SIZE = struct
   let to_int = Saturation_repr.mul_safe_of_int_exn
 
   let one = 1
-
-  let two = 2
-
-  let three = 3
-
-  let four = 4
 
   let check_eq :
       type a b error_trace.
@@ -1724,11 +1712,136 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
 
 let meta_basic = {size = Type_size.one}
 
+let meta_compound1 loc ({size} : _ ty_metadata) : _ ty_metadata tzresult =
+  Type_size.compound1 loc size >|? fun size -> {size}
+
+let meta_compound2 loc ({size = size1} : _ ty_metadata)
+    ({size = size2} : _ ty_metadata) : _ ty_metadata tzresult =
+  Type_size.compound2 loc size1 size2 >|? fun size -> {size}
+
+let unit_metadata : unit ty_metadata = meta_basic
+
+let never_metadata : never ty_metadata = meta_basic
+
+let int_metadata : z num ty_metadata = meta_basic
+
+let nat_metadata : n num ty_metadata = meta_basic
+
+let signature_metadata : signature ty_metadata = meta_basic
+
+let string_metadata : Script_string.t ty_metadata = meta_basic
+
+let bytes_metadata : bytes ty_metadata = meta_basic
+
+let mutez_metadata : Tez.t ty_metadata = meta_basic
+
+let bool_metadata : bool ty_metadata = meta_basic
+
+let key_hash_metadata : public_key_hash ty_metadata = meta_basic
+
+let key_metadata : public_key ty_metadata = meta_basic
+
+let timestamp_metadata : Script_timestamp.t ty_metadata = meta_basic
+
+let chain_id_metadata : Script_chain_id.t ty_metadata = meta_basic
+
+let address_metadata : address ty_metadata = meta_basic
+
+let tx_rollup_l2_address_metadata : tx_rollup_l2_address ty_metadata =
+  meta_basic
+
+let sapling_transaction_metadata : Sapling.transaction ty_metadata = meta_basic
+
+let sapling_transaction_deprecated_metadata :
+    Sapling.Legacy.transaction ty_metadata =
+  meta_basic
+
+let sapling_state_metadata : Sapling.state ty_metadata = meta_basic
+
+let operation_metadata : operation ty_metadata = meta_basic
+
+let bls12_381_g1_metadata : Script_bls.G1.t ty_metadata = meta_basic
+
+let bls12_381_g2_metadata : Script_bls.G2.t ty_metadata = meta_basic
+
+let bls12_381_fr_metadata : Script_bls.Fr.t ty_metadata = meta_basic
+
+let chest_metadata : Script_timelock.chest ty_metadata = meta_basic
+
+let chest_key_metadata : Script_timelock.chest_key ty_metadata = meta_basic
+
+let pair_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) pair ty_metadata tzresult =
+  meta_compound2
+
+let or_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) or_ ty_metadata tzresult =
+  meta_compound2
+
+let lambda_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) lambda ty_metadata tzresult =
+  meta_compound2
+
+let option_metadata :
+    Script.location -> 'a ty_metadata -> 'a option ty_metadata tzresult =
+  meta_compound1
+
+let list_metadata :
+    Script.location -> 'a ty_metadata -> 'a Script_list.t ty_metadata tzresult =
+  meta_compound1
+
+let set_metadata :
+    Script.location -> 'a ty_metadata -> 'a set ty_metadata tzresult =
+  meta_compound1
+
+let map_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) map ty_metadata tzresult =
+  meta_compound2
+
+let big_map_metadata :
+    Script.location ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a, 'b) big_map ty_metadata tzresult =
+  meta_compound2
+
+let contract_metadata :
+    Script.location -> 'a ty_metadata -> 'a typed_contract ty_metadata tzresult
+    =
+  meta_compound1
+
+let ticket_metadata :
+    Script.location -> 'a ty_metadata -> 'a ticket ty_metadata tzresult =
+  meta_compound1
+
 let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
-  | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
-  | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
-  | Tx_rollup_l2_address_t ->
-      meta_basic
+  | Unit_t -> unit_metadata
+  | Never_t -> never_metadata
+  | Int_t -> int_metadata
+  | Nat_t -> nat_metadata
+  | Signature_t -> signature_metadata
+  | String_t -> string_metadata
+  | Bytes_t -> bytes_metadata
+  | Mutez_t -> mutez_metadata
+  | Bool_t -> bool_metadata
+  | Key_hash_t -> key_hash_metadata
+  | Key_t -> key_metadata
+  | Timestamp_t -> timestamp_metadata
+  | Chain_id_t -> chain_id_metadata
+  | Address_t -> address_metadata
+  | Tx_rollup_l2_address_t -> tx_rollup_l2_address_metadata
   | Pair_t (_, _, meta, _) -> meta
   | Or_t (_, _, meta, _) -> meta
   | Option_t (_, meta, _) -> meta
@@ -1739,10 +1852,16 @@ let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Big_map_t (_, _, meta) -> meta
   | Ticket_t (_, meta) -> meta
   | Contract_t (_, meta) -> meta
-  | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
-  | Sapling_state_t _ | Operation_t | Bls12_381_g1_t | Bls12_381_g2_t
-  | Bls12_381_fr_t | Chest_t | Chest_key_t ->
-      meta_basic
+  | Sapling_transaction_t _ -> sapling_transaction_metadata
+  | Sapling_transaction_deprecated_t _ ->
+      sapling_transaction_deprecated_metadata
+  | Sapling_state_t _ -> sapling_state_metadata
+  | Operation_t -> operation_metadata
+  | Bls12_381_g1_t -> bls12_381_g1_metadata
+  | Bls12_381_g2_t -> bls12_381_g2_metadata
+  | Bls12_381_fr_t -> bls12_381_fr_metadata
+  | Chest_t -> chest_metadata
+  | Chest_key_t -> chest_key_metadata
 
 let ty_size t = (ty_metadata t).size
 
@@ -1784,6 +1903,16 @@ let is_comparable : type v c. (v, c) ty -> c dbool = function
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
+let assert_ok1 f x =
+  match f Micheline.dummy_location x with
+  | Ok res -> res
+  | Error _ -> assert false
+
+let assert_ok2 f x y =
+  match f Micheline.dummy_location x y with
+  | Ok res -> res
+  | Error _ -> assert false
+
 let unit_t = Unit_t
 
 let int_t = Int_t
@@ -1815,15 +1944,15 @@ let pair_t :
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) pair ty_ex_c tzresult
     =
  fun loc l r ->
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  pair_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
-  Ty_ex_c (Pair_t (l, r, {size}, cmp))
+  Ty_ex_c (Pair_t (l, r, metadata, cmp))
 
 let pair_3_t loc l m r = pair_t loc m r >>? fun (Ty_ex_c r) -> pair_t loc l r
 
 let comparable_pair_t loc l r =
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Pair_t (l, r, {size}, YesYes)
+  pair_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  Pair_t (l, r, metadata, YesYes)
 
 let comparable_pair_3_t loc l m r =
   comparable_pair_t loc m r >>? fun r -> comparable_pair_t loc l r
@@ -1832,79 +1961,86 @@ let or_t :
     type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) or_ ty_ex_c tzresult =
  fun loc l r ->
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
-  Ty_ex_c (Or_t (l, r, {size}, cmp))
+  Ty_ex_c (Or_t (l, r, metadata, cmp))
 
-let or_bytes_bool_t = Or_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
+let or_bytes_bool_t =
+  Or_t
+    ( bytes_t,
+      bool_t,
+      assert_ok2 or_metadata bytes_metadata bool_metadata,
+      YesYes )
 
 let comparable_or_t loc l r =
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Or_t (l, r, {size}, YesYes)
+  or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  Or_t (l, r, metadata, YesYes)
 
 let lambda_t loc l r =
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Lambda_t (l, r, {size})
+  lambda_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  Lambda_t (l, r, metadata)
 
 let option_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size ->
+  option_metadata loc (ty_metadata t) >|? fun metadata ->
   let cmp = is_comparable t in
-  Option_t (t, {size}, cmp)
+  Option_t (t, metadata, cmp)
 
-let option_mutez_t = Option_t (mutez_t, {size = Type_size.two}, Yes)
+let option_mutez_t =
+  Option_t (mutez_t, assert_ok1 option_metadata mutez_metadata, Yes)
 
-let option_string_t = Option_t (string_t, {size = Type_size.two}, Yes)
+let option_string_t =
+  Option_t (string_t, assert_ok1 option_metadata string_metadata, Yes)
 
-let option_bytes_t = Option_t (bytes_t, {size = Type_size.two}, Yes)
+let option_bytes_t =
+  Option_t (bytes_t, assert_ok1 option_metadata bytes_metadata, Yes)
 
-let option_nat_t = Option_t (nat_t, {size = Type_size.two}, Yes)
+let option_nat_t = Option_t (nat_t, assert_ok1 option_metadata nat_metadata, Yes)
 
 let option_pair_nat_nat_t =
-  Option_t
-    ( Pair_t (nat_t, nat_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata nat_metadata nat_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (nat_t, nat_t, pmetadata, YesYes), ometadata, Yes)
 
 let option_pair_nat_mutez_t =
-  Option_t
-    ( Pair_t (nat_t, mutez_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata nat_metadata mutez_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (nat_t, mutez_t, pmetadata, YesYes), ometadata, Yes)
 
 let option_pair_mutez_mutez_t =
-  Option_t
-    ( Pair_t (mutez_t, mutez_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata mutez_metadata mutez_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (mutez_t, mutez_t, pmetadata, YesYes), ometadata, Yes)
 
 let option_pair_int_nat_t =
-  Option_t
-    ( Pair_t (int_t, nat_t, {size = Type_size.three}, YesYes),
-      {size = Type_size.four},
-      Yes )
+  let pmetadata = assert_ok2 pair_metadata int_metadata nat_metadata in
+  let ometadata = assert_ok1 option_metadata pmetadata in
+  Option_t (Pair_t (int_t, nat_t, pmetadata, YesYes), ometadata, Yes)
 
 let list_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {size})
+  list_metadata loc (ty_metadata t) >|? fun metadata -> List_t (t, metadata)
 
 let operation_t = Operation_t
 
-let list_operation_t = List_t (operation_t, {size = Type_size.two})
+let list_operation_t =
+  List_t (operation_t, assert_ok1 list_metadata operation_metadata)
 
 let set_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> Set_t (t, {size})
+  set_metadata loc (ty_metadata t) >|? fun metadata -> Set_t (t, metadata)
 
 let map_t loc l r =
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Map_t (l, r, {size})
+  map_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  Map_t (l, r, metadata)
 
 let big_map_t loc l r =
-  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Big_map_t (l, r, {size})
+  big_map_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  Big_map_t (l, r, metadata)
 
 let contract_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> Contract_t (t, {size})
+  contract_metadata loc (ty_metadata t) >|? fun metadata ->
+  Contract_t (t, metadata)
 
-let contract_unit_t = Contract_t (unit_t, {size = Type_size.two})
+let contract_unit_t =
+  Contract_t (unit_t, assert_ok1 contract_metadata unit_metadata)
 
 let sapling_transaction_t ~memo_size = Sapling_transaction_t memo_size
 
@@ -1924,7 +2060,7 @@ let bls12_381_g2_t = Bls12_381_g2_t
 let bls12_381_fr_t = Bls12_381_fr_t
 
 let ticket_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> Ticket_t (t, {size})
+  ticket_metadata loc (ty_metadata t) >|? fun metadata -> Ticket_t (t, metadata)
 
 let chest_key_t = Chest_key_t
 
