@@ -99,6 +99,8 @@ module Make (Parameters : PARAMETERS) = struct
     l1_level : int32;
   }
 
+  type l1_op_content = {level : int32; inj_ops : Inj_operation.Hash.t list}
+
   type status =
     | Pending of POperation.t
     | Injected of injected_info
@@ -161,7 +163,7 @@ module Make (Parameters : PARAMETERS) = struct
   module Injected_ophs = Disk_persistence.Make_table (struct
     include Operation_hash.Table
 
-    type value = int32 * Inj_operation.Hash.t list
+    type value = l1_op_content
 
     let name = "injected_ophs"
 
@@ -171,9 +173,12 @@ module Make (Parameters : PARAMETERS) = struct
 
     let value_encoding =
       let open Data_encoding in
-      obj2
-        (req "injection_level" int32)
-        (req "l1_ops" (list Inj_operation.Hash.encoding))
+      conv
+        (fun {level; inj_ops} -> (level, inj_ops))
+        (fun (level, inj_ops) -> {level; inj_ops})
+      @@ obj2
+           (req "injection_level" int32)
+           (req "inj_ops" (list Inj_operation.Hash.encoding))
   end)
 
   (** The part of the state which gathers information about injected
@@ -204,7 +209,7 @@ module Make (Parameters : PARAMETERS) = struct
   module Included_in_blocks = Disk_persistence.Make_table (struct
     include Block_hash.Table
 
-    type value = int32 * Inj_operation.Hash.t list
+    type value = l1_op_content
 
     let name = "included_in_blocks"
 
@@ -214,7 +219,12 @@ module Make (Parameters : PARAMETERS) = struct
 
     let value_encoding =
       let open Data_encoding in
-      obj2 (req "level" int32) (req "l1_ops" (list Inj_operation.Hash.encoding))
+      conv
+        (fun {level; inj_ops} -> (level, inj_ops))
+        (fun (level, inj_ops) -> {level; inj_ops})
+      @@ obj2
+           (req "inclusion_level" int32)
+           (req "inj_ops" (list Inj_operation.Hash.encoding))
   end)
 
   (** The part of the state which gathers information about
@@ -228,6 +238,8 @@ module Make (Parameters : PARAMETERS) = struct
     current_protocol : Protocol_hash.t;
     next_protocol : Protocol_hash.t;
   }
+
+  type last_seen_head = {block_hash : Block_hash.t; level : int32}
 
   (** The internal state of each injector worker.  *)
   type state = {
@@ -258,7 +270,7 @@ module Make (Parameters : PARAMETERS) = struct
     injection_ttl : int;
         (** The number of blocks after which an operation is retried when
             injected but never included. *)
-    mutable last_seen_head : (Block_hash.t * int32) option;
+    mutable last_seen_head : last_seen_head option;
         (** Last L1 head that the injector has seen (used to compute
             reorganizations). *)
     mutable protocols : protocols;
@@ -282,7 +294,12 @@ module Make (Parameters : PARAMETERS) = struct
     let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
-  let last_head_encoding = Data_encoding.(tup2 Block_hash.encoding int32)
+  let last_head_encoding =
+    let open Data_encoding in
+    conv
+      (fun {block_hash; level} -> (block_hash, level))
+      (fun (block_hash, level) -> {block_hash; level})
+    @@ obj2 (req "block_hash" Block_hash.encoding) (req "level" int32)
 
   let read_last_head ~data_dir ~warn =
     Disk_persistence.maybe_read_value
@@ -358,8 +375,8 @@ module Make (Parameters : PARAMETERS) = struct
         ~warn_unreadable
         ~initial_size:n
         ~data_dir
-        ~filter:(fun (_, ops) ->
-          List.exists (Injected_operations.mem injected_operations) ops)
+        ~filter:(fun {inj_ops; _} ->
+          List.exists (Injected_operations.mem injected_operations) inj_ops)
     in
     let*! () =
       emit_event_loaded "injected_ophs" @@ Injected_ophs.length injected_ophs
@@ -369,8 +386,8 @@ module Make (Parameters : PARAMETERS) = struct
         ~warn_unreadable
         ~initial_size:((confirmations + retention_period) * n)
         ~data_dir
-        ~filter:(fun (_, ops) ->
-          List.exists (Included_operations.mem included_operations) ops)
+        ~filter:(fun {inj_ops; _} ->
+          List.exists (Included_operations.mem included_operations) inj_ops)
     in
     let*! () =
       emit_event_loaded "included_in_blocks"
@@ -415,7 +432,7 @@ module Make (Parameters : PARAMETERS) = struct
     | Some {l1_level; _} -> (
         match state.last_seen_head with
         | None -> false
-        | Some (_, head_level) ->
+        | Some {level = head_level; _} ->
             Int32.sub head_level l1_level < Int32.of_int confirmations)
 
   (** Add an operation to the pending queue corresponding to the signer for this
@@ -449,7 +466,7 @@ module Make (Parameters : PARAMETERS) = struct
     Injected_ophs.replace
       state.injected.injected_ophs
       oph
-      (injection_level, List.map fst infos)
+      {level = injection_level; inj_ops = List.map fst infos}
 
   (** [add_included_operations state oph l1_block l1_level operations] marks the
     [operations] as included (in the L1 batch [oph]) in the Tezos block
@@ -480,7 +497,7 @@ module Make (Parameters : PARAMETERS) = struct
     Included_in_blocks.replace
       state.included.included_in_blocks
       l1_block
-      (l1_level, List.map fst infos)
+      {level = l1_level; inj_ops = List.map fst infos}
 
   (** [remove state oph] removes the operations that correspond to the L1 batch
     [oph] from the injected operations in the injector state. This function is
@@ -491,7 +508,7 @@ module Make (Parameters : PARAMETERS) = struct
     | None ->
         (* Nothing removed *)
         return []
-    | Some (_level, mophs) ->
+    | Some {inj_ops; _} ->
         let* () = Injected_ophs.remove state.injected.injected_ophs oph in
         let+ removed =
           List.fold_left_es
@@ -508,7 +525,7 @@ module Make (Parameters : PARAMETERS) = struct
                   in
                   info :: removed)
             []
-            mophs
+            inj_ops
         in
         List.rev removed
 
@@ -522,7 +539,7 @@ module Make (Parameters : PARAMETERS) = struct
     | None ->
         (* Nothing removed *)
         return []
-    | Some (_level, mophs) ->
+    | Some {inj_ops; _} ->
         let* () =
           Included_in_blocks.remove state.included.included_in_blocks block
         in
@@ -540,7 +557,7 @@ module Make (Parameters : PARAMETERS) = struct
                 in
                 info :: removed)
           []
-          mophs
+          inj_ops
 
   let fee_parameter_of_operations state ops =
     List.fold_left
@@ -830,7 +847,7 @@ module Make (Parameters : PARAMETERS) = struct
               ()
           in
           header.level
-      | Some (_hash, level) -> return level
+      | Some {level; _} -> return level
     in
     match operations_to_inject with
     | [] -> return_unit
@@ -1025,9 +1042,9 @@ module Make (Parameters : PARAMETERS) = struct
         (state.signer.pkh, state.tags, confirmed_level)
     in
     Included_in_blocks.iter_es
-      (fun block (level, _operations) ->
+      (fun block {level = inclusion_level; _} ->
         if
-          level
+          inclusion_level
           <= Int32.sub confirmed_level (Int32.of_int state.retention_period)
         then
           let* _removed_ops = forget_block state block in
@@ -1041,7 +1058,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let expired =
       Injected_ophs.fold
-        (fun oph (injection_level, _ops) acc ->
+        (fun oph {level = injection_level; _} acc ->
           if
             head_level
             > Int32.add injection_level (Int32.of_int state.injection_ttl)
@@ -1082,17 +1099,19 @@ module Make (Parameters : PARAMETERS) = struct
       head. It first reverts any blocks that are in the alternative branch of
       the reorganization and then registers the effect of the new branch (the
       newly included operation and confirmed operations).  *)
-  let on_new_tezos_head state ((head_hash, head_level) as head) =
+  let on_new_tezos_head state
+      ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
     let*! reorg =
       match state.last_seen_head with
-      | None -> return {Reorg.no_reorg with new_chain = [head]}
+      | None ->
+          return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
       | Some last_head ->
           Layer_1.get_tezos_reorg_for_new_head
             state.l1_ctxt
-            (`Head last_head)
-            head
+            (`Head (last_head.block_hash, last_head.level))
+            (head_hash, head_level)
     in
     let* reorg =
       match reorg with
@@ -1110,7 +1129,7 @@ module Make (Parameters : PARAMETERS) = struct
              missing info on the Layer 1. We may miss on some backtracking but
              it is better than to fail. *)
           let*! () = Event.(emit1 cannot_compute_reorg) state head_hash in
-          return {Reorg.no_reorg with new_chain = [head]}
+          return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
       | _ -> Lwt.return reorg
     in
     let* () =
@@ -1201,8 +1220,8 @@ module Make (Parameters : PARAMETERS) = struct
           (* The execution of the request handler is protected to avoid stopping the
              worker in case of an exception. *)
           protect @@ fun () -> add_pending_operation state op
-      | Request.New_tezos_head head ->
-          protect @@ fun () -> on_new_tezos_head state head
+      | Request.New_tezos_head (block_hash, level) ->
+          protect @@ fun () -> on_new_tezos_head state {block_hash; level}
       | Request.Inject -> protect @@ fun () -> on_inject state
 
     type launch_error = error trace
