@@ -647,7 +647,7 @@ module Make (PVM : Pvm.S) = struct
   end
 end
 
-let run ~data_dir (configuration : Configuration.t)
+let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
     (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
@@ -661,6 +661,13 @@ let run ~data_dir (configuration : Configuration.t)
         ())
       configuration.sc_rollup_node_operators
   in
-  let* node_ctxt = Node_context.init cctxt ~data_dir Read_write configuration in
+  let* node_ctxt =
+    Node_context.init
+      cctxt
+      ~data_dir
+      ?log_kernel_debug_file
+      Read_write
+      configuration
+  in
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration

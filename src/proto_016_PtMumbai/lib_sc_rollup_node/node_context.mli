@@ -34,6 +34,8 @@ type lcc = {commitment : Sc_rollup.Commitment.Hash.t; level : Raw_level.t}
 (** Abstract type for store to force access through this module. *)
 type 'a store constraint 'a = [< `Read | `Write > `Read]
 
+type debug_logger = string -> unit Lwt.t
+
 type 'a t = {
   cctxt : Protocol_client_context.full;
       (** Client context used by the rollup node. *)
@@ -72,6 +74,10 @@ type 'a t = {
   lpc : ('a, Sc_rollup.Commitment.t option) Reference.t;
       (** The last published commitment, i.e. commitment that the operator is
           staked on. *)
+  kernel_debug_logger : debug_logger;
+      (** Logger used for writing [kernel_debug] messages *)
+  finaliser : unit -> unit Lwt.t;
+      (** Aggregation of finalisers to run when the node context closes *)
 }
 
 (** Read/write node context {!t}. *)
@@ -114,6 +120,7 @@ val get_fee_parameter : _ t -> Configuration.purpose -> Injection.fee_parameter
 val init :
   Protocol_client_context.full ->
   data_dir:string ->
+  ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
   Configuration.t ->
   'a t tzresult Lwt.t

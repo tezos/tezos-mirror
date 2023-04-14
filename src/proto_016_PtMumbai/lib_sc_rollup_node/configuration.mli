@@ -84,6 +84,7 @@ type t = {
   batcher : batcher;
   injector_retention_period : int;
   l2_blocks_cache_size : int;
+  log_kernel_debug : bool;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of

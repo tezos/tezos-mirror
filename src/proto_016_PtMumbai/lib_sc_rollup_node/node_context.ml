@@ -31,6 +31,8 @@ type lcc = {commitment : Sc_rollup.Commitment.Hash.t; level : Raw_level.t}
 
 type 'a store = 'a Store.t
 
+type debug_logger = string -> unit Lwt.t
+
 type 'a t = {
   cctxt : Protocol_client_context.full;
   dal_cctxt : Dal_node_client.cctxt option;
@@ -51,6 +53,8 @@ type 'a t = {
   context : 'a Context.index;
   lcc : ('a, lcc) Reference.t;
   lpc : ('a, Sc_rollup.Commitment.t option) Reference.t;
+  kernel_debug_logger : debug_logger;
+  finaliser : unit -> unit Lwt.t;
 }
 
 type rw = [`Read | `Write] t
@@ -161,7 +165,20 @@ let unlock {lockfile; _} =
     (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
     (fun () -> Lwt_unix.close lockfile)
 
-let init (cctxt : Protocol_client_context.full) ~data_dir mode
+let make_kernel_logger ?log_kernel_debug_file data_dir =
+  let open Lwt_syntax in
+  let path =
+    match log_kernel_debug_file with
+    | None -> Filename.concat data_dir "kernel.log"
+    | Some path -> path
+  in
+  let+ fd =
+    Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
+  in
+  Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+
+let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
+    mode
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -210,6 +227,20 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
       Event.warn_dal_enabled_no_node ()
     else Lwt.return_unit
   in
+  let*! kernel_debug_logger, kernel_debug_finaliser =
+    let open Lwt_syntax in
+    let kernel_debug = Event.kernel_debug in
+    if configuration.log_kernel_debug then
+      let+ chan = make_kernel_logger ?log_kernel_debug_file data_dir in
+      let kernel_debug msg =
+        let* () = Lwt_io.write chan msg in
+        let* () = Lwt_io.flush chan in
+        let* () = kernel_debug msg in
+        return_unit
+      in
+      (kernel_debug, fun () -> Lwt_io.close chan)
+    else return (kernel_debug, fun () -> return_unit)
+  in
   return
     {
       cctxt;
@@ -231,11 +262,15 @@ let init (cctxt : Protocol_client_context.full) ~data_dir mode
       lockfile;
       store;
       context;
+      kernel_debug_logger;
+      finaliser = kernel_debug_finaliser;
     }
 
-let close ({cctxt; store; context; l1_ctxt; _} as node_ctxt) =
+let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
   let open Lwt_result_syntax in
   let message = cctxt#message in
+  let*! () = message "Running finaliser@." in
+  let*! () = finaliser () in
   let*! () = message "Shutting down L1@." in
   let*! () = Layer1.shutdown l1_ctxt in
   let*! () = message "Closing context@." in
@@ -835,5 +870,7 @@ module Internal_for_tests = struct
         lockfile;
         store;
         context;
+        kernel_debug_logger = Event.kernel_debug;
+        finaliser = (fun () -> Lwt.return_unit);
       }
 end
