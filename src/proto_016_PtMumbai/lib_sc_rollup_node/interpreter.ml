@@ -176,11 +176,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
     then
       let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
-      (* Write final state to store. *)
       let*! ctxt = PVM.State.set ctxt state in
-
-      (* let*! context_hash = Context.commit ctxt in *)
-      (* let*! () = Store.Contexts.add node_ctxt.store head.hash context_hash in *)
       return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
     else return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
 

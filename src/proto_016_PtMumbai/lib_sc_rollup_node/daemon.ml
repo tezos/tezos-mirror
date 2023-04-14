@@ -313,6 +313,15 @@ module Make (PVM : Pvm.S) = struct
     let* () = Node_context.mark_finalized_head node_ctxt hash in
     return_unit
 
+  let previous_context (node_ctxt : _ Node_context.t) ~predecessor
+      Layer1.{hash = _; level} =
+    let open Lwt_result_syntax in
+    if level <= Raw_level.to_int32 node_ctxt.genesis_info.level then
+      (* This is before we have interpreted the boot sector, so we start
+         with an empty context in genesis *)
+      return (Context.empty node_ctxt.context)
+    else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
+
   let rec process_head (node_ctxt : _ Node_context.t)
       Layer1.({hash; level} as head) =
     let open Lwt_result_syntax in
@@ -327,8 +336,9 @@ module Make (PVM : Pvm.S) = struct
         return_unit
     | Some predecessor ->
         let* () = process_head node_ctxt predecessor in
+        let* ctxt = previous_context node_ctxt ~predecessor head in
         let* () = Node_context.save_level node_ctxt head in
-        let* inbox_hash, inbox, inbox_witness, messages, ctxt =
+        let* inbox_hash, inbox, inbox_witness, messages =
           Inbox.process_head node_ctxt ~predecessor head
         in
         let* () =
@@ -588,8 +598,9 @@ module Make (PVM : Pvm.S) = struct
     let process_messages (node_ctxt : _ Node_context.t) ~predecessor
         ~predecessor_timestamp head messages =
       let open Lwt_result_syntax in
+      let* ctxt = previous_context node_ctxt ~predecessor head in
       let* () = Node_context.save_level node_ctxt head in
-      let* inbox_hash, inbox, inbox_witness, messages, ctxt =
+      let* inbox_hash, inbox, inbox_witness, messages =
         Inbox.Internal_for_tests.process_messages
           node_ctxt
           ~predecessor

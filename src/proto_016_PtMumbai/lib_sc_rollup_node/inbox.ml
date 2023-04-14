@@ -126,14 +126,6 @@ let process_messages (node_ctxt : _ Node_context.t) ~predecessor
   let* inbox = Node_context.inbox_of_head node_ctxt predecessor in
   let inbox_metrics = Metrics.Inbox.metrics in
   Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
-  let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
-  let* ctxt =
-    if Raw_level.(level <= node_ctxt.Node_context.genesis_info.level) then
-      (* This is before we have interpreted the boot sector, so we start
-         with an empty context in genesis *)
-      return (Context.empty node_ctxt.context)
-    else Node_context.checkout_context node_ctxt predecessor.hash
-  in
   let* ( _messages_history,
          witness_hash,
          inbox,
@@ -154,11 +146,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~predecessor
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   return
-    ( inbox_hash,
-      inbox,
-      witness_hash,
-      messages_with_protocol_internal_messages,
-      ctxt )
+    (inbox_hash, inbox, witness_hash, messages_with_protocol_internal_messages)
 
 let process_head (node_ctxt : _ Node_context.t) ~predecessor
     Layer1.{level; hash = head_hash} =
@@ -180,8 +168,7 @@ let process_head (node_ctxt : _ Node_context.t) ~predecessor
     let* (( _inbox_hash,
             inbox,
             _witness_hash,
-            _messages_with_protocol_internal_messages,
-            _ctxt ) as res) =
+            _messages_with_protocol_internal_messages ) as res) =
       process_messages
         node_ctxt
         ~predecessor
@@ -197,8 +184,7 @@ let process_head (node_ctxt : _ Node_context.t) ~predecessor
       ( Sc_rollup.Inbox.hash inbox,
         inbox,
         Sc_rollup.Inbox.current_witness inbox,
-        [],
-        Context.empty node_ctxt.context )
+        [] )
 
 let start () = Inbox_event.starting ()
 
