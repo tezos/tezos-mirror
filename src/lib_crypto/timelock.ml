@@ -181,10 +181,22 @@ let hash_to_prime rsa_public ~time value key =
      using it here is fine as the input is already uniformly distributed *)
   Z.(nextprime (of_bits (Bytes.to_string hash_result)))
 
+(* Proof generation optimisation taken from page 3 of the following paper:
+   https://crypto.stanford.edu/~dabo/pubs/papers/VDFsurvey.pdf page 3
+   where g is the time-locked value.
+*)
 let prove_wesolowski rsa_public ~time locked_value unlocked_value =
   let l = hash_to_prime rsa_public ~time locked_value unlocked_value in
-  let exponent = Z.(pow (of_int 2) time / l) in
-  Z.powm locked_value exponent rsa_public
+  let pi, r = Z.(ref one, ref one) in
+  for _ = 1 to time do
+    let two_r = Z.(!r lsl 1) in
+    (* r <- 2*r mod l *)
+    (r := Z.(two_r mod l)) ;
+    let pi_sqr = Z.(!pi * !pi mod rsa_public) in
+    (* pi <- pi^2 * locked_value^b where b = floor(2*r/l) in [0,1] *)
+    pi := if two_r >= l then Z.(pi_sqr * locked_value) else pi_sqr
+  done ;
+  Z.(!pi mod rsa_public)
 
 let prove rsa_public ~time locked_value unlocked_value =
   let vdf_proof =
