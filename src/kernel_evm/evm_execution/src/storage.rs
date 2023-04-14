@@ -184,7 +184,7 @@ pub mod blocks {
         use super::test_utils::blocks_iter;
         use super::*;
         use primitive_types::U256;
-        use tezos_ethereum::basic::H256;
+        use sha3::{Digest, Keccak256};
         use tezos_smart_rollup_mock::MockHost;
 
         #[test]
@@ -197,7 +197,8 @@ pub mod blocks {
                 .take(BLOCKS_STORED + DELETE_BLOCKS_N)
                 .enumerate()
                 .for_each(|(i, (hash, ts))| {
-                    let keccak_hash = H256::from(hash).into();
+                    let keccak_hash =
+                        H256::from_slice(Keccak256::digest(hash.0).as_slice());
                     if i == DELETE_BLOCKS_N {
                         last_kept_block_hash = Some(keccak_hash)
                     }
