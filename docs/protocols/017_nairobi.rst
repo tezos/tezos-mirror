@@ -43,11 +43,12 @@ Smart Rollups
 - Use ``Ticket_transfer`` module in ``sc_rollup_operations``. (MR :gl:`!7438`)
 
 - Refactor WASM PVM to enable breaking changes such as new host functions and
-  parameterization of maximum call depth. (MRs :gl:`!7724`, :gl:`!7726`)
+  parameterization of maximum call depth. (MRs :gl:`!7724`, :gl:`!7726`,
+  :gl:`!7910`, :gl:`!7912`, :gl:`!8076`, :gl:`!8280`)
 
 - A new kind of internal message informs kernels when a protocol upgrade occurs.
   The ``Protocol_migration`` message is injected by the economic protocol during
-  a protocol migration. (MR :gl:`!7729`)
+  a protocol migration. (MRs :gl:`!7729`, :gl:`!8300`).
 
 - Existing smart rollups can benefit from new protocol improvements. The WASM PVM
   checks if it needs to upgrade to a new revision when it receives a ``Protocol_migration``
@@ -60,6 +61,17 @@ Smart Rollups
   The protocol computes the valid candidate commitment to cement, and cements it.
   The provided ``commitment`` is omitted by the protocol and unchecked with the
   found one. (MR :gl:`!7316`)
+
+- Two new host functions have been added to the WASM PVM:
+  ``store_delete_value`` (MR :gl:`!8307`), and ``store_create`` (MR :gl:`!8375`).
+
+- The ``store_get_nth_key`` host function is now deprecated, kernels **should
+  not use it** as it is not fully deterministic (MR :gl:`!8458`).
+
+- The stack size limit of the WASM PVM has been significantly increased (MRs
+  :gl:`!7748`, :gl:`!8377`).
+
+- Publishing twice the same commitment is no longer allowed. (MR :gl:`!8269`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
