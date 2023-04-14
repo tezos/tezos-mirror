@@ -57,6 +57,7 @@ type error +=
   | No_publisher
   | Refutation_player_failed_to_start
   | No_refutation_coordinator
+  | Could_not_acquire_lock of string
 
 type error += Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
 
@@ -345,4 +346,20 @@ let () =
     `Permanent
     Data_encoding.unit
     (function Refutation_player_failed_to_start -> Some () | _ -> None)
-    (fun () -> Refutation_player_failed_to_start)
+    (fun () -> Refutation_player_failed_to_start) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"could_not_acquire_lock"
+    ~title:"Could not acquire lock on data dir"
+    ~description:"Could not acquire lock on data dir."
+    ~pp:(fun ppf f ->
+      Format.fprintf
+        ppf
+        "Could not acquire lock on data directory, another rollup node may \
+         already be running with this data. If this is not the case, consider \
+         removing manually the file %S"
+        f)
+    Data_encoding.(obj1 (req "lock_file" string))
+    (function Could_not_acquire_lock f -> Some f | _ -> None)
+    (fun f -> Could_not_acquire_lock f)
