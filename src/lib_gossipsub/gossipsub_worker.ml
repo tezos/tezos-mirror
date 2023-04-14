@@ -288,6 +288,42 @@ struct
      The automaton doesn't filter out the alternative peers we are already
      connected to. *)
 
+  (** On a [Heartbeat] events, the worker sends graft and prune messages
+      following the automaton's output. It also sends [IHave] messages (computed
+      by the automaton as well). *)
+  let handle_heartheat ~emit_p2p_msg = function
+    | gstate, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
+        let iter pmap mk_msg =
+          Peer.Map.iter
+            (fun peer topicset ->
+              Topic.Set.iter
+                (fun topic ->
+                  send_p2p_message
+                    ~emit_p2p_msg
+                    (mk_msg peer topic)
+                    (Seq.return peer))
+                topicset)
+            pmap
+        in
+        (* Send Graft messages. *)
+        iter to_graft (fun _peer topic -> Graft {topic}) ;
+        (* Send Prune messages with adequate px. *)
+        iter to_prune (fun peer_to_prune topic ->
+            let px =
+              GS.select_px_peers gstate ~peer_to_prune topic ~noPX_peers
+              |> List.to_seq
+            in
+            Prune {topic; px}) ;
+        (* Send IHave messages. *)
+        GS.select_gossip_messages gstate
+        |> List.iter (fun GS.{peer; topic; message_ids} ->
+               if not (List.is_empty message_ids) then
+                 send_p2p_message
+                   ~emit_p2p_msg
+                   (IHave {topic; message_ids})
+                   (Seq.return peer)) ;
+        gstate
+
   (** Handling application events. *)
   let apply_app_event ~emit_p2p_msg ~emit_app_msg gossip_state = function
     | Inject_message {message; message_id; topic} ->
@@ -358,12 +394,7 @@ struct
 
            Do we want to detect cases where two successive [Heartbeat] events
            would be handled (e.g. because the first one is late)? *)
-        let gossip_state, output = GS.heartbeat gossip_state in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5159
-
-           Handle Heartbeat's output *)
-        ignore output ;
-        gossip_state
+        GS.heartbeat gossip_state |> handle_heartheat ~emit_p2p_msg
     | P2P_input event ->
         apply_p2p_event ~emit_p2p_msg ~emit_app_msg gossip_state event
     | App_input event ->
