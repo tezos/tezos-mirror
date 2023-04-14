@@ -10,12 +10,13 @@
 //! as addresses and values.
 
 use crate::address::EthereumAddress;
-use crate::basic::{GasLimit, GasPrice, Wei, H256, U256};
+use crate::basic::{GasLimit, GasPrice, Wei, H256};
 use libsecp256k1::{
     curve::Scalar, recover, sign, verify, Message, PublicKey, RecoveryId, SecretKey,
     Signature,
 };
 use primitive_types::H256 as PTH256;
+use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use sha3::{Digest, Keccak256};
 
@@ -110,7 +111,7 @@ impl EthereumTransactionCommon {
         let _ = s.set_b32(&s1);
         // recompute parity from v and chain_id
         let ri = self.v - (self.chain_id * U256::from(2) + U256::from(35));
-        if let Ok(ri) = RecoveryId::parse(ri.into()) {
+        if let Ok(ri) = RecoveryId::parse(ri.byte(0)) {
             (Signature { r, s }, ri)
         } else {
             panic!(

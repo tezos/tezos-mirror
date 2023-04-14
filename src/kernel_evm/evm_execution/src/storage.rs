@@ -183,8 +183,8 @@ pub mod blocks {
     pub mod tests {
         use super::test_utils::blocks_iter;
         use super::*;
-        use primitive_types::U256 as PTU256;
-        use tezos_ethereum::basic::{H256, U256};
+        use primitive_types::U256;
+        use tezos_ethereum::basic::H256;
         use tezos_smart_rollup_mock::MockHost;
 
         #[test]
@@ -203,9 +203,9 @@ pub mod blocks {
                     }
                     add_new_block(
                         &mut mock_host,
-                        PTU256::from(i as i32),
+                        U256::from(i as i32),
                         keccak_hash,
-                        U256::from(ts).into(),
+                        U256::from(ts.i64()),
                     )
                     .unwrap()
                 });
@@ -213,7 +213,7 @@ pub mod blocks {
             // Make sure that blocks are cleaned up
             (0..DELETE_BLOCKS_N).for_each(|i| {
                 assert_eq!(
-                    get_block_hash(&mock_host, PTU256::from(i as i32))
+                    get_block_hash(&mock_host, U256::from(i as i32))
                         .expect_err("Blocks should be cleaned up"),
                     EvmBlockStorageError::RuntimeError(
                         host::runtime::RuntimeError::PathNotFound
@@ -223,7 +223,7 @@ pub mod blocks {
 
             // Make sure that last block is kept
             assert_eq!(
-                get_block_hash(&mock_host, PTU256::from(DELETE_BLOCKS_N as i32))
+                get_block_hash(&mock_host, U256::from(DELETE_BLOCKS_N as i32))
                     .unwrap_or_else(|_| panic!(
                         "Block with number {} should be still kept",
                         DELETE_BLOCKS_N

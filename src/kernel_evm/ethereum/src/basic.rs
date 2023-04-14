@@ -8,12 +8,10 @@
 //! Many of the functions in this module (all the `one` and `zero`) can be made
 //! constant, but the underlying library and functions we use are not constant.
 //! TODO: <https://gitlab.com/tezos/tezos/-/milestones/114>
-use core::ops::{Add, Div, Mul, Sub};
-use primitive_types::{H256 as PTH256, U256 as PTU256};
+use primitive_types::{H256 as PTH256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::BlockHash;
-use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32_usize;
@@ -33,8 +31,8 @@ impl GasPrice {
     }
 
     /// Create a new gas price from primitive type
-    pub fn from_u256(value: PTU256) -> Self {
-        Self { value: U256(value) }
+    pub fn from_u256(value: U256) -> Self {
+        Self { value }
     }
 
     /// Zero
@@ -80,7 +78,7 @@ impl GasLimit {
         let max_u64: U256 = U256::from(core::u64::MAX);
 
         if self.value <= max_u64 {
-            Some(self.value.0.low_u64())
+            Some(self.value.low_u64())
         } else {
             None
         }
@@ -92,8 +90,8 @@ impl GasLimit {
     }
 
     /// Create a new gas limit from primitive type
-    pub fn from_u256(value: PTU256) -> Self {
-        Self { value: U256(value) }
+    pub fn from_u256(value: U256) -> Self {
+        Self { value }
     }
 
     /// Zero
@@ -137,8 +135,8 @@ impl Wei {
     }
 
     /// Create a new value in Wei from primitive type
-    pub fn from_u256(value: PTU256) -> Self {
-        Self { value: U256(value) }
+    pub fn from_u256(value: U256) -> Self {
+        Self { value }
     }
 
     /// Zero
@@ -164,143 +162,6 @@ impl Decodable for Wei {
 impl Encodable for Wei {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.append(&self.value);
-    }
-}
-
-/// Unsigned 256 bit integers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
-pub struct U256(PTU256);
-
-impl U256 {
-    /// Value one 0x00 31 times and then a 0x01
-    pub fn one() -> U256 {
-        U256(PTU256::one())
-    }
-
-    /// Value zero
-    pub fn zero() -> U256 {
-        U256(PTU256::zero())
-    }
-
-    /// Create from slice - data in big endian format
-    pub fn from_slice_be(data: &[u8]) -> Self {
-        U256(PTU256::from_big_endian(data))
-    }
-
-    /// Create from slice - data in little endian format
-    pub fn from_slice_le(data: &[u8]) -> Self {
-        U256(PTU256::from_little_endian(data))
-    }
-}
-
-impl std::fmt::Display for U256 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<PTU256> for U256 {
-    fn from(v: PTU256) -> Self {
-        Self(v)
-    }
-}
-
-impl From<Timestamp> for U256 {
-    fn from(v: Timestamp) -> Self {
-        Self(PTU256::from(v.i64()))
-    }
-}
-
-impl From<i32> for U256 {
-    fn from(v: i32) -> Self {
-        Self(PTU256::from(v))
-    }
-}
-
-impl From<u64> for U256 {
-    fn from(v: u64) -> Self {
-        Self(PTU256::from(v))
-    }
-}
-
-impl From<usize> for U256 {
-    fn from(v: usize) -> Self {
-        Self(PTU256::from(v))
-    }
-}
-
-impl From<u8> for U256 {
-    fn from(v: u8) -> Self {
-        Self(PTU256::from(v))
-    }
-}
-
-impl Add for U256 {
-    type Output = U256;
-
-    fn add(self, rhs: U256) -> Self::Output {
-        U256(self.0 + rhs.0)
-    }
-}
-
-// Scalar in ethereum RLP encoding is big endian: (taken from yellow paper)
-// If RLP is used to encode a scalar, defined only as a non-negative integer (in N, or in Nx for any x), it must be encoded
-// as the shortest byte array whose big-endian interpretation is the scala
-impl Decodable for U256 {
-    fn decode(decoder: &Rlp<'_>) -> Result<U256, DecoderError> {
-        Ok(U256::from_slice_be(decoder.data()?))
-    }
-}
-
-impl Encodable for U256 {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        // fortunately, primitive types are Encodable
-        s.append_internal(&self.0);
-    }
-}
-
-impl Mul for U256 {
-    type Output = U256;
-
-    fn mul(self, rhs: U256) -> Self::Output {
-        U256(self.0 * rhs.0)
-    }
-}
-
-impl Sub for U256 {
-    type Output = U256;
-
-    fn sub(self, rhs: U256) -> Self::Output {
-        U256(self.0 - rhs.0)
-    }
-}
-
-impl Div for U256 {
-    type Output = U256;
-
-    fn div(self, rhs: U256) -> Self::Output {
-        U256(self.0 / rhs.0)
-    }
-}
-
-#[allow(clippy::from_over_into)]
-impl Into<PTU256> for U256 {
-    fn into(self) -> PTU256 {
-        self.0
-    }
-}
-
-impl From<U256> for u8 {
-    fn from(val: U256) -> Self {
-        PTU256::as_u32(&val.0) as u8
-    }
-}
-
-impl From<U256> for [u8; WORD_SIZE] {
-    fn from(v: U256) -> [u8; WORD_SIZE] {
-        let mut bytes = [0_u8; WORD_SIZE];
-        v.0.to_big_endian(&mut bytes);
-        bytes
     }
 }
 

@@ -775,7 +775,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn gas_price(&self) -> U256 {
-        self.block.gas_price.value.into()
+        self.block.gas_price.value
     }
 
     fn origin(&self) -> H160 {
@@ -804,11 +804,11 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_gas_limit(&self) -> U256 {
-        self.block.gas_limit.value.into()
+        self.block.gas_limit.value
     }
 
     fn block_base_fee_per_gas(&self) -> U256 {
-        self.block.base_fee_per_gas.value.into()
+        self.block.base_fee_per_gas.value
     }
 
     fn chain_id(&self) -> U256 {
