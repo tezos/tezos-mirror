@@ -31,6 +31,7 @@
 
 module Gossipsub_intf = Gossipsub_intf
 open Gossipsub_intf
+module Worker = Gossipsub_worker.Make
 
 module Make (C : AUTOMATON_CONFIG) :
   AUTOMATON

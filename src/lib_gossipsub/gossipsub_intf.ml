@@ -620,7 +620,7 @@ module type WORKER_CONFIGURATION = sig
     type 'a t
 
     (** Create a new empty stream. *)
-    val empty : 'a t
+    val empty : unit -> 'a t
 
     (** Push the given value into the stream. *)
     val push : 'a -> 'a t -> unit
@@ -636,10 +636,8 @@ module type WORKER = sig
   (** The state of a gossipsub worker. *)
   type t
 
-  type 'a monad
-
-  (** The Gossipsub automaton of the worker. *)
-  module GS : AUTOMATON
+  (** We (re-)export the GS, Monad and Stream modules. *)
+  include WORKER_CONFIGURATION
 
   (** A full message is defined by its content, topic and id. *)
   type full_message = {
@@ -700,7 +698,7 @@ module type WORKER = sig
   val start : heartbeat_span:GS.Span.t -> GS.Topic.t list -> t -> t
 
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
-  val shutdown : t -> unit monad
+  val shutdown : t -> unit Monad.t
 
   (** [app_input state app_input] adds the given application input [app_input]
       to the worker's input stream. *)
@@ -709,4 +707,12 @@ module type WORKER = sig
   (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
       worker's input stream. *)
   val p2p_input : t -> p2p_input -> unit
+
+  (** [p2p_output_stream t] returns the output stream containing data for the
+      P2P layer. *)
+  val p2p_output_stream : t -> p2p_output Stream.t
+
+  (** [app_output_stream t] returns the output stream containing data for the
+      application layer. *)
+  val app_output_stream : t -> app_output Stream.t
 end
