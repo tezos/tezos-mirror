@@ -107,6 +107,16 @@ let assert_iwant_output_success ~__LOC__ output =
   | Iwant_from_peer_with_low_score _ ->
       Test.fail ~__LOC__ "Expected IWant to succeed."
 
+let assert_topic_mesh ~__LOC__ ~topic ~expected_peers state =
+  let actual_peers =
+    GS.Introspection.(get_peers_in_topic_mesh topic (view state))
+  in
+  Check.(
+    (actual_peers = expected_peers)
+      (list int)
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__)
+
 let many_peers limits = (4 * limits.degree_optimal) + 1
 
 let make_peers ~number =
@@ -208,7 +218,7 @@ let test_handle_received_subscriptions rng limits parameters =
     ~tags:["gossipsub"; "subscribe"]
   @@ fun () ->
   let topics = ["topic1"; "topic2"; "topic3"; "topic4"] in
-  let peers = make_peers ~number:(many_peers limits) in
+  let peers = make_peers ~number:2 in
   let state =
     init_state
       ~peers
@@ -257,6 +267,15 @@ let test_handle_received_subscriptions rng limits parameters =
   (* Unknown peer should not be subscribed to any topic *)
   assert_subscribed_topics ~__LOC__ ~peer:unknown_peer ~expected_topics:[] state ;
 
+  (* Heartbeat to fill the mesh. *)
+  let state, _ = GS.heartbeat state in
+  (* Both peer 0 and peer 1 should be in the mesh of "topic1". *)
+  assert_topic_mesh
+    ~__LOC__
+    ~topic:"topic1"
+    ~expected_peers:[peers.(0); peers.(1)]
+    state ;
+
   (* Peer 0 unsubscribes from the first topic *)
   let state, _ =
     GS.handle_unsubscribe {topic = "topic1"; peer = peers.(0)} state
@@ -267,6 +286,8 @@ let test_handle_received_subscriptions rng limits parameters =
     ~peer:peers.(0)
     ~expected_topics:["topic2"; "topic3"]
     state ;
+  (* Only peer 1 should be in the mesh of "topic1". *)
+  assert_topic_mesh ~__LOC__ ~topic:"topic1" ~expected_peers:[peers.(1)] state ;
   unit
 
 (* The Join function should:
