@@ -58,6 +58,38 @@ end
 
 type t = (module S)
 
+let pp ppf (module Bench : S) =
+  let open Bench in
+  let open Format in
+  let f fmt = fprintf ppf fmt in
+  let pp_option f ppf = function
+    | None -> pp_print_string ppf "None"
+    | Some x -> fprintf ppf "Some@ (@[%a@])" f x
+  in
+  let pp_config fmt config =
+    Data_encoding.Json.pp fmt
+    @@ Data_encoding.Json.construct config_encoding config
+  in
+  f "@[<v>" ;
+  f "name: %a@;" Namespace.pp name ;
+  f "info: %s@;" info ;
+  f "module_filename: %s@;" module_filename ;
+  f
+    "generated_code_destination: %a@;"
+    (pp_option pp_print_string)
+    generated_code_destination ;
+  f
+    "tags: [%a]@;"
+    (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf "; ") pp_print_string)
+    tags ;
+  f "@[<v2>default_config:@ @[%a@]@]@;" pp_config default_config ;
+  f
+    "@[<v2>local models for inference:@ @[<v>%a@]@]@;"
+    (pp_print_list (fun ppf (local_model_name, model) ->
+         fprintf ppf "@[<v2>%s:@ @[%a@]@]" local_model_name Model.pp model))
+    models ;
+  f "@]"
+
 type ('cfg, 'workload) poly =
   (module S with type config = 'cfg and type workload = 'workload)
 
