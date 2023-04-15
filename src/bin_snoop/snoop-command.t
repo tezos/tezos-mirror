@@ -3,7 +3,7 @@ Missing config file prints
   Benchmarking with the following options:
   { options = { seed=self-init;
                 bench #=1;
-                nsamples/bench=3000;
+                nsamples/bench=500;
                 minor_heap_size=262144 words;
                 config directory=__nosuchdir };
      save_file = output.json;
