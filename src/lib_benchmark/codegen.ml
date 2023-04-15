@@ -36,7 +36,7 @@ let pp_codegen_error fmtr = function
   | Variable_not_found s ->
       Format.fprintf
         fmtr
-        "Fixed_point_transform: Variable not found: %a"
+        "Codegen: Variable not found: %a"
         Free_variable.pp
         s
 
