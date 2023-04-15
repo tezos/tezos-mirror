@@ -34,11 +34,7 @@ exception Codegen_error of codegen_error
 
 let pp_codegen_error fmtr = function
   | Variable_not_found s ->
-      Format.fprintf
-        fmtr
-        "Codegen: Variable not found: %a"
-        Free_variable.pp
-        s
+      Format.fprintf fmtr "Codegen: Variable not found: %a" Free_variable.pp s
 
 let () =
   Printexc.register_printer (fun exn ->
