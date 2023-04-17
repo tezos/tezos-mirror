@@ -172,15 +172,23 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       - Sending [Unsubscribe] messages to connected peers. *)
   let handle_leave ~emit_p2p_output topic = function
     | gstate, GS.Not_joined -> gstate
-    | gstate, Leaving_topic {to_prune; noPX_peers = _} ->
+    | gstate, Leaving_topic {to_prune; noPX_peers} ->
         let peers = View.(view gstate |> get_connected_peers) in
         (* Sending [Prune] before [Unsubscribe] to let full-connection peers
            clean their mesh before handling [Unsubscribe] message. *)
-        let prune = Prune {topic; px = Seq.empty} in
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5350
+        Peer.Set.iter
+          (fun peer_to_prune ->
+            (* Send Prune messages with adequate px. *)
+            let prune =
+              let px =
+                GS.select_px_peers gstate ~peer_to_prune topic ~noPX_peers
+                |> List.to_seq
+              in
+              Prune {topic; px}
+            in
+            send_p2p_message ~emit_p2p_output prune (Seq.return peer_to_prune))
+          to_prune ;
 
-           Send a list of alternative peers when pruning a link for a topic. *)
-        send_p2p_message ~emit_p2p_output prune (Peer.Set.to_seq to_prune) ;
         send_p2p_message
           ~emit_p2p_output
           (Unsubscribe {topic})
