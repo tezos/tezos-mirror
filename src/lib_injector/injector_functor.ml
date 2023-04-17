@@ -249,6 +249,8 @@ module Make (Parameters : PARAMETERS) = struct
     retention_period : int;
         (** Number of blocks for which the injector keeps the included
             information. *)
+    allowed_attempts : int;
+        (** The number of attempts that will be made to inject an operation. *)
     mutable last_seen_head : (Block_hash.t * int32) option;
         (** Last L1 head that the injector has seen (used to compute
             reorganizations). *)
@@ -292,7 +294,7 @@ module Make (Parameters : PARAMETERS) = struct
     state.last_seen_head <- Some head
 
   let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
-      ~retention_period ~signer strategy tags =
+      ~retention_period ~allowed_attempts ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -383,6 +385,7 @@ module Make (Parameters : PARAMETERS) = struct
         included = {included_operations; included_in_blocks};
         state;
         retention_period;
+        allowed_attempts;
         last_seen_head;
         protocols = head_protocols;
         proto_client;
@@ -419,13 +422,7 @@ module Make (Parameters : PARAMETERS) = struct
           state
           op.operation
       in
-      let* () = Op_queue.replace state.queue op.hash op in
-      let*! () =
-        Event.(emit1 number_of_operations_in_queue)
-          state
-          (Op_queue.length state.queue)
-      in
-      return_unit
+      Op_queue.replace state.queue op.hash op
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state oph operations =
@@ -644,6 +641,20 @@ module Make (Parameters : PARAMETERS) = struct
         end in
         return (results, (module Unsigned_op : Proto_unsigned_op))
 
+  let register_error state (op : Inj_operation.t) error =
+    let open Lwt_result_syntax in
+    Inj_operation.register_error op error ;
+    if op.errors.count > state.allowed_attempts then
+      let*! () =
+        Event.(emit3 discard_error_operation)
+          state
+          op.operation
+          op.errors.count
+          op.errors.last_error
+      in
+      Op_queue.remove state.queue op.hash
+    else return_unit
+
   let inject_on_node state ~nb (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in
     let* signed_op_bytes =
@@ -671,24 +682,25 @@ module Make (Parameters : PARAMETERS) = struct
   let rec inject_operations ~must_succeed state
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
-    let* operations_results, raw_op =
+    let*! simulation_result =
       trace (Step_failed "simulation")
       @@ simulate_operations ~must_succeed state operations
     in
+    let* () =
+      match simulation_result with
+      | Ok _ -> return_unit
+      | Error error ->
+          List.iter_es (fun op -> register_error state op error) operations
+    in
+    let*? operations_results, raw_op = simulation_result in
     let failure = ref false in
-    let*! rev_non_failing_operations =
-      List.fold_left_s
+    let* rev_non_failing_operations =
+      List.fold_left_es
         (fun acc (op, {status; _}) ->
-          let open Lwt_syntax in
           match status with
           | Unsuccessful (Failed error) ->
-              let+ () =
-                Event.(emit2 dropping_operation)
-                  state
-                  op.Inj_operation.operation
-                  error
-              in
               failure := true ;
+              let+ () = register_error state op error in
               acc
           | Successful | Unsuccessful (Backtracked | Skipped | Other_branch) ->
               (* Not known to be failing *)
@@ -894,6 +906,11 @@ module Make (Parameters : PARAMETERS) = struct
                       info.op.operation
                       status
                   in
+                  let* () =
+                    match status with
+                    | Failed error -> register_error state info.op error
+                    | Other_branch | Backtracked | Skipped -> return_unit
+                  in
                   match retry with
                   | Retry -> return (included, info.op :: to_retry)
                   | Forget -> return (included, to_retry)
@@ -1043,7 +1060,15 @@ module Make (Parameters : PARAMETERS) = struct
 
   (* The request {Request.Inject} triggers an injection of the operations
      the pending queue. *)
-  let on_inject state = inject_pending_operations state ()
+  let on_inject state =
+    let open Lwt_syntax in
+    let* res = inject_pending_operations state () in
+    let* () =
+      Event.(emit1 number_of_operations_in_queue)
+        state
+        (Op_queue.length state.queue)
+    in
+    return res
 
   module Types = struct
     type nonrec state = state
@@ -1055,6 +1080,7 @@ module Make (Parameters : PARAMETERS) = struct
       data_dir : string;
       state : Parameters.state;
       retention_period : int;
+      allowed_attempts : int;
       strategy : injection_strategy;
       tags : Tags.t;
     }
@@ -1112,6 +1138,7 @@ module Make (Parameters : PARAMETERS) = struct
             data_dir;
             state;
             retention_period;
+            allowed_attempts;
             strategy;
             tags;
           } =
@@ -1123,6 +1150,7 @@ module Make (Parameters : PARAMETERS) = struct
            ~data_dir
            state
            ~retention_period
+           ~allowed_attempts
            ~signer
            strategy
            tags
@@ -1284,9 +1312,10 @@ module Make (Parameters : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(reconnection_delay = 2.0) state ~signers =
+      ?(allowed_attempts = 100) ?(reconnection_delay = 2.0) state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
+    assert (allowed_attempts >= 0) ;
     let signers_map =
       List.fold_left
         (fun acc (signer, strategy, tags) ->
@@ -1326,6 +1355,7 @@ module Make (Parameters : PARAMETERS) = struct
                 data_dir;
                 state;
                 retention_period;
+                allowed_attempts;
                 strategy;
                 tags;
               }

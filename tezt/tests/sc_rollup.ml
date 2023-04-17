@@ -4567,6 +4567,59 @@ let test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+let test_injector_auto_discard =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["injector"];
+      description = "Injector discards repeatedly failing operations";
+    }
+    ~kind:"arith"
+  @@ fun protocol _sc_rollup_node _sc_rollup_client sc_rollup tezos_node client
+    ->
+  let* operator = Client.gen_and_show_keys client in
+  (* Change operator and only batch messages *)
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~protocol
+      Batcher
+      tezos_node
+      ~base_dir:(Client.base_dir client)
+      ~operators:[("add_messages", operator.alias)]
+  in
+  let sc_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+  let nb_attempts = 5 in
+  let* () =
+    Sc_rollup_node.run
+      ~event_level:`Debug
+      sc_rollup_node
+      sc_rollup
+      ["--injector-attempts"; string_of_int nb_attempts]
+  in
+  let monitor_injector_queue =
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "number_of_operations_in_queue.v0"
+      (fun event ->
+        let nb = JSON.(event |-> "number_of_operations" |> as_int) in
+        Log.info "Injector: %d operations in queue" nb ;
+        (* Because we send one batch of messages by block to the injector, and
+           each operation is allowed to fail [nb_attempts] times, we should have
+           at most [nb_attempts] in the queue. *)
+        Check.((nb <= nb_attempts) int)
+          ~error_msg:
+            "There are %L add messages operations in the injector queue but \
+             there should be at most %R" ;
+        None)
+  in
+  let n = 65 in
+  let batch_size = 3 in
+  let* _hashes =
+    send_messages_batcher ~batch_size n client sc_rollup_node sc_client
+  in
+  Lwt.cancel monitor_injector_queue ;
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -4734,6 +4787,7 @@ let register ~protocols =
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
   test_accuser protocols ;
+  test_injector_auto_discard protocols ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
