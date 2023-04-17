@@ -447,7 +447,7 @@ module Request = struct
   let current_branch chain_db peer =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
-    Peer_metadata.incr meta (Sent_request Head) ;
+    Peer_metadata.incr meta (Sent_request Branch) ;
     try_send chain_db peer @@ Get_current_branch chain_id
 end
 
