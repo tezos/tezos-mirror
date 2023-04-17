@@ -237,6 +237,19 @@ let injector_attempts_arg =
              "injector-attempts should be positive" ;
          p)
 
+let injection_ttl_arg =
+  Tezos_clic.arg
+    ~long:"injection-ttl"
+    ~placeholder:"number"
+    ~doc:
+      (Format.sprintf
+         "The number of blocks after which an operation that is injected but \
+          never included is retried. Default value is %d"
+         Configuration.default_injector.injection_ttl)
+  @@ Tezos_clic.map_parameter Client_proto_args.int_parameter ~f:(fun p ->
+         if p < 1 then Stdlib.failwith "injection-ttl should be > 1" ;
+         p)
+
 let log_kernel_debug_arg =
   Tezos_clic.switch
     ~long:"log-kernel-debug"
@@ -275,7 +288,7 @@ let make_operators sc_rollup_node_operators =
 
 let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
     ~reconnection_delay ~dal_node_endpoint ~injector_attempts
-    ~injector_retention_period ~mode ~sc_rollup_address
+    ~injector_retention_period ~injection_ttl ~mode ~sc_rollup_address
     ~sc_rollup_node_operators ~log_kernel_debug =
   let open Configuration in
   let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
@@ -301,6 +314,8 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
               injector_retention_period;
           attempts =
             Option.value ~default:default_injector.attempts injector_attempts;
+          injection_ttl =
+            Option.value ~default:default_injector.injection_ttl injection_ttl;
         };
       l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
       log_kernel_debug;
@@ -310,8 +325,8 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
 
 let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
     ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-    ~injector_retention_period ~injector_attempts ~mode ~sc_rollup_address
-    ~sc_rollup_node_operators =
+    ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+    ~sc_rollup_address ~sc_rollup_node_operators =
   let open Configuration in
   let new_sc_rollup_node_operators = make_operators sc_rollup_node_operators in
   (* Merge operators *)
@@ -347,6 +362,8 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
                 injector_retention_period;
             attempts =
               Option.value ~default:default_injector.attempts injector_attempts;
+            injection_ttl =
+              Option.value ~default:default_injector.injection_ttl injection_ttl;
           };
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
@@ -356,8 +373,8 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
 
 let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
     ~loser_mode ~reconnection_delay ~dal_node_endpoint
-    ~injector_retention_period ~injector_attempts ~mode ~sc_rollup_address
-    ~sc_rollup_node_operators ~log_kernel_debug =
+    ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+    ~sc_rollup_address ~sc_rollup_node_operators ~log_kernel_debug =
   let open Lwt_result_syntax in
   let config_file = Configuration.config_filename ~data_dir in
   let*! exists_config = Lwt_unix.file_exists config_file in
@@ -376,6 +393,7 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~dal_node_endpoint
         ~injector_retention_period
         ~injector_attempts
+        ~injection_ttl
         ~mode
         ~sc_rollup_address
         ~sc_rollup_node_operators
@@ -411,6 +429,7 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~dal_node_endpoint
         ~injector_retention_period
         ~injector_attempts
+        ~injection_ttl
         ~mode
         ~sc_rollup_address
         ~sc_rollup_node_operators
@@ -424,7 +443,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args11
+    (args12
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -435,6 +454,7 @@ let config_init_command =
        dal_node_endpoint_arg
        injector_retention_period_arg
        injector_attempts_arg
+       injection_ttl_arg
        log_kernel_debug_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
@@ -451,6 +471,7 @@ let config_init_command =
            dal_node_endpoint,
            injector_retention_period,
            injector_attempts,
+           injection_ttl,
            log_kernel_debug )
          mode
          sc_rollup_address
@@ -466,6 +487,7 @@ let config_init_command =
           ~dal_node_endpoint
           ~injector_retention_period
           ~injector_attempts
+          ~injection_ttl
           ~mode
           ~sc_rollup_address
           ~sc_rollup_node_operators
@@ -485,7 +507,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args13
+    (args14
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -497,6 +519,7 @@ let legacy_run_command =
        dal_node_endpoint_arg
        injector_retention_period_arg
        injector_attempts_arg
+       injection_ttl_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg)
     (prefixes ["run"] @@ stop)
@@ -511,6 +534,7 @@ let legacy_run_command =
            dal_node_endpoint,
            injector_retention_period,
            injector_attempts,
+           injection_ttl,
            log_kernel_debug,
            log_kernel_debug_file )
          cctxt ->
@@ -525,6 +549,7 @@ let legacy_run_command =
           ~dal_node_endpoint
           ~injector_retention_period
           ~injector_attempts
+          ~injection_ttl
           ~mode
           ~sc_rollup_address
           ~sc_rollup_node_operators:[]
@@ -540,7 +565,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args11
+    (args12
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -550,6 +575,7 @@ let run_command =
        dal_node_endpoint_arg
        injector_retention_period_arg
        injector_attempts_arg
+       injection_ttl_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
@@ -565,6 +591,7 @@ let run_command =
            dal_node_endpoint,
            injector_retention_period,
            injector_attempts,
+           injection_ttl,
            log_kernel_debug,
            log_kernel_debug_file )
          mode
@@ -582,6 +609,7 @@ let run_command =
           ~dal_node_endpoint
           ~injector_retention_period
           ~injector_attempts
+          ~injection_ttl
           ~mode:(Some mode)
           ~sc_rollup_address:(Some sc_rollup_address)
           ~sc_rollup_node_operators

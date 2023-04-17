@@ -50,7 +50,7 @@ type batcher = {
   max_batch_size : int;
 }
 
-type injector = {retention_period : int; attempts : int}
+type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
 type t = {
   sc_rollup_address : Sc_rollup.t;
@@ -219,7 +219,8 @@ let default_batcher =
     max_batch_size = default_batcher_max_batch_size;
   }
 
-let default_injector = {retention_period = 2048; attempts = 100}
+let default_injector =
+  {retention_period = 2048; attempts = 100; injection_ttl = 120}
 
 let max_injector_retention_period =
   5 * 8192 (* Preserved cycles (5) for mainnet *)
@@ -481,17 +482,21 @@ let batcher_encoding =
 let injector_encoding : injector Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {retention_period; attempts} -> (retention_period, attempts))
-    (fun (retention_period, attempts) ->
+    (fun {retention_period; attempts; injection_ttl} ->
+      (retention_period, attempts, injection_ttl))
+    (fun (retention_period, attempts, injection_ttl) ->
       if retention_period > max_injector_retention_period then
         Format.ksprintf
           Stdlib.failwith
-          "injector_retention_period should be smaller than %d"
+          "injector.retention_period should be smaller than %d"
           max_injector_retention_period ;
-      {retention_period; attempts})
-  @@ obj2
+      if injection_ttl < 1 then
+        Stdlib.failwith "injector.injection_ttl should be at least 1" ;
+      {retention_period; attempts; injection_ttl})
+  @@ obj3
        (dft "retention_period" uint16 default_injector.retention_period)
        (dft "attempts" uint16 default_injector.attempts)
+       (dft "injection_ttl" uint16 default_injector.injection_ttl)
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in

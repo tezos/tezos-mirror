@@ -224,6 +224,8 @@ module Make_table (H : H) = struct
 
   let iter_es f t = H.iter_es f t.table
 
+  let fold f t = H.fold f t.table
+
   let length t = H.length t.table
 
   let replace_seq t seq =
