@@ -78,22 +78,7 @@ let get_messages Node_context.{cctxt; _} head =
         block.operations
         {apply; apply_internal})
   in
-  let ({predecessor; _} : Block_header.shell_header) = block.header.shell in
-  let* {
-         timestamp = predecessor_timestamp;
-         proto_level = predecessor_proto_level;
-         _;
-       } =
-    Layer1.fetch_tezos_shell_header cctxt predecessor
-  in
-  let is_migration_block =
-    block.header.shell.proto_level <> predecessor_proto_level
-  in
-  return
-    ( is_migration_block,
-      List.rev rev_messages,
-      predecessor_timestamp,
-      predecessor )
+  return (List.rev rev_messages)
 
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
@@ -134,9 +119,12 @@ let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
          messages_with_protocol_internal_messages )
 
 let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
-    ~predecessor ~predecessor_timestamp ~level messages =
+    ~(predecessor : Layer1.header) ~level messages =
   let open Lwt_result_syntax in
-  let* inbox = Node_context.inbox_of_head node_ctxt predecessor in
+  let* inbox =
+    Node_context.inbox_of_head node_ctxt (Layer1.head_of_header predecessor)
+  in
+  let predecessor_timestamp = predecessor.header.timestamp in
   let inbox_metrics = Metrics.Inbox.metrics in
   Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
   let* ( _messages_history,
@@ -167,25 +155,25 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
   return
     (inbox_hash, inbox, witness_hash, messages_with_protocol_internal_messages)
 
-let process_head (node_ctxt : _ Node_context.t) ~predecessor
-    Layer1.{level; hash = head_hash} =
+let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
+    (head : Layer1.header) =
   let open Lwt_result_syntax in
   let first_inbox_level =
     Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
   in
-  if level >= first_inbox_level then (
+  if head.level >= first_inbox_level then
     (* We compute the inbox of this block using the inbox of its
        predecessor. That way, the computation of inboxes is robust to chain
        reorganization. *)
-    let* ( is_migration_block,
-           collected_messages,
-           predecessor_timestamp,
-           predecessor_hash ) =
-      get_messages node_ctxt head_hash
-    in
-    assert (Block_hash.(predecessor.Layer1.hash = predecessor_hash)) ;
+    let* collected_messages = get_messages node_ctxt head.hash in
     let*! () =
-      Inbox_event.get_messages head_hash level (List.length collected_messages)
+      Inbox_event.get_messages
+        head.hash
+        head.level
+        (List.length collected_messages)
+    in
+    let is_migration_block =
+      head.header.proto_level <> predecessor.header.proto_level
     in
     let* (( _inbox_hash,
             inbox,
@@ -195,12 +183,11 @@ let process_head (node_ctxt : _ Node_context.t) ~predecessor
         node_ctxt
         ~is_migration_block
         ~predecessor
-        ~predecessor_timestamp
-        ~level
+        ~level:head.level
         collected_messages
     in
-    let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
-    return res)
+    let* () = same_inbox_as_layer_1 node_ctxt head.hash inbox in
+    return res
   else
     let* inbox = Node_context.genesis_inbox node_ctxt in
     return

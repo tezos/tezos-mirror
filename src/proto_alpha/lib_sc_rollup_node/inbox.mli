@@ -42,8 +42,8 @@ open Sc_rollup
     [operations] of the [head] block. *)
 val process_head :
   Node_context.rw ->
-  predecessor:Layer1.head ->
-  Layer1.head ->
+  predecessor:Layer1.header ->
+  Layer1.header ->
   (Sc_rollup.Inbox.Hash.t
   * Sc_rollup.Inbox.t
   * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
@@ -88,8 +88,7 @@ module Internal_for_tests : sig
   val process_messages :
     Node_context.rw ->
     is_migration_block:bool ->
-    predecessor:Layer1.head ->
-    predecessor_timestamp:Timestamp.time ->
+    predecessor:Layer1.header ->
     level:int32 ->
     Sc_rollup.Inbox_message.t list ->
     (Sc_rollup.Inbox.Hash.t
