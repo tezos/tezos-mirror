@@ -39,3 +39,15 @@ let encoding block_encoding =
 
 let map f {old_chain; new_chain} =
   {old_chain = List.map f old_chain; new_chain = List.map f new_chain}
+
+let map_es f {old_chain; new_chain} =
+  let open Lwt_result_syntax in
+  let* old_chain = List.map_es f old_chain in
+  let* new_chain = List.map_es f new_chain in
+  return {old_chain; new_chain}
+
+let map_ep f {old_chain; new_chain} =
+  let open Lwt_result_syntax in
+  let* old_chain = List.map_ep f old_chain
+  and* new_chain = List.map_ep f new_chain in
+  return {old_chain; new_chain}
