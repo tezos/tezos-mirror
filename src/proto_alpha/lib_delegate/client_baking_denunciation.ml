@@ -40,24 +40,39 @@ module HLevel = Hashtbl.Make (struct
 end)
 
 (* Blocks are associated to the delegates who baked them *)
-module Delegate_Map = Map.Make (Signature.Public_key_hash)
+module Delegate_map = Signature.Public_key_hash.Map
 
-(* (pre)endorsements are associated to the slot they are injected
-   with; we rely on the fact that there is a unique canonical slot
-   identifying a (pre)endorser. *)
-module Slot_Map = Slot.Map
+module Validators_cache =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Raw_level.t
+
+      let equal = Raw_level.equal
+
+      let hash = Hashtbl.hash
+    end)
 
 (* type of operations stream, as returned by monitor_operations RPC *)
 type ops_stream =
   ((Operation_hash.t * packed_operation) * error trace option) list Lwt_stream.t
 
+type 'kind recorded_consensus =
+  | No_operation_seen
+  | Operation_seen of 'kind operation
+
+type recorded_consensus_operations = {
+  endorsement : Kind.endorsement recorded_consensus;
+  preendorsement : Kind.preendorsement recorded_consensus;
+}
+
 type 'a state = {
-  (* Endorsements seen so far *)
-  endorsements_table : Kind.endorsement operation Slot_Map.t HLevel.t;
-  (* Preendorsements seen so far *)
-  preendorsements_table : Kind.preendorsement operation Slot_Map.t HLevel.t;
+  (* Validators rights for the last preserved levels *)
+  validators_rights : public_key_hash Slot.Map.t Validators_cache.t;
+  (* Consensus operations seen so far *)
+  consensus_operations_table :
+    recorded_consensus_operations Delegate_map.t HLevel.t;
   (* Blocks received so far *)
-  blocks_table : Block_hash.t Delegate_Map.t HLevel.t;
+  blocks_table : Block_hash.t Delegate_map.t HLevel.t;
   (* Maximum delta of level to register *)
   preserved_levels : int;
   (* Highest level seen in a block *)
@@ -80,10 +95,13 @@ type 'a state = {
 
 let create_state ~preserved_levels blocks_stream ops_stream ops_stream_stopper =
   let clean_frequency = max 1 (preserved_levels / 10) in
+  let validators_rights = Validators_cache.create (preserved_levels + 2) in
+  (* We keep rights for [preserved_levels] in the past, and 2 levels in the
+     future from [highest_level_encountered] *)
   Lwt.return
     {
-      endorsements_table = HLevel.create preserved_levels;
-      preendorsements_table = HLevel.create preserved_levels;
+      validators_rights;
+      consensus_operations_table = HLevel.create preserved_levels;
       blocks_table = HLevel.create preserved_levels;
       preserved_levels;
       highest_level_encountered = Raw_level.root (* 0l *);
@@ -120,7 +138,13 @@ let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
   | Preendorsement, Single (Preendorsement consensus_content)
   | Endorsement, Single (Endorsement consensus_content) ->
       consensus_content.block_payload_hash
-  | _ -> .
+
+let get_slot (type kind) (op_kind : kind consensus_operation_type)
+    (op : kind Operation.t) =
+  match (op_kind, op.protocol_data.contents) with
+  | Preendorsement, Single (Preendorsement consensus_content)
+  | Endorsement, Single (Endorsement consensus_content) ->
+      consensus_content.slot
 
 let double_consensus_op_evidence (type kind) :
     kind consensus_operation_type ->
@@ -134,68 +158,148 @@ let double_consensus_op_evidence (type kind) :
   | Endorsement -> Plugin.RPC.Forge.double_endorsement_evidence
   | Preendorsement -> Plugin.RPC.Forge.double_preendorsement_evidence
 
-let process_consensus_op (type kind) cctxt
-    (op_kind : kind consensus_operation_type) (new_op : kind Operation.t)
-    chain_id level round slot ops_table =
-  let map =
-    Option.value ~default:Slot_Map.empty
-    @@ HLevel.find ops_table (chain_id, level, round)
-  in
-  (* If a previous endorsement made by this pkh (the slot determines the pkh)
-     is found for the same level we inject a double_(pre)endorsement *)
-  match Slot_Map.find slot map with
+let lookup_recorded_consensus (type kind) consensus_key
+    (op_kind : kind consensus_operation_type) map : kind recorded_consensus =
+  match Delegate_map.find consensus_key map with
+  | None -> No_operation_seen
+  | Some {endorsement; preendorsement} -> (
+      match op_kind with
+      | Endorsement -> endorsement
+      | Preendorsement -> preendorsement)
+
+let add_consensus_operation (type kind) consensus_key
+    (op_kind : kind consensus_operation_type)
+    (recorded_operation : kind recorded_consensus) map =
+  Delegate_map.update
+    consensus_key
+    (fun x ->
+      let record =
+        Option.value
+          ~default:
+            {
+              endorsement = No_operation_seen;
+              preendorsement = No_operation_seen;
+            }
+          x
+      in
+      match op_kind with
+      | Endorsement -> Some {record with endorsement = recorded_operation}
+      | Preendorsement -> Some {record with preendorsement = recorded_operation})
+    map
+
+let get_validator_rights state cctxt level =
+  let open Lwt_result_syntax in
+  match Validators_cache.find_opt state.validators_rights level with
   | None ->
-      return
-      @@ HLevel.add
-           ops_table
-           (chain_id, level, round)
-           (Slot_Map.add slot new_op map)
-  | Some existing_op
-    when Block_payload_hash.(
-           get_payload_hash op_kind existing_op
-           <> get_payload_hash op_kind new_op)
-         || Block_hash.(existing_op.shell.branch <> new_op.shell.branch) ->
-      (* same slot, level, and round, and:
-         different payload hash OR different branch *)
-      let new_op_hash, existing_op_hash =
-        (Operation.hash new_op, Operation.hash existing_op)
+      let* validators =
+        Plugin.RPC.Validators.get cctxt (cctxt#chain, `Head 0) ~levels:[level]
       in
-      let op1, op2 =
-        if Operation_hash.(new_op_hash < existing_op_hash) then
-          (new_op, existing_op)
-        else (existing_op, new_op)
+      let validators =
+        List.fold_left
+          (fun acc ({consensus_key; slots; _} : RPC.Validators.t) ->
+            List.fold_left
+              (fun acc slot -> Slot.Map.add slot consensus_key acc)
+              acc
+              slots)
+          Slot.Map.empty
+          validators
       in
-      get_block_offset level >>= fun block ->
-      let chain = `Hash chain_id in
-      Alpha_block_services.hash cctxt ~chain ~block () >>=? fun block_hash ->
-      double_consensus_op_evidence
-        op_kind
-        cctxt
-        (`Hash chain_id, block)
-        ~branch:block_hash
-        ~op1
-        ~op2
-        ()
-      >>=? fun bytes ->
-      let bytes = Signature.concat bytes Signature.zero in
-      let double_op_detected, double_op_denounced =
-        Events.(
-          match op_kind with
-          | Endorsement ->
-              (double_endorsement_detected, double_endorsement_denounced)
-          | Preendorsement ->
-              (double_preendorsement_detected, double_preendorsement_denounced))
-      in
-      Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
-      >>= fun () ->
-      HLevel.replace
-        ops_table
-        (chain_id, level, round)
-        (Slot_Map.add slot new_op map) ;
-      Shell_services.Injection.operation cctxt ~chain bytes >>=? fun op_hash ->
-      Events.(emit double_op_denounced) (op_hash, bytes) >>= fun () ->
-      return_unit
-  | _ -> return_unit
+      Validators_cache.replace state.validators_rights level validators ;
+      return validators
+  | Some t -> return t
+
+let process_consensus_op (type kind) state cctxt
+    (op_kind : kind consensus_operation_type) (new_op : kind Operation.t)
+    chain_id level round slot =
+  let open Lwt_result_syntax in
+  let diff = Raw_level.diff state.highest_level_encountered level in
+  if Int32.(diff > of_int state.preserved_levels) then return_unit
+    (* We do not handle operations older than [preserved_levels] *)
+  else if diff < -2l then return_unit
+    (* We do not handle operations too far in the future *)
+  else
+    let* endorsing_rights = get_validator_rights state cctxt level in
+    match Slot.Map.find slot endorsing_rights with
+    | None ->
+        (* We do not handle operations that do not have a valid slot *)
+        return_unit
+    | Some consensus_key -> (
+        let round_map =
+          Option.value ~default:Delegate_map.empty
+          @@ HLevel.find
+               state.consensus_operations_table
+               (chain_id, level, round)
+        in
+        match lookup_recorded_consensus consensus_key op_kind round_map with
+        | No_operation_seen ->
+            return
+            @@ HLevel.add
+                 state.consensus_operations_table
+                 (chain_id, level, round)
+                 (add_consensus_operation
+                    consensus_key
+                    op_kind
+                    (Operation_seen new_op)
+                    round_map)
+        | Operation_seen existing_op
+          when Block_payload_hash.(
+                 get_payload_hash op_kind existing_op
+                 <> get_payload_hash op_kind new_op)
+               || Slot.(get_slot op_kind existing_op <> slot)
+               || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
+          ->
+            (* Same level, round, and delegate, and:
+               different payload hash OR different slot OR different branch *)
+            let new_op_hash, existing_op_hash =
+              (Operation.hash new_op, Operation.hash existing_op)
+            in
+            let op1, op2 =
+              if Operation_hash.(new_op_hash < existing_op_hash) then
+                (new_op, existing_op)
+              else (existing_op, new_op)
+            in
+            let*! block = get_block_offset level in
+            let chain = `Hash chain_id in
+            let* block_hash =
+              Alpha_block_services.hash cctxt ~chain ~block ()
+            in
+            let* bytes =
+              double_consensus_op_evidence
+                op_kind
+                cctxt
+                (`Hash chain_id, block)
+                ~branch:block_hash
+                ~op1
+                ~op2
+                ()
+            in
+            let bytes = Signature.concat bytes Signature.zero in
+            let double_op_detected, double_op_denounced =
+              Events.(
+                match op_kind with
+                | Endorsement ->
+                    (double_endorsement_detected, double_endorsement_denounced)
+                | Preendorsement ->
+                    ( double_preendorsement_detected,
+                      double_preendorsement_denounced ))
+            in
+            let*! () =
+              Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
+            in
+            HLevel.replace
+              state.consensus_operations_table
+              (chain_id, level, round)
+              (add_consensus_operation
+                 consensus_key
+                 op_kind
+                 (Operation_seen new_op)
+                 round_map) ;
+            let* op_hash =
+              Shell_services.Injection.private_operation cctxt ~chain bytes
+            in
+            let*! () = Events.(emit double_op_denounced) (op_hash, bytes) in
+            return_unit
+        | _ -> return_unit)
 
 let process_operations (cctxt : #Protocol_client_context.full) state
     (endorsements : 'a list) ~packed_op chain_id =
@@ -210,6 +314,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
             {shell; protocol_data}
           in
           process_consensus_op
+            state
             cctxt
             Preendorsement
             new_preendorsement
@@ -217,7 +322,6 @@ let process_operations (cctxt : #Protocol_client_context.full) state
             level
             round
             slot
-            state.preendorsements_table
       | Operation_data
           ({contents = Single (Endorsement {round; slot; level; _}); _} as
           protocol_data) ->
@@ -225,6 +329,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
             {shell; protocol_data}
           in
           process_consensus_op
+            state
             cctxt
             Endorsement
             new_endorsement
@@ -232,7 +337,6 @@ let process_operations (cctxt : #Protocol_client_context.full) state
             level
             round
             slot
-            state.endorsements_table
       | _ ->
           (* not a consensus operation *)
           return_unit)
@@ -263,16 +367,16 @@ let process_block (cctxt : #Protocol_client_context.full) state
       >>=? fun round ->
       let chain = `Hash chain_id in
       let map =
-        Option.value ~default:Delegate_Map.empty
+        Option.value ~default:Delegate_map.empty
         @@ HLevel.find state.blocks_table (chain_id, level, round)
       in
-      match Delegate_Map.find baker.delegate map with
+      match Delegate_map.find baker.delegate map with
       | None ->
           return
           @@ HLevel.add
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_Map.add baker.delegate new_hash map)
+               (Delegate_map.add baker.delegate new_hash map)
       | Some existing_hash when Block_hash.(existing_hash = new_hash) ->
           (* This case should never happen *)
           Events.(emit double_baking_but_not) () >>= fun () ->
@@ -280,7 +384,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_Map.add baker.delegate new_hash map)
+               (Delegate_map.add baker.delegate new_hash map)
       | Some existing_hash ->
           (* If a previous block made by this pkh is found for
              the same (level, round) we inject a double_baking_evidence *)
@@ -312,7 +416,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_Map.add baker.delegate new_hash map))
+               (Delegate_map.add baker.delegate new_hash map))
 
 (* Remove levels that are lower than the
    [highest_level_encountered] minus [preserved_levels] *)
@@ -338,8 +442,7 @@ let cleanup_old_operations state =
           if Raw_level.(level < threshold) then None else Some x)
         hmap
     in
-    filter state.preendorsements_table ;
-    filter state.endorsements_table ;
+    filter state.consensus_operations_table ;
     filter state.blocks_table)
 
 (* Each new block is processed :
@@ -386,14 +489,6 @@ let process_new_block cctxt state bi =
   | Error errs ->
       Events.(emit accuser_block_error) (bi.hash, errs) >>= Lwt.return
 
-let rec wait_for_first_block ~name stream =
-  Lwt_stream.get stream >>= function
-  | None | Some (Error _) ->
-      B_Events.(emit cannot_fetch_event) name >>= fun () ->
-      (* NOTE: this is not a tight loop because of Lwt_stream.get *)
-      wait_for_first_block ~name stream
-  | Some (Ok bi) -> Lwt.return bi
-
 let log_errors_and_continue ~name p =
   p >>= function
   | Ok () -> Lwt.return_unit
@@ -405,9 +500,9 @@ let start_ops_monitor cctxt =
     ~chain:cctxt#chain
     ~applied:true
     ~branch_delayed:true
-    ~branch_refused:true
-    ~refused:true
-    ~outdated:true
+    ~branch_refused:false
+    ~refused:false
+    ~outdated:false
     ()
 
 let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
@@ -426,7 +521,6 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
           state.ops_stream_stopper () ;
           Lwt.return_unit))
     canceler ;
-  wait_for_first_block ~name state.blocks_stream >>= fun _first_event ->
   let last_get_block = ref None in
   let get_block () =
     match !last_get_block with
