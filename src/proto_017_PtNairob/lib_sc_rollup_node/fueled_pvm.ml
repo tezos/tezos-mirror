@@ -141,14 +141,20 @@ module Make (PVM : Pvm.S) = struct
           {
             reveal_preimage =
               (fun hash ->
-                let hash =
-                  (* The payload represents the encoded [Sc_rollup_reveal_hash.t]. We must
-                     decode it properly, instead of converting it byte-for-byte. *)
-                  Data_encoding.Binary.of_string_exn
-                    Sc_rollup_reveal_hash.encoding
-                    hash
-                in
                 let*! data =
+                  let*? hash =
+                    (* The payload represents the encoded [Sc_rollup_reveal_hash.t]. We must
+                       decode it properly, instead of converting it byte-for-byte. *)
+                    Result.bind_error
+                      (Data_encoding.Binary.of_string
+                         Sc_rollup_reveal_hash.encoding
+                         hash)
+                      (error_with
+                         "Bad reveal hash '%a': %a"
+                         Hex.pp
+                         (Hex.of_string hash)
+                         Data_encoding.Binary.pp_read_error)
+                  in
                   get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
                 in
                 match data with
