@@ -413,6 +413,14 @@ module type AUTOMATON = sig
       for this connection for [retain_duration] seconds. *)
   val remove_peer : remove_peer -> [`Remove_peer] monad
 
+  (** [handle_subscribe {topic; peer}] handles a request from a remote [peer]
+      informing us that it is subscribed to [topic]. *)
+  val handle_subscribe : subscribe -> [`Subscribe] monad
+
+  (** [handle_unsubscribe {topic; peer}] handles a request from a remote [peer]
+      informing us that it unsubscribed from [topic]. *)
+  val handle_unsubscribe : unsubscribe -> [`Unsubscribe] monad
+
   (** [handle_ihave { peer; topic; message_ids }] handles the gossip message
       [IHave] emitted by [peer] for [topic] with the [message_ids].  *)
   val handle_ihave : ihave -> [`IHave] monad
@@ -443,14 +451,6 @@ module type AUTOMATON = sig
 
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
   val heartbeat : [`Heartbeat] monad
-
-  (** [handle_subscribe {topic; peer}] handles a request from a remote [peer]
-      informing us that it is subscribed to [topic]. *)
-  val handle_subscribe : subscribe -> [`Subscribe] monad
-
-  (** [handle_unsubscribe {topic; peer}] handles a request from a remote [peer]
-      informing us that it unsubscribed from [topic]. *)
-  val handle_unsubscribe : unsubscribe -> [`Unsubscribe] monad
 
   (** [join { topic }] handles a join to a new topic. On success, the function
       returns the set of peers that have been grafted to form the mesh of the

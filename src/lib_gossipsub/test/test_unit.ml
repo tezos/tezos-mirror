@@ -624,6 +624,39 @@ let test_handle_graft_for_not_joined_topic rng limits parameters =
   assert_output ~__LOC__ output Unknown_topic ;
   unit
 
+(** Tests sending a graft without subscribing to the topic results in susbcribing to the topic. *)
+let test_handle_graft_from_unsubscribed_peer rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test handle graft without subscribe"
+    ~tags:["gossipsub"; "graft"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:1 in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> false)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let peer = peers.(0) in
+  (* Check that the peers is not subscribed to the topic before sending graft. *)
+  assert_subscribed_topics ~__LOC__ ~peer:peers.(0) ~expected_topics:[] state ;
+  (* Send graft. *)
+  let state, _output = GS.handle_graft {peer; topic} state in
+  (* Check that the peers is now subscribed to the topic. *)
+  assert_subscribed_topics
+    ~__LOC__
+    ~peer:peers.(0)
+    ~expected_topics:[topic]
+    state ;
+  unit
+
 (** Tests that prune removes peer from our mesh.
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L1323
@@ -1697,6 +1730,7 @@ let register rng limits parameters =
   test_fanout rng limits parameters ;
   test_handle_graft_for_joined_topic rng limits parameters ;
   test_handle_graft_for_not_joined_topic rng limits parameters ;
+  test_handle_graft_from_unsubscribed_peer rng limits parameters ;
   test_handle_prune_peer_in_mesh rng limits parameters ;
   test_mesh_addition rng limits parameters ;
   test_mesh_subtraction rng limits parameters ;
