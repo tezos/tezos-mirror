@@ -42,8 +42,6 @@
 /src/proto_*/lib_protocol/sc_rollup_game*          @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_inbox*         @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_refutation*    @sribaroud
-/src/proto_*/bin_sc_rollup*  @ole.kruger
-/src/proto_*/lib_sc_rollup*  @ole.kruger
 
 /src/lib_webassembly         @lthms @ole.kruger @picdc
 /src/lib_scoru_wasm          @lthms @ole.kruger @picdc
