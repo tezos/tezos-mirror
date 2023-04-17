@@ -38,9 +38,12 @@ module Coordinator : sig
         (** The [Dac_plugin.hash Data_streamer.t] that the [Coordinator] node
             use to advertise root hashes to [Committee_member] and [Observer]
             nodes. *)
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
-           This could be problematic in case coordinator and member/observer
-           use two different plugins that bind different underlying hashes. *)
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
+       This could be problematic in case coordinator and member/observer
+       use two different plugins that bind different underlying hashes. *)
+    certificate_streamers : Certificate_streamers.t;
+        (** Certificate streamers to communicate to DAC clients when a
+            certificate has been updated with a new signature. *)
   }
 
   (** [public_keys_opt t] returns the list of public keys associated with the
@@ -178,6 +181,6 @@ val get_node_store : t -> 'a Store_sigs.mode -> 'a Store.Irmin_store.t
 val get_committee_members :
   t -> Tezos_crypto.Aggregate_signature.public_key_hash list tzresult
 
-(** [get_coordinator_client ctx] returns the Coordinator client if it 
+(** [get_coordinator_client ctx] returns the Coordinator client if it
     is available. *)
 val get_coordinator_client : t -> Dac_node_client.cctxt tzresult

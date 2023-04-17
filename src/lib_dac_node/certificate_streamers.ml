@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type hash = bytes
+module Map = Map.Make (struct
+  type t = Dac_plugin.hash
 
-let hash_to_bytes = Fun.id
+  let compare = Dac_plugin.raw_compare
+end)
 
-let hash_to_hex hash = Hex.of_bytes hash
+type t = Certificate_repr.t Data_streamer.t Map.t ref
 
-type supported_hashes = Blake2B
+let init () = ref Map.empty
 
-let raw_compare = Bytes.compare
-
-let non_proto_encoding_unsafe = Data_encoding.bytes' Hex
-
-module type T = sig
-  val encoding : hash Data_encoding.t
-
-  val equal : hash -> hash -> bool
-
-  val hash_string :
-    scheme:supported_hashes -> ?key:string -> string list -> hash
-
-  val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> hash
-
-  val scheme_of_hash : hash -> supported_hashes
-
-  val of_hex : string -> hash option
-
-  val to_hex : hash -> string
-
-  val size : scheme:supported_hashes -> int
-
-  val hash_rpc_arg : hash Tezos_rpc.Arg.arg
-
-  module Proto : Registered_protocol.T
-end
-
-type t = (module T)
-
-let table : t Protocol_hash.Table.t = Protocol_hash.Table.create 5
-
-let register (make_plugin : (bytes -> hash) -> t) : unit =
-  let dac_plugin = make_plugin Fun.id in
-  let module Plugin = (val dac_plugin) in
-  assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
-  Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
-
-let get hash = Protocol_hash.Table.find table hash
+let push (t : t) root_hash certificate =
+  t :=
+    Map.update
+      root_hash
+      (function
+        | None -> Some (Data_streamer.init ()) | Some stream -> Some stream)
+      !t ;
+  let stream =
+    !t |> Map.find root_hash |> Option.value_f ~default:(fun _ -> assert false)
+  in
+  (* TODO: insert issue here. Add logic for closing stream if certificate has
+     100% of signatures. *)
+  Data_streamer.publish stream certificate

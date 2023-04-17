@@ -36,6 +36,7 @@ module Coordinator = struct
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
            This could be problematic in case coordinator and member/observer
            use two different plugins that bind different underlying hashes. *)
+    certificate_streamers : Certificate_streamers.t;
   }
 
   let get_all_committee_members_public_keys committee_members_addresses cctxt =
@@ -55,7 +56,8 @@ module Coordinator = struct
       get_all_committee_members_public_keys committee_members_addresses cctxt
     in
     let hash_streamer = Data_streamer.init () in
-    {committee_members; hash_streamer}
+    let certificate_streamers = Certificate_streamers.init () in
+    {committee_members; hash_streamer; certificate_streamers}
 
   let public_keys_opt t =
     List.map
