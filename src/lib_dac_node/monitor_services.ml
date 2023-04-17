@@ -32,6 +32,19 @@ module S = struct
       ~query:Tezos_rpc.Query.empty
       ~output:P.encoding
       Tezos_rpc.Path.(open_root / "monitor" / "root_hashes")
+
+  let certificate ((module P) : Dac_plugin.t) =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Monitor a stream of updates to certificates for a given root hash. \
+         Every time a new signature for the root hash is received by the \
+         coordinator node, the corresponding certificate is updated and \
+         streamed via this endpoint. This monitor endpoint guarantees at least \
+         once delivery, i.e. a certificate update could be streamed multiple \
+         times."
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Certificate_repr.encoding (module P))
+      Tezos_rpc.Path.(open_root / "monitor" /: P.hash_rpc_arg)
 end
 
 let root_hashes dac_node_cctxt dac_plugin =
@@ -39,5 +52,13 @@ let root_hashes dac_node_cctxt dac_plugin =
     (S.root_hashes dac_plugin)
     dac_node_cctxt
     ()
+    ()
+    ()
+
+let certificate dac_node_cctxt dac_plugin root_hash =
+  Tezos_rpc.Context.make_streamed_call
+    (S.certificate dac_plugin)
+    dac_node_cctxt
+    ((), root_hash)
     ()
     ()
