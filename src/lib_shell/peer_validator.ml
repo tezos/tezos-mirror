@@ -290,10 +290,11 @@ let may_validate_new_branch w locator =
           locator
       in
       match v with
-      | Known_valid, prefix_locator ->
-          if prefix_locator.Block_locator.history <> [] then
-            bootstrap_new_branch w prefix_locator
-          else return_unit
+      | Known_valid, {history = []; _} -> return_unit
+      | Known_valid, {history = [x]; head_header; head_hash}
+        when Block_hash.equal x head_header.shell.predecessor ->
+          validate_new_head w head_hash head_header
+      | Known_valid, prefix_locator -> bootstrap_new_branch w prefix_locator
       | Unknown, _ ->
           (* May happen when:
              - A locator from another chain is received;
