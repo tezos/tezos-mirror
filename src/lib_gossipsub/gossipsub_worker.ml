@@ -473,9 +473,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     in
     {schedule_cancellation}
 
-  let start ~heartbeat_span topics t =
+  let start topics t =
     match t.status with
     | Starting ->
+        let heartbeat_span =
+          View.((view t.gossip_state).limits.heartbeat_interval)
+        in
         let heartbeat_handle = heartbeat_events_producer ~heartbeat_span t in
         let event_loop_handle = event_loop t in
         let status = Running {heartbeat_handle; event_loop_handle} in
