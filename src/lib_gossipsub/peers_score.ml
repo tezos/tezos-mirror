@@ -65,20 +65,18 @@ struct
             This field is updated when pruning, grafting or removing the associated peer. *)
   }
 
-  type t = {
+  type stats = {
     behaviour_penalty : int;  (** The score associated to a peer. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
     parameters : topic score_parameters;
   }
 
-  let newly_connected parameters =
-    {
-      behaviour_penalty = 0;
-      topic_status = Topic.Map.empty;
-      peer_status = Connected;
-      parameters;
-    }
+  type t = {
+    stats : stats;  (** [stats] contains the gossipsub score counters. *)
+    score : float Lazy.t;
+        (** [score] is the score obtained from [stats]. We lazify it in order to compute it at most once. *)
+  }
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5451
      Add printers for [t] *)
@@ -124,26 +122,39 @@ struct
     let p7 = p7 ps in
     p1 +. p7
 
-  let penalty score penalty =
-    {score with behaviour_penalty = score.behaviour_penalty + penalty}
+  let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
-  let set_connected score = {score with peer_status = Connected}
+  let float ps = Lazy.force ps.score
 
-  let expires ps =
-    match ps.peer_status with
+  let newly_connected parameters : t =
+    make
+      {
+        behaviour_penalty = 0;
+        topic_status = Topic.Map.empty;
+        peer_status = Connected;
+        parameters;
+      }
+
+  let penalty {stats; _} penalty =
+    make {stats with behaviour_penalty = stats.behaviour_penalty + penalty}
+
+  let set_connected {stats; _} = make {stats with peer_status = Connected}
+
+  let expires {stats; _} =
+    match stats.peer_status with
     | Connected -> None
     | Disconnected {expires} -> Some expires
 
-  let graft (ps : t) topic =
+  let graft ({stats; _} : t) topic =
     let topic_status =
       Topic.Map.add
         topic
         {mesh_status = Active {since = Time.now (); during = Span.zero}}
-        ps.topic_status
+        stats.topic_status
     in
-    {ps with topic_status}
+    make {stats with topic_status}
 
-  let prune (ps : t) topic =
+  let prune ({stats; _} : t) topic =
     let topic_status =
       Topic.Map.update
         topic
@@ -151,12 +162,12 @@ struct
           | None -> None
           | Some {mesh_status = Inactive} as v -> v
           | Some {mesh_status = Active _} -> Some {mesh_status = Inactive})
-        ps.topic_status
+        stats.topic_status
     in
-    {ps with topic_status}
+    make {stats with topic_status}
 
-  let remove_peer (stats : t) ~retain_duration =
-    let score = float stats in
+  let remove_peer ({stats; score} : t) ~retain_duration =
+    let score = Lazy.force score in
     if Compare.Float.(score > 0.0) then
       (* We only retain non-positive scores to
          dissuade attacks on the score function. *)
@@ -176,9 +187,9 @@ struct
       in
       (* TODO https://gitlab.com/tezos/tezos/-/issues/5447
          apply score penalties due to mesh message deliveries deficit. *)
-      stats |> Option.some
+      make stats |> Option.some
 
-  let refresh_graft_status now ps =
+  let refresh_graft_status now {stats; _} =
     let topic_status =
       Topic.Map.map
         (fun ({mesh_status} as v) ->
@@ -187,14 +198,14 @@ struct
           | Active {since; during = _} ->
               let during = Time.sub now (Time.to_span since) |> Time.to_span in
               {mesh_status = Active {since; during}})
-        ps.topic_status
+        stats.topic_status
     in
-    {ps with topic_status}
+    make {stats with topic_status}
 
   let refresh ps =
     let current = Time.now () in
     let refresh () = Some (refresh_graft_status current ps) in
-    match ps.peer_status with
+    match ps.stats.peer_status with
     | Connected -> refresh ()
     | Disconnected {expires = at} when Time.(at > current) -> refresh ()
     | Disconnected _ -> None
