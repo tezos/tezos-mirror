@@ -582,6 +582,78 @@ module Make (C : AUTOMATON_CONFIG) :
 
   include Helpers
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5148
+     Consider merging subcribe/unsubscribe with join/leave. *)
+  module Subscribe = struct
+    let handle topic peer =
+      let open Monad.Syntax in
+      let*! connections in
+      match Peer.Map.find peer connections with
+      | None -> return Subscribe_to_unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.add topic connection.topics}
+          in
+          let connections = Peer.Map.add peer connection connections in
+          let* () = set_connections connections in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
+             rust-libp2p adds the peer to the mesh if needed here. *)
+          return Subscribed
+  end
+
+  let handle_subscribe : subscribe -> [`Subscribe] output Monad.t =
+   fun {topic; peer} -> Subscribe.handle topic peer
+
+  module Unsubscribe = struct
+    let remove_peer_from_mesh topic peer =
+      let open Monad.Syntax in
+      let*! mesh in
+      let mesh =
+        Topic.Map.update
+          topic
+          (Option.map (fun peers -> Peer.Set.remove peer peers))
+          mesh
+      in
+      set_mesh mesh
+
+    let remove_peer_from_fanout topic peer =
+      let open Monad.Syntax in
+      let*! fanout in
+      let fanout =
+        Topic.Map.update
+          topic
+          (Option.map (fun fanout_peers ->
+               {
+                 fanout_peers with
+                 peers = Peer.Set.remove peer fanout_peers.peers;
+               }))
+          fanout
+      in
+      set_fanout fanout
+
+    let handle topic peer =
+      let open Monad.Syntax in
+      let*! connections in
+      match Peer.Map.find peer connections with
+      | None -> return @@ Unsubscribe_from_unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.remove topic connection.topics}
+          in
+          let peers = Peer.Map.add peer connection connections in
+          let* () = set_connections peers in
+          (* Remove the peer from mesh as done in the rust implementation
+             but not go implementation. *)
+          let* () = remove_peer_from_mesh topic peer in
+          (* Remove the peer from fanout. This is not done in go/rust implementation but
+             we do it here as it is more natural and consistent with the above mesh cleaning. *)
+          let* () = remove_peer_from_fanout topic peer in
+          return Unsubscribed
+  end
+
+  let handle_unsubscribe : unsubscribe -> [`Unsubscribe] output Monad.t =
+   fun {topic; peer} -> Unsubscribe.handle topic peer
+
   module IHave = struct
     let check_too_many_recv_ihave_message count =
       let open Monad.Syntax in
@@ -823,78 +895,6 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let handle_prune : prune -> [`Prune] output Monad.t =
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5148
-     Consider merging subcribe/unsubscribe with join/leave. *)
-  module Subscribe = struct
-    let handle topic peer =
-      let open Monad.Syntax in
-      let*! connections in
-      match Peer.Map.find peer connections with
-      | None -> return Subscribe_to_unknown_peer
-      | Some connection ->
-          let connection =
-            {connection with topics = Topic.Set.add topic connection.topics}
-          in
-          let connections = Peer.Map.add peer connection connections in
-          let* () = set_connections connections in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
-             rust-libp2p adds the peer to the mesh if needed here. *)
-          return Subscribed
-  end
-
-  let handle_subscribe : subscribe -> [`Subscribe] output Monad.t =
-   fun {topic; peer} -> Subscribe.handle topic peer
-
-  module Unsubscribe = struct
-    let remove_peer_from_mesh topic peer =
-      let open Monad.Syntax in
-      let*! mesh in
-      let mesh =
-        Topic.Map.update
-          topic
-          (Option.map (fun peers -> Peer.Set.remove peer peers))
-          mesh
-      in
-      set_mesh mesh
-
-    let remove_peer_from_fanout topic peer =
-      let open Monad.Syntax in
-      let*! fanout in
-      let fanout =
-        Topic.Map.update
-          topic
-          (Option.map (fun fanout_peers ->
-               {
-                 fanout_peers with
-                 peers = Peer.Set.remove peer fanout_peers.peers;
-               }))
-          fanout
-      in
-      set_fanout fanout
-
-    let handle topic peer =
-      let open Monad.Syntax in
-      let*! connections in
-      match Peer.Map.find peer connections with
-      | None -> return @@ Unsubscribe_from_unknown_peer
-      | Some connection ->
-          let connection =
-            {connection with topics = Topic.Set.remove topic connection.topics}
-          in
-          let peers = Peer.Map.add peer connection connections in
-          let* () = set_connections peers in
-          (* Remove the peer from mesh as done in the rust implementation
-             but not go implementation. *)
-          let* () = remove_peer_from_mesh topic peer in
-          (* Remove the peer from fanout. This is not done in go/rust implementation but
-             we do it here as it is more natural and consistent with the above mesh cleaning. *)
-          let* () = remove_peer_from_fanout topic peer in
-          return Unsubscribed
-  end
-
-  let handle_unsubscribe : unsubscribe -> [`Unsubscribe] output Monad.t =
-   fun {topic; peer} -> Unsubscribe.handle topic peer
 
   module Publish = struct
     let check_seen message_id =
