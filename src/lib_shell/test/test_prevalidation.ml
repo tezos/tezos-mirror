@@ -26,9 +26,15 @@
 (** Testing
     -------
     Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/main.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe -- -f test_prevalidation.ml
     Subject:      Unit tests for {!Prevalidation.T}
 *)
+
+let register_test ~title ~additional_tags =
+  Test.register
+    ~__FILE__
+    ~title:("Shell: Mempool prevalidation: " ^ title)
+    ~tags:(["mempool"; "prevalidation"] @ additional_tags)
 
 module Init = struct
   let chain_id = Shell_test_helpers.chain_id
@@ -64,6 +70,17 @@ module Init = struct
         context_hash
     in
     Store.Unsafe.block_of_repr repr
+
+  (** Register a Tezt test from a function that takes a context as
+      argument and returns a tzresult promise. *)
+  let register_test_that_needs_ctxt f =
+    register_test (fun () ->
+        let open Lwt_syntax in
+        let* res = wrap_tzresult_lwt_disk f () in
+        match res with
+        | Ok () -> unit
+        | Error err ->
+            Test.fail "Test failed with tztrace:@.%a" pp_print_trace err)
 end
 
 let make_chain_store ctxt =
@@ -123,7 +140,9 @@ let now () = Time.System.to_protocol (Tezos_base.Time.System.now ())
 let chain_store = ()
 
 (** Test that [create] returns [Ok] in a pristine context. *)
-let test_create ctxt =
+let () =
+  Init.register_test_that_needs_ctxt ~title:"create" ~additional_tags:["create"]
+  @@ fun ctxt ->
   let open Lwt_result_syntax in
   let (module Chain_store) = make_chain_store ctxt in
   let module Filter = MakeFilter (Mock_protocol) in
@@ -466,7 +485,11 @@ let consistent_outcomes ~mempool_is_empty proto_outcome filter_outcome =
     the filter's [Mempool.add_operation_and_enforce_mempool_bound],
     check the returned classification and the updates of the protocol
     and filter internal states. *)
-let test_add_operation ctxt =
+let () =
+  Init.register_test_that_needs_ctxt
+    ~title:"add_operation"
+    ~additional_tags:["add"]
+  @@ fun ctxt ->
   (* Number of operations that will be added. *)
   let nb_ops = 100 in
   let open Lwt_result_syntax in
@@ -558,7 +581,11 @@ let test_add_operation ctxt =
   return_unit
 
 (** Test [Prevalidation.remove_operation]. *)
-let test_remove_operation ctxt =
+let () =
+  Init.register_test_that_needs_ctxt
+    ~title:"remove_operation"
+    ~additional_tags:["remove"]
+  @@ fun ctxt ->
   (* Number of operations initially added to the validation state. *)
   let nb_initial_ops = 20 in
   (* Number of operations on which we will call [remove_operation]
@@ -650,29 +677,3 @@ let test_remove_operation ctxt =
   in
   remove_ops state nb_initial_ops removed_op_was_present ops ;
   return_unit
-
-let () =
-  let register_test name f =
-    Tztest.tztest name `Quick (Init.wrap_tzresult_lwt_disk f)
-  in
-  Alcotest_lwt.run
-    ~__FILE__
-    "mempool-prevalidation"
-    [
-      (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation.exe -- test create '0' *)
-      ("create", [register_test "[create] succeeds" test_create]);
-      (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation.exe -- test add_operation '0' *)
-      ( "add_operation",
-        [
-          register_test
-            "Check classification and state updates"
-            test_add_operation;
-        ] );
-      (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation.exe -- test remove_operation '0' *)
-      ( "remove_operation",
-        [register_test "Test remove_operation" test_remove_operation] );
-    ]
-  |> Lwt_main.run
