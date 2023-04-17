@@ -58,14 +58,31 @@ let () =
 
 *)
 
+type header = {
+  hash : Block_hash.t;
+  level : int32;
+  header : Block_header.shell_header;
+}
+
+let header_encoding =
+  let open Data_encoding in
+  conv
+    (fun {hash; level = _; header} -> (hash, header))
+    (fun (hash, header) -> {hash; level = header.level; header})
+    (merge_objs
+       (obj1 (req "hash" Block_hash.encoding))
+       Block_header.shell_header_encoding)
+
 type head = {hash : Block_hash.t; level : int32}
 
 let head_encoding =
-  Data_encoding.(
-    conv
-      (fun {hash; level} -> (hash, level))
-      (fun (hash, level) -> {hash; level})
-      (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32)))
+  let open Data_encoding in
+  conv
+    (fun {hash; level} -> (hash, level))
+    (fun (hash, level) -> {hash; level})
+    (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32))
+
+let head_of_header {hash; level; header = _} = {hash; level}
 
 module Blocks_cache =
   Aches_lwt.Lache.Make_option
@@ -79,7 +96,8 @@ let blocks_cache : blocks_cache = Blocks_cache.create 32
 include Octez_crawler.Layer_1
 
 let iter_heads l1_ctxt f =
-  iter_heads l1_ctxt @@ fun (hash, {shell = {level; _}; _}) -> f {hash; level}
+  iter_heads l1_ctxt @@ fun (hash, {shell = {level; _} as header; _}) ->
+  f {hash; level; header}
 
 (**
 

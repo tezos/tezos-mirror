@@ -45,8 +45,8 @@ module type S = sig
   val process_head :
     Node_context.rw ->
     'a Context.t ->
-    predecessor:Layer1.head ->
-    Layer1.head ->
+    predecessor:Layer1.header ->
+    Layer1.header ->
     Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
     ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
 
