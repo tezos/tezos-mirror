@@ -50,7 +50,7 @@ module type S = sig
   val process_head :
     Node_context.rw ->
     predecessor:Block_hash.t ->
-    Layer1.head ->
+    Layer1.header ->
     Context.rw ->
     Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t option tzresult Lwt.t
 
