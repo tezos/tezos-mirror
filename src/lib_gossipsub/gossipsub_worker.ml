@@ -172,7 +172,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       - Sending [Unsubscribe] messages to connected peers. *)
   let handle_leave ~emit_p2p_output topic = function
     | gstate, GS.Not_joined -> gstate
-    | gstate, Leaving_topic {to_prune} ->
+    | gstate, Leaving_topic {to_prune; noPX_peers = _} ->
         let peers = View.(view gstate |> get_connected_peers) in
         (* Sending [Prune] before [Unsubscribe] to let full-connection peers
            clean their mesh before handling [Unsubscribe] message. *)
