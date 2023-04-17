@@ -846,8 +846,6 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle peer topic =
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5264
          Be sure that the peers that requested failed/rejected graft are properly pruned. *)
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5305
-         A peer can be grafted only if he subscribed to this topic. *)
       let open Monad.Syntax in
       let*? () = check_filter peer in
       let*? mesh = check_topic_known topic in
@@ -859,6 +857,15 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? () = check_score peer topic score in
       let*? () = check_mesh_size mesh connection in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
+      (* Call [handle_subscribe] to ensure the invariant where all grafted peers subscribed. *)
+      let* output = handle_subscribe {topic; peer} in
+      (match output with
+      | Subscribe_to_unknown_peer ->
+          (* Not possible due to invariant. *)
+          ()
+      | Subscribed ->
+          (* Expected case. *)
+          ()) ;
       Grafting_successfully |> return
   end
 
