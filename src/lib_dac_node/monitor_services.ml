@@ -44,7 +44,7 @@ module S = struct
          times."
       ~query:Tezos_rpc.Query.empty
       ~output:(Certificate_repr.encoding (module P))
-      Tezos_rpc.Path.(open_root / "monitor" /: P.hash_rpc_arg)
+      Tezos_rpc.Path.(open_root / "monitor" / "certificate" /: P.hash_rpc_arg)
 end
 
 let root_hashes dac_node_cctxt dac_plugin =

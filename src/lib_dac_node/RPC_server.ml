@@ -228,6 +228,45 @@ module Coordinator = struct
     in
     return root_hash
 
+  let handle_monitor_certificate ro_store certificate_streamers root_hash =
+    let open Lwt_result_syntax in
+    let stream, stopper =
+      Certificate_streamers.handle_subscribe certificate_streamers root_hash
+    in
+    let*! () = Event.emit_new_subscription_to_certificate_updates root_hash in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    let next () = Lwt_stream.get stream in
+    (* Add the current certificate to the streamer, if any, to ensure that
+       a certificate is returned even in the case that no updates to the
+       certificate happen for a long time. *)
+    let*! current_certificate_store_value_res =
+      Store.Certificate_store.find ro_store root_hash
+    in
+    match current_certificate_store_value_res with
+    | Ok current_certificate_store_value ->
+        let () =
+          Option.iter
+            (fun Store.{aggregate_signature; witnesses} ->
+              let certificate =
+                Certificate_repr.{root_hash; aggregate_signature; witnesses}
+              in
+              Certificate_streamers.push
+                certificate_streamers
+                root_hash
+                certificate)
+            current_certificate_store_value
+        in
+        Tezos_rpc.Answer.return_stream {next; shutdown}
+    | Error e -> Tezos_rpc.Answer.fail e
+
+  let register_monitor_certificate dac_plugin ro_store certificate_streamers dir
+      =
+    Tezos_rpc.Directory.gen_register
+      dir
+      (Monitor_services.S.certificate dac_plugin)
+      (fun ((), root_hash) () () ->
+        handle_monitor_certificate ro_store certificate_streamers root_hash)
+
   let register_coordinator_post_preimage dac_plugin hash_streamer page_store =
     add_service
       Tezos_rpc.Directory.register0
@@ -252,12 +291,14 @@ module Coordinator = struct
     in
     let page_store = Node_context.get_page_store node_ctxt in
     let cctxt = Node_context.get_tezos_node_cctxt node_ctxt in
-
+    let certificate_streamers = modal_node_ctxt.certificate_streamers in
+    let ro_store = Node_context.get_node_store node_ctxt Store_sigs.Read_only in
     Tezos_rpc.Directory.empty
     |> register_coordinator_post_preimage dac_plugin hash_streamer page_store
     |> register_get_verify_signature dac_plugin public_keys_opt
     |> register_get_preimage dac_plugin page_store
     |> register_monitor_root_hashes dac_plugin hash_streamer
+    |> register_monitor_certificate dac_plugin ro_store certificate_streamers
     |> register_put_dac_member_signature node_ctxt dac_plugin cctxt
     |> register_get_certificate node_ctxt dac_plugin
 end

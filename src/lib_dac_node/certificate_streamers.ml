@@ -33,16 +33,21 @@ type t = Certificate_repr.t Data_streamer.t Map.t ref
 
 let init () = ref Map.empty
 
-let push (t : t) root_hash certificate =
+let create_if_none t root_hash =
   t :=
     Map.update
       root_hash
       (function
         | None -> Some (Data_streamer.init ()) | Some stream -> Some stream)
       !t ;
-  let stream =
-    !t |> Map.find root_hash |> Option.value_f ~default:(fun _ -> assert false)
-  in
+  !t |> Map.find root_hash |> Option.value_f ~default:(fun _ -> assert false)
+
+let handle_subscribe t root_hash =
+  let certificate_streamer = create_if_none t root_hash in
+  Data_streamer.handle_subscribe certificate_streamer
+
+let push (t : t) root_hash certificate =
+  let certificate_streamer = create_if_none t root_hash in
   (* TODO: insert issue here. Add logic for closing stream if certificate has
      100% of signatures. *)
-  Data_streamer.publish stream certificate
+  Data_streamer.publish certificate_streamer certificate

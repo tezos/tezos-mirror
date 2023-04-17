@@ -35,5 +35,8 @@ type t
 (** [init ()] returns an empty map of certificate streams. *)
 val init : unit -> t
 
+val handle_subscribe :
+  t -> Dac_plugin.hash -> Certificate_repr.t Lwt_stream.t * Lwt_watcher.stopper
+
 (** [push t root_hash certificate] streams the updated certificate for [root_hash]. *)
 val push : t -> Dac_plugin.hash -> Certificate_repr.t -> unit
