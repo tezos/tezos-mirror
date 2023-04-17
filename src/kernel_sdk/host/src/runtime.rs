@@ -134,7 +134,7 @@ pub trait Runtime {
     /// Count the number of subkeys under `prefix`.
     ///
     /// See [SmartRollupCore::store_list_size].
-    fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<i64, RuntimeError>;
+    fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError>;
 
     /// Move one part of durable storage to a different location
     ///
@@ -369,12 +369,12 @@ where
         }
     }
 
-    fn store_count_subkeys<T: Path>(&self, path: &T) -> Result<i64, RuntimeError> {
+    fn store_count_subkeys<T: Path>(&self, path: &T) -> Result<u64, RuntimeError> {
         let count =
             unsafe { SmartRollupCore::store_list_size(self, path.as_ptr(), path.size()) };
 
         if count >= 0 {
-            Ok(count)
+            Ok(count as u64)
         } else {
             Err(RuntimeError::HostErr(count.into()))
         }
@@ -886,7 +886,7 @@ mod tests {
         let result = mock.store_count_subkeys(&PATH);
 
         // Assert
-        assert_eq!(Ok(subkey_count), result);
+        assert_eq!(Ok(subkey_count.try_into().unwrap()), result);
     }
 
     #[test]
