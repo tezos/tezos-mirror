@@ -306,7 +306,7 @@ module Coordinator = struct
             root_hash
             Store.{aggregate_signature; witnesses}
         in
-        return @@ aggregate_signature
+        return @@ (aggregate_signature, witnesses)
 
   let check_dac_member_has_signed ((module P) : Dac_plugin.t) signature_store
       root_hash dac_member_pkh =
@@ -382,12 +382,38 @@ module Coordinator = struct
               rw_node_store
               dac_member_signature
           in
-          let* _aggregate_sig =
+          let* certificate_streamers_opt =
+            match Node_context.mode ctx with
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5292
+                Make type non optional when Legacy mode has been removed. *)
+            | Node_context.Coordinator {certificate_streamers; _} ->
+                return @@ Some certificate_streamers
+            | Legacy _ -> return None
+            | _ ->
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/5370
+                   This line will never be executed as
+                   [handle_put_dac_member_signature] is only invoked when the
+                   DAC node is running in either coordinator or legacy mode.
+                *)
+                failwith "Operation not supported for operating mode"
+          in
+          let root_hash = dac_member_signature.root_hash in
+          let* aggregate_signature, witnesses =
             update_aggregate_sig_store
               dac_plugin
               rw_node_store
               dac_committee
-              dac_member_signature.root_hash
+              root_hash
           in
-          return_unit
+          let certificate =
+            Certificate_repr.{root_hash; aggregate_signature; witnesses}
+          in
+          return
+          @@ Option.iter
+               (fun certificate_streamers ->
+                 Certificate_streamers.push
+                   certificate_streamers
+                   root_hash
+                   certificate)
+               certificate_streamers_opt
 end
