@@ -10,7 +10,7 @@
 //! as addresses and values.
 
 use crate::address::EthereumAddress;
-use crate::basic::{GasLimit, GasPrice, Wei};
+use crate::basic::{GasLimit, GasPrice};
 use libsecp256k1::{
     curve::Scalar, recover, sign, verify, Message, PublicKey, RecoveryId, SecretKey,
     Signature,
@@ -69,7 +69,7 @@ pub struct EthereumTransactionCommon {
     /// be transferred to the message call’s recipient or,
     /// in the case of contract creation, as an endowment
     /// to the newly created account
-    pub value: Wei,
+    pub value: U256,
     /// the transaction data. In principle this can be large
     pub data: Vec<u8>,
     /// Signature x-axis part of point on elliptic curve. See yellow paper, appendix F
@@ -256,7 +256,7 @@ impl Decodable for EthereumTransactionCommon {
             let gas_price: GasPrice = decode_field(&next(&mut it)?, "gas_price")?;
             let gas_limit: GasLimit = decode_field(&next(&mut it)?, "gas_limit")?;
             let to: EthereumAddress = decode_field(&next(&mut it)?, "to")?;
-            let value: Wei = decode_field(&next(&mut it)?, "value")?;
+            let value: U256 = decode_field(&next(&mut it)?, "value")?;
             let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
             let v: U256 = decode_field(&next(&mut it)?, "v")?;
             let r: H256 = decode_field_h256(&next(&mut it)?, "r")?;
@@ -293,7 +293,7 @@ impl Encodable for EthereumTransactionCommon {
         stream.append_internal(&self.gas_price);
         stream.append_internal(&self.gas_limit);
         stream.append_internal(&self.to);
-        stream.append_internal(&self.value);
+        stream.append(&self.value);
         if self.data.is_empty() {
             // no data == null, not empty vec
             stream.append_empty_data();
@@ -410,7 +410,7 @@ mod test {
             EthereumAddress::from_u64_be(0),
             "making sure the expected address is correct"
         );
-        let value = Wei::new(U256::from(1000000000000000000u64));
+        let value = U256::from(1000000000000000000u64);
         let data: Vec<u8> = vec![];
         let chain_id = U256::one();
         let v = chain_id;
@@ -476,7 +476,7 @@ mod test {
         let gas_limit = GasLimit::new(U256::from(21000));
         let to =
             EthereumAddress::from("3535353535353535353535353535353535353535".to_string());
-        let value = Wei::new(U256::from(1000000000000000000u64));
+        let value = U256::from(1000000000000000000u64);
         let data: Vec<u8> = vec![];
         let chain_id = U256::one();
         let v = chain_id;
@@ -519,7 +519,7 @@ mod test {
         let gas_price = GasPrice::new(U256::from(29075052730u64));
         let gas_limit = GasLimit::new(U256::from(274722));
         let to = EthereumAddress::from("".to_string());
-        let value = Wei::new(U256::from(1000000000u64));
+        let value = U256::from(1000000000u64);
         let data: Vec<u8> = hex::decode("ffff").unwrap();
         let chain_id = U256::one();
         let v = U256::from(38);
@@ -562,7 +562,7 @@ mod test {
         let gas_limit = GasLimit::new(U256::from(21000));
         let to =
             EthereumAddress::from("3535353535353535353535353535353535353535".to_string());
-        let value = Wei::new(U256::from(1000000000000000000u64));
+        let value = U256::from(1000000000000000000u64);
         let data: Vec<u8> = vec![];
         let chain_id = U256::one();
         let v = U256::from(37);
@@ -601,7 +601,7 @@ mod test {
         let gas_limit = GasLimit::new(U256::from(21000));
         let to =
             EthereumAddress::from("423163e58aabec5daa3dd1130b759d24bef0f6ea".to_string());
-        let value = Wei::new(U256::from(5000000000000000u64));
+        let value = U256::from(5000000000000000u64);
         let data: Vec<u8> = hex::decode("deace8f5000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000041bca408a6b4029b42883aeb2c25087cab76cb58000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002357a49c7d75f600000000000000000000000000000000000000000000000000000000640b5549000000000000000000000000710bda329b2a6224e4b44833de30f38e7f81d5640000000000000000000000000000000000000000000000000000000000000000").unwrap();
         let v = U256::from(37);
         let r = string_to_h256_unsafe(
@@ -651,7 +651,7 @@ mod test {
             EthereumAddress::from_u64_be(0),
             "making sure the expected address is correct"
         );
-        let value = Wei::new(U256::from(1000000000000000000u64));
+        let value = U256::from(1000000000000000000u64);
         let data: Vec<u8> = vec![];
         let v = U256::from(37);
         let r = string_to_h256_unsafe(
@@ -716,7 +716,7 @@ mod test {
         let gas_limit = GasLimit::new(U256::from(274722));
         let to =
             EthereumAddress::from("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string());
-        let value = Wei::new(U256::from(760460536160301065u64)); // /!\ > 2^53 -1
+        let value = U256::from(760460536160301065u64); // /!\ > 2^53 -1
         let data: Vec<u8> = hex::decode("3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c6000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").unwrap();
         let v = U256::from(37);
         let r = string_to_h256_unsafe(
@@ -764,7 +764,7 @@ mod test {
         let gas_limit = GasLimit::new(U256::from(274722));
         let to =
             EthereumAddress::from("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string());
-        let value = Wei::new(U256::from(760460536160301065u64)); // /!\ > 2^53 -1
+        let value = U256::from(760460536160301065u64); // /!\ > 2^53 -1
         let data: Vec<u8> = hex::decode("3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c6000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").unwrap();
         let v = U256::from(37);
         let r = string_to_h256_unsafe(
@@ -818,7 +818,7 @@ mod test {
             to: EthereumAddress::from(
                 "4e1b2c985d729ae6e05ef7974013eeb48f394449".to_string(),
             ),
-            value: Wei::new(U256::from(1000000000u64)),
+            value: U256::from(1000000000u64),
             data: vec![],
             v: U256::from(38),
             r: string_to_h256_unsafe(
@@ -862,7 +862,7 @@ mod test {
             to: EthereumAddress::from(
                 "4e1b2c985d729ae6e05ef7974013eeb48f394449".to_string(),
             ),
-            value: Wei::new(U256::from(1000000000u64)),
+            value: U256::from(1000000000u64),
             data: vec![],
             v: U256::from(38),
             r: string_to_h256_unsafe(
@@ -903,7 +903,7 @@ mod test {
             to: EthereumAddress::from(
                 "4e1b2c985d729ae6e05ef7974013eeb48f394449".to_string(),
             ),
-            value: Wei::new(U256::from(1000000000u64)),
+            value: U256::from(1000000000u64),
             data: vec![],
             v: U256::one(),
             r: H256::zero(),
@@ -969,7 +969,7 @@ mod test {
             to: EthereumAddress::from(
                 "3535353535353535353535353535353535353535".to_string(),
             ),
-            value: Wei::new(U256::from(1000000000000000000u64)),
+            value: U256::from(1000000000000000000u64),
             data: vec![],
             v: U256::from(37),
             r: string_to_h256_unsafe(
@@ -1000,7 +1000,7 @@ mod test {
             to: EthereumAddress::from(
                 "ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string(),
             ),
-            value: Wei::new(U256::from(760460536160301065u64)),
+            value: U256::from(760460536160301065u64),
             data,
             v: U256::from(37),
             r: string_to_h256_unsafe(
@@ -1031,7 +1031,7 @@ mod test {
             to: EthereumAddress::from(
                 "ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string(),
             ),
-            value: Wei::new(U256::from(760460536160301065u64)),
+            value: U256::from(760460536160301065u64),
             data,
             v: U256::one(),
             r: H256::zero(),
@@ -1065,7 +1065,7 @@ mod test {
             to: EthereumAddress::from(
                 "ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string(),
             ),
-            value: Wei::new(U256::from(760460536160301065u64)),
+            value: U256::from(760460536160301065u64),
             data,
             v: U256::zero(),
             r: H256::zero(),
@@ -1107,7 +1107,7 @@ mod test {
             to: EthereumAddress::from(
                 "3535353535353535353535353535353535353535".to_string(),
             ),
-            value: Wei::new(U256::from(1000000000000000000u64)),
+            value: U256::from(1000000000000000000u64),
             data: vec![],
             v: U256::one(),
             r: H256::zero(),

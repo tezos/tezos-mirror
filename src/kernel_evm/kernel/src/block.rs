@@ -202,7 +202,7 @@ fn apply_transaction<Host: Runtime>(
     index: u32,
 ) -> Result<TransactionReceipt, Error> {
     let tx = &transaction.transaction;
-    let value: U256 = tx.value.value;
+    let value: U256 = tx.value;
     let gas = Wei::zero();
 
     // First pay for the gas

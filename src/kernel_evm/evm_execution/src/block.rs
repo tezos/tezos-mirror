@@ -11,7 +11,7 @@
 use super::storage::blocks::get_current_number_n_timestamp;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
-use tezos_ethereum::basic::{GasLimit, GasPrice, Wei};
+use tezos_ethereum::basic::{GasLimit, GasPrice};
 /// All data for an Ethereum block.
 ///
 /// This data does not change for the duration of the block. All balues are
@@ -31,7 +31,7 @@ pub struct BlockConstants {
     /// Gas limit for the current block.
     pub gas_limit: GasLimit,
     /// The base fee per gas for doing a transaction.
-    pub base_fee_per_gas: Wei,
+    pub base_fee_per_gas: U256,
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
     /// main net, or some other net). We can use it to identify rollup EVM kernel.
     pub chain_id: U256,
@@ -49,7 +49,7 @@ impl BlockConstants {
             timestamp: U256::zero(),
             difficulty: U256::zero(),
             gas_limit: GasLimit::one(),
-            base_fee_per_gas: Wei::one(),
+            base_fee_per_gas: U256::one(),
             chain_id: U256::zero(),
         }
     }

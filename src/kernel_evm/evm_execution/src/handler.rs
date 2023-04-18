@@ -808,7 +808,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_base_fee_per_gas(&self) -> U256 {
-        self.block.base_fee_per_gas.value
+        self.block.base_fee_per_gas
     }
 
     fn chain_id(&self) -> U256 {
