@@ -179,6 +179,56 @@ let make_kernel_logger ?log_kernel_debug_file data_dir =
   in
   Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
 
+let check_fee_parameters Configuration.{fee_parameters; _} =
+  let check_value purpose name compare to_string mempool_default value =
+    if compare mempool_default value > 0 then
+      error_with
+        "Bad configuration fee_parameter.%s for %s. It must be at least %s for \
+         operations of the injector to be propagated."
+        name
+        (Configuration.string_of_purpose purpose)
+        (to_string mempool_default)
+    else Ok ()
+  in
+  let check purpose
+      {
+        Injector_sigs.minimal_fees;
+        minimal_nanotez_per_byte;
+        minimal_nanotez_per_gas_unit;
+        force_low_fee = _;
+        fee_cap = _;
+        burn_cap = _;
+      } =
+    let open Result_syntax in
+    let+ () =
+      check_value
+        purpose
+        "minimal_fees"
+        Int64.compare
+        Int64.to_string
+        (Tez.to_mutez Plugin.Mempool.default_minimal_fees)
+        minimal_fees.mutez
+    and+ () =
+      check_value
+        purpose
+        "minimal_nanotez_per_byte"
+        Q.compare
+        Q.to_string
+        Plugin.Mempool.default_minimal_nanotez_per_byte
+        minimal_nanotez_per_byte
+    and+ () =
+      check_value
+        purpose
+        "minimal_nanotez_per_gas_unit"
+        Q.compare
+        Q.to_string
+        Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+        minimal_nanotez_per_gas_unit
+    in
+    ()
+  in
+  Configuration.Operator_purpose_map.iter_e check fee_parameters
+
 let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     mode
     Configuration.(
@@ -195,6 +245,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
         _;
       } as configuration) =
   let open Lwt_result_syntax in
+  let*? () = check_fee_parameters configuration in
   let* lockfile = lock ~data_dir in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
