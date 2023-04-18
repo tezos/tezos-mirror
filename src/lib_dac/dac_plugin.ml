@@ -25,7 +25,11 @@
 
 type hash = bytes
 
+type raw_hash = bytes
+
 let hash_to_bytes = Fun.id
+
+let raw_hash_to_bytes = Fun.id
 
 let hash_to_hex hash = Hex.of_bytes hash
 
@@ -35,7 +39,34 @@ let raw_compare = Bytes.compare
 
 let non_proto_encoding_unsafe = Data_encoding.bytes' Hex
 
+let hash_to_raw = Fun.id
+
+let raw_hash_to_hex raw_hash =
+  let (`Hex hash) =
+    (* The [encoding] of a hash here never, so [to_string_exn] is safe. *)
+    Hex.of_bytes raw_hash
+  in
+  hash
+
+let raw_hash_of_hex hex = Hex.to_bytes (`Hex hex)
+
+let raw_hash_rpc_arg =
+  let construct = raw_hash_to_hex in
+  let destruct hash =
+    match raw_hash_of_hex hash with
+    | None -> Error "Impossible to parse raw_hash"
+    | Some reveal_hash -> Ok reveal_hash
+  in
+  Tezos_rpc.Arg.make
+    ~descr:"A reveal hash"
+    ~name:"reveal_hash"
+    ~destruct
+    ~construct
+    ()
+
 module type T = sig
+  val raw_to_hash : raw_hash -> hash
+
   val encoding : hash Data_encoding.t
 
   val equal : hash -> hash -> bool
@@ -52,8 +83,6 @@ module type T = sig
   val to_hex : hash -> string
 
   val size : scheme:supported_hashes -> int
-
-  val hash_rpc_arg : hash Tezos_rpc.Arg.arg
 
   module Proto : Registered_protocol.T
 end

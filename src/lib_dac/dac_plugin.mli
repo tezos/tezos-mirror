@@ -32,7 +32,11 @@
 
 type hash
 
+type raw_hash
+
 val hash_to_bytes : hash -> bytes
+
+val raw_hash_to_bytes : raw_hash -> bytes
 
 val hash_to_hex : hash -> Hex.t
 
@@ -45,13 +49,23 @@ val raw_compare : hash -> hash -> int
     Only use in situations where the plugin is not available,
     and for reporting purposes (e.g. when emitting an event or registering
     an error). *)
-val non_proto_encoding_unsafe : hash Data_encoding.t
+val non_proto_encoding_unsafe : raw_hash Data_encoding.t
+
+val hash_to_raw : hash -> raw_hash
+
+val raw_hash_to_hex : raw_hash -> string
+
+val raw_hash_of_hex : string -> raw_hash option
+
+val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
 
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
     Fix static supported_hashes type *)
 type supported_hashes = Blake2B
 
 module type T = sig
+  val raw_to_hash : raw_hash -> hash
+
   (** The encoding of reveal hashes. *)
   val encoding : hash Data_encoding.t
 
@@ -80,9 +94,6 @@ module type T = sig
   (** [size ~scheme] returns the size of reveal hashes using the [scheme]
       specified in input. *)
   val size : scheme:supported_hashes -> int
-
-  (** Hash argument definition for RPC *)
-  val hash_rpc_arg : hash Tezos_rpc.Arg.arg
 
   module Proto : Registered_protocol.T
 end

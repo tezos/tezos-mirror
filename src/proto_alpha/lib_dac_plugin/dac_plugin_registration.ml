@@ -92,19 +92,13 @@ end) : Dac_plugin.T = struct
     Protocol.Sc_rollup_reveal_hash.size
       ~scheme:(dac_hash_to_proto_supported_hashes scheme)
 
-  let hash_rpc_arg =
-    let construct = to_hex in
-    let destruct hash =
-      match of_hex hash with
-      | None -> Error "Cannot parse reveal hash"
-      | Some reveal_hash -> Ok reveal_hash
-    in
-    Tezos_rpc.Arg.make
-      ~descr:"A reveal hash"
-      ~name:"reveal_hash"
-      ~destruct
-      ~construct
-      ()
+  let raw_to_hash raw_hash =
+    let hex_raw_hash = Dac_plugin.raw_hash_to_hex raw_hash in
+    match of_hex hex_raw_hash with
+    | Some hash -> hash
+    | None ->
+        Stdlib.failwith @@ "Cannot convert raw_hash " ^ hex_raw_hash
+        ^ " to hash"
 
   module Proto = Registerer.Registered
 end

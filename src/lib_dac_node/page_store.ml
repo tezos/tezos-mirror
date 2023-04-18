@@ -30,8 +30,8 @@ type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
   | Incorrect_page_hash of {
-      expected : Dac_plugin.hash;
-      actual : Dac_plugin.hash;
+      expected : Dac_plugin.raw_hash;
+      actual : Dac_plugin.raw_hash;
     }
 
 let () =
@@ -102,9 +102,9 @@ let () =
         ppf
         "Hash of page content is %a, while %a was expected."
         Format.pp_print_bytes
-        (Dac_plugin.hash_to_bytes expected)
+        (Dac_plugin.raw_hash_to_bytes expected)
         Format.pp_print_bytes
-        (Dac_plugin.hash_to_bytes actual))
+        (Dac_plugin.raw_hash_to_bytes actual))
     Data_encoding.(
       obj2
         (req "expected" Dac_plugin.non_proto_encoding_unsafe)
@@ -143,7 +143,7 @@ module type S = sig
 
   val mem : Dac_plugin.t -> t -> Dac_plugin.hash -> bool tzresult Lwt.t
 
-  val load : Dac_plugin.t -> t -> Dac_plugin.hash -> bytes tzresult Lwt.t
+  val load : Dac_plugin.t -> t -> Dac_plugin.raw_hash -> bytes tzresult Lwt.t
 end
 
 (** Implementation of dac pages storage using filesystem. *)
@@ -184,7 +184,8 @@ module Filesystem : S with type configuration = string = struct
     | Error {unix_code = Unix.ENOENT; _} -> return false
     | Error _ -> tzfail @@ Cannot_read_page_from_page_storage hash_string
 
-  let load ((module P) : Dac_plugin.t) data_dir hash =
+  let load ((module P) : Dac_plugin.t) data_dir raw_hash =
+    let hash = P.raw_to_hash raw_hash in
     let open Lwt_result_syntax in
     let hash_string = P.to_hex hash in
     let path = path data_dir hash_string in
@@ -209,7 +210,12 @@ module With_data_integrity_check (P : S) :
     let scheme = Plugin.scheme_of_hash hash in
     let content_hash = Plugin.hash_bytes [content] ~scheme in
     if not @@ Plugin.equal hash content_hash then
-      tzfail @@ Incorrect_page_hash {expected = hash; actual = content_hash}
+      tzfail
+      @@ Incorrect_page_hash
+           {
+             expected = Dac_plugin.hash_to_raw hash;
+             actual = Dac_plugin.hash_to_raw content_hash;
+           }
     else P.save plugin page_store ~hash ~content
 
   let mem = P.mem
@@ -225,7 +231,10 @@ module With_remote_fetch (R : sig
   type remote_context
 
   val fetch :
-    Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
+    Dac_plugin.t ->
+    remote_context ->
+    Dac_plugin.raw_hash ->
+    bytes tzresult Lwt.t
 end)
 (P : S) :
   S
@@ -242,13 +251,14 @@ end)
 
   let mem plugin (_remote_ctxt, page_store) hash = P.mem plugin page_store hash
 
-  let load plugin (remote_ctxt, page_store) hash =
+  let load plugin (remote_ctxt, page_store) raw_hash =
     let open Lwt_result_syntax in
     let (module Plugin : Dac_plugin.T) = plugin in
+    let hash = Plugin.raw_to_hash raw_hash in
     let* page_exists_in_store = mem plugin (remote_ctxt, page_store) hash in
-    if page_exists_in_store then P.load plugin page_store hash
+    if page_exists_in_store then P.load plugin page_store raw_hash
     else
-      let* content = R.fetch plugin remote_ctxt hash in
+      let* content = R.fetch plugin remote_ctxt raw_hash in
       let+ () = P.save plugin page_store ~hash ~content in
       content
 end
@@ -269,8 +279,8 @@ module Remote : S with type configuration = remote_configuration = struct
       (struct
         type remote_context = Dac_node_client.cctxt
 
-        let fetch dac_plugin remote_context hash =
-          Dac_node_client.get_preimage dac_plugin remote_context ~page_hash:hash
+        let fetch _dac_plugin remote_context hash =
+          Dac_node_client.get_preimage remote_context ~page_hash:hash
       end)
       (F)
 
@@ -292,7 +302,10 @@ module Internal_for_tests = struct
     type remote_context
 
     val fetch :
-      Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
+      Dac_plugin.t ->
+      remote_context ->
+      Dac_plugin.raw_hash ->
+      bytes tzresult Lwt.t
   end)
   (P : S) :
     S

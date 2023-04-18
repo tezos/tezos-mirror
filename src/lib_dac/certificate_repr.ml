@@ -29,7 +29,7 @@
 
 (* Representation of a Data Availibility Committee Certificate. *)
 type t = {
-  root_hash : Dac_plugin.hash;
+  root_hash : Dac_plugin.raw_hash;
   aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
   witnesses : Z.t;
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4853
@@ -37,11 +37,11 @@ type t = {
       *)
 }
 
-let encoding ((module P) : Dac_plugin.t) =
+let encoding =
   let obj_enc =
     Data_encoding.(
       obj3
-        (req "root_hash" P.encoding)
+        (req "root_hash" Dac_plugin.non_proto_encoding_unsafe)
         (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
         (req "witnesses" z))
   in

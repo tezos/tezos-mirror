@@ -135,8 +135,8 @@ let new_head ctxt =
       {li Send the signature back to the [Coordinaotor].}
     } *)
 module Committee_member = struct
-  let push_payload_signature dac_plugin coordinator_cctxt wallet_cctxt
-      committee_member root_hash =
+  let push_payload_signature coordinator_cctxt wallet_cctxt committee_member
+      root_hash =
     let open Lwt_result_syntax in
     let signer_pkh =
       committee_member.Wallet_account.Committee_member.public_key_hash
@@ -149,10 +149,12 @@ module Committee_member = struct
         secret_key_uri
         bytes_to_sign
     in
-    let signature_repr = Signature_repr.{root_hash; signature; signer_pkh} in
+    let signature_repr =
+      Signature_repr.
+        {root_hash = Dac_plugin.hash_to_raw root_hash; signature; signer_pkh}
+    in
     let* () =
       Dac_node_client.put_dac_member_signature
-        dac_plugin
         coordinator_cctxt
         ~signature:signature_repr
     in
@@ -181,7 +183,6 @@ module Committee_member = struct
             ctxt.Node_context.Committee_member.committee_member
           in
           push_payload_signature
-            dac_plugin
             coordinator_cctxt
             wallet_cctxt
             committee_member
@@ -267,8 +268,8 @@ end
     } *)
 
 module Legacy = struct
-  let push_payload_signature dac_plugin coordinator_cctxt wallet_cctxt
-      committee_member root_hash =
+  let push_payload_signature coordinator_cctxt wallet_cctxt committee_member
+      root_hash =
     let open Lwt_result_syntax in
     let secret_key_uri_opt =
       committee_member.Wallet_account.Legacy.secret_key_uri_opt
@@ -284,11 +285,15 @@ module Legacy = struct
             bytes_to_sign
         in
         let signature_repr =
-          Signature_repr.{root_hash; signature; signer_pkh}
+          Signature_repr.
+            {
+              root_hash = Dac_plugin.hash_to_raw root_hash;
+              signature;
+              signer_pkh;
+            }
         in
         let* () =
           Dac_node_client.put_dac_member_signature
-            dac_plugin
             coordinator_cctxt
             ~signature:signature_repr
         in
@@ -325,7 +330,6 @@ module Legacy = struct
                  If there is no [committee_member_address] provided, it means the node is run as an observer
                    then we simply [return ()] *)
               push_payload_signature
-                dac_plugin
                 coordinator_cctxt
                 wallet_cctxt
                 committee_member

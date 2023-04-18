@@ -266,7 +266,7 @@ module Coordinator = struct
       Signature_repr.{root_hash; signer_pkh; signature} =
     Store.Signature_store.add
       signature_store
-      ~primary_key:root_hash
+      ~primary_key:(Plugin.raw_to_hash root_hash)
       ~secondary_key:signer_pkh
       signature
 
@@ -326,7 +326,8 @@ module Coordinator = struct
          dac_committee
 
   let check_coordinator_knows_root_hash ((module Plugin) : Dac_plugin.t)
-      page_store root_hash =
+      page_store raw_root_hash =
+    let root_hash = Plugin.raw_to_hash raw_root_hash in
     let open Lwt_result_syntax in
     let*! has_payload =
       Page_store.Filesystem.mem (module Plugin) page_store root_hash
