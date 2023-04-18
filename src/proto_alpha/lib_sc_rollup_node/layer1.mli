@@ -57,6 +57,10 @@ val iter_heads : t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
 (** {2 Helpers } *)
 
+(** [cache_shell_header hash header] saves in the local cache the shell [header]
+    for the block [hash]. *)
+val cache_shell_header : Block_hash.t -> Block_header.shell_header -> unit
+
 (** [fetch_tezos_shell_header cctxt hash] returns the block shell header of
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)

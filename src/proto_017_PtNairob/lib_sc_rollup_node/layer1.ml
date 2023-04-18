@@ -90,13 +90,22 @@ module Blocks_cache =
 
 type blocks_cache = Alpha_block_services.block_info Blocks_cache.t
 
+type headers_cache = Block_header.shell_header Blocks_cache.t
+
 (** Global blocks cache for the smart rollup node. *)
 let blocks_cache : blocks_cache = Blocks_cache.create 32
 
+(** Global block headers cache for the smart rollup node. *)
+let headers_cache : headers_cache = Blocks_cache.create 32
+
 include Octez_crawler.Layer_1
+
+let cache_shell_header hash header =
+  Blocks_cache.put headers_cache hash (Lwt.return_some header)
 
 let iter_heads l1_ctxt f =
   iter_heads l1_ctxt @@ fun (hash, {shell = {level; _} as header; _}) ->
+  cache_shell_header hash header ;
   f {hash; level; header}
 
 (**
@@ -129,12 +138,7 @@ let fetch_tezos_shell_header cctxt hash =
     | Ok shell_header -> return_some shell_header
   in
   let+ shell_header =
-    let res =
-      Blocks_cache.bind blocks_cache hash (function
-          | Some block_info -> Lwt.return_some block_info.header.shell
-          | None -> Lwt.return_none)
-    in
-    match res with Some lwt -> lwt | None -> fetch hash
+    Blocks_cache.bind_or_put headers_cache hash fetch Lwt.return
   in
   match (shell_header, !errors) with
   | None, None ->
