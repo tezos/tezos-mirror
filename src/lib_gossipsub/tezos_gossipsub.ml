@@ -422,7 +422,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let get_scores_score scores peer = Peer.Map.find peer scores
 
     let get_scores_score_or_zero scores peer =
-      get_scores_score scores peer |> Option.fold ~none:0.0 ~some:Score.float
+      get_scores_score scores peer
+      |> Option.fold ~none:Score.zero ~some:Score.value
 
     let get_score peer state = get_scores_score state.scores peer
 
@@ -568,8 +569,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! peer_score_opt = get_score peer in
       with_score peer_score_opt @@ fun peer_score ->
-      fail_if Compare.Float.(Score.float peer_score < threshold)
-      @@ on_failure peer_score
+      fail_if Score.(value peer_score < threshold) @@ on_failure peer_score
   end
 
   include Helpers
@@ -702,7 +702,10 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! gossip_threshold in
       let*? () =
-        check_score peer gossip_threshold ~on_failure:(fun score ->
+        check_score
+          peer
+          (Score.of_float gossip_threshold)
+          ~on_failure:(fun score ->
             Ihave_from_peer_with_low_score {score; threshold = gossip_threshold})
       in
       let* count_ihave_received = update_and_get_ihave_per_heartbeat peer in
@@ -734,7 +737,10 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! gossip_threshold in
       let*? () =
-        check_score peer gossip_threshold ~on_failure:(fun score ->
+        check_score
+          peer
+          (Score.of_float gossip_threshold)
+          ~on_failure:(fun score ->
             Iwant_from_peer_with_low_score {score; threshold = gossip_threshold})
       in
       let routed_message_ids = Message_id.Map.empty in
@@ -798,7 +804,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_score peer topic score =
       let open Monad.Syntax in
       let*! prune_backoff in
-      if Compare.Float.(Score.float score >= 0.0) then unit
+      if Score.(value score >= zero) then unit
       else
         let* () = set_backoff_for_peer prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
@@ -873,7 +879,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! score_opt = get_score peer in
       (* Global invariant: peer in mesh => connection exists => score exists *)
       with_score score_opt @@ fun score ->
-      fail_if Compare.Float.(score |> Score.float < accept_px_threshold)
+      fail_if Score.(value score < of_float accept_px_threshold)
       @@ Ignore_PX_score_too_low score
 
     let check_topic_known topic =
@@ -915,7 +921,7 @@ module Make (C : AUTOMATON_CONFIG) :
       match fanout_opt with
       | None ->
           let filter_by_score score =
-            Compare.Float.(score >= publish_threshold)
+            Score.(score >= of_float publish_threshold)
           in
           let filter _peer {direct; _} score =
             (not direct) && filter_by_score score
@@ -989,7 +995,7 @@ module Make (C : AUTOMATON_CONFIG) :
         | Some _peer_info ->
             let score = get_scores_score_or_zero scores peer in
             let backed_off = exists_backoff topic peer backoff in
-            not (backed_off || Compare.Float.(score < 0.0))
+            not (backed_off || Score.(score < zero))
       in
       let*! fanout in
       let valid_fanout_peers =
@@ -1011,7 +1017,7 @@ module Make (C : AUTOMATON_CONFIG) :
               let backed_off = exists_backoff topic peer backoff in
               not
                 (direct || backed_off
-                || Compare.Float.(score < 0.0)
+                || Score.(score < zero)
                 || Peer.Set.mem peer valid_fanout_peers)
             in
             select_peers topic ~filter ~max
@@ -1056,7 +1062,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let noPX_peers =
         (* no PX for peers with negative score. *)
         let get_score = get_scores_score_or_zero scores in
-        Peer.Set.filter (fun peer -> Compare.Float.(get_score peer < 0.0)) mesh
+        Peer.Set.filter (fun peer -> Score.(get_score peer < zero)) mesh
       in
       Leaving_topic {to_prune = mesh; noPX_peers} |> return
 
@@ -1267,7 +1273,7 @@ module Make (C : AUTOMATON_CONFIG) :
                  let s2 = get_score peer2 in
                  (* Global invariant:
                     peers in mesh => peer in connections => peer in scores *)
-                 Float.compare s2 s1)
+                 Score.compare s2 s1)
         in
 
         let peers_high_score, peers_low_score =
@@ -1329,7 +1335,7 @@ module Make (C : AUTOMATON_CONFIG) :
           (* Drop all peers with negative score, without PX *)
           Peer.Set.fold
             (fun peer (to_prune, peers, noPX_peers) ->
-              if Compare.Float.(get_score peer < 0.0) then
+              if Score.(get_score peer < zero) then
                 let to_prune, peers =
                   prune topic to_prune ~old_peers:peers [peer]
                 in
@@ -1351,7 +1357,7 @@ module Make (C : AUTOMATON_CONFIG) :
               let in_mesh = Peer.Set.mem peer peers in
               let backed_off = exists_backoff topic peer backoff in
               (not in_mesh) && (not backed_off) && (not connection.direct)
-              && Compare.Float.(score >= 0.0)
+              && Score.(score >= zero)
             in
             select_connections_peers connections scores rng topic ~filter ~max
             |> add_to_peers_topic_set to_graft topic
@@ -1385,7 +1391,7 @@ module Make (C : AUTOMATON_CONFIG) :
                 let in_mesh = Peer.Set.mem peer peers in
                 let backed_off = exists_backoff topic peer backoff in
                 (not in_mesh) && (not backed_off) && (not connection.direct)
-                && Compare.Float.(score >= 0.0)
+                && Score.(score >= zero)
                 && has_outbound_connection peer
               in
               select_connections_peers connections scores rng topic ~filter ~max
@@ -1507,7 +1513,7 @@ module Make (C : AUTOMATON_CONFIG) :
                   let score = get_scores_score_or_zero scores peer in
                   if
                     Topic.Set.mem topic connection.topics
-                    && Compare.Float.(score >= publish_threshold)
+                    && Score.(score >= of_float publish_threshold)
                   then acc
                   else
                     let peers_to_keep, peers_to_remove = acc in
@@ -1526,7 +1532,7 @@ module Make (C : AUTOMATON_CONFIG) :
           let filter peer connection score =
             let in_fanout = Peer.Set.mem peer peers_to_keep in
             (not in_fanout) && (not connection.direct)
-            && Compare.Float.(score >= publish_threshold)
+            && Score.(score >= of_float publish_threshold)
           in
           let new_peers =
             select_connections_peers
@@ -1647,7 +1653,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let do_px = do_px state in
     let peers_to_px = peers_to_px state in
     let filter peer _conn score =
-      (not (Peer.equal peer_to_prune peer)) && Compare.Float.(score >= 0.0)
+      (not (Peer.equal peer_to_prune peer)) && Score.(score >= zero)
     in
     if do_px && not (Peer.Set.mem peer_to_prune noPX_peers) then
       select_connections_peers
@@ -1679,7 +1685,7 @@ module Make (C : AUTOMATON_CONFIG) :
            in the excluded set and are not direct peers. *)
         let filter peer {direct; _} score =
           (not direct)
-          && Compare.Float.(score >= state.limits.gossip_threshold)
+          && Score.(score >= of_float state.limits.gossip_threshold)
           && not (Peer.Set.mem peer excluded_peers)
         in
 
@@ -1855,13 +1861,13 @@ module Make (C : AUTOMATON_CONFIG) :
     type connected_peers_filter =
       | Direct
       | Subscribed_to of Topic.t
-      | Score_above of {threshold : float}
+      | Score_above of {threshold : Score.value}
     (* Add other cases here if needed. *)
 
     let connected_peers_filter _peer connection score = function
       | Direct -> connection.direct
       | Subscribed_to topic -> Topic.Set.mem topic connection.topics
-      | Score_above {threshold} -> Compare.Float.(score >= threshold)
+      | Score_above {threshold} -> Score.(score >= threshold)
 
     let get_connected_peers =
       let rec filter_rec peer connection score = function

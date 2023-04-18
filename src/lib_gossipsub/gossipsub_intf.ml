@@ -240,6 +240,8 @@ module type SCORE = sig
   (** The type of peer scoring statistics. *)
   type t
 
+  type value
+
   type span
 
   type time
@@ -249,8 +251,8 @@ module type SCORE = sig
   (** [newly_connected params] creates a fresh statistics record. *)
   val newly_connected : topic score_parameters -> t
 
-  (** [float ps] evaluates the score of [ps]. *)
-  val float : t -> float
+  (** [value ps] evaluates the score of [ps]. *)
+  val value : t -> value
 
   (** [penalty ps penalty] increments the behavioural penalty of [ps]. *)
   val penalty : t -> int -> t
@@ -280,7 +282,13 @@ module type SCORE = sig
       of the scoring statistics. *)
   val refresh : t -> t option
 
-  include Compare.S with type t := t
+  (** The zero score value, corresponding to a neutral score. *)
+  val zero : value
+
+  (** Convert a float into a score value. *)
+  val of_float : float -> value
+
+  include Compare.S with type t := value
 end
 
 module type AUTOMATON = sig
@@ -647,7 +655,7 @@ module type AUTOMATON = sig
     type connected_peers_filter =
       | Direct
       | Subscribed_to of Topic.t
-      | Score_above of {threshold : float}
+      | Score_above of {threshold : Score.value}
 
     val view : state -> view
 

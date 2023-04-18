@@ -42,6 +42,8 @@ struct
 
   type topic = Topic.t
 
+  type value = float
+
   type peer_status =
     | Connected
     | Disconnected of {
@@ -124,7 +126,7 @@ struct
 
   let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
-  let float ps = Lazy.force ps.score
+  let value ps = Lazy.force ps.score
 
   let newly_connected parameters : t =
     make
@@ -210,14 +212,13 @@ struct
     | Disconnected {expires = at} when Time.(at > current) -> refresh ()
     | Disconnected _ -> None
 
-  let compare s1 s2 =
-    let f1 = float s1 in
-    let f2 = float s2 in
-    Float.compare f1 f2
+  let zero = 0.0
+
+  let of_float = Fun.id
 
   include Compare.Make (struct
-    type nonrec t = t
+    type t = value
 
-    let compare = compare
+    let compare = Float.compare
   end)
 end
