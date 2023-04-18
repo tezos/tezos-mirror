@@ -27,6 +27,23 @@
 (* ------------------------------------------------------------------------- *)
 (* OCaml codegen *)
 
+(* Handling codegen errors. *)
+type codegen_error = Variable_not_found of Free_variable.t
+
+exception Codegen_error of codegen_error
+
+let pp_codegen_error fmtr = function
+  | Variable_not_found s ->
+      Format.fprintf fmtr "Codegen: Variable not found: %a" Free_variable.pp s
+
+let () =
+  Printexc.register_printer (fun exn ->
+      match exn with
+      | Codegen_error err ->
+          let s = Format.asprintf "%a" pp_codegen_error err in
+          Some s
+      | _ -> None)
+
 module Codegen_helpers = struct
   open Ast_helper
 
@@ -291,8 +308,7 @@ let codegen (Model.Model model) (sol : solution)
     (transform : Costlang.transform) model_name =
   let subst fv =
     match Free_variable.Map.find fv sol.map with
-    | None ->
-        raise (Fixed_point_transform.Codegen_error (Variable_not_found fv))
+    | None -> raise (Codegen_error (Variable_not_found fv))
     | Some f -> f
   in
   let module T = (val transform) in
