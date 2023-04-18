@@ -25,6 +25,7 @@
 
 open Tezos_gossipsub
 open Gossipsub_intf
+open Test_gossipsub_shared
 module M = QCheck2.Gen
 
 (* We need monadic sequences to represent {!Fragments}. *)
@@ -36,7 +37,11 @@ module SeqM = Seqes.Monadic.Make1 (M)
    [now] in [GS.Time] but it's not much cleaner. *)
 
 (** [Make] instantiates a generator for gossipsub transitions. *)
-module Make (GS : AUTOMATON with type Time.t = int) = struct
+module Make
+    (GS : AUTOMATON
+            with type Time.t = Milliseconds.t
+             and type Span.t = Milliseconds.Span.t) =
+struct
   open M
 
   (** We re-export {!GS} modules and types for convenience. *)
@@ -63,7 +68,7 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
 
   type output = O : _ GS.output -> output
 
-  type event = Input : 'a input -> event | Elapse of int
+  type event = Input : 'a input -> event | Elapse of GS.Span.t
 
   type transition =
     | Transition : {
@@ -308,7 +313,11 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
       let+ x = gen in
       raw_of_list (f x)
 
-    let tick : t = Thread ([Elapse 1] |> List.to_seq |> SeqM.of_seq) |> M.return
+    let tick : t =
+      Thread
+        ([Elapse (Milliseconds.Span.of_int_ms 1000)]
+        |> List.to_seq |> SeqM.of_seq)
+      |> M.return
 
     let repeat : int -> t -> t =
      fun n fragment ->
@@ -419,14 +428,14 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
           (fun (time, state, acc) event ->
             match event with
             | Input i ->
-                Test_gossipsub_shared.Time.set time ;
+                Time.set time ;
                 let state', output = dispatch i state in
                 let step =
                   Transition {time; input = i; state; state'; output}
                 in
                 (time, state', step :: acc)
-            | Elapse d -> (time + d, state, acc))
-          (0, state, [])
+            | Elapse d -> (Milliseconds.add time d, state, acc))
+          (Milliseconds.zero, state, [])
           seq
       in
       return (List.rev rev_trace)
@@ -467,4 +476,4 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     match List.rev trace with [] -> Ok () | t :: _ -> f t
 end
 
-include Make (Test_gossipsub_shared.GS)
+include Make (GS)

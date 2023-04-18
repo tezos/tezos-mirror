@@ -42,7 +42,7 @@ module Basic_fragments = struct
   open Gossipsub_pbt_generators
   open Fragment
 
-  let prune_backoff = 10
+  let prune_backoff = Milliseconds.Span.of_int_s 10
 
   let add_then_remove_peer ~gen_peer : t =
     of_input_gen (add_peer ~gen_peer) @@ fun ap ->
@@ -437,7 +437,7 @@ module Test_remove_peer = struct
        of the final state. *)
     not_in_view all_peers final_state
 
-  let scenario limits =
+  let scenario (limits : ('a, 'b, 'c, Milliseconds.span) limits) =
     let open Fragment in
     let open Basic_fragments in
     let gen_peer = M.oneofl all_peers in
@@ -452,7 +452,10 @@ module Test_remove_peer = struct
          1. remove it
          2. wait until [expire=retain_duration+slack]
          3. wait until the next round of cleanup in the heartbeat *)
-      let expire = limits.retain_duration + (limits.heartbeat_interval * 2) in
+      let expire =
+        Milliseconds.Span.seconds limits.retain_duration
+        + (Milliseconds.Span.seconds limits.heartbeat_interval * 2)
+      in
       let heartbeat_cleanup_ticks = limits.backoff_cleanup_ticks in
       add_then_remove_peer ~gen_peer
       @% repeat expire tick
@@ -464,7 +467,8 @@ module Test_remove_peer = struct
          After pruning, we wait for [backoff + slack] ticks then force
          triggering a cleanup of the backoffs in the heartbeat. *)
       let backoff =
-        Basic_fragments.prune_backoff + (limits.heartbeat_interval * 2)
+        Milliseconds.seconds Basic_fragments.prune_backoff
+        + (Milliseconds.Span.seconds limits.heartbeat_interval * 2)
       in
       let heartbeat_cleanup_ticks = limits.backoff_cleanup_ticks in
       graft_then_prune ~gen_peer ~gen_topic
@@ -491,12 +495,18 @@ module Test_remove_peer = struct
       ]
     @% heartbeat
 
-  let pp_backoff fmtr (backoff : int GS.Peer.Map.t) =
+  let pp_backoff fmtr backoff =
     let list = backoff |> GS.Peer.Map.bindings in
     Format.pp_print_list
       ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
       (fun fmtr (topic, backoff) ->
-        Format.fprintf fmtr "peer %a -> %d," GS.Peer.pp topic backoff)
+        Format.fprintf
+          fmtr
+          "peer %a -> %a,"
+          GS.Peer.pp
+          topic
+          Milliseconds.pp
+          backoff)
       fmtr
       list
 
@@ -519,7 +529,7 @@ module Test_remove_peer = struct
           "peer %a, expire=%a, cleanup=%b"
           GS.Peer.pp
           peer
-          (pp_print_option pp_print_int)
+          (pp_print_option Milliseconds.pp)
           expires
           cleanup)
       v.scores
@@ -533,12 +543,18 @@ module Test_remove_peer = struct
     let scenario =
       let open M in
       let* limits =
-        let+ retain_duration = M.int_range 0 (limits.retain_duration * 2)
-        and+ heartbeat_interval = M.int_range 0 (limits.heartbeat_interval * 2)
+        let+ retain_duration =
+          M.int_range 0 (Milliseconds.Span.seconds limits.retain_duration * 2)
+        and+ heartbeat_interval =
+          M.int_range 0 (Milliseconds.Span.seconds limits.heartbeat_interval * 2)
         and+ backoff_cleanup_ticks =
           M.int_range 1 (limits.backoff_cleanup_ticks * 2)
         in
         let score_cleanup_ticks = backoff_cleanup_ticks in
+        let retain_duration = Milliseconds.Span.of_int_s retain_duration in
+        let heartbeat_interval =
+          Milliseconds.Span.of_int_s heartbeat_interval
+        in
         {
           limits with
           retain_duration;
@@ -769,12 +785,13 @@ module Test_peers_below_degree_high = struct
                 ~__LOC__
                 "@[<v 2>Dumping trace until failure:@;\
                  @[<hov>%a@]@;\
-                 At time %d: peers in mesh=%d, target = %d, degree_high = %d@;\
+                 At time %a: peers in mesh=%d, target = %d, degree_high = %d@;\
                  Limits:@;\
                  %a@;\
                  @]"
                 (pp_trace ~pp_state ~pp_output ())
                 prefix
+                Milliseconds.pp
                 t
                 remaining
                 target

@@ -25,6 +25,7 @@
 
 open Tezos_gossipsub
 open Gossipsub_intf
+module Milliseconds = Test_gossipsub_shared.Milliseconds
 
 let per_topic_score_parameters =
   Topic_score_parameters_single
@@ -55,12 +56,12 @@ let default_limits =
     do_px = true;
     peers_to_px = 16;
     accept_px_threshold = 0.;
-    unsubscribe_backoff = 10;
-    graft_flood_backoff = -50;
-    prune_backoff = 60;
-    retain_duration = 10;
-    fanout_ttl = 60;
-    heartbeat_interval = 1;
+    unsubscribe_backoff = Milliseconds.Span.of_int_s 10;
+    graft_flood_backoff = Milliseconds.Span.of_int_s ~-50;
+    prune_backoff = Milliseconds.Span.of_int_s 60;
+    retain_duration = Milliseconds.Span.of_int_s 10;
+    fanout_ttl = Milliseconds.Span.of_int_s 60;
+    heartbeat_interval = Milliseconds.Span.of_int_s 1;
     backoff_cleanup_ticks = 15;
     score_cleanup_ticks = 1;
     degree_low = 5;

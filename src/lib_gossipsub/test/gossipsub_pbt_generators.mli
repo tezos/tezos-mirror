@@ -53,7 +53,7 @@ type ex_input = I : _ input -> ex_input
 type output = O : _ GS.output -> output
 
 (** An [event] is either an input for the gossipsub automaton, or some time elapsing. *)
-type event = Input : 'a input -> event | Elapse of int
+type event = Input : 'a input -> event | Elapse of Milliseconds.span
 
 (** A [transition] is a quadruple [(i, s, s', o)] corresponding to an
       automaton transition from state [s] to state [s'] under input [i],
