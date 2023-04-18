@@ -29,7 +29,7 @@ module L = Plompiler.LibCircuit
 open Gates_common
 
 module type Params = sig
-  val wire : string
+  val wire : int
 
   val selector : string
 
@@ -37,16 +37,8 @@ module type Params = sig
 
   val cs :
     q:L.scalar L.repr ->
-    a:L.scalar L.repr ->
-    b:L.scalar L.repr ->
-    c:L.scalar L.repr ->
-    d:L.scalar L.repr ->
-    e:L.scalar L.repr ->
-    ag:L.scalar L.repr ->
-    bg:L.scalar L.repr ->
-    cg:L.scalar L.repr ->
-    dg:L.scalar L.repr ->
-    eg:L.scalar L.repr ->
+    wires:L.scalar L.repr array ->
+    wires_g:L.scalar L.repr array ->
     ?precomputed_advice:L.scalar L.repr SMap.t ->
     unit ->
     L.scalar L.repr list L.t
@@ -66,27 +58,19 @@ module AddWire (Params : Params) : Base_sig = struct
 
   let gx_composition = Params.is_next
 
-  let equations ~q ~a ~b ~c ~d ~e ~ag ~bg ~cg ~dg ~eg ?precomputed_advice:_ () =
-    let var =
-      match Params.wire with
-      | s when s = left -> if Params.is_next then ag else a
-      | s when s = right -> if Params.is_next then bg else b
-      | s when s = output -> if Params.is_next then cg else c
-      | s when s = top -> if Params.is_next then dg else d
-      | s when s = bottom -> if Params.is_next then eg else e
-      | _ -> assert false
-    in
-    Scalar.[q * var]
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
+    let ws = if Params.is_next then wires_g else wires in
+    Scalar.[q * ws.(Params.wire)]
 
   let blinds =
     let array = if Params.is_next then [|0; 1|] else [|1; 0|] in
-    SMap.singleton Params.wire array
+    SMap.singleton (wire_name Params.wire) array
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
     let tmps, _ = get_buffers ~nb_buffers ~nb_ids:0 in
-    let poly_names = [prefix_common q_label; prefix Params.wire] in
+    let poly_names = [prefix_common q_label; prefix (wire_name Params.wire)] in
     let composition_gx =
       if Params.is_next then ([0; 1], Domain.length domain) else ([0; 0], 1)
     in
@@ -102,195 +86,34 @@ module AddWire (Params : Params) : Base_sig = struct
     let q = get_answer answers X @@ prefix_common q_label in
     let w =
       let p = if Params.is_next then GX else X in
-      get_answer answers p @@ prefix Params.wire
+      get_answer answers p @@ prefix (wire_name Params.wire)
     in
     let res = Scalar.mul q w in
     SMap.singleton (prefix @@ arith ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(Params.wire, 2); (q_label, 2)]
+  let polynomials_degree =
+    SMap.of_list [(wire_name Params.wire, 2); (q_label, 2)]
 
   let cs = Params.cs
 end
 
-(* Add next output gate
-   Arith monomial
+(* Linear arith monomial
    degree : 2n
    advice selectors : None
-   equations : + q·c
+   equations : + q·w
 *)
-module AddOutput = AddWire (struct
-  let wire = output
+let linear_monomial ?(is_next = false) wire selector =
+  (module AddWire (struct
+    let wire = wire
 
-  let selector = "qo"
+    let selector = selector
 
-  let is_next = false
+    let is_next = is_next
 
-  let cs ~q:qo ~a:_ ~b:_ ~c ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qo c)
-end)
-
-(* Add next left gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·a
-*)
-module AddLeft = AddWire (struct
-  let wire = left
-
-  let selector = "ql"
-
-  let is_next = false
-
-  let cs ~q:ql ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul ql a)
-end)
-
-(* Add next right gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·b
-*)
-module AddRight = AddWire (struct
-  let wire = right
-
-  let selector = "qr"
-
-  let is_next = false
-
-  let cs ~q:qr ~a:_ ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qr b)
-end)
-
-(* Add top gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·d
-*)
-module AddTop = AddWire (struct
-  let wire = top
-
-  let selector = "qd"
-
-  let is_next = false
-
-  let cs ~q:qd ~a:_ ~b:_ ~c:_ ~d ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qd d)
-end)
-
-(* Add bottom gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·e
-*)
-module AddBottom = AddWire (struct
-  let wire = bottom
-
-  let selector = "qe"
-
-  let is_next = false
-
-  let cs ~q:qe ~a:_ ~b:_ ~c:_ ~d:_ ~e ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qe e)
-end)
-
-(* Add next output gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·cg
-*)
-module AddNextOutput = AddWire (struct
-  let wire = output
-
-  let selector = "qog"
-
-  let is_next = true
-
-  let cs ~q:qog ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qog cg)
-end)
-
-(* Add next left gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·ag
-*)
-module AddNextLeft = AddWire (struct
-  let wire = left
-
-  let selector = "qlg"
-
-  let is_next = true
-
-  let cs ~q:qlg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qlg ag)
-end)
-
-(* Add next right gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·bg
-*)
-module AddNextRight = AddWire (struct
-  let wire = right
-
-  let selector = "qrg"
-
-  let is_next = true
-
-  let cs ~q:qrg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qrg bg)
-end)
-
-(* Add next top gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·dg
-*)
-module AddNextTop = AddWire (struct
-  let wire = top
-
-  let selector = "qdg"
-
-  let is_next = true
-
-  let cs ~q:qdg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg ~eg:_
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qdg dg)
-end)
-
-(* Add next bottom gate
-   Arith monomial
-   degree : 2n
-   advice selectors : None
-   equations : + q·eg
-*)
-module AddNextBottom = AddWire (struct
-  let wire = bottom
-
-  let selector = "qeg"
-
-  let is_next = true
-
-  let cs ~q:qeg ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg
-      ?precomputed_advice:_ () =
-    map_singleton (L.Num.mul qeg eg)
-end)
+    let cs ~q ~wires ~wires_g ?precomputed_advice:_ () =
+      let w = if is_next then wires_g.(wire) else wires.(wire) in
+      map_singleton (L.Num.mul q w)
+  end) : Base_sig)
 
 (* Add constant
    Arith monomial
@@ -311,9 +134,7 @@ module Constant : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    [q]
+  let equations ~q ~wires:_ ~wires_g:_ ?precomputed_advice:_ () = [q]
 
   let blinds = SMap.empty
 
@@ -339,9 +160,7 @@ module Constant : Base_sig = struct
 
   let polynomials_degree = SMap.empty
 
-  let cs ~q:qc ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
-    L.ret [qc]
+  let cs ~q:qc ~wires:_ ~wires_g:_ ?precomputed_advice:_ () = L.ret [qc]
 end
 
 (* Add multiplication
@@ -363,37 +182,43 @@ module Multiplication : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
+    let b = wires.(1) in
     Scalar.[q * a * b]
 
-  let blinds = SMap.of_list [(right, [|1; 0|]); (left, [|1; 0|])]
+  let blinds = SMap.of_list [(wire_name 0, [|1; 0|]); (wire_name 1, [|1; 0|])]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ :
       prover_identities =
    fun evaluations ->
     let tmps, _ = get_buffers ~nb_buffers ~nb_ids:0 in
-    let ({q; a; b; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let a = wires.(0) in
+    let b = wires.(1) in
     let res = Evaluations.mul_c ~res:tmps.(0) ~evaluations:[q; a; b] () in
     SMap.singleton (prefix @@ arith ^ ".0") res
 
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let ({q; a; b; _} : answers) =
+    let ({q; wires; _} : answers) =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
+    let a = wires.(0) in
+    let b = wires.(1) in
     let res = Scalar.(q * a * b) in
     SMap.singleton (prefix @@ arith ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(left, 3); (right, 3); (q_label, 3)]
+  let polynomials_degree =
+    SMap.of_list [(wire_name 0, 3); (wire_name 1, 3); (q_label, 3)]
 
-  let cs ~q:qm ~a ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qm ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let a = wires.(0) in
+    let b = wires.(1) in
     map_singleton
       (let* tmp = Num.mul qm a in
        Num.mul tmp b)
@@ -418,20 +243,20 @@ module X2B : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:_ ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let b = wires.(1) in
     Scalar.[q * square b]
 
-  let blinds = SMap.singleton right [|1; 0|]
+  let blinds = SMap.singleton (wire_name 1) [|1; 0|]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ :
       prover_identities =
    fun evaluations ->
     let tmps, _ = get_buffers ~nb_buffers ~nb_ids:0 in
-    let ({q; b; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let b = wires.(1) in
     let res =
       Evaluations.mul_c ~res:tmps.(0) ~evaluations:[q; b] ~powers:[1; 2] ()
     in
@@ -440,17 +265,18 @@ module X2B : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let ({q; b; _} : answers) =
+    let ({q; wires; _} : answers) =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
+    let b = wires.(1) in
     let res = Scalar.(q * square b) in
     SMap.singleton (prefix @@ arith ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(right, 3); (q_label, 3)]
+  let polynomials_degree = SMap.of_list [(wire_name 1, 3); (q_label, 3)]
 
-  let cs ~q:qx2b ~a:_ ~b ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qx2b ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let b = wires.(1) in
     map_singleton
       (let* b2 = Num.square b in
        Num.mul qx2b b2)
@@ -475,20 +301,20 @@ module X5A : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     Scalar.[q * pow a (Z.of_int 5)]
 
-  let blinds = SMap.singleton left [|1; 0|]
+  let blinds = SMap.singleton (wire_name 0) [|1; 0|]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ :
       prover_identities =
    fun evaluations ->
     let tmps, _ = get_buffers ~nb_buffers ~nb_ids:0 in
-    let ({q; a; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let a = wires.(0) in
     let res =
       Evaluations.mul_c ~res:tmps.(0) ~evaluations:[q; a] ~powers:[1; 5] ()
     in
@@ -497,20 +323,21 @@ module X5A : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let ({q; a; _} : answers) =
+    let ({q; wires; _} : answers) =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
+    let a = wires.(0) in
     let a2 = Scalar.mul a a in
     let a4 = Scalar.mul a2 a2 in
     let a5 = Scalar.mul a4 a in
     let res = Scalar.mul q a5 in
     SMap.singleton (prefix @@ arith ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(left, 6); (q_label, 6)]
+  let polynomials_degree = SMap.of_list [(wire_name 0, 6); (q_label, 6)]
 
-  let cs ~q:qx5 ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qx5 ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let a = wires.(0) in
     map_singleton
       (let* a5 = Num.pow5 a in
        Num.mul qx5 a5)
@@ -535,20 +362,20 @@ module X5C : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:_ ~b:_ ~c ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let c = wires.(2) in
     Scalar.[q * pow c (Z.of_int 5)]
 
-  let blinds = SMap.singleton output [|1; 0|]
+  let blinds = SMap.singleton (wire_name 2) [|1; 0|]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ :
       prover_identities =
    fun evaluations ->
     let tmps, _ = get_buffers ~nb_buffers ~nb_ids:0 in
-    let ({q; c; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let c = wires.(2) in
     let res =
       Evaluations.mul_c ~res:tmps.(0) ~evaluations:[q; c] ~powers:[1; 5] ()
     in
@@ -557,20 +384,21 @@ module X5C : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let ({q; c; _} : answers) =
+    let ({q; wires; _} : answers) =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
+    let c = wires.(2) in
     let c2 = Scalar.mul c c in
     let c4 = Scalar.mul c2 c2 in
     let c5 = Scalar.mul c4 c in
     let res = Scalar.mul q c5 in
     SMap.singleton (prefix @@ arith ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(output, 6); (q_label, 6)]
+  let polynomials_degree = SMap.of_list [(wire_name 2, 6); (q_label, 6)]
 
-  let cs ~q:qx5c ~a:_ ~b:_ ~c ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qx5c ~wires ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
+    let c = wires.(2) in
     map_singleton
       (let* c5 = Num.pow5 c in
        Num.mul qx5c c5)
@@ -597,8 +425,7 @@ module Public : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q:_ ~wires:_ ~wires_g:_ ?precomputed_advice:_ () =
     Scalar.[zero]
 
   let compute_PI ~start public_inputs domain evaluations =
@@ -659,8 +486,7 @@ module Public : Base_sig = struct
   let polynomials_degree = SMap.empty
 
   (* this function will not be used *)
-  let cs ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:_ ~wires:_ ~wires_g:_ ?precomputed_advice:_ () =
     let open L in
     ret []
 end
@@ -690,8 +516,7 @@ end) : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q:_ ~wires:_ ~wires_g:_ ?precomputed_advice:_ () =
     Scalar.[zero]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ :
@@ -719,6 +544,7 @@ end) : Base_sig = struct
   let polynomials_degree = SMap.of_list [(com_label, 2); (q_label, 2)]
 
   (* TODO: implement *)
-  let cs ~q:_ ~a:_ ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_ =
-    failwith "input commitments in aPlonK proofs are not supported yet"
+  let cs ~q:_ ~wires:_ ~wires_g:_ =
+    failwith
+      "input commitments in meta-verification proofs are not supported yet"
 end

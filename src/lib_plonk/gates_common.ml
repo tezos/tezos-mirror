@@ -35,42 +35,15 @@ let mone = Scalar.negate one
 
 let two = Scalar.add one one
 
-let left = "a"
-
-let right = "b"
-
-let output = "c"
-
-let top = "d"
-
-let bottom = "e"
+let wire_name = Plompiler.Csir.wire_name
 
 let com_label = "com"
 
 let tmp_buffers = ref [||]
 
-type answers = {
-  q : Poly.scalar;
-  a : Poly.scalar;
-  b : Poly.scalar;
-  c : Poly.scalar;
-  d : Poly.scalar;
-  e : Poly.scalar;
-  ag : Poly.scalar;
-  bg : Poly.scalar;
-  cg : Poly.scalar;
-  dg : Poly.scalar;
-  eg : Poly.scalar;
-}
+type answers = {q : Scalar.t; wires : Scalar.t array; wires_g : Scalar.t array}
 
-type witness = {
-  q : Evaluations.t;
-  a : Evaluations.t;
-  b : Evaluations.t;
-  c : Evaluations.t;
-  d : Evaluations.t;
-  e : Evaluations.t;
-}
+type witness = {q : Evaluations.t; wires : Evaluations.t array}
 
 let get_buffers ~nb_buffers ~nb_ids =
   let precomputed = !tmp_buffers in
@@ -88,6 +61,7 @@ let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
   let dummy = Scalar.zero in
   let answer = get_answer answers in
   let answer_wire w =
+    let w = wire_name w in
     match SMap.find_opt w blinds with
     | Some array ->
         assert (Array.length array = 2) ;
@@ -98,16 +72,15 @@ let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
     | None -> (dummy, dummy)
   in
   let q = prefix_common q_label |> answer X in
-  let a, ag = answer_wire left in
-  let b, bg = answer_wire right in
-  let c, cg = answer_wire output in
-  let d, dg = answer_wire top in
-  let e, eg = answer_wire bottom in
-  {q; a; b; c; d; e; ag; bg; cg; dg; eg}
+  let wires, wires_g =
+    Array.init Plompiler.Csir.nb_wires_arch answer_wire |> Array.split
+  in
+  {q; wires; wires_g}
 
 let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
   let dummy = Evaluations.zero in
   let find_wire w =
+    let w = wire_name w in
     match SMap.find_opt w blinds with
     | Some array ->
         assert (Array.length array = 2) ;
@@ -117,11 +90,7 @@ let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
   in
   {
     q = Evaluations.find_evaluation evaluations (prefix_common q_label);
-    a = find_wire left;
-    b = find_wire right;
-    c = find_wire output;
-    d = find_wire top;
-    e = find_wire bottom;
+    wires = Array.init Plompiler.Csir.nb_wires_arch find_wire;
   }
 
 (* Block names to merge identities within, if identities are independent, use q_label instead.
@@ -158,16 +127,8 @@ module type Base_sig = sig
 
   val equations :
     q:Scalar.t ->
-    a:Scalar.t ->
-    b:Scalar.t ->
-    c:Scalar.t ->
-    d:Scalar.t ->
-    e:Scalar.t ->
-    ag:Scalar.t ->
-    bg:Scalar.t ->
-    cg:Scalar.t ->
-    dg:Scalar.t ->
-    eg:Scalar.t ->
+    wires:Scalar.t array ->
+    wires_g:Scalar.t array ->
     ?precomputed_advice:Scalar.t SMap.t ->
     unit ->
     Scalar.t list
@@ -194,16 +155,8 @@ module type Base_sig = sig
 
   val cs :
     q:L.scalar L.repr ->
-    a:L.scalar L.repr ->
-    b:L.scalar L.repr ->
-    c:L.scalar L.repr ->
-    d:L.scalar L.repr ->
-    e:L.scalar L.repr ->
-    ag:L.scalar L.repr ->
-    bg:L.scalar L.repr ->
-    cg:L.scalar L.repr ->
-    dg:L.scalar L.repr ->
-    eg:L.scalar L.repr ->
+    wires:L.scalar L.repr array ->
+    wires_g:L.scalar L.repr array ->
     ?precomputed_advice:L.scalar L.repr SMap.t ->
     unit ->
     L.scalar L.repr list L.t

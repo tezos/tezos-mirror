@@ -51,19 +51,27 @@ module AddWeierstrass : Base_sig = struct
 
   let gx_composition = true
 
-  let equations ~q ~a ~b ~c ~d:_ ~e:_ ~ag ~bg ~cg ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
     if Scalar.is_zero q then Scalar.[zero; zero]
     else if not (Scalar.(is_one) q) then
       failwith "AddWeierstrass.equations : qecc_ws_add must be zero or one."
     else
+      let a = wires.(0) in
+      let b = wires.(1) in
+      let c = wires.(2) in
+      let ag = wires_g.(0) in
+      let bg = wires_g.(1) in
+      let cg = wires_g.(2) in
       let lambda = Scalar.(div_exn (sub bg ag) (sub b a)) in
       let x = Scalar.(sub (lambda * lambda) (a + b)) in
       let y = Scalar.(sub (lambda * sub a x) ag) in
       Scalar.[sub x c; sub y cg]
 
   let blinds =
-    SMap.of_list [(right, [|1; 1|]); (left, [|1; 1|]); (output, [|1; 1|])]
+    SMap.of_list
+      [
+        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
+      ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
@@ -75,10 +83,12 @@ module AddWeierstrass : Base_sig = struct
        (c + b + a)·(b - a)^2 - (bg - ag)^2 = 0 *)
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; b; c; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let a = wires.(0) in
+    let b = wires.(1) in
+    let c = wires.(2) in
     (* tmps.(2) <- (b - a) *)
     let b_minus_a =
       Evaluations.linear_c
@@ -164,9 +174,11 @@ module AddWeierstrass : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let {q; a; b; c; ag; bg; cg; _} =
+    let {q; wires; wires_g} =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
+    let a, b, c = (wires.(0), wires.(1), wires.(2)) in
+    let ag, bg, cg = (wires_g.(0), wires_g.(1), wires_g.(2)) in
     let num_lambda = Scalar.(sub bg ag) in
     let den_lambda = Scalar.(sub b a) in
     (* identity on new point's x coordinate:
@@ -190,10 +202,16 @@ module AddWeierstrass : Base_sig = struct
       ]
 
   let polynomials_degree =
-    SMap.of_list [(left, 4); (right, 4); (output, 4); (q_label, 4)]
+    SMap.of_list
+      [(wire_name 0, 4); (wire_name 1, 4); (wire_name 2, 4); (q_label, 4)]
 
-  let cs ~q:qec ~a ~b ~c ~d:_ ~e:_ ~ag ~bg ~cg ~dg:_ ~eg:_ ?precomputed_advice:_
-      () =
+  let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
+    let a = wires.(0) in
+    let b = wires.(1) in
+    let c = wires.(2) in
+    let ag = wires_g.(0) in
+    let bg = wires_g.(1) in
+    let cg = wires_g.(2) in
     let open L in
     let open Num in
     let sub = add ~qr:mone in
@@ -243,12 +261,17 @@ module AddEdwards : Base_sig = struct
     Scalar.of_string
       "19257038036680949359750312669786877991949435402254120286184196891950884077233"
 
-  let equations ~q ~a:px ~b:qx ~c:rx ~d:_ ~e:_ ~ag:py ~bg:qy ~cg:ry ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
     if Scalar.is_zero q then Scalar.[zero; zero]
     else if not (Scalar.is_one q) then
       failwith "AddEdwards.equations : qecc_ed_add must be zero or one."
     else
+      let px = wires.(0) in
+      let py = wires_g.(0) in
+      let qx = wires.(1) in
+      let qy = wires_g.(1) in
+      let rx = wires.(2) in
+      let ry = wires_g.(2) in
       let pxqy = Scalar.(px * qy) in
       let qxpy = Scalar.(qx * py) in
       let pyqy = Scalar.(py * qy) in
@@ -262,18 +285,23 @@ module AddEdwards : Base_sig = struct
       Scalar.[rx' + negate rx; ry' + negate ry]
 
   let blinds =
-    SMap.of_list [(right, [|1; 1|]); (left, [|1; 1|]); (output, [|1; 1|])]
+    SMap.of_list
+      [
+        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
+      ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; b; c; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-    let s, p, q, r = (q, a, b, c) in
-
+    let s = q in
+    let p = wires.(0) in
+    let q = wires.(1) in
+    let r = wires.(2) in
     (* identity on new point's x coordinate:
        q · [r_x · (1 + Params_d · p_x · q_x · p_y · q_y) - (q_x · q_y + p_y · q_x)] = 0 *)
     (* tmps.(0) <- p_x · q_y *)
@@ -374,10 +402,12 @@ module AddEdwards : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let {q; a; b; c; ag; bg; cg; _} =
+    let {q; wires; wires_g} =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
-    let px, py, qx, qy, rx, ry = (a, ag, b, bg, c, cg) in
+    let px, py = (wires.(0), wires_g.(0)) in
+    let qx, qy = (wires.(1), wires_g.(1)) in
+    let rx, ry = (wires.(2), wires_g.(2)) in
     let pxqx = Scalar.mul px qx in
     let pyqy = Scalar.mul py qy in
     let den_common = Scalar.(param_d * pxqx * pyqy) in
@@ -402,10 +432,16 @@ module AddEdwards : Base_sig = struct
       ]
 
   let polynomials_degree =
-    SMap.of_list [(left, 6); (right, 6); (output, 6); (q_label, 6)]
+    SMap.of_list
+      [(wire_name 0, 6); (wire_name 1, 6); (wire_name 2, 6); (q_label, 6)]
 
-  let cs ~q:qec ~a:px ~b:qx ~c:rx ~d:_ ~e:_ ~ag:py ~bg:qy ~cg:ry ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
+    let px = wires.(0) in
+    let py = wires_g.(0) in
+    let qx = wires.(1) in
+    let qy = wires_g.(1) in
+    let rx = wires.(2) in
+    let ry = wires_g.(2) in
     let open L in
     let open Num in
     let sub = add ~qr:mone in
@@ -477,10 +513,16 @@ module ConditionalAddEdwards : Base_sig = struct
         r_x =     (p_x * (b * q_y + 1 - b) + b * q_x * p_y) / (1 + b * d * p_x * q_x * p_y * q_y)
         r_y = (p_y * (b * q_y + 1 - b) - b * a * p_x * q_x) / (1 - b * d * p_x * q_x * p_y * q_y)
   *)
-  let equations ~q ~a:bit ~b:qx ~c:qy ~d:px ~e:py ~ag:_ ~bg:_ ~cg:_ ~dg:rx
-      ~eg:ry ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g ?precomputed_advice:_ () =
     if Scalar.is_zero q then Scalar.[zero; zero]
     else
+      let bit = wires.(0) in
+      let qx = wires.(1) in
+      let qy = wires.(2) in
+      let px = wires.(3) in
+      let py = wires.(4) in
+      let rx = wires_g.(3) in
+      let ry = wires_g.(4) in
       let qx' = Scalar.(bit * qx) in
       let qy' = Scalar.((bit * qy) + sub one bit) in
       let pxqy' = Scalar.(px * qy') in
@@ -498,21 +540,24 @@ module ConditionalAddEdwards : Base_sig = struct
   let blinds =
     SMap.of_list
       [
-        (left, [|1; 0|]);
-        (right, [|1; 0|]);
-        (output, [|1; 0|]);
-        (top, [|1; 1|]);
-        (bottom, [|1; 1|]);
+        (wire_name 0, [|1; 0|]);
+        (wire_name 1, [|1; 0|]);
+        (wire_name 2, [|1; 0|]);
+        (wire_name 3, [|1; 1|]);
+        (wire_name 4, [|1; 1|]);
       ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain evaluations =
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; b; c; d; e} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-    let b, qx, qy, px, py, rx, ry = (a, b, c, d, e, d, e) in
-
+    let b = wires.(0) in
+    let qx, qy = (wires.(1), wires.(2)) in
+    let px, py = (wires.(3), wires.(4)) in
+    (* (rx, ry) will be evaluated on GX *)
+    let rx, ry = (px, py) in
     (* identity on new point's x coordinate:
        q · [r_x · (1 + d · b · p_x · q_x · p_y · q_y)
             - (b · p_x · q_y + p_x - b · p_x + b · q_x · p_y) = 0] *)
@@ -637,10 +682,13 @@ module ConditionalAddEdwards : Base_sig = struct
 
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ _ answers =
-    let {q; a; b; c; d; e; dg; eg; _} =
+    let {q; wires; wires_g} =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
-    let b, qx, qy, px, py, rx, ry = (a, b, c, d, e, dg, eg) in
+    let b = wires.(0) in
+    let qx, qy = (wires.(1), wires.(2)) in
+    let px, py = (wires.(3), wires.(4)) in
+    let rx, ry = (wires_g.(3), wires_g.(4)) in
     let bpxqy = Scalar.(b * px * qy) in
     let pyqx = Scalar.(py * qx) in
     let den_common = Scalar.(param_d * bpxqy * pyqx) in
@@ -670,10 +718,23 @@ module ConditionalAddEdwards : Base_sig = struct
 
   let polynomials_degree =
     SMap.of_list
-      [(left, 7); (right, 7); (output, 7); (top, 7); (bottom, 7); (q_label, 7)]
+      [
+        (wire_name 0, 7);
+        (wire_name 1, 7);
+        (wire_name 2, 7);
+        (wire_name 3, 7);
+        (wire_name 4, 7);
+        (q_label, 7);
+      ]
 
-  let cs ~q:qec ~a:bit ~b:qx ~c:qy ~d:px ~e:py ~ag:_ ~bg:_ ~cg:_ ~dg:rx ~eg:ry
-      ?precomputed_advice:_ () =
+  let cs ~q:qec ~wires ~wires_g ?precomputed_advice:_ () =
+    let bit = wires.(0) in
+    let qx = wires.(1) in
+    let qy = wires.(2) in
+    let px = wires.(3) in
+    let py = wires.(4) in
+    let rx = wires_g.(3) in
+    let ry = wires_g.(4) in
     let open L in
     let open Num in
     let sub x y = add ~qr:mone x y in

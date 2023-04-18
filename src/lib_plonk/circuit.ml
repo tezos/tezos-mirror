@@ -45,30 +45,17 @@ let gates_to_string m =
 
 module Circuit : sig
   type t = private {
-    wires : int array SMap.t;
+    wires : int array array;
     gates : Scalar.t array SMap.t;
     tables : Scalar.t array list list;
     public_input_size : int;
     input_com_sizes : int list;
     circuit_size : int;
-    nb_wires : int;
     table_size : int;
     nb_lookups : int;
     ultra : bool;
     range_checks : int list * int;
   }
-
-  val make_wires :
-    a:int list ->
-    b:int list ->
-    c:int list ->
-    d:int list ->
-    e:int list ->
-    ?f:int list ->
-    ?g:int list ->
-    ?h:int list ->
-    unit ->
-    int list SMap.t
 
   val make_gates :
     ?qc:Scalar.t list ->
@@ -99,7 +86,7 @@ module Circuit : sig
     Scalar.t list SMap.t
 
   val make :
-    wires:int list SMap.t ->
+    wires:int list array ->
     gates:Scalar.t list SMap.t ->
     ?tables:Scalar.t array list list ->
     public_input_size:int ->
@@ -125,13 +112,12 @@ module Circuit : sig
     t
 end = struct
   type t = {
-    wires : int array SMap.t;
+    wires : int array array;
     gates : Scalar.t array SMap.t;
     tables : Scalar.t array list list;
     public_input_size : int;
     input_com_sizes : int list;
     circuit_size : int;
-    nb_wires : int;
     table_size : int;
     nb_lookups : int;
     ultra : bool;
@@ -139,14 +125,6 @@ end = struct
   }
 
   let get_selectors circuit = SMap.keys circuit.gates
-
-  let make_wires ~a ~b ~c ~d ~e ?(f = []) ?(g = []) ?(h = []) () =
-    (* Filtering and mapping selectors with labels. *)
-    let wire_map =
-      SMap.of_list [("a", a); ("b", b); ("c", c); ("d", d); ("e", e)]
-    in
-    let add_map map (label, l) = if l = [] then map else SMap.add label l map in
-    List.fold_left add_map wire_map [("f", f); ("g", g); ("h", h)]
 
   let make_gates ?(qc = []) ?(ql = []) ?(qr = []) ?(qo = []) ?(qd = [])
       ?(qe = []) ?(qlg = []) ?(qrg = []) ?(qog = []) ?(qdg = []) ?(qeg = [])
@@ -193,47 +171,35 @@ end = struct
     in
     List.fold_left add_map base (gate_list @ SMap.bindings precomputed_advice)
 
-  let verify_name name i =
-    assert (i < 26) ;
-    let alphabet = "abcdefghijklmnopqrstuvwxyz" in
-    let letter_i = alphabet.[i] in
-    let msg =
-      Printf.sprintf
-        "%d-th wire must be named '%c' (current name is '%s')."
-        i
-        letter_i
-        name
-    in
-    if String.length name <> 1 then raise (Invalid_argument msg)
-    else if Char.equal name.[0] letter_i then ()
-    else raise (Invalid_argument msg)
-
   (* If public_input_size is greater than 0, selector ql will be added if not
      already present.
      Wires and gates cannot be empty and must all have the same length.
   *)
   let make ~wires ~gates ?(tables = []) ~public_input_size
       ?(input_com_sizes = []) ?(range_checks = ([], -1)) () =
-    if SMap.is_empty wires then
+    if Array.length wires = 0 then
       raise @@ Invalid_argument "Make Circuit: empty wires." ;
     if SMap.is_empty gates then
       raise @@ Invalid_argument "Make Circuit: empty gates." ;
-    let circuit_size = List.length (snd (SMap.choose wires)) in
+    (* We infer the circuit size from the length of the first wire *)
+    let circuit_size = List.length wires.(0) in
     if Int.equal circuit_size 0 then
       raise (Invalid_argument "Make Circuit: empty circuit.") ;
-    let wires = SMap.map Array.of_list wires in
-
-    (* Check that all wires have same size, and each wire i is named
-       as the i-th alphabet’s letter. *)
-    let nb_wires = SMap.cardinal wires in
-    let () =
-      List.iteri
-        (fun i (name, l) ->
-          verify_name name i ;
-          if Array.length l = circuit_size then ()
-          else raise (Invalid_argument "Make Circuit: different length wires."))
-        (SMap.bindings wires)
+    let wires = Array.map Array.of_list wires in
+    let nb_wires = Array.length wires in
+    (* Check that all wires have same size *)
+    Array.iter
+      (fun l ->
+        if Array.length l <> circuit_size then
+          raise (Invalid_argument "Make Circuit: different length wires."))
+      wires ;
+    (* Add missing wires if omitted to have exactly [Csir.nb_wires_arch] *)
+    let unused_wires =
+      Array.init
+        (Plompiler.Csir.nb_wires_arch - Array.length wires)
+        (fun _ -> Array.init circuit_size (Fun.const 0))
     in
+    let wires = Array.concat [wires; unused_wires] in
     (* Filter out null gates *)
     let gates =
       SMap.filter_map
@@ -327,14 +293,13 @@ end = struct
       tables;
       public_input_size;
       input_com_sizes;
-      nb_wires;
       table_size;
       nb_lookups;
       ultra;
       range_checks;
     }
 
-  let get_nb_of_constraints cs = Array.length (snd (SMap.choose cs.wires))
+  let get_nb_of_constraints cs = Array.length cs.wires.(0)
   (* ////////////////////////////////////////////////////////// *)
 
   let sat_gate identities gate trace tables =
@@ -376,6 +341,8 @@ end = struct
                   (* Retrieving the selector's identity name and equations *)
                   let s_id_name, _ = Custom_gates.get_ids s_name in
                   let s_ids = SMap.find s_id_name id_map in
+                  let wires = [|a; b; c; d; e|] in
+                  let wires_g = [|ag; bg; cg; dg; eg|] in
                   let precomputed_advice = SMap.of_list ci.precomputed_advice in
                   (* Updating the identities with the equations' output *)
                   List.iteri
@@ -383,16 +350,8 @@ end = struct
                     ((Custom_gates.get_eqs s_name)
                        ~precomputed_advice
                        ~q
-                       ~a
-                       ~b
-                       ~c
-                       ~d
-                       ~e
-                       ~ag
-                       ~bg
-                       ~cg
-                       ~dg
-                       ~eg
+                       ~wires
+                       ~wires_g
                        ()) ;
                   SMap.add s_id_name s_ids id_map)
             identities
@@ -441,12 +400,9 @@ end = struct
     let open CS in
     let cs = List.rev Array.(to_list @@ concat cs) in
     assert (cs <> []) ;
-    let add_wires a b c d e wires =
-      let add_wire key w wires =
-        SMap.update key (fun l -> Some (w :: Option.get l)) wires
-      in
-      wires |> add_wire "a" a |> add_wire "b" b |> add_wire "c" c
-      |> add_wire "d" d |> add_wire "e" e
+    let add_wires ws wires =
+      if Array.length wires = 0 then Array.map (fun w -> [w]) ws
+      else Array.map2 (fun w l -> w :: l) ws wires
     in
     let add_selectors sels map pad =
       (* Add to the map all new selectors with the coresponding padding
@@ -475,20 +431,15 @@ end = struct
         map
         map
     in
-
-    let wires_map =
-      SMap.of_list [("a", []); ("b", []); ("c", []); ("d", []); ("e", [])]
-    in
-
     List.fold_left
-      (fun (wires_map, selectors_map, advice_map, pad)
+      (fun (wires, selectors_map, advice_map, pad)
            {a; b; c; d; e; sels; precomputed_advice; label} ->
         ignore label ;
-        let wires_map = add_wires a b c d e wires_map in
+        let wires = add_wires [|a; b; c; d; e|] wires in
         let selectors_map = add_selectors sels selectors_map pad in
         let advice_map = add_selectors precomputed_advice advice_map pad in
-        (wires_map, selectors_map, advice_map, pad + 1))
-      SMap.(wires_map, empty, empty, 0)
+        (wires, selectors_map, advice_map, pad + 1))
+      SMap.([||], empty, empty, 0)
       cs
     |> fun (wires, selectors, advice, _) ->
     let gates = SMap.union_disjoint selectors advice in

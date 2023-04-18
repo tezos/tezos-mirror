@@ -25,6 +25,16 @@
 
 let nb_wires_arch = 5
 
+let wire_name i = "w_" ^ string_of_int i
+
+let linear_selector_name = function
+  | 0 -> "ql"
+  | 1 -> "qr"
+  | 2 -> "qo"
+  | 3 -> "qd"
+  | 4 -> "qe"
+  | n -> "q_w" ^ string_of_int n
+
 module Scalar = struct
   include Bls12_381.Fr
 

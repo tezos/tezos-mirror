@@ -166,8 +166,13 @@ module AnemoiDouble : Base_sig = struct
     in
     (qid1, qid2)
 
-  let equations ~q ~a:_ ~b:x1 ~c:y1 ~d:x0 ~e:y0 ~ag:_ ~bg:_ ~cg:_ ~dg:x2 ~eg:y2
-      ?(precomputed_advice = SMap.empty) () =
+  let equations ~q ~wires ~wires_g ?(precomputed_advice = SMap.empty) () =
+    let x1 = wires.(1) in
+    let y1 = wires.(2) in
+    let x0 = wires.(3) in
+    let y0 = wires.(4) in
+    let x2 = wires_g.(3) in
+    let y2 = wires_g.(4) in
     if Scalar.is_zero q then Scalar.[zero; zero; zero; zero]
     else
       let kx1 = SMap.find kx1_label precomputed_advice in
@@ -181,11 +186,11 @@ module AnemoiDouble : Base_sig = struct
   let blinds =
     SMap.of_list
       [
-        (left, [|0; 0|]);
-        (right, [|1; 0|]);
-        (output, [|1; 0|]);
-        (top, [|1; 1|]);
-        (bottom, [|1; 1|]);
+        (wire_name 0, [|0; 0|]);
+        (wire_name 1, [|1; 0|]);
+        (wire_name 2, [|1; 0|]);
+        (wire_name 3, [|1; 1|]);
+        (wire_name 4, [|1; 1|]);
       ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
@@ -193,11 +198,14 @@ module AnemoiDouble : Base_sig = struct
    fun evaluations ->
     let domain_size = Domain.length domain in
     let buffers, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; b; c; d; e; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-    let selector, x1, y1, x0, y0, x2, y2 = (q, b, c, d, e, d, e) in
-
+    let selector = q in
+    let x1, y1 = (wires.(1), wires.(2)) in
+    let x0, y0 = (wires.(3), wires.(4)) in
+    (* (x2, y2) will be evaluated on GX *)
+    let x2, y2 = (x0, y0) in
     let kx1, ky1, kx2, ky2 =
       ( Evaluations.find_evaluation evaluations (prefix_common kx1_label),
         Evaluations.find_evaluation evaluations (prefix_common ky1_label),
@@ -240,11 +248,15 @@ module AnemoiDouble : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let {q; b; c; d; e; dg; eg; _} =
+    let {q; wires; wires_g} =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
-    let x0, y0, x1, y1, x2, y2 = (d, e, b, c, dg, eg) in
-
+    let x0 = wires.(3) in
+    let y0 = wires.(4) in
+    let x1 = wires.(1) in
+    let y1 = wires.(2) in
+    let x2 = wires_g.(3) in
+    let y2 = wires_g.(4) in
     let kx1 = get_answer answers X @@ prefix_common kx1_label in
     let ky1 = get_answer answers X @@ prefix_common ky1_label in
     let kx2 = get_answer answers X @@ prefix_common kx2_label in
@@ -256,16 +268,8 @@ module AnemoiDouble : Base_sig = struct
     let identities =
       equations
         ~q
-        ~a:0
-        ~b:x1
-        ~c:y1
-        ~d:x0
-        ~e:y0
-        ~ag:0
-        ~bg:0
-        ~cg:0
-        ~dg:x2
-        ~eg:y2
+        ~wires:Scalar.[|zero; x1; y1; x0; y0|]
+        ~wires_g:Scalar.[|zero; zero; zero; x2; y2|]
         ~precomputed_advice
         ()
       |> List.map (Scalar.mul q)
@@ -276,10 +280,22 @@ module AnemoiDouble : Base_sig = struct
          identities
 
   let polynomials_degree =
-    SMap.of_list [(right, 6); (output, 6); (top, 6); (bottom, 6); (q_label, 6)]
+    SMap.of_list
+      [
+        (wire_name 1, 6);
+        (wire_name 2, 6);
+        (wire_name 3, 6);
+        (wire_name 4, 6);
+        (q_label, 6);
+      ]
 
-  let cs ~q ~a:_ ~b:x1 ~c:y1 ~d:x0 ~e:y0 ~ag:_ ~bg:_ ~cg:_ ~dg:x2 ~eg:y2
-      ?(precomputed_advice = SMap.empty) () =
+  let cs ~q ~wires ~wires_g ?(precomputed_advice = SMap.empty) () =
+    let x1 = wires.(1) in
+    let y1 = wires.(2) in
+    let x0 = wires.(3) in
+    let y0 = wires.(4) in
+    let x2 = wires_g.(3) in
+    let y2 = wires_g.(4) in
     let open L in
     let kx1 = SMap.find kx1_label precomputed_advice in
     let ky1 = SMap.find ky1_label precomputed_advice in

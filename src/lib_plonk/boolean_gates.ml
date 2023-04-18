@@ -48,18 +48,18 @@ module BoolCheck : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     Scalar.[q * sub one a * a]
 
-  let blinds = SMap.of_list [(left, [|1; 0|])]
+  let blinds = SMap.of_list [(wire_name 0, [|1; 0|])]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; _} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-
+    let a = wires.(0) in
     let one_minus_a =
       Evaluations.linear_c
         ~res:tmps.(0)
@@ -76,14 +76,14 @@ module BoolCheck : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ _ answers =
     let q = get_answer answers X @@ prefix_common q_label in
-    let a = get_answer answers X @@ prefix left in
+    let a = get_answer answers X @@ prefix (wire_name 0) in
     let res = Scalar.(q * a * sub one a) in
     SMap.singleton (prefix @@ q_label ^ ".0") res
 
-  let polynomials_degree = SMap.of_list [(left, 3); (q_label, 3)]
+  let polynomials_degree = SMap.of_list [(wire_name 0, 3); (q_label, 3)]
 
-  let cs ~q ~a ~b:_ ~c:_ ~d:_ ~e:_ ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let a = wires.(0) in
     let open L in
     map_singleton
       (let* tmp = Num.mul q a in
@@ -114,8 +114,12 @@ module CondSwap : Base_sig = struct
 
   let gx_composition = false
 
-  let equations ~q ~a:bit ~b ~c ~d ~e ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let equations ~q ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let bit = wires.(0) in
+    let b = wires.(1) in
+    let c = wires.(2) in
+    let d = wires.(3) in
+    let e = wires.(4) in
     let bbit = Scalar.(sub one bit) in
     Scalar.
       [q * ((bbit * b) + sub (bit * c) d); q * ((bit * b) + sub (bbit * c) e)]
@@ -123,20 +127,21 @@ module CondSwap : Base_sig = struct
   let blinds =
     SMap.of_list
       [
-        (left, [|1; 0|]);
-        (right, [|1; 0|]);
-        (output, [|1; 0|]);
-        (top, [|1; 0|]);
-        (bottom, [|1; 0|]);
+        (wire_name 0, [|1; 0|]);
+        (wire_name 1, [|1; 0|]);
+        (wire_name 2, [|1; 0|]);
+        (wire_name 3, [|1; 0|]);
+        (wire_name 4, [|1; 0|]);
       ]
 
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
-    let ({q; a; b; c; d; e} : witness) =
+    let ({q; wires} : witness) =
       get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
     in
-    let b, x, y, u, v = (a, b, c, d, e) in
-
+    let b = wires.(0) in
+    let x, y = (wires.(1), wires.(2)) in
+    let u, v = (wires.(3), wires.(4)) in
     let bb =
       Evaluations.linear_c
         ~res:tmps.(0)
@@ -173,10 +178,12 @@ module CondSwap : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
-    let ({q; a; b; c; d; e; _} : answers) =
+    let ({q; wires; _} : answers) =
       get_answers ~q_label ~blinds ~prefix ~prefix_common answers
     in
-    let bit, x, y, u, v = (a, b, c, d, e) in
+    let bit = wires.(0) in
+    let x, y = (wires.(1), wires.(2)) in
+    let u, v = (wires.(3), wires.(4)) in
     let bbit = Scalar.(sub one bit) in
     (* 0 = q · [(1 - bit) · x + bit       · y - u] *)
     let id1 = Scalar.(q * ((bbit * x) + sub (bit * y) u)) in
@@ -187,10 +194,21 @@ module CondSwap : Base_sig = struct
 
   let polynomials_degree =
     SMap.of_list
-      [(q_label, 3); (left, 3); (right, 3); (output, 3); (top, 3); (bottom, 3)]
+      [
+        (q_label, 3);
+        (wire_name 0, 3);
+        (wire_name 1, 3);
+        (wire_name 2, 3);
+        (wire_name 3, 3);
+        (wire_name 4, 3);
+      ]
 
-  let cs ~q:qbool ~a:bit ~b:x ~c:y ~d:u ~e:v ~ag:_ ~bg:_ ~cg:_ ~dg:_ ~eg:_
-      ?precomputed_advice:_ () =
+  let cs ~q:qbool ~wires ~wires_g:_ ?precomputed_advice:_ () =
+    let bit = wires.(0) in
+    let x = wires.(1) in
+    let y = wires.(2) in
+    let u = wires.(3) in
+    let v = wires.(4) in
     let open L in
     let open Num in
     let* bit_times_x = mul bit x in

@@ -43,16 +43,8 @@ module type S = sig
   val get_eqs :
     string ->
     q:Scalar.t ->
-    a:Scalar.t ->
-    b:Scalar.t ->
-    c:Scalar.t ->
-    d:Scalar.t ->
-    e:Scalar.t ->
-    ag:Scalar.t ->
-    bg:Scalar.t ->
-    cg:Scalar.t ->
-    dg:Scalar.t ->
-    eg:Scalar.t ->
+    wires:Scalar.t array ->
+    wires_g:Scalar.t array ->
     ?precomputed_advice:Scalar.t SMap.t ->
     unit ->
     Scalar.t list
@@ -62,16 +54,8 @@ module type S = sig
   val get_cs :
     string ->
     q:L.scalar L.repr ->
-    a:L.scalar L.repr ->
-    b:L.scalar L.repr ->
-    c:L.scalar L.repr ->
-    d:L.scalar L.repr ->
-    e:L.scalar L.repr ->
-    ag:L.scalar L.repr ->
-    bg:L.scalar L.repr ->
-    cg:L.scalar L.repr ->
-    dg:L.scalar L.repr ->
-    eg:L.scalar L.repr ->
+    wires:L.scalar L.repr array ->
+    wires_g:L.scalar L.repr array ->
     ?precomputed_advice:L.scalar L.repr SMap.t ->
     unit ->
     L.scalar L.repr list L.t
@@ -131,20 +115,14 @@ module Aggregator = struct
     let open Boolean_gates in
     let open Hash_gates in
     let open Ecc_gates in
+    let linear_monomials =
+      let open Plompiler.Csir in
+      List.init nb_wires_arch (fun i -> (linear_selector_name i, i))
+    in
     SMap.of_list
       ([
          (Public.q_label, (module Public : Base_sig));
          (Constant.q_label, (module Constant));
-         (AddLeft.q_label, (module AddLeft));
-         (AddRight.q_label, (module AddRight));
-         (AddOutput.q_label, (module AddOutput));
-         (AddTop.q_label, (module AddTop));
-         (AddBottom.q_label, (module AddBottom));
-         (AddNextLeft.q_label, (module AddNextLeft));
-         (AddNextRight.q_label, (module AddNextRight));
-         (AddNextOutput.q_label, (module AddNextOutput));
-         (AddNextTop.q_label, (module AddNextTop));
-         (AddNextBottom.q_label, (module AddNextBottom));
          (Multiplication.q_label, (module Multiplication));
          (X5A.q_label, (module X5A));
          (X5C.q_label, (module X5C));
@@ -156,6 +134,10 @@ module Aggregator = struct
          (CondSwap.q_label, (module CondSwap));
          (AnemoiDouble.q_label, (module AnemoiDouble));
        ]
+      @ List.map (fun (q, i) -> (q, linear_monomial i q)) linear_monomials
+      @ List.map
+          (fun (q, i) -> (q ^ "g", linear_monomial ~is_next:true i (q ^ "g")))
+          linear_monomials
       @ List.init nb_input_com (fun i ->
             ( "qcom" ^ string_of_int i,
               (module InputCom (struct

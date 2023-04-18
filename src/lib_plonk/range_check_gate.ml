@@ -103,7 +103,7 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let ids_label = "RC_Perm"
 
-  let wire = "a"
+  let wire = "w_0"
 
   type public_parameters = Poly.t SMap.t
 
