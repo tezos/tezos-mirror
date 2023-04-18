@@ -79,24 +79,7 @@ module Parameters :
     | Refute _ -> Refute
 
   let fee_parameter node_ctxt operation =
-    let {
-      Injection.minimal_fees;
-      minimal_nanotez_per_byte;
-      minimal_nanotez_per_gas_unit;
-      force_low_fee;
-      fee_cap;
-      burn_cap;
-    } =
-      Node_context.get_fee_parameter node_ctxt (operation_tag operation)
-    in
-    {
-      minimal_fees = {mutez = Tez.to_mutez minimal_fees};
-      minimal_nanotez_per_byte;
-      minimal_nanotez_per_gas_unit;
-      force_low_fee;
-      fee_cap = {mutez = Tez.to_mutez fee_cap};
-      burn_cap = {mutez = Tez.to_mutez burn_cap};
-    }
+    Node_context.get_fee_parameter node_ctxt (operation_tag operation)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See
